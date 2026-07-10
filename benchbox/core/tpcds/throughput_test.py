@@ -22,6 +22,7 @@ from benchbox.core.connection import DatabaseConnection
 from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
+from benchbox.platforms.base.connection_wrappers import count_query_rows
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -454,15 +455,19 @@ class TPCDSThroughputTest:
 
     def _run_single_stream_query(
         self, connection, query_text: str, query_display_id: str, stream_id: int
-    ) -> dict[str, Any] | None:
+    ) -> tuple[dict[str, Any] | None, int]:
         if hasattr(connection, "set_query_context"):
             connection.set_query_context(query_display_id, stream_id=stream_id)
         cursor = connection.execute(query_text)
-        if hasattr(cursor, "fetchall"):
-            cursor.fetchall()
+        # count_query_rows() reads the adapter-reported count directly (when
+        # available) instead of materializing the result set via fetchall() -
+        # see connection_wrappers.py. Previously this called cursor.fetchall()
+        # and discarded the return value entirely, so TPC-DS result_count was
+        # hardcoded to 0 below regardless of the true result size.
+        row_count = count_query_rows(cursor)
         if hasattr(connection, "commit"):
             connection.commit()
-        return getattr(cursor, "platform_result", None)
+        return getattr(cursor, "platform_result", None), row_count
 
     def _execute_single_query(
         self,
@@ -497,7 +502,9 @@ class TPCDSThroughputTest:
                 query_text = self._get_stream_query_text(query_id, variant, stream_seed, config.scale_factor)
             label = f"Stream_{stream_id}_Position_{position + 1}_Query_{query_display_id}"
             try:
-                platform_result = self._run_single_stream_query(connection, query_text, query_display_id, stream_id)
+                platform_result, row_count = self._run_single_stream_query(
+                    connection, query_text, query_display_id, stream_id
+                )
             finally:
                 with self._capture_lock:
                     self.captured_items.append((label, query_text))
@@ -513,7 +520,7 @@ class TPCDSThroughputTest:
                 {
                     "execution_time_seconds": elapsed_seconds(query_start),
                     "success": True,
-                    "result_count": 0,
+                    "result_count": row_count,
                 }
             )
             stream_result.queries_successful += 1

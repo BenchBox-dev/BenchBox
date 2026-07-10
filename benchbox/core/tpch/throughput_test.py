@@ -21,6 +21,7 @@ from typing import Any, Callable, Optional
 from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
+from benchbox.platforms.base.connection_wrappers import count_query_rows
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -342,7 +343,6 @@ class TPCHThroughputTest:
                             connection.set_query_context(query_id)
 
                         cursor = connection.execute(query_text)
-                        rows = cursor.fetchall() if hasattr(cursor, "fetchall") else []
 
                         # Check for validation failures from platform adapter
                         if hasattr(cursor, "platform_result"):
@@ -367,11 +367,14 @@ class TPCHThroughputTest:
 
                     execution_time = elapsed_seconds(query_start)
 
+                    # count_query_rows() reads the adapter-reported count directly
+                    # (when available) instead of re-materializing the result set
+                    # via fetchall() a second time - see connection_wrappers.py.
                     query_result.update(
                         {
                             "execution_time_seconds": execution_time,
                             "success": True,
-                            "result_count": len(rows),
+                            "result_count": count_query_rows(cursor),
                         }
                     )
 

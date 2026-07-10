@@ -352,6 +352,26 @@ that bypass the throughput test's `run()` pre-generation step
 (`enable_preflight=False`). They are **not** the throughput default, and their
 ordering does not match the official dsqgen permutation.
 
+### GIL / Result-Materialization Note
+
+For embedded engines (DuckDB, SQLite, DataFusion, ...) that release the GIL
+during native query execution but not while converting result rows into
+Python objects, fetching a query's full result set (`cursor.fetchall()`)
+re-acquires the GIL for the duration of that conversion. Every concurrent
+stream that materializes a result at the same time serializes on this step,
+so larger result sets and higher stream counts inflate
+`execution_time_seconds` (and therefore depress `Throughput@Size`)
+independently of the engine's actual query-execution concurrency - an
+artifact of Python result handling, not of the platform under test.
+`benchbox/core/tpcds/throughput_test.py` avoids forcing this materialization
+to compute `result_count`: it reads the platform adapter's already-computed
+row count directly
+(`benchbox.platforms.base.connection_wrappers.count_query_rows`) instead of
+calling `fetchall()` a second time and discarding the rows. If you build a
+custom harness that calls `fetchall()` per stream to inspect or log results,
+be aware that under this GIL constraint doing so measures Python object
+materialization throughput as much as it measures the database engine.
+
 ### Maintenance Operations
 
 When the `maintenance` phase is included, BenchBox runs the TPC-DS-prescribed
