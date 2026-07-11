@@ -441,7 +441,8 @@ class PlatformAdapterCursor:
 
     def fetchone(self):
         """Return one row."""
-        return self.rows[0] if self.rows else None
+        rows = self.rows
+        return rows[0] if rows else None
 
     def row_count(self) -> int:
         """Return this cursor's row count without forcing full materialization.

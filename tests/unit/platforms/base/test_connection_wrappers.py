@@ -134,6 +134,25 @@ def test_has_real_rows_access_alone_does_not_warn(caplog):
     assert len(warnings) == 1
 
 
+def test_fetchone_on_placeholder_cursor_warns_once_and_shares_budget_with_fetchall(caplog):
+    # fetchone() routes through the same lazy `rows` property, so it must
+    # trigger the one-time placeholder warning itself - and consume the same
+    # once-per-cursor budget as fetchall(), not a separate one.
+    cursor = PlatformAdapterCursor({"query_id": "q_fetchone", "rows_returned": 2})
+
+    with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        assert cursor.fetchone() == (None,)
+
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+
+    with caplog.at_level(logging.WARNING, logger=_LOGGER_NAME):
+        assert cursor.fetchall() == [(None,), (None,)]
+
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1  # still exactly one - shared budget
+
+
 def test_first_row_present_case_element_zero_real_but_still_warns_on_padding(caplog):
     # #1117 nuance: element 0 is the real first_row, but the remaining
     # cardinality is fabricated padding - has_real_rows is False and the
