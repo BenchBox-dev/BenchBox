@@ -2,7 +2,8 @@ id: tpch-throughput-seed-validation-fix
 title: "Fix TPC-H Q11/16/18/20 row-count validation under non-reference seeds so throughput runs can be clean"
 worktree: uat-hardening
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-07-11"
 category: "Correctness / Data Integrity"
 
 description: |
@@ -294,8 +295,35 @@ work:
       lint-markers clean (no new test files, no new markers needed).
   - id: w4
     summary: "Run the nightly throughput config locally via make uat-sweep and confirm the cell passes clean with Throughput@Size > 0"
-    status: pending
+    status: done
     needs: [w3]
+    notes: |
+      Command: make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
+      (SF=1, streams=3, seed=20260709 -- a non-reference seed -- via
+      run-official --streams 3, phases_arg="load,throughput",
+      validator_clean_rate_floor=1.0). Log:
+      /tmp/tpch-seed-uat-sweep.log. Ran at commit b833c878a (this TODO's
+      implementation commit); source_dirty=false.
+
+      Result: phase_exit_codes preflight=0 execute=0 validate=0 report=0.
+      matrix_summary.tsv: status=passed terminal_state=passed
+      submit_terminal_state=submittable validator_status=clean.
+      validator_rollup.tsv: error_count=0 warning_count=0
+      validator_clean_rate=100.0%.
+      Result JSON (benchmark_runs/results/tpch_sf1_duckdb_sql_20260711_083610_03c8ab80.json)
+      summary: queries.failed=0, queries.passed=66 (22 queries x 3 streams),
+      validation="passed", tpc_metrics.throughput_at_size=265178.57 (>0).
+      Q11/16/18/20 status=SUCCESS on all 3 streams (0,1,2) -- the literal w0
+      defect, now clean end-to-end through the real UAT harness at the
+      config that previously required continue-on-error in nightly.yml.
+
+      Process note (unrelated to this fix, flagging for the orchestrator):
+      this worktree's local `develop` ref was stale (merge-base fc31f3604,
+      well behind the actual develop tip at session start), so `git diff
+      --name-only develop...HEAD` returned many files from already-merged
+      upstream PRs. Used `git diff --name-only 295b64544..HEAD` (295b64544
+      = this session's recorded starting HEAD SHA, see w0) instead, which
+      correctly isolates this TODO's own 8 touched files.
 
 deferred:
   - summary: "Parameter-aware expected row counts for Q11/16/18/20 (deriving expectations per seed instead of excluding)"
@@ -345,6 +373,16 @@ scope_limit:
     - "tests/integration/"
     - "tests/uat/throughput.py"
     - "docs/development/throughput-result-alignment.md"
+
+files_affected:
+  modified:
+    - benchbox/core/expected_results/tpch_results.py
+    - benchbox/core/tpch/power_test.py
+    - benchbox/core/tpch/throughput_test.py
+    - benchbox/core/validation/query_validation.py
+    - tests/integration/test_tpch_power_test.py
+    - tests/integration/test_tpch_throughput_test.py
+    - tests/unit/core/expected_results/test_validation_engine.py
 
 metadata:
   tags: [tpch, throughput, validation, seed-derivation, correctness]
