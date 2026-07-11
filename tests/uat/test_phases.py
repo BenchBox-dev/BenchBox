@@ -18,7 +18,7 @@ from tests.uat.phases import (
     preflight as preflight_phase,
     report as report_phase,
 )
-from tests.uat.runner import CellResult
+from tests.uat.runner import CellResult, classify_for_submit, submit_state_is_cell_failure
 
 pytestmark = pytest.mark.fast
 
@@ -964,6 +964,14 @@ def test_execute_outcome_carries_compatibility_pruned_cells(tmp_path):
 
 
 def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
+    """A passed cell whose result JSON refuses submission surfaces as FAILED.
+
+    Submit classification is the runner's job (run_cell, runner.py:256-260);
+    execute.py no longer re-applies it. The fake runner therefore mirrors
+    run_cell's classification step against the real fixture JSON, and the
+    test pins that the classified failure flows through run_execute's
+    pipeline (ladder, results aggregation) unmangled.
+    """
     result_path = tmp_path / "benchmark_runs" / "results" / "failed-query.json"
     _write_submit_result(result_path, failed=1)
     cfg = validate_config(
@@ -976,15 +984,21 @@ def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
     )
 
     def fake_runner(platform, benchmark, scale, **kwargs):
+        # Same classification sequence as the real run_cell: classify the
+        # exported result JSON, downgrade a passed status when the submit
+        # state is a cell failure.
+        submit_state = classify_for_submit(result_path)
+        is_failure = submit_state_is_cell_failure(submit_state)
         return CellResult(
             platform=platform,
             benchmark=benchmark,
             scale=scale,
-            status="passed",
-            exit_code=0,
+            status="failed" if is_failure else "passed",
+            exit_code=1 if is_failure else 0,
             elapsed_s=1.0,
             log_path=tmp_path / "cell.log",
             result_path=result_path,
+            submit_terminal_state=submit_state.value,
         )
 
     outcome = exec_phase.run_execute(
@@ -992,9 +1006,6 @@ def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
         log_dir=tmp_path,
         databases_root=tmp_path / "databases",
         runner=fake_runner,
-        # fake_runner deliberately skips submit classification (unlike the
-        # real run_cell) to exercise execute.py's downgrade mirror.
-        runner_needs_submit_classification=True,
     )
 
     assert outcome.results[0].status == "failed"

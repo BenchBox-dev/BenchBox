@@ -20,7 +20,7 @@ from __future__ import annotations
 import datetime as _dt
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 from tests.uat import docker_assets
@@ -35,7 +35,7 @@ from tests.uat.phases.enumerate import (
     enumerate_cells_with_pruning,
 )
 from tests.uat.preflight_budget import free_space_gib as default_free_space_reader
-from tests.uat.runner import CellResult, classify_for_submit, run_cell, submit_state_is_cell_failure
+from tests.uat.runner import CellResult, run_cell
 
 
 @dataclass(frozen=True)
@@ -103,7 +103,6 @@ def run_execute(
     databases_root: Path | None = None,
     cleanup_enabled: bool = True,
     runner=None,
-    runner_needs_submit_classification: bool = False,
     docker_runner: DockerRunner | None = None,
     free_space_checks_enabled: bool = False,
     free_space_path: Path | str | None = None,
@@ -118,13 +117,11 @@ def run_execute(
     the module-level `run_cell` lazily so monkeypatching
     `tests.uat.phases.execute.run_cell` from a test takes effect.
 
-    `runner_needs_submit_classification` defaults to False because the real
-    `run_cell` (runner.py:256-260) already classifies for submit before
-    returning -- re-classifying its output via `_apply_submit_classification`
-    would re-read + re-parse the same result JSON for no behavior change (the
-    mirror is idempotent on an already-classified `CellResult`). Set it True
-    only for an injected test runner that deliberately skips classification
-    to exercise the downgrade path (see
+    Submit classification is the runner's contract, not this phase's: the
+    real `run_cell` (runner.py:256-260) classifies the exported result JSON
+    and downgrades a passed cell before returning, so `run_execute` treats
+    every `CellResult` it receives as already classified. Injected test
+    runners must do the same (see
     test_execute_downgrades_passed_cell_with_query_failure_result).
     """
     if runner is None:
@@ -228,7 +225,6 @@ def run_execute(
                         databases_root=databases_root,
                         cleanup_enabled=cleanup_enabled,
                         runner=runner,
-                        runner_needs_submit_classification=runner_needs_submit_classification,
                         log_dir=log_dir,
                         benchmark_runs_dir=benchmark_runs_dir,
                     )
@@ -477,7 +473,6 @@ def _run_or_skip_platform(
     databases_root: Path | None,
     cleanup_enabled: bool,
     runner,
-    runner_needs_submit_classification: bool,
     log_dir: Path | None,
     benchmark_runs_dir: Path,
 ) -> None:
@@ -499,7 +494,6 @@ def _run_or_skip_platform(
             databases_root=databases_root,
             cleanup_enabled=cleanup_enabled,
             runner=runner,
-            runner_needs_submit_classification=runner_needs_submit_classification,
             log_dir=log_dir,
             benchmark_runs_dir=benchmark_runs_dir,
         )
@@ -519,7 +513,6 @@ def _run_platform_benchmark(
     databases_root: Path | None,
     cleanup_enabled: bool,
     runner,
-    runner_needs_submit_classification: bool,
     log_dir: Path | None,
     benchmark_runs_dir: Path,
 ) -> None:
@@ -551,8 +544,6 @@ def _run_platform_benchmark(
             streams=config.execute.streams,
             seed=config.execute.seed,
         )
-        if runner_needs_submit_classification:
-            cell_result = _apply_submit_classification(cell_result)
         results.append(cell_result)
         observed.append(
             LadderRung(
@@ -579,21 +570,6 @@ def _run_platform_benchmark(
             databases_root=databases_root,
             dry_run=config.dry_run,
         )
-
-
-def _apply_submit_classification(cell_result: CellResult) -> CellResult:
-    """Mirror submit refusals for any runner that returned a result JSON."""
-    if cell_result.status != "passed" or cell_result.result_path is None or not cell_result.result_path.exists():
-        return cell_result
-    submit_state = classify_for_submit(cell_result.result_path)
-    if submit_state.value == cell_result.submit_terminal_state and not submit_state_is_cell_failure(submit_state):
-        return cell_result
-    return replace(
-        cell_result,
-        status="failed" if submit_state_is_cell_failure(submit_state) else cell_result.status,
-        exit_code=(cell_result.exit_code or 1) if submit_state_is_cell_failure(submit_state) else cell_result.exit_code,
-        submit_terminal_state=submit_state.value,
-    )
 
 
 def _reorder_for_topology(

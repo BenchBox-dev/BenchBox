@@ -120,18 +120,19 @@ work:
     notes: >
       run_cell (runner.py:256-260) already classifies for submit before
       returning; _apply_submit_classification's mirror in
-      _run_platform_benchmark is idempotent on an already-classified
+      _run_platform_benchmark was idempotent on an already-classified
       CellResult, so it was pure waste (second file read) for the real
-      runner. Rather than an identity check against `run_cell` (fragile
-      under unittest.mock.Mock's attribute auto-vivification, which broke
-      inspect.unwrap in a spike of this approach), gated the mirror behind
-      an explicit `runner_needs_submit_classification: bool = False`
-      parameter threaded through run_execute -> _run_or_skip_platform ->
-      _run_platform_benchmark. The one test that genuinely needs the mirror
-      (test_execute_downgrades_passed_cell_with_query_failure_result, whose
-      fake_runner deliberately skips classification) now opts in
-      explicitly; kept per the TODO's own guidance rather than deleted.
-      Removed matrix.py's SQL_PLATFORMS/DOCKER_PLATFORMS/DATAFRAME_PLATFORMS
+      runner. Deleted _apply_submit_classification outright: submit
+      classification is the runner's contract (documented in run_execute's
+      docstring), and injected test runners must classify like run_cell
+      does. An interim commit gated the mirror behind a
+      runner_needs_submit_classification flag; the review follow-up removed
+      the flag and the mirror entirely, and its sole consumer
+      (test_execute_downgrades_passed_cell_with_query_failure_result)
+      now mirrors run_cell's classify_for_submit/
+      submit_state_is_cell_failure sequence in its fake runner, keeping the
+      fixture-JSON classification policy load-bearing in the test. Also
+      removed matrix.py's SQL_PLATFORMS/DOCKER_PLATFORMS/DATAFRAME_PLATFORMS
       placeholder tuples (immediately overwritten before any read) and
       timeouts.py's env_without_pythonpath/iter_argv_for_log plus their
       tests (verified zero callers repo-wide via grep).

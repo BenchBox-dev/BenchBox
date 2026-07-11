@@ -378,10 +378,12 @@ def _handle_execute(args: argparse.Namespace) -> int:
 
     outcome = result.execute_outcome
     if outcome is None:
-        # A mid-execute abort (the per-cell disk-floor watch) can trip before
-        # run_execute returns -- cells.jsonl and the partial report were
-        # still written via the orchestrator's abort-artifact path; there is
-        # just no ExecuteOutcome to report per-cell counts from here.
+        # Reachable only when the execute phase never actually ran -- e.g. a
+        # `dry_run: true` config, where run_sweep records exit 0 per phase
+        # without invoking run_execute. (A mid-execute disk-floor abort does
+        # NOT land here: run_sweep synthesizes an ExecuteOutcome from the
+        # attempted cells for that case, so it flows through the normal
+        # summary path below.) There are no per-cell counts to report.
         summary = {
             "name": config.name,
             "log_dir": str(result.log_dir),

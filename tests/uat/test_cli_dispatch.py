@@ -382,12 +382,12 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
 def test_uat_execute_and_execute_only_sweep_produce_identical_cells_jsonl(tmp_path, monkeypatch, capsys):
     """uat-execute-path-unification w2 parity requirement.
 
-    `make uat-execute` now routes through the same canonical phase loop
-    (`orchestrator.run_sweep`, scoped to `[preflight?, execute]`) as
-    `make uat-sweep`. For the same mocked runner, the two must produce
-    byte-identical cells.jsonl (and accounting sidecar) content -- pinning
-    the whole point of the unification: no more silently-different behavior
-    between the two entry points.
+    Post-unification, both `make uat-execute` and `make uat-sweep` share
+    `orchestrator.run_sweep`, so byte-identical cells.jsonl is largely a
+    given. What this test actually pins is that `_handle_execute`'s
+    config-scoping (phases narrowed to `[preflight?, execute]`, cleanup
+    override applied) is cell-output-neutral, and it guards against a
+    future change quietly re-diverging the two entry points.
     """
     from tests.uat.config import load_config
     from tests.uat.orchestrator import run_sweep
