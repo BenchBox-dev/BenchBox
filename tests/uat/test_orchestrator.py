@@ -219,6 +219,33 @@ def test_package_phase_excludes_failed_cells_result_paths(tmp_path: Path):
     assert failed_cell.result_path not in captured["result_paths"]
 
 
+def test_write_cells_jsonl_persists_throughput_check(tmp_path: Path):
+    """w5 regression: throughput_check must survive the cells.jsonl round-trip.
+
+    Before this, CellResult.throughput_check -- the one diagnostic the
+    stream-count guard exists to surface -- was dropped by
+    _write_cells_jsonl, so a stream-count failure left durable artifacts
+    saying only failed/exit 1 with no explanation.
+    """
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="failed",
+        exit_code=1,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+        throughput_check="throughput stream count mismatch: requested 3, executed 1",
+    )
+    source_info = orchestrator.RunSourceInfo(commit_sha="abc123", commit_short_sha="abc123", dirty=False)
+
+    orchestrator._write_cells_jsonl(tmp_path / "cells.jsonl", (cell,), source_info=source_info)
+
+    lines = [json.loads(line) for line in (tmp_path / "cells.jsonl").read_text().splitlines()]
+    assert lines[0]["throughput_check"] == "throughput stream count mismatch: requested 3, executed 1"
+
+
 def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_path: Path):
     root = tmp_path / "shared-runs"
     cfg = validate_config(

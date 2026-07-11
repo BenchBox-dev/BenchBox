@@ -131,8 +131,25 @@ work:
       only the passed cell's path.
   - id: w5
     summary: "Persist throughput_check in cells.jsonl and as an appended REPORT_HEADER column; bump the matrix-summary header fixture and replay header test in the same PR"
-    status: pending
+    status: done
     needs: [w1]
+    notes: |
+      Wiring (jsonl write side landed with w4's commit since both touched
+      orchestrator.py; completed here): tests/uat/orchestrator.py
+      _write_cells_jsonl() now writes "throughput_check": cell.throughput_check.
+      tests/uat/_cli.py _handle_report()'s CellResult reconstruction reads it
+      back via payload.get("throughput_check") (defaults to None for older
+      artifacts predating the field). tests/uat/phases/report.py:
+      REPORT_HEADER gained "throughput_check" as the LAST column (must_preserve:
+      existing columns keep their positions) and render_row() appends
+      cell.throughput_check or ''. Bumped
+      tests/uat/fixtures/uat-2026-05-02-matrix-summary-header.tsv to match.
+      Tests: tests/uat/test_orchestrator.py
+      (test_write_cells_jsonl_persists_throughput_check),
+      tests/uat/test_report.py (header-shape + render_row column-position
+      tests), tests/uat/test_report_accounting.py (CLI round-trip with and
+      without the field present). Verification command 2
+      (test_replay_2026_05_02.py -m slow) passes against the bumped fixture.
   - id: w6
     summary: "Guard _kill_process_group for win32 (fall back to proc.kill() at minimum); add a non-skipif unit test with a mocked platform"
     status: pending

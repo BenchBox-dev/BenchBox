@@ -13,7 +13,7 @@ from tests.uat.runner import CellResult
 pytestmark = pytest.mark.fast
 
 
-def _cell(platform, benchmark, scale, status="passed", elapsed=1.0, result=None):
+def _cell(platform, benchmark, scale, status="passed", elapsed=1.0, result=None, throughput_check=None):
     return CellResult(
         platform=platform,
         benchmark=benchmark,
@@ -23,6 +23,7 @@ def _cell(platform, benchmark, scale, status="passed", elapsed=1.0, result=None)
         elapsed_s=elapsed,
         log_path=Path(f"/tmp/{platform}_{benchmark}_{scale}.log"),
         result_path=Path(result) if result else None,
+        throughput_check=throughput_check,
     )
 
 
@@ -32,6 +33,46 @@ def test_render_row_matches_header_columns():
     fields = row.split("\t")
     expected_cols = report.REPORT_HEADER.split("\t")
     assert len(fields) == len(expected_cols)
+
+
+def test_report_header_appends_throughput_check_last():
+    """w5: the new column must be appended, not inserted -- existing positional
+    TSV consumers rely on the pre-existing column order (spec Section 6)."""
+    columns = report.REPORT_HEADER.split("\t")
+    assert columns[-1] == "throughput_check"
+    assert columns[:-1] == [
+        "platform",
+        "benchmark",
+        "scale",
+        "status",
+        "terminal_state",
+        "elapsed_s",
+        "log_path",
+        "result_path",
+        "submit_terminal_state",
+        "validator_status",
+        "source_commit_sha",
+        "source_dirty",
+    ]
+
+
+def test_render_row_includes_throughput_check_as_last_column():
+    cell = _cell(
+        "duckdb",
+        "tpch",
+        0.01,
+        status="failed",
+        result="/tmp/r.json",
+        throughput_check="throughput stream count mismatch: requested 3, executed 1",
+    )
+    row = report.render_row(cell, validator_status="clean")
+    assert row.split("\t")[-1] == "throughput stream count mismatch: requested 3, executed 1"
+
+
+def test_render_row_throughput_check_defaults_to_empty_string():
+    cell = _cell("duckdb", "tpch", 0.01, status="passed", result="/tmp/r.json")
+    row = report.render_row(cell, validator_status="clean")
+    assert row.split("\t")[-1] == ""
 
 
 def test_write_report_counts(tmp_path: Path):

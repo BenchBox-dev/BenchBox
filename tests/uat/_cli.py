@@ -198,6 +198,7 @@ def _handle_report(args: argparse.Namespace) -> int:
                     log_path=Path(payload.get("log_path", "")),
                     result_path=(Path(payload["result_path"]) if payload.get("result_path") else None),
                     submit_terminal_state=payload.get("submit_terminal_state", "submittable"),
+                    throughput_check=payload.get("throughput_check"),
                 )
             )
     # Skipped-unreachable cells are not JSONL rows; the durable sweep writes

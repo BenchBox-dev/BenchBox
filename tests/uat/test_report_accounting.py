@@ -274,3 +274,70 @@ def test_report_cli_marks_failed_cell_with_result_path_not_submittable(
     lines = text.splitlines()
     assert "failed\tfailed:submittable\t" in lines[1]
     capsys.readouterr()  # drain stdout to keep this test quiet in -s runs
+
+
+# ---------------------------------------------------------------------------
+# uat-status-taxonomy-exit-code-fixes w5: throughput_check must survive a
+# `make uat-report` regeneration from cells.jsonl -- it is the one
+# diagnostic the #1094 stream-count guard exists to surface.
+# ---------------------------------------------------------------------------
+
+
+def test_report_cli_reads_throughput_check_back_from_cells_jsonl(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "failed",
+                "exit_code": 1,
+                "elapsed_s": 2.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+                "submit_terminal_state": "submittable",
+                "throughput_check": "throughput stream count mismatch: requested 3, executed 1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 1
+    lines = output_tsv.read_text(encoding="utf-8").splitlines()
+    assert lines[0].split("\t")[-1] == "throughput_check"
+    assert lines[1].split("\t")[-1] == "throughput stream count mismatch: requested 3, executed 1"
+    capsys.readouterr()
+
+
+def test_report_cli_throughput_check_defaults_to_none_when_absent(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """Older cells.jsonl artifacts predate throughput_check; the report must still regenerate cleanly."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "passed",
+                "exit_code": 0,
+                "elapsed_s": 1.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 0
+    lines = output_tsv.read_text(encoding="utf-8").splitlines()
+    assert lines[1].split("\t")[-1] == ""
+    capsys.readouterr()
