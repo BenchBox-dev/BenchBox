@@ -2,7 +2,8 @@ id: "placeholder-rows-fetch-safety"
 title: "Make PlatformAdapterCursor placeholder rows impossible to mistake for real data"
 worktree: "auto-revert-incident"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-11"
 category: "Code Quality and Technical Debt"
 description: |
   Since #1100, PlatformAdapterCursor.fetchall()/fetchone()/.rows fabricate
@@ -38,7 +39,7 @@ prior_art:
 work:
 - id: w1
   summary: "Audit all in-repo call sites of PlatformAdapterCursor fetchall/fetchone/.rows; classify each as count-only, value-dependent-with-real-rows, or value-dependent-at-risk; record the table in the PR body."
-  status: pending
+  status: done
 - id: w2
   summary: "Implement has_real_rows plus a once-per-cursor warning on placeholder materialization; document the three-branch contract."
   notes: |
@@ -46,11 +47,11 @@ work:
     silent; the warning fires only when placeholder rows are actually
     materialized via fetchall()/fetchone()/.rows.
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Unit-test the warning/has_real_rows matrix; file follow-up TODOs for any at-risk consumers found in w1 (do not edit them here)."
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Matrix: placeholder fetch warns once and has_real_rows is False;
     explicit-rows fetch does not warn and has_real_rows is True; count-only
