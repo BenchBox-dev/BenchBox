@@ -252,10 +252,20 @@ they are not treated as zero. Treat a large `unknown=` count as a prompt
 to partition the sweep into smaller configs or refresh the table after
 the next run.
 
+The free-space floor and per-cell disk watch are always on for every
+execute-bearing run, independent of the `phases:` list — omitting
+`"preflight"` skips the pre-sweep budget report/abort only, not the
+mid-sweep interlock. A crash inside the budget estimator (bad table row,
+unreadable TSV) is a hard preflight failure with the underlying
+exception, not a silent downgrade to the flat cutoff; unknown cells
+remain advisory and stay a warning.
+
 Operators who know a run fits can override the disk gates by explicitly
 setting `preflight.free_space_min_gib: 0`. Use that only for supervised
 reruns; it disables both the static free-space floor and the budget
-headroom gate.
+headroom gate, prints a `[disk-gate] DISABLED by config` warning at
+sweep start, and records `disk_gate_disabled: true` in the
+`cells.jsonl.accounting.json` sidecar.
 
 When a sweep aborts on the free-space floor (or any other phase), it does
 not write a resumable manifest -- resume was retired as fragile (see

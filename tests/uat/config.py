@@ -143,6 +143,33 @@ class UATConfig:
     report: ReportConfig = field(default_factory=ReportConfig)
     compatibility: CompatibilityConfig = field(default_factory=CompatibilityConfig)
 
+    @property
+    def disk_gate_enabled(self) -> bool:
+        """Whether the free-space floor and per-cell disk watch are active.
+
+        Always-on for every execute-bearing run, decoupled from the
+        `phases:` list -- omitting `"preflight"` skips the pre-sweep
+        budget report/abort only, not this safety interlock (see
+        uat-disk-gate-always-on). The sole opt-out is an explicit
+        `preflight.free_space_min_gib: 0`, which callers must pair with a
+        loud warning (`disk_gate_disabled_warning`) since it turns the gate
+        off entirely.
+        """
+        return self.preflight.free_space_min_gib > 0
+
+
+DISK_GATE_DISABLED_WARNING_PREFIX = "[disk-gate] DISABLED by config"
+
+
+def disk_gate_disabled_warning(config: UATConfig) -> str | None:
+    """Return the loud opt-out warning when `disk_gate_enabled` is False."""
+    if config.disk_gate_enabled:
+        return None
+    return (
+        f"{DISK_GATE_DISABLED_WARNING_PREFIX}: preflight.free_space_min_gib=0 -- "
+        "the free-space floor and per-cell disk watch will NOT run for this sweep"
+    )
+
 
 ROOT_FIELDS = frozenset(
     {

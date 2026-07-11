@@ -21,7 +21,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from tests.uat.config import UATConfig, load_config
+from tests.uat.config import UATConfig, disk_gate_disabled_warning, load_config
 from tests.uat.phases import (
     execute as exec_phase,
     preflight as preflight_phase,
@@ -143,6 +143,11 @@ def run_sweep(  # noqa: C901
     validator_rollup_tsv: Path | None = None
     submissions_dir: Path | None = None
 
+    if not config.dry_run and "execute" in config.phases:
+        gate_warning = disk_gate_disabled_warning(config)
+        if gate_warning is not None:
+            print(gate_warning, file=sys.stderr)
+
     for phase in config.phases:
         if config.dry_run:
             phase_exit_codes[phase] = 0
@@ -179,11 +184,11 @@ def run_sweep(  # noqa: C901
                 "benchmark_runs_dir": benchmark_runs_dir,
                 "databases_root": databases_root,
                 "cleanup_enabled": config.cleanup.prune_databases,
-                "free_space_checks_enabled": "preflight" in config.phases,
+                "free_space_checks_enabled": config.disk_gate_enabled,
                 "runner": _build_disk_floor_runner(
                     exec_phase.run_cell,
                     attempted_cells=attempted_cells,
-                    watch_disk_floor="preflight" in config.phases,
+                    watch_disk_floor=config.disk_gate_enabled,
                     free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
                     free_space_min_gib=config.preflight.free_space_min_gib,
                 ),
@@ -213,6 +218,7 @@ def run_sweep(  # noqa: C901
                 execute_outcome.results,
                 source_info=source_info,
                 skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
+                disk_gate_disabled=not config.disk_gate_enabled,
             )
             _write_compatibility_pruned_jsonl(
                 compatibility_pruned_jsonl,
@@ -402,6 +408,7 @@ def _emit_abort_artifacts(
         cells,
         source_info=source_info,
         skipped_unreachable_count=skipped_unreachable_count,
+        disk_gate_disabled=not config.disk_gate_enabled,
     )
     _write_compatibility_pruned_jsonl(log_dir / "compatibility_pruned.jsonl", compatibility_pruned)
     report_phase.write_report(
@@ -440,6 +447,7 @@ def _write_cells_jsonl(
     *,
     source_info: RunSourceInfo,
     skipped_unreachable_count: int = 0,
+    disk_gate_disabled: bool = False,
 ) -> None:
     lines: list[str] = []
     for cell in cells:
@@ -480,9 +488,20 @@ def _write_cells_jsonl(
     # The skipped-unreachable cells are `Cell` records (not `CellResult` rows)
     # and are therefore not part of the JSONL stream. Persist their count in a
     # sidecar so a report regenerated from `cells.jsonl` (make uat-report) can
-    # read it back and keep `total_defined` faithful.
+    # read it back and keep `total_defined` faithful. `disk_gate_disabled` is
+    # an additive field (uat-disk-gate-always-on w2) recording whether this
+    # run's free-space floor was turned off by `free_space_min_gib: 0` --
+    # existing readers key on `skipped_unreachable_count` and ignore it.
     accounting_path = _cells_accounting_path(path)
-    accounting_text = json.dumps({"skipped_unreachable_count": int(skipped_unreachable_count)}) + "\n"
+    accounting_text = (
+        json.dumps(
+            {
+                "skipped_unreachable_count": int(skipped_unreachable_count),
+                "disk_gate_disabled": bool(disk_gate_disabled),
+            }
+        )
+        + "\n"
+    )
     report_phase.atomic_write_text(accounting_path, accounting_text)
 
 

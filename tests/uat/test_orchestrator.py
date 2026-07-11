@@ -489,6 +489,101 @@ def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
     assert "abort_phase=execute" in partial_text
 
 
+def test_execute_only_config_still_gets_disk_floor_watch(tmp_path: Path):
+    """An execute-only config (no `preflight` in `phases:`) still aborts on low disk.
+
+    Regression for uat-disk-gate-always-on w1/w4: the mid-sweep per-cell
+    watch and platform-boundary check used to be keyed on
+    `"preflight" in config.phases`, so a legitimate execute-only composition
+    ran with zero disk gating. `free_space_min_gib` defaults to 5.0, so the
+    gate is on by default; there is no `preflight` phase here to have
+    established it.
+    """
+    cfg = validate_config(
+        {
+            "name": "execute-only-disk-smoke",
+            "phases": ["execute"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
+        patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
+        patch.object(orchestrator.preflight_phase, "free_space_gib", return_value=1.0),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "execute"
+    assert "free space" in (result.abort_reason or "")
+    partial_report = tmp_path / "logs" / "matrix_summary.partial.tsv"
+    assert partial_report.exists()
+    assert "# run_status=ABORTED" in partial_report.read_text(encoding="utf-8")
+
+
+def test_zero_floor_warns_loudly_and_flags_accounting_sidecar(tmp_path: Path, capsys):
+    """`free_space_min_gib: 0` disables the gate but must say so loudly.
+
+    Regression for uat-disk-gate-always-on w2: the explicit opt-out prints a
+    `[disk-gate] DISABLED by config` warning at sweep start and records
+    `disk_gate_disabled: true` in the `cells.jsonl.accounting.json` sidecar
+    so the opt-out is visible without re-reading the YAML.
+    """
+    cfg = validate_config(
+        {
+            "name": "zero-floor-smoke",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "preflight": {"free_space_min_gib": 0},
+        }
+    )
+    assert cfg.disk_gate_enabled is False
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 0,
+        },
+    )()
+
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert "[disk-gate] DISABLED by config" in capsys.readouterr().err
+    accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert accounting["disk_gate_disabled"] is True
+
+
 def test_execute_free_space_abort_emits_partial_artifacts(tmp_path: Path):
     """An execute-outcome-reported free-space abort still emits abort artifacts (resume machinery retired)."""
     cfg = validate_config(

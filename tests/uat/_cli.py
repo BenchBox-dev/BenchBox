@@ -384,12 +384,15 @@ def _handle_verify_tuning_matrix(args: argparse.Namespace) -> int:
 
 def _handle_execute(args: argparse.Namespace) -> int:
     """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
-    from tests.uat.config import load_config
+    from tests.uat.config import disk_gate_disabled_warning, load_config
     from tests.uat.phases.execute import default_benchmark_runs_dir, default_log_dir, run_execute
     from tests.uat.phases.preflight import preflight_kwargs_from_config, run_preflight
 
     config = load_config(args.config)
     benchmark_runs_dir = default_benchmark_runs_dir(config)
+    gate_warning = disk_gate_disabled_warning(config)
+    if gate_warning is not None:
+        print(gate_warning, file=sys.stderr)
     if "preflight" in config.phases:
         preflight = run_preflight(**preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir))
         if preflight.disk_budget_summary:
@@ -409,7 +412,7 @@ def _handle_execute(args: argparse.Namespace) -> int:
         "benchmark_runs_dir": benchmark_runs_dir,
         "databases_root": databases_root,
         "cleanup_enabled": not args.no_cleanup and config.cleanup.prune_databases,
-        "free_space_checks_enabled": "preflight" in config.phases,
+        "free_space_checks_enabled": config.disk_gate_enabled,
     }
     outcome = run_execute(config, **execute_kwargs)
 

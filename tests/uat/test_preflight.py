@@ -96,7 +96,16 @@ def test_preflight_config_accepts_local_platforms_check():
     assert cfg.preflight.local_platforms_check is True
 
 
-def test_preflight_disk_budget_table_error_is_advisory(tmp_path: Path, monkeypatch):
+def test_preflight_disk_budget_table_error_hard_fails_preflight(tmp_path: Path, monkeypatch):
+    """An estimator crash (bad table) is a hard preflight abort, not a warn-and-continue.
+
+    Regression for uat-disk-gate-always-on w3: a `except Exception` here used
+    to downgrade estimator crashes to a warning and silently fall back to the
+    flat free_space_min_gib cutoff. Unknown cells (missing table rows) stay
+    advisory -- see test_preflight_disk_headroom_gate_respects_zero_override
+    and the unknown_cells coverage below for that path; this test is only
+    for the table itself being unparseable.
+    """
     table = tmp_path / "disk_budget.tsv"
     table.write_text(
         "platform\tbenchmark\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\nduckdb\ttpch\t1.0\t2.0\t0.5\n",
@@ -118,13 +127,39 @@ def test_preflight_disk_budget_table_error_is_advisory(tmp_path: Path, monkeypat
 
     result = preflight.run_preflight(free_space_path=tmp_path, disk_budget_config=cfg)
 
-    assert result.aborted is False
-    assert result.abort_reason is None
+    assert result.aborted is True
+    assert result.abort_reason is not None
+    assert result.abort_reason.startswith("disk budget estimator failed: ValueError: disk budget table ")
+    assert "missing columns" in result.abort_reason
+    assert "scale_factor" in result.abort_reason
     assert result.disk_budget_summary is None
-    assert len(result.warnings) == 1
-    assert result.warnings[0].startswith("disk budget estimate unavailable: ValueError: disk budget table ")
-    assert "missing columns" in result.warnings[0]
-    assert "scale_factor" in result.warnings[0]
+
+
+def test_preflight_disk_budget_unexpected_error_propagates(tmp_path: Path, monkeypatch):
+    """Only (OSError, ValueError, KeyError) are caught -- other exceptions still propagate.
+
+    Guards against re-widening the except clause narrowed in w3.
+    """
+    cfg = config.validate_config(
+        {
+            "name": "budget-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("unexpected estimator bug")
+
+    monkeypatch.setattr(preflight, "estimate_disk_budget_summary_and_gate", _boom)
+
+    with pytest.raises(RuntimeError, match="unexpected estimator bug"):
+        preflight.run_preflight(free_space_path=tmp_path, disk_budget_config=cfg)
 
 
 def test_preflight_reports_all_required_disk_roots(tmp_path: Path, monkeypatch):

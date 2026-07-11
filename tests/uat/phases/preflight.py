@@ -214,8 +214,29 @@ def run_preflight(
                     f"{len(budget_gate.budget.unknown_cells)} unknown largest-scale cell(s); "
                     "estimate may be low"
                 )
-        except Exception as exc:
-            warnings.append(f"disk budget estimate unavailable: {type(exc).__name__}: {exc}")
+        except (OSError, ValueError, KeyError) as exc:
+            # The estimator CRASHED (bad table row, unreadable TSV, a
+            # malformed config field) -- distinct from the advisory
+            # unknown_cells case above, which stays a warning. Downgrading a
+            # crash to a warning would silently fall back to the flat
+            # free_space_min_gib cutoff below and disable the stronger
+            # budget-aware gate with only a stderr line (uat-disk-gate-
+            # always-on w3). Hard-fail preflight instead, surfacing which
+            # exception fired so the operator can fix the budget table or
+            # set an explicit flat floor.
+            return PreflightResult(
+                phase="preflight",
+                free_space_gib=free_gib,
+                docker_reachable=docker_ok,
+                host_load_1m=load_1m,
+                aborted=True,
+                abort_reason=f"disk budget estimator failed: {type(exc).__name__}: {exc}",
+                warnings=tuple(warnings),
+                local_platforms_checked=(),
+                local_platforms_attempted=(),
+                disk_budget_summary=None,
+                free_space_report=(),
+            )
     if free_space_min_gib <= 0:
         required_gib = 0.0
     elif budget_gate is not None:
