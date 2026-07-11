@@ -2,7 +2,8 @@ id: "auto-revert-signature-attribution"
 title: "Make auto-revert-on-failure signature-aware so persistent red does not blame every subsequent merge"
 worktree: "auto-revert-incident"
 priority: "High"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-11"
 category: "Core Functionality"
 description: |
   The auto-revert-on-failure job in .github/workflows/develop-post-merge.yml
@@ -53,7 +54,7 @@ prior_art:
 work:
 - id: w0
   summary: "Re-validate the incident evidence: confirm the auto-revert job's if-condition still fires on any gate failure at develop tip, and pin the 2026-07-10 facts."
-  status: pending
+  status: done
   notes: |
     The CI run links (29097093548 etc.) expire; the durable pins are the
     revert PRs themselves (#1099, #1104, #1107-#1112, #1115, #1120-#1122,
@@ -63,7 +64,7 @@ work:
 - id: w1
   summary: "Emit failure signatures: junit XML via PYTEST_ADDOPTS on the pytest gates plus an always-run signature-artifact upload step per gate job."
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Set PYTEST_ADDOPTS="--junitxml=<file>" as a step env in the workflow so
     `make ci-test` / `make test-medium` pick it up without changing local
@@ -72,11 +73,11 @@ work:
 - id: w2
   summary: "Add stdlib-only scripts/post_merge_signature.py: build a signature JSON from junit XML / job results, and diff two signatures returning the set of NEW failure IDs; unit-test both paths."
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Gate auto-revert on the signature diff vs the previous run: revert PR only when new failure IDs exist, else upsert the incident issue."
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Previous-run lookup: gh api /actions/workflows/develop-post-merge.yml/runs
     ?branch=develop&status=completed&per_page=1&created<... or walk runs and
@@ -86,14 +87,14 @@ work:
 - id: w4
   summary: "Green-run cleanup job: when all four gates succeed, close open auto-revert/* PRs and open incident issues, commenting the green run and SHA."
   needs: []
-  status: pending
+  status: done
   notes: |
     Covers both incident:develop-red and incident:develop-red-revert-conflict
     issues. Reuse the close-orphaned-prs close-with-comment shape.
 - id: w5
   summary: "Fix the stale metrics-job MEDIUM_TEST_RESULT comment; extend the metrics JSON with the signature outcome (new_failure_ids, revert_suppressed) as additive fields only."
   needs: [w3]
-  status: pending
+  status: done
 deferred:
 - summary: "Retroactive relabeling/closing of pre-existing bogus revert PRs"
   reason: "Handled operationally by fix-session-isolation-placeholder-rows w3."
