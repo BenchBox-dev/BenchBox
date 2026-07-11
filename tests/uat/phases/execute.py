@@ -60,6 +60,13 @@ class ExecuteOutcome(PhaseResult):
     skipped_unreachable: tuple[Cell, ...]
     compatibility_pruned: tuple[CompatibilityPrunedCell, ...] = ()
     docker_events: tuple[DockerLifecycleEvent, ...] = ()
+    # Typed cause for `aborted` -- e.g. "disk_floor", "docker_startup",
+    # "docker_teardown". None when not aborted. Consumers must branch on this
+    # field, never on substrings of `abort_reason` (a human-facing message
+    # that can be reworded without notice) -- see
+    # uat-execute-path-unification w5. Not part of the cells.jsonl schema;
+    # do not thread it into cells_io.write_cells_jsonl.
+    abort_kind: str | None = None
 
     def exit_code(self) -> int:
         if self.aborted:
@@ -162,6 +169,7 @@ def run_execute(
     last_completed_platform: str | None = None
     last_docker_cleanup_status = "not-run"
     abort_reason: str | None = None
+    abort_kind: str | None = None
 
     for platform, platform_pairs in by_platform:
         platform_abort_reason = _free_space_abort_reason(
@@ -174,6 +182,7 @@ def run_execute(
             context=f"before starting platform {platform}",
             log_dir=log_dir,
         )
+        platform_abort_kind: str | None = "disk_floor" if platform_abort_reason is not None else None
         docker_state = _DockerPlatformState(cleanup_status=last_docker_cleanup_status)
 
         docker_startup_failed = False
@@ -203,6 +212,7 @@ def run_execute(
                         docker_startup_failed = True
                     else:
                         platform_abort_reason = startup_reason
+                        platform_abort_kind = "docker_startup"
             if platform_abort_reason is None and not docker_startup_failed:
                 try:
                     _run_or_skip_platform(
@@ -224,22 +234,21 @@ def run_execute(
                     )
                 except Exception as exc:  # noqa: BLE001 - re-raised after annotation
                     # A mid-sweep DiskFloorAbort propagates out of the runner
-                    # here, bypassing the normal ExecuteOutcome return. The
-                    # skipped-unreachable cells accumulated for earlier
-                    # platforms would otherwise be lost (run_execute never
-                    # returns), causing the abort report to under-count
-                    # `total_defined`. Annotate the exception with the count
-                    # so the orchestrator can thread it into the abort
-                    # artifact. The platform teardown still runs via the
-                    # enclosing `finally` before the exception propagates.
-                    if not hasattr(exc, "skipped_unreachable_count"):
-                        try:
-                            exc.skipped_unreachable_count = len(skipped_unreachable)  # type: ignore[attr-defined]
-                        except (AttributeError, TypeError):
-                            pass
+                    # here, bypassing the normal ExecuteOutcome return.
+                    # Annotate it with what the orchestrator needs to thread
+                    # into the abort artifact instead of losing it (or, for
+                    # compatibility_pruned, re-deriving it via a second,
+                    # possibly-diverging enumeration). The platform teardown
+                    # still runs via the enclosing `finally` before the
+                    # exception propagates.
+                    _annotate_disk_floor_abort(
+                        exc,
+                        skipped_unreachable=skipped_unreachable,
+                        compatibility_pruned=enumeration.compatibility_pruned,
+                    )
                     raise
         finally:
-            docker_state, teardown_abort_reason = _teardown_docker_platform_if_needed(
+            docker_state, teardown_abort_reason, teardown_abort_kind = _teardown_docker_platform_if_needed(
                 config,
                 platform=platform,
                 docker_state=docker_state,
@@ -255,9 +264,11 @@ def run_execute(
             last_docker_cleanup_status = docker_state.cleanup_status
             if platform_abort_reason is None:
                 platform_abort_reason = teardown_abort_reason
+                platform_abort_kind = teardown_abort_kind
 
         if platform_abort_reason is not None:
             abort_reason = platform_abort_reason
+            abort_kind = platform_abort_kind
             break
         last_completed_platform = platform
 
@@ -270,6 +281,7 @@ def run_execute(
         docker_events=tuple(docker_events),
         aborted=abort_reason is not None,
         abort_reason=abort_reason,
+        abort_kind=abort_kind,
     )
 
 
@@ -360,9 +372,9 @@ def _teardown_docker_platform_if_needed(
     free_space_min_gib: float,
     free_space_reader: FreeSpaceReader,
     log_dir: Path | None,
-) -> tuple[_DockerPlatformState, str | None]:
+) -> tuple[_DockerPlatformState, str | None, str | None]:
     if not docker_state.started or docker_state.spec is None or docker_state.project_name is None:
-        return docker_state, None
+        return docker_state, None, None
 
     cleanup_status, cleanup_abort_reason = _run_docker_teardown(
         config,
@@ -379,7 +391,9 @@ def _teardown_docker_platform_if_needed(
         started=docker_state.started,
         cleanup_status=cleanup_status,
     )
-    abort_reason = _free_space_abort_reason(
+    if cleanup_abort_reason is not None:
+        return state, cleanup_abort_reason, "docker_teardown"
+    free_space_abort_reason = _free_space_abort_reason(
         enabled=free_space_checks_enabled,
         path=free_space_path,
         min_gib=free_space_min_gib,
@@ -389,7 +403,9 @@ def _teardown_docker_platform_if_needed(
         context=f"after Docker teardown for platform {platform}",
         log_dir=log_dir,
     )
-    return state, cleanup_abort_reason or abort_reason
+    if free_space_abort_reason is not None:
+        return state, free_space_abort_reason, "disk_floor"
+    return state, None, None
 
 
 def _run_docker_teardown(
@@ -699,6 +715,33 @@ def _maybe_prune_completed(
                     dry_run=dry_run,
                 )
                 already_pruned.add(key)
+
+
+def _annotate_disk_floor_abort(
+    exc: BaseException,
+    *,
+    skipped_unreachable: list[Cell],
+    compatibility_pruned: tuple[CompatibilityPrunedCell, ...],
+) -> None:
+    """Attach accounting the orchestrator needs to thread into abort artifacts.
+
+    A mid-sweep DiskFloorAbort propagates out of `run_execute`, bypassing the
+    normal `ExecuteOutcome` return. Both the skipped-unreachable count and
+    this run's actual compatibility-pruned enumeration would otherwise be
+    lost, forcing the orchestrator to either under-count `total_defined` or
+    fall back to a second, possibly-diverging re-enumeration -- see
+    uat-execute-path-unification w5.
+    """
+    if not hasattr(exc, "skipped_unreachable_count"):
+        try:
+            exc.skipped_unreachable_count = len(skipped_unreachable)  # type: ignore[attr-defined]
+        except (AttributeError, TypeError):
+            pass
+    if not hasattr(exc, "compatibility_pruned"):
+        try:
+            exc.compatibility_pruned = compatibility_pruned  # type: ignore[attr-defined]
+        except (AttributeError, TypeError):
+            pass
 
 
 def _free_space_abort_reason(

@@ -66,6 +66,12 @@ class PreflightResult(PhaseResult):
     local_platforms_attempted: tuple[str, ...] = ()
     disk_budget_summary: str | None = None
     free_space_report: tuple[str, ...] = ()
+    # Typed cause for `aborted` -- "disk_floor", "docker_required", or
+    # "local_platform_unreachable". None when not aborted. Consumers must
+    # branch on this field, never on substrings of `abort_reason` (a
+    # human-facing message that can be reworded without notice) -- see
+    # uat-execute-path-unification w5.
+    abort_kind: str | None = None
 
 
 def free_space_gib(path: str | Path) -> float:
@@ -234,6 +240,7 @@ def run_preflight(
                 host_load_1m=load_1m,
                 aborted=True,
                 abort_reason=f"disk budget estimator failed: {type(exc).__name__}: {exc}",
+                abort_kind="disk_floor",
                 warnings=tuple(warnings),
                 local_platforms_checked=(),
                 local_platforms_attempted=(),
@@ -248,9 +255,11 @@ def run_preflight(
         required_gib = free_space_min_gib
     free_space_report = format_free_space_report(free_space_entries, required_gib=required_gib)
 
+    abort_kind: str | None = None
     if free_space_min_gib > 0 and budget_gate is not None and budget_gate.headroom.shortfalls:
         aborted = True
         abort_reason = format_disk_headroom_failure(budget_gate.headroom)
+        abort_kind = "disk_floor"
     elif free_space_min_gib > 0:
         short_roots = tuple(root for root in free_space_entries if root.free_gib < free_space_min_gib)
         if short_roots:
@@ -260,9 +269,15 @@ def run_preflight(
                 for root in short_roots
             )
             abort_reason = f"free space gate failed: {details}"
+            abort_kind = "disk_floor"
     if docker_required and not docker_ok:
         aborted = True
         abort_reason = (abort_reason or "") + ("; docker_required=true but `docker ps` is unreachable")
+        # Disk-floor abort (set above, if any) takes precedence as the typed
+        # cause when both conditions fire in the same run -- it is the more
+        # actionable/primary safety interlock.
+        if abort_kind is None:
+            abort_kind = "docker_required"
     if load_1m is not None and load_1m > noisy_neighbor_warn_load:
         warnings.append(f"host load {load_1m:.1f} > {noisy_neighbor_warn_load:.1f}")
     if not docker_ok and not docker_required:
@@ -279,6 +294,7 @@ def run_preflight(
         if local_abort is not None:
             aborted = True
             abort_reason = local_abort
+            abort_kind = "local_platform_unreachable"
 
     return PreflightResult(
         phase="preflight",
@@ -287,6 +303,7 @@ def run_preflight(
         host_load_1m=load_1m,
         aborted=aborted,
         abort_reason=abort_reason,
+        abort_kind=abort_kind,
         warnings=tuple(warnings),
         local_platforms_checked=checked,
         local_platforms_attempted=attempted,

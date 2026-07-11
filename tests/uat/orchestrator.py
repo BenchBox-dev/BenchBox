@@ -206,17 +206,39 @@ def run_sweep(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = exc.reason
+                # Synthesize an ExecuteOutcome from what run_execute had
+                # already accumulated before the abort propagated, instead
+                # of passing execute_outcome=None. The None path forced
+                # _emit_abort_artifacts to fall back to
+                # _compatibility_pruned_for_config, a second independent
+                # re-enumeration that can diverge from the one execute
+                # actually used. execute.py threads its real enumeration
+                # onto the exception (`exc.compatibility_pruned`)
+                # specifically so this constructor can use it directly.
+                execute_outcome = exec_phase.ExecuteOutcome(
+                    phase="execute",
+                    results=tuple(attempted_cells),
+                    pruned=(),
+                    skipped_unreachable=(),
+                    compatibility_pruned=getattr(exc, "compatibility_pruned", ()) or (),
+                    aborted=True,
+                    abort_reason=abort_reason,
+                    abort_kind="disk_floor",
+                )
                 _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=attempted_cells,
-                    execute_outcome=None,
+                    execute_outcome=execute_outcome,
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
-                    # run_execute annotates the abort with the unreachable
-                    # cells skipped before the disk-floor trip; without this
-                    # the abort report would drop them from total_defined.
+                    # The skipped-unreachable Cell objects (not just their
+                    # count) are lost crossing the exception boundary, so the
+                    # synthesized outcome above always carries an empty
+                    # skipped_unreachable -- override with the real count
+                    # run_execute annotated the exception with, or the abort
+                    # report would under-count total_defined.
                     skipped_unreachable_count=getattr(exc, "skipped_unreachable_count", 0),
                 )
                 break

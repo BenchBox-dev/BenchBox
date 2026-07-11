@@ -489,6 +489,59 @@ def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
     assert "abort_phase=execute" in partial_text
 
 
+def test_disk_floor_abort_threads_real_compatibility_pruned_without_reenumerating(tmp_path: Path):
+    """w5: abort artifacts on a mid-sweep disk-floor trip must use execute's
+    actual enumeration -- threaded onto the DiskFloorAbort exception -- not a
+    second independent re-enumeration (`_compatibility_pruned_for_config`)
+    that could diverge from what execute actually used.
+    """
+    cfg = validate_config(
+        {
+            "name": "disk-floor-compat-smoke",
+            "phases": ["execute"],
+            "platforms": {"include": ["polars-df"]},
+            "benchmarks": {"include": ["vector_search", "tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="polars-df",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    reenumerate_calls: list[object] = []
+    real_compat_for_config = orchestrator._compatibility_pruned_for_config
+
+    def spy_compat_for_config(config):
+        reenumerate_calls.append(config)
+        return real_compat_for_config(config)
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
+        patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
+        patch.object(orchestrator.preflight_phase, "free_space_gib", return_value=1.0),
+        patch.object(orchestrator, "_compatibility_pruned_for_config", side_effect=spy_compat_for_config),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "execute"
+    assert reenumerate_calls == []  # the disk-floor abort path must not re-enumerate
+    assert result.execute_outcome is not None
+    assert result.execute_outcome.abort_kind == "disk_floor"
+
+    pruned_rows = [
+        json.loads(line)
+        for line in (tmp_path / "logs" / "compatibility_pruned.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert pruned_rows[0]["benchmark"] == "vector_search"
+    assert pruned_rows[0]["rule_id"] == "uat.compat.dataframe.sql_only_benchmark"
+
+
 def test_execute_only_config_still_gets_disk_floor_watch(tmp_path: Path):
     """An execute-only config (no `preflight` in `phases:`) still aborts on low disk.
 
