@@ -173,6 +173,17 @@ jobs:
     # dropped). The 44 tpch-extension "errors" reported earlier were
     # sandbox-only (egress proxy 403 on the extension download) and do not
     # occur on the runner.
+    #
+    # PR-LANE CONSUMER ADDED 2026-07-11 (medium-tier-pre-merge-lane): the tier
+    # now also runs pre-merge as pr.yml's `medium-test` job, path-gated on
+    # ci-paths' needs-code-ci output so docs/TODO-only PRs skip it. That job
+    # is a plain `make test-medium` run with no signature/junit emission (the
+    # PR lane does not feed auto-revert). This post-merge job stays the
+    # blocking safety net for the residual gap the PR lane cannot see: a
+    # stale-base squash race, where a PR's own merge-tree CI passes but the
+    # eventual develop tip has a semantic conflict with another PR merged in
+    # between (see the TODO description for the #1093/#1095/#1100 incident
+    # this closes half of).
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
