@@ -43,12 +43,44 @@ exceeds ``config.stream_timeout``:
   ``config.cancel_on_timeout`` directly, so a stale/leftover attribute value
   can never be mistaken for this run's cancellation state.
 
-Even with both enabled, exiting this method's ``with
-ThreadPoolExecutor(...)`` block still blocks (via the implicit
-``shutdown(wait=True)`` in ``__exit__``) until every submitted thread
-returns, including a leaked one -- cooperative cancellation shortens that
-wait to roughly one more query's execution time; without it, the wait is
-unbounded, matching today's behavior except now surfaced instead of silent.
+Non-blocking shutdown (return without joining a leaked thread)
+----------------------------------------------------------------
+``execute()`` manages the ``ThreadPoolExecutor`` manually (no ``with``
+block) so it can call ``executor.shutdown(wait=False)`` in a ``finally``
+instead of relying on the context manager's implicit
+``shutdown(wait=True)``. This means ``execute()`` returns as soon as its
+own timeout/accounting window closes -- bounded by ``config.stream_timeout``
+plus classification overhead -- rather than blocking until every submitted
+thread finishes.
+
+On the healthy path (no timeout fires), every future is already ``done()``
+by the time ``as_completed()`` returns, so ``shutdown(wait=False)`` is a
+no-op: there is nothing left to join, and default-timeout behavior for
+healthy runs is unchanged. On the hung path, any future still not
+``done()`` when the deadline elapses is *abandoned*, not killed -- Python
+cannot forcibly stop a running thread. ``shutdown(wait=False)`` only stops
+the executor from accepting new submissions; it does not touch threads
+already running, so the leaked thread keeps executing in the background
+until ``stream_fn`` itself returns (naturally, or via cooperative
+cancellation if enabled) and exits.
+
+**Zombie connection/accounting semantics** (see also
+``docs/development/throughput-result-alignment.md``): a leaked stream's
+database connection is owned by that stream's own ``stream_fn`` and is
+closed by its own ``finally`` block whenever the thread eventually ends --
+``execute()`` never touches it. Until then, the zombie thread holds an open
+session and may still be issuing queries against the database after
+``execute()`` -- and the whole throughput phase -- has returned; a
+subsequent phase (e.g. data maintenance) that starts immediately after can
+run concurrently with it. This residual hazard is why cooperative
+cancellation (bounding the zombie's remaining lifetime to ~one more query)
+is recommended whenever a hard stream_timeout matters operationally. TTT
+and success-rate accounting are unaffected: a leaked stream was already
+excluded from ``result.stream_results`` (and therefore from TTT and
+``streams_successful``) under the *old* blocking behavior too -- it only
+contributes to ``result.streams_executed`` and ``result.errors``, exactly
+as before. What changes here is only how long ``execute()`` itself blocks
+before returning, not what gets counted.
 """
 
 from __future__ import annotations
@@ -135,7 +167,16 @@ class StreamRunner:
         cooperative_cancel = bool(getattr(config, "cancel_on_timeout", False))
         cancel_events: dict[int, threading.Event] = {}
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Managed manually (no `with` block): the context manager's implicit
+        # `__exit__` calls `shutdown(wait=True)`, which would block this
+        # method's return on every submitted thread -- including a leaked
+        # one that never completes. The `finally` below calls
+        # `shutdown(wait=False)` instead, so a still-running (abandoned, not
+        # killed) thread cannot hold `execute()` hostage. See the module
+        # docstring "Non-blocking shutdown" section for the full rationale
+        # and the zombie connection/accounting semantics this implies.
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        try:
             # Track future -> stream_id mapping for timeout error reporting
             future_to_stream_id: dict[concurrent.futures.Future[ThroughputStreamResult], int] = {}
 
@@ -260,6 +301,16 @@ class StreamRunner:
                     # be silent even in non-verbose runs.
                     logger.warning(error_msg)
                     pending.discard(future)
+        finally:
+            # wait=False: never block this method's return on a still-running
+            # (abandoned, not killed) thread. On the healthy path every
+            # future is already done() by this point, so this is a no-op --
+            # nothing to join, default timeout behavior for healthy runs is
+            # unchanged. On the hung path, any leaked thread keeps running
+            # to completion in the background; its connection is closed by
+            # its own stream_fn's finally whenever that eventually happens.
+            # See the module docstring "Non-blocking shutdown" section.
+            executor.shutdown(wait=False)
 
     @staticmethod
     def compute_metrics(

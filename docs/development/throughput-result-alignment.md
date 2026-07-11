@@ -175,11 +175,10 @@ and sets the timed-out stream's event; each spec's `_execute_stream` query
 loop polls its own event between queries and stops early if set, marking
 the stream unsuccessful. This lets a leaked stream actually wind down soon
 after a timeout instead of running unbounded — the only safe mechanism,
-since Python threads cannot be hard-killed. Even with this enabled, exiting
-`execute()`'s `ThreadPoolExecutor` context still blocks until every
-submitted thread returns (`shutdown(wait=True)` on `__exit__`); cooperative
-cancellation shortens that wait to roughly one more query's execution time
-instead of leaving it unbounded.
+since Python threads cannot be hard-killed. **Update (`throughput-executor-
+nonblocking-shutdown`, 2026-07, see below):** `execute()` no longer blocks
+its own return on a leaked thread either way — see "Non-Blocking Executor
+Shutdown" below for how this composes with cooperative cancellation.
 
 **Stale cancel-event leak across reused configs (review follow-up):**
 `config._stream_cancel_events` is set purely by presence, and each spec's
@@ -227,6 +226,91 @@ reported as timed-out before it ever executes a single query.
 mis-configuration is detected (`max_workers < num_streams` and a timeout is
 set); default behavior (unset or `max_workers >= num_streams`) is
 unaffected.
+
+---
+
+## Non-Blocking Executor Shutdown (`throughput-executor-nonblocking-shutdown`, 2026-07)
+
+`throughput-timeout-leak-and-success-gates` (above) fixed timeout
+*detection* (a leaked stream is now always logged and recorded in
+`result.errors`) but explicitly deferred a residual problem: `execute()`
+ran its streams inside a `with concurrent.futures.ThreadPoolExecutor(...)`
+block. The context manager's implicit `__exit__` calls
+`shutdown(wait=True)`, which blocks until *every* submitted thread
+returns — including a leaked one. With cooperative cancellation off (the
+default), a genuinely hung stream therefore still blocked `execute()`
+itself for as long as the stream kept running, and with it the whole
+throughput phase and any subsequent phase (e.g. data maintenance).
+
+**Fix:** `execute()` now manages the `ThreadPoolExecutor` manually (no
+`with` block) and calls `executor.shutdown(wait=False)` in a `finally`.
+`shutdown(wait=False)` only stops the executor from accepting new
+submissions — it does not touch, join, or wait on threads that are already
+running. This is deliberately **not** a thread-kill: Python cannot forcibly
+stop a running thread, and this change does not attempt to. A leaked
+thread is *abandoned*, not killed — it keeps running `stream_fn` to
+completion in the background, entirely decoupled from the caller of
+`execute()`.
+
+**Healthy-path behavior is unchanged.** When every stream completes before
+the timeout (or no timeout is set), every future is already `done()` by
+the time the `as_completed()`/fallback loop finishes, so
+`shutdown(wait=False)` has nothing left to wait for — it is a no-op
+compared to the old `shutdown(wait=True)`. Only the hung-stream shutdown
+path changes; default timeout behavior for healthy runs is unaffected.
+
+### Zombie connection ownership
+
+A leaked stream's database connection is owned and opened by that
+stream's own `_execute_stream` implementation (TPC-H's and TPC-DS's
+`throughput_test.py` each open/close their own connection per stream).
+`StreamRunner.execute()` never held or touched that connection directly,
+and this change does not alter that: the connection is closed by the
+stream's own `finally` block whenever that thread's `stream_fn` call
+eventually returns — naturally, or sooner if cooperative cancellation
+(`cancel_on_timeout=True`) is enabled and the stream notices its cancel
+event between queries. `execute()` returning early does not close, orphan,
+or leak the connection any differently than before; it only stops
+*waiting* for that closure to happen before returning control to the
+caller.
+
+### TTT / accounting semantics for a stream that outlives `execute()`
+
+No accounting behavior changes here — a leaked stream was **already**
+excluded from `result.stream_results` (and therefore from TTT and
+`streams_successful`) under the old, blocking behavior, because
+`_record_completed_future()` is only invoked for futures observed as
+`done()`; a still-pending leaked future never reaches it. It contributes
+only to `result.streams_executed` (incremented in the timeout fallback
+loop) and to `result.errors` (the leak-surfacing message). This item
+changes *when* `execute()` returns, not *what* gets counted — the
+`streams_executed` / `streams_successful` / `errors` contract from
+`throughput-timeout-leak-and-success-gates` is unchanged.
+
+### Residual hazard: overlap with a subsequent phase
+
+This is the hazard `throughput-timeout-leak-and-success-gates` explicitly
+deferred. Because `execute()` (and therefore the whole throughput phase)
+can now return while a leaked stream's thread is still running, a caller
+that immediately proceeds to a subsequent phase (e.g. TPC-DS data
+maintenance) can now genuinely overlap with that zombie thread still
+issuing queries and holding a connection against the same database. This
+was already possible in principle before this change (Python cannot
+forcibly cancel a thread either way), but the old blocking `shutdown(wait=
+True)` accidentally provided a de facto (unbounded, and therefore
+unreliable as a guarantee) serialization between the throughput phase and
+whatever ran next, simply because `execute()` could not return until the
+zombie finished. That accidental serialization is now gone by design.
+
+Mitigating this overlap is the job of `cancel_on_timeout=True`: it bounds
+the zombie's remaining lifetime to roughly one more query instead of
+leaving it unbounded, shrinking (but not eliminating, since Python still
+cannot force a thread to stop mid-query) the window in which a subsequent
+phase can run concurrently with it. Callers whose downstream phases are
+sensitive to this overlap (e.g. connection-pool exhaustion, contention on
+a shared DB) should enable cooperative cancellation and/or leave headroom
+between phases; `StreamRunner.execute()` does not — and, given Python's
+threading constraints, cannot — provide a stronger guarantee than that.
 
 ---
 
