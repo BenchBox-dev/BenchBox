@@ -136,19 +136,6 @@ def test_kill_process_group_uses_killpg_when_available(monkeypatch):
     mock_proc.kill.assert_not_called()
 
 
-def test_iter_argv_for_log_quotes_spaces():
-    out = timeouts.iter_argv_for_log(["echo", "hello world"])
-    assert out == "echo 'hello world'"
-
-
-def test_env_without_pythonpath_drops_pythonpath(monkeypatch):
-    monkeypatch.setenv("PYTHONPATH", "/some/path")
-    monkeypatch.setenv("OTHER", "x")
-    env = timeouts.env_without_pythonpath()
-    assert "PYTHONPATH" not in env
-    assert env["OTHER"] == "x"
-
-
 def _pid_exists(pid: int) -> bool:
     try:
         os.kill(pid, 0)

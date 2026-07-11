@@ -216,6 +216,38 @@ def test_sweep_main_forwards_dry_run_override(monkeypatch, capsys):
     assert '"phase_exit_codes"' in capsys.readouterr().out
 
 
+def test_stress_main_forwards_platform_benchmark_scale_as_stress_overrides(monkeypatch, capsys):
+    """w3: _handle_stress routes through run_sweep_from_path(stress_overrides=...)
+    instead of hand-duplicating the platform/benchmark/scale override logic.
+    """
+    calls: list[tuple[Path, dict]] = []
+
+    class StubResult:
+        name = "stub"
+        log_dir = Path("logs")
+        aborted_phase = None
+        abort_reason = None
+        phase_exit_codes = {"execute": 0}
+
+        def exit_code(self):
+            return 0
+
+    def fake_run_sweep_from_path(config_path, *, dry_run_override=None, stress_overrides=None):
+        assert dry_run_override is None
+        calls.append((config_path, stress_overrides))
+        return StubResult()
+
+    monkeypatch.setattr("tests.uat.orchestrator.run_sweep_from_path", fake_run_sweep_from_path)
+    rc = _cli.main(["stress", "--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.5"])
+
+    assert rc == 0
+    default_config_path = Path("tests/uat/_cli.py").resolve().parent / "configs" / "stress-default.yaml"
+    assert calls == [(default_config_path, {"platform": "duckdb", "benchmark": "tpch", "scale": 0.5})]
+    out = capsys.readouterr().out
+    assert '"phase_exit_codes"' in out
+    assert "abort_reason" not in out
+
+
 def test_make_uat_sweep_forwards_dry_run_variable():
     makefile = Path("Makefile").read_text(encoding="utf-8")
     target = makefile.split("uat-sweep:", maxsplit=1)[1].split("# make uat-stress", maxsplit=1)[0]
@@ -345,3 +377,70 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
         "free_space_checks_enabled": True,
     }
     assert '"name": "managed-cli"' in capsys.readouterr().out
+
+
+def test_uat_execute_and_execute_only_sweep_produce_identical_cells_jsonl(tmp_path, monkeypatch, capsys):
+    """uat-execute-path-unification w2 parity requirement.
+
+    Post-unification, both `make uat-execute` and `make uat-sweep` share
+    `orchestrator.run_sweep`, so byte-identical cells.jsonl is largely a
+    given. What this test actually pins is that `_handle_execute`'s
+    config-scoping (phases narrowed to `[preflight?, execute]`, cleanup
+    override applied) is cell-output-neutral, and it guards against a
+    future change quietly re-diverging the two entry points.
+    """
+    from tests.uat.config import load_config
+    from tests.uat.orchestrator import run_sweep
+    from tests.uat.runner import CellResult
+
+    def fake_run_cell(platform, benchmark, scale, **kwargs):
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.23,
+            log_path=Path("/nonexistent/cell.log"),
+            result_path=Path("/nonexistent/result.json"),
+        )
+
+    monkeypatch.setattr("tests.uat.phases.execute.run_cell", fake_run_cell)
+
+    config_path = tmp_path / "uat.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                'name: "parity-smoke"',
+                "phases: [execute]",
+                "platforms:",
+                '  include: ["duckdb"]',
+                "benchmarks:",
+                '  include: ["tpch"]',
+                "scales:",
+                "  rungs: [0.01]",
+                "preflight:",
+                "  free_space_min_gib: 0",
+                "output:",
+                f'  logs_dir_template: "{tmp_path / "execute-run"}"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rc = _cli.main(["execute", "--config", str(config_path)])
+    assert rc == 0
+    execute_summary = json.loads(capsys.readouterr().out)
+    execute_log_dir = Path(execute_summary["log_dir"])
+
+    sweep_config = load_config(config_path)
+    sweep_log_dir = tmp_path / "sweep-run"
+    run_sweep(sweep_config, log_dir_override=sweep_log_dir)
+
+    execute_cells = (execute_log_dir / "cells.jsonl").read_text(encoding="utf-8")
+    sweep_cells = (sweep_log_dir / "cells.jsonl").read_text(encoding="utf-8")
+    assert execute_cells == sweep_cells
+
+    execute_sidecar = (execute_log_dir / "cells.jsonl.accounting.json").read_text(encoding="utf-8")
+    sweep_sidecar = (sweep_log_dir / "cells.jsonl.accounting.json").read_text(encoding="utf-8")
+    assert execute_sidecar == sweep_sidecar

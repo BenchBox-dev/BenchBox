@@ -93,23 +93,22 @@ def _handle_sweep(args: argparse.Namespace) -> int:
 
 def _handle_stress(args: argparse.Namespace) -> int:
     """Implements `make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=]`."""
-    from dataclasses import replace
-
-    from tests.uat.config import load_config
-    from tests.uat.orchestrator import run_sweep
+    from tests.uat.orchestrator import run_sweep_from_path
 
     if args.config is None:
         config_path = Path(__file__).resolve().parent / "configs" / "stress-default.yaml"
     else:
         config_path = Path(args.config)
-    config = load_config(config_path)
-    if args.platform is not None:
-        config = replace(config, platforms=replace(config.platforms, groups=(), include=(args.platform,)))
-    if args.benchmark is not None:
-        config = replace(config, benchmarks=replace(config.benchmarks, groups=(), include=(args.benchmark,)))
-    if args.scale is not None:
-        config = replace(config, scales=replace(config.scales, override=args.scale))
-    result = run_sweep(config)
+    # Same closed override set `run_sweep_from_path` already implements for
+    # `make uat-sweep`'s dry-run path (spec Section 4 override contract) --
+    # this used to be a second, hand-duplicated copy of the platform/
+    # benchmark/scale override logic. Reuse instead of re-implementing.
+    stress_overrides = {
+        "platform": args.platform,
+        "benchmark": args.benchmark,
+        "scale": args.scale,
+    }
+    result = run_sweep_from_path(config_path, stress_overrides=stress_overrides)
     print(
         json.dumps(
             {
@@ -145,60 +144,12 @@ def _handle_preflight(args: argparse.Namespace) -> int:
     return 0
 
 
-def _read_skipped_unreachable_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
-    """Read the skipped-unreachable count persisted alongside ``cells.jsonl``.
-
-    The durable sweep writes ``<cells.jsonl>.accounting.json`` next to the cell
-    stream because skipped-unreachable cells are ``Cell`` records, not
-    ``CellResult`` rows, and so cannot appear in the JSONL. Returns
-    ``(count, sidecar_present)``: ``(0, False)`` when the sidecar is absent or
-    unreadable (older artifacts predate it - the count is *assumed* 0, not
-    confirmed), and ``(count, True)`` when a sidecar was read successfully.
-    The caller threads ``sidecar_present`` into
-    ``write_report(unreachable_count_is_estimated=...)`` so a regenerated
-    report can distinguish "confirmed unreachable=0" from "sidecar missing,
-    unreachable assumed 0."
-    """
-    import json as _json
-
-    sidecar = cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
-    if not sidecar.exists():
-        return 0, False
-    try:
-        with sidecar.open(encoding="utf-8") as fh:
-            payload = _json.load(fh)
-        return int(payload.get("skipped_unreachable_count", 0)), True
-    except (OSError, ValueError, TypeError):
-        return 0, False
-
-
 def _handle_report(args: argparse.Namespace) -> int:
     """Implements `make uat-report`. Reads cells from a JSON-lines stream."""
-    import json as _json
-
+    from tests.uat.cells_io import read_cells_jsonl, read_skipped_unreachable_sidecar
     from tests.uat.phases.report import write_report
-    from tests.uat.runner import CellResult
 
-    cells = []
-    with open(args.cells_jsonl, encoding="utf-8") as fh:
-        for line in fh:
-            if not line.strip():
-                continue
-            payload = _json.loads(line)
-            cells.append(
-                CellResult(
-                    platform=payload["platform"],
-                    benchmark=payload["benchmark"],
-                    scale=float(payload["scale"]),
-                    status=payload["status"],
-                    exit_code=int(payload.get("exit_code", 0)),
-                    elapsed_s=float(payload.get("elapsed_s", 0.0)),
-                    log_path=Path(payload.get("log_path", "")),
-                    result_path=(Path(payload["result_path"]) if payload.get("result_path") else None),
-                    submit_terminal_state=payload.get("submit_terminal_state", "submittable"),
-                    throughput_check=payload.get("throughput_check"),
-                )
-            )
+    cells = read_cells_jsonl(Path(args.cells_jsonl))
     # Skipped-unreachable cells are not JSONL rows; the durable sweep writes
     # their count to a sidecar next to cells.jsonl. Read it back so a
     # regenerated report keeps `total_defined` faithful instead of printing
@@ -206,7 +157,7 @@ def _handle_report(args: argparse.Namespace) -> int:
     # (older artifacts), the count defaults to 0 but is not confirmed -
     # `unreachable_count_is_estimated` makes that distinction visible instead
     # of silently looking identical to a confirmed clean run.
-    skipped_unreachable_count, sidecar_present = _read_skipped_unreachable_sidecar(Path(args.cells_jsonl))
+    skipped_unreachable_count, sidecar_present = read_skipped_unreachable_sidecar(Path(args.cells_jsonl))
     rungs = _split_csv(args.rungs)
     summary = write_report(
         cells,
@@ -383,42 +334,76 @@ def _handle_verify_tuning_matrix(args: argparse.Namespace) -> int:
 
 
 def _handle_execute(args: argparse.Namespace) -> int:
-    """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
-    from tests.uat.config import disk_gate_disabled_warning, load_config
-    from tests.uat.phases.execute import default_benchmark_runs_dir, default_log_dir, run_execute
-    from tests.uat.phases.preflight import preflight_kwargs_from_config, run_preflight
+    """Implements `make uat-execute CONFIG=path/to/uat.yaml`.
+
+    Routes through the orchestrator's canonical phase loop (`run_sweep`,
+    scoped to `[preflight?, execute]`) instead of a hand-rolled
+    preflight+execute duplicate, so `make uat-execute` gets the same
+    per-cell disk-floor watch and durable cells.jsonl + accounting sidecar a
+    sweep gets -- see uat-execute-path-unification w2. One behavior
+    improvement over the prior standalone implementation: a mid-execute
+    disk-floor abort now also emits the abort-safe cells.jsonl/partial-report
+    artifacts (previously `make uat-execute` had none).
+    """
+    from dataclasses import replace
+
+    from tests.uat.config import load_config
+    from tests.uat.orchestrator import run_sweep
+    from tests.uat.phases.execute import default_benchmark_runs_dir
 
     config = load_config(args.config)
     benchmark_runs_dir = default_benchmark_runs_dir(config)
-    gate_warning = disk_gate_disabled_warning(config)
-    if gate_warning is not None:
-        print(gate_warning, file=sys.stderr)
-    if "preflight" in config.phases:
-        preflight = run_preflight(**preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir))
-        if preflight.disk_budget_summary:
-            print(preflight.disk_budget_summary, file=sys.stderr)
-        for line in getattr(preflight, "free_space_report", ()):
-            print(line, file=sys.stderr)
-        for warning in preflight.warnings:
-            print(f"[preflight warn] {warning}", file=sys.stderr)
-        if preflight.aborted:
-            print(f"[preflight] ABORT: {preflight.abort_reason}", file=sys.stderr)
-            return 2
-
     databases_root = Path(args.databases_root).expanduser() if args.databases_root else benchmark_runs_dir / "databases"
-    log_dir = default_log_dir(config)
-    execute_kwargs: dict = {
-        "log_dir": log_dir,
-        "benchmark_runs_dir": benchmark_runs_dir,
-        "databases_root": databases_root,
-        "cleanup_enabled": not args.no_cleanup and config.cleanup.prune_databases,
-        "free_space_checks_enabled": config.disk_gate_enabled,
-    }
-    outcome = run_execute(config, **execute_kwargs)
+
+    # `make uat-execute` runs preflight only when the config's own `phases:`
+    # list requests it (matching the prior standalone implementation' gating
+    # on `"preflight" in config.phases`), plus execute -- never
+    # validate/package/report/explorer_smoke, which stay `make uat-sweep`'s
+    # job.
+    phases = tuple(phase for phase in ("preflight", "execute") if phase in config.phases)
+    if "execute" not in phases:
+        phases = (*phases, "execute")
+    cleanup_enabled = not args.no_cleanup and config.cleanup.prune_databases
+    scoped_config = replace(
+        config,
+        phases=phases,
+        cleanup=replace(config.cleanup, prune_databases=cleanup_enabled),
+    )
+
+    result = run_sweep(scoped_config, databases_root=databases_root)
+
+    if result.aborted_phase == "preflight":
+        print(f"[preflight] ABORT: {result.abort_reason}", file=sys.stderr)
+        return 2
+
+    outcome = result.execute_outcome
+    if outcome is None:
+        # Reachable only when the execute phase never actually ran -- e.g. a
+        # `dry_run: true` config, where run_sweep records exit 0 per phase
+        # without invoking run_execute. (A mid-execute disk-floor abort does
+        # NOT land here: run_sweep synthesizes an ExecuteOutcome from the
+        # attempted cells for that case, so it flows through the normal
+        # summary path below.) There are no per-cell counts to report.
+        summary = {
+            "name": config.name,
+            "log_dir": str(result.log_dir),
+            "passed": 0,
+            "failed": 0,
+            "timed_out": 0,
+            "pruned": 0,
+            "compatibility_pruned": 0,
+            "skipped_unreachable": 0,
+            "docker_events": 0,
+            "aborted": True,
+            "abort_reason": result.abort_reason,
+        }
+        print(json.dumps(summary, indent=2))
+        print(f"[execute] ABORT: {result.abort_reason}", file=sys.stderr)
+        return 2
 
     summary = {
         "name": config.name,
-        "log_dir": str(log_dir),
+        "log_dir": str(result.log_dir),
         "passed": sum(1 for r in outcome.results if r.status == "passed"),
         "failed": sum(1 for r in outcome.results if r.status == "failed"),
         "timed_out": sum(1 for r in outcome.results if r.status == "timed-out"),
