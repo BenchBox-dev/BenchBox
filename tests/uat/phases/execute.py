@@ -64,6 +64,12 @@ class ExecuteOutcome(PhaseResult):
     def exit_code(self) -> int:
         if self.aborted:
             return 2
+        # `all(... for result in self.results)` is vacuously True when
+        # `self.results` is empty (e.g. every platform was unreachable, or
+        # every managed Docker compose-up failed) -- that must not read as a
+        # clean sweep.
+        if not self.results:
+            return 1
         return 0 if all(result.status == "passed" for result in self.results) else 1
 
 

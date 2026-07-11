@@ -79,8 +79,19 @@ work:
       still exercised (stream-count mismatch on a passed cell).
   - id: w2
     summary: "ExecuteOutcome.exit_code() returns nonzero when results is empty or nothing passed; regression tests for the all-unreachable and compose-up-all-failed paths"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      tests/uat/phases/execute.py ExecuteOutcome.exit_code(): added an
+      explicit `if not self.results: return 1` guard before the
+      `all(status == "passed" ...)` check, since `all([])` is vacuously True.
+      Extended the existing test_execute_skips_unreachable_platform with an
+      `exit_code() == 1` assertion (all-unreachable path, zero cells run),
+      and added test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails
+      (single-platform sweep whose only managed compose-up fails -> empty
+      results) plus a direct-construction sanity test
+      (test_execute_outcome_exit_code_zero_only_when_all_passed) covering
+      all-passed/one-failed/no-results in tests/uat/test_phases.py.
   - id: w3
     summary: "Stop terminal_state falling through to submit_terminal_state for failed cells: give them an explicit failed-state token; update fixtures and test_report_accounting"
     status: pending
