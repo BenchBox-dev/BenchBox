@@ -335,10 +335,13 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
     rc = _cli.main(["execute", "--config", str(config_path)])
 
     assert rc == 0
+    # free_space_checks_enabled is True even though "preflight" is absent from
+    # `phases:` -- the disk gate is always-on for execute-bearing runs,
+    # decoupled from phase-list membership (uat-disk-gate-always-on w1).
     assert captured == {
         "docker_manage_platforms": True,
         "docker_platform_switch": "volumes",
         "cleanup_enabled": True,
-        "free_space_checks_enabled": False,
+        "free_space_checks_enabled": True,
     }
     assert '"name": "managed-cli"' in capsys.readouterr().out

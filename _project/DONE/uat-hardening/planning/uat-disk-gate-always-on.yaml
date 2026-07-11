@@ -2,7 +2,8 @@ id: uat-disk-gate-always-on
 title: "Make the UAT disk-headroom gate always-on (decouple from phase list) and stop the budget gate degrading silently"
 worktree: uat-hardening
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-07-11"
 category: "Reliability / Safety"
 
 description: |
@@ -40,20 +41,63 @@ prior_art:
 work:
   - id: w1
     summary: "Replace the phase-list keying in orchestrator.py and _cli.py with an always-on default driven by the resolved floor; the preflight phase keeps owning only the pre-sweep report/abort"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      Added `UATConfig.disk_gate_enabled` property (config.py, resolved
+      floor > 0). orchestrator.py's execute-phase kwargs
+      (`free_space_checks_enabled`, `watch_disk_floor` fed into
+      `_build_disk_floor_runner`) and _cli.py's `_handle_execute`
+      `free_space_checks_enabled` kwarg now consume it instead of
+      `"preflight" in config.phases`. The `if phase == "preflight":` /
+      `if "preflight" in config.phases:` blocks that own the pre-sweep
+      report/abort are unchanged -- only the two keying sites that gated a
+      safety interlock were replaced.
   - id: w2
     summary: "free_space_min_gib: 0 emits a prominent 'disk gate DISABLED by config' warning at sweep start and records disk_gate_disabled=true in the accounting sidecar"
-    status: pending
+    status: done
     needs: [w1]
+    notes: >
+      Config-load validation already allowed exactly 0 via
+      `_require_nonnegative_float` (negatives rejected) -- no schema change
+      needed. Added `config.disk_gate_disabled_warning()` printed to stderr
+      at the top of `run_sweep` (when `"execute" in config.phases` and not
+      dry_run) and at the top of `_cli._handle_execute`. Threaded a new
+      `disk_gate_disabled` bool through `orchestrator._write_cells_jsonl`
+      into the `cells.jsonl.accounting.json` sidecar (additive field;
+      existing readers key only on `skipped_unreachable_count`).
   - id: w3
     summary: "Narrow preflight.py:217 to expected error types; estimator failures fail preflight with the underlying error instead of silently degrading to the flat cutoff"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      Narrowed the `except Exception` around
+      `estimate_disk_budget_summary_and_gate` to `(OSError, ValueError,
+      KeyError)`. On catch, `run_preflight` now returns immediately with
+      `aborted=True` and `abort_reason=f"disk budget estimator failed:
+      {type(exc).__name__}: {exc}"` instead of appending a warning and
+      falling through to the flat-cutoff path. `unknown_cells` (missing
+      table rows) is unchanged -- still advisory, still a warning, never a
+      gate. Updated the old warn-and-continue test
+      (test_preflight_disk_budget_table_error_is_advisory ->
+      test_preflight_disk_budget_table_error_hard_fails_preflight) and
+      added test_preflight_disk_budget_unexpected_error_propagates to pin
+      that a genuinely unexpected exception type is NOT swallowed.
   - id: w4
     summary: "Regression tests: execute-only config still gets the per-cell watch; estimator exception fails preflight; zero-floor warning + sidecar flag asserted"
-    status: pending
+    status: done
     needs: [w1, w2, w3]
+    notes: >
+      Added to test_orchestrator.py: test_execute_only_config_still_gets_disk_floor_watch
+      (phases=["execute"], mocked low disk -> aborted_phase == "execute")
+      and test_zero_floor_warns_loudly_and_flags_accounting_sidecar
+      (free_space_min_gib=0 -> stderr warning + accounting sidecar
+      disk_gate_disabled=true). Added to test_preflight.py: the w3 tests
+      above. Updated test_cli_dispatch.py's
+      test_execute_main_reads_cleanup_config_for_standalone_path
+      (free_space_checks_enabled expectation False -> True for an
+      execute-only config, since the disk gate no longer depends on
+      "preflight" being in phases).
 
 deferred:
   - summary: "Pre-cell (predictive) disk check so one oversized cell cannot fill the disk before the post-cell watch fires"
@@ -103,3 +147,14 @@ metadata:
   estimated_effort: Small
   created_date: "2026-07-11"
   source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), findings D1/D2"
+
+files_affected:
+  modified:
+  - tests/uat/config.py
+  - tests/uat/orchestrator.py
+  - tests/uat/_cli.py
+  - tests/uat/phases/preflight.py
+  - tests/uat/test_orchestrator.py
+  - tests/uat/test_preflight.py
+  - tests/uat/test_cli_dispatch.py
+  - docs/operations/uat-framework.md
