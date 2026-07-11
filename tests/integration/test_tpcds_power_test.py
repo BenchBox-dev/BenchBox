@@ -27,6 +27,7 @@ from benchbox.core.tpcds.power_test import (
     TPCDSPowerTest,
     TPCDSPowerTestResult as PowerTestResult,  # Alias for backward compatibility
 )
+from benchbox.platforms.base.connection_wrappers import PlatformAdapterCursor
 
 # Mark all tests in this file as integration tests
 pytestmark = [
@@ -414,6 +415,60 @@ class TestTPCDSPowerTest:
         mock_cursor.fetchall.assert_called()
         mock_connection.commit.assert_called()
 
+    def test_execute_query_count_only_path_never_warns(self, caplog):
+        """#1137 review: _execute_query must count via a PlatformAdapterCursor's
+        reported rows_returned (never materializing/warning), not eagerly call
+        fetchall() when a real count is already available."""
+        import logging
+
+        mock_benchmark = self.create_mock_benchmark()
+        cursor = PlatformAdapterCursor(
+            {"status": "SUCCESS", "rows_returned": 7, "first_row": ("sentinel",), "query_id": "1"}
+        )
+        mock_connection = Mock()
+        mock_connection.execute.return_value = cursor
+
+        power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
+        power_test.connection = mock_connection
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.base.connection_wrappers"):
+            result = power_test._execute_query(1, "SELECT 1 as test")
+
+        assert result["status"] == "success"
+        assert result["result_count"] == 7
+        assert cursor._rows is None  # never materialized
+        connection_wrapper_warnings = [
+            r
+            for r in caplog.records
+            if r.name == "benchbox.platforms.base.connection_wrappers" and r.levelno == logging.WARNING
+        ]
+        assert connection_wrapper_warnings == []
+
+    def test_warm_up_database_never_warns(self, caplog):
+        """#1137 review: warm-up queries drain via row_count(), not fetchall(),
+        so a real PlatformAdapterCursor never trips the placeholder warning."""
+        import logging
+
+        mock_benchmark = self.create_mock_benchmark()
+        cursor = PlatformAdapterCursor({"status": "SUCCESS", "rows_returned": 3, "query_id": "warmup"})
+        mock_connection = Mock()
+        mock_connection.execute.return_value = cursor
+
+        power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:", warm_up=True)
+        power_test.connection = mock_connection
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.base.connection_wrappers"):
+            power_test._warm_up_database()
+
+        assert mock_connection.execute.call_count >= 5
+        assert cursor._rows is None  # never materialized
+        connection_wrapper_warnings = [
+            r
+            for r in caplog.records
+            if r.name == "benchbox.platforms.base.connection_wrappers" and r.levelno == logging.WARNING
+        ]
+        assert connection_wrapper_warnings == []
+
     def test_execute_one_query_propagates_captured_plan_fields(self):
         """--capture-plans / --normalize-plan-literals on TPC-DS power: the adapter's
         captured plan/fingerprints live on cursor.platform_result, but _execute_one_query
@@ -495,6 +550,50 @@ class TestTPCDSPowerTest:
         query_result = result.query_results[0]
         assert "query_plan" not in query_result
         assert "plan_fingerprint" not in query_result
+
+    def test_execute_one_query_count_only_path_never_warns(self, caplog):
+        """#1137 review: _execute_one_query must count via a
+        PlatformAdapterCursor's reported rows_returned (never
+        materializing/warning) rather than eagerly calling fetchall()."""
+        import logging
+
+        from benchbox.core.tpcds.power_test import TPCDSPowerTestConfig, TPCDSPowerTestResult
+
+        mock_benchmark = self.create_mock_benchmark()
+        power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
+        power_test.config = TPCDSPowerTestConfig(scale_factor=1.0)
+
+        cursor = PlatformAdapterCursor(
+            {"status": "SUCCESS", "rows_returned": 5, "first_row": ("sentinel",), "query_id": "1"}
+        )
+        mock_connection = Mock(spec=["execute", "commit"])
+        mock_connection.execute.return_value = cursor
+
+        result = TPCDSPowerTestResult(
+            config=power_test.config,
+            start_time="",
+            end_time="",
+            total_time=0.0,
+            power_at_size=0.0,
+            queries_executed=0,
+            queries_successful=0,
+            query_results=[],
+            success=True,
+            errors=[],
+        )
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.base.connection_wrappers"):
+            power_test._execute_one_query(0, 1, mock_connection, stream_param_seed=1, result=result)
+
+        query_result = result.query_results[0]
+        assert query_result["result_count"] == 5
+        assert cursor._rows is None  # never materialized
+        connection_wrapper_warnings = [
+            r
+            for r in caplog.records
+            if r.name == "benchbox.platforms.base.connection_wrappers" and r.levelno == logging.WARNING
+        ]
+        assert connection_wrapper_warnings == []
 
     @patch("benchbox.core.tpcds.power_test.DatabaseConnection")
     def test_query_execution_error_handling(self, mock_db_connection):

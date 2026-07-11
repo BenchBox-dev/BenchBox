@@ -310,7 +310,6 @@ class TPCHPowerTest:
                             self.connection.set_query_context(query_id, stream_id=self.config.stream_id)
 
                         cursor = self.connection.execute(query_text)
-                        rows = cursor.fetchall() if hasattr(cursor, "fetchall") else []
 
                         # Check for validation failures from platform adapter
                         if hasattr(cursor, "platform_result"):
@@ -338,7 +337,7 @@ class TPCHPowerTest:
                         {
                             "execution_time_seconds": execution_time,
                             "success": True,
-                            "result_count": self._query_result_count(cursor, rows),
+                            "result_count": self._query_result_count(cursor),
                         }
                     )
 
@@ -423,14 +422,25 @@ class TPCHPowerTest:
         return None
 
     @staticmethod
-    def _query_result_count(cursor: Any, rows: list[Any]) -> int:
-        """Return the true result cardinality for adapter cursors when available."""
+    def _query_result_count(cursor: Any) -> int:
+        """Return the true result cardinality for adapter cursors when available.
+
+        Checks platform_result["rows_returned"] first - this never
+        materializes the cursor's row list, so a count-only power run never
+        trips PlatformAdapterCursor's placeholder-materialization warning
+        (#1137: that warning exists to catch VALUE-dependent consumers of
+        fabricated placeholder rows, not this count-only path). Only calls
+        cursor.fetchall() as a fallback when no reported count is available
+        (raw DB-API cursors, test doubles).
+        """
         platform_result = getattr(cursor, "platform_result", None)
         if isinstance(platform_result, dict):
             reported = platform_result.get("rows_returned")
             if isinstance(reported, int) and reported >= 0:
                 return reported
-        return len(rows)
+        if hasattr(cursor, "fetchall"):
+            return len(cursor.fetchall())
+        return 0
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all queries for the power test."""

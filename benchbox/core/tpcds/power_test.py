@@ -315,7 +315,6 @@ class TPCDSPowerTest:
                 if hasattr(connection, "set_query_context"):
                     connection.set_query_context(query_display_id, stream_id=self.config.stream_id)
                 cursor = connection.execute(query_text)
-                rows = cursor.fetchall() if hasattr(cursor, "fetchall") else []
 
                 if hasattr(cursor, "platform_result"):
                     result_dict = cursor.platform_result
@@ -340,7 +339,7 @@ class TPCDSPowerTest:
                 {
                     "execution_time_seconds": execution_time,
                     "success": True,
-                    "result_count": len(rows),
+                    "result_count": self._query_result_count(cursor),
                 }
             )
             result.queries_successful += 1
@@ -364,6 +363,27 @@ class TPCDSPowerTest:
 
         result.query_results.append(query_result)
         result.queries_executed += 1
+
+    @staticmethod
+    def _query_result_count(cursor: Any) -> int:
+        """Return the true result cardinality for adapter cursors when available.
+
+        Checks platform_result["rows_returned"] first - this never
+        materializes the cursor's row list, so a count-only power run never
+        trips PlatformAdapterCursor's placeholder-materialization warning
+        (#1137: that warning exists to catch VALUE-dependent consumers of
+        fabricated placeholder rows, not this count-only path). Only calls
+        cursor.fetchall() as a fallback when no reported count is available
+        (raw DB-API cursors, test doubles).
+        """
+        platform_result = getattr(cursor, "platform_result", None)
+        if isinstance(platform_result, dict):
+            reported = platform_result.get("rows_returned")
+            if isinstance(reported, int) and reported >= 0:
+                return reported
+        if hasattr(cursor, "fetchall"):
+            return len(cursor.fetchall())
+        return 0
 
     def _finalize_power_metrics(self, result: TPCDSPowerTestResult, start_time: float) -> None:
         """Compute Power@Size, total time, success flag - TPC-DS requires >=70% query success."""
@@ -581,7 +601,16 @@ class TPCDSPowerTest:
         for query in warm_up_queries:
             try:
                 cursor = self.connection.execute(query)
-                cursor.fetchall()
+                # row_count() reads the already-executed platform_result
+                # directly and never materializes/warns (#1137); fall back to
+                # fetchall() to drain a raw DB-API cursor that has no
+                # row_count(). The result is discarded either way - this is
+                # purely a drain/no-op, not a data dependency.
+                counter = getattr(cursor, "row_count", None)
+                if callable(counter):
+                    counter()
+                elif hasattr(cursor, "fetchall"):
+                    cursor.fetchall()
             except Exception:
                 pass  # Ignore warm-up failures
 
@@ -606,8 +635,7 @@ class TPCDSPowerTest:
 
         try:
             cursor = self.connection.execute(query_text)
-            rows = cursor.fetchall()
-            result["result_count"] = len(rows)
+            result["result_count"] = self._query_result_count(cursor)
             self.connection.commit()
         except Exception as e:
             result["status"] = "error"

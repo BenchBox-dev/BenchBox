@@ -266,6 +266,54 @@ class TestTPCTestIntegration:
         assert result.success
         assert result.query_results[0]["result_count"] == 42
 
+    def test_tpch_power_test_count_only_path_never_warns(self, tpch_mock_benchmark, caplog):
+        """#1137 review: the power harness must count via row_count() (never
+        materializing/warning), not eagerly call fetchall() on every query.
+
+        Uses a FRESH, not-yet-materialized cursor - unlike
+        test_tpch_power_test_uses_adapter_reported_row_count above, which
+        already calls fetchall() on its cursor before the run and would mask
+        a regression here."""
+        import logging
+
+        cursor = PlatformAdapterCursor(
+            {
+                "status": "SUCCESS",
+                "rows_returned": 42,
+                "first_row": ("sentinel",),
+                "query_id": "6",
+            }
+        )
+        assert cursor._rows is None  # not yet materialized
+
+        mock_connection = Mock()
+        mock_connection.execute.return_value = cursor
+
+        power_test = TPCHPowerTest(
+            benchmark=tpch_mock_benchmark,
+            connection=mock_connection,
+            scale_factor=1.0,
+            seed=1,
+            validation=False,
+            warm_up=False,
+            query_subset=["6"],
+        )
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.base.connection_wrappers"):
+            result = power_test.run()
+
+        assert result.success
+        assert result.query_results[0]["result_count"] == 42
+        assert cursor._rows is None  # still never materialized
+        # Filtered by logger name: query_subset itself logs an unrelated,
+        # expected non-compliance warning from benchbox.core.tpch.power_test.
+        connection_wrapper_warnings = [
+            r
+            for r in caplog.records
+            if r.name == "benchbox.platforms.base.connection_wrappers" and r.levelno == logging.WARNING
+        ]
+        assert connection_wrapper_warnings == []
+
     @patch("rich.console.Console")
     def test_tpch_power_test_execution_flow(self, mock_console, tpch_mock_benchmark):
         """Test TPC-H power test execution flow."""
