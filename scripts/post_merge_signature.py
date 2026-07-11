@@ -129,6 +129,16 @@ def _build_command(args: argparse.Namespace) -> int:
     try:
         if args.junit:
             signature = build_signature_from_junit(args.job, args.junit)
+            # A gate can fail for a reason junit never records - e.g. pytest-cov's
+            # --cov-fail-under gate, which fails the step (and job) while every
+            # individual testcase passes, leaving zero <failure>/<error> elements.
+            # Trusting an empty junit-derived signature in that case would make
+            # the diff see no new failures and silently suppress a real revert.
+            # Only override when the job actually failed AND junit found nothing -
+            # a job that failed WITH real testcase failures keeps its junit
+            # signature (more precise than the coarse job-level descriptor).
+            if args.job_failed and not signature["failure_ids"]:
+                signature = build_signature_from_job_failure(args.job, args.failed_step)
         else:
             signature = build_signature_from_job_failure(args.job, args.failed_step)
     except SignatureError as exc:
@@ -171,7 +181,17 @@ def main(argv: list[str] | None = None) -> int:
     build_parser.add_argument("--junit", type=Path, help="Path to a junit XML report")
     build_parser.add_argument(
         "--failed-step",
-        help="Name of the failed step, for non-junit jobs (omit if the job succeeded)",
+        help="Name of the failed step, for non-junit jobs (omit if the job succeeded). "
+        "Combined with --junit and --job-failed, this is also the fallback descriptor "
+        "used when the job failed but junit recorded no testcase-level failures.",
+    )
+    build_parser.add_argument(
+        "--job-failed",
+        action="store_true",
+        help="The job failed overall (e.g. job.status == 'failure'). With --junit, an "
+        "empty junit-derived signature is then treated as untrustworthy (a job can fail "
+        "for a reason junit never records, e.g. a coverage-threshold gate) and replaced "
+        "with a --failed-step job-failure descriptor instead of a false-clean signature.",
     )
     build_parser.add_argument("--out", type=Path, required=True, help="Path to write the signature JSON")
     build_parser.set_defaults(func=_build_command)

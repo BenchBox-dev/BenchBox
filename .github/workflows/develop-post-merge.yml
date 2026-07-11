@@ -85,16 +85,26 @@ jobs:
       - name: Emit fast-test signature
         # Bare python is intentional: the signature builder is stdlib-only.
         # Falls back to a job-failure descriptor if pytest crashed before
-        # writing junit XML at all (e.g. a collection-time crash), or left a
-        # truncated/unparseable file behind (killed mid-write) - a signature
-        # artifact must ALWAYS upload, or the auto-revert diff would compare
-        # against a partial current signature and could wrongly suppress.
+        # writing junit XML at all (e.g. a collection-time crash), left a
+        # truncated/unparseable file behind (killed mid-write), or failed for
+        # a reason junit never records (e.g. pytest-cov's --cov-fail-under
+        # gate, where every testcase passes but the step still fails) - a
+        # signature artifact must ALWAYS upload and must never look clean
+        # when the job actually failed, or the auto-revert diff would
+        # compare against a partial/false-clean current signature and could
+        # wrongly suppress.
         if: always()
         shell: bash
         run: |
           set -euo pipefail
+          JOB_FAILED_FLAG=""
+          if [ "${{ job.status }}" = "failure" ]; then
+            JOB_FAILED_FLAG="--job-failed"
+          fi
           if [ -f fast-test-junit.xml ]; then
-            python scripts/post_merge_signature.py build --job fast-test --junit fast-test-junit.xml --out signature.json \
+            python scripts/post_merge_signature.py build --job fast-test --junit fast-test-junit.xml \
+              --failed-step "Run CI fast-test mirror (job failed with no testcase-level failures, e.g. coverage threshold)" \
+              $JOB_FAILED_FLAG --out signature.json \
               || python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (junit xml unparseable)" --out signature.json
           else
             python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (no junit xml produced)" --out signature.json
@@ -198,15 +208,23 @@ jobs:
 
       - name: Emit medium-test signature
         # Bare python is intentional: the signature builder is stdlib-only.
-        # Same missing/unparseable-junit fallback as fast-test: a signature
-        # artifact must always upload so the auto-revert diff never runs on
-        # a partial current signature.
+        # Same missing/unparseable-junit AND job-failed-but-junit-is-clean
+        # fallbacks as fast-test: a signature artifact must always upload and
+        # must never look clean when the job actually failed, or the
+        # auto-revert diff could run on a partial/false-clean current
+        # signature.
         if: always()
         shell: bash
         run: |
           set -euo pipefail
+          JOB_FAILED_FLAG=""
+          if [ "${{ job.status }}" = "failure" ]; then
+            JOB_FAILED_FLAG="--job-failed"
+          fi
           if [ -f medium-test-junit.xml ]; then
-            python scripts/post_merge_signature.py build --job medium-test --junit medium-test-junit.xml --out signature.json \
+            python scripts/post_merge_signature.py build --job medium-test --junit medium-test-junit.xml \
+              --failed-step "Run medium speed tier (job failed with no testcase-level failures)" \
+              $JOB_FAILED_FLAG --out signature.json \
               || python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (junit xml unparseable)" --out signature.json
           else
             python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (no junit xml produced)" --out signature.json
@@ -402,14 +420,25 @@ jobs:
 
           # Merge the four gate jobs' per-job signature artifacts (one
           # subdirectory per artifact, downloaded above) into a single
-          # combined signature for this run.
-          if compgen -G "current-signatures/*/signature.json" > /dev/null; then
-            if ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
-              current-signatures/*/signature.json > current-combined.json; then
-              fail_open_reason="Could not combine this run's signature artifacts (malformed signature JSON)."
+          # combined signature for this run. Require ALL FOUR expected gate
+          # artifacts, not just "at least one": if one gate crashes/times out
+          # before its always()-run signature step can upload (or the upload
+          # itself fails), the other three still leave signature.json files
+          # behind, so a bare compgen glob check would silently diff a
+          # partial current signature and could suppress a revert the missing
+          # gate's real failure warranted.
+          EXPECTED_SIGNATURE_JOBS=(lint fast-test explorer-tokens medium-test)
+          missing_signatures=()
+          for job in "${EXPECTED_SIGNATURE_JOBS[@]}"; do
+            if [ ! -f "current-signatures/signature-${job}/signature.json" ]; then
+              missing_signatures+=("${job}")
             fi
-          else
-            fail_open_reason="No current-run signature artifacts were found."
+          done
+          if [ "${#missing_signatures[@]}" -gt 0 ]; then
+            fail_open_reason="Missing current-run signature artifact(s) for: ${missing_signatures[*]} (gate job crashed, timed out, or was cancelled before its signature could upload)."
+          elif ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
+            current-signatures/*/signature.json > current-combined.json; then
+            fail_open_reason="Could not combine this run's signature artifacts (malformed signature JSON)."
           fi
 
           if [ -z "${fail_open_reason}" ]; then
