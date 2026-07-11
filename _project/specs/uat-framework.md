@@ -124,7 +124,7 @@ tests/uat/
 | `docker_assets.py` | Single connection registry: compose-file map, compose-derived host ports + platform options, safe project-scoped compose commands | 180 | 504 |
 | `docker_cleanup.py` | Docker stack teardown at platform boundaries; project-scoped down/volume handling | — | 372 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 | 83 |
-| `preflight_budget.py` | Disk free-space floor budgeting and resume-on-abort accounting | — | 216 |
+| `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 216 |
 | `phases/__init__.py` | UAT phase package marker and phase contract documentation string | — | 17 |
 | `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 407 |
 | `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 | 137 |
@@ -292,16 +292,15 @@ preflight:
 # The estimate never gates execution; unknown cells are surfaced as a
 # count and `preflight.free_space_min_gib` remains the hard cutoff.
 
-# Resume manifest -------------------------------------------------------
-# On a free-space-floor abort, the orchestrator writes
-# `<log-dir>/resume.json` with:
-#   version: 1
-#   config_name, log_dir, aborted_phase, abort_reason
-#   attempted[]: cell_key, platform, benchmark, scale,
-#                terminal_state, exit_code, elapsed_s,
-#                log_path, result_path
-# `--resume <manifest>` on sweep/execute reuses attempted records and
-# runs the remaining cells without invalidating datagen reuse.
+# Resume (retired) -------------------------------------------------------
+# The resume manifest (`<log-dir>/resume.json`, `--resume <manifest>`)
+# was removed -- see uat-resume-retirement-artifact-durability. It was
+# verified fragile (no version/config/commit check on replay, only ever
+# written for free-space aborts, unreachable from `make`) and datagen
+# reuse already makes a full rerun cheap. The abort-safe artifacts
+# (cells.jsonl, compatibility_pruned.jsonl, matrix_summary.partial.tsv)
+# stay and are now written atomically -- see "Artifact provenance and
+# abort evidence" in docs/operations/uat-framework.md.
 
 # Validate phase --------------------------------------------------------
 validate:
@@ -672,7 +671,7 @@ ran with implicit shared design; the retrospective is the cost.
 
 ## 9. `tests/uat/configs/` content policy
 
-The `tests/uat/configs/` tree holds four lifecycle classes, distinguished by
+The `tests/uat/configs/` tree holds three lifecycle classes, distinguished by
 file-header comment and, for generated rerun shards, by location:
 
 ### 9.1 Editable templates
@@ -706,18 +705,15 @@ name: "uat-2026-05-02"
 
 ### 9.3 Generated rerun shards
 
-Generated rerun shards are operational evidence emitted by a single sweep's
-resume/follow-up path. They live under
+Generated rerun shards are operational evidence emitted by a sweep's manual
+follow-up -- an operator re-running a triaged subset of failed cells in a
+smaller, cell-scoped config (often one file per platform). They live under
 `tests/uat/configs/generated-rerun-shards/`, carry a generated/frozen header,
-and must not be cloned as reusable starting points.
+and must not be cloned as reusable starting points. This is unrelated to the
+retired `--resume <manifest>` mechanism (see the "Resume (retired)" note in
+Section 3): these shards are ordinary sweep configs, not runtime state.
 
-### 9.4 Ephemeral resume state
-
-`resume.json` is runtime state written under the run log directory and consumed
-by `--resume <manifest>`. It is not a tracked config artifact and not a
-reusable file class.
-
-### 9.5 PR conventions
+### 9.4 PR conventions
 
 | Action | Header | Reviewer expectation |
 |---|---|---|
@@ -726,10 +722,9 @@ reusable file class.
 | Add a new historical replay (post-sweep snapshot) | `# HISTORICAL` | Verify the `name:` field encodes the sweep's date/identity. |
 | Edit a `# HISTORICAL` file | (manual review) | Prefer a dated successor unless the framework contract itself drifted. |
 | Add a generated rerun shard | Generated header under `generated-rerun-shards/` | Verify it is frozen evidence from a named sweep, not a template. |
-| Add resume runtime state | n/a | Reject; `resume.json` belongs under the run log directory. |
 
 The conceptual policy is "templates are starting points; historical configs and
-generated rerun shards are evidence; resume state is runtime-only."
+generated rerun shards are evidence."
 
 ## 10. What UAT does NOT assert
 

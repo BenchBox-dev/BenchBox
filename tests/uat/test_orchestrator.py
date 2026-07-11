@@ -430,10 +430,17 @@ def test_orchestrator_writes_compatibility_pruned_jsonl_and_report_count(tmp_pat
     assert "compatibility_pruned=1" in (tmp_path / "logs" / "matrix_summary.tsv").read_text()
 
 
-def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
+def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
+    """A mid-sweep disk-floor abort still emits the #691 abort-safe artifacts.
+
+    Resume machinery (resume.json manifest) was retired -- see
+    uat-resume-retirement-artifact-durability -- but the abort-safe
+    provenance contract (cells.jsonl + partial report on abort) must
+    keep working.
+    """
     cfg = validate_config(
         {
-            "name": "resume-smoke",
+            "name": "disk-floor-smoke",
             "phases": ["preflight", "execute"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
@@ -471,13 +478,9 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
     assert result.aborted_phase == "execute"
-    manifest = tmp_path / "logs" / "resume.json"
-    payload = json.loads(manifest.read_text(encoding="utf-8"))
-    assert payload["aborted_phase"] == "execute"
-    assert payload["source"]["commit_sha"]
-    assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
     cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
-    assert cells[0]["source_commit_sha"] == payload["source"]["commit_sha"]
+    assert cells[0]["platform"] == "duckdb"
+    assert cells[0]["source_commit_sha"]
     partial_report = tmp_path / "logs" / "matrix_summary.partial.tsv"
     assert partial_report.exists()
     partial_text = partial_report.read_text(encoding="utf-8")
@@ -485,10 +488,11 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
     assert "abort_phase=execute" in partial_text
 
 
-def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
+def test_execute_free_space_abort_emits_partial_artifacts(tmp_path: Path):
+    """An execute-outcome-reported free-space abort still emits abort artifacts (resume machinery retired)."""
     cfg = validate_config(
         {
-            "name": "resume-smoke",
+            "name": "free-space-smoke",
             "phases": ["preflight", "execute"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
@@ -535,75 +539,9 @@ def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
     assert result.aborted_phase == "execute"
-    manifest = tmp_path / "logs" / "resume.json"
-    payload = json.loads(manifest.read_text(encoding="utf-8"))
-    assert payload["aborted_phase"] == "execute"
-    assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
+    cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
+    assert cells[0]["platform"] == "duckdb"
     assert (tmp_path / "logs" / "matrix_summary.partial.tsv").exists()
-
-
-def test_manifest_runner_reuses_attempted_cells_and_runs_complement(tmp_path: Path):
-    manifest = tmp_path / "resume.json"
-    manifest.write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "attempted": [
-                    {
-                        "cell_key": "duckdb|tpch|0.01",
-                        "platform": "duckdb",
-                        "benchmark": "tpch",
-                        "scale": 0.01,
-                        "terminal_state": "passed",
-                        "exit_code": 0,
-                        "elapsed_s": 1.0,
-                        "log_path": str(tmp_path / "prior.log"),
-                        "result_path": str(tmp_path / "prior.json"),
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    cfg = validate_config(
-        {
-            "name": "resume-smoke",
-            "platforms": {"include": ["duckdb"]},
-            "benchmarks": {"include": ["tpch"]},
-            "scales": {"rungs": [0.01, 0.1]},
-        }
-    )
-    calls: list[float] = []
-
-    def base_runner(platform, benchmark, scale, **kwargs):
-        calls.append(scale)
-        return CellResult(
-            platform=platform,
-            benchmark=benchmark,
-            scale=scale,
-            status="passed",
-            exit_code=0,
-            elapsed_s=2.0,
-            log_path=tmp_path / f"{scale}.log",
-            result_path=tmp_path / f"{scale}.json",
-        )
-
-    runner = orchestrator.build_resume_runner(
-        orchestrator.load_resume_attempts(manifest),
-        base_runner,
-        log_dir=tmp_path,
-    )
-
-    outcome = exec_phase.run_execute(
-        cfg,
-        log_dir=tmp_path,
-        databases_root=tmp_path / "databases",
-        runner=runner,
-    )
-
-    assert calls == [0.1]
-    assert [result.scale for result in outcome.results] == [0.01, 0.1]
-    assert outcome.results[0].result_path == tmp_path / "prior.json"
 
 
 def _source_info() -> orchestrator.RunSourceInfo:

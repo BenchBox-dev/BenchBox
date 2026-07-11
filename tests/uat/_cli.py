@@ -75,8 +75,6 @@ def _handle_sweep(args: argparse.Namespace) -> int:
     from tests.uat.orchestrator import run_sweep_from_path
 
     sweep_kwargs = {"dry_run_override": True if args.dry_run else None}
-    if args.resume:
-        sweep_kwargs["resume_manifest"] = Path(args.resume)
     result = run_sweep_from_path(Path(args.config), **sweep_kwargs)
     print(
         json.dumps(
@@ -406,12 +404,6 @@ def _handle_execute(args: argparse.Namespace) -> int:
 
     databases_root = Path(args.databases_root).expanduser() if args.databases_root else benchmark_runs_dir / "databases"
     log_dir = default_log_dir(config)
-    runner = None
-    if args.resume:
-        from tests.uat.orchestrator import build_resume_runner, load_resume_attempts
-        from tests.uat.phases.execute import run_cell
-
-        runner = build_resume_runner(load_resume_attempts(Path(args.resume)), run_cell, log_dir=log_dir)
     execute_kwargs: dict = {
         "log_dir": log_dir,
         "benchmark_runs_dir": benchmark_runs_dir,
@@ -419,8 +411,6 @@ def _handle_execute(args: argparse.Namespace) -> int:
         "cleanup_enabled": not args.no_cleanup and config.cleanup.prune_databases,
         "free_space_checks_enabled": "preflight" in config.phases,
     }
-    if runner is not None:
-        execute_kwargs["runner"] = runner
     outcome = run_execute(config, **execute_kwargs)
 
     summary = {
@@ -502,7 +492,6 @@ def _build_parser() -> argparse.ArgumentParser:
     sweep = subparsers.add_parser("sweep", help="run a multi-phase UAT sweep from YAML")
     sweep.add_argument("--config", required=True)
     sweep.add_argument("--dry-run", action="store_true", help="Override the YAML config and skip workload phases")
-    sweep.add_argument("--resume", default=None, help="Path to a prior sweep resume.json manifest")
     _set_handler(sweep, _handle_sweep)
 
     stress = subparsers.add_parser("stress", help="run the canned stress preset")
@@ -564,7 +553,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional override for ~/Developer/benchmark_runs/databases",
     )
     execute.add_argument("--no-cleanup", action="store_true", help="Disable reuse-aware database cleanup")
-    execute.add_argument("--resume", default=None, help="Path to a prior execute/sweep resume.json manifest")
     _set_handler(execute, _handle_execute)
 
     docker = subparsers.add_parser(
