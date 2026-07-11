@@ -62,8 +62,21 @@ prior_art:
 work:
   - id: w1
     summary: "Guard the official/throughput status rewrite so timed-out (and any non-passed status) is preserved; only downgrade passed cells"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      tests/uat/runner.py run_cell(): both status="failed" rewrites in the
+      official/throughput block (successful-read-but-not-ok, and
+      missing/unresolved result_path) are now guarded by `status == "passed"`,
+      mirroring the existing submit-classification guard a few lines above.
+      A timed-out cell with no result JSON now records
+      throughput_check="not validated: cell timed out" instead of the generic
+      "no result JSON resolved..." message, and its status/exit_code are left
+      untouched (stays "timed-out"/124). Added 4 regression tests to
+      tests/uat/test_runner.py: timeout-preserves-status, missing-result
+      downgrades a passed cell, an already-failed cell keeps its own exit
+      code, and the existing downgrade-on-real-throughput-failure behavior is
+      still exercised (stream-count mismatch on a passed cell).
   - id: w2
     summary: "ExecuteOutcome.exit_code() returns nonzero when results is empty or nothing passed; regression tests for the all-unreachable and compose-up-all-failed paths"
     status: pending
