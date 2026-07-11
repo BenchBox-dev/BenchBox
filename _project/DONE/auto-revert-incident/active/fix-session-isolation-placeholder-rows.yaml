@@ -124,5 +124,12 @@ verification:
 scope_limit:
   only_modify:
   - "tests/integration/test_throughput_session_isolation.py"
+  # #1130 review: the primary path (w0/w1, actually taken) lands #1117 as-is
+  # rather than the fallback test-only rewrite; #1117 changed these two
+  # paths. Recorded post-hoc for an accurate scope_limit on this completed
+  # item's audit trail - both were already merged via #1117 before this
+  # correction, not a re-opening of scope.
+  - "benchbox/platforms/base/connection_wrappers.py"
+  - "tests/unit/platforms/base/test_connection_wrappers.py"
 deps:
   needs: []
