@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import csv
 import os
-import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable, Iterable
@@ -28,7 +27,12 @@ from tests.uat.matrix import (
     resolve_platforms,
 )
 from tests.uat.phases import PhaseResult
-from tests.uat.preflight_budget import DiskBudget, DiskHeadroomCheck, DiskRootFreeSpace
+from tests.uat.preflight_budget import (
+    DiskBudget,
+    DiskHeadroomCheck,
+    DiskRootFreeSpace,
+    free_space_gib as free_space_gib,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -72,17 +76,6 @@ class PreflightResult(PhaseResult):
     # human-facing message that can be reworded without notice) -- see
     # uat-execute-path-unification w5.
     abort_kind: str | None = None
-
-
-def free_space_gib(path: str | Path) -> float:
-    """Return free space at `path` in GiB."""
-    p = Path(path).expanduser()
-    if not p.exists():
-        # Walk up to first existing ancestor so a missing log dir doesn't
-        # falsely trigger the abort.
-        p = next((ancestor for ancestor in p.parents if ancestor.exists()), Path("/"))
-    usage = shutil.disk_usage(p)
-    return usage.free / (1024**3)
 
 
 def docker_reachable() -> bool:

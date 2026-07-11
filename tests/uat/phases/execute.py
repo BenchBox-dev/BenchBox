@@ -34,7 +34,7 @@ from tests.uat.phases.enumerate import (
     CompatibilityPrunedCell,
     enumerate_cells_with_pruning,
 )
-from tests.uat.phases.preflight import free_space_gib as default_free_space_reader
+from tests.uat.preflight_budget import free_space_gib as default_free_space_reader
 from tests.uat.runner import CellResult, classify_for_submit, run_cell, submit_state_is_cell_failure
 
 

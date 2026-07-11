@@ -20,7 +20,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from tests.uat import cells_io
+from tests.uat import cells_io, preflight_budget
 from tests.uat.config import UATConfig, disk_gate_disabled_warning, load_config
 from tests.uat.phases import (
     execute as exec_phase,
@@ -112,7 +112,7 @@ def _build_disk_floor_runner(
         result = base_runner(platform, benchmark, scale, **kwargs)
         attempted_cells.append(result)
         if watch_disk_floor:
-            free_gib = preflight_phase.free_space_gib(free_space_path)
+            free_gib = preflight_budget.free_space_gib(free_space_path)
             if free_gib < free_space_min_gib:
                 raise DiskFloorAbort(
                     f"free space {free_gib:.1f} GiB < cutoff {free_space_min_gib:.1f} GiB at {free_space_path}"
