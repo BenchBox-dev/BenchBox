@@ -160,6 +160,65 @@ def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
     assert captured["bundles_dir"] == tmp_path / "submissions" / "smoke"
 
 
+def test_package_phase_excludes_failed_cells_result_paths(tmp_path: Path):
+    """w4 regression: a failed official cell's exported JSON must not be packaged/submitted.
+
+    runner.py resolves a result path for official cells regardless of exit
+    code, so the package-phase input filter must check cell.status, not just
+    `result_path is not None`.
+    """
+    cfg = validate_config(
+        {
+            "name": "smoke",
+            "phases": ["execute", "package"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "package": {"submit_terminal_state": "local-stage"},
+            "output": {"submissions_dir_template": str(tmp_path / "submissions" / "{name}")},
+        }
+    )
+    passed_cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "passed.log",
+        result_path=tmp_path / "passed.json",
+    )
+    failed_cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.1,
+        status="failed",
+        exit_code=1,
+        elapsed_s=1.0,
+        log_path=tmp_path / "failed.log",
+        result_path=tmp_path / "failed.json",
+    )
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (passed_cell, failed_cell), "aborted": False, "abort_reason": None, "exit_code": lambda self: 1},
+    )()
+    captured: dict[str, list[Path]] = {}
+
+    def fake_package(config, *, result_paths, submissions_dir):
+        captured["result_paths"] = list(result_paths)
+        return type("PackageResult", (), {"aborted": False, "abort_reason": None, "exit_code": lambda self: 0})()
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=execute_outcome),
+        patch("tests.uat.phases.package.run_package", side_effect=fake_package),
+    ):
+        orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert captured["result_paths"] == [passed_cell.result_path]
+    assert failed_cell.result_path not in captured["result_paths"]
+
+
 def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_path: Path):
     root = tmp_path / "shared-runs"
     cfg = validate_config(

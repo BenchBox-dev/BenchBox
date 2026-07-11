@@ -117,8 +117,18 @@ work:
       _handle_report path.
   - id: w4
     summary: "Filter package-phase inputs to passed cells only (orchestrator.py:422); add a test that a failed official cell's exported JSON is not submitted"
-    status: pending
+    status: done
     needs: [w3]
+    notes: |
+      tests/uat/orchestrator.py: the package-phase `result_paths` list
+      comprehension now filters on `r.result_path and r.status == "passed"`
+      (was `r.result_path` only). Left the validate-phase filter at line 383
+      untouched -- out of scope (that phase reasonably still validates every
+      resolved result JSON, passed or not). Added
+      test_package_phase_excludes_failed_cells_result_paths to
+      tests/uat/test_orchestrator.py: a two-cell execute outcome (one passed,
+      one failed, both with result_path set) asserts run_package receives
+      only the passed cell's path.
   - id: w5
     summary: "Persist throughput_check in cells.jsonl and as an appended REPORT_HEADER column; bump the matrix-summary header fixture and replay header test in the same PR"
     status: pending
