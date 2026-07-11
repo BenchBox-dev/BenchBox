@@ -243,21 +243,35 @@ itself for as long as the stream kept running, and with it the whole
 throughput phase and any subsequent phase (e.g. data maintenance).
 
 **Fix:** `execute()` now manages the `ThreadPoolExecutor` manually (no
-`with` block) and calls `executor.shutdown(wait=False)` in a `finally`.
-`shutdown(wait=False)` only stops the executor from accepting new
-submissions — it does not touch, join, or wait on threads that are already
-running. This is deliberately **not** a thread-kill: Python cannot forcibly
-stop a running thread, and this change does not attempt to. A leaked
-thread is *abandoned*, not killed — it keeps running `stream_fn` to
-completion in the background, entirely decoupled from the caller of
-`execute()`.
+`with` block) and calls `executor.shutdown(wait=False, cancel_futures=True)`
+in a `finally`. `shutdown(wait=False)` only stops the executor from
+accepting new submissions — it does not touch, join, or wait on threads
+that are already running. This is deliberately **not** a thread-kill:
+Python cannot forcibly stop a running thread, and this change does not
+attempt to. A leaked (already-**running**) thread is *abandoned*, not
+killed — it keeps running `stream_fn` to completion in the background,
+entirely decoupled from the caller of `execute()`.
+
+`cancel_futures=True` handles a distinct case: when `max_workers <
+num_streams`, a future can still be **queued** (submitted, but never
+dispatched to a worker thread) at the timeout deadline — see "Known
+limitation" above. Without `cancel_futures=True`, such a future would sit
+in the executor's queue and start executing only once a worker frees up
+(e.g. when an earlier hung stream eventually returns), which could be well
+after `execute()` has already returned and counted that stream as
+timed-out — extra, unexpected DB work overlapping with whatever runs next.
+`cancel_futures` only cancels futures that have not started running
+(Python's documented `ThreadPoolExecutor.shutdown` semantics); an
+already-running future is never touched by it, so the
+can't-forcibly-cancel-a-running-thread invariant above is unaffected.
 
 **Healthy-path behavior is unchanged.** When every stream completes before
 the timeout (or no timeout is set), every future is already `done()` by
 the time the `as_completed()`/fallback loop finishes, so
-`shutdown(wait=False)` has nothing left to wait for — it is a no-op
-compared to the old `shutdown(wait=True)`. Only the hung-stream shutdown
-path changes; default timeout behavior for healthy runs is unaffected.
+`shutdown(wait=False, cancel_futures=True)` has nothing left to wait for or
+cancel — it is a no-op compared to the old `shutdown(wait=True)`. Only the
+hung-stream shutdown path changes; default timeout behavior for healthy
+runs is unaffected.
 
 ### Zombie connection ownership
 

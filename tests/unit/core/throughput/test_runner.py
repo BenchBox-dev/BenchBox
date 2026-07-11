@@ -600,3 +600,34 @@ class TestStreamRunnerNonBlockingShutdown:
         cancel_events = getattr(config, "_stream_cancel_events", None)
         assert isinstance(cancel_events, dict) and len(cancel_events) == 1
         assert all(not event.is_set() for event in cancel_events.values())
+
+    def test_queued_stream_never_starts_after_max_workers_throttled_timeout(self) -> None:
+        """#1141 review: with max_workers < num_streams, a future can still
+        be QUEUED (never dispatched to a worker) at the timeout deadline -
+        distinct from a leaked RUNNING future. Without cancel_futures=True,
+        that queued stream would start executing once the sole worker frees
+        up (when the hung stream 0 finally returns), well after execute()
+        has already returned and counted stream 1 as timed out too - extra
+        DB work overlapping with whatever runs next."""
+        started = threading.Event()
+
+        def stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
+            if stream_id == 0:
+                time.sleep(self.HANG_SLEEP)  # occupies the sole worker past the timeout
+            else:
+                started.set()  # only reachable if stream 1 was ever dispatched
+            return _make_stream_result(stream_id)
+
+        config = _FakeConfig(num_streams=2, max_workers=1, stream_timeout=self.TINY_TIMEOUT, cancel_on_timeout=False)
+        result = _make_result()
+        logger = logging.getLogger("test-throughput-runner")
+
+        StreamRunner.execute(stream_fn, config, result, logger)
+
+        assert result.streams_executed == 2
+        assert len(result.errors) == 2
+
+        # Wait well past HANG_SLEEP (when the sole worker frees up) - a
+        # cancelled queued future must never be dispatched, even once a
+        # worker becomes free.
+        assert not started.wait(timeout=self.HANG_SLEEP + 1.0)

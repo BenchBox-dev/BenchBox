@@ -46,23 +46,31 @@ exceeds ``config.stream_timeout``:
 Non-blocking shutdown (return without joining a leaked thread)
 ----------------------------------------------------------------
 ``execute()`` manages the ``ThreadPoolExecutor`` manually (no ``with``
-block) so it can call ``executor.shutdown(wait=False)`` in a ``finally``
-instead of relying on the context manager's implicit
+block) so it can call ``executor.shutdown(wait=False, cancel_futures=True)``
+in a ``finally`` instead of relying on the context manager's implicit
 ``shutdown(wait=True)``. This means ``execute()`` returns as soon as its
 own timeout/accounting window closes -- bounded by ``config.stream_timeout``
 plus classification overhead -- rather than blocking until every submitted
 thread finishes.
 
 On the healthy path (no timeout fires), every future is already ``done()``
-by the time ``as_completed()`` returns, so ``shutdown(wait=False)`` is a
-no-op: there is nothing left to join, and default-timeout behavior for
-healthy runs is unchanged. On the hung path, any future still not
-``done()`` when the deadline elapses is *abandoned*, not killed -- Python
-cannot forcibly stop a running thread. ``shutdown(wait=False)`` only stops
-the executor from accepting new submissions; it does not touch threads
-already running, so the leaked thread keeps executing in the background
-until ``stream_fn`` itself returns (naturally, or via cooperative
-cancellation if enabled) and exits.
+by the time ``as_completed()`` returns, so this call is a no-op: there is
+nothing left to join or cancel, and default-timeout behavior for healthy
+runs is unchanged. On the hung path, two distinct futures can remain
+outstanding at the deadline:
+
+* **Running** (already dispatched to a worker thread): *abandoned*, not
+  killed -- Python cannot forcibly stop a running thread. ``cancel_futures``
+  never touches these (Python's documented semantics only cancel futures
+  that have not started running); the leaked thread keeps executing in the
+  background until ``stream_fn`` itself returns (naturally, or via
+  cooperative cancellation if enabled) and exits.
+* **Queued** (submitted, but ``max_workers < num_streams`` left it still
+  waiting for a worker): ``cancel_futures=True`` cancels these outright, so
+  they never start at all. Without this, a queued stream would begin
+  executing only *after* ``execute()`` has already returned and counted it
+  as timed-out -- extra DB work that can overlap with whatever phase runs
+  next.
 
 **Zombie connection/accounting semantics** (see also
 ``docs/development/throughput-result-alignment.md``): a leaked stream's
@@ -306,11 +314,24 @@ class StreamRunner:
             # (abandoned, not killed) thread. On the healthy path every
             # future is already done() by this point, so this is a no-op --
             # nothing to join, default timeout behavior for healthy runs is
-            # unchanged. On the hung path, any leaked thread keeps running
-            # to completion in the background; its connection is closed by
-            # its own stream_fn's finally whenever that eventually happens.
-            # See the module docstring "Non-blocking shutdown" section.
-            executor.shutdown(wait=False)
+            # unchanged. On the hung path, any already-RUNNING leaked thread
+            # keeps running to completion in the background; its connection
+            # is closed by its own stream_fn's finally whenever that
+            # eventually happens.
+            #
+            # cancel_futures=True: when max_workers < num_streams, a future
+            # can still be QUEUED (never dispatched to a worker) at the
+            # deadline -- distinct from a leaked RUNNING future. Without
+            # this, such a future would start executing only AFTER
+            # execute() has already returned and counted it as timed-out,
+            # creating extra DB work that can overlap with whatever phase
+            # runs next. cancel_futures only cancels futures that have not
+            # started running (Python's documented semantics); an
+            # already-running future is never touched by it, so the
+            # can't-forcibly-cancel-a-running-thread invariant above is
+            # unaffected. See the module docstring "Non-blocking shutdown"
+            # section.
+            executor.shutdown(wait=False, cancel_futures=True)
 
     @staticmethod
     def compute_metrics(
