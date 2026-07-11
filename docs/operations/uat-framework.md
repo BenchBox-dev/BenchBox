@@ -225,7 +225,9 @@ Every durable artifact (`cells.jsonl`, its `.accounting.json` sidecar,
 `matrix_summary` TSVs) is written atomically: content lands in a `.tmp`
 sibling first, gets `fsync`'d, then `os.replace`s the real path. A crash or
 error mid-write leaves the previous good artifact (or nothing, on a first
-write) in place instead of a torn file.
+write) in place instead of a torn file. `cells.jsonl` is written before its
+accounting sidecar, so a crash between the two writes cannot leave a fresh
+sidecar next to a stale (or absent) cell stream.
 
 ## Disk-budget estimate
 

@@ -441,14 +441,6 @@ def _write_cells_jsonl(
     source_info: RunSourceInfo,
     skipped_unreachable_count: int = 0,
 ) -> None:
-    # The skipped-unreachable cells are `Cell` records (not `CellResult` rows)
-    # and are therefore not part of the JSONL stream. Persist their count in a
-    # sidecar so a report regenerated from `cells.jsonl` (make uat-report) can
-    # read it back and keep `total_defined` faithful.
-    accounting_path = _cells_accounting_path(path)
-    accounting_text = json.dumps({"skipped_unreachable_count": int(skipped_unreachable_count)}) + "\n"
-    report_phase.atomic_write_text(accounting_path, accounting_text)
-
     lines: list[str] = []
     for cell in cells:
         terminal_state = report_phase.terminal_state(cell)
@@ -476,7 +468,22 @@ def _write_cells_jsonl(
             )
             + "\n"
         )
+    # Write the cell stream itself before its accounting sidecar. If a crash
+    # lands between the two writes, a reader sees either no cells.jsonl yet
+    # (nothing to combine) or a cells.jsonl without a sidecar yet (make
+    # uat-report's _read_skipped_unreachable_sidecar treats a missing sidecar
+    # as an estimated skipped_unreachable_count=0, not a false confirmed 0).
+    # The reverse order could leave a fresh sidecar beside a stale cell
+    # stream, which make uat-report would silently combine as if consistent.
     report_phase.atomic_write_text(path, "".join(lines))
+
+    # The skipped-unreachable cells are `Cell` records (not `CellResult` rows)
+    # and are therefore not part of the JSONL stream. Persist their count in a
+    # sidecar so a report regenerated from `cells.jsonl` (make uat-report) can
+    # read it back and keep `total_defined` faithful.
+    accounting_path = _cells_accounting_path(path)
+    accounting_text = json.dumps({"skipped_unreachable_count": int(skipped_unreachable_count)}) + "\n"
+    report_phase.atomic_write_text(accounting_path, accounting_text)
 
 
 def _write_compatibility_pruned_jsonl(path: Path, cells: Iterable[Any]) -> None:

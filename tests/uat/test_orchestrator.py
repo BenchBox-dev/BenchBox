@@ -590,6 +590,34 @@ def test_write_cells_jsonl_persists_skipped_unreachable_sidecar(tmp_path: Path):
     assert json.loads(sidecar.read_text(encoding="utf-8"))["skipped_unreachable_count"] == 3
 
 
+def test_write_cells_jsonl_writes_cell_stream_before_accounting_sidecar(tmp_path: Path):
+    """cells.jsonl must land before its accounting sidecar (w4).
+
+    A crash between the two writes must never leave a fresh sidecar beside a
+    stale (or absent) cell stream -- see
+    uat-resume-retirement-artifact-durability w4. Record the path order
+    `atomic_write_text` is called in and assert cells.jsonl comes first.
+    """
+    cells_jsonl = tmp_path / "cells.jsonl"
+    written_paths: list[Path] = []
+    real_atomic_write_text = orchestrator.report_phase.atomic_write_text
+
+    def recording_atomic_write_text(path: Path, text: str) -> None:
+        written_paths.append(path)
+        real_atomic_write_text(path, text)
+
+    with patch.object(orchestrator.report_phase, "atomic_write_text", side_effect=recording_atomic_write_text):
+        orchestrator._write_cells_jsonl(
+            cells_jsonl,
+            (),
+            source_info=_source_info(),
+            skipped_unreachable_count=1,
+        )
+
+    sidecar = cells_jsonl.with_name("cells.jsonl.accounting.json")
+    assert written_paths == [cells_jsonl, sidecar]
+
+
 def test_abort_artifacts_thread_skipped_unreachable_when_outcome_missing(tmp_path: Path):
     cfg = validate_config(
         {
