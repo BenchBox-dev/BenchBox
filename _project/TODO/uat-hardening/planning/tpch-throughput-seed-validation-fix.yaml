@@ -1,0 +1,122 @@
+id: tpch-throughput-seed-validation-fix
+title: "Fix TPC-H Q11/16/18/20 row-count validation under non-reference seeds so throughput runs can be clean"
+worktree: uat-hardening
+priority: High
+status: Not Started
+category: "Correctness / Data Integrity"
+
+description: |
+  DECISION (user, 2026-07-11): fix this as part of the UAT hardening effort.
+  It is the single defect that neutralizes the nightly throughput UAT gate.
+
+  The defect (documented in .github/workflows/nightly.yml:580-595 and
+  tests/uat/throughput.py:116-129, verified on develop @ fc31f3604):
+  TPC-H throughput mode derives per-stream/per-position query parameters as
+  `seed + stream_id * 1000 + position`
+  (benchbox/core/tpch/throughput_test.py), so queries 11/16/18/20 -- TPC-H's
+  parameter-sensitive, answer-set-boundary queries -- never land on the
+  reference-seed exact-match validation path after the first query of
+  stream 0. They then fail BenchBox's LOOSE (+-50%) row-count check on
+  every stream. Reproduced upstream with a custom seed, a different custom
+  seed, and no seed at all; confirmed independent of concurrency (same 4
+  queries fail in single-stream POWER mode with a non-reference seed).
+
+  Consequence: every throughput cell is permanently red, which forced
+  `continue-on-error: true` on the nightly sweep (nightly.yml:596) and
+  reduced the CI signal to a single stream-count assertion. Restoring the
+  gate (nightly-throughput-gate-restoration) depends on this fix.
+
+  Prior-art policy to mirror: the bounded correctness gate ALREADY excludes
+  Q11/Q16/Q18/Q20 "for answer-set boundary sensitivity"
+  (docs/operations/release-guide.md:33-35); the fix brings the loose
+  validation path in line with that established policy instead of inventing
+  a new one. Expected shape: when a query's substitution parameters differ
+  from the reference seed AND the query is in the documented
+  parameter-sensitive set, row-count validation records
+  "not validated (parameter-sensitive, non-reference params)" instead of a
+  failure; validation status for the run treats these as neither pass nor
+  fail (mirroring how the correctness gate's exclusion works). Value: a
+  clean throughput run becomes achievable and Throughput@Size is computed,
+  un-neutralizing validate_throughput_metric.
+
+prior_art:
+  - "docs/operations/release-guide.md:33-35 + make test-correctness-gate -- the existing Q11/16/18/20 exclusion policy and its rationale. Reuse the policy and the query set constant."
+  - "benchbox/core/tpch/throughput_test.py -- per-stream seed derivation (the mechanism stays; only validation policy changes)."
+  - "benchbox/core/expected_results/ -- where reference-seed expectations live; check whether a parameter-sensitive query-set constant already exists there before defining one (if it exists, import it; do not duplicate)."
+
+work:
+  - id: w0
+    summary: "Re-validate the defect at HEAD: non-reference-seed TPC-H power run on DuckDB confirms Q11/16/18/20 fail loose validation; record command, SHA, and failure lines in notes"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Locate the loose validation path and reference-seed exact-match branch; record the pinned file list in work notes -- w2 must stay within that narrowed set, not the full scope_limit"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Implement the parameter-sensitive exclusion: one shared query-set constant, applied only when params differ from the reference seed; per-query detail records the exclusion reason"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Verify end-to-end: non-reference-seed run reports clean-with-exclusions; wrong row count on a non-excluded query still fails; summary.validation keeps submit classification honest"
+    status: pending
+    needs: [w2]
+  - id: w4
+    summary: "Run the nightly throughput config locally via make uat-sweep and confirm the cell passes clean with Throughput@Size > 0"
+    status: pending
+    needs: [w3]
+
+deferred:
+  - summary: "Parameter-aware expected row counts for Q11/16/18/20 (deriving expectations per seed instead of excluding)"
+    reason: "Requires per-parameter answer-set computation; the exclusion mirrors the established correctness-gate policy and unblocks the gate now. Track as a future strengthening."
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Reference-seed runs keep EXACT-match validation for all queries including Q11/16/18/20 -- the exclusion applies only to non-reference parameters."
+  - "The correctness gate (make test-correctness-gate) behavior and its exclusion list are untouched."
+  - "TPC-H/TPC-DS throughput success-gate defaults (0.99/0.70) from PR #1106 unchanged."
+  - "Per-stream seed derivation formula unchanged (it is TPC-compliant stream permutation behavior)."
+
+approach: |
+  Investigation-first TODO: w0/w1 are mandatory before any code. The
+  scope_limit below is deliberately broad for the INVESTIGATION only; w1
+  must pin the actual seam (expected: the validation module producing
+  summary.validation, possibly tpch/throughput_test.py where seed
+  provenance is known) and w2+ must stay within the pinned files. Keep the
+  change scoped to validation policy; do not touch execution. This is
+  comparator/validation-adjacent code -- check .github/CODEOWNERS: if the
+  touched paths are soundness-critical, the PR waits for Code Owner review
+  instead of auto-merge (call it out in the PR body).
+
+anti_patterns:
+  - "DO NOT widen the loose tolerance band to make the queries pass -- that weakens validation for every query."
+  - "DO NOT exclude the 4 queries unconditionally -- reference-seed runs must keep validating them."
+  - "DO NOT special-case inside tests/uat -- the fix belongs in benchbox core so every consumer (CLI runs, UAT, nightly) benefits."
+
+verification:
+  - description: "Non-reference-seed run validates clean with recorded exclusions; wrong-count regression still fails"
+    command: "uv run -- python -m pytest tests/unit/core/ tests/integration/test_tpch_throughput_test.py tests/integration/test_throughput_corrections.py -q"
+    expected_output: "pass including new exclusion tests"
+  - description: "Throughput UAT cell goes green locally"
+    command: "make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml"
+    expected_output: "exit 0, matrix summary shows the cell passed"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tpch/"
+    - "benchbox/core/expected_results/"
+    - "benchbox/core/results/"
+    - "benchbox/core/validation/"
+    - "benchbox/validation/"
+    - "tests/unit/core/"
+    - "tests/integration/"
+    - "tests/uat/throughput.py"
+    - "docs/development/throughput-result-alignment.md"
+
+metadata:
+  tags: [tpch, throughput, validation, seed-derivation, correctness]
+  estimated_effort: Large
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604); nightly.yml:580-595 known-defect block; user decision Q3"

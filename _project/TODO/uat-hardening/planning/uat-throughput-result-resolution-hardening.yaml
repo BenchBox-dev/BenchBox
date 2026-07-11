@@ -1,0 +1,96 @@
+id: uat-throughput-result-resolution-hardening
+title: "Harden the throughput result-path resolver: exact platform token, scale token, deterministic tie-break, narrower nightly window"
+worktree: uat-hardening
+priority: Medium-High
+status: Not Started
+category: "Bug Fix / Data Pipeline"
+
+description: |
+  The official/throughput cell path resolves its result JSON by
+  filename-glob + mtime instead of the stdout contract every other cell
+  uses (because `run-official` has no --quiet; documented at
+  tests/uat/throughput.py:13-16). The resolver has two real weaknesses,
+  verified on develop @ fc31f3604:
+
+  1. SUBSTRING PLATFORM MATCH (tests/uat/throughput.py:60-66): the glob
+     `f"{benchmark_token}_*{platform_token}*.json"` with platform="duckdb"
+     matches `tpch_sf1_pg_duckdb_sql_20260709.json`. The existing
+     false-positive test (test_throughput.py:62-71) only checks
+     postgresql (not a substring); the pg_duckdb->duckdb collision
+     direction is untested. The glob also carries no scale token, so SF is
+     entirely unfiltered.
+
+  2. ARBITRARY TIE-BREAK + WIDE CI WINDOW: max-mtime tie-break
+     (throughput.py:70) is arbitrary within filesystem mtime granularity.
+     Mitigated in production by sequential execution and per-cell
+     started_after (captured before the subprocess launches,
+     runner.py:157), but the nightly assert step widens the window to a
+     full hour over a shared results dir
+     (.github/workflows/nightly.yml:607-612) -- safe on a fresh CI runner,
+     wrong-file-prone on any persistent runner or multi-cell sweep.
+
+  Context: #1119 (d48231a3b) fixed a genuine TEST-only mtime race
+  (_MTIME_SLACK backdating); production was mostly sound. This TODO fixes
+  the remaining production weaknesses.
+
+prior_art:
+  - "tests/uat/throughput.py:resolve_official_result_path -- the resolver being hardened; keep its signature so runner.py:246-251 and nightly.yml consumers do not churn. Extend."
+  - "benchbox result filename convention (e.g. tpch_sf1_duckdb_sql_<date>.json) -- derive the exact token grammar from the exporter that writes these names (find it via the existing test fixtures in tests/uat/test_throughput.py) rather than guessing."
+
+work:
+  - id: w1
+    summary: "Pin the filename grammar: locate the exporter that writes result filenames, document the token order (benchmark, sf, platform, mode, date) in the resolver docstring"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Exact-token platform matching: split filename on underscores and require the platform token sequence to match exactly (pg_duckdb no longer matches duckdb); add the collision-direction regression test"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Add a scale token to the filter (scale param threaded from run_cell, which knows it); tie-break by (mtime, filename) so equal-mtime resolution is deterministic"
+    status: pending
+    needs: [w2]
+  - id: w4
+    summary: "Narrow the nightly assert window: capture a start timestamp before the sweep step and pass it through instead of now()-1h (nightly.yml)"
+    status: pending
+    needs: [w3]
+
+deferred:
+  - summary: "Replace glob resolution entirely with a result-path manifest emitted by run-official"
+    reason: "Requires a benchbox CLI surface change (run-official output contract) which the no-CLI-surface-drift constraint makes a bigger conversation; the hardened glob is sufficient for sequential UAT."
+
+deps:
+  needs: [uat-status-taxonomy-exit-code-fixes, tpch-throughput-seed-validation-fix]
+
+must_preserve:
+  - "resolve_official_result_path signature stays backward-compatible (new scale param optional/keyword)."
+  - "The started_after >= semantics from #1119 (with test-side _MTIME_SLACK) keep working."
+  - "validate_stream_count / validate_throughput_metric split (nightly hard-gates stream count independently) unchanged here."
+
+approach: |
+  Small PR. w1 is reading, not code. The runner passes platform, benchmark,
+  and scale into run_cell already (runner.py:145-154); threading scale to
+  the resolver is mechanical. For w4, the workflow step ordering makes a
+  $GITHUB_ENV timestamp trivial.
+
+anti_patterns:
+  - "DO NOT parse result JSON contents to disambiguate candidates -- filename + window must suffice; content-sniffing hides grammar drift."
+
+verification:
+  - description: "Resolver collision + determinism tests"
+    command: "uv run -- python -m pytest tests/uat/test_throughput.py tests/uat/test_runner.py -q"
+    expected_output: "pass, including pg_duckdb/duckdb collision and equal-mtime determinism tests"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/throughput.py"
+    - "tests/uat/runner.py"
+    - "tests/uat/test_throughput.py"
+    - "tests/uat/test_runner.py"
+    - ".github/workflows/nightly.yml"
+
+metadata:
+  tags: [uat, throughput, result-resolution]
+  estimated_effort: Small
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), finding R4"

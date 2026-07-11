@@ -1,0 +1,132 @@
+id: uat-resume-retirement-artifact-durability
+title: "Delete UAT resume machinery; make durable artifacts atomic and run dirs collision-free"
+worktree: uat-hardening
+priority: High
+status: Not Started
+category: "Reliability / Data Integrity"
+
+description: |
+  DECISION (user, 2026-07-11): delete the resume machinery and lean on
+  datagen-reuse making restarts cheap, rather than hardening it.
+
+  Why deletion is the right call -- the resume path was verified fragile in
+  four independent ways on develop @ fc31f3604:
+  (a) load_resume_attempts (tests/uat/orchestrator.py:70-81) checks neither
+      manifest version nor config_name nor commit -- resuming with a
+      different config or on different code silently replays stale records;
+  (b) replayed passed cells never verify result_path still exists;
+  (c) the manifest is written only for free-space aborts (orchestrator.py
+      :263-272, :310-317, :346-354, all gated on the prose string
+      `"free space" in abort_reason`) -- docker/validate/package aborts were
+      never resumable anyway;
+  (d) `--resume` is unreachable from the documented make surface (no
+      RESUME= passthrough at Makefile:2206/:2224).
+
+  Deletion scope: _write_resume_manifest, load_resume_attempts,
+  build_resume_runner, RESUME_MANIFEST_VERSION (orchestrator.py),
+  `--resume` flags on the sweep and execute subparsers (_cli.py:504, :566)
+  and their handler branches (_cli.py:78-79, :409-413), resume-manifest
+  sections in _project/specs/uat-framework.md (Section 3 "Resume manifest",
+  Section 9.4) and docs/operations/uat-framework.md, and the resume-runner
+  tests in test_orchestrator.py / test_runner.py.
+
+  KEPT AND HARDENED -- the abort-safe provenance artifacts (#691) stay; the
+  restart story becomes "rerun the config; datagen reuse + ladder pruning
+  make it cheap". Two durability defects in those artifacts get fixed here
+  because resume's deletion makes the artifacts the ONLY record:
+
+  1. SAME-DAY EVIDENCE DESTRUCTION: default log dirs are date-granular
+     (`uat_{date}`, config.py:55, execute.py:758-763) and every durable
+     artifact is opened mode "w" (cells.jsonl orchestrator.py:579, sidecar
+     :576-578, compatibility_pruned.jsonl :609-625, matrix_summary TSV).
+     A second same-day run of the same config silently overwrites the first
+     run's evidence.
+
+  2. NO ATOMIC WRITES ANYWHERE: every artifact is written in place. A crash
+     mid-write leaves torn JSON/TSV; the sidecar is written before
+     cells.jsonl so a crash between the two leaves a fresh sidecar beside a
+     stale cell stream, and `make uat-report` will combine them.
+
+prior_art:
+  - "tests/uat/orchestrator.py:_emit_abort_artifacts -- the abort-provenance path that stays; the atomic-write helper wraps its existing writes. Extend."
+  - "benchbox/ result exporters and _project/scripts/generate_indexes.py were checked for an existing temp+rename helper: none found in the UAT dependency set, so a small `_atomic_write(path, data)` helper inside tests/uat/ is genuinely new (single function, not a module)."
+  - "tests/uat/phases/execute.py:758-771 default_log_dir -- the {date} template expansion point where run-dir uniqueness is added. Extend (add {time} or a collision-suffix), do not invent a second template mechanism."
+
+work:
+  - id: w1
+    summary: "Delete resume machinery: orchestrator functions + manifest writes, --resume CLI flags and handler branches, resume tests; scrub resume mentions from spec and operator docs"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Add temp-file+os.replace atomic writes for cells.jsonl, accounting sidecar, compatibility_pruned.jsonl, validator_rollup.tsv, matrix_summary TSV (single shared helper in tests/uat/)"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Make default run dirs collision-free: the default log-dir template gains a time component; test that two same-day sweeps land in distinct dirs"
+    status: pending
+    needs: []
+  - id: w4
+    summary: "Write cells.jsonl before its accounting sidecar (reverse current order) so a crash between the two cannot leave a fresh sidecar beside a stale stream; add an ordering test"
+    status: pending
+    needs: [w2]
+
+deferred:
+  - summary: "Timestamped submissions dirs (submissions_dir_template has the same date-granular default)"
+    reason: "Submissions are keyed by config {name} not {date}; collision semantics differ (append vs overwrite) and package-phase behavior is under uat-release-gate-enforcement's remit."
+
+deps:
+  needs: [uat-status-taxonomy-exit-code-fixes]
+
+must_preserve:
+  - "Abort paths still emit cells.jsonl + sidecar + compatibility_pruned.jsonl + partial TSV (the #691 abort-safe provenance contract)."
+  - "generated-rerun-shards/ configs remain untouched -- they are frozen evidence of past sweeps, not consumers of the deleted machinery."
+  - "cells.jsonl + sidecar schema stays readable by _cli.py report (only write mechanics change, not content)."
+  - "Existing logs_dir_template values in checked-in configs keep working verbatim (only the DEFAULT template changes)."
+
+approach: |
+  w1 is pure deletion plus doc scrub -- grep for 'resume' across tests/uat,
+  Makefile, _project/specs/uat-framework.md, docs/operations/uat-*.md and
+  remove each surface. w2 introduces one helper (write to
+  path.with_suffix('.tmp') in the same directory, fsync, os.replace) and
+  threads it through the five write sites. w3 changes the default template
+  string and its expansion. Keep the PR reviewable: deletion commit,
+  durability commit.
+
+anti_patterns:
+  - "DO NOT leave a deprecation shim for --resume -- the flag was unreachable from make; a hard removal with a clear argparse error is honest."
+  - "DO NOT switch artifacts to append-mode as the collision fix -- distinct run dirs are the fix; append-mode reintroduces the double-counting class of bug the mode-w design avoided."
+
+verification:
+  - description: "No resume references remain in Python code"
+    command: "grep -rni 'resume' tests/uat/ --include='*.py' | grep -vi 'resumable\\|datagen'"
+    expected_output: "no hits"
+  - description: "No resume references remain in Makefile, spec, or operator docs"
+    command: "grep -ni 'resume' Makefile _project/specs/uat-framework.md docs/operations/uat-framework.md tests/uat/README.md | grep -vi 'resumable\\|datagen'"
+    expected_output: "no hits (or only prose explaining the removal)"
+  - description: "UAT unit suite green, including new atomicity/ordering/collision tests"
+    command: "uv run -- python -m pytest tests/uat/ -m fast -q"
+    expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/orchestrator.py"
+    - "tests/uat/_cli.py"
+    - "tests/uat/config.py"
+    - "tests/uat/phases/execute.py"
+    - "tests/uat/phases/validate.py"
+    - "tests/uat/phases/report.py"
+    - "tests/uat/test_orchestrator.py"
+    - "tests/uat/test_runner.py"
+    - "tests/uat/test_cli_dispatch.py"
+    - "tests/uat/test_config.py"
+    - "tests/uat/test_phases.py"
+    - "Makefile"
+    - "_project/specs/uat-framework.md"
+    - "docs/operations/uat-framework.md"
+    - "tests/uat/README.md"
+
+metadata:
+  tags: [uat, resume, durability, artifacts]
+  estimated_effort: Medium
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), finding A3 + user decision Q5"

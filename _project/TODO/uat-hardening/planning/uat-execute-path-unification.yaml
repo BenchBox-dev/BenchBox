@@ -1,0 +1,143 @@
+id: uat-execute-path-unification
+title: "Unify make uat-execute with the orchestrator path; single cells.jsonl codec; de-duplicate phase logic in _cli/execute"
+worktree: uat-hardening
+priority: Medium-High
+status: Not Started
+category: "Architecture"
+
+description: |
+  `make uat-execute` is a weaker, artifact-less re-implementation of the
+  sweep's execute leg. Verified on develop @ fc31f3604:
+
+  1. _handle_execute (tests/uat/_cli.py:386-441) duplicates the
+     orchestrator's preflight->execute sequence but does NOT install the
+     per-cell disk-floor watch (orchestrator.py:141-162), does NOT write
+     cells.jsonl or the accounting sidecar, so it has weaker mid-sweep disk
+     protection (partially addressed by uat-disk-gate-always-on) and
+     produces no durable artifacts for `make uat-report`. Same config,
+     silently different behavior from `make uat-sweep`.
+
+  2. Duplicated contracts: the cells.jsonl schema lives in two files with
+     no shared codec (writer orchestrator.py:563-604, reader
+     _cli.py:184-201); the sidecar filename convention is built by hand in
+     both (_cli.py:166 vs orchestrator.py:558-560); _handle_stress
+     (_cli.py:96-113) duplicates run_sweep_from_path's stress_overrides
+     logic (orchestrator.py:683-692) which currently has zero production
+     callers.
+
+  3. execute.py god-phase cleanups that fall out of unification:
+     - _apply_submit_classification (execute.py:544-556) re-reads and
+       re-classifies the same result JSON run_cell already classified
+       (runner.py:256-260) -- duplicate policy application, second file
+       read per cell;
+     - _compatibility_pruned_for_config re-runs enumeration during
+       abort-artifact emission (orchestrator.py:554-555) -- a second
+       independent enumeration that can diverge from the one execute used;
+       thread the actual enumeration through instead;
+     - free-space checking exists in three variants (preflight gate,
+       execute platform-boundary at execute.py:680-706, orchestrator
+       per-cell wrapper) -- consolidate the measurement into one shared
+       helper (the policy sites stay distinct);
+     - dead code: matrix.py:84-86 placeholder tuple assignments,
+       timeouts.py:114-131 env_without_pythonpath / iter_argv_for_log
+       (zero callers, docstring claims a consumer that does not exist).
+
+  4. Prose-string abort contract: the orchestrator decides to emit abort
+     artifacts via `"free space" in (result.abort_reason or "")`
+     (orchestrator.py:263, :346). Replace with a typed abort-kind enum
+     field on PhaseResult/ExecuteOutcome so rewording a message cannot
+     change control flow. (Resume-manifest emission at those sites is gone
+     after uat-resume-retirement-artifact-durability.)
+
+prior_art:
+  - "tests/uat/orchestrator.py:run_sweep -- the canonical phase loop; _handle_execute becomes a thin call into a single-phase entry (e.g. run_sweep with an execute-only phases override), not a third path. Reuse."
+  - "tests/uat/orchestrator.py:563-604 + _cli.py:184-201 -- the two cells.jsonl codecs to merge; the merged codec is a new small module tests/uat/cells_io.py (genuinely new file, single owner for the JSONL + sidecar schema). Supersede both inline copies."
+  - "tests/uat/phases/preflight.py:free_space_gib + execute.py:_free_space_abort_reason + orchestrator.py:_build_disk_floor_runner -- three free-space variants; measurement consolidates into preflight_budget.py (existing module). Extend."
+
+work:
+  - id: w1
+    summary: "Extract cells_io.py owning cells.jsonl + accounting-sidecar read/write (single schema definition); orchestrator and _cli consume it; sidecar path helper unified"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Route _handle_execute through the orchestrator single-phase path so uat-execute gets the disk watch and writes cells.jsonl + sidecar like a sweep; keep --databases-root/--no-cleanup semantics"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Delete _handle_stress duplication: route through run_sweep_from_path(stress_overrides=...); keep CLI flags and behavior identical"
+    status: pending
+    needs: [w2]
+  - id: w4
+    summary: "Remove _apply_submit_classification double-application from execute.py; delete dead code (matrix.py placeholders, timeouts env_without_pythonpath/iter_argv_for_log)"
+    status: pending
+    needs: []
+  - id: w5
+    summary: "Replace the 'free space' abort_reason substring checks with a typed abort_kind field; thread execute's actual enumeration into abort-artifact emission instead of re-enumerating"
+    status: pending
+    needs: [w1]
+  - id: w6
+    summary: "Consolidate free-space measurement into one helper in preflight_budget.py consumed by all three policy sites"
+    status: pending
+    needs: [w5]
+
+deferred:
+  - summary: "Extract docker lifecycle (execute.py:256-427) into a platform_lifecycle module beside docker_assets"
+    reason: "uat-container-engine-routing rewrites that block for engine routing; extracting first then rewriting doubles the churn. Reassess after that TODO."
+  - summary: "Move default_log_dir/default_benchmark_runs_dir template rendering out of execute.py"
+    reason: "Cosmetic module placement; three consumers work today. Not worth a PR slot in this batch."
+  - summary: "_cli.py:572 parser-build-time imports of docker_assets/container_cleanup constants"
+    reason: "Startup-cost nit; fix opportunistically if touching that block in w2/w3."
+
+deps:
+  needs: [uat-resume-retirement-artifact-durability, uat-disk-gate-always-on]
+
+must_preserve:
+  - "make uat-execute CLI surface (CONFIG=, DATABASES_ROOT=, NO_CLEANUP=) and its exit-code contract."
+  - "make uat-stress override semantics (PLATFORM/BENCHMARK/SCALE closed override set per spec Section 4)."
+  - "cells.jsonl + sidecar on-disk schema (content identical; only the owning code moves)."
+  - "FAIL-and-advance decision points in execute.py (compose-up failure advances, disk floor aborts) -- behavior-preserving refactor."
+
+approach: |
+  Behavior-preserving refactor with one behavior improvement (uat-execute
+  gains artifacts + disk watch -- call that out in the PR body). Land w1
+  first; w2 is the riskiest step, so pin it with a test asserting
+  uat-execute and uat-sweep-with-execute-only-phases produce identical
+  cells.jsonl for the same mocked runner. Diff-check `git diff --name-only`
+  against scope_limit before opening the PR.
+
+anti_patterns:
+  - "DO NOT change any YAML config semantics in this PR -- pure path unification."
+  - "DO NOT let the typed abort_kind leak into cells.jsonl as a schema change here; artifact schema changes belong to the taxonomy TODO (already merged by the time this lands)."
+
+verification:
+  - description: "uat-execute and execute-only sweep produce identical artifacts for the same config (new parity test)"
+    command: "uv run -- python -m pytest tests/uat/ -m fast -q"
+    expected_output: "all pass including the new parity test"
+  - description: "Dead-code removal is complete"
+    command: "grep -rn 'env_without_pythonpath\\|iter_argv_for_log' tests/uat/ && echo FOUND || echo CLEAN"
+    expected_output: "CLEAN"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/_cli.py"
+    - "tests/uat/orchestrator.py"
+    - "tests/uat/cells_io.py"
+    - "tests/uat/phases/execute.py"
+    - "tests/uat/phases/preflight.py"
+    - "tests/uat/preflight_budget.py"
+    - "tests/uat/matrix.py"
+    - "tests/uat/timeouts.py"
+    - "tests/uat/runner.py"
+    - "tests/uat/test_cli_dispatch.py"
+    - "tests/uat/test_orchestrator.py"
+    - "tests/uat/test_phases.py"
+    - "tests/uat/test_matrix.py"
+    - "tests/uat/test_timeouts.py"
+    - "tests/uat/test_runner.py"
+    - "tests/uat/test_e2e_integration.py"
+
+metadata:
+  tags: [uat, architecture, refactor, cli]
+  estimated_effort: Large
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), findings R1/R2/R3, F1.2-F1.4, F7.1"
