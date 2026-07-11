@@ -72,11 +72,18 @@ def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(path.name + ".tmp")
-    with tmp_path.open("w", encoding=encoding) as fh:
-        fh.write(text)
-        fh.flush()
-        os.fsync(fh.fileno())
-    os.replace(tmp_path, path)
+    try:
+        with tmp_path.open("w", encoding=encoding) as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        # Don't leave an orphaned .tmp sibling in the run directory when the
+        # write or the replace fails -- the destination is still the previous
+        # good artifact (or absent), which is the durability contract.
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 class SourceInfo(Protocol):

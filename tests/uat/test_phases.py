@@ -1084,7 +1084,9 @@ def test_atomic_write_text_survives_a_failed_write_without_torn_output(tmp_path:
     The temp-file + os.replace design means a crash or exception while
     building/writing the new content leaves the last successfully written
     artifact untouched -- unlike the prior mode="w" writes, which truncated
-    the destination file before any new content was available.
+    the destination file before any new content was available. The failed
+    write's .tmp sibling must also be cleaned up, not orphaned in the run
+    directory.
     """
     target = tmp_path / "validator_rollup.tsv"
     report_phase.atomic_write_text(target, "good-content\n")
@@ -1094,6 +1096,7 @@ def test_atomic_write_text_survives_a_failed_write_without_torn_output(tmp_path:
             report_phase.atomic_write_text(target, "new-content-that-never-lands\n")
 
     assert target.read_text(encoding="utf-8") == "good-content\n"
+    assert not target.with_name(target.name + ".tmp").exists()
 
 
 def test_default_benchmark_runs_dir_substitutes_date_and_name(tmp_path):
