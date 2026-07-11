@@ -1,0 +1,122 @@
+id: tpch-throughput-rowcount-validation-range-mode
+title: "Fix TPC-H throughput row-count validation for the spec's non-deterministic queries (wire up RANGE mode)"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  TPC-H throughput fails row-count validation for queries 11, 16, 18, and 20 on
+  EVERY stream, at SF=1 on DuckDB, for ANY seed choice (reproduced with seed=42,
+  seed=7, and no seed). This is NOT a concurrency bug: the identical 4 queries
+  fail identically in single-stream POWER mode with a non-reference seed, while
+  POWER mode with no seed (qgen defaults, exact validation against the official
+  answer files) passes cleanly.
+
+  ROOT CAUSE (hypothesis, to confirm in w0): the throughput driver derives each
+  stream's per-query seed as `seed + stream_id*1000 + position`
+  (benchbox/core/tpch/throughput_test.py), so no throughput query (beyond
+  possibly the first query of stream 0) can ever land on the reference-seed
+  exact-match validation path. Every throughput query therefore falls back to
+  the LOOSE (+-50%) tolerance in benchbox/core/expected_results/tpch_results.py,
+  which is not wide enough for these 4 TPC-H-spec-sanctioned non-deterministic
+  queries (their row counts legitimately vary with substitution parameters).
+  tpch_results.py's own docstring flags a RANGE mode as "reserved for future
+  use" and NOT yet wired up for TPC-H (tpch_results.py:23-26) -- almost certainly
+  the intended fix: validate these queries against a spec-derived acceptable
+  RANGE rather than an exact reference or a blanket +-50% band.
+
+  Discovered during throughput-uat-and-ci-coverage (#1094) verification against a
+  live SF=1 DuckDB run. Previously invisible because the throughput driver was
+  only ever exercised against Mock connections before
+  throughput-real-db-integration-tests (#1074), and that item's new tests run at
+  SF=0.01, which does not reproduce this SF=1-scale manifestation.
+
+  BLAST RADIUS TODAY: the nightly throughput UAT cell's `uat-sweep` step is
+  marked `continue-on-error: true` (.github/workflows/nightly.yml:591-596)
+  specifically to tolerate this known defect; the concurrency invariant that
+  item protects (requested stream count reaches the driver) is hard-gated by a
+  separate step, but the cell's overall clean-pass status stays red until this
+  is fixed. Closing this lets that continue-on-error be removed so a NEW
+  correctness regression in the throughput cell fails the nightly outright.
+
+prior_art:
+  - "benchbox/core/expected_results/tpch_results.py:23-26 — the documented, unused RANGE mode ('reserved for future use'); this item wires it up for TPC-H's non-deterministic queries."
+  - "benchbox/core/expected_results/tpch_results.py — existing EXACT and LOOSE (+-50%) validation modes and the per-query mode selection to extend."
+  - "benchbox/core/tpch/throughput_test.py — the per-query seed derivation `seed + stream_id*1000 + position` that keeps throughput queries off the exact-match path."
+  - "tests/uat/throughput.py:validate_throughput_metric — the UAT validator that currently documents this as a known non-gating failure; re-gate it once fixed."
+  - ".github/workflows/nightly.yml:591-596 — the `continue-on-error: true` on the throughput uat-sweep step to remove once this lands."
+  - "_sources/tpc-h/specification.pdf — spec basis for the acceptable row-count ranges of Q11/Q16/Q18/Q20."
+
+work:
+  - id: w0
+    summary: "Confirm the defect and its root cause: reproduce Q11/16/18/20 loose-tolerance failure at SF=1, and prove throughput seeds never hit the exact-match path"
+    status: pending
+    notes: |
+      Run a real DuckDB TPC-H throughput (or single-stream power with a
+      non-reference seed) at SF=1; capture which validation mode each of
+      Q11/16/18/20 resolves to and why they fail. Confirm POWER with no seed
+      passes. Capture to /tmp/tpch-rowcount-w0.log and summarize which queries,
+      which mode, observed vs expected counts.
+  - id: w1
+    summary: "Derive spec-sanctioned acceptable row-count RANGES for the affected non-deterministic TPC-H queries"
+    needs: [w0]
+    status: pending
+    notes: |
+      From the TPC-H spec / qgen substitution-parameter domains, establish the
+      legitimate min/max row-count band per affected query. Document the spec
+      basis; do NOT invent bounds -- if a query's range is not spec-derivable,
+      say so and keep it on LOOSE with a recorded justification.
+  - id: w2
+    summary: "Wire up RANGE validation mode in tpch_results.py and assign the affected queries to it"
+    needs: [w1]
+    status: pending
+  - id: w3
+    summary: "Add tests pinning that Q11/16/18/20 pass RANGE validation across streams/seeds and that a planted out-of-range count still fails"
+    needs: [w2]
+    status: pending
+  - id: w4
+    summary: "Re-gate the nightly throughput cell: remove continue-on-error from the uat-sweep step and re-enable validate_throughput_metric as a hard gate"
+    needs: [w3]
+    status: pending
+    notes: "Only after w3 proves the cell passes cleanly at SF=1."
+
+must_preserve:
+  - "EXACT validation (reference-seed path) still fires and stays strict for deterministic queries and power/no-seed runs."
+  - "Do not widen validation for queries that are actually deterministic -- only the spec-sanctioned non-deterministic queries move to RANGE."
+  - "The concurrency invariant already hard-gated in nightly (requested stream count reaches the driver) keeps its own independent gate."
+
+anti_patterns:
+  - "DO NOT 'fix' this by widening the global LOOSE tolerance -- that would mask real regressions on every query; scope RANGE to the specific spec-non-deterministic queries."
+  - "DO NOT invent row-count bounds -- derive them from the spec/substitution domains, or leave the query on LOOSE with a recorded reason."
+  - "DO NOT change the throughput per-query seed scheme to force exact-match -- that collides with byte-identity guarantees from throughput-pregenerate-query-streams; fix validation, not generation."
+
+verification:
+  - description: "Q11/16/18/20 pass validation in TPC-H throughput at SF=1 and a planted out-of-range count fails"
+    command: "uv run -- python -m pytest tests/integration -k 'tpch and throughput and (range or rowcount or validation)' -n 0 -v"
+    expected_output: "affected queries validate via RANGE; planted out-of-range count is rejected"
+  - description: "Nightly throughput UAT cell passes cleanly (no continue-on-error needed)"
+    command: "make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml"
+    expected_output: "throughput cell validates with no known-defect leniency"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/expected_results/tpch_results.py"
+    - "tests/integration/"
+    - "tests/uat/throughput.py"
+    - ".github/workflows/nightly.yml"
+
+impact:
+  business_value: |
+    TPC-H throughput result validation is currently either too strict (fails
+    spec-legal queries) or too loose (would miss real regressions). A spec-
+    derived RANGE mode makes throughput validation trustworthy and lets the
+    nightly cell hard-gate correctness.
+  technical_debt: |
+    Removes a standing continue-on-error carve-out in nightly CI.
+
+metadata:
+  tags: [tpc-h, throughput, validation, correctness, range-mode, follow-up]
+  estimated_effort: Medium
+  created_date: "2026-07-11"
+  origin: "Follow-up from concurrency-review batch; discovered during throughput-uat-and-ci-coverage (#1094) verification."
