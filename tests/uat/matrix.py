@@ -81,10 +81,6 @@ UAT_DATAFRAME_PLATFORM_BASES: tuple[str, ...] = (
     "datafusion",
 )
 
-SQL_PLATFORMS: tuple[str, ...] = ()
-DOCKER_PLATFORMS: tuple[str, ...] = ()
-DATAFRAME_PLATFORMS: tuple[str, ...] = ()
-
 
 def _registry_platform_subset(
     group_name: str,

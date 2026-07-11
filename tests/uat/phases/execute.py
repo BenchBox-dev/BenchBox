@@ -96,6 +96,7 @@ def run_execute(
     databases_root: Path | None = None,
     cleanup_enabled: bool = True,
     runner=None,
+    runner_needs_submit_classification: bool = False,
     docker_runner: DockerRunner | None = None,
     free_space_checks_enabled: bool = False,
     free_space_path: Path | str | None = None,
@@ -109,6 +110,15 @@ def run_execute(
     without spawning subprocesses or requiring a live Docker daemon. Resolves
     the module-level `run_cell` lazily so monkeypatching
     `tests.uat.phases.execute.run_cell` from a test takes effect.
+
+    `runner_needs_submit_classification` defaults to False because the real
+    `run_cell` (runner.py:256-260) already classifies for submit before
+    returning -- re-classifying its output via `_apply_submit_classification`
+    would re-read + re-parse the same result JSON for no behavior change (the
+    mirror is idempotent on an already-classified `CellResult`). Set it True
+    only for an injected test runner that deliberately skips classification
+    to exercise the downgrade path (see
+    test_execute_downgrades_passed_cell_with_query_failure_result).
     """
     if runner is None:
         runner = run_cell
@@ -208,6 +218,7 @@ def run_execute(
                         databases_root=databases_root,
                         cleanup_enabled=cleanup_enabled,
                         runner=runner,
+                        runner_needs_submit_classification=runner_needs_submit_classification,
                         log_dir=log_dir,
                         benchmark_runs_dir=benchmark_runs_dir,
                     )
@@ -450,6 +461,7 @@ def _run_or_skip_platform(
     databases_root: Path | None,
     cleanup_enabled: bool,
     runner,
+    runner_needs_submit_classification: bool,
     log_dir: Path | None,
     benchmark_runs_dir: Path,
 ) -> None:
@@ -471,6 +483,7 @@ def _run_or_skip_platform(
             databases_root=databases_root,
             cleanup_enabled=cleanup_enabled,
             runner=runner,
+            runner_needs_submit_classification=runner_needs_submit_classification,
             log_dir=log_dir,
             benchmark_runs_dir=benchmark_runs_dir,
         )
@@ -490,6 +503,7 @@ def _run_platform_benchmark(
     databases_root: Path | None,
     cleanup_enabled: bool,
     runner,
+    runner_needs_submit_classification: bool,
     log_dir: Path | None,
     benchmark_runs_dir: Path,
 ) -> None:
@@ -521,7 +535,8 @@ def _run_platform_benchmark(
             streams=config.execute.streams,
             seed=config.execute.seed,
         )
-        cell_result = _apply_submit_classification(cell_result)
+        if runner_needs_submit_classification:
+            cell_result = _apply_submit_classification(cell_result)
         results.append(cell_result)
         observed.append(
             LadderRung(

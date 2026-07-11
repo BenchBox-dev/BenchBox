@@ -992,6 +992,9 @@ def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
         log_dir=tmp_path,
         databases_root=tmp_path / "databases",
         runner=fake_runner,
+        # fake_runner deliberately skips submit classification (unlike the
+        # real run_cell) to exercise execute.py's downgrade mirror.
+        runner_needs_submit_classification=True,
     )
 
     assert outcome.results[0].status == "failed"
