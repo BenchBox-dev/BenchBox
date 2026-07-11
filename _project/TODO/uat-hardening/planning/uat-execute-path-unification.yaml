@@ -114,7 +114,7 @@ verification:
     command: "uv run -- python -m pytest tests/uat/ -m fast -q"
     expected_output: "all pass including the new parity test"
   - description: "Dead-code removal is complete"
-    command: "grep -rn 'env_without_pythonpath\\|iter_argv_for_log' tests/uat/ && echo FOUND || echo CLEAN"
+    command: "grep -rn 'env_without_pythonpath\\|iter_argv_for_log' tests/uat/ && { echo FOUND; exit 1; } || echo CLEAN"
     expected_output: "CLEAN"
 
 scope_limit:

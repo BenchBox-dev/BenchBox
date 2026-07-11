@@ -98,10 +98,10 @@ anti_patterns:
 
 verification:
   - description: "No resume references remain in Python code"
-    command: "grep -rni 'resume' tests/uat/ --include='*.py' | grep -vi 'resumable\\|datagen'"
+    command: "! (grep -rni 'resume' tests/uat/ --include='*.py' | grep -vi 'resumable\\|datagen')"
     expected_output: "no hits"
   - description: "No resume references remain in Makefile, spec, or operator docs"
-    command: "grep -ni 'resume' Makefile _project/specs/uat-framework.md docs/operations/uat-framework.md tests/uat/README.md | grep -vi 'resumable\\|datagen'"
+    command: "! (grep -ni 'resume' Makefile _project/specs/uat-framework.md docs/operations/uat-framework.md tests/uat/README.md | grep -vi 'resumable\\|datagen')"
     expected_output: "no hits (or only prose explaining the removal)"
   - description: "UAT unit suite green, including new atomicity/ordering/collision tests"
     command: "uv run -- python -m pytest tests/uat/ -m fast -q"
