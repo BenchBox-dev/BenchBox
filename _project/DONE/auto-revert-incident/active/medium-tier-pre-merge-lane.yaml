@@ -2,7 +2,8 @@ id: "medium-tier-pre-merge-lane"
 title: "Run the medium test tier pre-merge on code PRs so medium breakage cannot land unexecuted"
 worktree: "auto-revert-incident"
 priority: "High"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-11"
 category: "Testing and Quality Assurance"
 description: |
   The medium tier (`make test-medium`, Makefile:90-91, ~18-27 min on the
@@ -40,16 +41,24 @@ prior_art:
 work:
 - id: w1
   summary: "Add the medium-test job to pr.yml: needs ci-paths, if needs-code-ci == 'true' (mirror code-test's gate at pr.yml:393), make test-medium, timeout-minutes 30."
-  status: pending
+  status: done
   notes: |
     Steps: checkout + setup-python 3.12 + setup-uv + uv sync --group dev +
     make test-medium. Confirm pr.yml's concurrency block cancels superseded
     runs so force-push storms do not stack 30-minute jobs; add
     cancel-in-progress if absent.
+
+    Done: job added to pr.yml (mirrors develop-post-merge's medium-test
+    steps, minus the signature/junit emission - the PR lane does not feed
+    auto-revert). Wired into ci-required-result's `needs:` list and its
+    MEDIUM_TEST_RESULT success check, same pattern as
+    correctness-gate/plan-capture-gate. pr.yml's concurrency block
+    (group: develop-pr-${{ github.ref }}, cancel-in-progress: true) already
+    existed pre-TODO - no change needed.
 - id: w2
   summary: "Update the develop-post-merge medium-test job comment to record the new PR-lane consumer; post-merge stays as the squash-race safety net."
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     The original decision record already moved to
     _project/DONE/main/medium-tier-ci-home.yaml - leave the DONE record
@@ -57,10 +66,29 @@ work:
     Coordination: auto-revert-signature-attribution rewrites
     develop-post-merge.yml heavily; this TODO lands AFTER it (deps.needs)
     so this comment tweak rebases trivially.
+
+    Done: appended a "PR-LANE CONSUMER ADDED 2026-07-11" paragraph to the
+    medium-test job's promotion-history comment block, comment-only (no
+    #1136 signature/auto-revert machinery touched). Confirmed
+    _project/TODO/main/planning/medium-tier-ci-home.yaml no longer exists
+    (moved to _project/DONE/main/medium-tier-ci-home.yaml before this TODO
+    started); left it untouched.
 - id: w3
   summary: "Validate on this TODO's own PR: the job must trigger (workflow files count as code paths or adjust the classifier lists accordingly) and pass; capture the run link in the PR body."
   needs: [w1]
-  status: pending
+  status: done
+  notes: |
+    Local check confirmed .github/workflows/** is already an explicit
+    code-ci pattern in .github/path-filters.yml, so this PR's own diff
+    (touching pr.yml and develop-post-merge.yml) sets needs-code-ci=true;
+    no classifier change was needed. Verified via
+    `path_filter_decision.py --changed-file <workflow-path-list> --check
+    needs-code-ci` (exit 0) vs a docs-only path list (exit 1).
+
+    The live PR-run validation (confirming medium-test actually executes
+    and passes on this TODO's own PR, and capturing the run link in the PR
+    body) is executed by the coordinator once the PR is opened - not run
+    from this worktree.
 deferred:
 - summary: "Make the new job a required status check in the develop ruleset"
   reason: "Branch-protection/ruleset change is admin/settings work, not repo code; without it auto-merge does not wait for this job - flag to the repo owner in the PR body."
