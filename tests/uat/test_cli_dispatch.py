@@ -216,6 +216,38 @@ def test_sweep_main_forwards_dry_run_override(monkeypatch, capsys):
     assert '"phase_exit_codes"' in capsys.readouterr().out
 
 
+def test_stress_main_forwards_platform_benchmark_scale_as_stress_overrides(monkeypatch, capsys):
+    """w3: _handle_stress routes through run_sweep_from_path(stress_overrides=...)
+    instead of hand-duplicating the platform/benchmark/scale override logic.
+    """
+    calls: list[tuple[Path, dict]] = []
+
+    class StubResult:
+        name = "stub"
+        log_dir = Path("logs")
+        aborted_phase = None
+        abort_reason = None
+        phase_exit_codes = {"execute": 0}
+
+        def exit_code(self):
+            return 0
+
+    def fake_run_sweep_from_path(config_path, *, dry_run_override=None, stress_overrides=None):
+        assert dry_run_override is None
+        calls.append((config_path, stress_overrides))
+        return StubResult()
+
+    monkeypatch.setattr("tests.uat.orchestrator.run_sweep_from_path", fake_run_sweep_from_path)
+    rc = _cli.main(["stress", "--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.5"])
+
+    assert rc == 0
+    default_config_path = Path("tests/uat/_cli.py").resolve().parent / "configs" / "stress-default.yaml"
+    assert calls == [(default_config_path, {"platform": "duckdb", "benchmark": "tpch", "scale": 0.5})]
+    out = capsys.readouterr().out
+    assert '"phase_exit_codes"' in out
+    assert "abort_reason" not in out
+
+
 def test_make_uat_sweep_forwards_dry_run_variable():
     makefile = Path("Makefile").read_text(encoding="utf-8")
     target = makefile.split("uat-sweep:", maxsplit=1)[1].split("# make uat-stress", maxsplit=1)[0]

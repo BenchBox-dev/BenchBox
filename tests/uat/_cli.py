@@ -93,23 +93,22 @@ def _handle_sweep(args: argparse.Namespace) -> int:
 
 def _handle_stress(args: argparse.Namespace) -> int:
     """Implements `make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=]`."""
-    from dataclasses import replace
-
-    from tests.uat.config import load_config
-    from tests.uat.orchestrator import run_sweep
+    from tests.uat.orchestrator import run_sweep_from_path
 
     if args.config is None:
         config_path = Path(__file__).resolve().parent / "configs" / "stress-default.yaml"
     else:
         config_path = Path(args.config)
-    config = load_config(config_path)
-    if args.platform is not None:
-        config = replace(config, platforms=replace(config.platforms, groups=(), include=(args.platform,)))
-    if args.benchmark is not None:
-        config = replace(config, benchmarks=replace(config.benchmarks, groups=(), include=(args.benchmark,)))
-    if args.scale is not None:
-        config = replace(config, scales=replace(config.scales, override=args.scale))
-    result = run_sweep(config)
+    # Same closed override set `run_sweep_from_path` already implements for
+    # `make uat-sweep`'s dry-run path (spec Section 4 override contract) --
+    # this used to be a second, hand-duplicated copy of the platform/
+    # benchmark/scale override logic. Reuse instead of re-implementing.
+    stress_overrides = {
+        "platform": args.platform,
+        "benchmark": args.benchmark,
+        "scale": args.scale,
+    }
+    result = run_sweep_from_path(config_path, stress_overrides=stress_overrides)
     print(
         json.dumps(
             {
