@@ -150,10 +150,14 @@ class UATConfig:
         Always-on for every execute-bearing run, decoupled from the
         `phases:` list -- omitting `"preflight"` skips the pre-sweep
         budget report/abort only, not this safety interlock (see
-        uat-disk-gate-always-on). The sole opt-out is an explicit
-        `preflight.free_space_min_gib: 0`, which callers must pair with a
-        loud warning (`disk_gate_disabled_warning`) since it turns the gate
-        off entirely.
+        uat-disk-gate-always-on). Reads the raw configured floor
+        (`preflight.free_space_min_gib`), not a budget-resolved value;
+        the pre-sweep gate separately resolves max(flat floor, budget
+        est_peak) in preflight_budget.check_disk_headroom. The sole
+        opt-out is an explicit `preflight.free_space_min_gib: 0`, which
+        callers must pair with a loud warning
+        (`disk_gate_disabled_warning`) since it turns the gate off
+        entirely.
         """
         return self.preflight.free_space_min_gib > 0
 

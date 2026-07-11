@@ -8,6 +8,7 @@ local-platform reachability enforcement.
 
 from __future__ import annotations
 
+import csv
 import os
 import shutil
 import subprocess
@@ -214,16 +215,18 @@ def run_preflight(
                     f"{len(budget_gate.budget.unknown_cells)} unknown largest-scale cell(s); "
                     "estimate may be low"
                 )
-        except (OSError, ValueError, KeyError) as exc:
+        except (OSError, ValueError, TypeError, KeyError, csv.Error) as exc:
             # The estimator CRASHED (bad table row, unreadable TSV, a
             # malformed config field) -- distinct from the advisory
-            # unknown_cells case above, which stays a warning. Downgrading a
-            # crash to a warning would silently fall back to the flat
-            # free_space_min_gib cutoff below and disable the stronger
-            # budget-aware gate with only a stderr line (uat-disk-gate-
-            # always-on w3). Hard-fail preflight instead, surfacing which
-            # exception fired so the operator can fix the budget table or
-            # set an explicit flat floor.
+            # unknown_cells case above, which stays a warning. TypeError
+            # covers truncated TSV rows: DictReader fills missing fields
+            # with restval=None and float(None) raises TypeError, not
+            # ValueError. Downgrading a crash to a warning would silently
+            # fall back to the flat free_space_min_gib cutoff below and
+            # disable the stronger budget-aware gate with only a stderr
+            # line (uat-disk-gate-always-on w3). Hard-fail preflight
+            # instead, surfacing which exception fired so the operator can
+            # fix the budget table or set an explicit flat floor.
             return PreflightResult(
                 phase="preflight",
                 free_space_gib=free_gib,

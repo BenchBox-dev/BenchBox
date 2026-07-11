@@ -135,8 +135,44 @@ def test_preflight_disk_budget_table_error_hard_fails_preflight(tmp_path: Path, 
     assert result.disk_budget_summary is None
 
 
+def test_preflight_disk_budget_truncated_row_hard_fails_preflight(tmp_path: Path, monkeypatch):
+    """A truncated table row (fewer fields than the header) is a clean preflight abort.
+
+    DictReader fills the missing fields with restval=None and float(None)
+    raises TypeError -- which must be caught and converted to the
+    "disk budget estimator failed:" abort like any other estimator crash,
+    not escape as a raw traceback.
+    """
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t1.0\n",  # truncated: 4 of 6 fields
+        encoding="utf-8",
+    )
+    cfg = config.validate_config(
+        {
+            "name": "budget-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 100.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(free_space_path=tmp_path, disk_budget_config=cfg)
+
+    assert result.aborted is True
+    assert result.abort_reason is not None
+    assert result.abort_reason.startswith("disk budget estimator failed: TypeError: ")
+    assert result.disk_budget_summary is None
+
+
 def test_preflight_disk_budget_unexpected_error_propagates(tmp_path: Path, monkeypatch):
-    """Only (OSError, ValueError, KeyError) are caught -- other exceptions still propagate.
+    """Only (OSError, ValueError, TypeError, KeyError, csv.Error) are caught -- others propagate.
 
     Guards against re-widening the except clause narrowed in w3.
     """
