@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.uat import orchestrator
+from tests.uat import cells_io, orchestrator
 from tests.uat.config import validate_config
 from tests.uat.phases import execute as exec_phase
 from tests.uat.phases.enumerate import CompatibilityPrunedCell
@@ -225,8 +225,8 @@ def test_write_cells_jsonl_persists_throughput_check(tmp_path: Path):
 
     Before this, CellResult.throughput_check -- the one diagnostic the
     stream-count guard exists to surface -- was dropped by
-    _write_cells_jsonl, so a stream-count failure left durable artifacts
-    saying only failed/exit 1 with no explanation.
+    cells_io.write_cells_jsonl, so a stream-count failure left durable
+    artifacts saying only failed/exit 1 with no explanation.
     """
     cell = CellResult(
         platform="duckdb",
@@ -241,7 +241,7 @@ def test_write_cells_jsonl_persists_throughput_check(tmp_path: Path):
     )
     source_info = orchestrator.RunSourceInfo(commit_sha="abc123", commit_short_sha="abc123", dirty=False)
 
-    orchestrator._write_cells_jsonl(tmp_path / "cells.jsonl", (cell,), source_info=source_info)
+    cells_io.write_cells_jsonl(tmp_path / "cells.jsonl", (cell,), source_info=source_info)
 
     lines = [json.loads(line) for line in (tmp_path / "cells.jsonl").read_text().splitlines()]
     assert lines[0]["throughput_check"] == "throughput stream count mismatch: requested 3, executed 1"
@@ -368,8 +368,8 @@ def test_cells_jsonl_terminal_marker_is_idempotent_after_timeout_marker(tmp_path
     )
     source_info = orchestrator.RunSourceInfo(commit_sha="abc123", commit_short_sha="abc123", dirty=False)
 
-    orchestrator._write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
-    orchestrator._write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
+    cells_io.write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
+    cells_io.write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
 
     text = cell_log.read_text(encoding="utf-8")
     assert text.count("# UAT_TERMINAL_STATE terminal_state=timeout") == 1
@@ -674,7 +674,7 @@ def _source_info() -> orchestrator.RunSourceInfo:
 
 def test_write_cells_jsonl_persists_skipped_unreachable_sidecar(tmp_path: Path):
     cells_jsonl = tmp_path / "cells.jsonl"
-    orchestrator._write_cells_jsonl(
+    cells_io.write_cells_jsonl(
         cells_jsonl,
         (),
         source_info=_source_info(),
@@ -695,14 +695,14 @@ def test_write_cells_jsonl_writes_cell_stream_before_accounting_sidecar(tmp_path
     """
     cells_jsonl = tmp_path / "cells.jsonl"
     written_paths: list[Path] = []
-    real_atomic_write_text = orchestrator.report_phase.atomic_write_text
+    real_atomic_write_text = cells_io.atomic_write_text
 
     def recording_atomic_write_text(path: Path, text: str) -> None:
         written_paths.append(path)
         real_atomic_write_text(path, text)
 
-    with patch.object(orchestrator.report_phase, "atomic_write_text", side_effect=recording_atomic_write_text):
-        orchestrator._write_cells_jsonl(
+    with patch.object(cells_io, "atomic_write_text", side_effect=recording_atomic_write_text):
+        cells_io.write_cells_jsonl(
             cells_jsonl,
             (),
             source_info=_source_info(),

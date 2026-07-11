@@ -15,12 +15,12 @@ import datetime as _dt
 import json
 import subprocess
 import sys
-from collections import deque
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from tests.uat import cells_io
 from tests.uat.config import UATConfig, disk_gate_disabled_warning, load_config
 from tests.uat.phases import (
     execute as exec_phase,
@@ -52,8 +52,6 @@ class RunSourceInfo:
 
 
 CellRunner = Callable[..., CellResult]
-FAILURE_TAIL_LINES = 50
-FAILURE_TAIL_CHARS = 12_000
 
 
 class DiskFloorAbort(RuntimeError):
@@ -213,7 +211,7 @@ def run_sweep(  # noqa: C901
                     skipped_unreachable_count=getattr(exc, "skipped_unreachable_count", 0),
                 )
                 break
-            _write_cells_jsonl(
+            cells_io.write_cells_jsonl(
                 cells_jsonl,
                 execute_outcome.results,
                 source_info=source_info,
@@ -403,7 +401,7 @@ def _emit_abort_artifacts(
         skipped_unreachable_count = (
             len(getattr(execute_outcome, "skipped_unreachable", ())) if execute_outcome is not None else 0
         )
-    _write_cells_jsonl(
+    cells_io.write_cells_jsonl(
         log_dir / "cells.jsonl",
         cells,
         source_info=source_info,
@@ -436,75 +434,6 @@ def _compatibility_pruned_for_config(config: UATConfig) -> tuple[Any, ...]:
     return tuple(exec_phase.enumerate_cells_with_pruning(config).compatibility_pruned)
 
 
-def _cells_accounting_path(cells_jsonl: Path) -> Path:
-    """Sidecar that persists accounting counts not representable as cell rows."""
-    return cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
-
-
-def _write_cells_jsonl(
-    path: Path,
-    cells: Iterable[CellResult],
-    *,
-    source_info: RunSourceInfo,
-    skipped_unreachable_count: int = 0,
-    disk_gate_disabled: bool = False,
-) -> None:
-    lines: list[str] = []
-    for cell in cells:
-        terminal_state = report_phase.terminal_state(cell)
-        failure_tail = _persist_cell_failure_context(cell, terminal_state=terminal_state)
-        lines.append(
-            json.dumps(
-                {
-                    "platform": cell.platform,
-                    "benchmark": cell.benchmark,
-                    "scale": cell.scale,
-                    "status": cell.status,
-                    "terminal_state": terminal_state,
-                    "submit_terminal_state": cell.submit_terminal_state,
-                    "timed_out": cell.status == "timed-out",
-                    "exit_code": cell.exit_code,
-                    "elapsed_s": cell.elapsed_s,
-                    "log_path": str(cell.log_path),
-                    "result_path": (str(cell.result_path) if cell.result_path else None),
-                    "throughput_check": cell.throughput_check,
-                    "failure_tail": failure_tail,
-                    "source_commit_sha": source_info.commit_sha,
-                    "source_commit_short_sha": source_info.commit_short_sha,
-                    "source_dirty": source_info.dirty,
-                }
-            )
-            + "\n"
-        )
-    # Write the cell stream itself before its accounting sidecar. If a crash
-    # lands between the two writes, a reader sees either no cells.jsonl yet
-    # (nothing to combine) or a cells.jsonl without a sidecar yet (make
-    # uat-report's _read_skipped_unreachable_sidecar treats a missing sidecar
-    # as an estimated skipped_unreachable_count=0, not a false confirmed 0).
-    # The reverse order could leave a fresh sidecar beside a stale cell
-    # stream, which make uat-report would silently combine as if consistent.
-    report_phase.atomic_write_text(path, "".join(lines))
-
-    # The skipped-unreachable cells are `Cell` records (not `CellResult` rows)
-    # and are therefore not part of the JSONL stream. Persist their count in a
-    # sidecar so a report regenerated from `cells.jsonl` (make uat-report) can
-    # read it back and keep `total_defined` faithful. `disk_gate_disabled` is
-    # an additive field (uat-disk-gate-always-on w2) recording whether this
-    # run's free-space floor was turned off by `free_space_min_gib: 0` --
-    # existing readers key on `skipped_unreachable_count` and ignore it.
-    accounting_path = _cells_accounting_path(path)
-    accounting_text = (
-        json.dumps(
-            {
-                "skipped_unreachable_count": int(skipped_unreachable_count),
-                "disk_gate_disabled": bool(disk_gate_disabled),
-            }
-        )
-        + "\n"
-    )
-    report_phase.atomic_write_text(accounting_path, accounting_text)
-
-
 def _write_compatibility_pruned_jsonl(path: Path, cells: Iterable[Any]) -> None:
     lines: list[str] = []
     for cell in cells:
@@ -524,52 +453,6 @@ def _write_compatibility_pruned_jsonl(path: Path, cells: Iterable[Any]) -> None:
             + "\n"
         )
     report_phase.atomic_write_text(path, "".join(lines))
-
-
-def _persist_cell_failure_context(cell: CellResult, *, terminal_state: str) -> str:
-    if cell.status == "passed" and cell.result_path is not None:
-        return ""
-    log_path = Path(cell.log_path)
-    tail = _cell_log_tail(log_path)
-    if log_path.exists():
-        if not _cell_log_has_marker(log_path):
-            with log_path.open("a", encoding="utf-8") as fh:
-                fh.write(
-                    f"# UAT_TERMINAL_STATE terminal_state={terminal_state} "
-                    f"status={cell.status} exit_code={cell.exit_code} "
-                    f"result_path={cell.result_path or ''}\n"
-                )
-                fh.write(f"# UAT_FAILURE_TAIL_START max_lines={FAILURE_TAIL_LINES}\n")
-                fh.write((tail or "(no subprocess output captured)") + "\n")
-                fh.write("# UAT_FAILURE_TAIL_END\n")
-    return tail
-
-
-def _cell_log_tail(log_path: Path) -> str:
-    if not log_path.exists():
-        return ""
-    lines: deque[str] = deque(maxlen=FAILURE_TAIL_LINES)
-    with log_path.open(encoding="utf-8", errors="replace") as fh:
-        for raw_line in fh:
-            line = raw_line.rstrip("\n")
-            if line.startswith("# UAT_"):
-                break
-            if line.startswith("# "):
-                continue
-            if line.strip():
-                lines.append(line)
-    tail = "\n".join(lines)
-    if len(tail) > FAILURE_TAIL_CHARS:
-        return tail[-FAILURE_TAIL_CHARS:]
-    return tail
-
-
-def _cell_log_has_marker(log_path: Path) -> bool:
-    with log_path.open(encoding="utf-8", errors="replace") as fh:
-        for line in fh:
-            if line.startswith("# UAT_TERMINAL_STATE "):
-                return True
-    return False
 
 
 def run_sweep_from_path(

@@ -145,60 +145,12 @@ def _handle_preflight(args: argparse.Namespace) -> int:
     return 0
 
 
-def _read_skipped_unreachable_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
-    """Read the skipped-unreachable count persisted alongside ``cells.jsonl``.
-
-    The durable sweep writes ``<cells.jsonl>.accounting.json`` next to the cell
-    stream because skipped-unreachable cells are ``Cell`` records, not
-    ``CellResult`` rows, and so cannot appear in the JSONL. Returns
-    ``(count, sidecar_present)``: ``(0, False)`` when the sidecar is absent or
-    unreadable (older artifacts predate it - the count is *assumed* 0, not
-    confirmed), and ``(count, True)`` when a sidecar was read successfully.
-    The caller threads ``sidecar_present`` into
-    ``write_report(unreachable_count_is_estimated=...)`` so a regenerated
-    report can distinguish "confirmed unreachable=0" from "sidecar missing,
-    unreachable assumed 0."
-    """
-    import json as _json
-
-    sidecar = cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
-    if not sidecar.exists():
-        return 0, False
-    try:
-        with sidecar.open(encoding="utf-8") as fh:
-            payload = _json.load(fh)
-        return int(payload.get("skipped_unreachable_count", 0)), True
-    except (OSError, ValueError, TypeError):
-        return 0, False
-
-
 def _handle_report(args: argparse.Namespace) -> int:
     """Implements `make uat-report`. Reads cells from a JSON-lines stream."""
-    import json as _json
-
+    from tests.uat.cells_io import read_cells_jsonl, read_skipped_unreachable_sidecar
     from tests.uat.phases.report import write_report
-    from tests.uat.runner import CellResult
 
-    cells = []
-    with open(args.cells_jsonl, encoding="utf-8") as fh:
-        for line in fh:
-            if not line.strip():
-                continue
-            payload = _json.loads(line)
-            cells.append(
-                CellResult(
-                    platform=payload["platform"],
-                    benchmark=payload["benchmark"],
-                    scale=float(payload["scale"]),
-                    status=payload["status"],
-                    exit_code=int(payload.get("exit_code", 0)),
-                    elapsed_s=float(payload.get("elapsed_s", 0.0)),
-                    log_path=Path(payload.get("log_path", "")),
-                    result_path=(Path(payload["result_path"]) if payload.get("result_path") else None),
-                    submit_terminal_state=payload.get("submit_terminal_state", "submittable"),
-                    throughput_check=payload.get("throughput_check"),
-                )
-            )
+    cells = read_cells_jsonl(Path(args.cells_jsonl))
     # Skipped-unreachable cells are not JSONL rows; the durable sweep writes
     # their count to a sidecar next to cells.jsonl. Read it back so a
     # regenerated report keeps `total_defined` faithful instead of printing
@@ -206,7 +158,7 @@ def _handle_report(args: argparse.Namespace) -> int:
     # (older artifacts), the count defaults to 0 but is not confirmed -
     # `unreachable_count_is_estimated` makes that distinction visible instead
     # of silently looking identical to a confirmed clean run.
-    skipped_unreachable_count, sidecar_present = _read_skipped_unreachable_sidecar(Path(args.cells_jsonl))
+    skipped_unreachable_count, sidecar_present = read_skipped_unreachable_sidecar(Path(args.cells_jsonl))
     rungs = _split_csv(args.rungs)
     summary = write_report(
         cells,
