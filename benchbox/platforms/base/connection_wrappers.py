@@ -292,13 +292,21 @@ class PlatformAdapterCursor:
         Priority order:
           1. An explicit ``rows`` list/tuple - already fully materialized upstream.
           2. ``rows_returned`` int - reconstructs a placeholder list of the *correct
-             length*. This must be checked before ``first_row``: ``first_row`` is only
-             ONE sample row (see ``sql_execution.execute_sql_query``'s
+             length*. This must be checked before ``first_row`` alone determines
+             cardinality: ``first_row`` is only ONE sample row (see
+             ``sql_execution.execute_sql_query``'s
              ``first_row=results[0] if results else None``), so treating its mere
              presence as "the whole result" silently collapsed every non-empty result
              to a length-1 list regardless of the true row count - a real correctness
              bug (empirically: 21/22 TPC-H throughput queries in a real run reported
              result_count=1; re-executing query 2's captured SQL returned 3 rows).
+             When both ``rows_returned`` and ``first_row`` are present (the normal
+             payload from ``execute_sql_query``), the first element of the returned
+             list is the real ``first_row`` value, not a placeholder - only the
+             remaining cardinality is padded with ``(None,)``. Fabricating an
+             all-``None`` list here silently discarded a real sampled row (e.g.
+             ``fetchone()``/``fetchall()[0]`` returning ``(None,)`` instead of the
+             adapter-reported value).
           3. ``first_row`` alone, only when no ``rows_returned`` count is present at
              all - the last remaining cardinality signal, so it fabricates a
              single-row list.
@@ -307,11 +315,15 @@ class PlatformAdapterCursor:
         if isinstance(explicit_rows, (list, tuple)):
             return list(explicit_rows)
 
+        first_row = self.platform_result.get("first_row")
         row_count = self.platform_result.get("rows_returned")
         if isinstance(row_count, int):
-            return [(None,)] * row_count if row_count > 0 else []
+            if row_count <= 0:
+                return []
+            if first_row is not None:
+                return [first_row] + [(None,)] * (row_count - 1)
+            return [(None,)] * row_count
 
-        first_row = self.platform_result.get("first_row")
         if first_row is not None:
             return [first_row]
 
