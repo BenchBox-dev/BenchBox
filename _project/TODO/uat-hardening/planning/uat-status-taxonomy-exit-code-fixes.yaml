@@ -94,8 +94,27 @@ work:
       all-passed/one-failed/no-results in tests/uat/test_phases.py.
   - id: w3
     summary: "Stop terminal_state falling through to submit_terminal_state for failed cells: give them an explicit failed-state token; update fixtures and test_report_accounting"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      tests/uat/phases/report.py terminal_state(): inserted
+      `if cell.status == "failed": return f"failed:{cell.submit_terminal_state}"`
+      between the result_path-is-None branch and the pre-existing
+      submit_terminal_state fall-through. Chose the recommended
+      "failed:<submit_state>" prefix form -- preserves the submit-
+      classification detail (e.g. "failed:query_failure") and is
+      unambiguous with any real submit-ready state; the default case with no
+      submit-refusal now reads "failed:submittable" instead of bare
+      "submittable". timed-out cells are unaffected (caught earlier in the
+      function by the existing status=="timed-out" check). No existing
+      fixture pinned the old "submittable"-for-failed-cell behavior (checked
+      report-accounting-skipped-unreachable-cells.jsonl -- its failed row has
+      result_path=null so it never reached this branch), so no fixture edit
+      was needed; added new coverage instead: 5 tests in
+      tests/uat/test_report.py (terminal_state() directly + a write_report
+      row-content check) and one CLI round-trip regression in
+      tests/uat/test_report_accounting.py exercising the cells.jsonl ->
+      _handle_report path.
   - id: w4
     summary: "Filter package-phase inputs to passed cells only (orchestrator.py:422); add a test that a failed official cell's exported JSON is not submitted"
     status: pending

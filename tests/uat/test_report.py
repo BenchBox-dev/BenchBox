@@ -85,6 +85,54 @@ def test_write_report_records_terminal_state_and_source_footer(tmp_path: Path):
     assert summary.exit_code() == 2
 
 
+# ---------------------------------------------------------------------------
+# w3: failed cells must not read as submission-ready.
+#
+# terminal_state() used to fall through to `cell.submit_terminal_state`
+# (default "submittable") for any failed cell with a resolved result_path,
+# which reads identically to a genuinely submission-ready cell. Give failed
+# cells an explicit "failed:<submit_state>" token instead -- it preserves the
+# submit-classification detail and cannot be confused with a real
+# submit-ready state.
+# ---------------------------------------------------------------------------
+
+
+def test_terminal_state_failed_cell_with_result_path_is_not_submittable():
+    cell = _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json")
+    # No submit-refusal fired -- submit_terminal_state defaults to "submittable".
+    assert cell.submit_terminal_state == "submittable"
+    assert report.terminal_state(cell) == "failed:submittable"
+
+
+def test_terminal_state_failed_cell_preserves_submit_refusal_reason():
+    from dataclasses import replace
+
+    cell = replace(
+        _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json"),
+        submit_terminal_state="query_failure",
+    )
+    assert report.terminal_state(cell) == "failed:query_failure"
+
+
+def test_terminal_state_timed_out_cell_with_result_path_stays_timeout():
+    """A timed-out cell that happens to have a resolved result_path is still 'timeout'."""
+    cell = _cell("duckdb", "tpch", 0.01, status="timed-out", result="/tmp/r.json")
+    assert report.terminal_state(cell) == "timeout"
+
+
+def test_terminal_state_failed_cell_without_result_path_is_unchanged():
+    """The pre-existing no_json_nonzero/no_json_exit_0 tokens are untouched by w3."""
+    cell = _cell("duckdb", "tpch", 0.01, status="failed")
+    assert report.terminal_state(cell) == "no_json_nonzero"
+
+
+def test_write_report_row_uses_failed_prefix_for_failed_cell_with_result(tmp_path: Path):
+    cell = _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json")
+    report.write_report([cell], output_path=tmp_path / "out.tsv")
+    lines = (tmp_path / "out.tsv").read_text(encoding="utf-8").splitlines()
+    assert "failed\tfailed:submittable\t" in lines[1]
+
+
 def test_cross_scale_clean_counts_full_ladder():
     cells = [
         _cell("duckdb", "tpch", 0.01, status="passed"),
