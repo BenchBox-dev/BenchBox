@@ -36,6 +36,28 @@ jobs:
       - name: Run CI lint mirror
         run: make ci-lint
 
+      - name: Emit lint signature
+        # Bare python is intentional: the signature builder is stdlib-only.
+        # `job.status` already reflects the lint step above by this point;
+        # lint has a single fallible step, so no per-step id is needed.
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ job.status }}" = "failure" ]; then
+            python scripts/post_merge_signature.py build --job lint --failed-step "Run CI lint mirror" --out signature.json
+          else
+            python scripts/post_merge_signature.py build --job lint --out signature.json
+          fi
+
+      - name: Upload lint signature
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signature-lint
+          path: signature.json
+          retention-days: 14
+
   fast-test:
     runs-on: ubuntu-latest
     steps:
@@ -53,7 +75,34 @@ jobs:
         run: uv sync --group dev
 
       - name: Run CI fast-test mirror
+        env:
+          # Picked up by `make ci-test`'s pytest invocation without touching
+          # the Makefile or local developer behavior (PYTEST_ADDOPTS is only
+          # set in this CI step's env).
+          PYTEST_ADDOPTS: "--junitxml=fast-test-junit.xml"
         run: make ci-test
+
+      - name: Emit fast-test signature
+        # Bare python is intentional: the signature builder is stdlib-only.
+        # Falls back to a job-failure descriptor if pytest crashed before
+        # writing junit XML at all (e.g. a collection-time crash).
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f fast-test-junit.xml ]; then
+            python scripts/post_merge_signature.py build --job fast-test --junit fast-test-junit.xml --out signature.json
+          else
+            python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (no junit xml produced)" --out signature.json
+          fi
+
+      - name: Upload fast-test signature
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signature-fast-test
+          path: signature.json
+          retention-days: 14
 
   explorer-tokens:
     name: explorer-tokens
@@ -66,10 +115,40 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run explorer token scan
+        id: token-scan
         run: make lint-explorer-tokens
 
       - name: Run public site theme token scan
+        id: theme-scan
         run: make lint-site-theme-tokens
+
+      - name: Emit explorer-tokens signature
+        # Bare python is intentional: the signature builder is stdlib-only.
+        # Per-step ids above disambiguate which of the two scans failed
+        # (the second step is skipped, not failed, if the first one fails).
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed_step=""
+          if [ "${{ steps.token-scan.outcome }}" = "failure" ]; then
+            failed_step="Run explorer token scan"
+          elif [ "${{ steps.theme-scan.outcome }}" = "failure" ]; then
+            failed_step="Run public site theme token scan"
+          fi
+          if [ -n "${failed_step}" ]; then
+            python scripts/post_merge_signature.py build --job explorer-tokens --failed-step "${failed_step}" --out signature.json
+          else
+            python scripts/post_merge_signature.py build --job explorer-tokens --out signature.json
+          fi
+
+      - name: Upload explorer-tokens signature
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signature-explorer-tokens
+          path: signature.json
+          retention-days: 14
 
   medium-test:
     name: medium-test
@@ -107,7 +186,31 @@ jobs:
         run: uv sync --group dev
 
       - name: Run medium speed tier
+        env:
+          # Picked up by `make test-medium`'s pytest invocation without
+          # touching the Makefile or local developer behavior.
+          PYTEST_ADDOPTS: "--junitxml=medium-test-junit.xml"
         run: make test-medium
+
+      - name: Emit medium-test signature
+        # Bare python is intentional: the signature builder is stdlib-only.
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f medium-test-junit.xml ]; then
+            python scripts/post_merge_signature.py build --job medium-test --junit medium-test-junit.xml --out signature.json
+          else
+            python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (no junit xml produced)" --out signature.json
+          fi
+
+      - name: Upload medium-test signature
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: signature-medium-test
+          path: signature.json
+          retention-days: 14
 
   close-orphaned-prs:
     name: close-orphaned-prs
@@ -241,10 +344,14 @@ jobs:
       auto-revert-pr-opened-at: ${{ steps.open-revert.outputs.auto-revert-pr-opened-at }}
       auto-revert-pr-url: ${{ steps.open-revert.outputs.auto-revert-pr-url }}
       conflict-issue-url: ${{ steps.open-revert.outputs.conflict-issue-url }}
+      revert-suppressed: ${{ steps.signature-decision.outputs.revert-suppressed }}
+      new-failure-ids: ${{ steps.signature-decision.outputs.new-failure-ids }}
+      incident-issue-url: ${{ steps.upsert-incident.outputs.incident-issue-url }}
     permissions:
       contents: write
       issues: write
       pull-requests: write
+      actions: read
     env:
       GH_TOKEN: ${{ github.token }}
       FAILING_SHA: ${{ github.sha }}
@@ -254,14 +361,141 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Download current run signature artifacts
+        # continue-on-error: a missing artifact here (e.g. a gate job
+        # crashed before its always()-run signature step) is one of the
+        # fail-open triggers handled below, not a hard job failure.
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: signature-*
+          path: current-signatures
+
+      - name: Determine signature comparison outcome
+        id: signature-decision
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          should_revert="true"
+          # Left empty (not "[]") unless the diff below actually succeeds,
+          # so a fail-open run reports new_failure_ids as "no data" (null in
+          # the metrics JSON) rather than the misleading "computed zero".
+          new_failure_ids_json=""
+          fail_open_reason=""
+          previous_run_url=""
+
+          # Merge the four gate jobs' per-job signature artifacts (one
+          # subdirectory per artifact, downloaded above) into a single
+          # combined signature for this run.
+          if compgen -G "current-signatures/*/signature.json" > /dev/null; then
+            jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
+              current-signatures/*/signature.json > current-combined.json
+          else
+            fail_open_reason="No current-run signature artifacts were found."
+          fi
+
+          if [ -z "${fail_open_reason}" ]; then
+            # Walk completed develop-post-merge runs and pick the highest
+            # run_number strictly below this run - that is the run to diff
+            # against, whatever its outcome.
+            runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/develop-post-merge.yml/runs?branch=develop&status=completed&per_page=10")"
+            prev_run_json="$(jq -c --argjson current "${GITHUB_RUN_NUMBER}" \
+              '[.workflow_runs[] | select(.run_number < $current)] | sort_by(.run_number) | last // empty' \
+              <<<"${runs_json}")"
+
+            if [ -z "${prev_run_json}" ] || [ "${prev_run_json}" = "null" ]; then
+              fail_open_reason="No previous completed develop-post-merge run was found on develop."
+            else
+              prev_run_id="$(jq -r '.id' <<<"${prev_run_json}")"
+              previous_run_url="$(jq -r '.html_url' <<<"${prev_run_json}")"
+              echo "Previous run: ${previous_run_url} (id ${prev_run_id})"
+
+              if ! gh run download "${prev_run_id}" --pattern 'signature-*' --dir previous-signatures 2>prev-download.log; then
+                fail_open_reason="Could not download the previous run's signature artifacts (likely expired retention): $(tail -n1 prev-download.log 2>/dev/null || true)"
+              fi
+            fi
+          fi
+
+          if [ -z "${fail_open_reason}" ]; then
+            if compgen -G "previous-signatures/*/signature.json" > /dev/null; then
+              jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
+                previous-signatures/*/signature.json > previous-combined.json
+            else
+              fail_open_reason="The previous run's signature artifacts were empty or missing."
+            fi
+          fi
+
+          if [ -z "${fail_open_reason}" ]; then
+            if python scripts/post_merge_signature.py diff \
+              --previous previous-combined.json \
+              --current current-combined.json \
+              --out diff.json; then
+              new_failure_ids_json="$(jq -c '.new_failure_ids' diff.json)"
+              if [ "$(jq 'length' <<<"${new_failure_ids_json}")" -eq 0 ]; then
+                # Current run's failures are all already present in the
+                # previous run's signature (identical-or-superset): develop
+                # is persistently red for the same reason, not because of
+                # this merge.
+                should_revert="false"
+              fi
+            else
+              fail_open_reason="scripts/post_merge_signature.py diff exited non-zero comparing this run to ${previous_run_url}."
+            fi
+          fi
+
+          # Never silently suppress a revert on a comparison error: any
+          # unresolved fail_open_reason forces should_revert back to true
+          # and is surfaced in the revert PR body below.
+          if [ -n "${fail_open_reason}" ]; then
+            echo "Failing open: ${fail_open_reason}"
+            should_revert="true"
+          fi
+
+          if [ "${should_revert}" = "true" ]; then
+            revert_suppressed="false"
+          else
+            revert_suppressed="true"
+          fi
+
+          {
+            echo "should-revert=${should_revert}"
+            echo "revert-suppressed=${revert_suppressed}"
+            echo "fail-open-reason=${fail_open_reason}"
+            echo "previous-run-url=${previous_run_url}"
+          } >> "${GITHUB_OUTPUT}"
+
+          {
+            echo "new-failure-ids<<EOF_NEW_IDS"
+            echo "${new_failure_ids_json}"
+            echo "EOF_NEW_IDS"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Open revert PR or conflict issue
         id: open-revert
+        if: steps.signature-decision.outputs.should-revert == 'true'
         shell: bash
+        env:
+          FAIL_OPEN_REASON: ${{ steps.signature-decision.outputs.fail-open-reason }}
+          NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
         run: |
           set -euo pipefail
 
           short_sha="${FAILING_SHA:0:12}"
           revert_branch="auto-revert/${short_sha}"
+
+          if [ -n "${FAIL_OPEN_REASON}" ]; then
+            signature_note="
+
+          Signature comparison could not be completed, so this revert was opened conservatively (fail-open): ${FAIL_OPEN_REASON}"
+          elif [ -n "${NEW_FAILURE_IDS}" ] && [ "${NEW_FAILURE_IDS}" != "[]" ]; then
+            signature_note="
+
+          New failure IDs vs the previous develop-post-merge run:
+          $(jq -r '.[] | "- " + .' <<<"${NEW_FAILURE_IDS}")"
+          else
+            signature_note=""
+          fi
 
           gh label create incident:develop-red \
             --description "Develop post-merge failure with an automatic revert PR" \
@@ -396,6 +630,7 @@ jobs:
           Failing SHA: \`${FAILING_SHA}\`
           Failing run: ${RUN_URL}
           Originating PR: ${pr_url}
+          ${signature_note}
 
           This PR reverts only the offending squash commit. Reviewers should decide whether to merge this revert or fix forward.
           EOF
@@ -429,6 +664,127 @@ jobs:
               "The automatic \`git revert ${FAILING_SHA}\` conflicted."
           fi
 
+      - name: Upsert develop-red incident issue
+        id: upsert-incident
+        # Only reached when the signature comparison cleanly determined the
+        # previous run was already red with an identical-or-superset
+        # signature (should-revert=false) - never on the fail-open path,
+        # which always opens a revert PR instead.
+        if: steps.signature-decision.outputs.should-revert == 'false'
+        shell: bash
+        env:
+          PREVIOUS_RUN_URL: ${{ steps.signature-decision.outputs.previous-run-url }}
+        run: |
+          set -euo pipefail
+
+          gh label create incident:develop-red \
+            --description "Develop post-merge failure with an automatic revert PR" \
+            --color B60205 >/dev/null 2>&1 || true
+
+          # One open incident issue per persistent-red episode: reuse it
+          # across every run that repeats the same failure signature instead
+          # of opening a new issue (or a revert PR) each time.
+          existing_issue_url="$(gh issue list \
+            --state open \
+            --label incident:develop-red \
+            --json url \
+            --jq '.[0].url // ""')"
+
+          comment_body="Develop is still red with the same failure signature as the previous run (${PREVIOUS_RUN_URL}).
+
+          Failing SHA: \`${FAILING_SHA}\`
+          Failing run: ${RUN_URL}
+
+          No new revert PR was opened for this run because no new failure IDs were introduced."
+
+          if [ -n "${existing_issue_url}" ]; then
+            gh issue comment "${existing_issue_url}" --body "${comment_body}"
+            echo "incident-issue-url=${existing_issue_url}" >> "${GITHUB_OUTPUT}"
+            echo "Commented on existing incident issue: ${existing_issue_url}"
+          else
+            body_file="$(mktemp)"
+            cat > "${body_file}" <<EOF
+          Develop went red and remains red across develop-post-merge runs with no new failure signature.
+
+          Failing SHA: \`${FAILING_SHA}\`
+          Failing run: ${RUN_URL}
+          Previous run: ${PREVIOUS_RUN_URL}
+
+          No revert PR was opened for this run: the failure signature matches (or is a subset of) the previous run's, so reverting this merge would not fix develop. A human needs to investigate the persistent failure.
+          EOF
+            issue_url="$(gh issue create \
+              --title "Develop is red: persistent post-merge failure" \
+              --body-file "${body_file}" \
+              --label incident:develop-red)"
+            echo "incident-issue-url=${issue_url}" >> "${GITHUB_OUTPUT}"
+            echo "Opened incident issue: ${issue_url}"
+          fi
+
+  green-run-cleanup:
+    name: green-run-cleanup
+    # Mirrors close-orphaned-prs' close-with-comment shape: when all four
+    # gates are green, any open auto-revert/* PR or develop-red incident
+    # issue left over from an earlier red streak is now stale - the failure
+    # it tracked is resolved, so clear it instead of leaving it for a human
+    # to notice and close by hand.
+    needs: [lint, fast-test, explorer-tokens, medium-test]
+    if: ${{ always() && needs.lint.result == 'success' && needs.fast-test.result == 'success' && needs.explorer-tokens.result == 'success' && needs.medium-test.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MERGED_SHA: ${{ github.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Close stale auto-revert PRs and develop-red incidents
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          comment_body="Closing: develop is green again at ${RUN_URL} (\`${MERGED_SHA:0:12}\`)."
+
+          mapfile -t pr_numbers < <(gh pr list \
+            --state open \
+            --base develop \
+            --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("auto-revert/")) | .number')
+
+          if [ "${#pr_numbers[@]}" -eq 0 ]; then
+            echo "No open auto-revert/* PRs to close."
+          else
+            for number in "${pr_numbers[@]}"; do
+              if gh pr close "${number}" --comment "${comment_body}"; then
+                echo "PR #${number}: closed (develop green)."
+              else
+                echo "PR #${number}: gh pr close failed; leaving open." >&2
+              fi
+            done
+          fi
+
+          for label in incident:develop-red incident:develop-red-revert-conflict; do
+            mapfile -t issue_numbers < <(gh issue list \
+              --state open \
+              --label "${label}" \
+              --json number \
+              --jq '.[].number')
+
+            if [ "${#issue_numbers[@]}" -eq 0 ]; then
+              echo "No open ${label} issues to close."
+              continue
+            fi
+
+            for number in "${issue_numbers[@]}"; do
+              if gh issue close "${number}" --comment "${comment_body}"; then
+                echo "Issue #${number} (${label}): closed (develop green)."
+              else
+                echo "Issue #${number} (${label}): gh issue close failed; leaving open." >&2
+              fi
+            done
+          done
+
   metrics:
     name: metrics
     runs-on: ubuntu-latest
@@ -444,15 +800,16 @@ jobs:
       LINT_RESULT: ${{ needs.lint.result }}
       FAST_TEST_RESULT: ${{ needs.fast-test.result }}
       EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
-      # NOTE: while medium-test carries job-level continue-on-error (see its
-      # promotion criterion), needs.medium-test.result is "success" even when
-      # its steps fail, so this var is inert - it cannot flip post_merge_red.
-      # It becomes live automatically when medium-test is promoted
-      # (continue-on-error dropped); kept wired to avoid churn at promotion.
+      # medium-test was promoted to a blocking gate 2026-07-06 (see its
+      # promotion note): needs.medium-test.result now reflects real step
+      # failures (continue-on-error dropped), so this var is live and does
+      # flip post_merge_red like the other three gates.
       MEDIUM_TEST_RESULT: ${{ needs.medium-test.result }}
       AUTO_REVERT_PR_OPENED_AT: ${{ needs.auto-revert-on-failure.outputs.auto-revert-pr-opened-at }}
       AUTO_REVERT_PR_URL: ${{ needs.auto-revert-on-failure.outputs.auto-revert-pr-url }}
       CONFLICT_ISSUE_URL: ${{ needs.auto-revert-on-failure.outputs.conflict-issue-url }}
+      NEW_FAILURE_IDS: ${{ needs.auto-revert-on-failure.outputs.new-failure-ids }}
+      REVERT_SUPPRESSED: ${{ needs.auto-revert-on-failure.outputs.revert-suppressed }}
     steps:
       - name: Write dev-loop metrics JSON
         shell: bash
@@ -503,6 +860,8 @@ jobs:
             --arg auto_revert_pr_opened_at "${AUTO_REVERT_PR_OPENED_AT}" \
             --arg auto_revert_pr_url "${AUTO_REVERT_PR_URL}" \
             --arg conflict_issue_url "${CONFLICT_ISSUE_URL}" \
+            --arg new_failure_ids "${NEW_FAILURE_IDS}" \
+            --arg revert_suppressed "${REVERT_SUPPRESSED}" \
             'def null_if_empty: if . == "" then null else . end;
              def ts: fromdateiso8601;
              ($pr.createdAt // null) as $created_at |
@@ -539,7 +898,9 @@ jobs:
                  | add) // 0) / 60
                ),
                auto_revert_pr_url: ($auto_revert_pr_url | null_if_empty),
-               conflict_issue_url: ($conflict_issue_url | null_if_empty)
+               conflict_issue_url: ($conflict_issue_url | null_if_empty),
+               new_failure_ids: (($new_failure_ids | fromjson?) // null),
+               revert_suppressed: ($revert_suppressed == "true")
              }' > "dev-loop-metrics/${MERGED_SHA}.json"
 
           cat "dev-loop-metrics/${MERGED_SHA}.json"
