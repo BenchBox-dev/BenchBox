@@ -268,13 +268,23 @@ def run_cell(
             else:
                 ok, reason = validate_throughput_result(result_json, requested_streams=streams)
                 throughput_check = reason
-                if not ok:
+                # Only a passed cell can be downgraded here -- a cell that is
+                # already failed/timed-out must keep that status (mirrors the
+                # submit-classification guard above at `status == "passed"`).
+                if not ok and status == "passed":
                     status = "failed"
                     exit_code = exit_code or 1
+        elif status == "timed-out":
+            # The cell timed out before exporting a result JSON; record why
+            # throughput validation was skipped instead of the generic
+            # "no result JSON resolved" reason so the artifact self-explains,
+            # and do not overwrite the timed-out status.
+            throughput_check = "not validated: cell timed out"
         else:
             throughput_check = "no result JSON resolved for throughput validation"
-            status = "failed"
-            exit_code = exit_code or 1
+            if status == "passed":
+                status = "failed"
+                exit_code = exit_code or 1
     return CellResult(
         platform=platform,
         benchmark=benchmark,

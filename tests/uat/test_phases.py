@@ -443,6 +443,9 @@ def test_execute_skips_unreachable_platform(tmp_path):
         )
     assert len(outcome.results) == 0
     assert len(outcome.skipped_unreachable) == 1
+    # w2 regression: `all(...)` over an empty `results` tuple is vacuously
+    # True, so an all-unreachable sweep (zero cells run) must not exit 0.
+    assert outcome.exit_code() == 1
 
 
 def _docker_platform_from_argv(argv: list[str]) -> str:
@@ -618,6 +621,100 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
         event.platform == "clickhouse-server" and event.action == "up" and event.status == "failed"
         for event in outcome.docker_events
     )
+
+
+def test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails(tmp_path):
+    """w2 regression: every managed compose-up failing means zero cells run.
+
+    A single-platform sweep whose only compose-up fails ends with an empty
+    `results` tuple, same as the all-unreachable case -- `all([])` must not
+    read as a clean sweep here either.
+    """
+    cfg = validate_config(
+        {
+            "name": "docker all compose-up failed",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        if action == "up":
+            return docker_assets.DockerCommandResult(
+                tuple(argv), 1, "", "docker command timed out after 300s", timed_out=True
+            )
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def fail_runner(platform, benchmark, scale, **kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError("no cell should run when the only compose-up failed")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=fail_runner,
+            docker_runner=fake_docker,
+            free_space_checks_enabled=True,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    assert outcome.aborted is False
+    assert len(outcome.results) == 0
+    assert len(outcome.skipped_unreachable) == 1
+    assert outcome.exit_code() == 1
+
+
+def test_execute_outcome_exit_code_zero_only_when_all_passed(tmp_path):
+    """Sanity check the guard did not change the ordinary passed/failed behavior."""
+    all_passed = exec_phase.ExecuteOutcome(
+        phase="execute",
+        results=(
+            CellResult(
+                platform="duckdb",
+                benchmark="tpch",
+                scale=0.01,
+                status="passed",
+                exit_code=0,
+                elapsed_s=1.0,
+                log_path=tmp_path / "cell.log",
+                result_path=None,
+            ),
+        ),
+        pruned=(),
+        skipped_unreachable=(),
+    )
+    assert all_passed.exit_code() == 0
+
+    one_failed = exec_phase.ExecuteOutcome(
+        phase="execute",
+        results=(
+            CellResult(
+                platform="duckdb",
+                benchmark="tpch",
+                scale=0.01,
+                status="failed",
+                exit_code=1,
+                elapsed_s=1.0,
+                log_path=tmp_path / "cell.log",
+                result_path=None,
+            ),
+        ),
+        pruned=(),
+        skipped_unreachable=(),
+    )
+    assert one_failed.exit_code() == 1
+
+    no_results = exec_phase.ExecuteOutcome(
+        phase="execute",
+        results=(),
+        pruned=(),
+        skipped_unreachable=(),
+    )
+    assert no_results.exit_code() == 1
 
 
 def test_execute_unmanaged_docker_keeps_skip_probe_without_commands(tmp_path):

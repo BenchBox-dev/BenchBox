@@ -52,7 +52,7 @@ from tests.uat.runner import CellResult
 
 REPORT_HEADER = (
     "platform\tbenchmark\tscale\tstatus\tterminal_state\telapsed_s\tlog_path\tresult_path\t"
-    "submit_terminal_state\tvalidator_status\tsource_commit_sha\tsource_dirty"
+    "submit_terminal_state\tvalidator_status\tsource_commit_sha\tsource_dirty\tthroughput_check"
 )
 
 _SKIPPED_STATUSES = frozenset({"skipped"})
@@ -105,7 +105,7 @@ def render_row(
         f"{cell.platform}\t{cell.benchmark}\t{cell.scale}\t"
         f"{cell.status}\t{terminal_state(cell)}\t{cell.elapsed_s:.2f}\t"
         f"{cell.log_path}\t{cell.result_path or ''}\t{cell.submit_terminal_state}\t{validator_status}\t"
-        f"{source_commit_sha}\t{source_dirty}"
+        f"{source_commit_sha}\t{source_dirty}\t{cell.throughput_check or ''}"
     )
 
 
@@ -125,6 +125,13 @@ def terminal_state(cell: CellResult) -> str:
         if cell.exit_code == 0:
             return "no_json_exit_0"
         return "no_json_nonzero"
+    if cell.status == "failed":
+        # A failed cell that still exported a result JSON must not read as
+        # submission-ready: falling through to `submit_terminal_state`
+        # (default "submittable") mislabeled failures as clean. The
+        # "failed:<submit_state>" token preserves the submit-classification
+        # detail while remaining unambiguous with any real submit-ready state.
+        return f"failed:{cell.submit_terminal_state}"
     if cell.submit_terminal_state:
         return cell.submit_terminal_state
     return cell.status

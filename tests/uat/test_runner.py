@@ -509,3 +509,132 @@ def test_classify_for_submit_keeps_unofficial_as_passed_cell(tmp_path: Path):
     assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unofficial
     assert result.status == "passed"
     assert result.submit_terminal_state == "unofficial"
+
+
+# ---------------------------------------------------------------------------
+# w1: official/throughput status guard (uat-status-taxonomy-exit-code-fixes).
+#
+# Regression coverage for finding 1: the throughput validation block used to
+# set status="failed" unconditionally whenever no result JSON was resolved,
+# silently overwriting a "timed-out" classification and corrupting
+# downstream terminal_state()/cells.jsonl accounting. The fix mirrors the
+# existing `if status == "passed"` guard on the submit-classification
+# downgrade a few lines above (runner.py:258).
+# ---------------------------------------------------------------------------
+
+
+def _fake_run_with_timeout_factory(*, exit_code: int, timed_out: bool):
+    """Fabricate a TimeoutResult so the fast lane never spawns a real subprocess.
+
+    The three w1 guard tests only exercise post-subprocess classification
+    logic; a live `sleep 3` against a 1s cap would cost ~1s of wall time and
+    add flake surface for nothing.
+    """
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        return TimeoutResult(exit_code=exit_code, timed_out=timed_out, elapsed_s=0.1, stdout=b"", stderr=b"")
+
+    return fake_run_with_timeout
+
+
+def test_run_cell_official_timeout_preserves_timed_out_status(tmp_path: Path):
+    """A timed-out official cell must stay 'timed-out', not be overwritten to 'failed'."""
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(
+            runner, "run_with_timeout", side_effect=_fake_run_with_timeout_factory(exit_code=124, timed_out=True)
+        ),
+        patch.object(runner, "resolve_official_result_path", return_value=None),
+    ):
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=1,
+            log_dir=tmp_path,
+            official=True,
+            streams=3,
+        )
+
+    assert result.status == "timed-out"
+    assert result.exit_code == 124
+    assert result.result_path is None
+    # The reason explains the skip instead of the generic "no result JSON
+    # resolved" message, so the artifact self-explains without implying a
+    # throughput check ran and failed.
+    assert result.throughput_check == "not validated: cell timed out"
+
+
+def test_run_cell_official_missing_result_downgrades_passed_cell(tmp_path: Path):
+    """A clean-exit official cell that resolved no result JSON is still a genuine failure."""
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(
+            runner, "run_with_timeout", side_effect=_fake_run_with_timeout_factory(exit_code=0, timed_out=False)
+        ),
+        patch.object(runner, "resolve_official_result_path", return_value=None),
+    ):
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path,
+            official=True,
+            streams=3,
+        )
+
+    assert result.status == "failed"
+    assert result.exit_code == 1
+    assert result.throughput_check == "no result JSON resolved for throughput validation"
+
+
+def test_run_cell_official_failed_exit_with_missing_result_keeps_original_exit_code(tmp_path: Path):
+    """A cell that already failed (nonzero exit, no timeout) keeps its own exit code."""
+    fake_argv = [sys.executable, "-c", "print('unused')"]
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(
+            runner, "run_with_timeout", side_effect=_fake_run_with_timeout_factory(exit_code=2, timed_out=False)
+        ),
+        patch.object(runner, "resolve_official_result_path", return_value=None),
+    ):
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path,
+            official=True,
+            streams=3,
+        )
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert result.throughput_check == "no result JSON resolved for throughput validation"
+
+
+def test_run_cell_official_downgrades_passed_cell_on_stream_count_mismatch(tmp_path: Path):
+    """Existing behavior is preserved: a passed cell still downgrades on a real throughput failure."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "official.json"
+    _write_result_json(result_path)  # no "stream" keys on the queries -> stream-count mismatch
+    fake_argv = [sys.executable, "-c", "pass"]
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(runner, "resolve_official_result_path", return_value=result_path),
+    ):
+        result = runner.run_cell(
+            "duckdb",
+            "tpch",
+            0.01,
+            timeout_s=10,
+            log_dir=tmp_path,
+            official=True,
+            streams=3,
+        )
+
+    assert result.status == "failed"
+    assert result.exit_code == 1
+    assert "throughput stream count mismatch" in (result.throughput_check or "")

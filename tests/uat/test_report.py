@@ -13,7 +13,7 @@ from tests.uat.runner import CellResult
 pytestmark = pytest.mark.fast
 
 
-def _cell(platform, benchmark, scale, status="passed", elapsed=1.0, result=None):
+def _cell(platform, benchmark, scale, status="passed", elapsed=1.0, result=None, throughput_check=None):
     return CellResult(
         platform=platform,
         benchmark=benchmark,
@@ -23,6 +23,7 @@ def _cell(platform, benchmark, scale, status="passed", elapsed=1.0, result=None)
         elapsed_s=elapsed,
         log_path=Path(f"/tmp/{platform}_{benchmark}_{scale}.log"),
         result_path=Path(result) if result else None,
+        throughput_check=throughput_check,
     )
 
 
@@ -32,6 +33,46 @@ def test_render_row_matches_header_columns():
     fields = row.split("\t")
     expected_cols = report.REPORT_HEADER.split("\t")
     assert len(fields) == len(expected_cols)
+
+
+def test_report_header_appends_throughput_check_last():
+    """w5: the new column must be appended, not inserted -- existing positional
+    TSV consumers rely on the pre-existing column order (spec Section 6)."""
+    columns = report.REPORT_HEADER.split("\t")
+    assert columns[-1] == "throughput_check"
+    assert columns[:-1] == [
+        "platform",
+        "benchmark",
+        "scale",
+        "status",
+        "terminal_state",
+        "elapsed_s",
+        "log_path",
+        "result_path",
+        "submit_terminal_state",
+        "validator_status",
+        "source_commit_sha",
+        "source_dirty",
+    ]
+
+
+def test_render_row_includes_throughput_check_as_last_column():
+    cell = _cell(
+        "duckdb",
+        "tpch",
+        0.01,
+        status="failed",
+        result="/tmp/r.json",
+        throughput_check="throughput stream count mismatch: requested 3, executed 1",
+    )
+    row = report.render_row(cell, validator_status="clean")
+    assert row.split("\t")[-1] == "throughput stream count mismatch: requested 3, executed 1"
+
+
+def test_render_row_throughput_check_defaults_to_empty_string():
+    cell = _cell("duckdb", "tpch", 0.01, status="passed", result="/tmp/r.json")
+    row = report.render_row(cell, validator_status="clean")
+    assert row.split("\t")[-1] == ""
 
 
 def test_write_report_counts(tmp_path: Path):
@@ -83,6 +124,54 @@ def test_write_report_records_terminal_state_and_source_footer(tmp_path: Path):
     assert "abort_phase=execute" in text
     assert "abort_reason=free space floor" in text
     assert summary.exit_code() == 2
+
+
+# ---------------------------------------------------------------------------
+# w3: failed cells must not read as submission-ready.
+#
+# terminal_state() used to fall through to `cell.submit_terminal_state`
+# (default "submittable") for any failed cell with a resolved result_path,
+# which reads identically to a genuinely submission-ready cell. Give failed
+# cells an explicit "failed:<submit_state>" token instead -- it preserves the
+# submit-classification detail and cannot be confused with a real
+# submit-ready state.
+# ---------------------------------------------------------------------------
+
+
+def test_terminal_state_failed_cell_with_result_path_is_not_submittable():
+    cell = _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json")
+    # No submit-refusal fired -- submit_terminal_state defaults to "submittable".
+    assert cell.submit_terminal_state == "submittable"
+    assert report.terminal_state(cell) == "failed:submittable"
+
+
+def test_terminal_state_failed_cell_preserves_submit_refusal_reason():
+    from dataclasses import replace
+
+    cell = replace(
+        _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json"),
+        submit_terminal_state="query_failure",
+    )
+    assert report.terminal_state(cell) == "failed:query_failure"
+
+
+def test_terminal_state_timed_out_cell_with_result_path_stays_timeout():
+    """A timed-out cell that happens to have a resolved result_path is still 'timeout'."""
+    cell = _cell("duckdb", "tpch", 0.01, status="timed-out", result="/tmp/r.json")
+    assert report.terminal_state(cell) == "timeout"
+
+
+def test_terminal_state_failed_cell_without_result_path_is_unchanged():
+    """The pre-existing no_json_nonzero/no_json_exit_0 tokens are untouched by w3."""
+    cell = _cell("duckdb", "tpch", 0.01, status="failed")
+    assert report.terminal_state(cell) == "no_json_nonzero"
+
+
+def test_write_report_row_uses_failed_prefix_for_failed_cell_with_result(tmp_path: Path):
+    cell = _cell("duckdb", "tpch", 0.01, status="failed", result="/tmp/r.json")
+    report.write_report([cell], output_path=tmp_path / "out.tsv")
+    lines = (tmp_path / "out.tsv").read_text(encoding="utf-8").splitlines()
+    assert "failed\tfailed:submittable\t" in lines[1]
 
 
 def test_cross_scale_clean_counts_full_ladder():

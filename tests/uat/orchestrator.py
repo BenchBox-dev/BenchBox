@@ -419,7 +419,11 @@ def run_sweep(  # noqa: C901
                     abort_reason=abort_reason,
                 )
                 break
-            result_paths = [r.result_path for r in execute_outcome.results if r.result_path]
+            # Only passed cells are submission-ready. A failed official cell
+            # still exports a result JSON (runner.py resolves the path
+            # regardless of exit code), but packaging/submitting it would
+            # present a known-bad run as a candidate submission.
+            result_paths = [r.result_path for r in execute_outcome.results if r.result_path and r.status == "passed"]
             submissions_dir = Path(
                 config.output.submissions_dir_template.replace("{date}", now.strftime("%Y%m%d")).replace(
                     "{name}", config.name
@@ -594,6 +598,7 @@ def _write_cells_jsonl(
                         "elapsed_s": cell.elapsed_s,
                         "log_path": str(cell.log_path),
                         "result_path": (str(cell.result_path) if cell.result_path else None),
+                        "throughput_check": cell.throughput_check,
                         "failure_tail": failure_tail,
                         "source_commit_sha": source_info.commit_sha,
                         "source_commit_short_sha": source_info.commit_short_sha,

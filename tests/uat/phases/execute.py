@@ -64,6 +64,15 @@ class ExecuteOutcome(PhaseResult):
     def exit_code(self) -> int:
         if self.aborted:
             return 2
+        # `all(... for result in self.results)` is vacuously True when
+        # `self.results` is empty (e.g. every platform was unreachable, or
+        # every managed Docker compose-up failed) -- that must not read as a
+        # clean sweep. Zero results = nonzero exit is deliberate: a
+        # degenerate config whose whole matrix is compatibility-pruned exits
+        # 1 here even though the report phase would exit 0 for it (pruned
+        # cells count as "skipped", not failures, in ReportSummary.exit_code()).
+        if not self.results:
+            return 1
         return 0 if all(result.status == "passed" for result in self.results) else 1
 
 
