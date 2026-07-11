@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import time
+from unittest.mock import Mock
 
 import pytest
 
@@ -94,6 +95,43 @@ time.sleep(30)
     assert result.timed_out is True
     assert result.exit_code == timeouts.EXIT_TIMEOUT
     assert result.stdout
+
+
+# ---------------------------------------------------------------------------
+# w6: _kill_process_group must not crash on platforms without os.killpg.
+#
+# `preexec_fn=os.setsid` is POSIX-only, so the process is never placed in
+# its own session on win32 either -- `os.killpg` doesn't exist there at all,
+# and AttributeError was not in the (ProcessLookupError, PermissionError)
+# catch. A per-cell timeout would crash the whole execute phase instead of
+# classifying the cell timed-out. Exercised via monkeypatch (no skipif) so
+# the guard is verified on every CI platform, not just win32.
+# ---------------------------------------------------------------------------
+
+
+def test_kill_process_group_falls_back_to_proc_kill_without_os_killpg(monkeypatch):
+    monkeypatch.delattr(timeouts.os, "killpg", raising=False)
+    mock_proc = Mock(pid=12345)
+
+    timeouts._kill_process_group(mock_proc)
+
+    mock_proc.kill.assert_called_once()
+
+
+def test_kill_process_group_uses_killpg_when_available(monkeypatch):
+    """Sanity check the guard did not disturb the ordinary POSIX ladder."""
+    calls: list[tuple[int, int]] = []
+
+    def fake_killpg(pid, sig):
+        calls.append((pid, sig))
+
+    monkeypatch.setattr(timeouts.os, "killpg", fake_killpg)
+    mock_proc = Mock(pid=999)
+
+    timeouts._kill_process_group(mock_proc)
+
+    assert calls == [(999, timeouts.signal.SIGTERM), (999, timeouts.signal.SIGKILL)]
+    mock_proc.kill.assert_not_called()
 
 
 def test_iter_argv_for_log_quotes_spaces():

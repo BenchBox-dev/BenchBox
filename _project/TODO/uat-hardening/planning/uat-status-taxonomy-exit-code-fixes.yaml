@@ -152,8 +152,20 @@ work:
       (test_replay_2026_05_02.py -m slow) passes against the bumped fixture.
   - id: w6
     summary: "Guard _kill_process_group for win32 (fall back to proc.kill() at minimum); add a non-skipif unit test with a mocked platform"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      tests/uat/timeouts.py _kill_process_group(): changed its parameter
+      from a bare `pid: int` to the `proc: subprocess.Popen` object (updated
+      its one call site in run_with_timeout accordingly) so the win32
+      fallback has something to call `.kill()` on. Both `os.killpg` calls
+      (SIGTERM and SIGKILL stages) now catch `AttributeError` in addition to
+      the existing `(ProcessLookupError, PermissionError)` and fall back to
+      `proc.kill()`. Added two tests to tests/uat/test_timeouts.py:
+      test_kill_process_group_falls_back_to_proc_kill_without_os_killpg
+      (monkeypatch.delattr(timeouts.os, "killpg") -- no skipif, runs on
+      every CI platform) and a sanity check that the ordinary POSIX
+      SIGTERM->SIGKILL ladder is unchanged when os.killpg is present.
 
 deferred:
   - summary: "Diagnostic re-run suppression on unrelated stderr noise (runner.py:215 gate cannot distinguish 'stderr has the error' from 'stderr has uv wrapper noise'; test_runner.py:251 pins the suppression)"
