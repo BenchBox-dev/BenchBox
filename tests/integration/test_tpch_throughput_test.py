@@ -249,6 +249,139 @@ class TestThroughputExecution:
         assert result.streams_successful == 1
 
 
+class TestThroughputReferenceSeedContext:
+    """tpch-throughput-seed-validation-fix w2/w3: _execute_stream() must tell
+    QueryValidator, per query, whether that query's derived seed
+    (seed + stream_id*1000 + position) matches the pinned reference seed for
+    its scale factor -- see
+    benchbox.core.validation.query_validation.set_reference_seed_context().
+    Per-position offsetting means this is essentially only ever True for
+    stream 0's first query (position 0) -- see w1 notes."""
+
+    def test_reference_seed_context_true_only_for_stream0_position0(self) -> None:
+        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
+
+        benchmark = _make_benchmark_mock()
+        connections: list[Mock] = []
+        factory = _make_connection_factory(connections)
+
+        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=1.0, num_streams=1)
+
+        calls: list[bool] = []
+        with patch(
+            "benchbox.core.tpch.throughput_test.set_reference_seed_context",
+            side_effect=lambda v: calls.append(v),
+        ):
+            test._execute_stream(stream_id=0, seed=TPCH_SF1_REFERENCE_SEED, config=test.config)
+
+        assert len(calls) == 22
+        assert calls[0] is True  # position 0: seed + 0*1000 + 0 == reference seed
+        assert all(v is False for v in calls[1:])  # every other position diverges
+
+    def test_reference_seed_context_false_for_default_base_seed(self) -> None:
+        """Default base_seed=42 never coincides with the reference seed at
+        any position -- the throughput driver's default config is always
+        non-reference (matches w0's live repro)."""
+        benchmark = _make_benchmark_mock()
+        connections: list[Mock] = []
+        factory = _make_connection_factory(connections)
+
+        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=1.0, num_streams=1)
+
+        calls: list[bool] = []
+        with patch(
+            "benchbox.core.tpch.throughput_test.set_reference_seed_context",
+            side_effect=lambda v: calls.append(v),
+        ):
+            test._execute_stream(stream_id=0, seed=test.config.base_seed, config=test.config)
+
+        assert len(calls) == 22
+        assert all(v is False for v in calls)
+
+    def test_reference_seed_context_cleared_after_every_query(self) -> None:
+        benchmark = _make_benchmark_mock()
+        connections: list[Mock] = []
+        factory = _make_connection_factory(connections)
+
+        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=1.0, num_streams=1)
+
+        with patch("benchbox.core.tpch.throughput_test.clear_reference_seed_context") as mock_clear:
+            test._execute_stream(stream_id=0, seed=42, config=test.config)
+
+        assert mock_clear.call_count == 22
+
+    def test_no_reference_seed_at_non_sf1_scale_factor(self) -> None:
+        """No pinned reference seed exists below SF=1.0 -- every query is
+        tagged non-reference regardless of the seed chosen."""
+        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
+
+        benchmark = _make_benchmark_mock()
+        connections: list[Mock] = []
+        factory = _make_connection_factory(connections)
+
+        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=0.01, num_streams=1)
+
+        calls: list[bool] = []
+        with patch(
+            "benchbox.core.tpch.throughput_test.set_reference_seed_context",
+            side_effect=lambda v: calls.append(v),
+        ):
+            test._execute_stream(stream_id=0, seed=TPCH_SF1_REFERENCE_SEED, config=test.config)
+
+        assert len(calls) == 22
+        assert all(v is False for v in calls)
+
+    def test_boundary_query_not_failed_on_stream1_with_default_seed_at_sf1(self) -> None:
+        """End-to-end regression for the w0 defect: at SF=1.0 with the
+        default base_seed, Q11/16/18/20 must not come back FAILED on ANY
+        stream (w0 found both stream 0 and stream 1 failing -- see w1 notes
+        on the separate, not-fixed-here set_query_context() stream_id
+        omission that widens EXACT-attempts to every stream; the parameter-
+        sensitive exclusion resolves it regardless of that omission).
+
+        Routes through the REAL PlatformAdapterConnection + DuckDBAdapter +
+        QueryValidator stack via a connection_factory whose raw cursor
+        deliberately returns a row count (999) that mismatches every real
+        SF=1 answer -- so the OTHER (non-boundary) 18 queries are EXPECTED to
+        genuinely fail here (that's correct EXACT-mode behavior, not this
+        test's concern); only Q11/16/18/20 must be absent from the failures.
+        """
+        from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        benchmark = Mock()
+        benchmark.get_query = Mock(return_value="SELECT 1")
+
+        def factory() -> PlatformAdapterConnection:
+            raw_connection = Mock()
+
+            def raw_execute(query_text):
+                raw_result = Mock()
+                raw_result.fetchall = Mock(return_value=[(1,)] * 999)
+                return raw_result
+
+            raw_connection.execute = Mock(side_effect=raw_execute)
+            raw_connection.close = Mock()
+
+            adapter = DuckDBAdapter()
+            connection = PlatformAdapterConnection(raw_connection, adapter)
+            connection.benchmark_type = "tpch"
+            connection.scale_factor = 1.0
+            return connection
+
+        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=1.0, num_streams=2)
+
+        stream0 = test._execute_stream(stream_id=0, seed=test.config.base_seed, config=test.config)
+        stream1 = test._execute_stream(stream_id=1, seed=test.config.base_seed, config=test.config)
+
+        boundary_ids = {11, 16, 18, 20}
+        for stream_result in (stream0, stream1):
+            failed_ids = {qr["query_id"] for qr in stream_result.query_results if not qr["success"]}
+            assert not (failed_ids & boundary_ids), (
+                f"stream {stream_result.stream_id}: boundary queries wrongly failed: {failed_ids & boundary_ids}"
+            )
+
+
 class TestCooperativeCancellation:
     """Cover the opt-in cooperative-cancel wiring in TPCHThroughputTest (w2)."""
 

@@ -22,6 +22,10 @@ from typing import Any, Callable, Optional
 from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
+from benchbox.core.validation.query_validation import (
+    clear_reference_seed_context,
+    set_reference_seed_context,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -445,6 +449,18 @@ class TPCHThroughputTest:
             # in the background. See runner.py's module docstring.
             cancel_event = self._resolve_cancel_event(config, stream_id)
 
+            # Reference seed for this scale factor (None if scale_factor has no
+            # pinned reference, e.g. != 1.0) -- used below to tell QueryValidator
+            # whether EACH query's derived seed (seed + stream_id*1000 + position,
+            # same formula _resolve_query_text() uses to generate the SQL; not
+            # re-derived here, just re-read for validation-context purposes)
+            # matches the reference answer set, so parameter-sensitive queries
+            # (Q11/16/18/20) can be excluded instead of EXACT-failed when it
+            # doesn't. See benchbox.core.validation.query_validation.
+            from benchbox.core.tpch.benchmark import get_reference_seed
+
+            reference_seed = get_reference_seed(config.scale_factor)
+
             cancelled = False
             for position, query_id in enumerate(query_permutation):
                 if self._cooperative_cancel_requested(
@@ -474,6 +490,18 @@ class TPCHThroughputTest:
                         if hasattr(connection, "set_query_context"):
                             connection.set_query_context(query_id)
 
+                        # Tell QueryValidator whether THIS query's derived seed
+                        # matches the pinned reference seed -- lets parameter-
+                        # sensitive queries (Q11/16/18/20) be excluded instead of
+                        # EXACT-failed when the throughput seed derivation (always
+                        # base_seed + stream_id*1000 + position, per must_preserve)
+                        # doesn't happen to reproduce the reference answer set.
+                        # Cleared in the finally below regardless of outcome so it
+                        # never leaks into unrelated validate_query_result() calls
+                        # on this thread.
+                        stream_seed = seed + stream_id * 1000 + position
+                        set_reference_seed_context(stream_seed == reference_seed)
+
                         cursor = connection.execute(query_text)
 
                         # Check for validation failures from platform adapter
@@ -493,6 +521,7 @@ class TPCHThroughputTest:
                         if hasattr(connection, "commit"):
                             connection.commit()
                     finally:
+                        clear_reference_seed_context()
                         # Capture labeled SQL for dry-run preview
                         if hasattr(self, "captured_items"):
                             self.captured_items.append((label, query_text))

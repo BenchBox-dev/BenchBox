@@ -18,6 +18,10 @@ from datetime import datetime
 from typing import Any, Optional
 
 from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
+from benchbox.core.validation.query_validation import (
+    clear_reference_seed_context,
+    set_reference_seed_context,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -138,6 +142,10 @@ class TPCHPowerTest:
 
         # Determine seed and validation mode based on user input and reference seed availability
         reference_seed = get_reference_seed(scale_factor)
+        # Stashed for run()'s per-query reference-seed context (see
+        # benchbox.core.validation.query_validation.set_reference_seed_context) --
+        # avoids recomputing get_reference_seed() on every query.
+        self.reference_seed = reference_seed
         user_provided_seed = seed is not None
         actual_seed = seed  # None = use qgen defaults mode (-d flag)
         actual_validation_mode = validation_mode or "exact"
@@ -309,6 +317,15 @@ class TPCHPowerTest:
                         if hasattr(self.connection, "set_query_context"):
                             self.connection.set_query_context(query_id, stream_id=self.config.stream_id)
 
+                        # Tell QueryValidator whether THIS query's parameters match the
+                        # pinned reference seed (None/qgen-defaults counts as reference-
+                        # equivalent, matching the __init__ seed-selection logic above) --
+                        # lets parameter-sensitive queries (Q11/16/18/20) be excluded
+                        # instead of EXACT-failed when they don't. Cleared in the finally
+                        # below regardless of outcome so it never leaks into unrelated
+                        # validate_query_result() calls on this thread.
+                        set_reference_seed_context(stream_seed is None or stream_seed == self.reference_seed)
+
                         cursor = self.connection.execute(query_text)
                         rows = cursor.fetchall() if hasattr(cursor, "fetchall") else []
 
@@ -329,6 +346,7 @@ class TPCHPowerTest:
                         if hasattr(self.connection, "commit"):
                             self.connection.commit()
                     finally:
+                        clear_reference_seed_context()
                         # Capture labeled SQL for dry-run preview
                         self.captured_items.append((label, query_text))
 

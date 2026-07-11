@@ -47,7 +47,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-validate the defect at HEAD: non-reference-seed TPC-H power run on DuckDB confirms Q11/16/18/20 fail loose validation; record command, SHA, and failure lines in notes"
-    status: Completed
+    status: done
     needs: []
     notes: |
       PREMISE CORRECTION: SF 0.01 does NOT reproduce -- expected-results
@@ -83,7 +83,7 @@ work:
       Premise otherwise CONFIRMED: proceeding to w1/w2.
   - id: w1
     summary: "Locate the loose validation path and reference-seed exact-match branch; record the pinned file list in work notes -- w2 must stay within that narrowed set, not the full scope_limit"
-    status: Completed
+    status: done
     needs: [w0]
     notes: |
       Seam, precisely:
@@ -179,6 +179,123 @@ work:
       None (unset) for every caller that never sets it (TPC-DS, DataFrame
       validation, any other QueryValidator user) -- preserves their exact
       pre-existing behavior untouched, satisfying must_preserve.
+  - id: w2
+    summary: "Implement the parameter-sensitive exclusion: one shared query-set constant, applied only when params differ from the reference seed; per-query detail records the exclusion reason"
+    status: done
+    needs: [w1]
+    notes: |
+      Implemented exactly the four pinned files from w1, no others:
+        - benchbox/core/expected_results/tpch_results.py: added
+          PARAMETER_SENSITIVE_QUERY_IDS = frozenset({"11","16","18","20"})
+          (no prior Python constant existed -- confirmed by w1 grep -- so
+          this is new, not a duplicate of the Makefile's env-var list).
+        - benchbox/core/validation/query_validation.py: added a
+          threading.local()-backed context
+          (set_reference_seed_context/get_reference_seed_context/
+          clear_reference_seed_context) plus
+          get_parameter_sensitive_query_ids(benchmark_type) (dict keyed by
+          benchmark, tpch -> the new constant, everything else -> empty
+          frozenset). validate_query_result() checks, BEFORE the registry
+          lookup: if get_reference_seed_context() is False and the
+          normalized query_id is parameter-sensitive for this benchmark,
+          return ValidationResult(is_valid=True,
+          validation_mode=ValidationMode.SKIP, warning_message="Query 'N'
+          not validated (parameter-sensitive, non-reference params).") --
+          the exact phrase from the TODO description, so it is greppable in
+          the per-query row_count_validation.warning field
+          (_build_query_result_with_validation in
+          benchbox/platforms/base/result_capture.py already maps SKIP ->
+          status SKIPPED without touching overall query status; unchanged).
+        - benchbox/core/tpch/power_test.py: TPCHPowerTest.__init__ stashes
+          self.reference_seed; run()'s per-query loop calls
+          set_reference_seed_context(stream_seed is None or stream_seed ==
+          self.reference_seed) immediately before connection.execute(), and
+          clear_reference_seed_context() in the existing finally block
+          (fires on both success and exception paths).
+        - benchbox/core/tpch/throughput_test.py: _execute_stream() resolves
+          reference_seed = get_reference_seed(config.scale_factor) once,
+          then per query computes stream_seed = seed + stream_id*1000 +
+          position (same formula _resolve_query_text() already uses to
+          generate the SQL -- re-read, not re-derived, so
+          must_preserve's "seed derivation formula unchanged" holds) and
+          calls set_reference_seed_context(stream_seed == reference_seed) /
+          clear_reference_seed_context() around connection.execute().
+      Deliberately did NOT touch throughput_test.py's
+      connection.set_query_context(query_id) call (missing stream_id= --
+      see w1 note 6): the exclusion above resolves the reproduced defect on
+      every stream regardless of that separate, pre-existing omission.
+      Flagged as a spawn_task follow-up, not folded into this change.
+      ruff, ty, and lint-imports (utils < core < platforms < cli) all clean
+      on the four touched files; no platforms/*.py file was modified.
+  - id: w3
+    summary: "Verify end-to-end: non-reference-seed run reports clean-with-exclusions; wrong row count on a non-excluded query still fails; summary.validation keeps submit classification honest"
+    status: done
+    needs: [w2]
+    notes: |
+      Added regression coverage at two levels (no new test files -- all
+      additions to existing files that already carry pytestmark, so
+      lint-markers stays clean):
+        - tests/unit/core/expected_results/test_validation_engine.py
+          (new TestParameterSensitiveExclusion class, 12 cases): constant
+          value, get_parameter_sensitive_query_ids() per-benchmark scoping,
+          context set/get/clear round-trip, each of Q11/16/18/20 excluded
+          when context=False (asserts the exact warning-message phrase),
+          each still EXACT-fails when context=True (must_preserve) and when
+          context is left unset/None (default -- proves callers that never
+          touch this context, e.g. TPC-DS, are unaffected), a non-boundary
+          query (Q1) still fails on a wrong count even with context=False
+          (anti_pattern guard against unconditional exclusion), and TPC-DS
+          explicitly unaffected by a non-reference context.
+        - tests/integration/test_tpch_power_test.py (new
+          TestPowerTestReferenceSeedContext class, 6 cases): verifies
+          TPCHPowerTest.run() calls set_reference_seed_context with the
+          correct bool for qgen-defaults / reference-seed / custom-seed
+          runs, verifies clear_reference_seed_context fires every query, and
+          two REAL-stack end-to-end cases routed through the actual
+          PlatformAdapterConnection + DuckDBAdapter + QueryValidator (only
+          the innermost raw DB cursor mocked, forced to return a row count
+          that would fail any real SF=1 EXACT comparison): a custom-seed run
+          reports Q11/16/18/20 as SUCCESS (not FAILED) -- the literal w0
+          repro, now fixed; a reference-seed run still reports Q11 as FAILED
+          (must_preserve).
+        - tests/integration/test_tpch_throughput_test.py (new
+          TestThroughputReferenceSeedContext class, 5 cases): verifies
+          per-position context is True ONLY for stream 0 position 0 with the
+          reference seed (every other position necessarily diverges, given
+          the seed+stream_id*1000+position formula), False for the default
+          base_seed=42 and for any seed at a non-SF=1.0 scale factor (no
+          pinned reference exists below SF=1.0), context cleared every
+          query, and a REAL-stack end-to-end case across TWO streams (0 and
+          1) confirming Q11/16/18/20 are absent from BOTH streams' failed-
+          query sets with the default base_seed -- this is the literal w0
+          throughput repro (8 failures = {11,16,18,20} x 2 streams), now 0
+          boundary-query failures on either stream. (The other 18
+          non-boundary queries are expected to fail in this specific test
+          because the mock forces every query's row count to 999 regardless
+          of query id -- that is correct EXACT-mode behavior and is not
+          this test's concern; it only asserts on the boundary set.)
+      All new + pre-existing tests pass:
+        - tests/unit/core/ (9993 passed, 12 skipped, 0 failed)
+        - tests/integration/test_tpch_power_test.py -m "integration and slow" (12 passed)
+        - tests/integration/test_tpch_throughput_test.py -m "integration and slow" (16 passed)
+        - tests/integration/test_throughput_corrections.py (included in the
+          tests/unit/core/ run above via the combined verification command;
+          separately reconfirmed, all passing)
+      One incidental finding during verification: a pre-existing local-only
+      test, tests/unit/core/results/test_integrity_validator.py::
+      TestIntegrityValidatorReferenceFiles, opportunistically scans
+      benchmark_runs/results/*_sf1_duckdb_*_2026*.json (gitignored, dev-
+      machine-local, no CI equivalent) for the LATEST matching file by
+      mtime and asserts it doesn't fail integrity checks. My own w0 repro
+      runs left deliberately-broken result files there, which the test
+      picked up and failed on (not a regression -- cleaned up the repro
+      artifacts; benchmark_runs/ is gitignored so nothing to commit).
+      ruff clean on all three touched test files; lint-imports clean;
+      lint-markers clean (no new test files, no new markers needed).
+  - id: w4
+    summary: "Run the nightly throughput config locally via make uat-sweep and confirm the cell passes clean with Throughput@Size > 0"
+    status: pending
+    needs: [w3]
 
 deferred:
   - summary: "Parameter-aware expected row counts for Q11/16/18/20 (deriving expectations per seed instead of excluding)"
