@@ -2,7 +2,8 @@ id: "fix-session-isolation-placeholder-rows"
 title: "Land the placeholder-rows fix for the session-isolation failure keeping develop red (via existing PR #1117)"
 worktree: "auto-revert-incident"
 priority: "Critical"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-11"
 category: "Testing and Quality Assurance"
 description: |
   Develop's post-merge medium-test lane has been red continuously since
@@ -66,7 +67,7 @@ prior_art:
 work:
 - id: w0
   summary: "Re-validate: failing test still red at develop tip with the [(None,)] signature; #1117 still open with only the mtime flake red; #1117's head merged into the tip locally turns the test green."
-  status: pending
+  status: done
   notes: |
     Record commands + SHAs + result lines in the close-out. The local
     merge-tree check (git fetch the PR head, merge into a throwaway branch
@@ -74,7 +75,7 @@ work:
 - id: w1
   summary: "Update #1117's branch onto the develop tip (GitHub MCP update_pull_request_branch), watch its PR CI; auto-merge (already enabled) lands it on green."
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     FALLBACK if refreshed CI fails for cause (not flake): rewrite the two
     value assertions (lines 243, 250) test-side - cardinality via the
@@ -84,11 +85,11 @@ work:
 - id: w2
   summary: "Confirm the develop-post-merge run for the merge SHA is green (medium-test passes, session-isolation test included)."
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
   summary: "Post-merge ops: once develop-post-merge is green, close superseded open auto-revert PRs with a comment linking this fix-forward PR."
   needs: [w2]
-  status: pending
+  status: done
   notes: |
     Ops action, not code: use gh/GitHub MCP. Close #1120, #1121, #1122,
     #1125, #1126, #1127, plus any opened since. Do NOT merge any of them -
