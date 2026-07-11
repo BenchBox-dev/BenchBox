@@ -42,6 +42,7 @@ honest default (option 1) was chosen over the additive `--strict` flag.
 from __future__ import annotations
 
 import datetime as _dt
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,6 +58,25 @@ REPORT_HEADER = (
 
 _SKIPPED_STATUSES = frozenset({"skipped"})
 _UNREACHABLE_STATUSES = frozenset({"skipped-unreachable", "skipped_unreachable", "unreachable"})
+
+
+def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
+    """Write `text` to `path` atomically via a temp sibling + fsync + os.replace.
+
+    Shared by every durable UAT artifact writer (cells.jsonl, its accounting
+    sidecar, compatibility_pruned.jsonl, validator_rollup.tsv, matrix_summary
+    TSVs) so a crash mid-write cannot leave torn JSON/TSV on disk -- see
+    uat-resume-retirement-artifact-durability w2. The temp file is a sibling
+    in the same directory as `path`, so `os.replace` is a same-filesystem
+    rename and therefore atomic on both POSIX and Windows.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(path.name + ".tmp")
+    with tmp_path.open("w", encoding=encoding) as fh:
+        fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp_path, path)
 
 
 class SourceInfo(Protocol):
@@ -211,7 +231,6 @@ def write_report(
     change `unreachable_count` itself; it only flags whether that number is
     confirmed or assumed.
     """
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     rows = list(cells)
     executed_count = len(rows)
 
@@ -226,51 +245,48 @@ def write_report(
     total_defined_count = attempted_count + skipped_count + unreachable_count
     candidate_count = total_defined_count
 
-    with output_path.open("w", encoding="utf-8") as fh:
-        fh.write(REPORT_HEADER + "\n")
-        for cell in rows:
-            v = (
-                _validator_status_for_path(validator_status_by_path, cell.result_path)
-                if validator_status_by_path
-                else ""
-            )
-            fh.write(render_row(cell, validator_status=v, source_info=source_info) + "\n")
-        fh.write(
-            "# "
-            f"rows={len(rows)} "
-            f"candidates={candidate_count} "
-            f"executed={executed_count} "
-            f"compatibility_pruned={compatibility_pruned_count} "
-            f"early_stop_pruned={early_stop_pruned_count} "
-            f"attempted={attempted_count} "
-            f"skipped={skipped_count} "
-            f"unreachable={unreachable_count} "
-            f"total_defined={total_defined_count} "
-            f"passed={pass_count} "
-            f"failed={fail_count} "
-            f"timed_out={timeout_count} "
-            f"registry_pruned={registry_pruned_count}\n"
+    lines: list[str] = [REPORT_HEADER + "\n"]
+    for cell in rows:
+        v = _validator_status_for_path(validator_status_by_path, cell.result_path) if validator_status_by_path else ""
+        lines.append(render_row(cell, validator_status=v, source_info=source_info) + "\n")
+    lines.append(
+        "# "
+        f"rows={len(rows)} "
+        f"candidates={candidate_count} "
+        f"executed={executed_count} "
+        f"compatibility_pruned={compatibility_pruned_count} "
+        f"early_stop_pruned={early_stop_pruned_count} "
+        f"attempted={attempted_count} "
+        f"skipped={skipped_count} "
+        f"unreachable={unreachable_count} "
+        f"total_defined={total_defined_count} "
+        f"passed={pass_count} "
+        f"failed={fail_count} "
+        f"timed_out={timeout_count} "
+        f"registry_pruned={registry_pruned_count}\n"
+    )
+    lines.append(
+        "# "
+        f"release_accounting passed={pass_count} failed={fail_count} timed_out={timeout_count} "
+        f"attempted={attempted_count} skipped={skipped_count} unreachable={unreachable_count} "
+        f"total_defined={total_defined_count} registry_pruned={registry_pruned_count}\n"
+    )
+    if unreachable_count or unreachable_count_is_estimated:
+        attention = "required" if unreachable_count else "not_required"
+        lines.append(
+            f"# UNREACHABLE_CELLS={unreachable_count} release_gate_attention={attention} "
+            f"unreachable_is_estimated={str(unreachable_count_is_estimated).lower()}\n"
         )
-        fh.write(
-            "# "
-            f"release_accounting passed={pass_count} failed={fail_count} timed_out={timeout_count} "
-            f"attempted={attempted_count} skipped={skipped_count} unreachable={unreachable_count} "
-            f"total_defined={total_defined_count} registry_pruned={registry_pruned_count}\n"
-        )
-        if unreachable_count or unreachable_count_is_estimated:
-            attention = "required" if unreachable_count else "not_required"
-            fh.write(
-                f"# UNREACHABLE_CELLS={unreachable_count} release_gate_attention={attention} "
-                f"unreachable_is_estimated={str(unreachable_count_is_estimated).lower()}\n"
-            )
-        footer = f"# run_status={run_status}"
-        if source_info is not None:
-            footer += f" source_commit_sha={source_info.commit_sha} source_dirty={str(source_info.dirty).lower()}"
-        if abort_phase:
-            footer += f" abort_phase={abort_phase}"
-        if abort_reason:
-            footer += f" abort_reason={_footer_value(abort_reason)}"
-        fh.write(footer + "\n")
+    footer = f"# run_status={run_status}"
+    if source_info is not None:
+        footer += f" source_commit_sha={source_info.commit_sha} source_dirty={str(source_info.dirty).lower()}"
+    if abort_phase:
+        footer += f" abort_phase={abort_phase}"
+    if abort_reason:
+        footer += f" abort_reason={_footer_value(abort_reason)}"
+    lines.append(footer + "\n")
+
+    atomic_write_text(output_path, "".join(lines))
 
     if rungs:
         clean_pairs = cross_scale_clean_pair_count(rows, rungs, validator_status_by_path=validator_status_by_path)

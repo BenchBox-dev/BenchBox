@@ -220,6 +220,13 @@ emits `cells.jsonl`, `compatibility_pruned.jsonl`, and
 per-cell logs also receive a bounded `UAT_FAILURE_TAIL` block so the run
 directory remains debuggable without relying on an operator tee log.
 
+Every durable artifact (`cells.jsonl`, its `.accounting.json` sidecar,
+`compatibility_pruned.jsonl`, `validator_rollup.tsv`, and the
+`matrix_summary` TSVs) is written atomically: content lands in a `.tmp`
+sibling first, gets `fsync`'d, then `os.replace`s the real path. A crash or
+error mid-write leaves the previous good artifact (or nothing, on a first
+write) in place instead of a torn file.
+
 ## Disk-budget estimate
 
 Preflight prints a disk-budget line and a per-root free-space report before

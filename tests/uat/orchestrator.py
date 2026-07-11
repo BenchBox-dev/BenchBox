@@ -441,63 +441,63 @@ def _write_cells_jsonl(
     source_info: RunSourceInfo,
     skipped_unreachable_count: int = 0,
 ) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     # The skipped-unreachable cells are `Cell` records (not `CellResult` rows)
     # and are therefore not part of the JSONL stream. Persist their count in a
     # sidecar so a report regenerated from `cells.jsonl` (make uat-report) can
     # read it back and keep `total_defined` faithful.
     accounting_path = _cells_accounting_path(path)
-    with accounting_path.open("w", encoding="utf-8") as acc_fh:
-        json.dump({"skipped_unreachable_count": int(skipped_unreachable_count)}, acc_fh)
-        acc_fh.write("\n")
-    with path.open("w", encoding="utf-8") as fh:
-        for cell in cells:
-            terminal_state = report_phase.terminal_state(cell)
-            failure_tail = _persist_cell_failure_context(cell, terminal_state=terminal_state)
-            fh.write(
-                json.dumps(
-                    {
-                        "platform": cell.platform,
-                        "benchmark": cell.benchmark,
-                        "scale": cell.scale,
-                        "status": cell.status,
-                        "terminal_state": terminal_state,
-                        "submit_terminal_state": cell.submit_terminal_state,
-                        "timed_out": cell.status == "timed-out",
-                        "exit_code": cell.exit_code,
-                        "elapsed_s": cell.elapsed_s,
-                        "log_path": str(cell.log_path),
-                        "result_path": (str(cell.result_path) if cell.result_path else None),
-                        "throughput_check": cell.throughput_check,
-                        "failure_tail": failure_tail,
-                        "source_commit_sha": source_info.commit_sha,
-                        "source_commit_short_sha": source_info.commit_short_sha,
-                        "source_dirty": source_info.dirty,
-                    }
-                )
-                + "\n"
+    accounting_text = json.dumps({"skipped_unreachable_count": int(skipped_unreachable_count)}) + "\n"
+    report_phase.atomic_write_text(accounting_path, accounting_text)
+
+    lines: list[str] = []
+    for cell in cells:
+        terminal_state = report_phase.terminal_state(cell)
+        failure_tail = _persist_cell_failure_context(cell, terminal_state=terminal_state)
+        lines.append(
+            json.dumps(
+                {
+                    "platform": cell.platform,
+                    "benchmark": cell.benchmark,
+                    "scale": cell.scale,
+                    "status": cell.status,
+                    "terminal_state": terminal_state,
+                    "submit_terminal_state": cell.submit_terminal_state,
+                    "timed_out": cell.status == "timed-out",
+                    "exit_code": cell.exit_code,
+                    "elapsed_s": cell.elapsed_s,
+                    "log_path": str(cell.log_path),
+                    "result_path": (str(cell.result_path) if cell.result_path else None),
+                    "throughput_check": cell.throughput_check,
+                    "failure_tail": failure_tail,
+                    "source_commit_sha": source_info.commit_sha,
+                    "source_commit_short_sha": source_info.commit_short_sha,
+                    "source_dirty": source_info.dirty,
+                }
             )
+            + "\n"
+        )
+    report_phase.atomic_write_text(path, "".join(lines))
 
 
 def _write_compatibility_pruned_jsonl(path: Path, cells: Iterable[Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as fh:
-        for cell in cells:
-            fh.write(
-                json.dumps(
-                    {
-                        "platform": cell.platform,
-                        "benchmark": cell.benchmark,
-                        "scale": cell.scale,
-                        "status": "compatibility-pruned",
-                        "rule_id": cell.rule_id,
-                        "rule_status": cell.status,
-                        "reason": cell.reason,
-                        "evidence": cell.evidence,
-                    }
-                )
-                + "\n"
+    lines: list[str] = []
+    for cell in cells:
+        lines.append(
+            json.dumps(
+                {
+                    "platform": cell.platform,
+                    "benchmark": cell.benchmark,
+                    "scale": cell.scale,
+                    "status": "compatibility-pruned",
+                    "rule_id": cell.rule_id,
+                    "rule_status": cell.status,
+                    "reason": cell.reason,
+                    "evidence": cell.evidence,
+                }
             )
+            + "\n"
+        )
+    report_phase.atomic_write_text(path, "".join(lines))
 
 
 def _persist_cell_failure_context(cell: CellResult, *, terminal_state: str) -> str:
