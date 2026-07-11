@@ -1029,6 +1029,38 @@ def test_default_log_dir_substitutes_date_and_name():
     assert "uat-2026-05-02" not in str(out)  # default template uses {date} only
 
 
+def test_default_log_dir_substitutes_time_component():
+    """The DEFAULT template's {time} placeholder expands to HHMMSS."""
+    cfg = validate_config({"name": "uat-smoke"})
+    out = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 14, 30, 7))
+    assert "143007" in str(out)
+
+
+def test_default_log_dir_time_avoids_same_day_collision():
+    """Two same-day sweeps at different times land in distinct default dirs.
+
+    Prior to uat-resume-retirement-artifact-durability the default template
+    was {date}-only, so a second same-day run silently overwrote the
+    first run's evidence (mode "w" on every durable artifact).
+    """
+    cfg = validate_config({"name": "uat-smoke"})
+    first = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 9, 0, 0))
+    second = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 9, 0, 1))
+    assert first != second
+
+
+def test_default_log_dir_explicit_date_only_template_still_works():
+    """Existing configs with an explicit {date}-only template keep working verbatim."""
+    cfg = validate_config(
+        {
+            "name": "uat-smoke",
+            "output": {"logs_dir_template": "~/Developer/benchmark_runs/logs/uat_custom_{date}"},
+        }
+    )
+    out = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 9, 0, 0))
+    assert str(out).endswith("uat_custom_20260505")
+
+
 def test_default_benchmark_runs_dir_substitutes_date_and_name(tmp_path):
     cfg = validate_config(
         {

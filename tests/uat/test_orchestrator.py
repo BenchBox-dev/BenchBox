@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -542,6 +543,34 @@ def test_execute_free_space_abort_emits_partial_artifacts(tmp_path: Path):
     cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
     assert cells[0]["platform"] == "duckdb"
     assert (tmp_path / "logs" / "matrix_summary.partial.tsv").exists()
+
+
+def test_two_sweeps_in_one_process_land_in_distinct_log_dirs(tmp_path: Path):
+    """Two same-day sweeps (no log_dir_override) land in distinct default dirs.
+
+    Regression test for w3 of uat-resume-retirement-artifact-durability: the
+    default logs_dir_template was {date}-only, so a second same-day sweep of
+    the same config silently overwrote the first run's mode="w" artifacts.
+    """
+    cfg = validate_config(
+        {
+            "name": "collision-smoke",
+            "dry_run": True,
+            "output": {"logs_dir_template": str(tmp_path / "uat_{date}_{time}")},
+        }
+    )
+    fixed_times = iter(
+        [
+            _dt.datetime(2026, 5, 5, 9, 0, 0),
+            _dt.datetime(2026, 5, 5, 9, 0, 1),
+        ]
+    )
+    with patch.object(orchestrator, "_dt") as mock_dt:
+        mock_dt.datetime.now.side_effect = lambda: next(fixed_times)
+        result1 = orchestrator.run_sweep(cfg)
+        result2 = orchestrator.run_sweep(cfg)
+
+    assert result1.log_dir != result2.log_dir
 
 
 def _source_info() -> orchestrator.RunSourceInfo:

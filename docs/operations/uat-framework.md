@@ -36,7 +36,7 @@ By default every BenchBox runtime artefact lands under the shared
 ├── datagen/                       # generated source data; preserved across runs
 ├── databases/                     # loaded DBs; pruned at safe reuse boundaries
 ├── results/                       # per-cell result JSON files
-├── logs/uat_<date>/               # per-cell logs + matrix_summary.tsv
+├── logs/uat_<date>_<time>/         # per-cell logs + matrix_summary.tsv
 └── submissions/<name>/            # local-stage / draft-pr bundles
 ```
 

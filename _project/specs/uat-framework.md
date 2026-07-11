@@ -343,9 +343,19 @@ report:
 
 # Output paths ----------------------------------------------------------
 output:
-  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_{date}"
+  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_{date}_{time}"
                                        # optional, str. {date} expands
-                                       # to YYYYMMDD at sweep start.
+                                       # to YYYYMMDD, {time} to HHMMSS,
+                                       # both at sweep start. {time} in
+                                       # the DEFAULT is what makes two
+                                       # same-day sweeps land in distinct
+                                       # dirs instead of one overwriting
+                                       # the other's mode="w" artifacts.
+                                       # Existing explicit templates that
+                                       # never mention {time} (every
+                                       # checked-in config today) render
+                                       # unchanged -- the placeholder is
+                                       # simply absent from the output.
   submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"
                                        # optional, str. {name} expands
                                        # to top-level `name:` field.
