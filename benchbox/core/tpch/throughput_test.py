@@ -66,6 +66,21 @@ class TPCHThroughputTestConfig:
 TPCHThroughputStreamResult = ThroughputStreamResult
 
 
+def _derive_query_seed(seed: int, stream_id: int, position: int) -> int:
+    """Per-query qgen seed for one throughput stream position.
+
+    ``seed`` is the per-stream base seed StreamRunner hands to
+    ``_execute_stream`` (``config.base_seed + stream_id`` -- see
+    ``benchbox.core.throughput.runner``). The SINGLE definition of the
+    per-position formula: query generation (pre-generation pass and the
+    ``_resolve_query_text`` inline fallback) and the reference-seed
+    validation context in ``_execute_stream`` must all derive the seed
+    through this helper so validation can never silently desynchronize
+    from the SQL that was actually generated.
+    """
+    return seed + stream_id * 1000 + position
+
+
 def _count_cursor_rows(cursor: Any) -> int:
     """Return a row count without importing benchbox.platforms from core.
 
@@ -263,7 +278,7 @@ class TPCHThroughputTest:
             query_permutation = TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)]
             sql_list: list[Any] = []
             for position, query_id in enumerate(query_permutation):
-                stream_seed = seed + stream_id * 1000 + position
+                stream_seed = _derive_query_seed(seed, stream_id, position)
                 try:
                     sql_list.append(
                         self.benchmark.get_query(
@@ -313,7 +328,7 @@ class TPCHThroughputTest:
 
         # Fall back to inline generation (_execute_stream called directly,
         # bypassing run()'s pre-generation pass).
-        stream_seed = seed + stream_id * 1000 + position
+        stream_seed = _derive_query_seed(seed, stream_id, position)
         return self.benchmark.get_query(
             query_id,
             seed=stream_seed,
@@ -491,15 +506,16 @@ class TPCHThroughputTest:
                             connection.set_query_context(query_id)
 
                         # Tell QueryValidator whether THIS query's derived seed
-                        # matches the pinned reference seed -- lets parameter-
-                        # sensitive queries (Q11/16/18/20) be excluded instead of
-                        # EXACT-failed when the throughput seed derivation (always
-                        # base_seed + stream_id*1000 + position, per must_preserve)
+                        # (_derive_query_seed -- the same single definition query
+                        # generation uses, so validation can never desynchronize
+                        # from the generated SQL) matches the pinned reference
+                        # seed -- lets parameter-sensitive queries (Q11/16/18/20)
+                        # be excluded instead of EXACT-failed when the derivation
                         # doesn't happen to reproduce the reference answer set.
                         # Cleared in the finally below regardless of outcome so it
                         # never leaks into unrelated validate_query_result() calls
                         # on this thread.
-                        stream_seed = seed + stream_id * 1000 + position
+                        stream_seed = _derive_query_seed(seed, stream_id, position)
                         set_reference_seed_context(stream_seed == reference_seed)
 
                         cursor = connection.execute(query_text)

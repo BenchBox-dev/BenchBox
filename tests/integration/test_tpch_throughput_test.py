@@ -371,8 +371,10 @@ class TestThroughputReferenceSeedContext:
 
         test = TPCHThroughputTest(benchmark=benchmark, connection_factory=factory, scale_factor=1.0, num_streams=2)
 
-        stream0 = test._execute_stream(stream_id=0, seed=test.config.base_seed, config=test.config)
-        stream1 = test._execute_stream(stream_id=1, seed=test.config.base_seed, config=test.config)
+        # Per-stream seeds mirror StreamRunner's real derivation
+        # (config.base_seed + stream_id -- see benchbox/core/throughput/runner.py).
+        stream0 = test._execute_stream(stream_id=0, seed=test.config.base_seed + 0, config=test.config)
+        stream1 = test._execute_stream(stream_id=1, seed=test.config.base_seed + 1, config=test.config)
 
         boundary_ids = {11, 16, 18, 20}
         for stream_result in (stream0, stream1):

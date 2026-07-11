@@ -102,6 +102,7 @@ class TestQueryValidator:
         assert result.actual_row_count == 101
         # expected_row_count is available but validation is skipped
         assert result.warning_message is not None
+        assert "SKIP" in result.warning_message or "skip" in result.warning_message
 
 
 class TestParameterSensitiveExclusion:
@@ -221,23 +222,46 @@ class TestParameterSensitiveExclusion:
         assert not result.is_valid
         assert result.validation_mode == ValidationMode.EXACT
 
-    def test_boundary_query_correct_count_still_passes_when_non_reference_seed(self):
-        """A parameter-sensitive query that happens to return the reference
-        count anyway still validates as a genuine PASS (not an exclusion) --
-        only a MISMATCH is what the exclusion would have masked."""
-        set_reference_seed_context(False)
+    def test_boundary_query_skipped_regardless_of_count_when_non_reference_seed(self):
+        """The exclusion is deterministic: it fires BEFORE the registry
+        lookup, so under a non-reference context a parameter-sensitive query
+        is SKIPped no matter what count it returned -- even a count that
+        happens to equal the reference answer. This pins the always-SKIP
+        semantics (a coincidental match is NOT reported as an EXACT PASS,
+        because under different substitution parameters the reference
+        expectation is meaningless either way)."""
         validator = QueryValidator()
-        result = validator.validate_query_result(
+
+        # Wrong count -> SKIP (not FAILED).
+        set_reference_seed_context(False)
+        wrong = validator.validate_query_result(
             benchmark_type="tpch",
             query_id="11",
             actual_row_count=999_999_999,
             scale_factor=1.0,
         )
-        # Sanity check the exclusion fired (SKIP, not a coincidental EXACT
-        # pass) -- test_boundary_query_excluded_when_non_reference_seed above
-        # already asserts this in detail; re-asserted here as the fixture for
-        # the next call's contrast.
-        assert result.validation_mode == ValidationMode.SKIP
+        assert wrong.is_valid
+        assert wrong.validation_mode == ValidationMode.SKIP
+
+        # Reference-matching count -> still SKIP (not an EXACT PASS). Derive
+        # the reference expectation from the registry itself so this test
+        # never hardcodes an answer-set row count.
+        reference_expected = validator.registry.get_expected_result("tpch", "11", 1.0)
+        assert reference_expected is not None
+        reference_count = reference_expected.get_expected_count(1.0)
+        assert reference_count is not None
+
+        set_reference_seed_context(False)
+        coincidental = validator.validate_query_result(
+            benchmark_type="tpch",
+            query_id="11",
+            actual_row_count=reference_count,
+            scale_factor=1.0,
+        )
+        assert coincidental.is_valid
+        assert coincidental.validation_mode == ValidationMode.SKIP
+        assert coincidental.warning_message is not None
+        assert "parameter-sensitive" in coincidental.warning_message
 
     def test_tpcds_query_unaffected_by_reference_seed_context(self):
         """TPC-DS never sets the reference-seed context, and has no entry in
