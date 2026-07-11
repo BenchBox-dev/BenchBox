@@ -119,16 +119,15 @@ def is_review_enforced(rules: list[dict[str, Any]]) -> bool:
 # v* tag-creation protection (tag-and-pypi-environment-admin-hardening w3)
 # ---------------------------------------------------------------------------
 
-# WARN-until-applied flag, mirroring ruleset_drift_check.DEVELOP_REVIEW_RULE_ENFORCED.
-# The v* tag-creation ruleset is a pending admin action (see
-# docs/operations/repo-admin-settings.md, "Tag creation restricted to release
-# flow"): the develop-PR GITHUB_TOKEN has no ``administration`` scope to POST a
-# ruleset. While this is False, ``tag_protection_findings`` are surfaced as
-# non-blocking warnings so the check can land BEFORE the admin acts without
-# turning the (eventual) canary red. Flip to True once the runbook's live-state
-# note records the applied ruleset id + conditions, exactly as
-# DEVELOP_REVIEW_RULE_ENFORCED is flipped for the develop review rule.
-TAG_RULESET_ENFORCED = False
+# Enforcement flag, mirroring ruleset_drift_check.DEVELOP_REVIEW_RULE_ENFORCED.
+# The v* tag-creation ruleset was applied by admin on 2026-07-10 (ruleset id
+# 18774756 ``v-tag-restricted``; see docs/operations/repo-admin-settings.md,
+# "Tag creation restricted to release flow"), so this is flipped to True:
+# ``tag_protection_findings`` for a missing/incomplete tag ruleset are now a
+# BLOCKING drift finding rather than a non-blocking warning. The bypass list
+# was confirmed to be the release-finalize identity only (User:57046) before
+# flipping, per the runbook's "CONFIRM before enforcing" gate.
+TAG_RULESET_ENFORCED = True
 
 # The ref pattern the release flow tags with (make release-finalize pushes v*).
 TAG_REF_PATTERN = "refs/tags/v*"
