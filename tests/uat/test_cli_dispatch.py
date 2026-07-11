@@ -345,3 +345,70 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
         "free_space_checks_enabled": True,
     }
     assert '"name": "managed-cli"' in capsys.readouterr().out
+
+
+def test_uat_execute_and_execute_only_sweep_produce_identical_cells_jsonl(tmp_path, monkeypatch, capsys):
+    """uat-execute-path-unification w2 parity requirement.
+
+    `make uat-execute` now routes through the same canonical phase loop
+    (`orchestrator.run_sweep`, scoped to `[preflight?, execute]`) as
+    `make uat-sweep`. For the same mocked runner, the two must produce
+    byte-identical cells.jsonl (and accounting sidecar) content -- pinning
+    the whole point of the unification: no more silently-different behavior
+    between the two entry points.
+    """
+    from tests.uat.config import load_config
+    from tests.uat.orchestrator import run_sweep
+    from tests.uat.runner import CellResult
+
+    def fake_run_cell(platform, benchmark, scale, **kwargs):
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.23,
+            log_path=Path("/nonexistent/cell.log"),
+            result_path=Path("/nonexistent/result.json"),
+        )
+
+    monkeypatch.setattr("tests.uat.phases.execute.run_cell", fake_run_cell)
+
+    config_path = tmp_path / "uat.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                'name: "parity-smoke"',
+                "phases: [execute]",
+                "platforms:",
+                '  include: ["duckdb"]',
+                "benchmarks:",
+                '  include: ["tpch"]',
+                "scales:",
+                "  rungs: [0.01]",
+                "preflight:",
+                "  free_space_min_gib: 0",
+                "output:",
+                f'  logs_dir_template: "{tmp_path / "execute-run"}"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rc = _cli.main(["execute", "--config", str(config_path)])
+    assert rc == 0
+    execute_summary = json.loads(capsys.readouterr().out)
+    execute_log_dir = Path(execute_summary["log_dir"])
+
+    sweep_config = load_config(config_path)
+    sweep_log_dir = tmp_path / "sweep-run"
+    run_sweep(sweep_config, log_dir_override=sweep_log_dir)
+
+    execute_cells = (execute_log_dir / "cells.jsonl").read_text(encoding="utf-8")
+    sweep_cells = (sweep_log_dir / "cells.jsonl").read_text(encoding="utf-8")
+    assert execute_cells == sweep_cells
+
+    execute_sidecar = (execute_log_dir / "cells.jsonl.accounting.json").read_text(encoding="utf-8")
+    sweep_sidecar = (sweep_log_dir / "cells.jsonl.accounting.json").read_text(encoding="utf-8")
+    assert execute_sidecar == sweep_sidecar

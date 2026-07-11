@@ -335,42 +335,74 @@ def _handle_verify_tuning_matrix(args: argparse.Namespace) -> int:
 
 
 def _handle_execute(args: argparse.Namespace) -> int:
-    """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
-    from tests.uat.config import disk_gate_disabled_warning, load_config
-    from tests.uat.phases.execute import default_benchmark_runs_dir, default_log_dir, run_execute
-    from tests.uat.phases.preflight import preflight_kwargs_from_config, run_preflight
+    """Implements `make uat-execute CONFIG=path/to/uat.yaml`.
+
+    Routes through the orchestrator's canonical phase loop (`run_sweep`,
+    scoped to `[preflight?, execute]`) instead of a hand-rolled
+    preflight+execute duplicate, so `make uat-execute` gets the same
+    per-cell disk-floor watch and durable cells.jsonl + accounting sidecar a
+    sweep gets -- see uat-execute-path-unification w2. One behavior
+    improvement over the prior standalone implementation: a mid-execute
+    disk-floor abort now also emits the abort-safe cells.jsonl/partial-report
+    artifacts (previously `make uat-execute` had none).
+    """
+    from dataclasses import replace
+
+    from tests.uat.config import load_config
+    from tests.uat.orchestrator import run_sweep
+    from tests.uat.phases.execute import default_benchmark_runs_dir
 
     config = load_config(args.config)
     benchmark_runs_dir = default_benchmark_runs_dir(config)
-    gate_warning = disk_gate_disabled_warning(config)
-    if gate_warning is not None:
-        print(gate_warning, file=sys.stderr)
-    if "preflight" in config.phases:
-        preflight = run_preflight(**preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir))
-        if preflight.disk_budget_summary:
-            print(preflight.disk_budget_summary, file=sys.stderr)
-        for line in getattr(preflight, "free_space_report", ()):
-            print(line, file=sys.stderr)
-        for warning in preflight.warnings:
-            print(f"[preflight warn] {warning}", file=sys.stderr)
-        if preflight.aborted:
-            print(f"[preflight] ABORT: {preflight.abort_reason}", file=sys.stderr)
-            return 2
-
     databases_root = Path(args.databases_root).expanduser() if args.databases_root else benchmark_runs_dir / "databases"
-    log_dir = default_log_dir(config)
-    execute_kwargs: dict = {
-        "log_dir": log_dir,
-        "benchmark_runs_dir": benchmark_runs_dir,
-        "databases_root": databases_root,
-        "cleanup_enabled": not args.no_cleanup and config.cleanup.prune_databases,
-        "free_space_checks_enabled": config.disk_gate_enabled,
-    }
-    outcome = run_execute(config, **execute_kwargs)
+
+    # `make uat-execute` runs preflight only when the config's own `phases:`
+    # list requests it (matching the prior standalone implementation' gating
+    # on `"preflight" in config.phases`), plus execute -- never
+    # validate/package/report/explorer_smoke, which stay `make uat-sweep`'s
+    # job.
+    phases = tuple(phase for phase in ("preflight", "execute") if phase in config.phases)
+    if "execute" not in phases:
+        phases = (*phases, "execute")
+    cleanup_enabled = not args.no_cleanup and config.cleanup.prune_databases
+    scoped_config = replace(
+        config,
+        phases=phases,
+        cleanup=replace(config.cleanup, prune_databases=cleanup_enabled),
+    )
+
+    result = run_sweep(scoped_config, databases_root=databases_root)
+
+    if result.aborted_phase == "preflight":
+        print(f"[preflight] ABORT: {result.abort_reason}", file=sys.stderr)
+        return 2
+
+    outcome = result.execute_outcome
+    if outcome is None:
+        # A mid-execute abort (the per-cell disk-floor watch) can trip before
+        # run_execute returns -- cells.jsonl and the partial report were
+        # still written via the orchestrator's abort-artifact path; there is
+        # just no ExecuteOutcome to report per-cell counts from here.
+        summary = {
+            "name": config.name,
+            "log_dir": str(result.log_dir),
+            "passed": 0,
+            "failed": 0,
+            "timed_out": 0,
+            "pruned": 0,
+            "compatibility_pruned": 0,
+            "skipped_unreachable": 0,
+            "docker_events": 0,
+            "aborted": True,
+            "abort_reason": result.abort_reason,
+        }
+        print(json.dumps(summary, indent=2))
+        print(f"[execute] ABORT: {result.abort_reason}", file=sys.stderr)
+        return 2
 
     summary = {
         "name": config.name,
-        "log_dir": str(log_dir),
+        "log_dir": str(result.log_dir),
         "passed": sum(1 for r in outcome.results if r.status == "passed"),
         "failed": sum(1 for r in outcome.results if r.status == "failed"),
         "timed_out": sum(1 for r in outcome.results if r.status == "timed-out"),

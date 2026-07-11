@@ -37,6 +37,13 @@ class SweepResult:
     aborted_phase: str | None
     abort_reason: str | None
     phase_exit_codes: dict[str, int]
+    # Additive: the raw per-phase results, threaded through so a single-phase
+    # caller (e.g. `make uat-execute`, which routes through this same phase
+    # loop -- see uat-execute-path-unification w2) can report the same detail
+    # `_handle_execute` used to build by hand, without re-deriving it. None
+    # when the corresponding phase did not run this sweep.
+    preflight: Any = None
+    execute_outcome: Any = None
 
     def exit_code(self) -> int:
         if self.aborted_phase is not None:
@@ -138,6 +145,7 @@ def run_sweep(  # noqa: C901
     cells_jsonl = log_dir / "cells.jsonl"
     compatibility_pruned_jsonl = log_dir / "compatibility_pruned.jsonl"
     execute_outcome = None
+    preflight_result = None
     validator_rollup_tsv: Path | None = None
     submissions_dir: Path | None = None
 
@@ -154,6 +162,7 @@ def run_sweep(  # noqa: C901
             result = preflight_phase.run_preflight(
                 **preflight_phase.preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir)
             )
+            preflight_result = result
             disk_budget_summary = getattr(result, "disk_budget_summary", None)
             if disk_budget_summary:
                 print(disk_budget_summary, file=sys.stderr)
@@ -364,6 +373,8 @@ def run_sweep(  # noqa: C901
         aborted_phase=aborted_phase,
         abort_reason=abort_reason,
         phase_exit_codes=phase_exit_codes,
+        preflight=preflight_result,
+        execute_outcome=execute_outcome,
     )
 
 
