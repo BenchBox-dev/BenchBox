@@ -523,11 +523,28 @@ def test_classify_for_submit_keeps_unofficial_as_passed_cell(tmp_path: Path):
 # ---------------------------------------------------------------------------
 
 
+def _fake_run_with_timeout_factory(*, exit_code: int, timed_out: bool):
+    """Fabricate a TimeoutResult so the fast lane never spawns a real subprocess.
+
+    The three w1 guard tests only exercise post-subprocess classification
+    logic; a live `sleep 3` against a 1s cap would cost ~1s of wall time and
+    add flake surface for nothing.
+    """
+
+    def fake_run_with_timeout(argv, timeout_s, *, stdout=None, stderr=None, env=None, cwd=None):
+        return TimeoutResult(exit_code=exit_code, timed_out=timed_out, elapsed_s=0.1, stdout=b"", stderr=b"")
+
+    return fake_run_with_timeout
+
+
 def test_run_cell_official_timeout_preserves_timed_out_status(tmp_path: Path):
     """A timed-out official cell must stay 'timed-out', not be overwritten to 'failed'."""
-    fake_argv = [sys.executable, "-c", "import time; time.sleep(3)"]
+    fake_argv = [sys.executable, "-c", "print('unused')"]
     with (
         patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(
+            runner, "run_with_timeout", side_effect=_fake_run_with_timeout_factory(exit_code=124, timed_out=True)
+        ),
         patch.object(runner, "resolve_official_result_path", return_value=None),
     ):
         result = runner.run_cell(
@@ -551,9 +568,12 @@ def test_run_cell_official_timeout_preserves_timed_out_status(tmp_path: Path):
 
 def test_run_cell_official_missing_result_downgrades_passed_cell(tmp_path: Path):
     """A clean-exit official cell that resolved no result JSON is still a genuine failure."""
-    fake_argv = [sys.executable, "-c", "pass"]
+    fake_argv = [sys.executable, "-c", "print('unused')"]
     with (
         patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(
+            runner, "run_with_timeout", side_effect=_fake_run_with_timeout_factory(exit_code=0, timed_out=False)
+        ),
         patch.object(runner, "resolve_official_result_path", return_value=None),
     ):
         result = runner.run_cell(
@@ -573,9 +593,12 @@ def test_run_cell_official_missing_result_downgrades_passed_cell(tmp_path: Path)
 
 def test_run_cell_official_failed_exit_with_missing_result_keeps_original_exit_code(tmp_path: Path):
     """A cell that already failed (nonzero exit, no timeout) keeps its own exit code."""
-    fake_argv = [sys.executable, "-c", "import sys; sys.exit(2)"]
+    fake_argv = [sys.executable, "-c", "print('unused')"]
     with (
         patch.object(runner, "benchbox_run_official_argv", return_value=fake_argv),
+        patch.object(
+            runner, "run_with_timeout", side_effect=_fake_run_with_timeout_factory(exit_code=2, timed_out=False)
+        ),
         patch.object(runner, "resolve_official_result_path", return_value=None),
     ):
         result = runner.run_cell(

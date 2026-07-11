@@ -104,8 +104,10 @@ time.sleep(30)
 # its own session on win32 either -- `os.killpg` doesn't exist there at all,
 # and AttributeError was not in the (ProcessLookupError, PermissionError)
 # catch. A per-cell timeout would crash the whole execute phase instead of
-# classifying the cell timed-out. Exercised via monkeypatch (no skipif) so
-# the guard is verified on every CI platform, not just win32.
+# classifying the cell timed-out. The fix is an up-front
+# `hasattr(os, "killpg")` guard that falls back to proc.kill(). Exercised
+# via monkeypatch.delattr (no skipif) -- deleting the attribute makes the
+# hasattr guard take the fallback path on every CI platform, not just win32.
 # ---------------------------------------------------------------------------
 
 

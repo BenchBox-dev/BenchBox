@@ -101,26 +101,24 @@ def _kill_process_group(proc: subprocess.Popen) -> None:
 
     `os.killpg` does not exist on win32 (the process is also never placed in
     its own session there -- `preexec_fn=os.setsid` is POSIX-only, see the
-    `preexec` selection above). Fall back to `proc.kill()`, which `subprocess`
-    implements portably (`TerminateProcess` on win32, `SIGKILL` on POSIX), so
-    a per-cell timeout still reaps the child instead of crashing the whole
-    execute phase with an uncaught AttributeError.
+    `preexec` selection above). Guard with `hasattr` and fall back to
+    `proc.kill()`, which `subprocess` implements portably (`TerminateProcess`
+    on win32, `SIGKILL` on POSIX), so a per-cell timeout still reaps the
+    child instead of crashing the whole execute phase with an uncaught
+    AttributeError.
     """
     import time
 
-    try:
-        os.killpg(proc.pid, signal.SIGTERM)
-    except AttributeError:
+    if not hasattr(os, "killpg"):
         proc.kill()
         return
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
     except (ProcessLookupError, PermissionError):
         return
     time.sleep(0.2)
     try:
         os.killpg(proc.pid, signal.SIGKILL)
-    except AttributeError:
-        proc.kill()
-        return
     except (ProcessLookupError, PermissionError):
         return
 
