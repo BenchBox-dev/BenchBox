@@ -47,24 +47,138 @@ prior_art:
 work:
   - id: w0
     summary: "Re-validate the defect at HEAD: non-reference-seed TPC-H power run on DuckDB confirms Q11/16/18/20 fail loose validation; record command, SHA, and failure lines in notes"
-    status: pending
+    status: Completed
     needs: []
+    notes: |
+      PREMISE CORRECTION: SF 0.01 does NOT reproduce -- expected-results
+      providers only support scale_factor==1.0
+      (benchbox/core/expected_results/tpch_results.py get_tpch_expected_results
+      returns None for SF!=1.0), so at SF 0.01 every query except scale-
+      independent Q1 gets ValidationMode.SKIP and the run reports
+      summary.validation="passed" with 66/66 regardless of seed. Re-ran at
+      SF=1.0 (still cheap, ~4s generate+load) which does carry answer files.
+
+      Command: uv run -- benchbox run --platform duckdb --benchmark tpch
+      --scale 1 --seed 12345 --phases generate,load,power --output
+      /tmp/tpch-seed-repro-sf1 --non-interactive
+      HEAD SHA: 295b645447773a0a8c6ab94a92a91f014be68540
+      Result JSON: benchmark_runs/results/tpch_sf1_duckdb_sql_20260711_081042_1a47cb2c.json
+
+      Failure lines (stream=0, run_type=warmup, from the exported queries[]
+      array -- the CLI's own summary/console output does NOT surface these;
+      see w1 notes for why):
+        {"id": "20", "run_type": "warmup", "status": "FAILED", "stream": 0}
+        {"id": "18", "run_type": "warmup", "status": "FAILED", "stream": 0}
+        {"id": "16", "run_type": "warmup", "status": "FAILED", "stream": 0}
+        {"id": "11", "run_type": "warmup", "status": "FAILED", "stream": 0}
+
+      Also ran the THROUGHPUT phase (2 streams, default base_seed=42, SF=1,
+      reusing the same generated data): 8 FAILED queries = exactly {11,16,18,20}
+      x 2 streams (both stream 0 and stream 1), confirming the TODO's "fails
+      on every stream" framing. CLI surfaced this one as "PARTIAL" /
+      "8 failed queries" (throughput DOES propagate failures to the run
+      verdict, unlike power's warmup-only failure which is silently
+      swallowed -- see w1 notes point 4).
+
+      Premise otherwise CONFIRMED: proceeding to w1/w2.
   - id: w1
     summary: "Locate the loose validation path and reference-seed exact-match branch; record the pinned file list in work notes -- w2 must stay within that narrowed set, not the full scope_limit"
-    status: pending
+    status: Completed
     needs: [w0]
-  - id: w2
-    summary: "Implement the parameter-sensitive exclusion: one shared query-set constant, applied only when params differ from the reference seed; per-query detail records the exclusion reason"
-    status: pending
-    needs: [w1]
-  - id: w3
-    summary: "Verify end-to-end: non-reference-seed run reports clean-with-exclusions; wrong row count on a non-excluded query still fails; summary.validation keeps submit classification honest"
-    status: pending
-    needs: [w2]
-  - id: w4
-    summary: "Run the nightly throughput config locally via make uat-sweep and confirm the cell passes clean with Throughput@Size > 0"
-    status: pending
-    needs: [w3]
+    notes: |
+      Seam, precisely:
+      1. benchbox/core/validation/query_validation.py QueryValidator.
+         validate_query_result() is the single dispatch point for row-count
+         validation (EXACT/RANGE/LOOSE/SKIP) -- called from ~20 platform
+         adapter execute_query() implementations (benchbox/platforms/*, out
+         of scope_limit) plus benchbox/core/benchmark_mixins.py (also out of
+         scope_limit, core/ but not core/validation|tpch|expected_results|
+         results/). None of those call sites are touched by this fix.
+      2. benchbox/core/expected_results/registry.py
+         ExpectedResultsRegistry.get_expected_result() decides EXACT vs SKIP
+         purely from stream_id (>0 => SKIP, "no answer files for streams>0")
+         -- it has NO visibility into which seed produced the current query's
+         parameters.
+      3. benchbox/core/expected_results/tpch_results.py
+         get_tpch_expected_results() registers EVERY TPC-H query with
+         ValidationMode.EXACT unconditionally (never LOOSE) -- so the LOOSE
+         mode described in that file's own module docstring ("BenchBox
+         automatically switches to LOOSE validation" for custom seeds) is
+         DEAD in practice.
+      4. benchbox/core/tpch/power_test.py TPCHPowerTest.__init__ computes an
+         `actual_validation_mode` string ("exact"/"loose"/"disabled") from
+         comparing the seed to get_reference_seed(scale_factor) (lines
+         ~140-195), stores it on TPCHPowerTestConfig.validation_mode -- but
+         grep confirms `.validation_mode` is read ONLY when building
+         to_dict() metadata; it is NEVER consulted to change how
+         validate_query_result() is called. The "auto-switch to loose"
+         plumbing is entirely vestigial. Root cause is NOT "wrong tolerance
+         chosen" -- it's "no seed-awareness reaches the validator at all".
+      5. Confirms exact match to TODO's "queries 11/16/18/20 ... never land
+         on the reference-seed exact-match path" framing: registry.py only
+         ever exact-validates stream_id in (None, 0); power_test.py's own
+         warmup/measurement iteration renumbering
+         (benchbox/core/tpch/platform_power.py current_stream_id = i for
+         warmup, warm_up_iterations+i for measurement) means only the
+         WARMUP run is ever tagged stream_id=0 and reaches EXACT validation
+         at all -- and platform_power.py's warmup loop (lines ~104-129)
+         never checks power_test_result.success, so those failures are
+         silently absorbed and never surface in the CLI's printed
+         success/PASSED verdict (only the measurement runs, tagged stream 1-3
+         and therefore already SKIPped, are checked). This means today,
+         POWER mode's Q11/16/18/20 failures are invisible unless you inspect
+         the exported JSON's queries[] array directly -- worth flagging as a
+         separate follow-up (spawned as a background task, not fixed here;
+         out of this TODO's scope which is validation-policy-only).
+      6. SEPARATE BUG FOUND (not fixed here, see below): throughput_test.py
+         _execute_stream()'s `connection.set_query_context(query_id)` call
+         (line ~475) omits `stream_id=stream_id` -- so EVERY throughput
+         stream is treated as stream_id=None -> "stream 0" by the registry,
+         meaning ALL streams (not just stream 0) attempt EXACT validation.
+         This is WHY w0's throughput repro found stream 1 also failing
+         Q11/16/18/20, not just stream 0. Chose NOT to fix this omission in
+         this TODO: the parameter-sensitive exclusion (w2) resolves it
+         completely regardless, because the exclusion check does not depend
+         on stream_id or the registry's skip logic -- it is computed
+         independently from the actual per-query seed
+         (base_seed + stream_id*1000 + position) vs the reference seed.
+         Leaving the stream_id omission in place does not reintroduce any
+         failure for THIS defect (confirmed: the other 18 "answer-stable"
+         queries already tolerate stream>0's different derived parameters
+         without EXACT mismatches in the w0 throughput repro -- 8/44 failed,
+         all and only {11,16,18,20} x 2 streams). Flagged as a spawn_task
+         follow-up per review-protocol instead of silently leaving it
+         undocumented.
+      7. No existing PARAMETER_SENSITIVE/BOUNDARY_SENSITIVE Python constant
+         in benchbox/core/expected_results/ (confirmed via grep) -- the only
+         prior art is Makefile's CORRECTNESS_GATE_QUERY_IDS (the INCLUDED 18,
+         inverse of the excluded 4), consumed only by
+         tests/integration/test_local_platform_benchmark_matrix.py via the
+         BENCHBOX_CORRECTNESS_GATE_QUERY_IDS env var -- test-only plumbing,
+         not importable production code. Defining a new constant, not
+         duplicating.
+
+      PINNED FILE LIST for w2 (narrowed from the full scope_limit):
+        - benchbox/core/expected_results/tpch_results.py (new constant)
+        - benchbox/core/validation/query_validation.py (context channel +
+          exclusion check)
+        - benchbox/core/tpch/power_test.py (compute + set/clear context)
+        - benchbox/core/tpch/throughput_test.py (compute + set/clear context)
+      Design constraint driving the context-channel approach (rather than a
+      new function parameter threaded through validate_query_result's
+      callers): threading an explicit "is_reference_seed" argument would
+      require editing every platform adapter's execute_query() signature
+      (~20 files under benchbox/platforms/, all outside scope_limit) plus
+      benchbox/core/benchmark_mixins.py (also outside scope_limit). Instead,
+      benchbox/core/tpch/{power_test,throughput_test}.py set a thread-local
+      "is this query using the reference seed's parameters" flag immediately
+      before calling connection.execute() (the same call site that already
+      calls set_query_context() via hasattr-duck-typing, so no platform code
+      needs to know this channel exists), and
+      benchbox/core/validation/query_validation.py reads it. Defaults to
+      None (unset) for every caller that never sets it (TPC-DS, DataFrame
+      validation, any other QueryValidator user) -- preserves their exact
+      pre-existing behavior untouched, satisfying must_preserve.
 
 deferred:
   - summary: "Parameter-aware expected row counts for Q11/16/18/20 (deriving expectations per seed instead of excluding)"
