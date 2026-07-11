@@ -2,7 +2,8 @@ id: uat-execute-path-unification
 title: "Unify make uat-execute with the orchestrator path; single cells.jsonl codec; de-duplicate phase logic in _cli/execute"
 worktree: uat-hardening
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-07-11"
 category: "Architecture"
 
 description: |
@@ -57,28 +58,130 @@ prior_art:
 work:
   - id: w1
     summary: "Extract cells_io.py owning cells.jsonl + accounting-sidecar read/write (single schema definition); orchestrator and _cli consume it; sidecar path helper unified"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      New tests/uat/cells_io.py owns write_cells_jsonl (moved from
+      orchestrator._write_cells_jsonl, including _persist_cell_failure_context
+      /_cell_log_tail/_cell_log_has_marker/FAILURE_TAIL_* constants),
+      read_cells_jsonl (moved from _cli._handle_report's inline JSONL
+      parsing), read_skipped_unreachable_sidecar (moved from
+      _cli._read_skipped_unreachable_sidecar), and cells_accounting_path
+      (the unified sidecar-filename convention). orchestrator.py and
+      _cli.py now call into cells_io; on-disk content is byte-identical
+      (verified via the existing write/read round-trip tests, updated to
+      call cells_io directly). Deviation from the implementation note:
+      atomic_write_text was NOT moved into cells_io.py -- report.py and
+      validate.py are both outside this TODO's scope_limit.only_modify,
+      and atomic_write_text is a generic primitive shared by five artifact
+      types, not cells.jsonl-specific. cells_io.py imports it from
+      report.py instead (`from tests.uat.phases.report import
+      atomic_write_text`), which satisfies "cells_io owns the schema" and
+      "orchestrator/_cli consume one codec" without an out-of-scope edit.
   - id: w2
     summary: "Route _handle_execute through the orchestrator single-phase path so uat-execute gets the disk watch and writes cells.jsonl + sidecar like a sweep; keep --databases-root/--no-cleanup semantics"
-    status: pending
+    status: done
     needs: [w1]
+    notes: >
+      _handle_execute now scopes config.phases to [preflight?, execute]
+      (preflight included only when the loaded config's own phases: list
+      requests it, matching the prior gating) and calls
+      orchestrator.run_sweep directly instead of hand-rolling
+      preflight+execute. SweepResult gained two additive fields
+      (`preflight`, `execute_outcome`) so _handle_execute can rebuild its
+      stdout JSON summary from the phase loop's own result. Behavior
+      improvement (per approach): uat-execute now gets the per-cell
+      disk-floor watch and writes cells.jsonl + accounting sidecar,
+      including abort-safe partial artifacts on a mid-execute disk-floor
+      trip (a scenario the old standalone path never covered). Added the
+      required parity test
+      (test_uat_execute_and_execute_only_sweep_produce_identical_cells_jsonl
+      in test_cli_dispatch.py): uat-execute and an execute-only sweep
+      produce byte-identical cells.jsonl + sidecar for the same mocked
+      run_cell.
   - id: w3
     summary: "Delete _handle_stress duplication: route through run_sweep_from_path(stress_overrides=...); keep CLI flags and behavior identical"
-    status: pending
+    status: done
     needs: [w2]
+    notes: >
+      _handle_stress no longer hand-applies the platform/benchmark/scale
+      replace() overrides; it builds a stress_overrides dict and calls
+      run_sweep_from_path(config_path, stress_overrides=...), which already
+      implemented the identical closed override set (previously zero
+      production callers). Printed JSON shape unchanged (still omits
+      abort_reason, unlike _handle_sweep's summary). Added
+      test_stress_main_forwards_platform_benchmark_scale_as_stress_overrides
+      since run_sweep_from_path's stress_overrides path had no direct test
+      before this TODO made it load-bearing.
   - id: w4
     summary: "Remove _apply_submit_classification double-application from execute.py; delete dead code (matrix.py placeholders, timeouts env_without_pythonpath/iter_argv_for_log)"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      run_cell (runner.py:256-260) already classifies for submit before
+      returning; _apply_submit_classification's mirror in
+      _run_platform_benchmark is idempotent on an already-classified
+      CellResult, so it was pure waste (second file read) for the real
+      runner. Rather than an identity check against `run_cell` (fragile
+      under unittest.mock.Mock's attribute auto-vivification, which broke
+      inspect.unwrap in a spike of this approach), gated the mirror behind
+      an explicit `runner_needs_submit_classification: bool = False`
+      parameter threaded through run_execute -> _run_or_skip_platform ->
+      _run_platform_benchmark. The one test that genuinely needs the mirror
+      (test_execute_downgrades_passed_cell_with_query_failure_result, whose
+      fake_runner deliberately skips classification) now opts in
+      explicitly; kept per the TODO's own guidance rather than deleted.
+      Removed matrix.py's SQL_PLATFORMS/DOCKER_PLATFORMS/DATAFRAME_PLATFORMS
+      placeholder tuples (immediately overwritten before any read) and
+      timeouts.py's env_without_pythonpath/iter_argv_for_log plus their
+      tests (verified zero callers repo-wide via grep).
   - id: w5
     summary: "Replace the 'free space' abort_reason substring checks with a typed abort_kind field; thread execute's actual enumeration into abort-artifact emission instead of re-enumerating"
-    status: pending
+    status: done
     needs: [w1]
+    notes: >
+      No live substring-driven control flow remained by the time this
+      TODO started (the two `"free space" in abort_reason` matches left in
+      the codebase are test assertions on message content, not branches --
+      superseded by earlier uat-status-taxonomy-exit-code-fixes /
+      uat-disk-gate-always-on work). Added the typed field anyway per the
+      binding implementation note, as forward-looking hardening: abort_kind:
+      str | None on ExecuteOutcome (execute.py) and PreflightResult
+      (preflight.py), values "disk_floor" / "docker_startup" /
+      "docker_teardown" / "docker_required" / "local_platform_unreachable".
+      Deviation: added on the two concrete subclasses rather than the
+      shared PhaseResult base -- phases/__init__.py is outside this TODO's
+      scope_limit.only_modify. Not threaded into cells.jsonl (anti_pattern
+      compliance). Threaded execute's real enumeration into the disk-floor
+      abort path: run_execute now annotates a propagating DiskFloorAbort
+      with its actual compatibility_pruned tuple (mirroring the existing
+      skipped_unreachable_count annotation), and orchestrator.run_sweep
+      synthesizes an ExecuteOutcome from it instead of passing
+      execute_outcome=None, so _emit_abort_artifacts no longer falls back
+      to _compatibility_pruned_for_config's second, possibly-diverging
+      re-enumeration for this path (that fallback stays correct/necessary
+      for a genuine preflight-phase abort, where execute never ran).
+      Regression test added:
+      test_disk_floor_abort_threads_real_compatibility_pruned_without_reenumerating.
   - id: w6
     summary: "Consolidate free-space measurement into one helper in preflight_budget.py consumed by all three policy sites"
-    status: pending
+    status: done
     needs: [w5]
+    notes: >
+      Moved free_space_gib from phases/preflight.py into preflight_budget.py
+      (the module that already owns the paired disk-budget estimator).
+      preflight.py re-exports it (`from tests.uat.preflight_budget import
+      free_space_gib as free_space_gib`) so its own internal call sites and
+      test_preflight.py's existing monkeypatches -- test_preflight.py is
+      outside this TODO's scope_limit.only_modify -- keep working unchanged.
+      execute.py's default_free_space_reader and orchestrator.py's
+      _build_disk_floor_runner now import/call preflight_budget.free_space_gib
+      directly; updated test_orchestrator.py's three patch targets from
+      orchestrator.preflight_phase.free_space_gib to
+      orchestrator.preflight_budget.free_space_gib accordingly. All three
+      policy sites (preflight gate, execute platform-boundary check,
+      orchestrator per-cell watch) keep distinct thresholds/behavior; only
+      the measurement primitive is shared.
 
 deferred:
   - summary: "Extract docker lifecycle (execute.py:256-427) into a platform_lifecycle module beside docker_assets"
@@ -141,3 +244,19 @@ metadata:
   estimated_effort: Large
   created_date: "2026-07-11"
   source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), findings R1/R2/R3, F1.2-F1.4, F7.1"
+
+files_affected:
+  added:
+  - tests/uat/cells_io.py
+  modified:
+  - tests/uat/_cli.py
+  - tests/uat/orchestrator.py
+  - tests/uat/phases/execute.py
+  - tests/uat/phases/preflight.py
+  - tests/uat/preflight_budget.py
+  - tests/uat/matrix.py
+  - tests/uat/timeouts.py
+  - tests/uat/test_cli_dispatch.py
+  - tests/uat/test_orchestrator.py
+  - tests/uat/test_phases.py
+  - tests/uat/test_timeouts.py
