@@ -615,13 +615,137 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
         ("cell", "run", "postgresql"),
         ("docker", "down", "postgresql"),
     ]
-    # The failed platform's cells are recorded as unreachable (not silently dropped),
-    # and the compose-up failure is captured in the lifecycle events.
-    assert any(cell.platform == "clickhouse-server" for cell in outcome.skipped_unreachable)
+    # The failed platform's cells are recorded as startup_failed (not
+    # skipped_unreachable -- uat-fail-advance-consistency w3 splits the two
+    # so accounting can tell "stack failed to start" from "TCP probe found
+    # nothing listening"), not silently dropped, and the compose-up failure
+    # is captured in the lifecycle events.
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
+    assert len(outcome.skipped_unreachable) == 0
     assert any(
         event.platform == "clickhouse-server" and event.action == "up" and event.status == "failed"
         for event in outcome.docker_events
     )
+
+
+def test_execute_teardown_failure_after_startup_failure_advances_instead_of_aborting(tmp_path):
+    """w4: teardown failing on a stack whose OWN startup already failed must not defeat #700's advance.
+
+    Regression for uat-fail-advance-consistency w4: `started=True` is set
+    unconditionally after a compose-up so the finally-teardown still runs on
+    a broken stack (it can still leak containers/volumes); before this fix,
+    a teardown failure on that same broken stack was treated exactly like a
+    healthy-stack teardown failure and turned into a GLOBAL abort, defeating
+    the #700 advance-past-broken-stack intent. Policy: only a stack that
+    started successfully makes an undoable teardown failure a resource-leak
+    emergency worth a global abort.
+    """
+    cfg = validate_config(
+        {
+            "name": "docker startup and teardown both fail",
+            "platforms": {"include": ["clickhouse-server", "postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    sequence: list[tuple[str, str, str]] = []
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        platform = _docker_platform_from_argv(argv)
+        sequence.append(("docker", action, platform))
+        # clickhouse-server's compose-up fails AND its teardown also fails.
+        if platform == "clickhouse-server":
+            return docker_assets.DockerCommandResult(tuple(argv), 1, "", f"{action} failed")
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        sequence.append(("cell", "run", platform))
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / f"{platform}.log",
+            result_path=None,
+        )
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=fake_docker,
+            free_space_checks_enabled=True,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    # The sweep advances past the broken stack instead of a global abort.
+    assert outcome.aborted is False
+    assert outcome.abort_reason is None
+    assert sequence == [
+        ("docker", "up", "clickhouse-server"),
+        ("docker", "down", "clickhouse-server"),
+        ("docker", "up", "postgresql"),
+        ("cell", "run", "postgresql"),
+        ("docker", "down", "postgresql"),
+    ]
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
+    # Both the raw teardown failure and the FAIL-and-advance policy decision
+    # are recorded as lifecycle events for auditability.
+    assert any(
+        event.platform == "clickhouse-server" and event.action == "down" and event.status == "failed"
+        for event in outcome.docker_events
+    )
+    assert any(
+        event.platform == "clickhouse-server"
+        and event.action == "down-policy"
+        and event.status == "advance-after-startup-failed"
+        for event in outcome.docker_events
+    )
+
+
+def test_execute_healthy_stack_teardown_failure_still_aborts_after_startup_failed_regression_guard(tmp_path):
+    """w4 must_preserve: a HEALTHY stack's teardown failure still aborts globally.
+
+    Companion to test_execute_docker_teardown_failure_aborts_before_next_platform:
+    that test already pins this behavior, but is duplicated here explicitly
+    alongside the new startup-failed-teardown-advances test so the two
+    directions of the w4 policy are visible side by side.
+    """
+    cfg = validate_config(
+        {
+            "name": "healthy stack teardown failure",
+            "platforms": {"include": ["clickhouse-server", "postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        if action == "down":
+            return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose down failed")
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    assert outcome.aborted is True
+    assert "Docker cleanup failed" in (outcome.abort_reason or "")
+    assert len(outcome.startup_failed) == 0
 
 
 def test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails(tmp_path):
@@ -665,7 +789,8 @@ def test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails(tmp_path)
 
     assert outcome.aborted is False
     assert len(outcome.results) == 0
-    assert len(outcome.skipped_unreachable) == 1
+    assert len(outcome.skipped_unreachable) == 0
+    assert len(outcome.startup_failed) == 1
     assert outcome.exit_code() == 1
 
 

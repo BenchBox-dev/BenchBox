@@ -220,6 +220,7 @@ def run_sweep(  # noqa: C901
                     results=tuple(attempted_cells),
                     pruned=(),
                     skipped_unreachable=(),
+                    startup_failed=(),
                     compatibility_pruned=getattr(exc, "compatibility_pruned", ()) or (),
                     aborted=True,
                     abort_reason=abort_reason,
@@ -233,13 +234,14 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
-                    # The skipped-unreachable Cell objects (not just their
-                    # count) are lost crossing the exception boundary, so the
-                    # synthesized outcome above always carries an empty
-                    # skipped_unreachable -- override with the real count
-                    # run_execute annotated the exception with, or the abort
-                    # report would under-count total_defined.
+                    # The skipped-unreachable / startup-failed Cell objects
+                    # (not just their counts) are lost crossing the exception
+                    # boundary, so the synthesized outcome above always
+                    # carries empty collections -- override with the real
+                    # counts run_execute annotated the exception with, or the
+                    # abort report would under-count total_defined.
                     skipped_unreachable_count=getattr(exc, "skipped_unreachable_count", 0),
+                    startup_failed_count=getattr(exc, "startup_failed_count", 0),
                 )
                 break
             cells_io.write_cells_jsonl(
@@ -247,6 +249,7 @@ def run_sweep(  # noqa: C901
                 execute_outcome.results,
                 source_info=source_info,
                 skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
+                startup_failed_count=len(getattr(execute_outcome, "startup_failed", ())),
                 disk_gate_disabled=not config.disk_gate_enabled,
             )
             _write_compatibility_pruned_jsonl(
@@ -364,9 +367,60 @@ def run_sweep(  # noqa: C901
                 playwright_browsers=config.explorer_smoke.playwright_browsers,
             )
             phase_exit_codes[phase] = result.exit_code()
+            if getattr(result, "skip_reason", None) == "node not on PATH":
+                # macOS operator machines legitimately lack `node` for
+                # non-explorer sweeps -- exit 0 stays, but the drop in
+                # browser coverage must be visible instead of a silent skip.
+                # Thread the status into the existing accounting sidecar
+                # (written by the execute phase, which always precedes
+                # explorer_smoke) rather than a second sidecar write; if no
+                # sidecar exists yet (e.g. a `phases:` list that runs
+                # explorer_smoke without execute), there is nothing durable
+                # to patch and the stderr warning is the only record -- see
+                # uat-fail-advance-consistency w2.
+                cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
+                print(
+                    "[explorer_smoke] WARNING: node not on PATH -- browser coverage skipped for this sweep "
+                    "(explorer_smoke_status=skipped_no_node)",
+                    file=sys.stderr,
+                )
+            if getattr(result, "aborted", False):
+                aborted_phase = phase
+                abort_reason = getattr(result, "abort_reason", None)
+                _emit_abort_artifacts(
+                    config=config,
+                    log_dir=log_dir,
+                    attempted=(),
+                    execute_outcome=execute_outcome,
+                    source_info=source_info,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                )
+                break
         elif phase == "report":
+            if execute_outcome is None:
+                # Match validate/package: a report built with no execute
+                # phase in this sweep silently wrote an empty TSV and exited
+                # 0, which reads as a clean sweep -- see
+                # uat-fail-advance-consistency w1. Standalone `make
+                # uat-report` (tests/uat/_cli.py `_handle_report`) is a
+                # different entry point that reads an existing cells.jsonl
+                # directly and never reaches run_sweep, so it is unaffected.
+                phase_exit_codes[phase] = 2
+                aborted_phase = phase
+                abort_reason = "report phase requires execute phase to have run"
+                _emit_abort_artifacts(
+                    config=config,
+                    log_dir=log_dir,
+                    attempted=(),
+                    execute_outcome=execute_outcome,
+                    source_info=source_info,
+                    aborted_phase=phase,
+                    abort_reason=abort_reason,
+                )
+                break
             tsv_path = log_dir / config.report.matrix_summary_tsv
-            cells = execute_outcome.results if execute_outcome else []
+            cells = execute_outcome.results
             # Wire validator status into the cross-scale check when a
             # validate phase ran earlier in this sweep. Without this,
             # cross_scale_clean_pair_count silently degrades to a
@@ -378,13 +432,10 @@ def run_sweep(  # noqa: C901
                 rungs=list(config.scales.rungs),
                 cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
                 validator_status_by_path=validator_status_by_path,
-                compatibility_pruned_count=(
-                    len(getattr(execute_outcome, "compatibility_pruned", ())) if execute_outcome else 0
-                ),
-                early_stop_pruned_count=(len(getattr(execute_outcome, "pruned", ())) if execute_outcome else 0),
-                skipped_unreachable_count=(
-                    len(getattr(execute_outcome, "skipped_unreachable", ())) if execute_outcome else 0
-                ),
+                compatibility_pruned_count=len(getattr(execute_outcome, "compatibility_pruned", ())),
+                early_stop_pruned_count=len(getattr(execute_outcome, "pruned", ())),
+                skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
+                startup_failed_count=len(getattr(execute_outcome, "startup_failed", ())),
                 source_info=source_info,
             )
             phase_exit_codes[phase] = summary.exit_code()
@@ -418,6 +469,7 @@ def _emit_abort_artifacts(
     aborted_phase: str,
     abort_reason: str | None,
     skipped_unreachable_count: int | None = None,
+    startup_failed_count: int | None = None,
 ) -> None:
     cells = tuple(getattr(execute_outcome, "results", ())) if execute_outcome is not None else tuple(attempted)
     compatibility_pruned = (
@@ -426,19 +478,23 @@ def _emit_abort_artifacts(
         else _compatibility_pruned_for_config(config)
     )
     early_stop_pruned_count = len(getattr(execute_outcome, "pruned", ())) if execute_outcome is not None else 0
-    # When the execute outcome is available, derive the unreachable count from
-    # it; otherwise (e.g. a mid-sweep DiskFloorAbort that bypassed the normal
-    # return) fall back to the count threaded in via `skipped_unreachable_count`
-    # so the abort report still reflects platforms skipped before the abort.
+    # When the execute outcome is available, derive the unreachable /
+    # startup-failed counts from it; otherwise (e.g. a mid-sweep
+    # DiskFloorAbort that bypassed the normal return) fall back to the counts
+    # threaded in via the `*_count` parameters so the abort report still
+    # reflects platforms skipped before the abort.
     if skipped_unreachable_count is None:
         skipped_unreachable_count = (
             len(getattr(execute_outcome, "skipped_unreachable", ())) if execute_outcome is not None else 0
         )
+    if startup_failed_count is None:
+        startup_failed_count = len(getattr(execute_outcome, "startup_failed", ())) if execute_outcome is not None else 0
     cells_io.write_cells_jsonl(
         log_dir / "cells.jsonl",
         cells,
         source_info=source_info,
         skipped_unreachable_count=skipped_unreachable_count,
+        startup_failed_count=startup_failed_count,
         disk_gate_disabled=not config.disk_gate_enabled,
     )
     _write_compatibility_pruned_jsonl(log_dir / "compatibility_pruned.jsonl", compatibility_pruned)
@@ -450,6 +506,7 @@ def _emit_abort_artifacts(
         compatibility_pruned_count=len(compatibility_pruned),
         early_stop_pruned_count=early_stop_pruned_count,
         skipped_unreachable_count=skipped_unreachable_count,
+        startup_failed_count=startup_failed_count,
         source_info=source_info,
         run_status="ABORTED",
         abort_phase=aborted_phase,

@@ -111,11 +111,19 @@ class ReportSummary(PhaseResult):
     cross_scale_floor_breached: bool
     registry_pruned_count: int = 0
     unreachable_count_is_estimated: bool = False
+    # A stack that never started (managed compose-up failure) is distinct
+    # from "TCP probe found nothing listening" (unreachable_count) -- see
+    # uat-fail-advance-consistency w3. Additive field; folding it into
+    # fail_count or unreachable_count would misrepresent an environment
+    # condition as a cell failure.
+    startup_failed_count: int = 0
 
     def exit_code(self) -> int:
         if self.aborted:
             return 2
-        has_uncleared_cells = self.fail_count > 0 or self.timeout_count > 0 or self.unreachable_count > 0
+        has_uncleared_cells = (
+            self.fail_count > 0 or self.timeout_count > 0 or self.unreachable_count > 0 or self.startup_failed_count > 0
+        )
         return 1 if has_uncleared_cells or self.cross_scale_floor_breached else 0
 
 
@@ -213,6 +221,7 @@ def write_report(
     compatibility_pruned_count: int = 0,
     early_stop_pruned_count: int = 0,
     skipped_unreachable_count: int = 0,
+    startup_failed_count: int = 0,
     registry_pruned_count: int = 0,
     unreachable_count_is_estimated: bool = False,
     source_info: SourceInfo | None = None,
@@ -237,6 +246,13 @@ def write_report(
     `_read_skipped_unreachable_sidecar` in `tests/uat/_cli.py`. It does not
     change `unreachable_count` itself; it only flags whether that number is
     confirmed or assumed.
+
+    `startup_failed_count` is disjoint from `unreachable_count`: it counts
+    cells whose platform's managed Docker stack never started (compose-up
+    failure), as opposed to a reachability probe finding nothing listening.
+    It feeds `total_defined_count` and the exit-code check exactly like
+    `unreachable_count` does, but is reported under its own counter -- see
+    uat-fail-advance-consistency w3.
     """
     rows = list(cells)
     executed_count = len(rows)
@@ -249,7 +265,7 @@ def write_report(
     attempted_count = executed_count - row_skipped_count - row_unreachable_count
     skipped_count = row_skipped_count + compatibility_pruned_count + early_stop_pruned_count + registry_pruned_count
     unreachable_count = row_unreachable_count + skipped_unreachable_count
-    total_defined_count = attempted_count + skipped_count + unreachable_count
+    total_defined_count = attempted_count + skipped_count + unreachable_count + startup_failed_count
     candidate_count = total_defined_count
 
     lines: list[str] = [REPORT_HEADER + "\n"]
@@ -267,6 +283,7 @@ def write_report(
         f"skipped={skipped_count} "
         f"unreachable={unreachable_count} "
         f"total_defined={total_defined_count} "
+        f"startup_failed={startup_failed_count} "
         f"passed={pass_count} "
         f"failed={fail_count} "
         f"timed_out={timeout_count} "
@@ -276,7 +293,8 @@ def write_report(
         "# "
         f"release_accounting passed={pass_count} failed={fail_count} timed_out={timeout_count} "
         f"attempted={attempted_count} skipped={skipped_count} unreachable={unreachable_count} "
-        f"total_defined={total_defined_count} registry_pruned={registry_pruned_count}\n"
+        f"total_defined={total_defined_count} startup_failed={startup_failed_count} "
+        f"registry_pruned={registry_pruned_count}\n"
     )
     if unreachable_count or unreachable_count_is_estimated:
         attention = "required" if unreachable_count else "not_required"
@@ -284,6 +302,8 @@ def write_report(
             f"# UNREACHABLE_CELLS={unreachable_count} release_gate_attention={attention} "
             f"unreachable_is_estimated={str(unreachable_count_is_estimated).lower()}\n"
         )
+    if startup_failed_count:
+        lines.append(f"# STARTUP_FAILED_CELLS={startup_failed_count} release_gate_attention=required\n")
     footer = f"# run_status={run_status}"
     if source_info is not None:
         footer += f" source_commit_sha={source_info.commit_sha} source_dirty={str(source_info.dirty).lower()}"
@@ -322,6 +342,7 @@ def write_report(
         cross_scale_floor_breached=floor_breached,
         registry_pruned_count=registry_pruned_count,
         unreachable_count_is_estimated=unreachable_count_is_estimated,
+        startup_failed_count=startup_failed_count,
         aborted=run_status in {"ABORTED", "BLOCKED"},
         abort_reason=abort_reason,
     )

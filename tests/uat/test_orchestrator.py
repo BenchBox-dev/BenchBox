@@ -161,6 +161,151 @@ def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
     assert captured["bundles_dir"] == tmp_path / "submissions" / "smoke"
 
 
+# ---------------------------------------------------------------------------
+# uat-fail-advance-consistency w1: report-without-execute must abort.
+# ---------------------------------------------------------------------------
+
+
+def test_report_phase_aborts_when_execute_outcome_missing(tmp_path: Path):
+    """A report phase with no execute phase in this sweep must abort, not print an empty clean report.
+
+    Before this fix, `cells = execute_outcome.results if execute_outcome
+    else []` let the report phase proceed with zero rows and exit 0 -- an
+    empty report reads as a clean sweep. validate/package already abort in
+    this situation; report must match.
+    """
+    cfg = validate_config({"name": "report-only", "phases": ["report"]})
+
+    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "report"
+    assert "execute phase" in (result.abort_reason or "")
+    assert result.exit_code() == 2
+    partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
+    assert "# run_status=ABORTED" in partial_text
+    assert "abort_phase=report" in partial_text
+
+
+def test_dry_run_report_only_sweep_stays_exit_zero(tmp_path: Path):
+    """Dry-run sweeps skip all phases upstream of the phase-specific branches -- must stay exit 0."""
+    cfg = validate_config({"name": "report-only-dry-run", "dry_run": True, "phases": ["report"]})
+
+    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert result.exit_code() == 0
+    assert result.phase_exit_codes == {"report": 0}
+
+
+# ---------------------------------------------------------------------------
+# uat-fail-advance-consistency w2: explorer_smoke corpus failures abort;
+# node-missing is a recorded, visible skip.
+# ---------------------------------------------------------------------------
+
+
+def test_explorer_smoke_corpus_failure_emits_abort_artifacts(tmp_path: Path):
+    """A structured explorer_smoke corpus failure flows through _emit_abort_artifacts, not an uncaught raise."""
+    cfg = validate_config(
+        {
+            "name": "explorer-corpus-fail",
+            "phases": ["execute", "explorer_smoke"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (cell,), "aborted": False, "abort_reason": None, "exit_code": lambda self: 0},
+    )()
+    aborted_result = type(
+        "ExplorerResult",
+        (),
+        {
+            "aborted": True,
+            "abort_reason": "Explorer smoke corpus contract failed:\n  - no result bundles",
+            "skip_reason": None,
+            "exit_code": lambda self: 2,
+        },
+    )()
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=execute_outcome),
+        patch("tests.uat.phases.explorer_smoke.run_explorer_smoke", return_value=aborted_result),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "explorer_smoke"
+    assert result.exit_code() == 2
+    partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
+    assert "# run_status=ABORTED" in partial_text
+    assert "abort_phase=explorer_smoke" in partial_text
+
+
+def test_explorer_smoke_node_missing_records_sidecar_status_and_warns(tmp_path: Path, capsys):
+    """node-missing stays exit 0 but is recorded in the accounting sidecar plus a prominent stderr warning."""
+    cfg = validate_config(
+        {
+            "name": "explorer-node-missing",
+            "phases": ["execute", "explorer_smoke"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (cell,), "aborted": False, "abort_reason": None, "exit_code": lambda self: 0},
+    )()
+    skipped_result = type(
+        "ExplorerResult",
+        (),
+        {
+            "aborted": False,
+            "abort_reason": None,
+            "skipped": True,
+            "skip_reason": "node not on PATH",
+            "exit_code": lambda self: 0,
+        },
+    )()
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=execute_outcome),
+        patch("tests.uat.phases.explorer_smoke.run_explorer_smoke", return_value=skipped_result),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert result.phase_exit_codes["explorer_smoke"] == 0
+    accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert accounting["explorer_smoke_status"] == "skipped_no_node"
+    stderr = capsys.readouterr().err
+    assert "node not on PATH" in stderr
+    assert "skipped_no_node" in stderr
+
+
 def test_package_phase_excludes_failed_cells_result_paths(tmp_path: Path):
     """w4 regression: a failed official cell's exported JSON must not be packaged/submitted.
 

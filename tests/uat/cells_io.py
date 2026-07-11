@@ -58,6 +58,7 @@ def write_cells_jsonl(
     *,
     source_info: SourceInfo,
     skipped_unreachable_count: int = 0,
+    startup_failed_count: int = 0,
     disk_gate_disabled: bool = False,
 ) -> None:
     """Write the durable per-cell result stream plus its accounting sidecar."""
@@ -96,6 +97,11 @@ def write_cells_jsonl(
         json.dumps(
             {
                 "skipped_unreachable_count": int(skipped_unreachable_count),
+                # Distinct from skipped_unreachable_count: a stack that never
+                # started (managed compose-up failure) vs. a reachability
+                # probe that found nothing listening. Additive field -- see
+                # uat-fail-advance-consistency w3.
+                "startup_failed_count": int(startup_failed_count),
                 "disk_gate_disabled": bool(disk_gate_disabled),
             }
         )
@@ -136,6 +142,24 @@ def read_cells_jsonl(path: Path) -> list[CellResult]:
     return cells
 
 
+def _read_accounting_payload(cells_jsonl: Path) -> tuple[dict[str, object], bool]:
+    """Read the accounting sidecar's raw JSON payload, if present and parseable.
+
+    Shared by every ``read_*_sidecar`` accessor below so they agree on what
+    "sidecar present" means (exists AND parses as JSON), and so a future
+    additive field only needs a new accessor, not a new file read.
+    """
+    sidecar = cells_accounting_path(cells_jsonl)
+    if not sidecar.exists():
+        return {}, False
+    try:
+        with sidecar.open(encoding="utf-8") as fh:
+            payload = json.load(fh)
+        return payload, True
+    except (OSError, ValueError, TypeError):
+        return {}, False
+
+
 def read_skipped_unreachable_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
     """Read the skipped-unreachable count persisted alongside ``cells.jsonl``.
 
@@ -147,15 +171,44 @@ def read_skipped_unreachable_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
     report can distinguish "confirmed unreachable=0" from "sidecar missing,
     unreachable assumed 0."
     """
-    sidecar = cells_accounting_path(cells_jsonl)
-    if not sidecar.exists():
-        return 0, False
-    try:
-        with sidecar.open(encoding="utf-8") as fh:
-            payload = json.load(fh)
-        return int(payload.get("skipped_unreachable_count", 0)), True
-    except (OSError, ValueError, TypeError):
-        return 0, False
+    payload, present = _read_accounting_payload(cells_jsonl)
+    return int(payload.get("skipped_unreachable_count", 0)), present
+
+
+def read_startup_failed_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
+    """Read the startup-failed count persisted alongside ``cells.jsonl``.
+
+    Mirrors ``read_skipped_unreachable_sidecar`` -- see
+    uat-fail-advance-consistency w3: startup_failed_count is additive to the
+    sidecar schema and distinct from skipped_unreachable_count (a stack that
+    never started vs. a reachability probe that found nothing listening).
+    """
+    payload, present = _read_accounting_payload(cells_jsonl)
+    return int(payload.get("startup_failed_count", 0)), present
+
+
+def update_accounting_sidecar(cells_jsonl: Path, **fields: object) -> bool:
+    """Merge additional keys into an already-written accounting sidecar.
+
+    Returns ``True`` when a sidecar existed and was patched in place,
+    ``False`` when there was nothing to patch (no sidecar written yet for
+    this ``cells.jsonl``). The false case is reachable when a phase that
+    wants to record accounting (e.g. explorer_smoke's node-missing skip --
+    see uat-fail-advance-consistency w2) runs in a sweep whose `phases:`
+    list never ran `execute`, so no sidecar was ever created. Callers should
+    not fabricate a sidecar from scratch here: a sidecar's presence is the
+    signal that its counts are confirmed (see
+    ``read_skipped_unreachable_sidecar``), and a sidecar containing only a
+    caller's opportunistic fields (with the execute-derived counts
+    defaulted to 0) would misrepresent an unconfirmed 0 as a real one.
+    """
+    payload, present = _read_accounting_payload(cells_jsonl)
+    if not present:
+        return False
+    payload.update(fields)
+    accounting_path = cells_accounting_path(cells_jsonl)
+    atomic_write_text(accounting_path, json.dumps(payload) + "\n")
+    return True
 
 
 def _persist_cell_failure_context(cell: CellResult, *, terminal_state: str) -> str:
