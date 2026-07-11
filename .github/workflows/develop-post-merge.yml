@@ -85,13 +85,17 @@ jobs:
       - name: Emit fast-test signature
         # Bare python is intentional: the signature builder is stdlib-only.
         # Falls back to a job-failure descriptor if pytest crashed before
-        # writing junit XML at all (e.g. a collection-time crash).
+        # writing junit XML at all (e.g. a collection-time crash), or left a
+        # truncated/unparseable file behind (killed mid-write) - a signature
+        # artifact must ALWAYS upload, or the auto-revert diff would compare
+        # against a partial current signature and could wrongly suppress.
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           if [ -f fast-test-junit.xml ]; then
-            python scripts/post_merge_signature.py build --job fast-test --junit fast-test-junit.xml --out signature.json
+            python scripts/post_merge_signature.py build --job fast-test --junit fast-test-junit.xml --out signature.json \
+              || python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (junit xml unparseable)" --out signature.json
           else
             python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (no junit xml produced)" --out signature.json
           fi
@@ -194,12 +198,16 @@ jobs:
 
       - name: Emit medium-test signature
         # Bare python is intentional: the signature builder is stdlib-only.
+        # Same missing/unparseable-junit fallback as fast-test: a signature
+        # artifact must always upload so the auto-revert diff never runs on
+        # a partial current signature.
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           if [ -f medium-test-junit.xml ]; then
-            python scripts/post_merge_signature.py build --job medium-test --junit medium-test-junit.xml --out signature.json
+            python scripts/post_merge_signature.py build --job medium-test --junit medium-test-junit.xml --out signature.json \
+              || python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (junit xml unparseable)" --out signature.json
           else
             python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (no junit xml produced)" --out signature.json
           fi
@@ -385,12 +393,21 @@ jobs:
           fail_open_reason=""
           previous_run_url=""
 
+          # Every external/parse command below is guarded (`if ! ...`) so a
+          # failure sets fail_open_reason instead of aborting the step under
+          # `set -e`: an aborted step would leave should-revert unwritten and
+          # skip BOTH downstream steps, silently dropping the revert - the
+          # exact anti-pattern this design forbids. Each stage is skipped
+          # once fail_open_reason is set, and fail-open always reverts.
+
           # Merge the four gate jobs' per-job signature artifacts (one
           # subdirectory per artifact, downloaded above) into a single
           # combined signature for this run.
           if compgen -G "current-signatures/*/signature.json" > /dev/null; then
-            jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
-              current-signatures/*/signature.json > current-combined.json
+            if ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
+              current-signatures/*/signature.json > current-combined.json; then
+              fail_open_reason="Could not combine this run's signature artifacts (malformed signature JSON)."
+            fi
           else
             fail_open_reason="No current-run signature artifacts were found."
           fi
@@ -399,18 +416,26 @@ jobs:
             # Walk completed develop-post-merge runs and pick the highest
             # run_number strictly below this run - that is the run to diff
             # against, whatever its outcome.
-            runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/develop-post-merge.yml/runs?branch=develop&status=completed&per_page=10")"
-            prev_run_json="$(jq -c --argjson current "${GITHUB_RUN_NUMBER}" \
+            #
+            # Known limitation: with per-SHA concurrency (cancel-in-progress
+            # false) two runs can be in flight at once, so the highest
+            # COMPLETED run_number below ours may be older than our true
+            # predecessor. Mis-selection errs toward reverting (an older
+            # baseline makes more failures look new), which is the safe
+            # direction.
+            if ! runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/develop-post-merge.yml/runs?branch=develop&status=completed&per_page=10")"; then
+              fail_open_reason="Could not list previous develop-post-merge runs via gh api."
+            elif ! prev_run_json="$(jq -c --argjson current "${GITHUB_RUN_NUMBER}" \
               '[.workflow_runs[] | select(.run_number < $current)] | sort_by(.run_number) | last // empty' \
-              <<<"${runs_json}")"
-
-            if [ -z "${prev_run_json}" ] || [ "${prev_run_json}" = "null" ]; then
+              <<<"${runs_json}")"; then
+              fail_open_reason="Could not parse the previous-runs listing."
+            elif [ -z "${prev_run_json}" ] || [ "${prev_run_json}" = "null" ]; then
               fail_open_reason="No previous completed develop-post-merge run was found on develop."
+            elif ! prev_run_id="$(jq -r '.id' <<<"${prev_run_json}")" \
+              || ! previous_run_url="$(jq -r '.html_url' <<<"${prev_run_json}")"; then
+              fail_open_reason="Could not extract the previous run's id/url."
             else
-              prev_run_id="$(jq -r '.id' <<<"${prev_run_json}")"
-              previous_run_url="$(jq -r '.html_url' <<<"${prev_run_json}")"
               echo "Previous run: ${previous_run_url} (id ${prev_run_id})"
-
               if ! gh run download "${prev_run_id}" --pattern 'signature-*' --dir previous-signatures 2>prev-download.log; then
                 fail_open_reason="Could not download the previous run's signature artifacts (likely expired retention): $(tail -n1 prev-download.log 2>/dev/null || true)"
               fi
@@ -419,20 +444,25 @@ jobs:
 
           if [ -z "${fail_open_reason}" ]; then
             if compgen -G "previous-signatures/*/signature.json" > /dev/null; then
-              jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
-                previous-signatures/*/signature.json > previous-combined.json
+              if ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
+                previous-signatures/*/signature.json > previous-combined.json; then
+                fail_open_reason="Could not combine the previous run's signature artifacts (malformed signature JSON)."
+              fi
             else
               fail_open_reason="The previous run's signature artifacts were empty or missing."
             fi
           fi
 
           if [ -z "${fail_open_reason}" ]; then
-            if python scripts/post_merge_signature.py diff \
+            if python3 scripts/post_merge_signature.py diff \
               --previous previous-combined.json \
               --current current-combined.json \
               --out diff.json; then
-              new_failure_ids_json="$(jq -c '.new_failure_ids' diff.json)"
-              if [ "$(jq 'length' <<<"${new_failure_ids_json}")" -eq 0 ]; then
+              if ! new_failure_ids_json="$(jq -c '.new_failure_ids' diff.json)" \
+                || ! new_count="$(jq 'length' <<<"${new_failure_ids_json}")"; then
+                new_failure_ids_json=""
+                fail_open_reason="Could not read the diff output (diff.json)."
+              elif [ "${new_count}" -eq 0 ]; then
                 # Current run's failures are all already present in the
                 # previous run's signature (identical-or-superset): develop
                 # is persistently red for the same reason, not because of

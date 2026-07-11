@@ -297,6 +297,34 @@ def test_cli_build_from_missing_junit_returns_error_exit_code(
     assert "error:" in captured.err
 
 
+def test_cli_build_from_malformed_junit_returns_error_exit_code(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The workflow's emit steps rely on this non-zero exit to trigger their
+    # `|| build --failed-step "... (junit xml unparseable)"` fallback when
+    # pytest was killed mid-write and left a truncated junit file behind.
+    junit_path = tmp_path / "junit.xml"
+    junit_path.write_text("<testsuites><testsuite>truncated mid-write", encoding="utf-8")
+    out_path = tmp_path / "signature.json"
+
+    exit_code = main(
+        [
+            "build",
+            "--job",
+            "fast-test",
+            "--junit",
+            str(junit_path),
+            "--out",
+            str(out_path),
+        ]
+    )
+
+    assert exit_code == 1
+    assert not out_path.exists()
+    captured = capsys.readouterr()
+    assert "error:" in captured.err
+
+
 def test_cli_diff_writes_new_failure_ids(tmp_path: Path) -> None:
     previous_path = tmp_path / "previous.json"
     current_path = tmp_path / "current.json"
