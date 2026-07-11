@@ -2,7 +2,8 @@ id: uat-status-taxonomy-exit-code-fixes
 title: "Fix UAT status-taxonomy corruption and exit-code soundness holes (timed-out overwrite, all([]) pass, failed=submittable, unpersisted throughput_check)"
 worktree: uat-hardening
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-07-11"
 category: "Bug Fix / Correctness"
 
 description: |
@@ -227,3 +228,19 @@ metadata:
   estimated_effort: Medium
   created_date: "2026-07-11"
   source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), findings A1/A2/A4/A6 + Windows killpg"
+
+files_affected:
+  modified:
+  - tests/uat/runner.py
+  - tests/uat/timeouts.py
+  - tests/uat/orchestrator.py
+  - tests/uat/_cli.py
+  - tests/uat/phases/execute.py
+  - tests/uat/phases/report.py
+  - tests/uat/fixtures/uat-2026-05-02-matrix-summary-header.tsv
+  - tests/uat/test_runner.py
+  - tests/uat/test_timeouts.py
+  - tests/uat/test_phases.py
+  - tests/uat/test_report.py
+  - tests/uat/test_report_accounting.py
+  - tests/uat/test_orchestrator.py
