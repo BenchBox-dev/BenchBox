@@ -134,8 +134,6 @@ for generated shards, by location:
   behavior changed and the same PR updates the relevant tests/docs.
 - `generated-rerun-shards/`: generated frozen rerun evidence, not reusable
   templates.
-- `resume.json`: ephemeral runtime state under a run log directory, not a
-  tracked config artifact.
 
 Clone a template for a new sweep:
 

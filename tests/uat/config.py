@@ -52,7 +52,7 @@ class ExecuteConfig:
 @dataclass(frozen=True)
 class OutputConfig:
     benchmark_runs_dir_template: str = "~/Developer/benchmark_runs"
-    logs_dir_template: str = "~/Developer/benchmark_runs/logs/uat_{date}"
+    logs_dir_template: str = "~/Developer/benchmark_runs/logs/uat_{date}_{time}"
     submissions_dir_template: str = "~/Developer/benchmark_runs/submissions/{name}"
 
 
@@ -388,7 +388,7 @@ def _validate_output(payload: dict[str, Any]) -> OutputConfig:
         logs_dir_template=str(
             payload.get(
                 "logs_dir_template",
-                "~/Developer/benchmark_runs/logs/uat_{date}",
+                "~/Developer/benchmark_runs/logs/uat_{date}_{time}",
             )
         ),
         submissions_dir_template=str(

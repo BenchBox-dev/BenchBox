@@ -2,7 +2,8 @@ id: uat-resume-retirement-artifact-durability
 title: "Delete UAT resume machinery; make durable artifacts atomic and run dirs collision-free"
 worktree: uat-hardening
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-07-11"
 category: "Reliability / Data Integrity"
 
 description: |
@@ -55,20 +56,90 @@ prior_art:
 work:
   - id: w1
     summary: "Delete resume machinery: orchestrator functions + manifest writes, --resume CLI flags and handler branches, resume tests; scrub resume mentions from spec and operator docs"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      Deleted _write_resume_manifest, load_resume_attempts, build_resume_runner,
+      RESUME_MANIFEST_VERSION, and the ResumeAttempts alias from
+      tests/uat/orchestrator.py, along with the now-dead `attempted`/manifest
+      branches in run_sweep (the preflight-abort branch's manifest write was
+      unreachable dead code -- execute never runs before a preflight abort).
+      Removed --resume from both the sweep and execute argparse subparsers and
+      their handlers in tests/uat/_cli.py. Renamed
+      _build_disk_floor_runner's attempted_for_resume param to attempted_cells
+      since it is still needed for abort-artifact emission independent of
+      resume. Removed the now-unused `cell_key` import and `_optional_path`
+      helper. Replaced the two resume-manifest-asserting tests in
+      test_orchestrator.py with resume-free versions
+      (test_disk_floor_abort_emits_partial_artifacts,
+      test_execute_free_space_abort_emits_partial_artifacts) that keep
+      covering the #691 abort-safe-artifact-emission contract; deleted
+      test_manifest_runner_reuses_attempted_cells_and_runs_complement outright
+      (tested a function that no longer exists). Scrubbed resume-manifest
+      sections from _project/specs/uat-framework.md (Section 3 block,
+      Section 9.4 -- folded 9.5 down to 9.4, "four classes" -> "three
+      classes"), docs/operations/uat-framework.md (heading + resume-with
+      instructions + the four-classes list), and tests/uat/README.md. No hard
+      removal shim; --resume now fails argparse with an "unrecognized
+      arguments" error. No RESUME= passthrough existed in the Makefile to
+      remove (confirmed via grep). Makefile's unrelated release-cut "resume"
+      terminology (a different feature) was left untouched.
   - id: w2
     summary: "Add temp-file+os.replace atomic writes for cells.jsonl, accounting sidecar, compatibility_pruned.jsonl, validator_rollup.tsv, matrix_summary TSV (single shared helper in tests/uat/)"
-    status: pending
+    status: done
     needs: [w1]
+    notes: |
+      Added atomic_write_text(path, text) to tests/uat/phases/report.py (temp
+      sibling via with_name(name + ".tmp"), fsync, os.replace, parent mkdir).
+      Placed it there rather than orchestrator.py to avoid a circular import:
+      orchestrator.py already imports report.py, and validate.py now imports
+      report.py too, so report.py stays the acyclic leaf both depend on.
+      Threaded it through all five write sites: _write_cells_jsonl and
+      _write_compatibility_pruned_jsonl in orchestrator.py (rewritten to build
+      content as a string/list-join instead of writing to an open handle),
+      run_validate's validator_rollup.tsv write in phases/validate.py (was
+      already a single write_text call, swapped directly), and write_report's
+      matrix_summary TSV in phases/report.py (rewritten to build a `lines`
+      list, joined and written once at the end). Content is byte-identical to
+      the prior mode="w" writes -- verified via the existing content-asserting
+      tests (JSONL field checks, TSV footer checks) all still passing
+      unmodified. Added 3 new tests in test_phases.py covering the helper
+      directly: write+cleanup-of-.tmp, overwrite semantics, and that a
+      simulated os.replace failure leaves the previous good artifact
+      untouched (no torn write).
   - id: w3
     summary: "Make default run dirs collision-free: the default log-dir template gains a time component; test that two same-day sweeps land in distinct dirs"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      Changed the OutputConfig dataclass default and the config-loader
+      fallback in tests/uat/config.py from "uat_{date}" to "uat_{date}_{time}".
+      default_log_dir() in tests/uat/phases/execute.py now also expands
+      {time} -> HHMMSS from the `now` passed in (or datetime.now()). str
+      .replace is a no-op when a placeholder is absent, so all 32 checked-in
+      configs with an explicit {date}-only logs_dir_template (verified by
+      grep) keep rendering identically -- confirmed by a new
+      test_default_log_dir_explicit_date_only_template_still_works test.
+      Added test_default_log_dir_substitutes_time_component and
+      test_default_log_dir_time_avoids_same_day_collision (unit-level, in
+      test_phases.py) plus an orchestrator-level
+      test_two_sweeps_in_one_process_land_in_distinct_log_dirs in
+      test_orchestrator.py that mocks datetime.now with two distinct
+      same-day values across two run_sweep() calls and asserts the resulting
+      log dirs differ (deterministic, not timing-dependent -- avoids
+      same-wall-clock-second flakiness in a fast test loop).
   - id: w4
     summary: "Write cells.jsonl before its accounting sidecar (reverse current order) so a crash between the two cannot leave a fresh sidecar beside a stale stream; add an ordering test"
-    status: pending
+    status: done
     needs: [w2]
+    notes: |
+      Reordered _write_cells_jsonl in orchestrator.py: the cell-stream content
+      is now built and atomic_write_text'd to cells.jsonl before the
+      accounting sidecar is computed and written. Added
+      test_write_cells_jsonl_writes_cell_stream_before_accounting_sidecar,
+      which wraps report_phase.atomic_write_text with a recording wrapper
+      (still delegating to the real implementation) and asserts the call
+      order is [cells.jsonl, sidecar].
 
 deferred:
   - summary: "Timestamped submissions dirs (submissions_dir_template has the same date-granular default)"
@@ -130,3 +201,42 @@ metadata:
   estimated_effort: Medium
   created_date: "2026-07-11"
   source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), finding A3 + user decision Q5"
+
+sections:
+  "Implementation Summary": |
+    Four commits, one per work unit, on fix/uat-resume-retirement:
+    1. w1 -- deleted _write_resume_manifest, load_resume_attempts,
+       build_resume_runner, RESUME_MANIFEST_VERSION from orchestrator.py; the
+       --resume flags and handler branches from _cli.py; the resume-manifest
+       tests from test_orchestrator.py (2 rewritten to keep covering
+       abort-artifact emission without resume, 1 deleted outright); scrubbed
+       resume-manifest prose from the spec, operator docs, and
+       tests/uat/README.md.
+    2. w2 -- added atomic_write_text() (temp sibling + fsync + os.replace) to
+       phases/report.py and threaded it through all five durable-artifact
+       write sites (cells.jsonl, its accounting sidecar,
+       compatibility_pruned.jsonl, validator_rollup.tsv, matrix_summary TSV).
+    3. w3 -- default logs_dir_template gained {time} (HHMMSS); default_log_dir
+       expands it alongside {date}; explicit {date}-only templates in
+       checked-in configs are unaffected (str.replace no-op).
+    4. w4 -- cells.jsonl is now written before its accounting sidecar.
+    Verification: both TODO-specified greps came back clean (only prose
+    explaining the removal, plus the unrelated Makefile release-cut
+    "resume" terminology, which was left untouched); `uv run -- python -m
+    pytest tests/uat/ -m fast -q` -> 372 passed; `make lint` clean. `git diff
+    --name-only` against develop confirmed every touched file is within
+    scope_limit.only_modify.
+
+files_affected:
+  modified:
+    - "tests/uat/orchestrator.py"
+    - "tests/uat/_cli.py"
+    - "tests/uat/config.py"
+    - "tests/uat/phases/execute.py"
+    - "tests/uat/phases/validate.py"
+    - "tests/uat/phases/report.py"
+    - "tests/uat/test_orchestrator.py"
+    - "tests/uat/test_phases.py"
+    - "_project/specs/uat-framework.md"
+    - "docs/operations/uat-framework.md"
+    - "tests/uat/README.md"

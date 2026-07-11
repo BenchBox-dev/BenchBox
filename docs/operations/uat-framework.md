@@ -36,7 +36,7 @@ By default every BenchBox runtime artefact lands under the shared
 ├── datagen/                       # generated source data; preserved across runs
 ├── databases/                     # loaded DBs; pruned at safe reuse boundaries
 ├── results/                       # per-cell result JSON files
-├── logs/uat_<date>/               # per-cell logs + matrix_summary.tsv
+├── logs/uat_<date>_<time>/         # per-cell logs + matrix_summary.tsv
 └── submissions/<name>/            # local-stage / draft-pr bundles
 ```
 
@@ -220,7 +220,16 @@ emits `cells.jsonl`, `compatibility_pruned.jsonl`, and
 per-cell logs also receive a bounded `UAT_FAILURE_TAIL` block so the run
 directory remains debuggable without relying on an operator tee log.
 
-## Disk-budget estimate and resume manifests
+Every durable artifact (`cells.jsonl`, its `.accounting.json` sidecar,
+`compatibility_pruned.jsonl`, `validator_rollup.tsv`, and the
+`matrix_summary` TSVs) is written atomically: content lands in a `.tmp`
+sibling first, gets `fsync`'d, then `os.replace`s the real path. A crash or
+error mid-write leaves the previous good artifact (or nothing, on a first
+write) in place instead of a torn file. `cells.jsonl` is written before its
+accounting sidecar, so a crash between the two writes cannot leave a fresh
+sidecar next to a stale (or absent) cell stream.
+
+## Disk-budget estimate
 
 Preflight prints a disk-budget line and a per-root free-space report before
 workload cells run:
@@ -248,20 +257,13 @@ setting `preflight.free_space_min_gib: 0`. Use that only for supervised
 reruns; it disables both the static free-space floor and the budget
 headroom gate.
 
-When a sweep aborts on the free-space floor after some cells have run,
-the orchestrator writes `<log-dir>/resume.json`. Resume with:
-
-```bash
-uv run -- python -m tests.uat._cli sweep --config <config.yaml> --resume <log-dir>/resume.json
-# or for execute-only debugging:
-uv run -- python -m tests.uat._cli execute --config <config.yaml> --resume <log-dir>/resume.json
-```
-
-The manifest records attempted cell keys plus terminal state, result
-paths, and source commit identity. Resuming reuses those records instead
-of rerunning the cells and continues through the complement. It does not
-delete datagen or loaded DBs, so normal datagen reuse and reuse-aware
-pruning remain intact.
+When a sweep aborts on the free-space floor (or any other phase), it does
+not write a resumable manifest -- resume was retired as fragile (see
+`_project/specs/uat-framework.md` Section 3, "Resume (retired)"). Just
+rerun the config; datagen reuse and reuse-aware database pruning make a
+full rerun cheap, and the abort-safe artifacts (`cells.jsonl`,
+`compatibility_pruned.jsonl`, `matrix_summary.partial.tsv`) from the
+aborted run remain on disk as evidence.
 
 ## Submission terminal states
 
@@ -300,9 +302,9 @@ and timed-out counts, followed by a run-status/source-provenance footer.
 Early-stop pruning is separate from compatibility pruning and must not be
 treated as a pass or a compatibility exclusion.
 
-## Config lifecycle (four classes)
+## Config lifecycle (three classes)
 
-Every file under `tests/uat/configs/` has one of four lifecycle classes. The
+Every file under `tests/uat/configs/` has one of three lifecycle classes. The
 class is signalled by the first-line header and, for generated shards, by
 location:
 
@@ -311,16 +313,12 @@ location:
 2. **Historical evidence** (`# HISTORICAL`) — an immutable replay of a past
    sweep, retained for provenance. Historical configs are evidence: reviewed,
    not re-run as-is. There is no hash ceremony or `.frozen-hashes.json` guard.
-3. **Generated rerun shard** — operational scratch emitted by a single sweep's
-   resume/follow-up (often one file per platform). These are NOT reusable
-   templates. They live under `tests/uat/configs/generated-rerun-shards/` (see
-   that directory's README), not at the top level, so they cannot masquerade as
-   editable starting points.
-4. **Ephemeral resume state** — `resume.json`, written under the run's log dir
-   on a free-space-floor abort and consumed by `--resume <manifest>` (see
-   "Resume manifest" in `_project/specs/uat-framework.md`). It is runtime state,
-   not a config artifact, and is never a reusable file class. A "resume config"
-   is not a category — only the per-run `resume.json` is.
+3. **Generated rerun shard** — operational scratch emitted by an operator's
+   manual follow-up to a sweep (re-running a triaged subset of failed cells,
+   often one file per platform). These are NOT reusable templates. They live
+   under `tests/uat/configs/generated-rerun-shards/` (see that directory's
+   README), not at the top level, so they cannot masquerade as editable
+   starting points.
 
 New sweeps clone a template:
 

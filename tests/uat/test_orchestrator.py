@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -430,10 +431,17 @@ def test_orchestrator_writes_compatibility_pruned_jsonl_and_report_count(tmp_pat
     assert "compatibility_pruned=1" in (tmp_path / "logs" / "matrix_summary.tsv").read_text()
 
 
-def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
+def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
+    """A mid-sweep disk-floor abort still emits the #691 abort-safe artifacts.
+
+    Resume machinery (resume.json manifest) was retired -- see
+    uat-resume-retirement-artifact-durability -- but the abort-safe
+    provenance contract (cells.jsonl + partial report on abort) must
+    keep working.
+    """
     cfg = validate_config(
         {
-            "name": "resume-smoke",
+            "name": "disk-floor-smoke",
             "phases": ["preflight", "execute"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
@@ -471,13 +479,9 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
     assert result.aborted_phase == "execute"
-    manifest = tmp_path / "logs" / "resume.json"
-    payload = json.loads(manifest.read_text(encoding="utf-8"))
-    assert payload["aborted_phase"] == "execute"
-    assert payload["source"]["commit_sha"]
-    assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
     cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
-    assert cells[0]["source_commit_sha"] == payload["source"]["commit_sha"]
+    assert cells[0]["platform"] == "duckdb"
+    assert cells[0]["source_commit_sha"]
     partial_report = tmp_path / "logs" / "matrix_summary.partial.tsv"
     assert partial_report.exists()
     partial_text = partial_report.read_text(encoding="utf-8")
@@ -485,10 +489,11 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
     assert "abort_phase=execute" in partial_text
 
 
-def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
+def test_execute_free_space_abort_emits_partial_artifacts(tmp_path: Path):
+    """An execute-outcome-reported free-space abort still emits abort artifacts (resume machinery retired)."""
     cfg = validate_config(
         {
-            "name": "resume-smoke",
+            "name": "free-space-smoke",
             "phases": ["preflight", "execute"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
@@ -535,75 +540,37 @@ def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
     assert result.aborted_phase == "execute"
-    manifest = tmp_path / "logs" / "resume.json"
-    payload = json.loads(manifest.read_text(encoding="utf-8"))
-    assert payload["aborted_phase"] == "execute"
-    assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
+    cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
+    assert cells[0]["platform"] == "duckdb"
     assert (tmp_path / "logs" / "matrix_summary.partial.tsv").exists()
 
 
-def test_manifest_runner_reuses_attempted_cells_and_runs_complement(tmp_path: Path):
-    manifest = tmp_path / "resume.json"
-    manifest.write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "attempted": [
-                    {
-                        "cell_key": "duckdb|tpch|0.01",
-                        "platform": "duckdb",
-                        "benchmark": "tpch",
-                        "scale": 0.01,
-                        "terminal_state": "passed",
-                        "exit_code": 0,
-                        "elapsed_s": 1.0,
-                        "log_path": str(tmp_path / "prior.log"),
-                        "result_path": str(tmp_path / "prior.json"),
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
+def test_two_sweeps_in_one_process_land_in_distinct_log_dirs(tmp_path: Path):
+    """Two same-day sweeps (no log_dir_override) land in distinct default dirs.
+
+    Regression test for w3 of uat-resume-retirement-artifact-durability: the
+    default logs_dir_template was {date}-only, so a second same-day sweep of
+    the same config silently overwrote the first run's mode="w" artifacts.
+    """
     cfg = validate_config(
         {
-            "name": "resume-smoke",
-            "platforms": {"include": ["duckdb"]},
-            "benchmarks": {"include": ["tpch"]},
-            "scales": {"rungs": [0.01, 0.1]},
+            "name": "collision-smoke",
+            "dry_run": True,
+            "output": {"logs_dir_template": str(tmp_path / "uat_{date}_{time}")},
         }
     )
-    calls: list[float] = []
-
-    def base_runner(platform, benchmark, scale, **kwargs):
-        calls.append(scale)
-        return CellResult(
-            platform=platform,
-            benchmark=benchmark,
-            scale=scale,
-            status="passed",
-            exit_code=0,
-            elapsed_s=2.0,
-            log_path=tmp_path / f"{scale}.log",
-            result_path=tmp_path / f"{scale}.json",
-        )
-
-    runner = orchestrator.build_resume_runner(
-        orchestrator.load_resume_attempts(manifest),
-        base_runner,
-        log_dir=tmp_path,
+    fixed_times = iter(
+        [
+            _dt.datetime(2026, 5, 5, 9, 0, 0),
+            _dt.datetime(2026, 5, 5, 9, 0, 1),
+        ]
     )
+    with patch.object(orchestrator, "_dt") as mock_dt:
+        mock_dt.datetime.now.side_effect = lambda: next(fixed_times)
+        result1 = orchestrator.run_sweep(cfg)
+        result2 = orchestrator.run_sweep(cfg)
 
-    outcome = exec_phase.run_execute(
-        cfg,
-        log_dir=tmp_path,
-        databases_root=tmp_path / "databases",
-        runner=runner,
-    )
-
-    assert calls == [0.1]
-    assert [result.scale for result in outcome.results] == [0.01, 0.1]
-    assert outcome.results[0].result_path == tmp_path / "prior.json"
+    assert result1.log_dir != result2.log_dir
 
 
 def _source_info() -> orchestrator.RunSourceInfo:
@@ -621,6 +588,34 @@ def test_write_cells_jsonl_persists_skipped_unreachable_sidecar(tmp_path: Path):
     sidecar = cells_jsonl.with_name("cells.jsonl.accounting.json")
     assert sidecar.exists()
     assert json.loads(sidecar.read_text(encoding="utf-8"))["skipped_unreachable_count"] == 3
+
+
+def test_write_cells_jsonl_writes_cell_stream_before_accounting_sidecar(tmp_path: Path):
+    """cells.jsonl must land before its accounting sidecar (w4).
+
+    A crash between the two writes must never leave a fresh sidecar beside a
+    stale (or absent) cell stream -- see
+    uat-resume-retirement-artifact-durability w4. Record the path order
+    `atomic_write_text` is called in and assert cells.jsonl comes first.
+    """
+    cells_jsonl = tmp_path / "cells.jsonl"
+    written_paths: list[Path] = []
+    real_atomic_write_text = orchestrator.report_phase.atomic_write_text
+
+    def recording_atomic_write_text(path: Path, text: str) -> None:
+        written_paths.append(path)
+        real_atomic_write_text(path, text)
+
+    with patch.object(orchestrator.report_phase, "atomic_write_text", side_effect=recording_atomic_write_text):
+        orchestrator._write_cells_jsonl(
+            cells_jsonl,
+            (),
+            source_info=_source_info(),
+            skipped_unreachable_count=1,
+        )
+
+    sidecar = cells_jsonl.with_name("cells.jsonl.accounting.json")
+    assert written_paths == [cells_jsonl, sidecar]
 
 
 def test_abort_artifacts_thread_skipped_unreachable_when_outcome_missing(tmp_path: Path):

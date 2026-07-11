@@ -765,10 +765,23 @@ def _append_lifecycle_log(log_dir: Path | None, line: str) -> None:
 
 
 def default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
-    """Resolve the YAML log_dir_template against {date} and {name}."""
+    """Resolve the YAML log_dir_template against {date}, {time}, and {name}.
+
+    {time} (HHMMSS, expanded at sweep start alongside {date}) is what makes
+    the DEFAULT template collision-free across same-day sweeps -- see
+    uat-resume-retirement-artifact-durability. Templates that never mention
+    {time} (every checked-in config predates this and only uses {date})
+    render unchanged: `str.replace` is a no-op when the placeholder is
+    absent, so existing explicit `logs_dir_template` values keep working
+    verbatim.
+    """
     now = now or _dt.datetime.now()
     template = config.output.logs_dir_template
-    rendered = template.replace("{date}", now.strftime("%Y%m%d")).replace("{name}", config.name)
+    rendered = (
+        template.replace("{date}", now.strftime("%Y%m%d"))
+        .replace("{time}", now.strftime("%H%M%S"))
+        .replace("{name}", config.name)
+    )
     return Path(rendered).expanduser()
 
 
