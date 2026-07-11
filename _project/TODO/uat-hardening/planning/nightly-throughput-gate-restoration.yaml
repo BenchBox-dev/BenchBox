@@ -1,0 +1,94 @@
+id: nightly-throughput-gate-restoration
+title: "Remove continue-on-error from the nightly throughput UAT sweep and strengthen stream-count semantics"
+worktree: uat-hardening
+priority: Medium-High
+status: Not Started
+category: "Testing and Quality Assurance"
+
+description: |
+  The nightly throughput-uat job (.github/workflows/nightly.yml:550-624)
+  currently discards the entire sweep exit code via
+  `continue-on-error: true` (nightly.yml:596) because the TPC-H
+  Q11/16/18/20 seed-derivation defect kept the cell permanently red. With
+  that defect fixed (tpch-throughput-seed-validation-fix), everything
+  #1094 wired up -- the cell exit code, the validator_clean_rate_floor:
+  1.0, the strict report exit policy -- can start gating.
+
+  Also strengthen the one check that stayed hard: validate_stream_count
+  (tests/uat/throughput.py:96-106) counts a stream as "executed" if it has
+  at least one query row REGARDLESS of status -- a stream whose every
+  query failed still counts (verified on develop @ fc31f3604). Keep the
+  existing wiring-defect check (distinct stream ids == requested) and add
+  a second assertion that every counted stream has at least one
+  SUCCESSFUL query, so a total-failure stream cannot satisfy the gate.
+
+  Note the core success gates remain deliberately tolerant (TPC-H 0.99,
+  TPC-DS 0.70 per #1106) -- this TODO does not change them; it makes the
+  UAT layer actually consume the sweep verdict.
+
+prior_art:
+  - "tests/uat/throughput.py:validate_stream_count / validate_throughput_metric -- the deliberate split that lets CI hard-gate one invariant; keep the split, add the per-stream success check as a third function or a strict=True flag. Extend."
+  - ".github/workflows/nightly.yml:550-624 -- the job being changed; the inline assert step already imports tests.uat.throughput helpers, so extension is additive."
+
+work:
+  - id: w0
+    summary: "Confirm tpch-throughput-seed-validation-fix landed and the sweep passes clean locally (make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml exits 0); record SHA + exit code"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Add strict per-stream success semantics: each counted stream needs >=1 successful query; unit tests cover the all-queries-failed stream case"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Remove continue-on-error from the sweep step; delete the stale known-defect comment block (nightly.yml:580-595); keep the independent stream-count assert step (now also strict) as defense-in-depth"
+    status: pending
+    needs: [w0, w1]
+  - id: w3
+    summary: "Trigger a workflow_dispatch nightly run and verify the job passes with gating enabled; record the run URL (operator-verified: needs gh auth + CI dispatch; batch agents record as waiting)"
+    status: pending
+    needs: [w2]
+
+deferred:
+  - summary: "Throughput performance-regression thresholds (Throughput@Size floor per platform/scale)"
+    reason: "Needs baseline data from several green nightly runs before a floor is defensible; premature thresholds create flake."
+  - summary: "Widening nightly throughput coverage beyond DuckDB TPC-H SF1"
+    reason: "Runtime budget: the job has a 20-minute timeout; adding platforms belongs to a capacity decision, not this gate fix."
+
+deps:
+  needs: [tpch-throughput-seed-validation-fix, uat-throughput-result-resolution-hardening]
+
+must_preserve:
+  - "The nightly job's 20-minute timeout and ubuntu-only footprint."
+  - "The stream-count wiring-defect check stays independent of the sweep exit (defense-in-depth per the tests/uat/throughput.py docstring)."
+  - "streams: 3 in the config (deliberately above the 2-stream floor per the config comment)."
+
+approach: |
+  Mostly CI-file surgery plus one helper. w3 is the real verification --
+  a green run with gating on. If the run is red for an environmental
+  reason (runner disk, image pull), fix or scope that before merging; do
+  not re-add continue-on-error.
+
+anti_patterns:
+  - "DO NOT re-add continue-on-error as a 'temporary' measure -- that is the failure mode this TODO removes."
+  - "DO NOT conflate the per-stream success check with the core min_success_rate gates -- UAT-layer check only."
+
+verification:
+  - description: "Strict stream-success unit tests"
+    command: "uv run -- python -m pytest tests/uat/test_throughput.py -q"
+    expected_output: "pass including all-queries-failed stream rejection"
+  - description: "Nightly job green with gating enabled (operator-verified: requires gh auth + a dispatched/scheduled CI run; a batch agent records this as waiting, not failed)"
+    command: "gh run list --workflow=nightly.yml --limit 1"
+    expected_output: "completed success after the change (record run URL in work notes)"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/nightly.yml"
+    - "tests/uat/throughput.py"
+    - "tests/uat/test_throughput.py"
+    - "tests/uat/configs/uat-throughput-duckdb-nightly.yaml"
+
+metadata:
+  tags: [uat, throughput, nightly, ci-gate]
+  estimated_effort: Small
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), gate-wiring findings + throughput agent risk"

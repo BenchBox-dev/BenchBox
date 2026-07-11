@@ -1,0 +1,105 @@
+id: uat-disk-gate-always-on
+title: "Make the UAT disk-headroom gate always-on (decouple from phase list) and stop the budget gate degrading silently"
+worktree: uat-hardening
+priority: Medium-High
+status: Not Started
+category: "Reliability / Safety"
+
+description: |
+  The #693 disk-headroom gate is trivially bypassable, verified on develop
+  @ fc31f3604:
+
+  1. PHASE-LIST KEYING: every mid-run free-space check is keyed on
+     `"preflight" in config.phases` -- orchestrator.py:295
+     (free_space_checks_enabled), :299 (watch_disk_floor), _cli.py:419.
+     An execute-only config (a legitimate composition the schema allows)
+     runs with ZERO disk gating. Omitting a phase named "preflight" should
+     skip the preflight REPORT, not disable a safety interlock.
+
+  2. SILENT DEGRADE: `except Exception` at tests/uat/phases/preflight.py:217
+     downgrades any failure inside estimate_disk_budget_summary_and_gate to
+     a warning; budget_gate stays None and the stronger budget-aware gate
+     silently falls back to the flat free_space_min_gib cutoff
+     (preflight.py:227-238). A bug in the estimator disables the gate it
+     feeds with only a stderr line.
+
+  3. EXPLICIT-ZERO SEMANTICS: free_space_min_gib <= 0 disables all checks
+     (execute.py:691-692) with no acknowledgement that a safety gate is off.
+
+  Desired end state: the free-space floor and per-cell disk watch are
+  active for every execute-bearing run regardless of the phases list;
+  `free_space_min_gib: 0` remains the documented opt-out but logs a loud
+  one-line warning; an estimator failure is a hard preflight error (the
+  operator fixes the budget table or sets the flat floor explicitly),
+  not a silent downgrade.
+
+prior_art:
+  - "tests/uat/orchestrator.py:141-162 _build_disk_floor_runner -- the per-cell watch mechanism; this TODO changes when it is installed, not how it works. Reuse."
+  - "tests/uat/preflight_budget.py -- the budget-vs-floor max() logic (preflight_budget.py:183-196) stays canonical. Reuse."
+
+work:
+  - id: w1
+    summary: "Replace the phase-list keying in orchestrator.py and _cli.py with an always-on default driven by the resolved floor; the preflight phase keeps owning only the pre-sweep report/abort"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "free_space_min_gib: 0 emits a prominent 'disk gate DISABLED by config' warning at sweep start and records disk_gate_disabled=true in the accounting sidecar"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Narrow preflight.py:217 to expected error types; estimator failures fail preflight with the underlying error instead of silently degrading to the flat cutoff"
+    status: pending
+    needs: []
+  - id: w4
+    summary: "Regression tests: execute-only config still gets the per-cell watch; estimator exception fails preflight; zero-floor warning + sidecar flag asserted"
+    status: pending
+    needs: [w1, w2, w3]
+
+deferred:
+  - summary: "Pre-cell (predictive) disk check so one oversized cell cannot fill the disk before the post-cell watch fires"
+    reason: "Needs per-cell size prediction; the advisory budget table is (platform, benchmark, scale)-keyed and could feed this, but prediction accuracy work is out of scope for a gate-wiring fix."
+
+deps:
+  needs: [uat-status-taxonomy-exit-code-fixes]
+
+must_preserve:
+  - "Abort semantics: disk-floor breach still produces a structured abort with docker teardown guaranteed (execute.py finally) and abort-safe artifacts."
+  - "The advisory disk-budget ESTIMATE remains advisory (never gates on unknown cells); only estimator CRASHES become errors."
+  - "preflight_budget.py max(flat floor, budget est) resolution logic unchanged."
+
+approach: |
+  Small PR. w1 moves the enable decision to one place (a helper on
+  UATConfig or in preflight_budget) that both orchestrator and _cli
+  consume, eliminating the duplicated keying. Coordinate with
+  uat-execute-path-unification (which will route _cli execute through the
+  orchestrator): land this first so the unified path inherits always-on
+  semantics.
+
+anti_patterns:
+  - "DO NOT gate the per-cell watch on any phase-name membership check -- that is the bug class being removed."
+  - "DO NOT let the estimator hard-fail bury WHICH table row/parse step failed; surface the underlying exception message."
+
+verification:
+  - description: "Bypass regression: execute-only config aborts on a mocked low-disk condition"
+    command: "uv run -- python -m pytest tests/uat/test_orchestrator.py tests/uat/test_preflight.py tests/uat/test_preflight_budget.py -q"
+    expected_output: "pass, including new always-on and estimator-failure tests"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/orchestrator.py"
+    - "tests/uat/_cli.py"
+    - "tests/uat/config.py"
+    - "tests/uat/phases/preflight.py"
+    - "tests/uat/preflight_budget.py"
+    - "tests/uat/phases/execute.py"
+    - "tests/uat/test_orchestrator.py"
+    - "tests/uat/test_preflight.py"
+    - "tests/uat/test_preflight_budget.py"
+    - "tests/uat/test_cli_dispatch.py"
+    - "docs/operations/uat-framework.md"
+
+metadata:
+  tags: [uat, disk-budget, safety-gate]
+  estimated_effort: Small
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), findings D1/D2"

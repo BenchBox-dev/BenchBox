@@ -1,0 +1,140 @@
+id: uat-operator-provisioning
+title: "Un-strand the second operator: venv extras for all release-gate platforms, coherent output-root contract, engine/sizing/prepull docs"
+worktree: uat-hardening
+priority: Medium
+status: Not Started
+category: "Operations / Documentation"
+
+description: |
+  Bus-factor findings from the review (develop @ fc31f3604): a competent
+  second operator on a fresh machine cannot run the release-gate sweep
+  from the docs alone. Ordered by how badly each strands them:
+
+  1. VENV PROVISIONING GAP: cells run `uv run --no-sync`
+     (matrix.py:353-363); PLATFORM_UV_EXTRA covers only clickhouse-local,
+     clickhouse-server, lakesail, singlestore, influxdb (matrix.py:36-43).
+     The default dev dependency-group ([dependency-groups] dev,
+     pyproject.toml:425+) covers most drivers but NOT modin[ray] and NOT
+     databend-driver -- both appear only under
+     [project.optional-dependencies] extras (modin at :149 in the all-style
+     extra and :241 in the modin extra; databend-driver at :207-209), which
+     a plain `uv sync` does not install -- and modin-df is in
+     release-gate stage 1, databend in stage 3. A second operator gets
+     ModuleNotFoundError cells recorded as FAILED, breaching the 1.0
+     clean-rate floor with no doc pointing at the cause. Fix in code:
+     extend PLATFORM_UV_EXTRA for modin and databend (the mechanism
+     exists); document the provisioning contract (which extras each
+     release-gate stage needs) in uat-local-provisioning.md.
+
+  2. OUTPUT-ROOT CONTRACT CONTRADICTION: uat-framework.md:391-392 and
+     AGENTS.md:121 say to set BENCHBOX_OUTPUT_DIR for sweeps, but sweeps
+     read the root ONLY from YAML output.* templates (execute.py:766-771,
+     config.py:53-56 defaults); the env var affects only bare uat-cell
+     defaults (runner.py:326-342) and uat_bring_up. Fix in code (preferred
+     over doc-only): when the YAML uses the DEFAULT templates, honor
+     BENCHBOX_OUTPUT_DIR as the base root; explicit YAML templates always
+     win. Then the docs become true.
+
+  3. PHANTOM BENCHBOX_SEED: uat-framework.md:393 tells operators to record
+     BENCHBOX_SEED; nothing reads it (grep verified: only the doc and a
+     YAML comment). Remove from docs, or wire it through if seeds are
+     meant to be controllable -- removing is correct: execute.official/
+     seed is the real mechanism (config.py:47-49).
+
+  4. UNDOCUMENTED PHYSICAL PREREQS: Docker VM memory (velox's 11.7 GB
+     ceiling lives in a code comment, matrix.py:29-34), doris
+     vm.max_map_count (documented only outside UAT docs), first-run
+     multi-GB image pulls/builds silently eating docker_start_timeout_s
+     300 (LakeSail admits it in release-gate-02:55 comment), node +
+     Playwright browser install for explorer smoke. Add a "fresh machine
+     checklist" section to uat-local-provisioning.md; add a pre-pull/
+     pre-build helper (make uat-prepull PLATFORM=... wrapping compose pull
+     --ignore-buildable + compose build) so first-run timeouts stop
+     presenting as skipped-unreachable mysteries.
+
+  5. ENGINE REQUIREMENT: after uat-container-engine-routing, document the
+     resolved-engine contract (mocker on macOS, docker elsewhere,
+     BENCHBOX_CONTAINER_CLI override) in uat-local-provisioning.md.
+
+prior_art:
+  - "tests/uat/matrix.py:36-43 PLATFORM_UV_EXTRA -- existing extra-injection mechanism; the fix is two new entries, not a new mechanism. Extend."
+  - "pyproject.toml extras 'modin' (:241) and 'databend' (:207) -- the extras to reference."
+  - "Makefile uat-bring-up (2182) -- the make-target shape for uat-prepull; same UAT_BRING_UP_KNOWN_PLATFORMS validation guard. Reuse pattern."
+  - "tests/uat/phases/execute.py:758-771 -- template expansion where the env-var default-base honoring lands. Extend."
+
+work:
+  - id: w1
+    summary: "Add modin and databend to PLATFORM_UV_EXTRA; fast import-probe test that every release-gate platform resolves in the dev group or has a PLATFORM_UV_EXTRA entry"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Honor BENCHBOX_OUTPUT_DIR as base when YAML output templates are defaults (explicit templates win); tests for both directions; align uat-framework.md/AGENTS.md wording"
+    status: pending
+    needs: []
+  - id: w3
+    summary: "Remove BENCHBOX_SEED from docs (execute.seed is the real mechanism); sweep docs for other phantom env vars (grep os.environ/os.getenv across tests/uat vs doc claims)"
+    status: pending
+    needs: []
+  - id: w4
+    summary: "make uat-prepull PLATFORM=... (compose pull + build via the resolved engine, project-scoped); document in uat-local-provisioning.md"
+    status: pending
+    needs: []
+  - id: w5
+    summary: "Fresh-machine checklist in uat-local-provisioning.md: extras per stage, engine install, VM memory, doris max_map_count, node+Playwright, prepull, first-run datagen/network costs"
+    status: pending
+    needs: [w1, w2, w3, w4]
+
+deferred:
+  - summary: "Linux release-gate validation run"
+    reason: "Code is not Linux-blocked but evidence/budgets are all macOS; an actual Linux sweep is an operational campaign, not a code/docs change. The checklist notes Linux as untested territory."
+  - summary: "make uat-bring-down counterpart to uat-bring-up"
+    reason: "uat-docker-cleanup APPLY=1 already covers reclamation; a dedicated target is ergonomic sugar."
+
+deps:
+  needs: [uat-resume-retirement-artifact-durability, uat-container-engine-routing]
+
+must_preserve:
+  - "Explicit YAML output templates always win over BENCHBOX_OUTPUT_DIR (no silent root switching for configured sweeps)."
+  - "uv run --no-sync invocation pattern (sync-per-cell would add minutes per cell)."
+  - "PLATFORM_UV_EXTRA stays the single extra-injection point (README.md:60-67 declares matrix.py the source of truth)."
+
+approach: |
+  Code changes are small and independent (w1-w4); the checklist (w5) is
+  the deliverable that ties them together and must be written against a
+  mentally-fresh machine: every command copy-pasteable, every prerequisite
+  stated with its failure symptom ("if you skip this you will see X").
+  House style: dense and terse per the docs-brevity feedback memory.
+
+anti_patterns:
+  - "DO NOT solve the provisioning gap with docs alone when PLATFORM_UV_EXTRA exists -- code first, docs describe the code."
+  - "DO NOT add bash blocks to CLAUDE.md/AGENTS.md that repeat uat-local-provisioning.md content (docs-brevity house rule)."
+
+verification:
+  - description: "Extras coverage test + output-root contract tests"
+    command: "uv run -- python -m pytest tests/uat/test_matrix.py tests/uat/test_config.py tests/uat/test_phases.py -q"
+    expected_output: "pass, including release-gate-platform import coverage and env-var/template precedence tests"
+  - description: "Prepull target smoke (dry-run)"
+    command: "make uat-prepull PLATFORM=postgresql DRY_RUN=1"
+    expected_output: "prints the pull/build plan without executing"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/matrix.py"
+    - "tests/uat/phases/execute.py"
+    - "tests/uat/config.py"
+    - "tests/uat/docker_assets.py"
+    - "scripts/uat-bring-up/uat_bring_up.py"
+    - "tests/uat/test_matrix.py"
+    - "tests/uat/test_config.py"
+    - "tests/uat/test_phases.py"
+    - "tests/uat/test_docker_assets.py"
+    - "Makefile"
+    - "docs/operations/uat-local-provisioning.md"
+    - "docs/operations/uat-framework.md"
+    - "AGENTS.md"
+
+metadata:
+  tags: [uat, operations, bus-factor, provisioning, docs]
+  estimated_effort: Medium
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), findings G1-G5"

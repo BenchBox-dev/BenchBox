@@ -1,0 +1,170 @@
+id: uat-release-gate-enforcement
+title: "Make UAT a real release gate: machine-readable gate summary, ancestry+freshness check in release readiness, tuned cross-scale floors"
+worktree: uat-hardening
+priority: Critical
+status: Not Started
+category: "Release Tooling"
+
+description: |
+  DECISION (user, 2026-07-11): UAT becomes a REAL gate. Today it is
+  advisory by documented design -- docs/operations/release-guide.md:71-73
+  says "long-running UAT remain[s] advisory"; release-finalize gates on
+  exactly RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
+  (Makefile:1054) and scripts/release_readiness_check.py reads only
+  release-canary evidence. No workflow, script, or target consumes any UAT
+  artifact; the APPROVE/HOLD checklist (docs/operations/uat-framework.md
+  :418-434) is manual and unreferenced from the release runbook. Verified
+  on develop @ fc31f3604.
+
+  MECHANISM (mirrors the proven release-canary pattern -- readiness check
+  queries canary summary artifact, fails on missing/red/stale/non-ancestor,
+  release-guide.md:47-57):
+
+  1. GATE SUMMARY ARTIFACT: at sweep completion the orchestrator writes
+     uat_gate_summary.json (versioned schema): config name,
+     source_commit_sha + source_dirty (already computed for the TSV,
+     report.py SourceInfo), container engine (from
+     uat-container-engine-routing), completed_at, per-phase exit codes,
+     accounting counts (attempted/passed/failed/timeout/unreachable/
+     startup_failed/skipped incl. pruned split), validator clean rate vs
+     floor, cross-scale pairs vs floor, explorer_smoke_status,
+     unreachable_is_estimated, and a single derived verdict green|red.
+
+  2. AGGREGATION + ORDERING: `make uat-gate-check` reads the three
+     release-gate stage summaries, enforces the cross-stage Docker
+     ordering invariant machine-readably (stage completed_at fields
+     replace the manual copy-paste snippet at uat-framework.md:404-413 /
+     report.py:release_gate_ordering_violations), enforces the
+     mechanizable APPROVE checklist items (all stages green, sidecar not
+     estimated, explorer smoke actually ran for stages that include it),
+     and writes a combined release-evidence file to a TRACKED path
+     (_project/release-evidence/uat-gate-summary.json) that the operator
+     commits.
+
+  3. RELEASE WIRING: extend scripts/release_readiness_check.py to require
+     the combined summary: verdict green, source_dirty false,
+     source_commit_sha an ancestor of the release PR head, age <= 21 days
+     (judgement call: releases are cut every few weeks and a full 3-stage
+     sweep costs an operator-day; the canary's 48h window would force
+     redundant sweeps -- document the rationale). Missing/red/stale/
+     non-ancestor fails validate-base on the release PR. Reuse the
+     existing RELEASE_READINESS_OVERRIDE_SHA/_REASON admin escape hatch
+     (release-guide.md:75-79) so incidents have the same documented
+     override as the canary.
+
+  4. TUNED FLOORS (user delegated the judgement): replace the placeholder
+     cross_scale_coverage_min_pairs: 1 in all three release-gate configs
+     (release-gate-01:60, -02:62, -03:53 -- "Tune to the approved pair
+     count during bring-up" was never done). Derivation rule: at
+     implementation time, compute eligible (platform, benchmark) pairs per
+     stage via enumerate_cells_with_pruning (registry + compatibility
+     truth), set floor = floor(0.8 * eligible_pairs) with absolute minimum
+     8 / 4 / 2 for stages 1 / 2 / 3, and write the derivation (eligible
+     count, formula, date) as a comment above the value in each config.
+     0.8 absorbs legitimate environment variance (a down docker stack)
+     while making mass-regression impossible to sign off.
+
+  5. DOCS: release-guide.md drops the "advisory" language for UAT,
+     documents the required evidence flow (sweep x3 -> uat-gate-check ->
+     commit evidence -> open release PR), and the release runbook gains
+     the checklist step that was always missing.
+
+prior_art:
+  - "scripts/release_readiness_check.py + .github/workflows/release-canary.yml -- the freshness+ancestry evidence pattern being mirrored; extend the script rather than adding a second checker. Extend."
+  - "tests/uat/phases/report.py:SourceInfo (source_commit_sha/source_dirty TSV columns) -- provenance capture already exists; the summary reuses it. Reuse."
+  - "tests/uat/phases/report.py:release_gate_ordering_violations -- existing ordering-check logic; uat-gate-check calls it with machine-derived timestamps instead of operator-derived ones. Reuse."
+  - "tests/uat/gate_summary.py is a NEW module (the w1 dataclass + serializer); nearest neighbor is the cells_io.py codec pattern from uat-execute-path-unification. Genuinely new, single-purpose."
+  - "_project/release-evidence/ is a NEW tracked directory (convention: committed release evidence, curated out of release branches like the rest of _project). No existing evidence-commit convention exists -- nearest neighbors are _project/verification-logs (ignored, wrong fit) and release-canary's workflow-artifact summary (wrong lifetime: 90-day artifact retention vs permanent evidence). Genuinely new, minimal (one JSON per release cycle)."
+
+work:
+  - id: w1
+    summary: "Define uat_gate_summary.json schema (versioned dataclass, serialized beside cells.jsonl); written for every sweep INCLUDING dry-run (verdict marks dry_run); unit tests for green/red derivation"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Machine-readable stage completion: sweep records completed_at + config name in the summary; release_gate_ordering_violations consumes summaries; delete the manual snippet from uat-framework.md"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "make uat-gate-check + _cli gate-check subcommand: aggregate 3 stage summaries, enforce ordering + mechanized APPROVE items, write _project/release-evidence/uat-gate-summary.json"
+    status: pending
+    needs: [w2]
+  - id: w4
+    summary: "Tune cross_scale_coverage_min_pairs in the three release-gate configs per the derivation rule (0.8 * eligible, minimums 8/4/2, derivation comment in each config)"
+    status: pending
+    needs: []
+  - id: w5
+    summary: "Extend release_readiness_check.py: require green/clean/ancestor/<=21d UAT evidence with the existing override escape hatch; unit tests for each failure mode (missing, red, stale, non-ancestor, dirty)"
+    status: pending
+    needs: [w3]
+  - id: w6
+    summary: "Update release-guide.md (drop 'advisory', document evidence flow + override), uat-framework.md (gate-check replaces manual checklist mechanics), AGENTS.md release section if it references the old flow"
+    status: pending
+    needs: [w5]
+
+deferred:
+  - summary: "Automated scheduled release-gate sweeps in CI (cloud runners with docker stacks)"
+    reason: "Cost/credential policy for hours-long multi-platform docker sweeps in CI is its own decision; the operator-run + committed-evidence model gets enforcement now without it."
+  - summary: "Per-platform runtime envelopes (compatibility.release_gate_runtime_envelopes) feeding the gate"
+    reason: "Schema field exists but no envelope data has been collected; needs several recorded sweeps first."
+
+deps:
+  needs: [uat-container-engine-routing, uat-fail-advance-consistency]
+
+must_preserve:
+  - "release-canary checks and RELEASE_REQUIRED_CONTEXTS continue working unchanged; UAT evidence is an ADDITIONAL requirement inside release_readiness_check, not a replacement."
+  - "Existing RELEASE_READINESS_OVERRIDE_SHA/_REASON override semantics (admin-only, documented, removed after use)."
+  - "Non-release sweeps (stress, nightly throughput, ad-hoc configs) write a summary but are never consumed by release readiness -- only the committed release-evidence file is."
+  - "The soundness-paths auto-merge exception: release_readiness_check.py changes may be CODEOWNERS-gated; check before enabling auto-merge."
+
+approach: |
+  This is the keystone TODO -- the release-canary precedent means the
+  readiness-check extension is pattern-following, not invention. Keep the
+  summary schema additive-versioned (version: 1) so later accounting
+  fields do not break the checker. w4 is independent and can land first
+  within the PR. The evidence path must survive on develop but be curated
+  out of release branches -- verify release-cut's curation globs cover
+  _project/release-evidence/ (they cover _project/ broadly; confirm, do
+  not assume).
+
+anti_patterns:
+  - "DO NOT gate on raw TSVs -- the checker consumes only the versioned summary JSON; TSVs stay human evidence."
+  - "DO NOT auto-commit evidence from inside the sweep -- the operator reviews and commits it deliberately (evidence is a human attestation plus machine verdict, and sweeps must not write to the git tree)."
+  - "DO NOT set the floors to eligible-pair-count exactly -- a single flaky docker stack would then block every release; 0.8 slack is the point."
+
+verification:
+  - description: "Gate summary + gate-check + readiness unit tests"
+    command: "uv run -- python -m pytest tests/uat/ tests/unit/test_release_infrastructure.py -m fast -q"
+    expected_output: "pass, incl. readiness failure modes (missing/red/stale/non-ancestor/dirty) and floor derivation comments present in the three configs"
+  - description: "End-to-end dry-run: a dry-run sweep produces a summary; uat-gate-check over three synthetic stage summaries produces the combined evidence file"
+    command: "make uat-sweep CONFIG=tests/uat/configs/release-gate-01-native-dataframe.yaml DRY_RUN=1 && ls ~/Developer/benchmark_runs/logs/uat_*/uat_gate_summary.json"
+    expected_output: "summary file exists with verdict field"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/orchestrator.py"
+    - "tests/uat/_cli.py"
+    - "tests/uat/phases/report.py"
+    - "tests/uat/cells_io.py"
+    - "tests/uat/gate_summary.py"
+    - "tests/uat/configs/release-gate-01-native-dataframe.yaml"
+    - "tests/uat/configs/release-gate-02-docker-nonoltp.yaml"
+    - "tests/uat/configs/release-gate-03-docker-oltp.yaml"
+    - "tests/uat/test_orchestrator.py"
+    - "tests/uat/test_report.py"
+    - "tests/uat/test_report_accounting.py"
+    - "tests/uat/test_cli_dispatch.py"
+    - "tests/uat/test_config.py"
+    - "scripts/release_readiness_check.py"
+    - "tests/unit/test_release_infrastructure.py"
+    - "Makefile"
+    - "_project/release-evidence/"
+    - "docs/operations/release-guide.md"
+    - "docs/operations/uat-framework.md"
+    - "AGENTS.md"
+
+metadata:
+  tags: [uat, release-gate, enforcement, evidence, provenance]
+  estimated_effort: Large
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), gate-wiring verdict + user decisions Q1/Q2"
