@@ -385,20 +385,10 @@ Live-state note (fill in after applying — do not leave blank):
 
 ```text
 # Tag-creation ruleset live state
-# checked: 2026-07-10  by: joeharris76 (admin)
-# ruleset id: 18774756  enforcement: active  conditions.ref_name.include: [refs/tags/v*]
-# rules: [creation]  bypass_actors: [User:57046 (always)]
+# checked: <YYYY-MM-DD>  by: <admin>
+# ruleset id: <id>  enforcement: <active?>  conditions.ref_name.include: <...>
+# rules: <creation, ...>  bypass_actors: <...>
 ```
-
-Applied 2026-07-10: `v-tag-restricted` (id 18774756) is live and active. The
-bypass list is a single `User` actor (57046, the release-finalize identity) —
-confirmed to be the release identity only, not a broad Write/Admin role, which
-is what `release-finalize`'s `git push origin v$(VERSION)` needs to still
-succeed. With this confirmed, `TAG_RULESET_ENFORCED` in
-`_project/scripts/ruleset_review_enforcement.py` is flipped to `True`, so a
-future regression (ruleset deleted, made inactive, ref narrowed, creation rule
-dropped, or bypass emptied) becomes a blocking drift finding instead of a
-warning.
 
 ### `pypi` environment required-reviewers gate (verify/pending admin action)
 

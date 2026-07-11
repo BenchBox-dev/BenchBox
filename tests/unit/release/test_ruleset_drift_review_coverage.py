@@ -224,35 +224,20 @@ def test_tag_protection_summary_only_payload_does_not_pass():
     assert findings, "summary-only ruleset lacks a creation rule and must be flagged"
 
 
-def test_tag_check_is_enforced_now_that_ruleset_is_applied():
-    # The v* tag ruleset was applied 2026-07-10 (see repo-admin-settings.md
-    # live-state note), so the flag is flipped: a regression is now blocking.
-    assert _rre.TAG_RULESET_ENFORCED is True
+def test_tag_check_is_warn_until_applied_by_default():
+    # Mirror DEVELOP_REVIEW_RULE_ENFORCED: the flag is False until the admin
+    # POST lands, so the check lands non-blocking.
+    assert _rre.TAG_RULESET_ENFORCED is False
 
 
-def test_tag_check_main_fails_when_missing_now_that_enforced(tmp_path, capsys):
+def test_tag_check_main_warns_non_blocking_when_missing(tmp_path, capsys):
     import json as _json
 
     payload = tmp_path / "rulesets.json"
     payload.write_text(_json.dumps([]), encoding="utf-8")
     rc = _rre.main(["--rulesets-file", str(payload)])
     out = capsys.readouterr().out
-    assert rc == 1, "missing tag ruleset must block now that TAG_RULESET_ENFORCED is True"
-    assert "Tag-creation ruleset - FAILED" in out
-    assert "target='tag'" in out
-
-
-def test_tag_check_main_warns_non_blocking_when_flag_off(tmp_path, capsys, monkeypatch):
-    # Preserve coverage of the WARN-until-applied path the flag used to give by
-    # default: with the flag forced off, a missing ruleset is non-blocking.
-    import json as _json
-
-    monkeypatch.setattr(_rre, "TAG_RULESET_ENFORCED", False)
-    payload = tmp_path / "rulesets.json"
-    payload.write_text(_json.dumps([]), encoding="utf-8")
-    rc = _rre.main(["--rulesets-file", str(payload)])
-    out = capsys.readouterr().out
-    assert rc == 0
+    assert rc == 0, "missing tag ruleset must be non-blocking while WARN-until-applied"
     assert "WARNING (non-blocking):" in out
     assert "target='tag'" in out
 
@@ -373,26 +358,15 @@ def test_tag_protection_narrower_exclude_does_not_negate_coverage():
 # ---------------------------------------------------------------------------
 
 
-def test_tag_creation_findings_blocks_by_default_when_no_tag_ruleset_exists():
-    # Live state after 2026-07-10: the v* tag ruleset is applied and
-    # TAG_RULESET_ENFORCED is True, so a missing target='tag' ruleset is a
-    # BLOCKING drift finding by default (no longer WARN-until-applied).
+def test_tag_creation_findings_warns_non_blocking_when_no_tag_ruleset_exists():
+    # Live state: only develop/main-release rulesets exist, no target='tag'
+    # ruleset yet -- must surface as a non-blocking warning by default
+    # (TAG_RULESET_ENFORCED is False), same WARN-until-applied pattern as the
+    # develop review rule.
     all_live = [
         _live_develop_ruleset(review_count=0, code_owner_review=False),
     ]
     findings = tag_creation_findings(all_live)
-    assert findings and blocking_findings(findings) == findings
-    assert not any(f.startswith(WARNING_PREFIX) for f in findings)
-    assert any("target='tag'" in f for f in findings)
-
-
-def test_tag_creation_findings_warns_when_enforcement_forced_off():
-    # Preserve the pre-2026-07-10 WARN-until-applied coverage via an explicit
-    # enforce_tag_rule=False override.
-    all_live = [
-        _live_develop_ruleset(review_count=0, code_owner_review=False),
-    ]
-    findings = tag_creation_findings(all_live, enforce_tag_rule=False)
     assert findings and all(f.startswith(WARNING_PREFIX) for f in findings)
     assert blocking_findings(findings) == []
     assert any("target='tag'" in f for f in findings)
