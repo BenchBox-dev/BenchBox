@@ -2,7 +2,8 @@ id: "scd2-docs-and-count-hygiene-followup"
 title: "Fix residual SCD2 doc overclaim, README count contradictions, and op-vs-setup portability note"
 worktree: "scd2-audit-followup"
 priority: "Low"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-11"
 category: "Documentation"
 description: |
   SCD2 adversarial audit findings N9, N10, N12 - tracked-file doc defects the
@@ -39,36 +40,46 @@ description: |
   built HTML; tracked files only. House rule: no em-dash/en-dash in _blog/
   content (currently 0; keep it 0).
 impact:
-  business_value: "Removes the last surviving pre-#1061 ClickHouse overclaim and the self-contradicting README counts, keeping the published honesty story consistent."
+  business_value: "Removes the last surviving pre-#1061 ClickHouse overclaim and the self-contradicting README counts, keeping
+    the published honesty story consistent."
   user_impact: "Readers of the outline/README no longer see contradictory portability and count claims."
-  technical_debt: "Closes the incomplete edges of two prior Completed remediations (#1057/#1061 outline miss, #923 README counts)."
+  technical_debt: "Closes the incomplete edges of two prior Completed remediations (#1057/#1061 outline miss, #923 README
+    counts)."
 prior_art:
-- "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md:104-117,169-170 - the corrected wording to mirror into the outline"
+- "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md:104-117,169-170 - the corrected wording to mirror
+  into the outline"
 - "docs/benchmarks/write-primitives.md:129-136 SCD2 paragraph - add the op-vs-setup distinction from draft:112-117"
-- "benchbox/core/write_primitives/README.md:27-28 correct totals (136 = 112 user-facing + 24 sketch) - reconcile :59 and :112 against these"
-- "_project/DONE/write-primitives-scd2-followup/scd2-portability-claim-accuracy.yaml - the Completed TODO that missed the outline"
+- "benchbox/core/write_primitives/README.md:27-28 correct totals (136 = 112 user-facing + 24 sketch) - reconcile :59 and :112
+  against these"
+- "_project/DONE/write-primitives-scd2-followup/scd2-portability-claim-accuracy.yaml - the Completed TODO that missed the
+  outline"
 
 work:
 - id: w1
-  summary: "N9: rescope outline:57-58 to standard-DML engines with the ClickHouse mutation-rewrite caveat, matching the draft and docs."
-  status: pending
+  summary: "N9: rescope outline:57-58 to standard-DML engines with the ClickHouse mutation-rewrite caveat, matching the draft
+    and docs."
+  status: done
 - id: w2
-  summary: "N10: fix README:59 'DELETE (12)' -> 14 and remove/annotate the stale TRANSACTION (8) section at :112. Do NOT change the 112 figure."
-  status: pending
+  summary: "N10: fix README:59 'DELETE (12)' -> 14 and remove/annotate the stale TRANSACTION (8) section at :112. Do NOT change
+    the 112 figure."
+  status: done
   notes: |
     Confirm the section sum reconciles to 136 raw / 112 user-facing after the
     edit. The 24 sketch ops are user-hidden; docs' 112 is correct.
 - id: w3
-  summary: "Add the operation-vs-setup SQL portability distinction to docs/benchmarks/write-primitives.md:132-136 (setup population SQL's ||/CAST floor)."
-  status: pending
+  summary: "Add the operation-vs-setup SQL portability distinction to docs/benchmarks/write-primitives.md:132-136 (setup population
+    SQL's ||/CAST floor)."
+  status: done
 - id: w4
-  summary: "Re-grep: 0 em/en-dashes in _blog/ SCD2 files; no remaining 'runs unchanged ... ClickHouse' overclaim in any tracked file."
+  summary: "Re-grep: 0 em/en-dashes in _blog/ SCD2 files; no remaining 'runs unchanged ... ClickHouse' overclaim in any tracked
+    file."
   needs: [w1, w2, w3]
-  status: pending
+  status: done
 
 deferred:
 - summary: "N12: add the SF1 basic row to the blog scale discussion (draft table) for balance."
-  reason: "The blog draft is owned by scd2-basic-idempotency-and-cleanup-scoping, which re-measures and may rewrite that table. Editing the draft here would collide. Fold the SF1 row into that TODO's w4 re-measurement instead."
+  reason: "The blog draft is owned by scd2-basic-idempotency-and-cleanup-scoping, which re-measures and may rewrite that table.
+    Editing the draft here would collide. Fold the SF1 row into that TODO's w4 re-measurement instead."
 
 must_preserve:
 - "The '112 operations' figure in docs and README stays (it is correct for user-facing ops)."
@@ -84,7 +95,8 @@ approach: |
   edit with the idempotency TODO if that one re-measured the tables.
 
 anti_patterns:
-- "DO NOT 'correct' 112 to 136 - because 112 is the user-facing count (24 sketch ops are hidden) and is right - only fix the self-contradicting per-category numbers."
+- "DO NOT 'correct' 112 to 136 - because 112 is the user-facing count (24 sketch ops are hidden) and is right - only fix the
+  self-contradicting per-category numbers."
 - "DO NOT edit docs/_build/ - because it is untracked build output - tracked sources only."
 - "DO NOT introduce em/en-dashes into _blog/ - because the house rule forbids them - use hyphens/rewordings."
 

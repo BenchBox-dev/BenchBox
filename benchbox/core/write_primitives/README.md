@@ -56,7 +56,7 @@ Tests selective and bulk updates with various predicates:
 - Conditional updates
 - UPDATE...RETURNING
 
-### 3. DELETE Operations (12 operations)
+### 3. DELETE Operations (14 operations)
 
 Tests deletion patterns from single row to bulk deletes:
 - Single row by primary key
@@ -66,6 +66,7 @@ Tests deletion patterns from single row to bulk deletes:
 - DELETE...RETURNING
 - Cascade simulation
 - DELETE vs TRUNCATE comparison
+- GDPR deletion by supplier list (1%, 5%)
 
 ### 4. BULK_LOAD Operations (36 operations)
 
@@ -109,15 +110,7 @@ Tests schema evolution and table management:
 - DROP TABLE
 - TRUNCATE TABLE (small, large datasets)
 
-### 7. TRANSACTION Operations (8 operations)
-
-Tests transaction control and isolation levels:
-- COMMIT (small/10 writes, medium/100 writes, large/1000 writes)
-- ROLLBACK (small/3 writes, medium/100 writes)
-- Nested SAVEPOINTs with partial rollback
-- Isolation levels (READ COMMITTED, SERIALIZABLE)
-
-### Sketch persistence operations (24 operations)
+### 7. SKETCH Operations (24 operations)
 
 Tests the **persist + merge + requery** lifecycle for Apache DataSketches
 sketch artifacts — the differentiated half of the modern approximate-
