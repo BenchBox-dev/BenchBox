@@ -1108,6 +1108,28 @@ class TestWritePrimitivesSCD2DuckDB:
             assert result.validation_passed is True
             assert self._current_state(conn) == (50, 50, 0)
 
+    def test_scd2_basic_write_is_idempotent_without_cleanup(self, scd2_env):
+        """N4: running basic's raw write twice with no cleanup must not create a
+        second current version per key.
+
+        Before the NOT EXISTS current-version guard, the second run re-inserted
+        both the 'new' keys and the 'changed'-key versions (the closed row still
+        carried valid_to = effective_ts, so the changed branch re-fired), doubling
+        every current version. The guard makes the write idempotent.
+        """
+        write_bench, conn = scd2_env
+        op = write_bench.get_operation("merge_scd_type2_basic")
+        conn.execute(op.write_sql)
+        state_after_first = self._current_state(conn)
+        conn.execute(op.write_sql)
+        assert self._current_state(conn) == state_after_first
+        # No business key has more than one current version.
+        offenders = conn.execute(
+            "SELECT c_custkey FROM scd2_ops_dim_customer WHERE is_current = true "
+            "GROUP BY c_custkey HAVING COUNT(*) <> 1"
+        ).fetchall()
+        assert offenders == []
+
     def test_scd2_no_change_is_idempotent(self, scd2_env):
         """An unchanged batch closes no rows and inserts zero new versions."""
         write_bench, conn = scd2_env
