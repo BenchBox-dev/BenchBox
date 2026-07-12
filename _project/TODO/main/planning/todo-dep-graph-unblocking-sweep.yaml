@@ -1,0 +1,81 @@
+id: todo-dep-graph-unblocking-sweep
+title: "Sweep TODO dep graph after each release batch to surface items whose blockers are now in DONE"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Process and Workflow
+
+description: |
+  After PR #759 moved `benchmark-runs-output-root-propagation` and
+  `benchmark-runs-local-artifact-guardrails` to DONE, the item
+  `benchmark-runs-duplicate-artifact-cleanup` (Medium-High) still has
+  `status: Not Started` with `deps.needs` pointing to both of those now-done
+  items. It is fully unblocked but nothing flagged it as ready to work.
+
+  This is a systemic gap: the TODO system has no automated step that detects
+  when a `deps.needs` item transitions to DONE and re-evaluates the downstream
+  item's readiness. The result is hidden unblocked work sitting in the backlog
+  looking like it's blocked.
+
+  Two deliverables:
+  1. An immediate fix — manually update `benchmark-runs-duplicate-artifact-cleanup`
+     to reflect its newly-unblocked state.
+  2. A process fix — `todo_cli.py` already has a `ready` command (line ~486).
+     Document its use in `_project/TODO/README.md` as a post-merge checklist
+     step so the command is discoverable and unblocking transitions are caught
+     automatically going forward.
+
+work:
+  - id: w1
+    summary: "Update benchmark-runs-duplicate-artifact-cleanup: change status to Not Started (unblocked)"
+    status: pending
+    notes: |
+      File: _project/TODO/main/planning/benchmark-runs-duplicate-artifact-cleanup.yaml
+      Verify deps are satisfied: both benchmark-runs-output-root-propagation and
+      benchmark-runs-local-artifact-guardrails are now in _project/DONE/.
+      Change status from the effective Blocked state to Not Started.
+      The item is now the first actionable step in its chain.
+
+  - id: w2
+    summary: "Document todo_cli.py ready in TODO/README.md as a post-merge checklist step"
+    status: pending
+    notes: |
+      The ready command already exists in todo_cli.py (~line 486). Add a
+      "Post-merge checklist" section (or extend the existing CLI Tool section)
+      in _project/TODO/README.md:
+        uv run _project/scripts/todo_cli.py ready
+        # Lists items whose deps.needs are all in the DONE tree — run after
+        # each batch of PRs to surface newly-unblocked work.
+
+prior_art:
+  - "_project/scripts/todo_cli.py:ready — check if command exists before adding"
+  - "_project/TODO/main/planning/benchmark-runs-duplicate-artifact-cleanup.yaml: immediate case to fix"
+
+must_preserve:
+  - "benchmark-runs-duplicate-artifact-cleanup.yaml deps.needs entries remain (they document history)"
+  - "Items that are genuinely still blocked (deps not yet in DONE) remain at Blocked status"
+
+verification:
+  - description: "benchmark-runs-duplicate-artifact-cleanup no longer appears in blocked list"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py list --status=Blocked"
+    expected_output: "benchmark-runs-duplicate-artifact-cleanup absent from output"
+  - description: "todo_cli.py ready runs and shows benchmark-runs-duplicate-artifact-cleanup as ready"
+    command: "uv run --project _project/scripts -- python _project/scripts/todo_cli.py ready"
+    expected_output: "benchmark-runs-duplicate-artifact-cleanup listed as ready to start"
+
+metadata:
+  created_date: "2026-06-08"
+  estimated_effort: "Small"
+  tags:
+    - process
+    - dep-graph
+    - todo-system
+    - housekeeping
+
+impact:
+  business_value: |
+    benchmark-runs-duplicate-artifact-cleanup (Medium-High) is currently the
+    only confirmed hidden-unblocked item, but the gap is systemic: every
+    completed dep silently unblocks downstream work that stays invisible
+    until someone manually traces the graph. A one-time sweep + recurring
+    check surfaces this class of work automatically.
