@@ -146,18 +146,22 @@ def _handle_preflight(args: argparse.Namespace) -> int:
 
 def _handle_report(args: argparse.Namespace) -> int:
     """Implements `make uat-report`. Reads cells from a JSON-lines stream."""
-    from tests.uat.cells_io import read_cells_jsonl, read_skipped_unreachable_sidecar
+    from tests.uat.cells_io import read_accounting_sidecar, read_cells_jsonl
     from tests.uat.phases.report import write_report
 
     cells = read_cells_jsonl(Path(args.cells_jsonl))
-    # Skipped-unreachable cells are not JSONL rows; the durable sweep writes
-    # their count to a sidecar next to cells.jsonl. Read it back so a
+    # Skipped-unreachable and startup-failed cells are not JSONL rows; the
+    # durable sweep writes their counts to a sidecar next to cells.jsonl.
+    # Read the sidecar ONCE and take both counts from the same payload so a
     # regenerated report keeps `total_defined` faithful instead of printing
     # `unreachable: 0` for an incomplete sweep. When the sidecar is missing
-    # (older artifacts), the count defaults to 0 but is not confirmed -
-    # `unreachable_count_is_estimated` makes that distinction visible instead
-    # of silently looking identical to a confirmed clean run.
-    skipped_unreachable_count, sidecar_present = read_skipped_unreachable_sidecar(Path(args.cells_jsonl))
+    # (older artifacts), the counts default to 0 but are not confirmed -
+    # `unreachable_count_is_estimated` makes that distinction visible, and
+    # because both counts come from the same sidecar, the one estimated
+    # flag covers startup_failed too.
+    accounting, sidecar_present = read_accounting_sidecar(Path(args.cells_jsonl))
+    skipped_unreachable_count = int(accounting.get("skipped_unreachable_count", 0))
+    startup_failed_count = int(accounting.get("startup_failed_count", 0))
     rungs = _split_csv(args.rungs)
     summary = write_report(
         cells,
@@ -165,6 +169,7 @@ def _handle_report(args: argparse.Namespace) -> int:
         rungs=rungs,
         cross_scale_floor=args.cross_scale_floor,
         skipped_unreachable_count=skipped_unreachable_count,
+        startup_failed_count=startup_failed_count,
         unreachable_count_is_estimated=not sidecar_present,
     )
     print(
@@ -177,6 +182,7 @@ def _handle_report(args: argparse.Namespace) -> int:
                 "skipped": summary.skipped_count,
                 "unreachable": summary.unreachable_count,
                 "unreachable_is_estimated": summary.unreachable_count_is_estimated,
+                "startup_failed": summary.startup_failed_count,
                 "total_defined": summary.total_defined_count,
                 "registry_pruned": summary.registry_pruned_count,
                 "passed": summary.pass_count,
@@ -394,6 +400,7 @@ def _handle_execute(args: argparse.Namespace) -> int:
             "pruned": 0,
             "compatibility_pruned": 0,
             "skipped_unreachable": 0,
+            "startup_failed": 0,
             "docker_events": 0,
             "aborted": aborted,
             "abort_reason": result.abort_reason,
@@ -403,6 +410,16 @@ def _handle_execute(args: argparse.Namespace) -> int:
             print(f"[execute] ABORT: {result.abort_reason}", file=sys.stderr)
         return result.exit_code()
 
+    # Known limitation on the mid-execute disk-floor abort path: run_sweep's
+    # synthesized ExecuteOutcome carries EMPTY skipped_unreachable /
+    # startup_failed tuples (the Cell objects are lost crossing the exception
+    # boundary; only integer counts survive, annotated onto the exception),
+    # so this stdout JSON prints 0 for both on that path. The durable
+    # artifacts are authoritative there: run_sweep threads the exc-annotated
+    # counts into the accounting sidecar and the partial report TSV, which
+    # carry the real numbers. Fixing the JSON would mean count-override
+    # fields on ExecuteOutcome that contradict its own tuples -- not worth
+    # the schema distortion for a summary whose durable twin is correct.
     summary = {
         "name": config.name,
         "log_dir": str(result.log_dir),
@@ -412,6 +429,7 @@ def _handle_execute(args: argparse.Namespace) -> int:
         "pruned": len(outcome.pruned),
         "compatibility_pruned": len(getattr(outcome, "compatibility_pruned", ())),
         "skipped_unreachable": len(outcome.skipped_unreachable),
+        "startup_failed": len(getattr(outcome, "startup_failed", ())),
         "docker_events": len(outcome.docker_events),
         "aborted": outcome.aborted,
         "abort_reason": outcome.abort_reason,

@@ -58,6 +58,13 @@ class ExecuteOutcome(PhaseResult):
     results: tuple[CellResult, ...]
     pruned: tuple[Cell, ...]
     skipped_unreachable: tuple[Cell, ...]
+    # Cells for a platform whose managed Docker stack never started
+    # (compose-up failure) -- distinct from `skipped_unreachable` (a
+    # reachability probe that found nothing listening). Kept as its own
+    # collection rather than folded into `skipped_unreachable` so accounting
+    # can tell "stack failed to start" from "TCP probe found nothing
+    # listening" -- see uat-fail-advance-consistency w3.
+    startup_failed: tuple[Cell, ...] = ()
     compatibility_pruned: tuple[CompatibilityPrunedCell, ...] = ()
     docker_events: tuple[DockerLifecycleEvent, ...] = ()
     # Typed cause for `aborted` -- e.g. "disk_floor", "docker_startup",
@@ -160,6 +167,7 @@ def run_execute(
     results: list[CellResult] = []
     pruned: list[Cell] = []
     skipped_unreachable: list[Cell] = []
+    startup_failed: list[Cell] = []
     docker_events: list[DockerLifecycleEvent] = []
     completed_pairs: set[tuple[str, str]] = set()
     already_pruned: set[tuple[str, str, float]] = set()
@@ -204,8 +212,13 @@ def run_execute(
                     # stack so one stack's startup failure cannot truncate the
                     # whole sweep. Genuine global aborts (free space, fixed
                     # container-name policy, teardown failure) still abort below.
+                    # These cells are recorded in `startup_failed`, not
+                    # `skipped_unreachable` -- a stack that never started is
+                    # accounted separately from a reachability probe that
+                    # found nothing listening (uat-fail-advance-consistency
+                    # w3).
                     if docker_state.cleanup_status == "startup-failed":
-                        skipped_unreachable.extend(cell for _, pb_cells in platform_pairs for cell in pb_cells)
+                        startup_failed.extend(cell for _, pb_cells in platform_pairs for cell in pb_cells)
                         docker_startup_failed = True
                     else:
                         platform_abort_reason = startup_reason
@@ -240,6 +253,7 @@ def run_execute(
                     _annotate_disk_floor_abort(
                         exc,
                         skipped_unreachable=skipped_unreachable,
+                        startup_failed=startup_failed,
                         compatibility_pruned=enumeration.compatibility_pruned,
                     )
                     raise
@@ -273,6 +287,7 @@ def run_execute(
         results=tuple(results),
         pruned=tuple(pruned),
         skipped_unreachable=tuple(skipped_unreachable),
+        startup_failed=tuple(startup_failed),
         compatibility_pruned=enumeration.compatibility_pruned,
         docker_events=tuple(docker_events),
         aborted=abort_reason is not None,
@@ -372,6 +387,18 @@ def _teardown_docker_platform_if_needed(
     if not docker_state.started or docker_state.spec is None or docker_state.project_name is None:
         return docker_state, None, None
 
+    # A stack whose OWN startup already failed already advanced the sweep at
+    # the #700 FAIL-and-advance decision point above (`run_execute`,
+    # docker_startup_failed). `started=True` is still set unconditionally so
+    # this teardown runs -- a partially-started compose stack can still leak
+    # containers/volumes -- but if teardown on that SAME broken stack also
+    # fails, that must not defeat the advance-past-broken-stack intent by
+    # turning into a GLOBAL abort. Only a stack that started successfully
+    # makes an undoable teardown failure a genuine resource-leak emergency
+    # worth aborting the whole sweep for -- see
+    # uat-fail-advance-consistency w4.
+    stack_started_successfully = docker_state.cleanup_status == "started"
+
     cleanup_status, cleanup_abort_reason = _run_docker_teardown(
         config,
         platform=platform,
@@ -388,7 +415,20 @@ def _teardown_docker_platform_if_needed(
         cleanup_status=cleanup_status,
     )
     if cleanup_abort_reason is not None:
-        return state, cleanup_abort_reason, "docker_teardown"
+        if stack_started_successfully:
+            return state, cleanup_abort_reason, "docker_teardown"
+        _record_docker_event(
+            docker_events,
+            log_dir=log_dir,
+            platform=platform,
+            action="down-policy",
+            status="advance-after-startup-failed",
+            project_name=docker_state.project_name,
+            message=(
+                "Teardown also failed for a stack whose own startup already failed; "
+                f"advancing per FAIL-and-advance policy instead of a global abort: {cleanup_abort_reason}"
+            ),
+        )
     free_space_abort_reason = _free_space_abort_reason(
         enabled=free_space_checks_enabled,
         path=free_space_path,
@@ -697,20 +737,27 @@ def _annotate_disk_floor_abort(
     exc: BaseException,
     *,
     skipped_unreachable: list[Cell],
+    startup_failed: list[Cell],
     compatibility_pruned: tuple[CompatibilityPrunedCell, ...],
 ) -> None:
     """Attach accounting the orchestrator needs to thread into abort artifacts.
 
     A mid-sweep DiskFloorAbort propagates out of `run_execute`, bypassing the
-    normal `ExecuteOutcome` return. Both the skipped-unreachable count and
-    this run's actual compatibility-pruned enumeration would otherwise be
-    lost, forcing the orchestrator to either under-count `total_defined` or
-    fall back to a second, possibly-diverging re-enumeration -- see
-    uat-execute-path-unification w5.
+    normal `ExecuteOutcome` return. The skipped-unreachable and
+    startup-failed counts, plus this run's actual compatibility-pruned
+    enumeration, would otherwise be lost, forcing the orchestrator to either
+    under-count `total_defined` or fall back to a second, possibly-diverging
+    re-enumeration -- see uat-execute-path-unification w5 and
+    uat-fail-advance-consistency w3.
     """
     if not hasattr(exc, "skipped_unreachable_count"):
         try:
             exc.skipped_unreachable_count = len(skipped_unreachable)  # type: ignore[attr-defined]
+        except (AttributeError, TypeError):
+            pass
+    if not hasattr(exc, "startup_failed_count"):
+        try:
+            exc.startup_failed_count = len(startup_failed)  # type: ignore[attr-defined]
         except (AttributeError, TypeError):
             pass
     if not hasattr(exc, "compatibility_pruned"):

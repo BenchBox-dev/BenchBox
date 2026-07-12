@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.uat import cells_io, orchestrator
+from tests.uat import cells_io, docker_assets, orchestrator
 from tests.uat.config import validate_config
 from tests.uat.phases import execute as exec_phase
 from tests.uat.phases.enumerate import CompatibilityPrunedCell
@@ -159,6 +159,186 @@ def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
     assert result.aborted_phase is None
     assert captured["bundles_dir"] == captured["package_dir"]
     assert captured["bundles_dir"] == tmp_path / "submissions" / "smoke"
+
+
+# ---------------------------------------------------------------------------
+# uat-fail-advance-consistency w1: report-without-execute must abort.
+# ---------------------------------------------------------------------------
+
+
+def test_report_phase_aborts_when_execute_outcome_missing(tmp_path: Path):
+    """A report phase with no execute phase in this sweep must abort, not print an empty clean report.
+
+    Before this fix, `cells = execute_outcome.results if execute_outcome
+    else []` let the report phase proceed with zero rows and exit 0 -- an
+    empty report reads as a clean sweep. validate/package already abort in
+    this situation; report must match.
+    """
+    cfg = validate_config({"name": "report-only", "phases": ["report"]})
+
+    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "report"
+    assert "execute phase" in (result.abort_reason or "")
+    assert result.exit_code() == 2
+    partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
+    assert "# run_status=ABORTED" in partial_text
+    assert "abort_phase=report" in partial_text
+
+
+def test_dry_run_report_only_sweep_stays_exit_zero(tmp_path: Path):
+    """Dry-run sweeps skip all phases upstream of the phase-specific branches -- must stay exit 0."""
+    cfg = validate_config({"name": "report-only-dry-run", "dry_run": True, "phases": ["report"]})
+
+    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert result.exit_code() == 0
+    assert result.phase_exit_codes == {"report": 0}
+
+
+# ---------------------------------------------------------------------------
+# uat-fail-advance-consistency w2: explorer_smoke corpus failures abort;
+# node-missing is a recorded, visible skip.
+# ---------------------------------------------------------------------------
+
+
+def test_explorer_smoke_corpus_failure_emits_abort_artifacts(tmp_path: Path):
+    """A structured explorer_smoke corpus failure flows through _emit_abort_artifacts, not an uncaught raise."""
+    cfg = validate_config(
+        {
+            "name": "explorer-corpus-fail",
+            "phases": ["execute", "explorer_smoke"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (cell,), "aborted": False, "abort_reason": None, "exit_code": lambda self: 0},
+    )()
+    aborted_result = type(
+        "ExplorerResult",
+        (),
+        {
+            "aborted": True,
+            "abort_reason": "Explorer smoke corpus contract failed:\n  - no result bundles",
+            "skip_reason": None,
+            "exit_code": lambda self: 2,
+        },
+    )()
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=execute_outcome),
+        patch("tests.uat.phases.explorer_smoke.run_explorer_smoke", return_value=aborted_result),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "explorer_smoke"
+    assert result.exit_code() == 2
+    partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
+    assert "# run_status=ABORTED" in partial_text
+    assert "abort_phase=explorer_smoke" in partial_text
+
+
+def test_explorer_smoke_node_missing_records_sidecar_status_and_warns(tmp_path: Path, capsys):
+    """node-missing stays exit 0 but is recorded in the accounting sidecar plus a prominent stderr warning."""
+    cfg = validate_config(
+        {
+            "name": "explorer-node-missing",
+            "phases": ["execute", "explorer_smoke"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (cell,), "aborted": False, "abort_reason": None, "exit_code": lambda self: 0},
+    )()
+    skipped_result = type(
+        "ExplorerResult",
+        (),
+        {
+            "aborted": False,
+            "abort_reason": None,
+            "skipped": True,
+            "skip_reason": "node not on PATH",
+            "exit_code": lambda self: 0,
+        },
+    )()
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=execute_outcome),
+        patch("tests.uat.phases.explorer_smoke.run_explorer_smoke", return_value=skipped_result),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert result.phase_exit_codes["explorer_smoke"] == 0
+    accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert accounting["explorer_smoke_status"] == "skipped_no_node"
+    stderr = capsys.readouterr().err
+    assert "node not on PATH" in stderr
+    assert "skipped_no_node" in stderr
+    # The recorded-path warning must claim durable recording, not hedge.
+    assert "recorded in the accounting sidecar" in stderr
+    assert "NOT durably recorded" not in stderr
+
+
+def test_explorer_smoke_node_missing_warns_not_durably_recorded_without_sidecar(tmp_path: Path, capsys):
+    """When no accounting sidecar exists (no execute phase ran), the warning must say so.
+
+    `update_accounting_sidecar` deliberately refuses to fabricate a sidecar
+    (its presence implies confirmed execute-derived counts), so the stderr
+    warning must state the status was NOT durably recorded instead of
+    implying it was.
+    """
+    cfg = validate_config({"name": "explorer-node-missing-no-sidecar", "phases": ["explorer_smoke"]})
+    skipped_result = type(
+        "ExplorerResult",
+        (),
+        {
+            "aborted": False,
+            "abort_reason": None,
+            "skipped": True,
+            "skip_reason": "node not on PATH",
+            "exit_code": lambda self: 0,
+        },
+    )()
+
+    with patch("tests.uat.phases.explorer_smoke.run_explorer_smoke", return_value=skipped_result):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert result.phase_exit_codes["explorer_smoke"] == 0
+    assert not (tmp_path / "logs" / "cells.jsonl.accounting.json").exists()
+    stderr = capsys.readouterr().err
+    assert "node not on PATH" in stderr
+    assert "NOT durably recorded" in stderr
 
 
 def test_package_phase_excludes_failed_cells_result_paths(tmp_path: Path):
@@ -824,3 +1004,149 @@ def test_disk_floor_abort_carries_skipped_unreachable_count():
                 runner=runner,
             )
     assert getattr(excinfo.value, "skipped_unreachable_count", None) == 1
+
+
+def _startup_fail_clickhouse_docker(argv, **kwargs):
+    """Fake docker runner: clickhouse compose-up fails, everything else succeeds."""
+    action = "up" if "up" in argv else "down"
+    compose_file = argv[argv.index("-f") + 1] if "-f" in argv else ""
+    if action == "up" and "/clickhouse/" in compose_file:
+        return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose up failed")
+    return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+
+def test_disk_floor_abort_carries_startup_failed_count(tmp_path: Path):
+    """Mirror of test_disk_floor_abort_carries_skipped_unreachable_count for w3's counter.
+
+    clickhouse-server is processed first: its managed compose-up fails, so
+    its cells accumulate in `startup_failed` (the #700 advance path). The
+    non-Docker duckdb platform then trips the disk-floor runner. The raised
+    abort must carry the already-accumulated startup_failed count (1) via
+    `_annotate_disk_floor_abort`.
+    """
+    cfg = validate_config(
+        {
+            "name": "disk-floor-annotate-startup-failed",
+            "platforms": {"include": ["clickhouse-server", "duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def runner(platform, benchmark, scale, **kwargs):
+        raise orchestrator.DiskFloorAbort("free space 1.0 GiB < cutoff 5.0 GiB")
+
+    with patch.object(exec_phase, "platform_is_reachable", return_value=True):
+        with pytest.raises(orchestrator.DiskFloorAbort) as excinfo:
+            exec_phase.run_execute(
+                cfg,
+                log_dir=tmp_path,
+                databases_root=tmp_path / "databases",
+                runner=runner,
+                docker_runner=_startup_fail_clickhouse_docker,
+            )
+    assert getattr(excinfo.value, "startup_failed_count", None) == 1
+
+
+def test_disk_floor_abort_threads_startup_failed_count_into_sidecar_and_partial_report(tmp_path: Path):
+    """Orchestrator-level: startup_failed survives the synthesized-outcome disk-floor path.
+
+    run_sweep's DiskFloorAbort handler synthesizes an ExecuteOutcome with an
+    EMPTY startup_failed tuple (the Cell objects are lost crossing the
+    exception boundary), so the abort artifacts must be fed from the
+    exc-annotated `startup_failed_count` instead. Assert the durable
+    accounting sidecar and the partial report TSV both carry the real count.
+    """
+    cfg = validate_config(
+        {
+            "name": "disk-floor-startup-failed-artifacts",
+            "phases": ["execute"],
+            "platforms": {"include": ["clickhouse-server", "duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+
+    with (
+        patch.object(exec_phase, "platform_is_reachable", return_value=True),
+        patch.object(exec_phase.docker_assets, "run_docker_command", side_effect=_startup_fail_clickhouse_docker),
+        patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
+        patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
+        patch.object(orchestrator.preflight_budget, "free_space_gib", return_value=1.0),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "execute"
+    assert result.execute_outcome is not None
+    assert result.execute_outcome.abort_kind == "disk_floor"
+    # The durable sidecar carries the exc-annotated count, not the
+    # synthesized outcome's empty tuple.
+    accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert accounting["startup_failed_count"] == 1
+    # And the partial report accounts for it (components precede the total).
+    partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
+    assert "startup_failed=1" in partial_text
+    assert "attempted=1 skipped=0 unreachable=0 startup_failed=1 total_defined=2" in partial_text
+
+
+# ---------------------------------------------------------------------------
+# cells_io.update_accounting_sidecar unit coverage (review REQUIRED 2).
+# ---------------------------------------------------------------------------
+
+
+def test_update_accounting_sidecar_returns_false_and_creates_no_file_without_sidecar(tmp_path: Path):
+    cells_jsonl = tmp_path / "cells.jsonl"
+
+    recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
+
+    assert recorded is False
+    # No sidecar is fabricated: presence implies confirmed execute-derived
+    # counts, which a patch-only write could not provide.
+    assert not cells_jsonl.with_name("cells.jsonl.accounting.json").exists()
+
+
+def test_update_accounting_sidecar_preserves_existing_counts(tmp_path: Path):
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_io.write_cells_jsonl(
+        cells_jsonl,
+        (),
+        source_info=_source_info(),
+        skipped_unreachable_count=3,
+        startup_failed_count=2,
+    )
+
+    recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
+
+    assert recorded is True
+    payload = json.loads(cells_jsonl.with_name("cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert payload == {
+        "skipped_unreachable_count": 3,
+        "startup_failed_count": 2,
+        "disk_gate_disabled": False,
+        "explorer_smoke_status": "skipped_no_node",
+    }
+
+
+def test_update_accounting_sidecar_returns_false_on_corrupt_sidecar_without_clobbering(tmp_path: Path):
+    cells_jsonl = tmp_path / "cells.jsonl"
+    sidecar = cells_jsonl.with_name("cells.jsonl.accounting.json")
+    sidecar.write_text("{not valid json", encoding="utf-8")
+
+    recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
+
+    assert recorded is False
+    # The corrupt sidecar is left untouched for post-mortem inspection, not
+    # overwritten with a fabricated payload.
+    assert sidecar.read_text(encoding="utf-8") == "{not valid json"

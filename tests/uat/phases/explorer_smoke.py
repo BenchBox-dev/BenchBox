@@ -140,12 +140,29 @@ def run_explorer_smoke(
     # Minimal always-on gate: validate the packaged corpus regardless of
     # explorer presence or Node availability. This is the check that has value
     # on a clean `main` checkout where the heavy browser path cannot run.
+    # Corpus problems are collected into `contract["errors"]` rather than
+    # raised -- a raw RuntimeError propagating out of `run_sweep`'s
+    # explorer_smoke branch (no try there) meant a crash with no abort
+    # artifacts. See uat-fail-advance-consistency w2.
     resolved_bundles_dir = _resolve_bundles_dir(bundles_dir)
     contract = _validate_external_corpus(bundles_dir=resolved_bundles_dir)
     (log_dir / "explorer_corpus_contract.json").write_text(
         json.dumps(contract, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    corpus_errors = contract.get("errors") or []
+    if corpus_errors:
+        return ExplorerSmokeResult(
+            phase="explorer_smoke",
+            build_returncode=0,
+            smoke_returncode=0,
+            build_log=None,
+            smoke_log=None,
+            skipped=False,
+            skip_reason=None,
+            aborted=True,
+            abort_reason="Explorer smoke corpus contract failed:\n  - " + "\n  - ".join(corpus_errors[:20]),
+        )
 
     if not explorer_present():
         return ExplorerSmokeResult(
@@ -295,14 +312,29 @@ def _absolute_path(path: Path) -> Path:
 
 
 def _validate_external_corpus(*, bundles_dir: Path) -> dict[str, object]:
-    """Fail early when UAT hands Explorer smoke an empty or malformed corpus."""
+    """Validate the packaged corpus UAT hands to Explorer smoke.
+
+    Returns a contract dict; an empty or malformed corpus is reported via
+    the `"errors"` key (empty list when clean) rather than by raising --
+    `run_explorer_smoke` turns a non-empty `errors` list into a structured
+    `ExplorerSmokeResult(aborted=True, ...)` so the failure flows through the
+    orchestrator's normal abort-artifact machinery instead of an uncaught
+    RuntimeError. See uat-fail-advance-consistency w2.
+    """
     bundle_files = sorted(
         path
         for path in bundles_dir.rglob("*.json")
         if not path.name.endswith((".manifest.json", ".plans.json", ".tuning.json"))
     )
     if not bundle_files:
-        raise RuntimeError(f"Explorer smoke corpus has no result bundles: {bundles_dir}")
+        return {
+            "bundles": 0,
+            "checked_bundles": 0,
+            "benchmarks": [],
+            "platforms": [],
+            "queries": 0,
+            "errors": [f"Explorer smoke corpus has no result bundles: {bundles_dir}"],
+        }
 
     benchmarks: set[str] = set()
     platforms: set[str] = set()
@@ -339,14 +371,13 @@ def _validate_external_corpus(*, bundles_dir: Path) -> dict[str, object]:
         if isinstance(queries, list):
             query_count += len(queries)
 
-    if errors:
-        raise RuntimeError("Explorer smoke corpus contract failed:\n  - " + "\n  - ".join(errors[:20]))
     return {
         "bundles": len(bundle_files),
         "checked_bundles": checked,
         "benchmarks": sorted(benchmarks),
         "platforms": sorted(platforms),
         "queries": query_count,
+        "errors": errors,
     }
 
 
