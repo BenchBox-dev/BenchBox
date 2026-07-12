@@ -129,3 +129,298 @@ def test_local_managed_clickhouse_compose_password_matches_uat_argv():
     assert 'CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"' in compose_text
     assert "init-default-database.sql:/docker-entrypoint-initdb.d/init-default-database.sql:ro" in compose_text
     assert "password=benchbox" in argv
+
+
+# --------------------------------------------------------------------------
+# resolve_container_cli() -- uat-container-engine-routing w1
+#
+# The autouse `isolate_container_cli_resolution` fixture (tests/uat/conftest.py)
+# defaults every test to a clean cache + BENCHBOX_CONTAINER_CLI=docker + a
+# stubbed `_which_container_cli` that reports everything present. These tests
+# override that within their own body to exercise the real resolution logic.
+# --------------------------------------------------------------------------
+
+
+def test_resolve_container_cli_env_override_wins_over_platform_default(monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "podman")
+    monkeypatch.setattr(docker_assets, "_current_platform", lambda: "darwin")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/usr/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        assert docker_assets.resolve_container_cli() == "podman"
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
+def test_resolve_container_cli_darwin_prefers_mocker_when_present(monkeypatch):
+    monkeypatch.delenv(docker_assets.CONTAINER_CLI_ENV_VAR, raising=False)
+    monkeypatch.setattr(docker_assets, "_current_platform", lambda: "darwin")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        assert docker_assets.resolve_container_cli() == "mocker"
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
+def test_resolve_container_cli_darwin_falls_back_to_docker_without_mocker(monkeypatch):
+    monkeypatch.delenv(docker_assets.CONTAINER_CLI_ENV_VAR, raising=False)
+    monkeypatch.setattr(docker_assets, "_current_platform", lambda: "darwin")
+    monkeypatch.setattr(
+        docker_assets, "_which_container_cli", lambda cli: None if cli == "mocker" else "/usr/bin/docker"
+    )
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        assert docker_assets.resolve_container_cli() == "docker"
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
+def test_resolve_container_cli_non_darwin_never_probes_mocker(monkeypatch):
+    """must_preserve: a docker-only Linux host stays byte-identical -- no mocker `which()` probe off darwin."""
+    monkeypatch.delenv(docker_assets.CONTAINER_CLI_ENV_VAR, raising=False)
+    monkeypatch.setattr(docker_assets, "_current_platform", lambda: "linux")
+    probed: list[str] = []
+
+    def fake_which(cli):
+        probed.append(cli)
+        return "/usr/bin/docker" if cli == "docker" else None
+
+    monkeypatch.setattr(docker_assets, "_which_container_cli", fake_which)
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        assert docker_assets.resolve_container_cli() == "docker"
+        assert probed == ["docker"]
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
+def test_resolve_container_cli_hard_errors_when_resolved_binary_missing(monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "ghost-cli")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: None)
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        with pytest.raises(docker_assets.DockerAssetError, match="ghost-cli"):
+            docker_assets.resolve_container_cli()
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
+def test_resolve_container_cli_is_memoized_across_calls(monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "docker")
+    calls: list[str] = []
+
+    def fake_which(cli):
+        calls.append(cli)
+        return "/usr/bin/docker"
+
+    monkeypatch.setattr(docker_assets, "_which_container_cli", fake_which)
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        assert docker_assets.resolve_container_cli() == "docker"
+        assert docker_assets.resolve_container_cli() == "docker"
+        assert calls == ["docker"]  # resolved once, memoized on the second call
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
+def test_compose_commands_use_the_resolved_engine_binary(monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        spec = docker_assets.docker_platform_spec("postgresql")
+        argv = docker_assets.compose_up_command(spec, "benchbox-uat-smoke-postgresql")
+        assert argv[0] == "mocker"
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
+def test_command_has_forbidden_prune_matches_compose_engines_but_exempts_apple_container():
+    """The forbidden-prune guard covers every compose engine argv[0] (docker,
+    mocker, an override) -- but NOT the Apple-native `container` CLI, whose
+    max-mode prunes are a deliberate documented operator action guarded by
+    container_cleanup._is_forbidden instead. Blocking those here broke
+    `make uat-docker-cleanup ENGINE=container MODE=max APPLY=1` outright."""
+    assert docker_assets.command_has_forbidden_prune(["mocker", "system", "prune"])
+    assert docker_assets.command_has_forbidden_prune(["mocker", "volume", "prune"])
+    assert docker_assets.command_has_forbidden_prune(["docker", "image", "prune", "-f"])
+    assert docker_assets.command_has_forbidden_prune(["podman", "volume", "prune"])
+    assert docker_assets.command_has_forbidden_prune(["/usr/local/bin/docker", "system", "prune"])
+    assert not docker_assets.command_has_forbidden_prune(["mocker", "compose", "up"])
+    assert not docker_assets.command_has_forbidden_prune(["docker", "volume", "ls"])
+    # Apple-native container CLI: max-mode prunes must pass through.
+    assert not docker_assets.command_has_forbidden_prune(["container", "volume", "prune"])
+    assert not docker_assets.command_has_forbidden_prune(["container", "network", "prune"])
+    assert not docker_assets.command_has_forbidden_prune(["container", "builder", "delete", "--force"])
+
+
+def test_command_has_forbidden_prune_is_robust_to_repeated_tokens():
+    # Pairwise scan, not index arithmetic: a repeated token earlier in argv
+    # must not confuse adjacency detection.
+    assert docker_assets.command_has_forbidden_prune(["docker", "volume", "volume", "prune"])
+    assert not docker_assets.command_has_forbidden_prune(["docker", "prune", "volume", "ls"])
+
+
+# --------------------------------------------------------------------------
+# sweep_leaked_mocker_volumes() -- uat-container-engine-routing w3
+#
+# Exact-name matching against compose-declared volume keys. mocker 0.5.4
+# joins <project>-<key> with a HYPHEN (live-verified: scratch project
+# `sepcheck` + key `checkvol` -> `sepcheck-checkvol`); docker compose joins
+# with `_`. Both joiners are matched exactly; a name-prefix scan is never
+# used because it would also match a sibling project (`p` vs `p-ha`).
+# --------------------------------------------------------------------------
+
+
+def _spec_with_volume_keys(tmp_path: Path, keys: tuple[str, ...]) -> docker_assets.DockerPlatformSpec:
+    compose = tmp_path / "docker-compose.yml"
+    volume_lines = "\n".join(f"  {key}:" for key in keys)
+    compose.write_text(f"services:\n  s:\n    image: alpine:3.19\nvolumes:\n{volume_lines}\n", encoding="utf-8")
+    return docker_assets.DockerPlatformSpec(platform="scratch", compose_files=(compose,))
+
+
+def test_compose_declared_volume_names_reads_real_platform_spec():
+    spec = docker_assets.docker_platform_spec("postgresql")
+    assert docker_assets.compose_declared_volume_names(spec) == ("postgresql18-data",)
+    assert "benchbox-uat-manual-postgresql-postgresql18-data" in docker_assets.expected_mocker_volume_names(
+        "benchbox-uat-manual-postgresql", spec
+    )
+
+
+def test_sweep_leaked_mocker_volumes_removes_exact_declared_names_only(tmp_path, monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    spec = _spec_with_volume_keys(tmp_path, ("pgdata", "other"))
+    calls: list[tuple[str, ...]] = []
+
+    def fake_runner(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        calls.append(argv_tuple)
+        if argv_tuple == ("mocker", "volume", "ls"):
+            return docker_assets.DockerCommandResult(
+                argv_tuple,
+                0,
+                "DRIVER   VOLUME NAME\n"
+                "local    p-pgdata\n"  # mocker joiner
+                "local    p_other\n"  # docker-compose joiner (future-proofing)
+                "local    unrelated-project_data\n",
+                "",
+            )
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    try:
+        removed = docker_assets.sweep_leaked_mocker_volumes("p", spec, runner=fake_runner)
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+    assert set(removed) == {"p-pgdata", "p_other"}
+    rm_calls = [c for c in calls if c[:3] == ("mocker", "volume", "rm")]
+    assert ("mocker", "volume", "rm", "p-pgdata") in rm_calls
+    assert ("mocker", "volume", "rm", "p_other") in rm_calls
+    assert not any("unrelated-project_data" in c for c in rm_calls)
+
+
+def test_sweep_leaked_mocker_volumes_never_touches_hyphen_sibling_project(tmp_path, monkeypatch):
+    """REQUIRED-2 regression: a sweep of project `p` must NOT match volumes
+    of sibling project `p-ha` -- under mocker's `-` joiner, `p-ha-data` and
+    `p-ha_data` both start with `p-`, so any prefix scan would delete a
+    sibling's data. Exact compose-declared-name matching cannot."""
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    spec = _spec_with_volume_keys(tmp_path, ("data",))
+    calls: list[tuple[str, ...]] = []
+
+    def fake_runner(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        calls.append(argv_tuple)
+        if argv_tuple == ("mocker", "volume", "ls"):
+            return docker_assets.DockerCommandResult(
+                argv_tuple,
+                0,
+                "DRIVER   VOLUME NAME\n"
+                "local    p-data\n"  # project p's own volume
+                "local    p-ha_data\n"  # sibling project p-ha (docker joiner)
+                "local    p-ha-data\n",  # sibling project p-ha (mocker joiner)
+                "",
+            )
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    try:
+        removed = docker_assets.sweep_leaked_mocker_volumes("p", spec, runner=fake_runner)
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+    assert removed == ("p-data",)
+    rm_calls = [c for c in calls if c[:3] == ("mocker", "volume", "rm")]
+    assert rm_calls == [("mocker", "volume", "rm", "p-data")]
+    assert not any("p-ha" in " ".join(c) for c in rm_calls)
+
+
+def test_sweep_leaked_mocker_volumes_is_noop_on_docker_engine(tmp_path, monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "docker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/usr/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    spec = _spec_with_volume_keys(tmp_path, ("pgdata",))
+    calls: list[tuple[str, ...]] = []
+
+    def fake_runner(argv, **kwargs):
+        calls.append(tuple(argv))
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    try:
+        removed = docker_assets.sweep_leaked_mocker_volumes("benchbox-uat-smoke-postgresql", spec, runner=fake_runner)
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+    assert removed == ()
+    assert calls == []  # docker already removes named volumes on `down -v`; no probe needed
+
+
+def test_sweep_leaked_mocker_volumes_is_noop_on_dry_run(tmp_path, monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    spec = _spec_with_volume_keys(tmp_path, ("pgdata",))
+    calls: list[tuple[str, ...]] = []
+
+    def fake_runner(argv, **kwargs):
+        calls.append(tuple(argv))
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "", dry_run=True)
+
+    try:
+        removed = docker_assets.sweep_leaked_mocker_volumes(
+            "benchbox-uat-smoke-postgresql", spec, runner=fake_runner, dry_run=True
+        )
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+    assert removed == ()
+    assert calls == []
+
+
+def test_sweep_leaked_mocker_volumes_swallows_individual_removal_failure(tmp_path, monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    spec = _spec_with_volume_keys(tmp_path, ("pgdata", "cache"))
+
+    def fake_runner(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        if argv_tuple == ("mocker", "volume", "ls"):
+            return docker_assets.DockerCommandResult(
+                argv_tuple, 0, "local    benchbox-uat-demo-pgdata\nlocal    benchbox-uat-demo-cache\n", ""
+            )
+        if argv_tuple == ("mocker", "volume", "rm", "benchbox-uat-demo-pgdata"):
+            return docker_assets.DockerCommandResult(argv_tuple, 1, "", "boom", error="stale reference")
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    try:
+        removed = docker_assets.sweep_leaked_mocker_volumes("benchbox-uat-demo", spec, runner=fake_runner)
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+    # One volume's rm failure does not abort the rest of the sweep.
+    assert removed == ("benchbox-uat-demo-cache",)

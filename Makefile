@@ -454,13 +454,17 @@ COMPOSE := $(CONTAINER_ENGINE) compose
 
 # `compose down -v` extended to also remove leaked named volumes on a SUCCESSFUL
 # down. mocker 0.5.4's `compose down -v` removes containers but LEAKS named
-# volumes (a stale-data risk across runs); this prunes any volume with the
-# project prefix afterward. A no-op beyond `down -v` on docker (which already
-# removes them). Scoped to the project so it never touches unrelated volumes.
-# Grepping the project-prefixed name directly avoids assuming `volume ls` emits a
-# header or a fixed column layout. $(1)=project $(2)=compose file.
+# volumes (a stale-data risk across runs); this removes the project's volumes
+# afterward. A no-op beyond `down -v` on docker (which already removes them).
+# EXACT-NAME matching: volume keys are read from the compose file's top-level
+# `volumes:` block and joined as <project>-<key> (mocker's live-verified
+# joiner) and <project>_<key> (docker compose's, future-proofing). A
+# name-prefix grep here would also match a sibling project whose name extends
+# this one (`p` vs `p-ha`) and delete its data -- same fix as
+# tests/uat/docker_assets.py sweep_leaked_mocker_volumes.
+# $(1)=project $(2)=compose file.
 define compose_down_fresh
-$(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then mocker volume ls 2>/dev/null | grep -oE "$(1)[-_][A-Za-z0-9._-]+" | while read -r _v; do mocker volume rm "$$_v" >/dev/null 2>&1 || true; done; fi
+$(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then awk '/^volumes:/{f=1;next} f&&/^[^ ]/{f=0} f&&/^  [A-Za-z0-9._-]+:/{k=$$1;sub(/:.*/,"",k);print k}' "$(2)" 2>/dev/null | while read -r _k; do mocker volume rm "$(1)-$$_k" >/dev/null 2>&1 || true; mocker volume rm "$(1)"_"$$_k" >/dev/null 2>&1 || true; done; fi
 endef
 
 test-docker-up-%:

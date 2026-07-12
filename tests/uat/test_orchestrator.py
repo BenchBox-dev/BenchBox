@@ -905,6 +905,51 @@ def _source_info() -> orchestrator.RunSourceInfo:
     return orchestrator.RunSourceInfo(commit_sha="deadbeef", commit_short_sha="deadbee", dirty=False)
 
 
+def test_sweep_records_container_engine_identity_and_sidecar_field(tmp_path: Path):
+    """uat-container-engine-routing w2: engine identity is logged at sweep
+    start and threaded into the cells.jsonl accounting sidecar."""
+    cfg = validate_config(
+        {
+            "name": "engine-identity",
+            "phases": ["execute"],
+            "platforms": {"include": []},
+        }
+    )
+    with patch.object(docker_assets, "container_engine_identity", return_value=("mocker", "mocker 0.5.4")):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.aborted_phase is None
+    lifecycle_log = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
+    assert "[engine] resolved_container_cli=mocker version=mocker 0.5.4" in lifecycle_log
+
+    sidecar = json.loads((tmp_path / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert sidecar["container_engine"] == "mocker"
+
+
+def test_sweep_records_engine_resolution_failure_without_aborting(tmp_path: Path):
+    """A resolution failure (no engine binary at all) is logged, not fatal --
+    a sweep with no Docker-managed platforms never needs one."""
+    cfg = validate_config(
+        {
+            "name": "engine-identity-missing",
+            "phases": ["execute"],
+            "platforms": {"include": []},
+        }
+    )
+    with patch.object(
+        docker_assets,
+        "container_engine_identity",
+        side_effect=docker_assets.DockerAssetError("no engine on PATH"),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.aborted_phase is None
+    lifecycle_log = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
+    assert "[engine] resolution failed: no engine on PATH" in lifecycle_log
+    sidecar = json.loads((tmp_path / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert sidecar["container_engine"] is None
+
+
 def test_write_cells_jsonl_persists_skipped_unreachable_sidecar(tmp_path: Path):
     cells_jsonl = tmp_path / "cells.jsonl"
     cells_io.write_cells_jsonl(
@@ -1135,6 +1180,7 @@ def test_update_accounting_sidecar_preserves_existing_counts(tmp_path: Path):
         "skipped_unreachable_count": 3,
         "startup_failed_count": 2,
         "disk_gate_disabled": False,
+        "container_engine": None,
         "explorer_smoke_status": "skipped_no_node",
     }
 

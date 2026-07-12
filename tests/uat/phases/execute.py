@@ -490,6 +490,38 @@ def _run_docker_teardown(
         message=_docker_result_message(down_result),
         result=down_result,
     )
+    # mocker 0.5.4's `compose down -v` leaks named volumes (live-validated in
+    # uat-container-engine-routing w0); sweep them project-scoped, mirroring
+    # the Makefile's compose_down_fresh macro (Makefile:452-463). Only when
+    # `-v` was actually requested (cleanup_mode volumes/images) -- a
+    # `containers`-mode teardown intentionally keeps volumes for reuse, and
+    # sweeping them here would defeat that. Best-effort regardless of
+    # `down_result` (matches the Makefile's `;` sequencing, not `&&`): a
+    # stack whose `down` itself failed can still have created volumes worth
+    # sweeping.
+    if (
+        config.cleanup.docker_platform_switch in {"volumes", "images"}
+        and docker_assets.resolve_container_cli() == "mocker"
+    ):
+        removed_volumes = docker_assets.sweep_leaked_mocker_volumes(
+            docker_state.project_name,
+            docker_state.spec,
+            runner=docker_runner,
+            dry_run=config.dry_run,
+        )
+        _record_docker_event(
+            docker_events,
+            log_dir=log_dir,
+            platform=platform,
+            action="volume-sweep",
+            status="ok",
+            project_name=docker_state.project_name,
+            message=(
+                f"removed {len(removed_volumes)} leaked mocker named volume(s): {', '.join(removed_volumes)}"
+                if removed_volumes
+                else "no leaked mocker named volumes found"
+            ),
+        )
     if down_result.succeeded:
         return cleanup_status, None
     return (
@@ -781,7 +813,7 @@ def _free_space_abort_reason(
     if not enabled or min_gib <= 0:
         return None
     free_gib = reader(path)
-    _append_lifecycle_log(
+    append_lifecycle_log(
         log_dir,
         f"[free-space] {context}: {free_gib:.2f} GiB free at {path} "
         f"(threshold {min_gib:.2f} GiB, docker_cleanup_status={docker_cleanup_status})",
@@ -819,7 +851,7 @@ def _record_docker_event(
     )
     events.append(event)
     command = f" command={result.command}" if result is not None else ""
-    _append_lifecycle_log(
+    append_lifecycle_log(
         log_dir,
         f"[docker] platform={platform} action={action} status={status} project={project_name}"
         f"{command} message={message}",
@@ -837,7 +869,8 @@ def _docker_result_message(result: docker_assets.DockerCommandResult) -> str:
     return detail
 
 
-def _append_lifecycle_log(log_dir: Path | None, line: str) -> None:
+def append_lifecycle_log(log_dir: Path | None, line: str) -> None:
+    """Append a timestamped line to uat_lifecycle.log. Public: also called from orchestrator.py (sweep-start engine identity, uat-container-engine-routing w2)."""
     if log_dir is None:
         return
     log_dir.mkdir(parents=True, exist_ok=True)

@@ -60,6 +60,7 @@ def write_cells_jsonl(
     skipped_unreachable_count: int = 0,
     startup_failed_count: int = 0,
     disk_gate_disabled: bool = False,
+    container_engine: str | None = None,
 ) -> None:
     """Write the durable per-cell result stream plus its accounting sidecar."""
     lines: list[str] = []
@@ -103,6 +104,11 @@ def write_cells_jsonl(
                 # uat-fail-advance-consistency w3.
                 "startup_failed_count": int(startup_failed_count),
                 "disk_gate_disabled": bool(disk_gate_disabled),
+                # Resolved engine binary (docker/mocker/...) at sweep start --
+                # additive field, None on older artifacts and on sweeps whose
+                # engine resolution failed. See uat-container-engine-routing
+                # w2.
+                "container_engine": container_engine,
             }
         )
         + "\n"

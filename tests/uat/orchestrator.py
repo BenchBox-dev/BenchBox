@@ -20,7 +20,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from tests.uat import cells_io, preflight_budget
+from tests.uat import cells_io, docker_assets, preflight_budget
 from tests.uat.config import UATConfig, disk_gate_disabled_warning, load_config
 from tests.uat.phases import (
     execute as exec_phase,
@@ -122,6 +122,25 @@ def _build_disk_floor_runner(
     return runner
 
 
+def _record_container_engine_identity(log_dir: Path) -> str | None:
+    """Resolve + record the container engine identity at sweep start (uat-container-engine-routing w2).
+
+    Best-effort: a resolution failure (no compose-capable binary on PATH at
+    all) does not abort the sweep here -- a config with no Docker-managed
+    platforms never needs one, and one that does will fail loudly at its own
+    compose-up step with a clear DockerAssetError. Returns the resolved
+    binary name (for the accounting sidecar), or None when resolution
+    failed.
+    """
+    try:
+        binary, version = docker_assets.container_engine_identity()
+    except docker_assets.DockerAssetError as exc:
+        exec_phase.append_lifecycle_log(log_dir, f"[engine] resolution failed: {exc}")
+        return None
+    exec_phase.append_lifecycle_log(log_dir, f"[engine] resolved_container_cli={binary} version={version}")
+    return binary
+
+
 def run_sweep(  # noqa: C901
     config: UATConfig,
     *,
@@ -133,6 +152,7 @@ def run_sweep(  # noqa: C901
     log_dir = log_dir_override or exec_phase.default_log_dir(config, now=now)
     benchmark_runs_dir = exec_phase.default_benchmark_runs_dir(config, now=now)
     log_dir.mkdir(parents=True, exist_ok=True)
+    container_engine = _record_container_engine_identity(log_dir)
 
     if databases_root is None:
         databases_root = benchmark_runs_dir / "databases"
@@ -182,6 +202,7 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
+                    container_engine=container_engine,
                 )
                 break
         elif phase == "execute":
@@ -242,6 +263,7 @@ def run_sweep(  # noqa: C901
                     # abort report would under-count total_defined.
                     skipped_unreachable_count=getattr(exc, "skipped_unreachable_count", 0),
                     startup_failed_count=getattr(exc, "startup_failed_count", 0),
+                    container_engine=container_engine,
                 )
                 break
             cells_io.write_cells_jsonl(
@@ -251,6 +273,7 @@ def run_sweep(  # noqa: C901
                 skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
                 startup_failed_count=len(getattr(execute_outcome, "startup_failed", ())),
                 disk_gate_disabled=not config.disk_gate_enabled,
+                container_engine=container_engine,
             )
             _write_compatibility_pruned_jsonl(
                 compatibility_pruned_jsonl,
@@ -268,6 +291,7 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
+                    container_engine=container_engine,
                 )
                 break
             phase_exit_codes[phase] = execute_outcome.exit_code()
@@ -286,6 +310,7 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
+                    container_engine=container_engine,
                 )
                 break
             result_paths = [r.result_path for r in execute_outcome.results if r.result_path]
@@ -308,6 +333,7 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
+                    container_engine=container_engine,
                 )
                 break
         elif phase == "package":
@@ -325,6 +351,7 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
+                    container_engine=container_engine,
                 )
                 break
             # Only passed cells are submission-ready. A failed official cell
@@ -354,6 +381,7 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
+                    container_engine=container_engine,
                 )
                 break
         elif phase == "explorer_smoke":
@@ -403,6 +431,7 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
+                    container_engine=container_engine,
                 )
                 break
         elif phase == "report":
@@ -425,6 +454,7 @@ def run_sweep(  # noqa: C901
                     source_info=source_info,
                     aborted_phase=phase,
                     abort_reason=abort_reason,
+                    container_engine=container_engine,
                 )
                 break
             tsv_path = log_dir / config.report.matrix_summary_tsv
@@ -478,6 +508,7 @@ def _emit_abort_artifacts(
     abort_reason: str | None,
     skipped_unreachable_count: int | None = None,
     startup_failed_count: int | None = None,
+    container_engine: str | None = None,
 ) -> None:
     cells = tuple(getattr(execute_outcome, "results", ())) if execute_outcome is not None else tuple(attempted)
     compatibility_pruned = (
@@ -504,6 +535,7 @@ def _emit_abort_artifacts(
         skipped_unreachable_count=skipped_unreachable_count,
         startup_failed_count=startup_failed_count,
         disk_gate_disabled=not config.disk_gate_enabled,
+        container_engine=container_engine,
     )
     _write_compatibility_pruned_jsonl(log_dir / "compatibility_pruned.jsonl", compatibility_pruned)
     report_phase.write_report(
