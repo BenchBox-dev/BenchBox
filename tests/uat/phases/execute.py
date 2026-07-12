@@ -808,6 +808,12 @@ def default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
     render unchanged: `str.replace` is a no-op when the placeholder is
     absent, so existing explicit `logs_dir_template` values keep working
     verbatim.
+
+    HHMMSS alone still collides when two sweeps using a {time} template
+    start in the same second (e.g. automation kicking off multiple configs
+    at once); since the log dir is now the durable record (no resume
+    machinery to merge into it), a resolved path that already exists gets a
+    numeric suffix appended until it names a fresh directory.
     """
     now = now or _dt.datetime.now()
     template = config.output.logs_dir_template
@@ -816,7 +822,13 @@ def default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
         .replace("{time}", now.strftime("%H%M%S"))
         .replace("{name}", config.name)
     )
-    return Path(rendered).expanduser()
+    path = Path(rendered).expanduser()
+    if "{time}" in template:
+        suffix = 2
+        while path.exists():
+            path = path.with_name(f"{path.name}-{suffix}")
+            suffix += 1
+    return path
 
 
 def default_benchmark_runs_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:

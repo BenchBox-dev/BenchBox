@@ -1064,6 +1064,28 @@ def test_default_log_dir_time_avoids_same_day_collision():
     assert first != second
 
 
+def test_default_log_dir_same_second_collision_gets_disambiguated(tmp_path: Path):
+    """#1143 review: {time} truncates to HHMMSS, so two sweeps starting in the
+    same second (e.g. automation kicking off multiple configs at once)
+    resolved to the same directory pre-fix, silently combining/overwriting
+    durable artifacts. A path that already exists on disk now gets a
+    numeric suffix instead.
+    """
+    cfg = validate_config(
+        {
+            "name": "collision-smoke",
+            "output": {"logs_dir_template": str(tmp_path / "uat_{date}_{time}")},
+        }
+    )
+    now = _dt.datetime(2026, 5, 5, 9, 0, 0)
+    first = exec_phase.default_log_dir(cfg, now=now)
+    first.mkdir(parents=True)
+    second = exec_phase.default_log_dir(cfg, now=now)
+
+    assert first != second
+    assert second.name == f"{first.name}-2"
+
+
 def test_default_log_dir_explicit_date_only_template_still_works():
     """Existing configs with an explicit {date}-only template keep working verbatim."""
     cfg = validate_config(
