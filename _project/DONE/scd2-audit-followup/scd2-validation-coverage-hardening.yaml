@@ -2,7 +2,8 @@ id: "scd2-validation-coverage-hardening"
 title: "Close SCD2 validation coverage holes (no-op passes, missing bounds, unscoped checks)"
 worktree: "scd2-audit-followup"
 priority: "Medium-High"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-11"
 category: "Testing and Quality Assurance"
 description: |
   SCD2 adversarial audit findings N2, N3, N5, N11. The three SCD2 ops in
@@ -43,32 +44,38 @@ description: |
   over the change_type label), not dead code. Timings the blog cites are
   unaffected: validations are excluded from the reported write duration.
 impact:
-  business_value: "Makes the SCD2 'portable AND validated' claim real by ensuring the validations can actually catch a broken op."
+  business_value: "Makes the SCD2 'portable AND validated' claim real by ensuring the validations can actually catch a broken
+    op."
   user_impact: "A no-op or partial SCD2 implementation on a new engine would be caught rather than reported passing."
   technical_debt: "Removes the false 'collective exactly-one guarantee' premise recorded in a prior Completed TODO."
 prior_art:
 - "benchbox/core/write_primitives/catalog/operations.yaml:105-107 the three SCD2 ops and their validation_queries"
-- "benchbox/core/write_primitives/benchmark.py:133-151 _check_validation_query (expected_rows / expected_rows_min-max / expected_value_min-max modes) - reuse the unused range modes"
+- "benchbox/core/write_primitives/benchmark.py:133-151 _check_validation_query (expected_rows / expected_rows_min-max / expected_value_min-max
+  modes) - reuse the unused range modes"
 - "operations.yaml merge_scd_type2_no_change no_rows_closed_by_batch - reuse its effective_ts scoping pattern for N5"
-- "operations.yaml merge_scd_type2_basic every_changed_key_has_current_staged_version - reuse this positive anti-join shape for N2"
-- "_project/DONE/write-primitives-scd2-followup/scd2-validation-soundness-hardening.yaml - the Completed TODO whose central premise N2 falsifies"
+- "operations.yaml merge_scd_type2_basic every_changed_key_has_current_staged_version - reuse this positive anti-join shape
+  for N2"
+- "_project/DONE/write-primitives-scd2-followup/scd2-validation-soundness-hardening.yaml - the Completed TODO whose central
+  premise N2 falsifies"
 
 work:
 - id: w0
   summary: "Re-confirm per-op which SCD2 ops lack a positive existence check; record that no_change has none."
-  status: pending
+  status: done
   notes: |
     scratchpad repro3.py classified each validation positive/negative:
     basic has 3 positive companions, new_keys_only has 1, no_change has 0.
     Reopen scd2-validation-soundness-hardening's premise in the PR body.
 - id: w1
-  summary: "N2: add every_unchanged_key_has_current_version_with_matching_hash to no_change (anti-join stage->dim on is_current AND row_hash = s.row_hash, expected 0)."
+  summary: "N2: add every_unchanged_key_has_current_version_with_matching_hash to no_change (anti-join stage->dim on is_current
+    AND row_hash = s.row_hash, expected 0)."
   needs: [w0]
-  status: pending
+  status: done
 - id: w2
-  summary: "N3: add dimension-cardinality bounds per op via expected_value_min/max (SELECT COUNT(*)): basic=seed+40, no_change=seed, new_keys_only=seed+20."
+  summary: "N3: add dimension-cardinality bounds per op via expected_value_min/max (SELECT COUNT(*)): basic=seed+40, no_change=seed,
+    new_keys_only=seed+20."
   needs: [w0]
-  status: pending
+  status: done
   notes: |
     Use a scale-independent form: bound the DELTA against the seed count rather
     than an absolute SF-specific number, or assert the exact post-op total via a
@@ -76,15 +83,16 @@ work:
 - id: w3
   summary: "N5: scope new_keys_only.no_rows_closed to the batch (valid_to IN (SELECT effective_ts ... WHERE change_type='new'))."
   needs: [w0]
-  status: pending
+  status: done
 - id: w4
   summary: "N11: change every_changed_key_closed_with_stamp to test d.valid_to = s.effective_ts instead of < DATE '9999-12-31'."
   needs: [w0]
-  status: pending
+  status: done
 - id: w5
-  summary: "Tests: each reproduced broken state now fails validation (zero-current keys; 50 junk current rows; no-op no_change against a dimension missing its keys)."
+  summary: "Tests: each reproduced broken state now fails validation (zero-current keys; 50 junk current rows; no-op no_change
+    against a dimension missing its keys)."
   needs: [w1, w2, w3, w4]
-  status: pending
+  status: done
 
 must_preserve:
 - "The happy-path SCD2 run stays green on DuckDB and PostgreSQL (0 rows deviating from the pristine seed)."
@@ -102,13 +110,16 @@ approach: |
   batch stamp. Land after the gating TODO so failures are observable.
 
 anti_patterns:
-- "DO NOT touch no_change's write_sql - because its change_type-vs-row_hash UPDATE is a verified correct live path - only add/adjust validation_queries."
+- "DO NOT touch no_change's write_sql - because its change_type-vs-row_hash UPDATE is a verified correct live path - only
+  add/adjust validation_queries."
 - "DO NOT hardcode SF-specific counts - because the ops run at any scale - bound the delta against the seed count."
-- "DO NOT rely on run ordering for correctness - because the audit showed unscoped checks (N5) only pass against a pristine seed - scope each check to its own batch."
+- "DO NOT rely on run ordering for correctness - because the audit showed unscoped checks (N5) only pass against a pristine
+  seed - scope each check to its own batch."
 
 verification:
 - description: "SCD2 unit + DuckDB integration green (single-threaded)."
-  command: "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q"
+  command: "uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py tests/integration/test_write_primitives_duckdb.py
+    -k scd2 -n 0 -q"
   expected_output: "all pass, including the new broken-state regression tests"
 - description: "no-op no_change against a dimension missing its 'unchanged' keys now FAILS validation."
   command: "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -n 0 -q -k no_change_noop"

@@ -1149,6 +1149,38 @@ class TestWritePrimitivesSCD2DuckDB:
         assert result.status == "VALIDATION_FAILED"
         assert result.error and "at_most_one_current_per_business_key" in result.error
 
+    def test_no_change_noop_against_missing_keys_fails_validation(self, scd2_env):
+        """N2: a no-op no_change against a dimension missing its unchanged keys
+        must fail, not pass vacuously.
+
+        Before the positive companion check, all three no_change validations were
+        zero-row 'offending' queries, so deleting the unchanged keys and doing
+        nothing passed them all. every_unchanged_key_has_current_version_matching_hash
+        now catches it.
+        """
+        write_bench, conn = scd2_env
+        # Remove the current versions of the 'unchanged' business keys (21-40).
+        conn.execute("DELETE FROM scd2_ops_dim_customer WHERE c_custkey BETWEEN 21 AND 40")
+        result = write_bench.execute_operation("merge_scd_type2_no_change", conn)
+        assert result.validation_passed is False
+        assert result.status == "VALIDATION_FAILED"
+        assert result.error and "every_unchanged_key_has_current_version_matching_hash" in result.error
+
+    def test_basic_wrong_insert_count_fails_cardinality_bound(self, scd2_env):
+        """N3: if basic inserts fewer new versions than the batch requires, the
+        cardinality bound fails even though every offending-row check passes.
+
+        Dropping the 'new' staging rows leaves only the 20 changed-key inserts, so
+        basic inserts 20 new versions instead of 40; basic_inserts_expected_new_version_count
+        (bounded to exactly 40) catches the shortfall.
+        """
+        write_bench, conn = scd2_env
+        conn.execute("DELETE FROM scd2_ops_stage_customer WHERE change_type = 'new'")
+        result = write_bench.execute_operation("merge_scd_type2_basic", conn)
+        assert result.validation_passed is False
+        assert result.status == "VALIDATION_FAILED"
+        assert result.error and "basic_inserts_expected_new_version_count" in result.error
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
