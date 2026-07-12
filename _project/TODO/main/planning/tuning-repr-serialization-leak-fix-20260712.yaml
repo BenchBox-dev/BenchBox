@@ -1,0 +1,64 @@
+id: tuning-repr-serialization-leak-fix-20260712
+title: "Stop publishing Python repr() strings in bundle raw_config; make serialization fallbacks loud"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07-12 tuning review, finding R9/C2-adjacent (evidence pinned to
+  commit acfb8992).
+
+  sanitize_platform_options (benchbox/core/results/platform_options.py:68-80) is
+  used for platform.raw_config (platforms/base/runtime_metadata.py:105) but does
+  NOT filter _INTERNAL_OPTION_KEYS (only _iter_public_options does), and
+  _sanitize_option_value falls back to str(value) (platform_options.py:138). Net
+  effect: UnifiedTuningConfiguration objects are published as ~900-char Python
+  repr() strings at platform.raw_config.tuning_config - 468 of 528 seed-corpus
+  bundles carry one, and the explorer's tuning hash ends up hashing repr text.
+
+work:
+  - id: w1
+    summary: "Exclude internal option keys from raw_config capture (align sanitize_platform_options call sites with _iter_public_options filtering, or filter at the runtime_metadata call site)"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Replace the str() fallback for non-JSON-able values on exported paths: use to_dict() when available, else drop the key with a captured warning marker"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Tests: a config object placed in options never serializes as a repr string in any exported payload; warning marker asserted for unknown objects"
+    status: pending
+    needs: [w2]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Secret redaction behavior (REDACTED_VALUE) exactly as-is"
+  - "Bundle emission must never raise because an option value is unserializable"
+
+anti_patterns:
+  - "Do not silently drop values with no trace - leave an explicit '<unserializable:TypeName>' marker so capture gaps stay visible"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/results/platform_options.py"
+    - "benchbox/platforms/base/runtime_metadata.py"
+    - "tests/unit/**"
+
+verification:
+  - description: "Sweep script over a fresh local run shows no repr strings"
+    command: "uv run -- python -m pytest tests/unit/core/results -q -k 'platform_options or raw_config'"
+    expected_output: "All passing incl. new no-repr assertions"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - serialization
+    - results-schema
+  estimated_effort: Small
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, finding R9"

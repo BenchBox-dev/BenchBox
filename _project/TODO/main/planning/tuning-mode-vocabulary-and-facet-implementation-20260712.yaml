@@ -1,0 +1,88 @@
+id: tuning-mode-vocabulary-and-facet-implementation-20260712
+title: "Implement decided mode vocabulary, fallback labeling, and facet/receipt semantics end-to-end"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07-12 tuning review, findings C4/C6 (rule side) and product
+  questions 3-4 (evidence pinned to commit acfb8992). GATED on ADR-2
+  (tuning-adr-mode-vocabulary-fallback-facets-20260712).
+
+  Implements whatever ADR-2 decides across the whole pipeline:
+  - resolver/runner: distinct mode/source for template-less tuned runs; wizard
+    provenance assigned; --official policy; raw file paths replaced by a
+    canonical mode + template ref (no local path leakage via
+    config.tuning_mode - run.py:311, schema.py:854);
+  - schema/loader: pinned vocabulary enforced at emission;
+  - explorer: facet rule per ADR-2 (mechanism-set warning in
+    ComparabilityReceipt, physical_rendering_id as secondary facet for TPC,
+    profile-version visibility), TuningBadge entries for any new mode values,
+    self-attested labeling per ADR-1 if decided;
+  - external-mode guard completeness: reject external+tuning for custom-file
+    mode too, not just the literal string "tuned" (run.py:617,2302).
+
+work:
+  - id: w1
+    summary: "Resolver/runner: implement decided fallback labeling + provenance assignment + official-mode policy; kill raw-path mode values"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Schema + loader: enforce pinned vocabulary; emit new mode/source values; migration note for old bundles"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Explorer: facet rule, receipt mechanism warning, badge entries, self-attested label per ADRs"
+    status: pending
+    needs: [w2]
+  - id: w4
+    summary: "Complete the external-table guard for all tuning-bearing modes"
+    status: pending
+    needs: [w1]
+  - id: w5
+    summary: "Cross-language vocabulary tests updated against the shared pin"
+    status: pending
+    needs: [w2, w3]
+
+deps:
+  needs:
+    - tuning-adr-mode-vocabulary-fallback-facets-20260712
+    - tuning-explorer-ingest-mode-extraction-20260712
+
+must_preserve:
+  - "Old-generation bundles keep loading and displaying (not-recorded state)"
+  - "Existing facet behavior for non-tuning facets untouched"
+
+anti_patterns:
+  - "No facet rule changes beyond what ADR-2 records"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/**"
+    - "benchbox/core/results/**"
+    - "benchbox/core/schemas.py"
+    - "_project/scripts/explorer_pipeline/**"
+    - "results-explorer/src/**"
+    - "docs/**"
+    - "tests/**"
+
+verification:
+  - description: "Fallback run end-to-end carries the decided distinct labeling into bundle and explorer"
+    command: "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark ssb --scale 0.01 --tuning tuned --non-interactive --output /tmp/fallback-check"
+    expected_output: "Bundle mode/source reflect fallback per ADR-2 (ssb has no duckdb template only if removed; else use a templateless platform/benchmark pair from w1 analysis)"
+  - description: "Python + TS suites green against shared vocabulary pin"
+    command: "uv run -- python -m pytest tests/unit -q -k tuning && cd results-explorer && npm test -- --run 2>&1 | tail -3"
+    expected_output: "All passing"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - explorer
+    - comparability
+    - vocabulary
+  estimated_effort: Large
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, findings C4/C6"

@@ -1,0 +1,68 @@
+id: tuning-generator-registry-completeness-20260712
+title: "Register orphaned DDL generators and make NoOp fallback loud + tested"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07-12 tuning review, finding R2 (evidence pinned to commit acfb8992).
+
+  benchbox/core/tuning/generators/ ships questdb.py, pg_duckdb.py, pg_mooncake.py
+  (exported in generators/__init__.py, each with dedicated unit tests) but
+  get_ddl_generator's mapping (benchbox/core/tuning/ddl_generator.py:653-681)
+  has no entries for them; unknown platforms silently receive NoOpDDLGenerator
+  (line 689). StarRocks has no generator at all. Consumers today: dry-run
+  preview (core/dryrun.py:1066-1101) and cloud_spark mixins - so the symptom is
+  a silently-empty tuning preview on platforms whose generators exist and pass
+  tests.
+
+work:
+  - id: w1
+    summary: "Register questdb, pg_duckdb, pg_mooncake in the get_ddl_generator mapping"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Log a warning when NoOpDDLGenerator is returned for a platform the CLI registry knows (silent fallback only for genuinely tuning-free platforms like sqlite)"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Add registry-completeness unit test: every module in core/tuning/generators/ exporting a BaseDDLGenerator subclass must be reachable via get_ddl_generator under at least one platform key"
+    status: pending
+    needs: [w1]
+
+deferred:
+  - summary: "A StarRocks DDL generator"
+    reason: "Renderer direction is gated on ADR-3; writing a new generator before the consolidation decision risks throwaway work"
+
+deps:
+  needs: []
+
+must_preserve:
+  - "NoOp fallback behavior for genuinely unsupported platforms (no exceptions from get_ddl_generator)"
+
+anti_patterns:
+  - "Do not raise for unknown platforms - dry-run must keep working everywhere"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tuning/ddl_generator.py"
+    - "tests/unit/core/tuning/**"
+
+verification:
+  - description: "Registry test enforces completeness"
+    command: "uv run -- python -m pytest tests/unit/core/tuning -q -k registry"
+    expected_output: "New completeness test passes; fails if a generator module is added without registration"
+  - description: "Existing generator tests stay green"
+    command: "uv run -- python -m pytest tests/unit/core/tuning -q"
+    expected_output: "All passing"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - ddl-generators
+  estimated_effort: Small
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, finding R2"

@@ -1,0 +1,114 @@
+id: tuning-applied-ledger-and-validation-status-20260712
+title: "Applied-tuning ledger: record what actually executed; honest validation_status; session-settings capture"
+worktree: main
+priority: Critical
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07-12 tuning review, findings C1, C5 (capture side), R6
+  (evidence pinned to commit acfb8992). GATED on ADR-1
+  (tuning-adr-trust-and-hash-semantics-20260712).
+
+  Today the bundle records intent as fact: tunings_applied is the requested
+  config's to_dict() and validation_status "APPLIED" certifies only that a
+  metadata-table INSERT succeeded (platforms/base/adapter.py:743-747). The base
+  apply_unified_tuning is a silent no-op (platforms/base/tuning_config.py:45-66).
+  Session-level SETs applied by configure_for_benchmark (ClickHouse OLAP pack,
+  StarRocks query settings) are captured nowhere. Rerun drift-detection is blind
+  to platform optimizations and unique/check constraints
+  (core/tuning/metadata.py:247-256) and never feeds published bundles;
+  FAILED_TO_SAVE surfaces for benign read-only/in-memory conditions.
+
+  Build, per ADR-1's decided semantics:
+  - an applied-statement ledger: every tuning-relevant statement the adapter
+    actually executes (DDL clauses, post-load statements, session SETs) appended
+    during execution and exported alongside the requested config;
+  - the applied-ledger hash (per ADR-1);
+  - honest validation_status semantics (e.g. applied_verified /
+    applied_unverified / noop / failed) replacing the metadata-write proxy, with
+    FAILED_TO_SAVE downgraded to a non-alarming metadata-persistence note;
+  - drift-validation results routed into the bundle where ADR-1 says they belong.
+
+work:
+  - id: w0
+    summary: "Re-validate pinned evidence at current HEAD after upstream TODOs merge (call sites move); note refs in PR"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Design the ledger data model + capture hooks (adapter records statements at execution time; base no-op records 'noop'); align with ADR-1 record"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Instrument the SQL adapters with real tuning paths (duckdb, clickhouse, starrocks, databricks, cloud_spark) plus session SETs from configure_for_benchmark in every mode including baseline"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Export ledger + applied hash into bundle/companion; implement new validation_status semantics; route drift-validation results per ADR-1"
+    status: pending
+    needs: [w1]
+  - id: w4
+    summary: "Surface dropped/unmapped tuning intents as run-time warnings (review finding R4)"
+    notes: "The ledger knows what was requested but not rendered (capability filtering, unregistered generator, log-only path); warn the author at run time and export the dropped list with reasons."
+    status: pending
+    needs: [w2, w3]
+  - id: w5
+    summary: "Tests: recording-connection harness asserts ledger matches executed statements"
+    notes: "Also: a deliberately no-op platform yields status noop, never applied; benign persistence failure does not surface as an alarming status."
+    status: pending
+    needs: [w2, w3]
+
+deferred:
+  - summary: "DataFrame runtime-tuning ledger parity (threads/memory/write-layout as applied observations, not just config blobs)"
+    reason: "Review finding N10; ledger shape must settle on SQL platforms first, then extend to the DF runner in a follow-up"
+
+deps:
+  needs:
+    - tuning-adr-trust-and-hash-semantics-20260712
+    - tuning-bundle-provenance-and-config-export-20260712
+
+must_preserve:
+  - "Requested-config export from tuning-bundle-provenance-and-config-export-20260712 (ledger is additive)"
+  - "Benchmark execution must never fail because ledger capture fails (capture degrades, run continues, degradation recorded)"
+
+approach: |
+  Thread a ledger object through the existing apply_* hook sequence rather than
+  re-architecting adapters; session SETs hook at the connection.execute wrapper
+  where one exists.
+
+anti_patterns:
+  - "No post-hoc reconstruction of the ledger from config - it must be produced by the execution path"
+  - "Do not repurpose the old APPLIED string with new semantics silently; new status vocabulary, documented mapping"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/**"
+    - "benchbox/core/tuning/**"
+    - "benchbox/core/results/**"
+    - "benchbox/base.py"
+    - "docs/**"
+    - "tests/**"
+
+verification:
+  - description: "End-to-end tuned duckdb run: bundle contains requested config, applied ledger with the actual CREATE INDEX statements, matching status"
+    command: "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/ledger-check"
+    expected_output: "Ledger lists executed statements; status reflects observation not intent"
+  - description: "Unit suites green"
+    command: "uv run -- python -m pytest tests/unit/core/tuning tests/unit/core/results tests/unit/platforms -q"
+    expected_output: "All passing"
+
+prior_art:
+  - "benchbox/core/results/schema.py .plans.json companion: existing per-run observation companion pattern — reuse for ledger export"
+  - "benchbox/core/tuning/metadata.py TuningMetadataManager: existing in-DB record of applied tunings — supersede as the bundle-facing record (keep for rerun drift detection)"
+  - "benchbox/platforms/clickhouse/tuning.py validate_session_cache_control: existing session-settings readback pattern — extend for capture"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - soundness
+    - applied-ledger
+  estimated_effort: Large
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, findings C1/C5/R6"

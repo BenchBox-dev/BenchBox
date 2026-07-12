@@ -1,0 +1,114 @@
+id: tuning-bundle-provenance-and-config-export-20260712
+title: "Export tuning provenance, requested config, and requested-config hash into bundles"
+worktree: main
+priority: Critical
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07-12 tuning review, findings C2/C3/C4 ungated parts (evidence
+  pinned to commit acfb8992). The evaluator-facing evidence chain is broken:
+
+  - tuning_config_hash and tuning_source_file are read from kwargs no call site
+    passes (benchbox/base.py:757-761; the adapter call at
+    platforms/base/adapter.py:851-881 omits both) -> bundle hash always absent,
+    source always "auto" (core/results/schema.py:1234). Corpus: 0/528 bundles
+    carry a hash.
+  - build_tuning_payload/_build_tuning_summary extract keys
+    (indexes/statistics/configuration) that UnifiedTuningConfiguration.to_dict()
+    never produces (schema.py:1250-1258, 1364-1374) -> clauses always empty and
+    the requested config is dropped at export entirely.
+  - TuningResolution provenance (mode/source enum/config file/searched paths) is
+    display-only (cli/tuning_resolver.py); TuningSource.INTERACTIVE_WIZARD is
+    never assigned.
+
+  Fix (decision-safe under ADR-1, which may later ADD an applied-side hash):
+  thread TuningResolution provenance into run_config -> result capture; export
+  the requested config canonically (to_dict) plus a clearly-named
+  requested-config hash; replace the dead clauses extraction with the real
+  config structure. Record source as the enum value, template as a repo-relative
+  ref or content hash - never a raw local path.
+
+work:
+  - id: w0
+    summary: "Re-validate pinned evidence at current HEAD (grep the kwarg call sites and clauses key extraction; note line refs in PR)"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Thread provenance (source enum, template ref, requested-config hash) into result capture kwargs"
+    notes: "From run.py through run_config into create_enhanced_benchmark_result kwargs; template ref repo-relative or hashed, never a raw local path; assign INTERACTIVE_WIZARD where the wizard produces the config."
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Rewrite build_tuning_payload/_build_tuning_summary to export the requested config's real structure"
+    notes: "Export constraints, platform_optimizations, table_tunings; drop the dead indexes/statistics/configuration extraction that never matches to_dict() keys."
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Schema/docs: document the new fields as REQUESTED (self-attested) values; bump/annotate bundle schema notes; loader round-trip support"
+    status: pending
+    needs: [w2]
+  - id: w4
+    summary: "Tests: bundle for a template run carries source=yaml + template ref + hash; fallback run carries source=fallback; hash is stable across dict ordering and distinct across differing configs"
+    status: pending
+    needs: [w2]
+
+deferred:
+  - summary: "Applied-side ledger, dual-hash, validation_status overhaul"
+    reason: "Gated on ADR-1; owned by tuning-applied-ledger-and-validation-status-20260712"
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Existing bundle schema keys remain readable by the explorer pipeline (additive change; no key renames)"
+  - "No raw local filesystem paths in exported bundles"
+
+approach: |
+  Name the new hash field explicitly (e.g. requested_config_hash) so ADR-1's
+  later applied-ledger hash can coexist without semantic collision. Reuse
+  BenchmarkTunings-style canonical JSON hashing (sort_keys, separators) but hash
+  the full UnifiedTuningConfiguration.to_dict().
+
+anti_patterns:
+  - "Do not reuse the ambiguous 'hash' key for the new value without qualifying its object"
+  - "Do not export repr() strings anywhere (see tuning-repr-serialization-leak-fix-20260712)"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/commands/run.py"
+    - "benchbox/cli/tuning_resolver.py"
+    - "benchbox/platforms/base/adapter.py"
+    - "benchbox/platforms/base/result_capture.py"
+    - "benchbox/base.py"
+    - "benchbox/core/results/schema.py"
+    - "benchbox/core/results/models.py"
+    - "benchbox/core/results/builder.py"
+    - "benchbox/core/results/loader.py"
+    - "benchbox/core/tuning/interface.py"
+    - "docs/**"
+    - "tests/unit/**"
+
+verification:
+  - description: "End-to-end: tuned duckdb run at SF 0.01 produces a bundle whose tuning block contains source enum, template ref, requested_config_hash, and the full requested config"
+    command: "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/tuning-export-check && uv run -- python -c \"import json,glob; b=json.load(open(sorted(glob.glob('/tmp/tuning-export-check/*.json'))[-1])); print(json.dumps(b['platform']['tuning'], indent=2))\""
+    expected_output: "tuning block with source, template ref/hash, requested_config_hash, and requested config structure"
+  - description: "Unit suites green"
+    command: "uv run -- python -m pytest tests/unit/core/results tests/unit/core/tuning tests/unit/cli/test_tuning* -q"
+    expected_output: "All passing"
+
+prior_art:
+  - "benchbox/core/results/schema.py build_plan_payload / .plans.json companion: existing companion-file + summary-block pattern — reuse for the tuning companion"
+  - "benchbox/core/tuning/interface.py get_configuration_hash: existing canonical-JSON hash recipe — extend to full unified config"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - soundness
+    - results-schema
+    - provenance
+  estimated_effort: Large
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, findings C2/C3/C4"

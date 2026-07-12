@@ -1,0 +1,75 @@
+id: tuning-adr-baseline-definition-and-renderer-20260712
+title: "DECISION GATE: what 'notuning' promises, and the single tuning-DDL renderer (ADR-3)"
+worktree: main
+priority: High
+status: Not Started
+category: Architecture Decision
+
+description: |
+  Decision gate from the 2026-07-12 tuning-system deep review (evidence pinned to
+  commit acfb8992; findings C5, R2, R3).
+
+  1. BASELINE DEFINITION. "notuning" is not a baseline today: ClickHouse applies
+     its aggressive OLAP session pack (grace-hash join, spill thresholds,
+     aggregation-in-order) ONLY when tuning is disabled
+     (benchbox/platforms/clickhouse/tuning.py:74-100); StarRocks injects
+     DISTRIBUTED BY HASH(first_col) BUCKETS 8 into every table in every mode
+     (benchbox/platforms/starrocks/workload.py:214-221). Decide what baseline
+     promises: platform defaults + engine-mandatory choices only? Where does the
+     ClickHouse pack live (tuned path, recorded harness-defaults block, or
+     removed)? This also settles the warn-vs-fail axis in the blocked
+     databricks-liquid-clustering-tuning-review-20260526 TODO.
+  2. SINGLE RENDERER. Tuning DDL is rendered by two parallel universes:
+     core/tuning/generators/* (used only by dry-run preview and cloud_spark
+     mixins) and per-adapter mixins (the only path touching real databases; some
+     are log-only or dead code - ClickHouse generate_tuning_clause has zero
+     callers). Decide the survivor: adapters consume generators (recommended - the
+     only design dry-run, execution, and a capability registry can share), or
+     generators fold into mixins.
+
+work:
+  - id: w1
+    summary: "Draft ADR: baseline definition options + session-pack relocation options; renderer consolidation options with migration cost sketch per platform"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Joe decides; record decisions; annotate databricks-liquid TODO open_questions with the settled policy axis"
+    status: pending
+    needs: [w1]
+
+deferred:
+  - summary: "Renderer migration and baseline enforcement"
+    reason: "Owned by tuning-renderer-consolidation-and-baseline-policy-20260712"
+
+deps:
+  needs: []
+
+verification:
+  - description: "Decision record exists defining baseline semantics and naming the surviving renderer"
+    command: "ls docs/development/ | grep -i 'tuning'"
+    expected_output: "Committed decision record with baseline definition and renderer direction"
+
+prior_art:
+  - "docs/development/adapter-refactor-map.md: prior refactor-direction record for the platforms/base split — reuse format"
+  - "benchbox/core/tuning/ddl_generator.py get_ddl_generator: existing registry that would become the single entry point — extend"
+
+open_questions:
+  - question: "Does 'notuning' permit curated session-optimization packs?"
+    gating: true
+    affects: [w2]
+    default: "No - baseline = platform defaults + engine-mandatory schema choices; session packs move to the tuned path or an explicitly recorded harness-defaults block"
+  - question: "Which renderer survives?"
+    gating: true
+    affects: [w2]
+    default: "Generators become the single renderer; adapter mixins consume them"
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - tuning
+    - decision-gate
+    - architecture
+  estimated_effort: Small
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12 (claude/tuning-system-review-7mzapy)"

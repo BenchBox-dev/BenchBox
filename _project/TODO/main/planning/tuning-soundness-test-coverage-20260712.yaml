@@ -1,0 +1,94 @@
+id: tuning-soundness-test-coverage-20260712
+title: "Test coverage for tuning soundness boundaries (registries, statuses, hashes, vocabulary)"
+worktree: main
+priority: High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  From the 2026-07-12 tuning review, finding R7 (evidence pinned to commit
+  acfb8992). 467 tuning unit tests pass while every soundness boundary has zero
+  coverage:
+
+  - No test covers requested-vs-applied integrity (tunings_applied vs executed
+    statements).
+  - Validation-status tests pin "PASSED" (test_tpc_tuning_template_parity.py:231,270),
+    a value production never emits (real set: NOT_APPLICABLE/APPLIED/
+    FAILED_TO_SAVE/NOT_VALIDATED).
+  - No test calls get_ddl_generator at all; no registry-completeness test.
+  - No cross-consistency test across the capability sources (interface compat
+    map, generator registry, platform_capabilities mapping).
+  - No tests for hash stability/canonicality (get_configuration_hash,
+    hash_tuning_template).
+  - No shared Python<->TypeScript tuning_mode vocabulary pin; Python emits
+    "balanced" (cli/tuning.py:52,56) unknown to the explorer.
+  - Resolver's emitted fallback log marker and coverage.py's parser expectation
+    can drift silently (coverage tests hand-write the strings).
+
+work:
+  - id: w1
+    summary: "Pin the real validation-status vocabulary in tests; remove fictional 'PASSED' fixtures"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Hash canonicality tests: dict-ordering stability, semantic-equivalence, distinctness across differing configs, truncation posture documented"
+    status: pending
+    needs: []
+  - id: w3
+    summary: "Cross-source consistency test over capability registries (expected-drift allowlist so it fails only on NEW drift until consolidation lands)"
+    status: pending
+    needs: []
+  - id: w4
+    summary: "Resolver marker <-> coverage.py parser round-trip test (resolver emits, parser classifies; no hand-written strings)"
+    status: pending
+    needs: []
+  - id: w5
+    summary: "Shared vocabulary pin: single source (JSON/YAML) asserted by both pytest and vitest for tuning_mode values"
+    status: pending
+    needs: []
+  - id: w6
+    summary: "Requested-vs-applied harness: adapter-level test with a recording connection asserting executed tuning statements are reflected in captured metadata (deepens once the applied ledger lands)"
+    status: pending
+    needs: [w1]
+
+deferred:
+  - summary: "Full applied-ledger integrity assertions"
+    reason: "Ledger shape gated on ADR-1; w6 pins today's requested-side behavior first"
+
+deps:
+  needs:
+    - tuning-platform-identity-canonical-keys-20260712
+    - tuning-generator-registry-completeness-20260712
+
+must_preserve:
+  - "Existing 467 passing tuning tests (modify only the fictional-vocabulary fixtures)"
+
+anti_patterns:
+  - "No tests that merely mirror implementation constants - each must encode an invariant that catches drift"
+
+scope_limit:
+  only_modify:
+    - "tests/**"
+    - "results-explorer/src/**/__tests__/**"
+    - "_project/scripts/tests/**"
+    - "benchbox/core/tuning/coverage.py"
+
+verification:
+  - description: "New suites pass and fail-on-drift is demonstrated (mutate one registry entry locally, observe failure, revert)"
+    command: "uv run -- python -m pytest tests/unit/core/tuning tests/unit/cli/test_tuning* -q"
+    expected_output: "All passing; drift-demo documented in PR body"
+
+prior_art:
+  - "benchbox/core/results/schema_specs.yaml + benchmark_specs.yaml: existing YAML-spec-consumed-by-code pattern — reuse for the shared tuning_mode vocabulary pin"
+  - "tests/uat/data/tuning_coverage.tsv: existing checked-in matrix asserted by tests — same enforcement shape"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - testing
+    - soundness
+  estimated_effort: Medium
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, finding R7"
