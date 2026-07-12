@@ -329,6 +329,14 @@ class TPCDSPowerTest:
                     # fallback in _attach_captured_plans.
                     propagate_plan_capture_fields(result_dict, query_result)
 
+                # Count BEFORE commit (#1144 review): when rows_returned
+                # isn't available, _query_result_count falls back to
+                # cursor.fetchall(). Some raw DB-API drivers with unbuffered
+                # SELECT results can reject/invalidate commit() while rows
+                # are still unread, so draining must happen first - matches
+                # the pre-#1137 ordering.
+                result_count = self._query_result_count(cursor)
+
                 if hasattr(connection, "commit"):
                     connection.commit()
             finally:
@@ -339,7 +347,7 @@ class TPCDSPowerTest:
                 {
                     "execution_time_seconds": execution_time,
                     "success": True,
-                    "result_count": self._query_result_count(cursor),
+                    "result_count": result_count,
                 }
             )
             result.queries_successful += 1

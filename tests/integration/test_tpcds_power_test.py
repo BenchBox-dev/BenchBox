@@ -469,6 +469,57 @@ class TestTPCDSPowerTest:
         ]
         assert connection_wrapper_warnings == []
 
+    def test_execute_one_query_drains_raw_cursor_before_commit(self):
+        """#1144 review: for a raw DB-API cursor (no platform_result, so
+        _query_result_count falls back to fetchall()), draining must happen
+        BEFORE commit() - some drivers with unbuffered SELECT results
+        reject/invalidate commit() while rows are still unread. #1137's fix
+        moved the fetchall()-based count to after commit(); this pins the
+        pre-#1137 ordering back in place."""
+        from benchbox.core.tpcds.power_test import TPCDSPowerTestConfig, TPCDSPowerTestResult
+
+        class _CommitBeforeDrainSensitiveCursor:
+            def __init__(self, rows: list) -> None:
+                self._rows = rows
+                self.drained = False
+
+            def fetchall(self) -> list:
+                self.drained = True
+                return self._rows
+
+        mock_benchmark = self.create_mock_benchmark()
+        power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
+        power_test.config = TPCDSPowerTestConfig(scale_factor=1.0)
+
+        cursor = _CommitBeforeDrainSensitiveCursor([("a",), ("b",)])
+        mock_connection = Mock(spec=["execute", "commit"])
+        mock_connection.execute.return_value = cursor
+
+        def _commit_requires_drained_cursor() -> None:
+            assert cursor.drained, "commit() was called before the cursor was drained"
+
+        mock_connection.commit.side_effect = _commit_requires_drained_cursor
+
+        result = TPCDSPowerTestResult(
+            config=power_test.config,
+            start_time="",
+            end_time="",
+            total_time=0.0,
+            power_at_size=0.0,
+            queries_executed=0,
+            queries_successful=0,
+            query_results=[],
+            success=True,
+            errors=[],
+        )
+
+        power_test._execute_one_query(0, 1, mock_connection, stream_param_seed=1, result=result)
+
+        query_result = result.query_results[0]
+        assert query_result["success"] is True
+        assert query_result["result_count"] == 2
+        mock_connection.commit.assert_called_once()
+
     def test_execute_one_query_propagates_captured_plan_fields(self):
         """--capture-plans / --normalize-plan-literals on TPC-DS power: the adapter's
         captured plan/fingerprints live on cursor.platform_result, but _execute_one_query
