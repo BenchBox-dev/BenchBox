@@ -65,18 +65,31 @@ def is_secret_option_key(key: str) -> bool:
     return any(part in normalized for part in _SECRET_KEY_PARTS)
 
 
-def sanitize_platform_options(options: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Return a JSON-friendly platform-options dict with secret-like values redacted."""
+def sanitize_platform_options(
+    options: Mapping[str, Any] | None,
+    *,
+    exclude_internal: bool = False,
+) -> dict[str, Any]:
+    """Return a JSON-friendly platform-options dict with secret-like values redacted.
+
+    ``exclude_internal`` drops keys in ``_INTERNAL_OPTION_KEYS`` and
+    underscore-prefixed keys, mirroring ``_iter_public_options`` semantics.
+    Set it for any payload that is exported/persisted (bundle metadata,
+    result payloads) so internal bookkeeping options (e.g. the full
+    ``tuning_config`` object) never leak into published data.
+    """
     if not options:
         return {}
 
     sanitized: dict[str, Any] = {}
     for key, value in options.items():
         key_str = str(key)
+        if exclude_internal and (key_str.startswith("_") or key_str in _INTERNAL_OPTION_KEYS):
+            continue
         if is_secret_option_key(key_str):
             sanitized[key_str] = REDACTED_VALUE
         else:
-            sanitized[key_str] = _sanitize_option_value(value)
+            sanitized[key_str] = _sanitize_option_value(value, exclude_internal=exclude_internal)
     return sanitized
 
 
@@ -112,7 +125,7 @@ def build_platform_options_capture(
         values[key] = value
         sources[key] = requested_source
 
-    sanitized_values = sanitize_platform_options(values)
+    sanitized_values = sanitize_platform_options(values, exclude_internal=True)
     return sanitized_values, {key: sources[key] for key in sanitized_values if key in sources}
 
 
@@ -126,16 +139,29 @@ def _iter_public_options(options: Mapping[str, Any] | None):
         yield key_str, value
 
 
-def _sanitize_option_value(value: Any) -> Any:
+def _sanitize_option_value(value: Any, *, exclude_internal: bool = False) -> Any:
     if isinstance(value, Mapping):
-        return sanitize_platform_options(value)
+        return sanitize_platform_options(value, exclude_internal=exclude_internal)
     if isinstance(value, list):
-        return [_sanitize_option_value(item) for item in value]
+        return [_sanitize_option_value(item, exclude_internal=exclude_internal) for item in value]
     if isinstance(value, tuple):
-        return [_sanitize_option_value(item) for item in value]
+        return [_sanitize_option_value(item, exclude_internal=exclude_internal) for item in value]
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
-    return str(value)
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        try:
+            as_dict = to_dict()
+        except Exception:
+            return f"<unserializable:{type(value).__name__}>"
+        if isinstance(as_dict, Mapping):
+            return sanitize_platform_options(as_dict, exclude_internal=exclude_internal)
+        return _sanitize_option_value(as_dict, exclude_internal=exclude_internal)
+    # No canonical serialization available. Never fall back to str()/repr()
+    # here: that would silently publish opaque Python repr text into
+    # exported bundles/payloads. Leave an explicit marker instead so gaps
+    # in capture stay visible rather than masquerading as real data.
+    return f"<unserializable:{type(value).__name__}>"
 
 
 __all__ = [
