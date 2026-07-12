@@ -74,8 +74,8 @@ effect, and attaching that as a receipt alongside the bundle) are the
 by this decision and are not a blocker for the current soundness work.
 
 Third-party attestation (an independent party re-running and certifying
-a result) stays **deferred**, consistent with the `verified` visibility
-state already reserved but unimplemented in
+a result) stays **deferred**, consistent with the `verified` trust
+label already reserved but unimplemented in
 `docs/reference/threat-model.md`. This decision does not fork or extend
 that vocabulary; it reuses "self-attested" as the tuning-specific
 instance of the same "not independently verified" concept the threat
@@ -99,7 +99,8 @@ forward. They are replaced by exactly two named hashes:
 2. **`applied_ledger_hash`** — a hash over the **applied-statement
    ledger**: the ordered record of DDL clauses, post-load statements,
    and session `SET`s that were *actually executed* against the target
-   platform (successes only, in execution order). This is the
+   platform. (Exact failure representation and ordering guarantees are
+   design decisions owned by the implementing TODO.) This is the
    **platform-specific physical identity** of the run — it changes if
    the platform renders the same requested template into different
    physical statements, or if some statements fail to apply.
