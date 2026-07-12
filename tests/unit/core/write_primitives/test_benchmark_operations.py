@@ -218,3 +218,43 @@ class TestOperationManagement:
 
     def test_get_data_source_benchmark_returns_tpch(self, wp: WritePrimitivesBenchmark):
         assert wp.get_data_source_benchmark() == "tpch"
+
+
+# ---------------------------------------------------------------------------
+# _get_effective_write_sql skip-order (audit finding N8)
+# ---------------------------------------------------------------------------
+class TestEffectiveWriteSqlSkipOrder:
+    """Skip decisions must precede the adapter sql_override short-circuit."""
+
+    def test_null_override_skips_even_with_sql_override(self, wp: WritePrimitivesBenchmark):
+        """An op marked unsupported on a platform is skipped even when the adapter
+        returns preprocessed SQL for it (the override side-channel bypass)."""
+        op = wp.get_operation("bulk_load_upsert_mode")
+        assert op.platform_overrides.get("datafusion", "MISSING") is None
+        effective_sql, skip_reason = wp._get_effective_write_sql(
+            op,
+            platform_key="datafusion",
+            sql_override="CREATE EXTERNAL TABLE rewritten AS SELECT 1",
+        )
+        assert effective_sql is None
+        assert skip_reason is not None
+        assert "unsupported on platform 'datafusion'" in skip_reason
+
+    def test_sql_override_wins_when_op_is_runnable(self, wp: WritePrimitivesBenchmark):
+        """When the op is NOT skipped, adapter preprocessing still takes effect."""
+        # An op with no file dependencies and no override for this platform is
+        # runnable, so the supplied sql_override becomes the effective body.
+        op = wp.get_operation("merge_scd_type2_basic")
+        assert not getattr(op, "file_dependencies", None)
+        assert "spark" not in (op.platform_overrides or {})
+        rewritten = "UPDATE rewritten SET a = 1"
+        effective_sql, skip_reason = wp._get_effective_write_sql(op, platform_key="spark", sql_override=rewritten)
+        assert skip_reason is None
+        assert effective_sql == rewritten
+
+    def test_scd2_null_override_skips_on_datafusion(self, wp: WritePrimitivesBenchmark):
+        """SCD2 ops (category merge, no preprocess override) still skip on datafusion."""
+        op = wp.get_operation("merge_scd_type2_basic")
+        effective_sql, skip_reason = wp._get_effective_write_sql(op, platform_key="datafusion")
+        assert effective_sql is None
+        assert skip_reason is not None and "unsupported on platform 'datafusion'" in skip_reason

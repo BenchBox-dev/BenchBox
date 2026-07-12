@@ -2,7 +2,8 @@ id: "write-primitives-sql-override-skip-order"
 title: "Apply write-primitives skip checks before sql_override short-circuit"
 worktree: "scd2-audit-followup"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-11"
 category: "Core Functionality"
 description: |
   SCD2 adversarial audit finding N8 (live defect, broader than SCD2).
@@ -31,15 +32,17 @@ impact:
   user_impact: "DataFusion (and any platform with a preprocess hook) no longer runs ops the catalog marks unsupported."
   technical_debt: "Removes an ordering hazard where adapter preprocessing outranks the entire skip policy."
 prior_art:
-- "benchbox/core/write_primitives/benchmark.py:372-442 _get_effective_write_sql - the ordering to fix (:398-399 early return vs :408-440 skip checks)"
+- "benchbox/core/write_primitives/benchmark.py:372-442 _get_effective_write_sql - the ordering to fix (:398-399 early return
+  vs :408-440 skip checks)"
 - "benchbox/platforms/datafusion.py:170-179 preprocess_operation_sql (returns rewritten SQL for every bulk_load op)"
 - "benchbox/platforms/base/execution.py:1048-1055 where preprocessed SQL becomes sql_override"
-- "benchbox/core/write_primitives/catalog/operations.yaml bulk_load_upsert_mode platform_overrides {datafusion: null, starrocks: null} - the override being bypassed"
+- "benchbox/core/write_primitives/catalog/operations.yaml bulk_load_upsert_mode platform_overrides {datafusion: null, starrocks:
+  null} - the override being bypassed"
 
 work:
 - id: w1
   summary: "Reorder _get_effective_write_sql so all skip checks run before the sql_override short-circuit."
-  status: pending
+  status: done
   notes: |
     Affected checks that currently sit AFTER the :398-399 early return:
     aggregate-state, Postgres skips, DuckDB token gate, platform_overrides null,
@@ -48,16 +51,19 @@ work:
     first and apply the override only if the op is not skipped. Keep
     adapter-preprocessing priority for the SQL body once the op is runnable.
 - id: w2
-  summary: "Regression test: bulk_load_upsert_mode (datafusion:null) is SKIPPED on datafusion even though preprocess_operation_sql returns rewritten SQL."
+  summary: "Regression test: bulk_load_upsert_mode (datafusion:null) is SKIPPED on datafusion even though preprocess_operation_sql
+    returns rewritten SQL."
   needs: [w1]
-  status: pending
+  status: done
 - id: w3
-  summary: "Document that the SCD2 datafusion:null overrides are honored only because category='merge' yields no preprocess override; note the ordering now enforces it structurally."
+  summary: "Document that the SCD2 datafusion:null overrides are honored only because category='merge' yields no preprocess
+    override; note the ordering now enforces it structurally."
   needs: [w1]
-  status: pending
+  status: done
 
 must_preserve:
-- "Legitimate adapter preprocessing (e.g. DataFusion bulk_load COPY -> CREATE EXTERNAL TABLE rewrite) still applies for ops that are NOT skipped."
+- "Legitimate adapter preprocessing (e.g. DataFusion bulk_load COPY -> CREATE EXTERNAL TABLE rewrite) still applies for ops
+  that are NOT skipped."
 - "The staging-population guard, bulk-load file check, and Postgres/DuckDB skips still fire for their ops."
 - "SCD2 ops on DuckDB/Postgres remain runnable and unaffected (they set no sql_override)."
 
@@ -69,8 +75,10 @@ approach: |
   no call-site changes needed.
 
 anti_patterns:
-- "DO NOT drop adapter preprocessing - because DataFusion bulk_load genuinely needs the CREATE EXTERNAL TABLE rewrite - only make skip checks outrank it."
-- "DO NOT special-case bulk_load_upsert_mode - because the ordering bug is general (any preprocess hook + any null override) - fix the ordering."
+- "DO NOT drop adapter preprocessing - because DataFusion bulk_load genuinely needs the CREATE EXTERNAL TABLE rewrite - only
+  make skip checks outrank it."
+- "DO NOT special-case bulk_load_upsert_mode - because the ordering bug is general (any preprocess hook + any null override)
+  - fix the ordering."
 
 verification:
 - description: "Write-primitives unit + DuckDB integration green."
@@ -89,7 +97,8 @@ scope_limit:
   - "benchbox/core/write_primitives/catalog/operations.yaml"
 
 success_metrics:
-- "An operation with platform_overrides {<platform>: null} is skipped on that platform even when a preprocess hook returns rewritten SQL."
+- "An operation with platform_overrides {<platform>: null} is skipped on that platform even when a preprocess hook returns
+  rewritten SQL."
 - "Adapter preprocessing still applies to runnable ops."
 - "SCD2 datafusion:null enforcement is now structural, not category-accidental."
 
