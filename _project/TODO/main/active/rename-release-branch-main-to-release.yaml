@@ -26,8 +26,21 @@ description: |
   GitHub Pages (deploy-pages, source = GitHub Actions). README badges pin no
   branch.
 
+  STATUS 2026-07-10 (reconciliation): the in-repo work (w1-w5) landed on
+  branch claude/git-branching-strategy-58vxjs as PR #1114 (awaiting Code Owner
+  review; touches release.yml). A parallel duplicate attempt, PR #1027, was
+  closed as superseded — #1114 is a strict superset of its file set and folded
+  in its two correct findings. Two refinements discovered during execution:
+  (a) default-branch-vs-release-branch classification — RELEASE_CANARY_BRANCH
+  and seed-corpus.yml's PR base are DEFAULT-branch semantics and go to
+  `develop`, NOT `release` (the canary fires from the default branch; seed
+  corpus carries curated-off results-data with a chore/ head); (b) the
+  protected-branch guards keep `main` blocked during the migration window
+  (`develop|main|release`), because a stale local `main` can still exist until
+  the GitHub rename. Only w6 (admin) remains.
+
 prior_art:
-  - "docs/operations/branch-rename-runbook.md — DRAFTED in the PR #993 session and saved to the session scratchpad (not yet committed); enumerates the full admin sequence, ordering/no-gap reasoning, verification, and rollback. Land it with w4/w6 or recreate from the scratchpad patch."
+  - "docs/operations/branch-rename-runbook.md — COMMITTED in PR #1114 (w4); enumerates the full admin sequence, ordering/no-gap reasoning, verification, and rollback. This is the runbook for w6."
   - "_project/TODO/main/active/tag-and-pypi-environment-admin-hardening.yaml — reuse the agent-does-code/docs plus admin-does-GitHub-action split for w6 (the branch rename + ruleset recreate are admin-only)."
   - "_project/decisions/single-repo-migration.md — the architecture record for the two-branch flow; the branching-strategy decision (A+B) should be recorded here or as a sibling decision doc (w5)."
 
@@ -95,9 +108,10 @@ work:
       refs/heads/release, preserving required checks (lint + the release test
       contexts), linear history, non-fast-forward, no direct push, deletion
       blocked, no bypass_actors. Update ruleset-id references in
-      repo-admin-settings.md. Do this together with merging w1-w5 (no orphaned
-      -release window; the release branch only receives pushes via
+      repo-admin-settings.md. Do this together with merging PR #1114 (w1-w5)
+      (no orphaned -release window; the release branch only receives pushes via
       release-finalize, which is maintainer-controlled, so no real CI gap).
+      Full step-by-step: docs/operations/branch-rename-runbook.md.
 
 # deps.needs on branch-default-switch-to-develop cleared 2026-07-08: Decision A
 # COMPLETED (see _project/DONE/main/branch-default-switch-to-develop.yaml), so the
