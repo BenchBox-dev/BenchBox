@@ -1107,6 +1107,12 @@ class TestDriversMixin:
             error_msg = result.get("error", "Unknown error")
             error_preview = error_msg[:80] + "..." if len(error_msg) > 80 else error_msg
             console.print(f"[red]❌ Query {index}/{total}: {query_id} FAILED - {error_preview}[/red]")
+        elif status == "VALIDATION_FAILED" or result.get("validation_passed") is False:
+            # The operation's write ran but a post-condition validation failed:
+            # surface it as a failure, never a green line.
+            error_msg = result.get("error") or "post-condition validation failed"
+            error_preview = error_msg[:80] + "..." if len(error_msg) > 80 else error_msg
+            console.print(f"[red]❌ Query {index}/{total}: {query_id} VALIDATION FAILED - {error_preview}[/red]")
         elif status == "SKIPPED":
             skip_reason = result.get("skip_reason") or result.get("error") or "Operation not supported on this platform"
             reason_preview = skip_reason[:80] + "..." if len(skip_reason) > 80 else skip_reason
@@ -1137,9 +1143,19 @@ class TestDriversMixin:
             console.print(f"[yellow]Benchmark cancelled. Processed {len(results)}/{total_queries} queries.[/yellow]")
             return
 
-        successful = len([r for r in results if r.get("status") == "SUCCESS"])
+        successful = len(
+            [r for r in results if r.get("status") == "SUCCESS" and r.get("validation_passed") is not False]
+        )
         skipped = len([r for r in results if r.get("status") == "SKIPPED"])
-        failed = len([r for r in results if r.get("status") == "FAILED"])
+        # A VALIDATION_FAILED operation (write ran, post-condition failed) counts
+        # as a failure, not a pass, alongside execution FAILED.
+        failed = len(
+            [
+                r
+                for r in results
+                if r.get("status") in ("FAILED", "VALIDATION_FAILED") or r.get("validation_passed") is False
+            ]
+        )
         if failed > 0:
             console.print(
                 f"[yellow]Completed {total_queries} queries: {successful} passed, {skipped} skipped, {failed} failed.[/yellow]"

@@ -1127,6 +1127,28 @@ class TestWritePrimitivesSCD2DuckDB:
         conn.execute(op.cleanup_sql)
         assert self._current_state(conn) == (50, 50, 0)
 
+    def test_failing_validation_reports_validation_failed_not_success(self, scd2_env):
+        """A post-condition validation failure must not report SUCCESS/green.
+
+        Inject a second current version for an existing business key so the
+        at_most_one_current_per_business_key invariant fails independently of the
+        operation. new_keys_only's cleanup only removes new-key rows, so the
+        planted duplicate survives and the failure is observed at the op level.
+        This guards the N1 regression: validation_passed was computed but never
+        gated success/status.
+        """
+        write_bench, conn = scd2_env
+        # Duplicate current row for existing key 1 (unique surrogate key).
+        conn.execute(
+            "INSERT INTO scd2_ops_dim_customer VALUES "
+            "(999999, 1, 'DUP', 'DUP', 0, 'DUP', 'DUP', true, DATE '1990-01-01', DATE '9999-12-31')"
+        )
+        result = write_bench.execute_operation("merge_scd_type2_new_keys_only", conn)
+        assert result.validation_passed is False
+        assert result.success is False
+        assert result.status == "VALIDATION_FAILED"
+        assert result.error and "at_most_one_current_per_business_key" in result.error
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

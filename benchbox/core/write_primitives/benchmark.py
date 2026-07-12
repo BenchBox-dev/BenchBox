@@ -25,6 +25,7 @@ from benchbox.core.connection import DatabaseConnection
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
     quote_identifier,
+    summarize_validation_failures,
     table_exists,
 )
 from benchbox.core.transactional.benchmark_base import TransactionalBenchmarkBase
@@ -1208,9 +1209,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 operation, connection, operation_id
             )
 
+            # The write SQL executed without raising, but a failed post-condition
+            # validation means the operation did not do what it claims. Report it
+            # as VALIDATION_FAILED (distinct from an execution FAILED) rather than
+            # SUCCESS, so a corrupting or no-op operation cannot render green.
             return OperationResult(
                 operation_id=operation_id,
-                success=True,
+                success=validation_passed,
                 write_duration_ms=write_duration_ms,
                 rows_affected=rows_affected,
                 validation_duration_ms=validation_duration_ms,
@@ -1218,7 +1223,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 validation_results=validation_results,
                 cleanup_duration_ms=cleanup_duration_ms,
                 cleanup_success=cleanup_success,
-                status="SUCCESS",
+                status="SUCCESS" if validation_passed else "VALIDATION_FAILED",
+                error=None if validation_passed else summarize_validation_failures(validation_results),
                 cleanup_warning=cleanup_warning,
                 executed_sql=write_sql,
             )
