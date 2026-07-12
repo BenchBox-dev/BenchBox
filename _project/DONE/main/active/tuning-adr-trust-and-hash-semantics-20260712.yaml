@@ -2,7 +2,8 @@ id: tuning-adr-trust-and-hash-semantics-20260712
 title: "DECISION GATE: tuning trust/attestation model and hash semantics (ADR-1)"
 worktree: main
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-07-12"
 category: Architecture Decision
 
 description: |
@@ -30,12 +31,23 @@ work:
   - id: w1
     summary: "Draft ADR with options and recommendation for trust model and hash semantics"
     notes: "Recommendations from the review: label self-attested now, introspection receipts as design direction, third-party attestation deferred; hashes as a pair (requested-config hash + applied-ledger hash)."
-    status: pending
+    status: done
     needs: []
   - id: w2
     summary: "Joe decides; record decisions, rejected options, and rationale in docs/development/ decision record; update threat-model doc if the self-attested label is adopted"
-    status: pending
+    status: done
     needs: [w1]
+    notes: |
+      Decisions made by Joe 2026-07-12, adopting both recommended defaults as-is:
+      (1) trust model - self-attested, labeled in explorer UI and docs;
+      post-load schema-introspection receipts are the design direction for
+      future verification; third-party attestation stays deferred, consistent
+      with docs/reference/threat-model.md's reserved `verified` state; (2) hash
+      semantics - two hashes (requested_config_hash + applied_ledger_hash), not
+      a single hash. Recorded in
+      docs/development/tuning-adr-001-trust-and-hash-semantics.md. Updating
+      threat-model.md's trust-label vocabulary is deferred to the TODOs that
+      implement the label in explorer UI/docs, not this decision-gate TODO.
 
 deferred:
   - summary: "Implementing the decided semantics"
@@ -72,4 +84,5 @@ metadata:
     - soundness
   estimated_effort: Small
   created_date: "2026-07-12"
+  completed_date: "2026-07-12"
   source_review: "tuning-system deep review 2026-07-12 (claude/tuning-system-review-7mzapy)"
