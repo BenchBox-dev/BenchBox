@@ -1,0 +1,68 @@
+id: "blog-scd2-sf1-scale-row"
+title: "Add the SF1 basic row to the SCD2 blog scale table for balance"
+worktree: "scd2-audit-followup"
+priority: "Low"
+status: "Not Started"
+category: "Documentation"
+description: |
+  Follow-up deferred from scd2-docs-and-count-hygiene-followup (audit finding N12)
+  and re-deferred from scd2-basic-idempotency-and-cleanup-scoping w4, which updated
+  the blog line counts (18 -> 20) but did not add the third scale point.
+
+  The SCD2 blog draft
+  (_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md) presents
+  the "change-batch-bound, not dimension-bound" scale claim on only two points
+  (SF0.01 and SF0.1, ~1.7x). Adding an SF1 row makes the growth curve honest: the
+  audit re-derivation measured SF1.0 basic median ~13.3 ms against a 150,000-row
+  dimension, i.e. 100x data costs ~6.4x, and the per-decade rate is NOT constant
+  (~1.74x then ~3.66x). The two-point presentation reads flatter than the curve.
+
+  Scope: blog draft only (the research note already records the SF1 figure in its
+  scale-independence section). Re-measure SF1 before publishing rather than
+  trusting the stale audit number, since the idempotency guard changed basic's SQL.
+impact: "Keeps the blog's scale-independence claim honest by showing three points instead of the two most favorable ones."
+prior_art:
+- "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md:196-213 - the SF0.01 / SF0.1 scale tables and the ~1.7x observation to extend"
+- "_project/DONE/scd2-audit-followup/scd2-docs-and-count-hygiene-followup.yaml deferred[] - N12 origin"
+- "_project/DONE/scd2-audit-followup/scd2-basic-idempotency-and-cleanup-scoping.yaml w4 - where the SF1 fold-in was re-deferred"
+
+work:
+- id: w1
+  summary: "Re-measure basic at SF1.0 (post-idempotency-guard) with the audit protocol; capture median/min/p90."
+  status: pending
+- id: w2
+  summary: "Add the SF1 row to the blog scale table and adjust the growth-rate sentence (per-decade rate is not constant; ~6.4x for 100x data)."
+  needs: [w1]
+  status: pending
+
+must_preserve:
+- "No em-dashes or en-dashes in blog content (house rule)."
+- "The change-batch-bound framing stays accurate; do not overstate flatness."
+- "SF0.01 / SF0.1 rows and their sources are unchanged unless re-measured."
+
+approach: |
+  Small factual addition. Re-measure SF1 rather than reuse the audit's ~13.3 ms,
+  then extend the existing table and soften the "~1.7x" sentence to acknowledge the
+  non-constant per-decade rate. Draft is unpublished, so this is low urgency.
+
+anti_patterns:
+- "DO NOT introduce em/en-dashes - house rule for _blog/ content - use hyphens."
+- "DO NOT reuse the stale audit SF1 number without re-measuring - the op changed - re-run first."
+
+verification:
+- description: "No em/en-dash in the edited draft."
+  command: "grep -nP \"[\\x{2014}\\x{2013}]\" _blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md"
+  expected_output: "no matches (exit 1)"
+
+scope_limit:
+  only_modify:
+  - "_blog/platform-deep-dives/drafts/apply-changes-into-vs-standard-sql.md"
+
+success_metrics:
+- "The blog scale table shows three points (SF0.01, SF0.1, SF1.0) with a re-measured SF1 median."
+- "The growth-rate sentence reflects the non-constant per-decade rate."
+
+metadata:
+  tags: ["scd2", "blog", "docs", "audit-followup", "N12"]
+  estimated_effort: "Small"
+  created_date: "2026-07-12"
