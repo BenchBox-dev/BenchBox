@@ -116,7 +116,12 @@ def recover_abandoned_uat_docker_usage(
     run = runner or docker_assets.run_docker_command
     cli = docker_assets.resolve_container_cli()
     inventory_note: str | None = None
-    if cli == "docker":
+    # Gate on `!= "mocker"` rather than `== "docker"`: mocker is the one
+    # engine KNOWN to break the Docker-shaped JSON inventory; a
+    # BENCHBOX_CONTAINER_CLI override pointing at some other
+    # docker-compatible binary should take the full inventory path, not
+    # silently degrade to the volume-only fallback.
+    if cli != "mocker":
         resources = tuple(_inventory_resources(run, cli))
     else:
         resources = tuple(_mocker_volume_resources(run, project_prefix))

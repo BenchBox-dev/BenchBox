@@ -505,6 +505,7 @@ def _run_docker_teardown(
     ):
         removed_volumes = docker_assets.sweep_leaked_mocker_volumes(
             docker_state.project_name,
+            docker_state.spec,
             runner=docker_runner,
             dry_run=config.dry_run,
         )

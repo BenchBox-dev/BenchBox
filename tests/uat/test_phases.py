@@ -534,13 +534,16 @@ def test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_m
         )
         volume_calls: list[tuple[str, ...]] = []
 
+        # Exact leaked name mocker 0.5.4 creates for this project: the
+        # postgresql spec declares volume key `postgresql18-data`, and
+        # mocker joins <project>-<key> with a hyphen (live-verified).
+        leaked_volume = "benchbox-uat-mocker-volume-sweep-postgresql-postgresql18-data"
+
         def fake_docker(argv, **kwargs):
             argv_tuple = tuple(argv)
             if argv_tuple == ("mocker", "volume", "ls"):
                 volume_calls.append(argv_tuple)
-                return docker_assets.DockerCommandResult(
-                    argv_tuple, 0, "local    benchbox-uat-mocker-volume-sweep-postgresql_pgdata\n", ""
-                )
+                return docker_assets.DockerCommandResult(argv_tuple, 0, f"local    {leaked_volume}\n", "")
             if argv_tuple[:3] == ("mocker", "volume", "rm"):
                 volume_calls.append(argv_tuple)
                 return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
@@ -571,9 +574,9 @@ def test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_m
         sweep_events = [e for e in outcome.docker_events if e.action == "volume-sweep"]
         assert len(sweep_events) == 1
         assert sweep_events[0].status == "ok"
-        assert "benchbox-uat-mocker-volume-sweep-postgresql_pgdata" in sweep_events[0].message
+        assert leaked_volume in sweep_events[0].message
         assert ("mocker", "volume", "ls") in volume_calls
-        assert ("mocker", "volume", "rm", "benchbox-uat-mocker-volume-sweep-postgresql_pgdata") in volume_calls
+        assert ("mocker", "volume", "rm", leaked_volume) in volume_calls
     finally:
         docker_assets.resolve_container_cli.cache_clear()
 

@@ -367,3 +367,85 @@ def test_mocker_compose_project_label_is_recognized(monkeypatch):
     owned_names = {r.display_name for r in report.targets}
     assert "pg-1" in owned_names
     assert "benchbox-uat-manual-postgresql_default" in owned_names
+
+
+def test_max_mode_apply_passes_the_real_forbidden_prune_guard(monkeypatch):
+    """REQUIRED-1 regression: `make uat-docker-cleanup ENGINE=container
+    MODE=max APPLY=1` executes `container prune` / `container volume prune`
+    / `container network prune` through the REAL run_docker_command, whose
+    forbidden-prune guard must exempt the Apple-native `container` CLI --
+    an engine-agnostic verb-pair guard blocked these and made max-mode
+    cleanup raise ContainerCleanupError. Only the subprocess layer is
+    mocked here; the guard itself runs for every command."""
+    import subprocess
+
+    executed: list[tuple[str, ...]] = []
+
+    def fake_subprocess_run(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        executed.append(argv_tuple)
+        if argv_tuple[:4] == ("container", "image", "ls", "--format"):
+            out = json.dumps(_IMAGES)
+        elif argv_tuple[:3] == ("container", "ls", "-a"):
+            out = json.dumps(_CONTAINERS)
+        elif argv_tuple[:4] == ("container", "volume", "ls", "--format"):
+            out = json.dumps(_VOLUMES)
+        elif argv_tuple[:4] == ("container", "network", "ls", "--format"):
+            out = json.dumps(_NETWORKS)
+        elif argv_tuple == ("container", "system", "df"):
+            out = _SYSTEM_DF
+        else:
+            out = ""
+        return subprocess.CompletedProcess(argv, 0, out, "")
+
+    monkeypatch.setattr(docker_assets.subprocess, "run", fake_subprocess_run)
+
+    # runner=None -> the real docker_assets.run_docker_command, guard included.
+    report = container_cleanup.reclaim_container_usage(mode="max", apply=True, runner=None)
+
+    assert ("container", "prune") in executed
+    assert ("container", "volume", "prune") in executed
+    assert ("container", "network", "prune") in executed
+    assert ("container", "builder", "delete", "--force") in executed
+    assert all(cmd.status == "ok" for cmd in report.commands)
+
+
+def test_non_uat_mocker_project_stays_shared_below_max():
+    """NIT-5 regression: a container labeled com.mocker.compose.project with
+    a NON-UAT project (`myapp`) is recognized as compose-managed but stays
+    `shared` -- untouched by `owned`, image-only widening in `images`, and
+    reclaimed only by `max`'s catch-all."""
+    containers = [
+        {
+            "id": "myapp-web-1",
+            "configuration": {
+                "id": "myapp-web-1",
+                "image": {"reference": "nginx:1.27"},
+                "labels": {"com.mocker.compose.project": "myapp", "com.mocker.compose.service": "web"},
+            },
+            "status": {"state": "running"},
+        },
+    ]
+
+    def fake(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        if argv_tuple[:4] == ("container", "image", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(_IMAGES), "")
+        if argv_tuple[:3] == ("container", "ls", "-a"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(containers), "")
+        if argv_tuple[:4] == ("container", "volume", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(_VOLUMES), "")
+        if argv_tuple[:4] == ("container", "network", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(_NETWORKS), "")
+        if argv_tuple == ("container", "system", "df"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, _SYSTEM_DF, "")
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    for mode in ("owned", "images"):
+        report = container_cleanup.reclaim_container_usage(mode=mode, apply=False, runner=fake)
+        assert "myapp-web-1" not in {r.display_name for r in report.targets}, mode
+        retained = {r.display_name: r.category for r in report.retained}
+        assert retained.get("myapp-web-1") == "shared", mode
+
+    max_report = container_cleanup.reclaim_container_usage(mode="max", apply=False, runner=fake)
+    assert "myapp-web-1" in {r.display_name for r in max_report.targets}

@@ -3,7 +3,7 @@ title: "Route UAT container lifecycle through a resolved engine (mocker on macOS
 worktree: uat-hardening
 priority: High
 status: Completed
-completed_date: "2026-07-12"
+completed_date: "2026-07-11"
 category: "Operations / Container Runtime"
 
 description: |
@@ -107,8 +107,18 @@ work:
       this through: `command_has_forbidden_prune()` matched a literal
       `"docker system prune"` substring, which would have silently
       stopped catching forbidden prunes the moment the resolved binary
-      wasn't literally "docker" -- rewrote it to match the verb pair in
-      the tokens after the binary name, engine-agnostic. New tests in
+      wasn't literally "docker" -- rewrote it to a pairwise verb-pair
+      scan over the tokens after the binary name, covering docker,
+      mocker, and any BENCHBOX_CONTAINER_CLI override. Review fix: the
+      Apple-native `container` CLI is EXEMPT from this guard -- its
+      max-mode prunes (`container prune` / `volume prune` / `network
+      prune`) are a deliberate documented operator action of
+      `uat-docker-cleanup ENGINE=container MODE=max`, guarded by
+      container_cleanup._is_forbidden instead; a fully engine-agnostic
+      guard blocked them and broke max-mode APPLY outright (regression
+      test: test_max_mode_apply_passes_the_real_forbidden_prune_guard
+      runs max/apply through the real run_docker_command with only the
+      subprocess layer mocked). New tests in
       test_docker_assets.py cover env override, darwin mocker-present/
       absent, non-darwin never probes mocker (must_preserve), missing
       binary hard error, and memoization. A new autouse fixture in
@@ -145,27 +155,41 @@ work:
     status: done
     needs: [w1]
     notes: >
-      `docker_assets.list_mocker_volumes_matching()` (list-only) and
-      `sweep_leaked_mocker_volumes()` (list + rm, built on the list
-      primitive) port the Makefile's compose_down_fresh grep+rm sequence.
-      Wired into `execute.py`'s `_run_docker_teardown()` after the compose
+      `sweep_leaked_mocker_volumes(project_name, spec)` in docker_assets,
+      wired into `execute.py`'s `_run_docker_teardown()` after the compose
       `down` call, gated on BOTH the resolved engine being mocker AND the
       cleanup mode having requested `-v` (`volumes`/`images`, matching
       docker's own semantics) -- a `containers`-mode teardown intentionally
       keeps volumes for platform reuse and must not have them swept out
       from under it. Runs best-effort regardless of the `down` command's
       own success (mirrors the Makefile's `;` sequencing). Records a
-      `volume-sweep` DockerLifecycleEvent either way. New tests in
-      test_phases.py:
+      `volume-sweep` DockerLifecycleEvent either way. Review fix
+      (deletion-scope): the sweep matches EXACT names derived from the
+      spec's compose-declared top-level volume keys
+      (compose_declared_volume_names/expected_mocker_volume_names, both
+      joiners: `-` is mocker 0.5.4's live-verified joiner, `_` is docker
+      compose's) instead of a name-prefix regex -- a prefix scan on
+      project `p` would also match a sibling project `p-ha`'s volumes and
+      delete its data. The same latent overreach existed in the Makefile's
+      compose_down_fresh grep (`$(1)[-_]...`); it now awk-extracts the
+      compose file's volume keys and removes exact `<project>-<key>` /
+      `<project>_<key>` names. Note: the review proposed tightening the
+      separator to `_`-only on the premise that compose joins with `_`;
+      live evidence (scratch project `sepcheck` + key `checkvol` ->
+      volume `sepcheck-checkvol`) shows mocker 0.5.4 joins with `-`, so
+      `_`-only would have made the sweep match nothing and silently
+      reintroduced the leak -- exact-name matching fixes the actual risk
+      without that regression. `list_mocker_volumes_matching()` stays
+      prefix-scoped by design for docker_cleanup's recovery inventory,
+      whose ownership rule is the project PREFIX spanning all UAT
+      projects (mirrors _is_uat_owned). New tests in test_docker_assets.py
+      (incl. test_sweep_leaked_mocker_volumes_never_touches_hyphen_sibling_project)
+      and test_phases.py:
       test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_mocker
       and
       test_execute_teardown_skips_mocker_volume_sweep_for_containers_mode.
       Live-validated end-to-end via the TODO's smoke command (see
-      verification section) -- also wired the same list primitive into
-      `docker_cleanup.recover_abandoned_uat_docker_usage` (see w1 notes
-      and the deviation below) since the standalone `make
-      uat-docker-cleanup` recovery path needed it too, not just the
-      in-sweep teardown.
+      verification section).
   - id: w4
     summary: "Fix container_cleanup PREFIX passthrough (thread project_prefix into _inventory_resources and all classifiers) with a regression test that a custom prefix changes classification"
     status: done
@@ -268,6 +292,8 @@ deviations:
   - "scope_limit did not list tests/uat/test_orchestrator.py, tests/uat/test_phases.py, or tests/uat/conftest.py, but w2 (orchestrator.py) and w3 (phases/execute.py) -- both in scope_limit as source files -- needed test coverage in their existing test files, and every uat test needed the new autouse conftest fixture (isolate_container_cli_resolution) to stay host-independent once resolve_container_cli() existed (this dev mac resolves to mocker by default, which would otherwise nondeterministically break every test asserting a literal 'docker' argv). All three are net-new test/fixture code, not behavior changes to anything outside the declared scope."
   - "docker_cleanup.py's mocker fallback (list-only `list_mocker_volumes_matching` + a `_mocker_volume_resources`/`inventory_note` path in `recover_abandoned_uat_docker_usage`) was not explicitly named in the original w1/w3 work units, but was required to meet the TODO's own live-smoke verification target: the first live run of `make uat-docker-cleanup APPLY=1` post-w1 crashed with a JSON parse error, because mocker's `container`/`image ls --format json` echo the literal string 'json' instead of JSON (a limitation only fully characterized during live verification, not foreseeable from the original plan). Threading the resolved engine into docker_cleanup.py's inventory without this fallback would have made `make uat-docker-cleanup` (the default ENGINE=docker path) crash outright on every macOS-with-mocker host -- a regression, not neutral. The fallback degrades to volume-only cleanup + a clear inventory_note pointing at ENGINE=container, and is covered by two new tests."
   - "w4's live-smoke follow-through surfaced a second, previously-undocumented container_cleanup.py bug: mocker-created containers/networks label the compose project under com.mocker.compose.project, not com.docker.compose.project, so every mocker-managed resource was silently classified 'shared' (never reclaimed by ENGINE=container in owned mode) before this fix. This was not in the original findings list; fixed and covered by test_mocker_compose_project_label_is_recognized, and confirmed by re-running the live smoke's ENGINE=container cleanup before and after the fix."
+  - "Review-round override of must_preserve's 'forbidden-command guard applies to every engine': the guard now exempts the Apple-native `container` CLI (only), because an engine-agnostic verb-pair guard blocked `container prune`/`volume prune`/`network prune` and broke `make uat-docker-cleanup ENGINE=container MODE=max APPLY=1` -- an active regression versus the pre-diff literal-'docker' match, which never fired for the container binary. The Apple store's max-mode prunes are a deliberate documented operator action with their own _is_forbidden guard; the run_docker_command guard's intent is protecting the shared docker/mocker host. Covered by test_max_mode_apply_passes_the_real_forbidden_prune_guard."
+  - "Review-round REQUIRED-2 was applied with a corrected premise: the reviewer proposed tightening the sweep separator to '_' only ('compose always joins with _'), but mocker 0.5.4 -- the only engine the sweep runs on -- joins <project>-<volume-key> with a HYPHEN (live-verified twice: sepcheck+checkvol -> sepcheck-checkvol, and the postgresql stack's benchbox-uat-manual-postgresql-postgresql18-data). A '_'-only separator would have made the sweep match nothing and silently reintroduced the volume leak w3 exists to fix. The sibling-project deletion risk the reviewer identified is real and is eliminated more strongly than the proposed fix: exact-name matching against compose-declared volume keys (both joiners), in both docker_assets.sweep_leaked_mocker_volumes and the Makefile's compose_down_fresh macro."
 
 scope_limit:
   only_modify:
@@ -298,6 +324,7 @@ metadata:
 files_affected:
   modified:
   - AGENTS.md
+  - Makefile
   - docs/operations/uat-framework.md
   - scripts/uat-bring-up/uat_bring_up.py
   - tests/uat/cells_io.py
