@@ -19,7 +19,7 @@ Three related gaps surfaced in the 2026-07-12 tuning-system review:
 
 2. **No pinned vocabulary.** `benchbox/cli/tuning.py:52,56` and callers emit `tuned`,
    `notuning`, `auto`, the wizard's `"balanced"` string (a template flavor, not a mode), and,
-   for custom configs, the raw file path passed to `--tuning` (`RunArgs.tuning_mode` docstring
+   for custom configs, the raw file path passed to `--tuning` (`ExecutionContext.tuning_mode` comment
    in the CLI args model: `# "tuned", "notuning", "auto", or path`). Raw paths leak local
    filesystem layout into shared result bundles and are not a stable comparability key. On the
    explorer side, `results-explorer/src/lib/facetMatching.ts:99` defaults a missing
