@@ -79,32 +79,42 @@ class PreflightResult(PhaseResult):
 
 
 def docker_reachable() -> bool:
-    """Return True iff `docker ps` succeeds within 5 s."""
+    """Return True iff the resolved container CLI's `ps` succeeds within 5 s.
+
+    A resolution failure (no engine binary on PATH at all) degrades to the
+    same "not reachable" signal as a missing/unresponsive daemon -- this is
+    a soft preflight probe, not the action that needs a hard error (see
+    uat-container-engine-routing w1; `resolve_container_cli()` itself still
+    hard-errors for the actions that actually shell out to build/start/stop
+    a stack).
+    """
     try:
+        cli = docker_assets.resolve_container_cli()
         subprocess.run(
-            ["docker", "ps"],
+            [cli, "ps"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=5,
             check=True,
         )
         return True
-    except (FileNotFoundError, subprocess.SubprocessError):
+    except (FileNotFoundError, subprocess.SubprocessError, docker_assets.DockerAssetError):
         return False
 
 
 def docker_data_root() -> Path | None:
-    """Return Docker's host-visible data root, when the engine reports one."""
+    """Return the resolved engine's host-visible data root, when it reports one."""
     try:
+        cli = docker_assets.resolve_container_cli()
         completed = subprocess.run(
-            ["docker", "info", "--format", "{{.DockerRootDir}}"],
+            [cli, "info", "--format", "{{.DockerRootDir}}"],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
             timeout=5,
             check=True,
         )
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError, docker_assets.DockerAssetError):
         return None
 
     value = completed.stdout.strip()

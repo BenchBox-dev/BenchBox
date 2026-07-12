@@ -40,7 +40,18 @@ from typing import Callable, Literal
 from tests.uat import docker_assets
 from tests.uat.docker_cleanup import COMPOSE_PROJECT_LABEL, DEFAULT_UAT_PROJECT_PREFIX
 
-ContainerResourceKind = Literal["image", "container", "volume"]
+# mocker-created containers/networks label the compose project under its own
+# key, NOT the Docker-compatible `com.docker.compose.project` -- live-verified
+# in uat-container-engine-routing w0/w4: `container ls --format json` on a
+# `mocker compose up` container shows
+# `{"com.mocker.compose.project": "...", "com.mocker.compose.service": "..."}`
+# with no `com.docker.compose.project` key at all. Checking only the Docker
+# key silently misclassified every mocker-managed container as "shared"
+# (never reclaimed, even in `owned` mode) -- this was caught by the
+# w-verification live smoke, not by design review.
+MOCKER_COMPOSE_PROJECT_LABEL = "com.mocker.compose.project"
+
+ContainerResourceKind = Literal["image", "container", "volume", "network"]
 ContainerCategory = Literal["owned", "shared", "system"]
 ContainerRunner = Callable[..., docker_assets.DockerCommandResult]
 
@@ -51,9 +62,15 @@ CONTAINER_CLEANUP_MODES: tuple[str, ...] = ("owned", "images", "max")
 # (resources are reclaimed through the CLI, which keeps the store consistent).
 CONTAINER_STORAGE_PATH = Path("~/Library/Application Support/com.apple.container")
 
-# Image name prefixes that mark a BenchBox-built image regardless of compose
-# labels (native images carry no compose project label).
-_OWNED_IMAGE_PREFIXES: tuple[str, ...] = ("benchbox/", "benchbox-", "local/benchbox")
+# Image name prefixes that mark a BenchBox-published image regardless of
+# compose labels (native images carry no compose project label). Deliberately
+# NOT a bare "benchbox-" prefix: that pattern also matches an unrelated local
+# dev image/container a developer happens to name "benchbox-experiment", which
+# would then be reclaimed even by the narrowest `owned` mode. `max` mode still
+# reclaims such a resource -- it treats every non-system resource as a target
+# regardless of name (see _partition_targets) -- so nothing is lost, only the
+# `owned`-mode overreach is removed (uat-container-engine-routing w6).
+_OWNED_IMAGE_PREFIXES: tuple[str, ...] = ("benchbox/", "local/benchbox")
 
 # The buildkit builder identifies itself with this role label; its image repo is
 # the container-builder-shim. Both are engine infrastructure, not workload.
@@ -86,6 +103,8 @@ class ContainerResource:
             return (CONTAINER_BIN, "image", "rm", self.display_name)
         if self.kind == "container":
             return (CONTAINER_BIN, "rm", "-f", self.identifier)
+        if self.kind == "network":
+            return (CONTAINER_BIN, "network", "rm", self.display_name)
         return (CONTAINER_BIN, "volume", "rm", self.display_name)
 
     def cleanup_command_text(self) -> str:
@@ -154,7 +173,7 @@ def reclaim_container_usage(
         )
     run = runner or docker_assets.run_docker_command
 
-    resources = _inventory_resources(run)
+    resources = _inventory_resources(run, project_prefix)
     targets, retained = _partition_targets(resources, mode)
     planned = _plan_commands(targets, mode)
     footprint_before = _read_footprint(run)
@@ -248,6 +267,17 @@ def _is_owned_image_name(name: str, project_prefix: str) -> bool:
     return any(lowered.startswith(prefix) for prefix in _OWNED_IMAGE_PREFIXES)
 
 
+def _compose_project_label(labels: dict[str, object]) -> str | None:
+    """Read the compose project label, checking mocker's own key first.
+
+    Prefers `com.mocker.compose.project` (see MOCKER_COMPOSE_PROJECT_LABEL) --
+    a resource created by `mocker compose` never carries the Docker key, and
+    the two are not expected to coexist.
+    """
+    value = labels.get(MOCKER_COMPOSE_PROJECT_LABEL) or labels.get(COMPOSE_PROJECT_LABEL)
+    return str(value) if value else None
+
+
 def _partition_targets(
     resources: tuple[ContainerResource, ...], mode: str
 ) -> tuple[tuple[ContainerResource, ...], tuple[ContainerResource, ...]]:
@@ -280,12 +310,17 @@ def _plan_commands(targets: tuple[ContainerResource, ...], mode: str) -> list[tu
     # Remove containers before their images so image removal is not blocked.
     commands.extend(_grouped_removals(targets, "container", (CONTAINER_BIN, "rm", "-f"), key=lambda r: r.identifier))
     commands.extend(_grouped_removals(targets, "volume", (CONTAINER_BIN, "volume", "rm"), key=lambda r: r.display_name))
+    commands.extend(
+        _grouped_removals(targets, "network", (CONTAINER_BIN, "network", "rm"), key=lambda r: r.display_name)
+    )
     commands.extend(_grouped_removals(targets, "image", (CONTAINER_BIN, "image", "rm"), key=lambda r: r.display_name))
     if mode == "max":
-        # Widest reclaim: stopped-container + volume prune sweep any non-system
-        # leftovers, then drop the builder's writable cache (recreated on build).
+        # Widest reclaim: stopped-container + volume/network prune sweep any
+        # non-system leftovers, then drop the builder's writable cache
+        # (recreated on build).
         commands.append((CONTAINER_BIN, "prune"))
         commands.append((CONTAINER_BIN, "volume", "prune"))
+        commands.append((CONTAINER_BIN, "network", "prune"))
         commands.append((CONTAINER_BIN, "builder", "delete", "--force"))
     return commands
 
@@ -321,15 +356,16 @@ def _is_forbidden(argv: tuple[str, ...]) -> bool:
 # --------------------------------------------------------------------------
 
 
-def _inventory_resources(run: ContainerRunner) -> tuple[ContainerResource, ...]:
+def _inventory_resources(run: ContainerRunner, project_prefix: str) -> tuple[ContainerResource, ...]:
     resources: list[ContainerResource] = []
-    resources.extend(_list_images(run))
-    resources.extend(_list_containers(run))
-    resources.extend(_list_volumes(run))
+    resources.extend(_list_images(run, project_prefix))
+    resources.extend(_list_containers(run, project_prefix))
+    resources.extend(_list_volumes(run, project_prefix))
+    resources.extend(_list_networks(run, project_prefix))
     return tuple(resources)
 
 
-def _list_images(run: ContainerRunner) -> list[ContainerResource]:
+def _list_images(run: ContainerRunner, project_prefix: str) -> list[ContainerResource]:
     rows = _run_json_array(run, [CONTAINER_BIN, "image", "ls", "--format", "json"])
     out: list[ContainerResource] = []
     for row in rows:
@@ -341,7 +377,7 @@ def _list_images(run: ContainerRunner) -> list[ContainerResource]:
         category: ContainerCategory
         if _BUILDER_IMAGE_MARKER in name:
             category = "system"
-        elif _is_owned_image_name(name, DEFAULT_UAT_PROJECT_PREFIX):
+        elif _is_owned_image_name(name, project_prefix):
             category = "owned"
         else:
             category = "shared"
@@ -357,7 +393,7 @@ def _list_images(run: ContainerRunner) -> list[ContainerResource]:
     return out
 
 
-def _list_containers(run: ContainerRunner) -> list[ContainerResource]:
+def _list_containers(run: ContainerRunner, project_prefix: str) -> list[ContainerResource]:
     rows = _run_json_array(run, [CONTAINER_BIN, "ls", "-a", "--format", "json"])
     out: list[ContainerResource] = []
     for row in rows:
@@ -372,13 +408,11 @@ def _list_containers(run: ContainerRunner) -> list[ContainerResource]:
             image_ref = str(image.get("reference") or "")
         status = row.get("status") if isinstance(row.get("status"), dict) else {}
         state = str(status.get("state") or "")
-        project = labels.get(COMPOSE_PROJECT_LABEL)
+        project = _compose_project_label(labels)
 
         if labels.get(_BUILDER_ROLE_LABEL) == "builder" or _BUILDER_IMAGE_MARKER in image_ref:
             category = "system"
-        elif _is_owned(project, DEFAULT_UAT_PROJECT_PREFIX) or _is_owned_image_name(
-            image_ref, DEFAULT_UAT_PROJECT_PREFIX
-        ):
+        elif _is_owned(project, project_prefix) or _is_owned_image_name(image_ref, project_prefix):
             category = "owned"
         else:
             category = "shared"
@@ -395,7 +429,7 @@ def _list_containers(run: ContainerRunner) -> list[ContainerResource]:
     return out
 
 
-def _list_volumes(run: ContainerRunner) -> list[ContainerResource]:
+def _list_volumes(run: ContainerRunner, project_prefix: str) -> list[ContainerResource]:
     rows = _run_json_array(run, [CONTAINER_BIN, "volume", "ls", "--format", "json"])
     out: list[ContainerResource] = []
     for row in rows:
@@ -404,7 +438,7 @@ def _list_volumes(run: ContainerRunner) -> list[ContainerResource]:
         name = str(row.get("name") or row.get("Name") or "")
         if not name:
             continue
-        category: ContainerCategory = "owned" if _is_owned(name, DEFAULT_UAT_PROJECT_PREFIX) else "shared"
+        category: ContainerCategory = "owned" if _is_owned(name, project_prefix) else "shared"
         out.append(
             ContainerResource(
                 kind="volume",
@@ -412,6 +446,44 @@ def _list_volumes(run: ContainerRunner) -> list[ContainerResource]:
                 name=name,
                 category=category,
                 status=str(row.get("driver") or row.get("Driver") or ""),
+            )
+        )
+    return out
+
+
+def _list_networks(run: ContainerRunner, project_prefix: str) -> list[ContainerResource]:
+    """Inventory Apple ``container`` networks (uat-container-engine-routing w5).
+
+    ``container network ls --format json`` was verified to exist and produce
+    structured JSON (see w0 notes); the built-in default network is marked
+    with a ``com.apple.container.resource.role=builtin`` label (or, on older
+    CLI versions without that label, is named ``default``) and is treated as
+    a system resource, mirroring the builder image/container check above.
+    """
+    rows = _run_json_array(run, [CONTAINER_BIN, "network", "ls", "--format", "json"])
+    out: list[ContainerResource] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        config = row.get("configuration") if isinstance(row.get("configuration"), dict) else {}
+        labels = config.get("labels") if isinstance(config.get("labels"), dict) else {}
+        name = str(config.get("name") or "")
+        identifier = str(row.get("id") or name)
+        project = _compose_project_label(labels)
+
+        if labels.get(_BUILDER_ROLE_LABEL) == "builtin" or name == "default":
+            category: ContainerCategory = "system"
+        elif _is_owned(project, project_prefix) or _is_owned_image_name(name, project_prefix):
+            category = "owned"
+        else:
+            category = "shared"
+        out.append(
+            ContainerResource(
+                kind="network",
+                identifier=identifier,
+                name=name,
+                category=category,
+                created_at=str(config.get("creationDate") or ""),
             )
         )
     return out

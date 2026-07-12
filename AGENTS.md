@@ -70,20 +70,47 @@ query). NOT validated: 3+ service stacks -- databend stays healthy on docker but
 minio exits on mocker, so use docker for multi-service (doris/starrocks are
 all-in-one single containers).
 
+## UAT container engine resolution
+
+`tests/uat/docker_assets.py:resolve_container_cli()` is the single resolver
+UAT's compose lifecycle, preflight probe, `uat-bring-up`, and `make
+uat-docker-cleanup` (ENGINE=docker, the default) all route through: env
+override `BENCHBOX_CONTAINER_CLI` (verbatim) > macOS: `mocker` if on PATH,
+else `docker` > every other platform: always `docker` (no mocker probing off
+darwin). Missing resolved binary is a hard error. Resolved once per process
+(cached); recorded in `uat_lifecycle.log` at sweep start and as
+`container_engine` in the `cells.jsonl.accounting.json` sidecar. When the
+resolved engine is mocker, managed teardown additionally sweeps mocker
+0.5.4's leaked named volumes (project-scoped, never a prune) whenever the
+cleanup mode requested `-v` (`volumes`/`images`). `ENGINE=docker` cleanup on
+a mocker-resolved host can't use Docker-shaped `--format json` inventory
+(`container`/`image ls` echo the literal string `json`; `volume inspect`
+takes one name and returns a lowercase non-Docker schema) -- it falls back
+to `mocker volume ls` (the one verb that behaves) for volume cleanup and
+reports container/image/network inventory as unavailable; use
+`ENGINE=container` (next section) for those, but note it can't see
+mocker-managed volumes either (Apple's native `container volume ls` is
+empty for them -- mocker tracks its own volumes separately).
+
 ## Apple container cleanup
 
 The Apple `container` store (`~/Library/Application Support/com.apple.container`)
 grows unbounded -- image snapshots, mocker compose leftovers, the buildkit
 builder's writable cache. Reclaim it via the container mode of the UAT cleanup
 flow: `make uat-docker-cleanup ENGINE=container [MODE=owned|images|max]
-[APPLY=1]`. Dry-run (no `APPLY`) prints `container system df` footprint + the
-plan; it speaks the native `container` CLI (mocker can't inventory). Mode ladder,
-widest last: `owned` (default; `benchbox/*` + `local/benchbox*` images and
-UAT-prefixed compose leftovers) < `images` (+ shared pull-through bases:
-postgres/ubuntu/uv/questdb) < `max` (+ stopped-container/volume prune + builder
-delete, ~all reclaimable). Never removes the store dir or stops `container
-system`. `owned` is safe anytime; `max` also clears non-BenchBox containers, so
-run it only when the engine is idle.
+[PREFIX=benchbox-uat] [APPLY=1]`. Dry-run (no `APPLY`) prints `container
+system df` footprint + the plan; it speaks the native `container` CLI (mocker
+can't inventory reliably) and also inventories networks. `PREFIX` actually
+scopes classification (previously silently ignored in favor of the default).
+Mode ladder, widest last: `owned` (default; `benchbox/*` + `local/benchbox*`
+image namespaces and PREFIX-labeled compose leftovers -- NOT a bare
+`benchbox-`-prefixed image/container name, so an unrelated local dev image
+like `benchbox-experiment` is never touched here) < `images` (+ shared
+pull-through bases: postgres/ubuntu/uv/questdb) < `max` (+
+stopped-container/volume/network prune + builder delete, ~all reclaimable,
+including bare-`benchbox-`-named resources). Never removes the store dir or
+stops `container system`. `owned` is safe anytime; `max` also clears
+non-BenchBox containers, so run it only when the engine is idle.
 
 ## Output Discipline
 

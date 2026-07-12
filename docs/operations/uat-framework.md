@@ -171,6 +171,49 @@ prefix. The recovery command still does not run `docker system prune`,
 `docker volume prune`, or `docker image prune`; non-UAT cleanup remains
 an explicit operator decision using the commands printed in the report.
 
+### Container engine resolution
+
+Every UAT Docker command (compose lifecycle, the preflight reachability
+probe, `make uat-bring-up`, and `make uat-docker-cleanup` in its default
+`ENGINE=docker` mode) shells out through one resolved binary, not a
+hardcoded `docker`. Resolution order: `BENCHBOX_CONTAINER_CLI` env override
+(honored verbatim) > platform default -- on macOS, `mocker` (the
+Docker-CLI-compatible shim over Apple Containerization) if it is on `PATH`,
+else `docker`; on every other platform, always `docker` (no mocker probing
+happens off darwin, so a docker-only Linux host is unaffected). A missing
+resolved binary is a hard error, not a silent fallback. The engine is
+resolved once per process and cached.
+
+The resolved binary and its `--version` output are recorded as an `[engine]`
+line in `uat_lifecycle.log` at sweep start, and as `container_engine` in the
+`cells.jsonl.accounting.json` sidecar (`null` when resolution itself failed
+before any Docker-managed platform needed one).
+
+On macOS with mocker resolved, managed teardown also sweeps named volumes
+mocker 0.5.4's `compose down -v` leaks: a project-scoped `mocker volume ls` +
+targeted `volume rm`, never a global prune, run only when the requested
+cleanup mode asked for volume removal (`volumes` or `images`, matching
+docker's own `-v` semantics -- a `containers`-mode teardown keeps volumes for
+platform reuse and is left alone). A `volume-sweep` lifecycle event records
+what, if anything, was removed.
+
+`make uat-docker-cleanup`'s default `ENGINE=docker` mode routes its
+inventory listing through the resolved engine too. When that engine is
+mocker, the Docker-shaped `--format json` inventory it normally relies on is
+unusable (`container`/`image ls --format json` echo the literal string
+`json` instead of JSON; `volume inspect` takes one name at a time and returns
+a lowercase, non-Docker schema) -- rather than crash, it falls back to
+mocker's one faithful plain-text verb (`mocker volume ls`) to find and remove
+leaked named volumes, and the report's `NOTE:` line says container/image/
+network inventory was skipped. On macOS, prefer `ENGINE=container` for
+reliable native inventory and cleanup of images/containers/networks (see
+AGENTS.md "Apple container cleanup"); that mode speaks the native `container`
+CLI directly and does not go through `resolve_container_cli()`. It cannot see
+mocker-managed named volumes, though -- Apple's native `container volume ls`
+is empty for them; mocker tracks its own compose-created volumes separately.
+Use `ENGINE=docker` (the default) for volume cleanup and `ENGINE=container`
+for everything else.
+
 ## Explorer smoke (browser)
 
 `make uat-explorer-smoke` invokes Playwright directly against a freshly

@@ -247,3 +247,65 @@ def test_apply_deduplicates_multitagged_uat_image_cleanup_id():
     ]
     assert image_cleanup_commands == [("docker", "image", "rm", "sha256:uat-image-id")]
     assert [call for call in calls if call[:3] == ("docker", "image", "rm")] == image_cleanup_commands
+
+
+# --------------------------------------------------------------------------
+# mocker fallback (uat-container-engine-routing w1/w3): the resolved engine's
+# JSON inventory is Docker-shaped and does not work against mocker (verified
+# live in w0 -- see recover_abandoned_uat_docker_usage's docstring). This
+# falls back to mocker's one faithful plain-text verb (`volume ls`) instead
+# of crashing on unparseable `--format json` output.
+# --------------------------------------------------------------------------
+
+
+def _mocker_volume_runner(calls: list[tuple[str, ...]]):
+    def fake_runner(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        calls.append(argv_tuple)
+        if argv_tuple == ("mocker", "volume", "ls"):
+            return docker_assets.DockerCommandResult(
+                argv_tuple,
+                0,
+                "DRIVER   VOLUME NAME\nlocal    benchbox-uat-smoke-postgresql_pgdata\nlocal    developer-scratch\n",
+                "",
+            )
+        if argv_tuple[:2] == ("container", "image") or argv_tuple[:2] == ("container", "ls"):
+            raise AssertionError(f"docker-shaped inventory must not run against mocker: {argv_tuple}")
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    return fake_runner
+
+
+def test_recover_falls_back_to_mocker_volume_listing_without_crashing(monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    calls: list[tuple[str, ...]] = []
+    try:
+        report = docker_cleanup.recover_abandoned_uat_docker_usage(apply=False, runner=_mocker_volume_runner(calls))
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+    assert report.engine == "mocker"
+    assert {r.display_name for r in report.uat_owned} == {"benchbox-uat-smoke-postgresql_pgdata"}
+    assert report.inventory_note is not None
+    assert "ENGINE=container" in report.inventory_note
+    rendered = docker_cleanup.format_cleanup_report(report)
+    assert "engine: mocker" in rendered
+    assert "NOTE:" in rendered
+    assert "mocker volume rm benchbox-uat-smoke-postgresql_pgdata" in rendered
+
+
+def test_recover_apply_removes_mocker_volumes_via_the_resolved_binary(monkeypatch):
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    calls: list[tuple[str, ...]] = []
+    try:
+        report = docker_cleanup.recover_abandoned_uat_docker_usage(apply=True, runner=_mocker_volume_runner(calls))
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+    assert ("mocker", "volume", "rm", "benchbox-uat-smoke-postgresql_pgdata") in calls
+    assert all(command.status == "ok" for command in report.cleanup_commands)
+    assert "developer-scratch" not in " ".join(" ".join(c) for c in calls if c[:2] == ("mocker", "volume"))

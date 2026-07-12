@@ -515,6 +515,119 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
     assert all("-v" in argv and "--remove-orphans" in argv for argv in down_commands)
 
 
+def test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_mocker(tmp_path, monkeypatch):
+    """uat-container-engine-routing w3: mocker's `compose down -v` leaks named
+    volumes; teardown must sweep them project-scoped when volumes/images mode
+    requested `-v` and the resolved engine is mocker."""
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        cfg = validate_config(
+            {
+                "name": "mocker volume sweep",
+                "platforms": {"include": ["postgresql"]},
+                "benchmarks": {"include": ["tpch"]},
+                "scales": {"rungs": [0.01]},
+                "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+            }
+        )
+        volume_calls: list[tuple[str, ...]] = []
+
+        def fake_docker(argv, **kwargs):
+            argv_tuple = tuple(argv)
+            if argv_tuple == ("mocker", "volume", "ls"):
+                volume_calls.append(argv_tuple)
+                return docker_assets.DockerCommandResult(
+                    argv_tuple, 0, "local    benchbox-uat-mocker-volume-sweep-postgresql_pgdata\n", ""
+                )
+            if argv_tuple[:3] == ("mocker", "volume", "rm"):
+                volume_calls.append(argv_tuple)
+                return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+            return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+        def recording_runner(platform, benchmark, scale, **kwargs):
+            return CellResult(
+                platform=platform,
+                benchmark=benchmark,
+                scale=scale,
+                status="passed",
+                exit_code=0,
+                elapsed_s=1.0,
+                log_path=tmp_path / f"{platform}.log",
+                result_path=None,
+            )
+
+        with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+            outcome = exec_phase.run_execute(
+                cfg,
+                log_dir=tmp_path,
+                databases_root=tmp_path / "databases",
+                runner=recording_runner,
+                docker_runner=fake_docker,
+            )
+
+        assert outcome.aborted is False
+        sweep_events = [e for e in outcome.docker_events if e.action == "volume-sweep"]
+        assert len(sweep_events) == 1
+        assert sweep_events[0].status == "ok"
+        assert "benchbox-uat-mocker-volume-sweep-postgresql_pgdata" in sweep_events[0].message
+        assert ("mocker", "volume", "ls") in volume_calls
+        assert ("mocker", "volume", "rm", "benchbox-uat-mocker-volume-sweep-postgresql_pgdata") in volume_calls
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
+def test_execute_teardown_skips_mocker_volume_sweep_for_containers_mode(tmp_path, monkeypatch):
+    """The sweep only runs when `-v` was requested (volumes/images mode) --
+    `containers` mode intentionally keeps volumes for platform-reuse, and the
+    sweep must not defeat that."""
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        cfg = validate_config(
+            {
+                "name": "mocker containers mode",
+                "platforms": {"include": ["postgresql"]},
+                "benchmarks": {"include": ["tpch"]},
+                "scales": {"rungs": [0.01]},
+                "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "containers"},
+            }
+        )
+        calls: list[tuple[str, ...]] = []
+
+        def fake_docker(argv, **kwargs):
+            calls.append(tuple(argv))
+            return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+        def recording_runner(platform, benchmark, scale, **kwargs):
+            return CellResult(
+                platform=platform,
+                benchmark=benchmark,
+                scale=scale,
+                status="passed",
+                exit_code=0,
+                elapsed_s=1.0,
+                log_path=tmp_path / f"{platform}.log",
+                result_path=None,
+            )
+
+        with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+            outcome = exec_phase.run_execute(
+                cfg,
+                log_dir=tmp_path,
+                databases_root=tmp_path / "databases",
+                runner=recording_runner,
+                docker_runner=fake_docker,
+            )
+
+        assert not any(e.action == "volume-sweep" for e in outcome.docker_events)
+        assert not any(c[:2] == ("mocker", "volume") for c in calls)
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
 def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
     cfg = validate_config(
         {
