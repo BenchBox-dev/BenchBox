@@ -91,9 +91,9 @@ work:
     from this worktree.
 deferred:
 - summary: "Make the new job a required status check in the develop ruleset"
-  reason: "Branch-protection/ruleset change is admin/settings work, not repo code; without it auto-merge does not wait for this job - flag to the repo owner in the PR body."
+  reason: "RESOLVED 2026-07-11: no ruleset change needed. The develop-squash-only ruleset's sole required check is the ci-required-result umbrella (docs/operations/repo-admin-settings.md, pinned by the release-canary drift job), and #1139 wired medium-test into that umbrella's needs+conjunction - auto-merge already waits on it transitively."
 - summary: "GitHub merge queue for develop"
-  reason: "The structural fix for stale-base squash races, but requires repo-settings evaluation (queue latency, runner budget); record as its own decision item if pursued."
+  reason: "RESOLVED 2026-07-11 as not-available: merge queues require organization-owned repos; BenchBox is user-owned. The ruleset also deliberately preserves strict_required_status_checks_policy=false (runbook: properties to preserve), so the strict-checks alternative is rejected by design. Accepted mitigation: the signature-aware develop-post-merge safety net (#1136)."
 must_preserve:
 - "Docs/TODO/markdown-only PRs must not start the medium job (ci-paths gating)"
 - "develop-post-merge medium-test job stays blocking and wired to auto-revert (it is the safety net for stale-base races PR CI cannot see)"

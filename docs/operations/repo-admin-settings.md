@@ -58,6 +58,8 @@ Required status checks:
 `ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
 that aggregates the required-lane jobs: `ci-paths`, `content-guard`,
 `code-lint`, `code-test`, `correctness-gate`, `plan-capture-gate`,
+`medium-test` (added 2026-07-11, #1139 — the medium tier now gates code
+PRs pre-merge via the same umbrella, no ruleset change needed),
 `explorer-tokens`, `audit-sha`, `package-smoke`, and `dependency-audit`.
 Branch protection deliberately keys off the umbrella so the path-aware
 classifier can skip subordinate jobs without making the protected check
