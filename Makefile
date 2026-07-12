@@ -2106,7 +2106,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup uat-artifact-hygiene uat-gate-check
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-prepull uat-docker-cleanup uat-artifact-hygiene uat-gate-check
 
 # Local-artifact hygiene gate. No-op unless an external output root is
 # configured (BENCHBOX_OUTPUT_DIR or OUTPUT=); when it is, fails if the
@@ -2193,6 +2193,26 @@ uat-bring-up:
 		--platform "$(PLATFORM)" \
 		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
 		$(if $(BENCHMARK_RUNS_DIR),--benchmark-runs-dir "$(BENCHMARK_RUNS_DIR)",) \
+		$(if $(DRY_RUN),--dry-run,)
+
+# make uat-prepull PLATFORM=<name> [PREPULL_TIMEOUT_S=900] [DRY_RUN=1]
+# `compose pull --ignore-buildable` + `compose build` via the resolved engine,
+# project-scoped -- no health probe (compare uat-bring-up). Fetches images/
+# builds ahead of a sweep so a slow stack's first-run download doesn't eat
+# into cleanup.docker_start_timeout_s and present as a mysterious
+# skipped-unreachable platform. Reuses uat_bring_up.py --prepull-only rather
+# than a new script (same PLATFORM validation, project-name derivation,
+# resolved-engine identity print).
+uat-prepull:
+	$(if $(strip $(PLATFORM)),$(if $(filter $(PLATFORM),$(UAT_BRING_UP_KNOWN_PLATFORMS)),,$(error unknown platform '$(PLATFORM)'; supported: $(UAT_BRING_UP_KNOWN_PLATFORMS))),)
+	@if [ -z "$(PLATFORM)" ]; then \
+		echo "Usage: make uat-prepull PLATFORM=<name> [PREPULL_TIMEOUT_S=900] [DRY_RUN=1]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python scripts/uat-bring-up/uat_bring_up.py \
+		--platform "$(PLATFORM)" \
+		--prepull-only \
+		$(if $(PREPULL_TIMEOUT_S),--prepull-timeout-s "$(PREPULL_TIMEOUT_S)",) \
 		$(if $(DRY_RUN),--dry-run,)
 
 # make uat-docker-cleanup [ENGINE=docker|container] [MODE=owned|images|max] [APPLY=1] [PREFIX=benchbox-uat]

@@ -56,6 +56,32 @@ def test_compose_up_command_includes_wait_timeout_and_scoped_service(platform, s
     assert argv[-5:] == ["-d", "--wait", "--wait-timeout", "42", service]
 
 
+def test_compose_pull_command_uses_ignore_buildable_and_is_project_scoped():
+    spec = docker_assets.docker_platform_spec("postgresql")
+    project = "benchbox-uat-smoke-postgresql"
+    argv = docker_assets.compose_pull_command(spec, project)
+    assert argv[:4] == ["docker", "compose", "-p", project]
+    assert "pull" in argv
+    assert "--ignore-buildable" in argv
+    assert not docker_assets.command_has_forbidden_prune(argv)
+
+
+def test_compose_pull_command_scopes_to_declared_service():
+    spec = docker_assets.docker_platform_spec("lakesail")
+    project = "benchbox-uat-smoke-lakesail"
+    argv = docker_assets.compose_pull_command(spec, project)
+    assert argv[-1] == "lakesail-connect"
+
+
+def test_compose_build_command_is_project_scoped():
+    spec = docker_assets.docker_platform_spec("lakesail")
+    project = "benchbox-uat-smoke-lakesail"
+    argv = docker_assets.compose_build_command(spec, project)
+    assert argv[:4] == ["docker", "compose", "-p", project]
+    assert "build" in argv
+    assert argv[-1] == "lakesail-connect"
+
+
 def test_compose_project_name_sanitizes_and_bounds_length():
     name = docker_assets.compose_project_name(
         "UAT! 2026/05 storage constrained sweep with a very long config name",
