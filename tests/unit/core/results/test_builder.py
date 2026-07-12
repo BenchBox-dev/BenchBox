@@ -178,6 +178,23 @@ class TestResultBuilder:
         assert result.failed_queries == 1
         assert result.validation_status == "PARTIAL"
 
+    def test_build_with_validation_failed_query_counts_as_failed(self) -> None:
+        """#1150 review: a write/op that ran but failed a post-condition check
+        (write_primitives/transaction_primitives status="VALIDATION_FAILED")
+        must count as a failure in aggregate accounting, not vanish from both
+        successful_queries and failed_queries.
+        """
+        builder = self.create_builder()
+        builder.add_query_result(self.create_query_result("1", 1.0, 100, "SUCCESS"))
+        builder.add_query_result(self.create_query_result("2", 1.0, 100, "VALIDATION_FAILED"))
+
+        result = builder.build()
+
+        assert result.total_queries == 2
+        assert result.successful_queries == 1
+        assert result.failed_queries == 1
+        assert result.validation_status == "PARTIAL"
+
     def test_build_calculates_tpc_metrics(self) -> None:
         """Test that TPC metrics are calculated."""
         builder = self.create_builder(scale_factor=1.0)
