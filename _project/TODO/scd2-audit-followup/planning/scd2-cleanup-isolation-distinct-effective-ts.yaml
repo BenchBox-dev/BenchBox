@@ -1,0 +1,107 @@
+id: "scd2-cleanup-isolation-distinct-effective-ts"
+title: "Isolate SCD2 op cleanups by giving each change_type group a distinct effective_ts"
+worktree: "scd2-audit-followup"
+priority: "Medium"
+status: "Not Started"
+category: "Core Functionality"
+description: |
+  Follow-up deferred from scd2-basic-idempotency-and-cleanup-scoping (audit
+  finding N4, cleanup half). The idempotency guard landed (PR #1157), but the
+  cross-op cleanup contamination was NOT fixed and cannot be fixed within
+  operations.yaml alone.
+
+  Problem: all three staging change_type groups share one effective_ts
+  (DATE '2026-01-01'), set in _get_population_sql
+  (benchbox/core/write_primitives/benchmark.py, the scd2_ops_stage_customer
+  branch). Every SCD2 op's cleanup is
+    DELETE FROM scd2_ops_dim_customer WHERE valid_from IN (SELECT effective_ts FROM stage)
+    UPDATE ... WHERE is_current = false AND valid_to IN (SELECT effective_ts FROM stage)
+  Because the subquery returns the same {2026-01-01} for every group, qualifying
+  it by change_type isolates nothing. Reproduced in the audit (repro2.py ATTACK
+  3b): running merge_scd_type2_basic's cleanup after merge_scd_type2_new_keys_only's
+  write deletes all 20 of new_keys_only's inserted rows.
+
+  This is latent, not shipping-broken: each op runs its own cleanup immediately
+  after its write in the normal flow, so contamination only occurs across ops
+  when a cleanup is skipped (swallowed failure). The merged idempotency guard
+  (N4 first half) and validation gating (N1, PR #1150) already make such a
+  swallowed-cleanup state fail the run observably rather than silently. So this
+  is a robustness/correctness hardening, not a fire.
+
+  Fix: give each change_type group a distinct effective_ts in _get_population_sql
+  (e.g. changed -> 2026-01-01, unchanged -> 2026-01-02, new -> 2026-01-03), so
+  each op's cleanup - qualified by that op's change_type(s) - touches only its own
+  rows. effective_ts is not part of the row_hash fingerprint, so this does not
+  affect change detection; it does change valid_from/valid_to values, so the
+  DuckDB and PostgreSQL SCD2 seed-state assertions and the validation queries that
+  filter on effective_ts must be re-checked.
+impact:
+  business_value: "Removes the last latent SCD2 correctness gap: one op's cleanup can no longer corrupt another op's rows even when cleanups are skipped or reordered."
+  user_impact: "SCD2 operations become independently cleanable regardless of run order, not just under the current catalog ordering."
+  technical_debt: "Retires the shared-effective_ts coupling that made change_type-scoped cleanup ineffective."
+prior_art:
+- "benchbox/core/write_primitives/benchmark.py _get_population_sql scd2_ops_stage_customer branch - the effective = DATE '2026-01-01' shared across all three group INSERTs (the line to differentiate)"
+- "benchbox/core/write_primitives/catalog/operations.yaml merge_scd_type2_basic / _no_change / _new_keys_only cleanup_sql - qualify DELETE/UPDATE subqueries by the op's change_type once effective_ts is distinct"
+- "tests/integration/test_write_primitives_duckdb.py TestWritePrimitivesSCD2DuckDB - seed-state assertions (50/50/0, closed counts) to re-verify"
+- "tests/integration/platforms/test_write_primitives_scd2_postgresql_live.py - live PG seed/cleanup assertions to re-verify"
+- "_project/DONE/scd2-audit-followup/scd2-basic-idempotency-and-cleanup-scoping.yaml deferred[] - the origin of this follow-up"
+
+work:
+- id: w1
+  summary: "Assign a distinct effective_ts per change_type group in _get_population_sql (changed/unchanged/new)."
+  status: pending
+- id: w2
+  summary: "Qualify basic and no_change cleanup_sql DELETE/UPDATE subqueries by the op's own change_type(s), now that effective_ts distinguishes groups."
+  needs: [w1]
+  status: pending
+- id: w3
+  summary: "Audit every SCD2 validation query that filters on effective_ts (no_rows_closed_by_batch, no_rows_closed, the N3 cardinality checks) and re-scope to the correct group(s)."
+  needs: [w1]
+  status: pending
+- id: w4
+  summary: "Re-verify DuckDB + live PostgreSQL seed-state and per-op assertions; add a test proving basic's cleanup no longer deletes new_keys_only's rows in a back-to-back run."
+  needs: [w1, w2, w3]
+  status: pending
+
+must_preserve:
+- "All three SCD2 ops still validate green on DuckDB and live PostgreSQL, seed restored exactly (0 rows deviating)."
+- "row_hash fingerprint semantics unchanged (effective_ts is not part of the fingerprint)."
+- "The idempotency guard on merge_scd_type2_basic stays intact."
+- "The fixed-size 20/20/20 change batch and scale-independence are preserved."
+
+approach: |
+  One population-SQL change (distinct effective_ts per group) unlocks meaningful
+  change_type-scoped cleanup. Sequence: differentiate effective_ts first, then
+  re-scope the cleanups and any effective_ts-filtered validations, then re-verify
+  seed-state on both engines. Keep the dates close (consecutive days) so the
+  "single-batch" framing in docs/blog stays accurate.
+
+anti_patterns:
+- "DO NOT put effective_ts into the row_hash fingerprint - because change detection must stay independent of the batch timestamp - keep it out."
+- "DO NOT scope cleanups by c_custkey - because basic and new_keys_only share the same 'new' custkeys - scope by the now-distinct effective_ts / change_type."
+- "DO NOT widen scope to rewrite the op UPDATE/INSERT bodies - the ops are correct; only population effective_ts and cleanup/validation scoping change."
+
+verification:
+- description: "SCD2 DuckDB integration green including a new cross-op cleanup-isolation test."
+  command: "uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -k scd2 -n 0 -q"
+  expected_output: "all pass, including the new isolation test"
+- description: "Live PostgreSQL SCD2 coverage still green."
+  command: "uv run -- python -m pytest tests/integration/platforms/test_write_primitives_scd2_postgresql_live.py -m live_postgresql -n 0 -q"
+  expected_output: "all pass (or skip if no PG container)"
+
+scope_limit:
+  only_modify:
+  - "benchbox/core/write_primitives/benchmark.py"
+  - "benchbox/core/write_primitives/catalog/operations.yaml"
+  - "tests/integration/test_write_primitives_duckdb.py"
+  - "tests/integration/platforms/test_write_primitives_scd2_postgresql_live.py"
+
+success_metrics:
+- "Each change_type group carries a distinct effective_ts."
+- "basic's cleanup run after new_keys_only's write no longer deletes new_keys_only's rows (proven by test)."
+- "All SCD2 ops still validate green and restore the seed on DuckDB and PostgreSQL."
+
+metadata:
+  tags: ["scd2", "write-primitives", "cleanup", "correctness", "audit-followup", "N4"]
+  estimated_effort: "Medium"
+  created_date: "2026-07-12"
