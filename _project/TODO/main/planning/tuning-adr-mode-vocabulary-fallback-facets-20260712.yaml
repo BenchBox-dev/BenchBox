@@ -1,0 +1,77 @@
+id: tuning-adr-mode-vocabulary-fallback-facets-20260712
+title: "DECISION GATE: tuning mode vocabulary, fallback labeling, and facet semantics (ADR-2)"
+worktree: main
+priority: High
+status: Not Started
+category: Architecture Decision
+
+description: |
+  Decision gate from the 2026-07-12 tuning-system deep review (evidence pinned to
+  commit acfb8992; findings C4-C6).
+
+  Decisions needed before mode/facet implementation work:
+
+  1. FALLBACK LABELING. `--tuning tuned` with no template silently runs a bare
+     default config still labeled "tuned" (benchbox/cli/tuning_resolver.py:295-307,
+     benchbox/cli/commands/run.py:1016-1022) and facet-matches curated-template
+     runs. Options: keep, introduce a distinct mode (e.g. tuned-fallback /
+     constraints), or refuse in non-interactive / --official runs.
+  2. MODE VOCABULARY PIN. Python emits tuned/notuning/auto/<raw path> plus
+     "balanced" (benchbox/cli/tuning.py:52,56); the explorer knows
+     tuned/notuning/auto and defaults missing to "untuned"
+     (results-explorer/src/lib/facetMatching.ts:99). Decide the canonical value
+     set, whether raw file paths are a legal mode value (they leak local paths into
+     bundles), and how absent-vs-baseline must be distinguished.
+  3. CROSS-PLATFORM "TUNED" FACET. Platform X tuned may render 6 physical
+     mechanisms while platform Y renders zero; the facet matches them. Decide
+     whether facet matching stays mode-string-based, incorporates
+     physical_rendering_id / mechanism counts, or adds a receipt-level warning.
+
+work:
+  - id: w1
+    summary: "Draft ADR with options and recommendations for fallback labeling, vocabulary pin, facet rule"
+    notes: "Recommendations from the review: distinct fallback mode + refuse under --official; pinned shared vocabulary artifact consumed by Python and TS; mode stays coarse facet with mechanism-set warning in receipt and physical_rendering_id promoted to matchable facet for TPC."
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Joe decides; record decisions and the pinned vocabulary in a decision record referenced by both Python and TS test suites"
+    status: pending
+    needs: [w1]
+
+deferred:
+  - summary: "Implementation across resolver, schema, explorer"
+    reason: "Owned by tuning-mode-vocabulary-and-facet-implementation-20260712"
+
+deps:
+  needs: []
+
+verification:
+  - description: "Decision record exists with the canonical mode value set and fallback policy"
+    command: "ls docs/development/ | grep -i 'tuning'"
+    expected_output: "Committed decision record enumerating mode values, fallback labeling, and facet-matching rule"
+
+prior_art:
+  - "benchbox/core/schemas.py:497: current free-string tuning_mode contract (comment-only) — supersede with pinned vocabulary"
+  - "results-explorer/src/components/TuningBadge.tsx TUNING_CONFIG: current TS-side value set — reuse as starting vocabulary"
+
+open_questions:
+  - question: "Does a template-less tuned run keep the 'tuned' label?"
+    gating: true
+    affects: [w2]
+    default: "No - distinct mode value; refuse under --official"
+  - question: "Do two 'tuned' runs on different platforms facet-match regardless of physical mechanisms?"
+    gating: true
+    affects: [w2]
+    default: "Coarse facet keeps matching; receipt warns on disjoint mechanism sets; physical_rendering_id becomes a secondary facet for TPC"
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - tuning
+    - decision-gate
+    - explorer
+    - comparability
+  estimated_effort: Small
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12 (claude/tuning-system-review-7mzapy)"

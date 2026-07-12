@@ -1,0 +1,85 @@
+id: tuning-docs-env-contract-fixes-20260712
+title: "Fix broken tuning docs/env contract: dead env var, stale README, undocumented precedence, dishonest auto mode"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Documentation
+
+description: |
+  From the 2026-07-12 tuning review, finding R5 (evidence pinned to commit acfb8992).
+
+  - BENCHBOX_TUNING_ENABLED sets config key tuning.enabled which NOTHING at
+    runtime reads (only reader is a test); yet docs/usage/configuration.md:91-94
+    and docs/reference/cli/configuration.md:93 claim it activates tuned runs in CI.
+  - examples/tunings/README.md is wholesale stale: documents a --tuning-config
+    flag that does not exist, example scripts that do not exist, stale flat
+    filenames, an env-var recipe that cannot work, and an unqualified "2-10x"
+    performance promise.
+  - The actual precedence order (flag default notuning -> keyword/path -> yaml
+    default_config_file [BENCHBOX_TUNING_CONFIG] -> BENCHBOX_TUNING_PATH ->
+    cwd-relative examples/ -> cwd -> fallback) is documented nowhere.
+  - --tuning auto on SQL platforms prints "using smart defaults based on system
+    profile" but delivers a default-constructed config (run.py:1021-1024);
+    real smart defaults exist only for DataFrame mode (tuning_runtime.py:49-92).
+  - docs/reference/cli/tuning.md: wrong --output default, three subcommands
+    (list/show/platforms) undocumented.
+
+work:
+  - id: w1
+    summary: "Decide-in-PR the env var: remove the doc claims AND either delete BENCHBOX_TUNING_ENABLED handling or emit a deprecation warning when set (recommend delete + release note)"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Rewrite examples/tunings/README.md against reality: --tuning flag, real template paths, auto-discovery as the primary UX, drop unfalsifiable performance claims"
+    status: pending
+    needs: []
+  - id: w3
+    summary: "Write the precedence table into docs/reference/cli/tuning.md; document tuning list/show/platforms; fix --output default"
+    notes: "Re-check the review's verified rules against HEAD before writing. Explicitly document that examples/ discovery is cwd-relative, so installed-package users hit the fallback unless BENCHBOX_TUNING_PATH is set (review finding N8)."
+    status: pending
+    needs: []
+  - id: w4
+    summary: "Make --tuning auto honest on SQL platforms: warn that smart defaults are DataFrame-only and the run proceeds with basic config (message change only; behavior change gated on ADR-2)"
+    status: pending
+    needs: []
+
+deferred:
+  - summary: "Ship discoverable templates with the installed package (package resources) so --tuning tuned works outside a repo checkout"
+    reason: "Behavior/packaging change beyond a docs fix; needs its own sizing after the precedence doc makes the limitation visible (review finding N8)"
+
+deps:
+  needs: []
+
+must_preserve:
+  - "BENCHBOX_TUNING_CONFIG and BENCHBOX_TUNING_PATH behavior exactly as implemented"
+
+anti_patterns:
+  - "Do not document aspirational behavior; every documented rule must have a file:line anchor at time of writing"
+
+scope_limit:
+  only_modify:
+    - "docs/**"
+    - "examples/tunings/README.md"
+    - "benchbox/cli/config.py"
+    - "benchbox/cli/commands/run.py"
+    - "benchbox/cli/tuning_resolver.py"
+    - "tests/unit/**"
+
+verification:
+  - description: "No doc references to the dead env var remain (or the var actually works)"
+    command: "grep -rn 'BENCHBOX_TUNING_ENABLED' docs/ benchbox/ | grep -v test"
+    expected_output: "Either zero doc hits + removed handling, or a functioning documented code path"
+  - description: "Docs build clean"
+    command: "make lint"
+    expected_output: "Passing"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - documentation
+    - cli
+  estimated_effort: Medium
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, finding R5"

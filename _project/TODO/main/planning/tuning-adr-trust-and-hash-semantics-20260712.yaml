@@ -1,0 +1,75 @@
+id: tuning-adr-trust-and-hash-semantics-20260712
+title: "DECISION GATE: tuning trust/attestation model and hash semantics (ADR-1)"
+worktree: main
+priority: Critical
+status: Not Started
+category: Architecture Decision
+
+description: |
+  Decision gate from the 2026-07-12 tuning-system deep review (evidence pinned to
+  commit acfb8992; full report delivered in-session, findings C1-C3).
+
+  Two product decisions only Joe can make, blocking the soundness remediation
+  (tuning-applied-ledger-and-validation-status-20260712):
+
+  1. TRUST MODEL for published tuning claims. Today bundles are self-attested and
+     nothing says so: `tunings_applied` is the requested config
+     (benchbox/platforms/base/adapter.py:743-747), APPLIED certifies only a
+     metadata-table write, and no mechanism lets an evaluator verify claims
+     against reality.
+  2. HASH SEMANTICS. The bundle hash field is never populated; four disjoint hash
+     notions exist (interface.py:846-863 full sha256; profile_validation.py:324-333
+     16-char template hash; the never-set bundle tuning_config_hash; the explorer's
+     8-char repr hash in _project/scripts/explorer_pipeline/transformer.py:187-201).
+     Decide what the hash must certify: requested template, effective post-filter
+     config, rendered DDL/applied ledger, or a pair.
+
+  Deliverable is a short ADR-style decision record, not code.
+
+work:
+  - id: w1
+    summary: "Draft ADR with options and recommendation for trust model and hash semantics"
+    notes: "Recommendations from the review: label self-attested now, introspection receipts as design direction, third-party attestation deferred; hashes as a pair (requested-config hash + applied-ledger hash)."
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Joe decides; record decisions, rejected options, and rationale in docs/development/ decision record; update threat-model doc if the self-attested label is adopted"
+    status: pending
+    needs: [w1]
+
+deferred:
+  - summary: "Implementing the decided semantics"
+    reason: "Owned by tuning-applied-ledger-and-validation-status-20260712 and tuning-facet-and-receipt gated items"
+
+deps:
+  needs: []
+
+verification:
+  - description: "Decision record exists and answers both questions unambiguously"
+    command: "ls docs/development/ | grep -i 'tuning'"
+    expected_output: "A committed decision record naming the chosen trust label and the object(s) each hash covers"
+
+prior_art:
+  - "docs/reference/threat-model.md: existing trust-label vocabulary (public-verified reserved) — extend, do not fork"
+  - "docs/development/adapter-refactor-map.md: existing design-record style in docs/development — reuse"
+
+open_questions:
+  - question: "Are published tuning claims labeled self-attested in explorer UI and docs, with verification deferred?"
+    gating: true
+    affects: [w2]
+    default: "Yes - label self-attested now; design post-load introspection receipts later"
+  - question: "What does the bundle tuning hash certify?"
+    gating: true
+    affects: [w2]
+    default: "Two hashes: canonical requested-config hash (platform-independent identity) + applied-ledger hash (physical identity)"
+
+metadata:
+  owners:
+    - "joe"
+  tags:
+    - tuning
+    - decision-gate
+    - soundness
+  estimated_effort: Small
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12 (claude/tuning-system-review-7mzapy)"

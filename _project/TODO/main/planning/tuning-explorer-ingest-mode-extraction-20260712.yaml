@@ -1,0 +1,84 @@
+id: tuning-explorer-ingest-mode-extraction-20260712
+title: "Explorer ingest: read tuning_mode from all bundle generations; stop conflating absent with baseline"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07-12 tuning review, finding C6 ungated part (evidence pinned to
+  commit acfb8992).
+
+  The explorer pipeline reads only config.tuning_mode
+  (_project/scripts/explorer_pipeline/transformer.py:178-184). All 528
+  seed-corpus bundles store the value at execution.tuning_mode (325) or nowhere
+  (203) -> every corpus run ingests as tuning_mode=None. facetMatching.ts:99 then
+  defaults null to "untuned", a token no producer emits, so "explicitly
+  baseline", "tuned but old schema", and "never recorded" all facet-match each
+  other. ComparabilityReceipt.tsx:177 shows "Not recorded". The explorer's own
+  tuning_hash (transformer.py:187-201) hashes {mode, repr string} - cosmetic repr
+  differences change it.
+
+  Fix the ingest layer (decision-safe): fall back to execution.tuning_mode,
+  ingest a distinct "unknown/not-recorded" state instead of null-coalescing to a
+  fake mode, and stop hashing repr text (hash the canonical config when present,
+  else emit no hash). Facet-matching RULE changes (whether unknown matches
+  baseline) are gated on ADR-2 and owned by the facet implementation TODO.
+
+work:
+  - id: w0
+    summary: "Re-validate pinned evidence at current HEAD: rerun the corpus sweep script (scratchpad tuning_sweep.py logic) and confirm field locations; commit compact counts in PR body"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "transformer.py: read config.tuning_mode with execution.tuning_mode fallback; represent not-recorded explicitly; tuning_hash only from machine-readable config (never repr strings)"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "facetMatching/receipt: surface not-recorded as its own display state (keep current matching rule until ADR-2; remove the invented 'untuned' default token in favor of the explicit state)"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Re-ingest the seed corpus and verify counts: 325 tuned / 203 not-recorded now visible in the explorer dataset"
+    status: pending
+    needs: [w1]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Ingest must not fail on any existing corpus bundle generation"
+  - "Existing explorer duckdb dataset column names (additive states, no renames)"
+
+anti_patterns:
+  - "Do not default missing mode to any real mode value"
+  - "Do not change which runs facet-match which (gated on ADR-2)"
+
+scope_limit:
+  only_modify:
+    - "_project/scripts/explorer_pipeline/**"
+    - "results-explorer/src/lib/facetMatching.ts"
+    - "results-explorer/src/components/ComparabilityReceipt.tsx"
+    - "results-explorer/src/components/TuningBadge.tsx"
+    - "results-explorer/src/**/__tests__/**"
+    - "tests/unit/**"
+
+verification:
+  - description: "Corpus re-ingest count check"
+    command: "uv run -- python _project/scripts/explorer_pipeline/pipeline.py --help"
+    expected_output: "Pipeline runs against results-data/bundles; dataset shows 325 tuned and 203 not-recorded rows (exact counts from w0 re-validation)"
+  - description: "Explorer unit tests green"
+    command: "cd results-explorer && npm test -- --run 2>&1 | tail -5"
+    expected_output: "All passing incl. new not-recorded state tests"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - explorer
+    - ingest
+    - comparability
+  estimated_effort: Medium
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, finding C6"

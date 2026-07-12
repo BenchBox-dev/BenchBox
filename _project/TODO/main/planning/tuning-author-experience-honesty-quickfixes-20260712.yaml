@@ -1,0 +1,83 @@
+id: tuning-author-experience-honesty-quickfixes-20260712
+title: "Author-facing honesty quickfixes: dry-run preview lookup, misleading displays, CLI footguns"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07-12 tuning review, findings R3 (partial), N1, N2, N3
+  (evidence pinned to commit acfb8992). Small, independent, decision-free fixes:
+
+  1. Dry-run tuning preview is silently empty: _extract_ddl_preview
+     (benchbox/core/dryrun.py:1087) does exact-key lookup
+     table_tunings.get(table_name) with lowercase benchmark names vs uppercase
+     template keys (LINEITEM) - verified: tuned duckdb/tpch dry-run rendered 0
+     tuning clauses. Normalize case like profile_validation.extract_template_columns
+     already does (.upper()).
+  2. Dry-run shows "Databricks Clustering Strategy: z_order" under Platform
+     Optimizations for non-Databricks runs (observed on duckdb) - suppress
+     platform-foreign default fields.
+  3. --dry-run takes a required OUTPUT_DIR string and swallows a following flag:
+     `--dry-run --non-interactive` created a directory literally named
+     "--non-interactive" (run.py:2597-2602). Reject values starting with '-'.
+  4. A local file/dir named "tuned" shadows the tuned keyword because path
+     existence is checked before keywords (tuning_resolver.py:200-207). Check
+     keywords first.
+  5. Invalid-value error hint says "--tuning list", itself an invalid value
+     (tuning_resolver.py:316,326); the real command is `benchbox tuning list`.
+
+work:
+  - id: w1
+    summary: "Case-normalize table-key lookup in _extract_ddl_preview (+ regression test using the shipped duckdb tpch template)"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Suppress platform-foreign optimization rows in dry-run display; only show fields relevant to the target platform"
+    status: pending
+    needs: []
+  - id: w3
+    summary: "Reject option-like values for --dry-run OUTPUT_DIR (leading '-') with a clear error"
+    status: pending
+    needs: []
+  - id: w4
+    summary: "Resolver: check keywords (tuned/notuning/auto) before path existence; fix the '--tuning list' hint to 'benchbox tuning list'"
+    status: pending
+    needs: []
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Explicit file paths (including relative) keep working for --tuning"
+  - "Dry-run remains non-executing and side-effect free apart from its output dir"
+
+anti_patterns:
+  - "Do not rewrite the preview to use adapter mixins here - renderer unification is gated on ADR-3"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/dryrun.py"
+    - "benchbox/cli/tuning_resolver.py"
+    - "benchbox/cli/commands/run.py"
+    - "tests/unit/**"
+
+verification:
+  - description: "Tuned duckdb dry-run now shows tuning clauses"
+    command: "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --dry-run /tmp/dr-check --non-interactive 2>&1 | grep -c 'ORDER BY'"
+    expected_output: ">= 1 tuning clause rendered in preview"
+  - description: "Flag-swallow guard"
+    command: "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --dry-run --non-interactive 2>&1 | tail -3"
+    expected_output: "Clear error about missing OUTPUT_DIR, no directory named '--non-interactive' created"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - dry-run
+    - cli
+    - author-experience
+  estimated_effort: Small
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, findings R3/N1/N2/N3"

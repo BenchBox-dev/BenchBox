@@ -1,0 +1,92 @@
+id: tuning-platform-identity-canonical-keys-20260712
+title: "Use canonical platform type keys (not display names) in tuning validation and metadata"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07-12 tuning review, finding R1 (evidence pinned to commit acfb8992).
+
+  benchbox/platforms/base/adapter.py:714 calls
+  `validate_for_platform(self.platform_name)` with the human display string
+  ("ClickHouse (Local)", "StarRocks"). TuningType.is_compatible_with_platform
+  (benchbox/core/tuning/interface.py:79-164) lowercases it and looks it up in a
+  map keyed by canonical types ("clickhouse"), so multi-word display names match
+  nothing and every enabled tuning type errors -> ValueError after data
+  generation. Verified empirically: a default-constructed config (constraints
+  default enabled=True) yields 4 errors on StarRocks / "ClickHouse (Local)" /
+  Doris / Trino; even the key "clickhouse" fails on default-enabled
+  foreign_keys/check_constraints. TuningMetadataManager also persists the display
+  name into the metadata table (benchbox/core/tuning/metadata.py:207).
+
+  Fix: introduce a canonical platform-type accessor on adapters (the CLI key,
+  e.g. database_config.type) and route every tuning-capability lookup and
+  metadata persistence through it. Also decide-in-code the unknown-platform
+  behavior explicitly (warn + treat as no-capability, never a crash keyed on
+  string formatting).
+
+work:
+  - id: w0
+    summary: "Re-validate pinned evidence at current HEAD (validate_for_platform probe, line refs)"
+    notes: "Re-run the empirical probe, confirm adapter.py/interface.py line refs; commit a compact summary (command, SHA, PASS/FAIL, key lines) in the PR description."
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Add canonical_platform_type to PlatformAdapter and switch tuning lookups to it"
+    notes: "Sourced from config type; audit all platform_name uses feeding dict lookups / lowercased comparisons / persistence, switch tuning paths to the canonical key."
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Make unknown-platform capability lookups an explicit warning path, not an empty-set hard fail"
+    notes: "Align default-enabled constraints with per-platform reality, or downgrade constraint-compat mismatches to warnings with a recorded drop."
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Regression tests: tuned-mode validation on starrocks/clickhouse/doris display names no longer crashes on name formatting; canonical key persisted in metadata table"
+    status: pending
+    needs: [w2]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Existing passing validation behavior for duckdb/databricks tuned templates"
+  - "validate_for_platform's public signature (callers exist in cli/config.py and platforms/base/tuning_config.py)"
+
+approach: |
+  Small, mechanical: one new property, call-site substitutions, plus explicit
+  unknown-platform semantics. Do NOT consolidate the capability registries here
+  (gated on ADR-3); this item only makes the existing lookups use the right key.
+
+anti_patterns:
+  - "Do not add starrocks/doris/etc to the hardcoded compat map as a fix - that grows the drift problem this plan later removes"
+  - "Do not normalize display names with string surgery (strip parens); use the config type key"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/base/adapter.py"
+    - "benchbox/platforms/base/tuning_config.py"
+    - "benchbox/core/tuning/interface.py"
+    - "benchbox/core/tuning/metadata.py"
+    - "benchbox/cli/config.py"
+    - "tests/unit/**"
+
+verification:
+  - description: "Empirical probe passes"
+    command: "uv run -- python -c \"from benchbox.core.tuning.interface import UnifiedTuningConfiguration; c=UnifiedTuningConfiguration(); print(c.validate_for_platform('StarRocks'))\""
+    expected_output: "No spurious 'not supported by platform' errors caused purely by display-name formatting"
+  - description: "Tuning unit suites stay green"
+    command: "uv run -- python -m pytest tests/unit/core/tuning tests/unit/cli/test_tuning* -q"
+    expected_output: "All passing"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - platform-identity
+    - correctness
+  estimated_effort: Medium
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, finding R1"

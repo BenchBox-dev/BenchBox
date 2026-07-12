@@ -1,0 +1,102 @@
+id: tuning-renderer-consolidation-and-baseline-policy-20260712
+title: "Single tuning renderer + capability registry; enforce decided baseline policy"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Architecture
+
+description: |
+  From the 2026-07-12 tuning review, findings C5 (policy side), R2/R3 (structural
+  side), architecture assessment (evidence pinned to commit acfb8992). GATED on
+  ADR-3 (tuning-adr-baseline-definition-and-renderer-20260712).
+
+  Implements the decided direction:
+  - ONE capability registry keyed by canonical platform type; the six current
+    sources (interface.py compat map, generator registry,
+    platform_capabilities.py, adapter mixins, `benchbox tuning platforms`
+    tables, coverage matrix) become derivations or lookups of it;
+  - ONE rendering path shared by dry-run preview and execution (per ADR-3,
+    expected: adapters consume core/tuning/generators/*); delete dead renderers
+    (clickhouse generate_tuning_clause has zero callers) and log-only apply
+    paths become real or explicitly declared no-capability;
+  - BASELINE POLICY per ADR-3: relocate/record the ClickHouse OLAP session pack
+    (clickhouse/tuning.py:74-100), label engine-mandatory layout (StarRocks
+    DISTRIBUTED BY injection) in bundle metadata, and align the databricks-liquid
+    warn-vs-fail behavior with the recorded policy axis;
+  - Databricks-specific layout validation moves out of interface.py
+    (_validate_databricks_effective_layout) into the platform layer.
+
+work:
+  - id: w1
+    summary: "Introduce the capability registry; derive interface compat checks and platform_capabilities from it; consistency test flips from allowlist-drift to strict"
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Renderer unification per ADR-3, one platform at a time starting duckdb -> clickhouse -> starrocks -> databricks; dry-run preview calls the same renderer as execution"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Baseline policy enforcement: session-pack relocation + engine-mandatory layout labeling + `benchbox tuning platforms` output generated from the registry"
+    status: pending
+    needs: [w1]
+  - id: w4
+    summary: "Move Databricks layout validation to the platform layer; slim interface.py to pure data model"
+    status: pending
+    needs: [w1]
+  - id: w5
+    summary: "Retire deprecated CLI shims (create-sample-tuning, df-tuning) with docs/test sweep, or explicitly re-justify keeping them"
+    status: pending
+    needs: []
+
+deps:
+  needs:
+    - tuning-adr-baseline-definition-and-renderer-20260712
+    - tuning-platform-identity-canonical-keys-20260712
+    - tuning-generator-registry-completeness-20260712
+
+must_preserve:
+  - "Physical rendering identity boundaries (zorder vs liquid auto/manual vs duckdb tuned) per the databricks-liquid TODO must_preserve"
+  - "Existing bundle schema compatibility during migration (renderer change must not silently change published metadata semantics without a schema note)"
+
+approach: |
+  Land per-platform in separate PRs under this one TODO's work units; each
+  platform migration ships with a before/after DDL snapshot test proving the
+  rendered statements are intentional (identical, or a documented improvement).
+
+anti_patterns:
+  - "No big-bang rewrite across all platforms in one PR"
+  - "Do not delete a mixin path before its generator replacement has a snapshot test"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tuning/**"
+    - "benchbox/platforms/**"
+    - "benchbox/cli/**"
+    - "benchbox/core/dryrun.py"
+    - "docs/**"
+    - "tests/**"
+
+verification:
+  - description: "Dry-run preview and execution render identical tuning DDL for a migrated platform"
+    command: "uv run -- python -m pytest tests/unit -q -k 'renderer or ddl_snapshot'"
+    expected_output: "Snapshot tests pass; preview==execution assertion holds"
+  - description: "Full tuning suites green"
+    command: "uv run -- python -m pytest tests/unit/core/tuning tests/unit/platforms tests/unit/cli/test_tuning* -q"
+    expected_output: "All passing"
+
+prior_art:
+  - "benchbox/core/tuning/ddl_generator.py get_ddl_generator: registry seed — extend into the capability registry"
+  - "benchbox/platforms/base/format_capabilities.py: existing per-platform capability declaration pattern — reuse shape"
+  - "docs/development/adapter-refactor-map.md: prior slice-by-slice platform refactor process — reuse"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - architecture
+    - renderer
+    - baseline
+  estimated_effort: Large
+  created_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, architecture assessment"
