@@ -2,7 +2,8 @@ id: tuning-generator-registry-completeness-20260712
 title: "Register orphaned DDL generators and make NoOp fallback loud + tested"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-07-12"
 category: Core Functionality
 
 description: |
@@ -20,15 +21,15 @@ description: |
 work:
   - id: w1
     summary: "Register questdb, pg_duckdb, pg_mooncake in the get_ddl_generator mapping"
-    status: pending
+    status: done
     needs: []
   - id: w2
     summary: "Log a warning when NoOpDDLGenerator is returned for a platform the CLI registry knows (silent fallback only for genuinely tuning-free platforms like sqlite)"
-    status: pending
+    status: done
     needs: [w1]
   - id: w3
     summary: "Add registry-completeness unit test: every module in core/tuning/generators/ exporting a BaseDDLGenerator subclass must be reachable via get_ddl_generator under at least one platform key"
-    status: pending
+    status: done
     needs: [w1]
 
 deferred:
