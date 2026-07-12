@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 407
+**Total registered rules:** 427
 
 **Platforms covered:** 33
 
@@ -22,7 +22,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | databricks | - | - | - | 2 | 1 | - | 3 |
 | datafusion | - | - | 4 | 2 | - | 14 | 20 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
-| duckdb | - | - | - | - | - | 6 | 6 |
+| duckdb | - | - | - | - | - | 26 | 26 |
 | fabric_dw | - | - | - | - | 1 | - | 1 |
 | firebolt | - | - | - | - | 1 | - | 1 |
 | lakesail | 5 | 6 | - | - | 1 | 69 | 81 |
@@ -221,6 +221,26 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.transaction_primitives.transaction_savepoint_deep_nesting` |
 | execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.transaction_primitives.transaction_savepoint_nested` |
 | execution_filter | benchmark=write_primitives, query=bulk_load_upsert_mode | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.bulk_load_upsert_mode` |
+| execution_filter | benchmark=write_primitives, query=merge_computed_values | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_computed_values` |
+| execution_filter | benchmark=write_primitives, query=merge_conditional_insert | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_conditional_insert` |
+| execution_filter | benchmark=write_primitives, query=merge_conditional_update | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_conditional_update` |
+| execution_filter | benchmark=write_primitives, query=merge_date_arithmetic | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_date_arithmetic` |
+| execution_filter | benchmark=write_primitives, query=merge_deduplication_window_function | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_deduplication_window_function` |
+| execution_filter | benchmark=write_primitives, query=merge_error_handling | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_error_handling` |
+| execution_filter | benchmark=write_primitives, query=merge_etl_aggregation_pattern | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_etl_aggregation_pattern` |
+| execution_filter | benchmark=write_primitives, query=merge_from_subquery_aggregated | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_from_subquery_aggregated` |
+| execution_filter | benchmark=write_primitives, query=merge_full_overlap_all_update | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_full_overlap_all_update` |
+| execution_filter | benchmark=write_primitives, query=merge_multi_column_update | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_multi_column_update` |
+| execution_filter | benchmark=write_primitives, query=merge_no_overlap_all_insert | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_no_overlap_all_insert` |
+| execution_filter | benchmark=write_primitives, query=merge_overlap_10pct | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_overlap_10pct` |
+| execution_filter | benchmark=write_primitives, query=merge_overlap_50pct | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_overlap_50pct` |
+| execution_filter | benchmark=write_primitives, query=merge_overlap_90pct | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_overlap_90pct` |
+| execution_filter | benchmark=write_primitives, query=merge_returning_clause | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_returning_clause` |
+| execution_filter | benchmark=write_primitives, query=merge_simple_upsert_small | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_simple_upsert_small` |
+| execution_filter | benchmark=write_primitives, query=merge_string_operations | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_string_operations` |
+| execution_filter | benchmark=write_primitives, query=merge_upsert_with_delete | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_upsert_with_delete` |
+| execution_filter | benchmark=write_primitives, query=merge_with_cte_source | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_with_cte_source` |
+| execution_filter | benchmark=write_primitives, query=merge_with_join_condition | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_with_join_condition` |
 
 ### fabric_dw
 

@@ -423,11 +423,6 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     f"{POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
                 )
 
-        if (platform_key or "").lower() == "duckdb":
-            duckdb_skip_reason = duckdb_write_primitive_skip_reason(operation)
-            if duckdb_skip_reason is not None:
-                return None, (f"Operation '{operation.id}' is skipped on DuckDB: {duckdb_skip_reason}")
-
         # A ``null`` platform override is an unsupported-on-this-platform skip; a
         # string override is a per-platform SQL body used only when the adapter
         # did not supply its own ``sql_override`` below.
@@ -453,6 +448,15 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             effective_sql = platform_override_sql
         else:
             effective_sql = operation.write_sql
+
+        # Gate against the SQL DuckDB will actually run: bundled DuckDB rejects
+        # MERGE INTO, but a per-platform override that removes it (or one that
+        # introduces it) must be judged on the effective body, not the catalog
+        # default.
+        if (platform_key or "").lower() == "duckdb":
+            duckdb_skip_reason = duckdb_write_primitive_skip_reason(operation, effective_sql)
+            if duckdb_skip_reason is not None:
+                return None, (f"Operation '{operation.id}' is skipped on DuckDB: {duckdb_skip_reason}")
 
         if (empty_reason := self._check_staging_table_population(operation.write_sql, connection)) is not None:
             return None, f"Operation '{operation.id}' is skipped because {empty_reason}"

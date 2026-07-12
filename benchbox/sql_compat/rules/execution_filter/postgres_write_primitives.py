@@ -94,6 +94,13 @@ _SKIPS_BY_QUERY_ID = {
     **POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS,
 }
 
+# NOTE: The runtime skip decision is made by ``_get_effective_write_sql`` reading
+# the CATEGORY/OPERATION skip dicts above directly; nothing resolves the
+# EXECUTION_FILTER registry phase at execution time today. Unlike the DuckDB rule
+# (whose skip set is a dynamic MERGE INTO token match and is therefore NOT
+# registered), this loop enumerates exactly the same static skip set the dicts
+# hold, so the registry and the runtime cannot disagree. It is registered for any
+# future registry-driven coverage consumer; the dicts remain the source of truth.
 for _query_id, _reason in _SKIPS_BY_QUERY_ID.items():
     REGISTRY.register(
         CompatibilityDecision(
