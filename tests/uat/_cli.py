@@ -384,6 +384,7 @@ def _handle_execute(args: argparse.Namespace) -> int:
         # NOT land here: run_sweep synthesizes an ExecuteOutcome from the
         # attempted cells for that case, so it flows through the normal
         # summary path below.) There are no per-cell counts to report.
+        aborted = result.aborted_phase is not None
         summary = {
             "name": config.name,
             "log_dir": str(result.log_dir),
@@ -394,12 +395,13 @@ def _handle_execute(args: argparse.Namespace) -> int:
             "compatibility_pruned": 0,
             "skipped_unreachable": 0,
             "docker_events": 0,
-            "aborted": True,
+            "aborted": aborted,
             "abort_reason": result.abort_reason,
         }
         print(json.dumps(summary, indent=2))
-        print(f"[execute] ABORT: {result.abort_reason}", file=sys.stderr)
-        return 2
+        if aborted:
+            print(f"[execute] ABORT: {result.abort_reason}", file=sys.stderr)
+        return result.exit_code()
 
     summary = {
         "name": config.name,

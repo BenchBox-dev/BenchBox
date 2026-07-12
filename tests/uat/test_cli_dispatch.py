@@ -444,3 +444,43 @@ def test_uat_execute_and_execute_only_sweep_produce_identical_cells_jsonl(tmp_pa
     execute_sidecar = (execute_log_dir / "cells.jsonl.accounting.json").read_text(encoding="utf-8")
     sweep_sidecar = (sweep_log_dir / "cells.jsonl.accounting.json").read_text(encoding="utf-8")
     assert execute_sidecar == sweep_sidecar
+
+
+def test_execute_main_reports_success_for_dry_run_config(tmp_path, monkeypatch, capsys):
+    """#1146 review: a `dry_run: true` config never invokes run_execute, so
+    `result.execute_outcome` stays None -- but that's not an abort. Before
+    this fix, `_handle_execute` treated a None outcome as *always* an abort
+    and hardcoded exit 2, so `make uat-execute` on a dry-run config failed
+    even though the (no-op) phase loop succeeded.
+    """
+    config_path = tmp_path / "uat.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                'name: "dry-run-smoke"',
+                "dry_run: true",
+                "phases: [execute]",
+                "platforms:",
+                '  include: ["duckdb"]',
+                "benchmarks:",
+                '  include: ["tpch"]',
+                "scales:",
+                "  rungs: [0.01]",
+                "output:",
+                f'  logs_dir_template: "{tmp_path / "dry-run-execute"}"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fail_run_execute(config, **kwargs):
+        raise AssertionError("dry_run: true must not invoke run_execute")
+
+    monkeypatch.setattr("tests.uat.phases.execute.run_execute", fail_run_execute)
+
+    rc = _cli.main(["execute", "--config", str(config_path)])
+
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["aborted"] is False
+    assert summary["abort_reason"] is None
+    assert rc == 0
