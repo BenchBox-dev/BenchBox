@@ -20,7 +20,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from tests.uat import cells_io, docker_assets, preflight_budget
+from tests.uat import cells_io, docker_assets, gate_summary, preflight_budget
 from tests.uat.config import UATConfig, disk_gate_disabled_warning, load_config
 from tests.uat.phases import (
     execute as exec_phase,
@@ -168,6 +168,9 @@ def run_sweep(  # noqa: C901
     preflight_result = None
     validator_rollup_tsv: Path | None = None
     submissions_dir: Path | None = None
+    validate_result: Any = None
+    report_summary: Any = None
+    explorer_smoke_status = gate_summary.EXPLORER_SMOKE_NOT_RUN
 
     if not config.dry_run and "execute" in config.phases:
         gate_warning = disk_gate_disabled_warning(config)
@@ -194,7 +197,7 @@ def run_sweep(  # noqa: C901
             if result.aborted:
                 aborted_phase = phase
                 abort_reason = result.abort_reason
-                _emit_abort_artifacts(
+                report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=(),
@@ -247,7 +250,7 @@ def run_sweep(  # noqa: C901
                     abort_reason=abort_reason,
                     abort_kind="disk_floor",
                 )
-                _emit_abort_artifacts(
+                report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=attempted_cells,
@@ -283,7 +286,7 @@ def run_sweep(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = execute_outcome.abort_reason
-                _emit_abort_artifacts(
+                report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=(),
@@ -302,7 +305,7 @@ def run_sweep(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = "validate phase requires execute phase to have run"
-                _emit_abort_artifacts(
+                report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=(),
@@ -321,11 +324,12 @@ def run_sweep(  # noqa: C901
                 floor=config.validate.validator_clean_rate_floor,
             )
             phase_exit_codes[phase] = vr.exit_code()
+            validate_result = vr
             validator_rollup_tsv = vr.rollup_tsv_path
             if vr.aborted:
                 aborted_phase = phase
                 abort_reason = vr.abort_reason
-                _emit_abort_artifacts(
+                report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=(),
@@ -343,7 +347,7 @@ def run_sweep(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = "package phase requires execute phase to have run"
-                _emit_abort_artifacts(
+                report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=(),
@@ -373,7 +377,7 @@ def run_sweep(  # noqa: C901
             if pr.aborted:
                 aborted_phase = phase
                 abort_reason = pr.abort_reason
-                _emit_abort_artifacts(
+                report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=(),
@@ -395,6 +399,18 @@ def run_sweep(  # noqa: C901
                 playwright_browsers=config.explorer_smoke.playwright_browsers,
             )
             phase_exit_codes[phase] = result.exit_code()
+            # Thread the ran/skipped distinction into the gate summary: an
+            # explorer_smoke skip is exit 0 by design (node/explorer absent),
+            # so the exit code alone cannot tell "browser coverage happened"
+            # from "browser coverage silently didn't" -- the release-gate
+            # aggregation (`make uat-gate-check`) enforces `ran` for stages
+            # whose `phases:` list includes explorer_smoke.
+            if getattr(result, "skipped", False):
+                explorer_smoke_status = (
+                    "skipped_no_node" if getattr(result, "skip_reason", None) == "node not on PATH" else "skipped"
+                )
+            else:
+                explorer_smoke_status = gate_summary.EXPLORER_SMOKE_RAN
             if getattr(result, "skip_reason", None) == "node not on PATH":
                 # macOS operator machines legitimately lack `node` for
                 # non-explorer sweeps -- exit 0 stays, but the drop in
@@ -423,7 +439,7 @@ def run_sweep(  # noqa: C901
             if getattr(result, "aborted", False):
                 aborted_phase = phase
                 abort_reason = getattr(result, "abort_reason", None)
-                _emit_abort_artifacts(
+                report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=(),
@@ -446,7 +462,7 @@ def run_sweep(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = "report phase requires execute phase to have run"
-                _emit_abort_artifacts(
+                report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
                     attempted=(),
@@ -476,7 +492,30 @@ def run_sweep(  # noqa: C901
                 startup_failed_count=len(getattr(execute_outcome, "startup_failed", ())),
                 source_info=source_info,
             )
+            report_summary = summary
             phase_exit_codes[phase] = summary.exit_code()
+
+    # Gate summary artifact: written for EVERY sweep, including dry-run
+    # (verdict "dry_run") and aborted sweeps (verdict "red"), so the
+    # release-gate aggregation (`make uat-gate-check`) always has a
+    # machine-readable per-stage record beside cells.jsonl. Written last:
+    # its completed_at is the sweep-completion timestamp the cross-stage
+    # Docker ordering check keys on.
+    completed_at = _dt.datetime.now()
+    _write_gate_summary_artifact(
+        config=config,
+        log_dir=log_dir,
+        source_info=source_info,
+        container_engine=container_engine,
+        completed_at=completed_at,
+        aborted_phase=aborted_phase,
+        abort_reason=abort_reason,
+        phase_exit_codes=phase_exit_codes,
+        execute_outcome=execute_outcome,
+        report_summary=report_summary,
+        validate_result=validate_result,
+        explorer_smoke_status=explorer_smoke_status,
+    )
 
     return SweepResult(
         name=config.name,
@@ -509,7 +548,7 @@ def _emit_abort_artifacts(
     skipped_unreachable_count: int | None = None,
     startup_failed_count: int | None = None,
     container_engine: str | None = None,
-) -> None:
+) -> report_phase.ReportSummary:
     cells = tuple(getattr(execute_outcome, "results", ())) if execute_outcome is not None else tuple(attempted)
     compatibility_pruned = (
         tuple(getattr(execute_outcome, "compatibility_pruned", ()))
@@ -538,7 +577,9 @@ def _emit_abort_artifacts(
         container_engine=container_engine,
     )
     _write_compatibility_pruned_jsonl(log_dir / "compatibility_pruned.jsonl", compatibility_pruned)
-    report_phase.write_report(
+    # Returned so run_sweep can fold the partial report's accounting into the
+    # gate summary artifact (uat-release-gate-enforcement w1).
+    return report_phase.write_report(
         cells,
         output_path=_partial_report_path(log_dir / config.report.matrix_summary_tsv),
         rungs=list(config.scales.rungs),
@@ -552,6 +593,104 @@ def _emit_abort_artifacts(
         abort_phase=aborted_phase,
         abort_reason=abort_reason,
     )
+
+
+def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> gate_summary.PhaseAccounting:
+    """Fold sweep results into the gate summary's accounting block.
+
+    Prefers the report phase's `ReportSummary` (complete or partial-abort --
+    both flow through `report_phase.write_report`, the single owner of the
+    accounting math). A sweep that ran execute without a report phase (e.g.
+    `make uat-execute`'s scoped `[preflight, execute]` loop) mirrors
+    write_report's counting on the outcome directly rather than writing a
+    throwaway TSV.
+    """
+    if report_summary is not None:
+        return gate_summary.PhaseAccounting(
+            attempted=report_summary.attempted_count,
+            passed=report_summary.pass_count,
+            failed=report_summary.fail_count,
+            timed_out=report_summary.timeout_count,
+            unreachable=report_summary.unreachable_count,
+            startup_failed=report_summary.startup_failed_count,
+            skipped=report_summary.skipped_count,
+            compatibility_pruned=report_summary.compatibility_pruned_count,
+            early_stop_pruned=report_summary.early_stop_pruned_count,
+            registry_pruned=report_summary.registry_pruned_count,
+            total_defined=report_summary.total_defined_count,
+        )
+    if execute_outcome is None:
+        return gate_summary.PhaseAccounting()
+    results = tuple(getattr(execute_outcome, "results", ()))
+    passed = sum(1 for r in results if r.status == "passed")
+    failed = sum(1 for r in results if r.status == "failed")
+    timed_out = sum(1 for r in results if r.status == "timed-out")
+    row_skipped = sum(1 for r in results if report_phase.is_skipped_status(r.status))
+    row_unreachable = sum(1 for r in results if report_phase.is_unreachable_status(r.status))
+    compatibility_pruned = len(getattr(execute_outcome, "compatibility_pruned", ()))
+    early_stop_pruned = len(getattr(execute_outcome, "pruned", ()))
+    unreachable = row_unreachable + len(getattr(execute_outcome, "skipped_unreachable", ()))
+    startup_failed = len(getattr(execute_outcome, "startup_failed", ()))
+    attempted = len(results) - row_skipped - row_unreachable
+    skipped = row_skipped + compatibility_pruned + early_stop_pruned
+    return gate_summary.PhaseAccounting(
+        attempted=attempted,
+        passed=passed,
+        failed=failed,
+        timed_out=timed_out,
+        unreachable=unreachable,
+        startup_failed=startup_failed,
+        skipped=skipped,
+        compatibility_pruned=compatibility_pruned,
+        early_stop_pruned=early_stop_pruned,
+        registry_pruned=0,
+        total_defined=attempted + skipped + unreachable + startup_failed,
+    )
+
+
+def _write_gate_summary_artifact(
+    *,
+    config: UATConfig,
+    log_dir: Path,
+    source_info: RunSourceInfo,
+    container_engine: str | None,
+    completed_at: _dt.datetime,
+    aborted_phase: str | None,
+    abort_reason: str | None,
+    phase_exit_codes: dict[str, int],
+    execute_outcome: Any,
+    report_summary: Any,
+    validate_result: Any,
+    explorer_smoke_status: str,
+) -> None:
+    """Serialize the per-sweep gate summary (uat-release-gate-enforcement w1)."""
+    summary = gate_summary.GateSummary(
+        config_name=config.name,
+        source_commit_sha=source_info.commit_sha,
+        source_dirty=source_info.dirty,
+        container_engine=container_engine,
+        completed_at=completed_at.isoformat(),
+        dry_run=config.dry_run,
+        aborted=aborted_phase is not None,
+        abort_phase=aborted_phase,
+        abort_reason=abort_reason,
+        phase_exit_codes=dict(phase_exit_codes),
+        accounting=_accounting_for_gate_summary(report_summary, execute_outcome),
+        unreachable_is_estimated=bool(getattr(report_summary, "unreachable_count_is_estimated", False)),
+        validator_clean_rate=(validate_result.clean_rate if validate_result is not None else None),
+        validator_clean_rate_floor=(validate_result.floor if validate_result is not None else None),
+        validator_floor_breached=(validate_result.floor_breached if validate_result is not None else None),
+        cross_scale_clean_pairs=(report_summary.cross_scale_clean_pairs if report_summary is not None else None),
+        cross_scale_floor=(report_summary.cross_scale_floor if report_summary is not None else None),
+        cross_scale_floor_breached=(report_summary.cross_scale_floor_breached if report_summary is not None else None),
+        explorer_smoke_status=explorer_smoke_status,
+        verdict=gate_summary.derive_verdict(
+            dry_run=config.dry_run,
+            aborted=aborted_phase is not None,
+            phase_exit_codes=phase_exit_codes,
+        ),
+    )
+    gate_summary.write_gate_summary(log_dir, summary)
 
 
 def _partial_report_path(path: Path) -> Path:

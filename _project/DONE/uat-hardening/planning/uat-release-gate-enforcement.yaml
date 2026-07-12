@@ -2,7 +2,8 @@ id: uat-release-gate-enforcement
 title: "Make UAT a real release gate: machine-readable gate summary, ancestry+freshness check in release readiness, tuned cross-scale floors"
 worktree: uat-hardening
 priority: Critical
-status: Not Started
+status: Completed
+completed_date: "2026-07-12"
 category: "Release Tooling"
 
 description: |
@@ -79,28 +80,133 @@ prior_art:
 work:
   - id: w1
     summary: "Define uat_gate_summary.json schema (versioned dataclass, serialized beside cells.jsonl); written for every sweep INCLUDING dry-run (verdict marks dry_run); unit tests for green/red derivation"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      New tests/uat/gate_summary.py: GateSummary (version: 1) +
+      PhaseAccounting dataclasses, derive_verdict (green|red|dry_run --
+      reduces to "any phase exit nonzero or aborted" since validate/report
+      floors already fold into their own exit_code()), atomic write via
+      report.atomic_write_text, forward-compat readers that drop unknown
+      keys. run_sweep writes the summary LAST for every sweep (dry-run,
+      green, red, all abort paths) via _write_gate_summary_artifact;
+      _emit_abort_artifacts now returns its partial ReportSummary so abort
+      accounting flows into the summary. completed_at is a sweep-end
+      datetime.now() capture. Accounting prefers the ReportSummary; a
+      report-less execute sweep (make uat-execute) mirrors write_report's
+      counting on the outcome (report.py's status predicates made public
+      as is_skipped_status/is_unreachable_status for that). Tests: verdict
+      matrix, dry-run/green/red/abort sweep summaries, unknown-key
+      round-trip (tests/uat/test_orchestrator.py).
   - id: w2
     summary: "Machine-readable stage completion: sweep records completed_at + config name in the summary; release_gate_ordering_violations consumes summaries; delete the manual snippet from uat-framework.md"
-    status: pending
+    status: done
     needs: [w1]
+    notes: >
+      Summary carries config_name + completed_at (w1). gate-check parses
+      the stage-1/stage-2 summaries' completed_at and feeds the existing
+      report.release_gate_ordering_violations (reused unchanged per prior
+      art) with each Docker stage's uat_lifecycle.log text -- both the
+      stage1->docker and stage2->stage3 boundaries are enforced. The
+      operator python snippet at uat-framework.md (old :456-463) is
+      deleted, replaced by the `make uat-gate-check` flow.
   - id: w3
     summary: "make uat-gate-check + _cli gate-check subcommand: aggregate 3 stage summaries, enforce ordering + mechanized APPROVE items, write _project/release-evidence/uat-gate-summary.json"
-    status: pending
+    status: done
     needs: [w2]
+    notes: >
+      _cli.py gate-check subcommand (--stage1/2/3 accept run dirs or
+      summary paths; --output defaults to the repo
+      _project/release-evidence/uat-gate-summary.json) +
+      gate_summary.build_combined_evidence: red on any non-green/dry-run
+      stage verdict, estimated sidecar, explorer_smoke configured-but-not-
+      ran, cross-stage sha mismatch, dirty tree, wrong stage count, or
+      ordering violation; exit 0 green / 1 red / 2 unreadable inputs.
+      "gate-check" added to MAKE_TARGET_SUBCOMMANDS and the constant-vs-
+      constant test in test_cli_dispatch.py; `make uat-gate-check` target
+      + .PHONY added. _project/release-evidence/README.md documents the
+      convention (operator-committed evidence, develop-only, curated out
+      of release branches). DEVIATION: .gitignore needed a
+      `!_project/release-evidence/` negation (the `_project/*` ignore
+      would have made the "TRACKED path" requirement impossible) --
+      .gitignore was not in scope_limit but the one-line change is the
+      mechanism's precondition. CLI tests: green evidence write, both
+      ordering boundaries, red-stage HOLD, missing-summary hard error.
   - id: w4
     summary: "Tune cross_scale_coverage_min_pairs in the three release-gate configs per the derivation rule (0.8 * eligible, minimums 8/4/2, derivation comment in each config)"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      Eligible = pairs whose EVERY configured rung is enumerable via
+      enumerate_cells_with_pruning (registry truth, 2026-07-12, develop @
+      acfb89922) -- raw pair counts include pairs missing a rung (e.g.
+      clickbench/joinorder 1.0-only) that the cross-scale check can never
+      count, so raw counts would give impossible floors. Stage 1: 153
+      eligible (208 raw) -> floor max(8, floor(0.8*153)) = 122. Stage 2:
+      64 eligible (83 raw) -> max(4, 51) = 51. Stage 3: 203 eligible (251
+      raw) -> max(2, 162) = 162. Derivation comments written above each
+      value; test_config.py::
+      test_release_gate_cross_scale_floors_are_tuned_and_achievable pins
+      the sound band (>= minimum, <= floor(0.8*eligible), < eligible --
+      the never-exact anti-pattern) without pinning exact registry
+      counts.
   - id: w5
     summary: "Extend release_readiness_check.py: require green/clean/ancestor/<=21d UAT evidence with the existing override escape hatch; unit tests for each failure mode (missing, red, stale, non-ancestor, dirty)"
-    status: pending
+    status: done
     needs: [w3]
+    notes: >
+      evaluate_uat_gate_evidence mirrors evaluate_canary_runs (pure,
+      injectable is_ancestor via the existing git merge-base helper);
+      _load_uat_gate_evidence reads the working tree first, then `git
+      show origin/develop:...` (release/base checkouts curate _project/
+      away; validate-main-pr.yml already fetches origin/develop). Runs
+      only after a green canary and combines via _combined_result, so
+      canary bootstrap/exit-20 semantics are untouched; the existing
+      RELEASE_READINESS_OVERRIDE_SHA/_REASON early-return covers the UAT
+      check automatically (test pinned). New args/envs: --uat-max-age-days
+      (RELEASE_UAT_MAX_AGE_DAYS, default 21), --uat-evidence-path,
+      --uat-evidence-ref. Unit tests in test_release_infrastructure.py::
+      TestUATGateReleaseEvidence: missing/red/dry_run/dirty/stale/
+      non-ancestor/missing-completed_at each block, green passes,
+      main() combination both ways, override bypass, make-target wiring,
+      README convention. NOTE: the gate takes effect once this script
+      version ships to main (validate-main-pr.yml runs the trusted-base
+      copy); no workflow change needed or made. CODEOWNERS: scripts/
+      release_readiness_check.py is NOT Code-Owner-gated (not in
+      .github/CODEOWNERS or SOUNDNESS_PREFIXES).
   - id: w6
     summary: "Update release-guide.md (drop 'advisory', document evidence flow + override), uat-framework.md (gate-check replaces manual checklist mechanics), AGENTS.md release section if it references the old flow"
-    status: pending
+    status: done
     needs: [w5]
+    notes: >
+      release-guide.md: advisory sentence now scopes to stress/live only;
+      new "UAT release-gate evidence (required)" section (sweep x3 ->
+      uat-gate-check -> commit evidence -> release PR, 21-day rationale,
+      origin/develop read, override), flow-precondition note, recovery
+      bullet. uat-framework.md: per-sweep summary documented; manual
+      ordering snippet replaced by `make uat-gate-check`; floor-tuning
+      sentence points at the w4 derivation; APPROVE/HOLD section now
+      describes the mechanized checklist + the two remaining manual items
+      (DuckDB reference green, NO_JSON error text). AGENTS.md release
+      paragraph gains the evidence precondition. REVIEW FOLLOW-UPS
+      (Opus review, applied pre-PR): R1 defense-in-depth --
+      build_combined_evidence now also requires the exact
+      EXPECTED_RELEASE_GATE_STAGES config-name tuple (kills same-dir-x3
+      and hollow-config substitution) and per-stage armed floor gates
+      (validator_clean_rate_floor + cross_scale_floor not None), both
+      tested; C1 -- gate-check HOLDs when a Docker stage (2/3) presents
+      no uat_lifecycle.log ("ordering not verifiable") instead of
+      silently passing, tested; C3 -- gate_summary module doc notes the
+      readiness checker relies on additive versioning rather than
+      validating `version`; N1 -- the git-show fallback honors
+      --uat-evidence-path; release-guide.md states the one-cycle
+      activation lag plainly. ADDITIONAL DEVIATION (review-mandated,
+      outside scope_limit): docs/operations/repo-admin-settings.md
+      advisory_suites line dropped "long-running UAT" and gained a
+      pointer to the release-guide evidence section -- one-line
+      doc-consistency fix; leaving an operator-facing contradiction was
+      judged worse than the scope breach (line not parsed by
+      ruleset_drift_check.py or any test; verified).
 
 deferred:
   - summary: "Automated scheduled release-gate sweeps in CI (cloud runners with docker stacks)"
@@ -168,3 +274,26 @@ metadata:
   estimated_effort: Large
   created_date: "2026-07-11"
   source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), gate-wiring verdict + user decisions Q1/Q2"
+
+files_affected:
+  added:
+  - _project/release-evidence/README.md
+  - tests/uat/gate_summary.py
+  modified:
+  - .gitignore
+  - docs/operations/repo-admin-settings.md
+  - AGENTS.md
+  - Makefile
+  - docs/operations/release-guide.md
+  - docs/operations/uat-framework.md
+  - scripts/release_readiness_check.py
+  - tests/uat/_cli.py
+  - tests/uat/configs/release-gate-01-native-dataframe.yaml
+  - tests/uat/configs/release-gate-02-docker-nonoltp.yaml
+  - tests/uat/configs/release-gate-03-docker-oltp.yaml
+  - tests/uat/orchestrator.py
+  - tests/uat/phases/report.py
+  - tests/uat/test_cli_dispatch.py
+  - tests/uat/test_config.py
+  - tests/uat/test_orchestrator.py
+  - tests/unit/test_release_infrastructure.py

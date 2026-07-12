@@ -22,6 +22,7 @@ MAKE_TARGET_SUBCOMMANDS = (
     "cell",
     "docker-cleanup",
     "execute",
+    "gate-check",
     "validate",
     "package",
     "explorer-smoke",
@@ -199,6 +200,113 @@ def _handle_report(args: argparse.Namespace) -> int:
         )
     )
     return summary.exit_code()
+
+
+def _stage_summary_path(raw: str) -> Path:
+    """Accept either a sweep run dir or a direct uat_gate_summary.json path."""
+    from tests.uat.gate_summary import GATE_SUMMARY_FILENAME
+
+    path = Path(raw).expanduser()
+    if path.is_dir():
+        return path / GATE_SUMMARY_FILENAME
+    return path
+
+
+def _handle_gate_check(args: argparse.Namespace) -> int:
+    """Implements `make uat-gate-check STAGE1=<dir> STAGE2=<dir> STAGE3=<dir>`.
+
+    Aggregates the three release-gate stage summaries (written by each
+    stage's sweep -- see tests.uat.gate_summary), enforces the cross-stage
+    Docker ordering invariant from the stages' machine-recorded completed_at
+    timestamps (replacing the operator-run snippet that used to live in
+    docs/operations/uat-framework.md), enforces the mechanizable APPROVE
+    checklist items, and writes the combined release-evidence file the
+    operator reviews and commits. Exit 0 only on a green combined verdict.
+    """
+    import datetime as _dt
+
+    from tests.uat import gate_summary
+    from tests.uat.phases.report import release_gate_ordering_violations
+
+    stage_paths = [_stage_summary_path(raw) for raw in (args.stage1, args.stage2, args.stage3)]
+    summaries = []
+    for path in stage_paths:
+        if not path.is_file():
+            print(f"[gate-check] ERROR: stage summary not found: {path}", file=sys.stderr)
+            return 2
+        try:
+            summaries.append(gate_summary.read_gate_summary(path))
+        except (ValueError, TypeError) as exc:
+            print(f"[gate-check] ERROR: unreadable stage summary {path}: {exc}", file=sys.stderr)
+            return 2
+
+    # Ordering invariant, machine-derived: no Docker `action=up` in stage 2/3
+    # may precede stage 1's (native + dataframe) completion, and none in
+    # stage 3 may precede stage 2's completion. Docker up events only exist
+    # in each run dir's uat_lifecycle.log; the boundaries come from the
+    # summaries' completed_at fields.
+    ordering_violations: list[str] = []
+    lifecycle_texts = []
+    for stage_label, path in zip(("stage2", "stage3"), stage_paths[1:]):
+        lifecycle = path.parent / "uat_lifecycle.log"
+        if lifecycle.is_file():
+            lifecycle_texts.append(lifecycle.read_text(encoding="utf-8"))
+        else:
+            # A Docker stage (2/3 by definition) with no lifecycle log means
+            # the ordering invariant cannot be verified at all -- that must
+            # HOLD, not silently pass as "no `action=up` events found".
+            # Stage 1 runs no Docker platforms, so it is exempt.
+            lifecycle_texts.append("")
+            ordering_violations.append(
+                f"{stage_label}: docker stage missing lifecycle log ({lifecycle}); ordering not verifiable"
+            )
+    try:
+        stage1_completed_at = _dt.datetime.fromisoformat(summaries[0].completed_at)
+        stage2_completed_at = _dt.datetime.fromisoformat(summaries[1].completed_at)
+    except (TypeError, ValueError) as exc:
+        print(f"[gate-check] ERROR: unparseable completed_at in stage summaries: {exc}", file=sys.stderr)
+        return 2
+    ordering_violations.extend(
+        f"stage1 boundary: {violation}"
+        for violation in release_gate_ordering_violations(
+            lifecycle_texts, native_stage_completed_at=stage1_completed_at
+        )
+    )
+    ordering_violations.extend(
+        f"stage2 boundary: {violation}"
+        for violation in release_gate_ordering_violations(
+            lifecycle_texts[1:], native_stage_completed_at=stage2_completed_at
+        )
+    )
+
+    evidence = gate_summary.build_combined_evidence(
+        summaries,
+        ordering_violations=ordering_violations,
+        generated_at=_dt.datetime.now(),
+    )
+    output = Path(args.output).expanduser()
+    gate_summary.write_combined_evidence(output, evidence)
+    print(
+        json.dumps(
+            {
+                "verdict": evidence.verdict,
+                "source_commit_sha": evidence.source_commit_sha,
+                "source_dirty": evidence.source_dirty,
+                "completed_at": evidence.completed_at,
+                "stage_verdicts": evidence.stage_verdicts,
+                "ordering_violations": list(evidence.ordering_violations),
+                "reasons": list(evidence.reasons),
+                "evidence_path": str(output),
+            },
+            indent=2,
+        )
+    )
+    if evidence.verdict != gate_summary.VERDICT_GREEN:
+        for reason in evidence.reasons:
+            print(f"[gate-check] HOLD: {reason}", file=sys.stderr)
+        return 1
+    print("[gate-check] APPROVE: all release-gate stages green; review and commit the evidence file.")
+    return 0
 
 
 def _handle_explorer_smoke(args: argparse.Namespace) -> int:
@@ -515,6 +623,20 @@ def _build_parser() -> argparse.ArgumentParser:
     preflight = subparsers.add_parser("preflight", help="print advisory disk and platform preflight status")
     preflight.add_argument("--config", required=True)
     _set_handler(preflight, _handle_preflight)
+
+    gate_check = subparsers.add_parser(
+        "gate-check",
+        help="aggregate the 3 release-gate stage summaries into committed release evidence",
+    )
+    gate_check.add_argument("--stage1", required=True, help="Stage-1 run dir or uat_gate_summary.json path")
+    gate_check.add_argument("--stage2", required=True, help="Stage-2 run dir or uat_gate_summary.json path")
+    gate_check.add_argument("--stage3", required=True, help="Stage-3 run dir or uat_gate_summary.json path")
+    gate_check.add_argument(
+        "--output",
+        default=str(Path(__file__).resolve().parents[2] / "_project" / "release-evidence" / "uat-gate-summary.json"),
+        help="Combined release-evidence output path (default: _project/release-evidence/uat-gate-summary.json)",
+    )
+    _set_handler(gate_check, _handle_gate_check)
 
     report = subparsers.add_parser("report", help="write a TSV report from a cells JSONL")
     report.add_argument("--cells-jsonl", required=True)

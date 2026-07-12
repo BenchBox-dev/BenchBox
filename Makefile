@@ -2106,7 +2106,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup uat-artifact-hygiene
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup uat-artifact-hygiene uat-gate-check
 
 # Local-artifact hygiene gate. No-op unless an external output root is
 # configured (BENCHBOX_OUTPUT_DIR or OUTPUT=); when it is, fails if the
@@ -2223,6 +2223,22 @@ uat-stress:
 		$(if $(PLATFORM),--platform "$(PLATFORM)",) \
 		$(if $(BENCHMARK),--benchmark "$(BENCHMARK)",) \
 		$(if $(SCALE),--scale "$(SCALE)",)
+
+# make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]
+# Aggregates the three release-gate stage summaries (uat_gate_summary.json in
+# each stage's run dir) into _project/release-evidence/uat-gate-summary.json,
+# enforcing cross-stage Docker ordering and the mechanized APPROVE checklist.
+# Review and commit the evidence file yourself; nothing here touches git.
+uat-gate-check:
+	@if [ -z "$(STAGE1)" ] || [ -z "$(STAGE2)" ] || [ -z "$(STAGE3)" ]; then \
+		echo "Usage: make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli gate-check \
+		--stage1 "$(STAGE1)" \
+		--stage2 "$(STAGE2)" \
+		--stage3 "$(STAGE3)" \
+		$(if $(OUTPUT),--output "$(OUTPUT)",)
 
 # make uat-execute CONFIG=tests/uat/configs/uat.yaml
 uat-execute:

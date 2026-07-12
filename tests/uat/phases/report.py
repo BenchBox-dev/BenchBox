@@ -148,9 +148,9 @@ def terminal_state(cell: CellResult) -> str:
     """Classify the terminal state visible in durable UAT artifacts."""
     if cell.status == "passed":
         return "passed"
-    if _is_skipped_status(cell.status):
+    if is_skipped_status(cell.status):
         return "skipped"
-    if _is_unreachable_status(cell.status):
+    if is_unreachable_status(cell.status):
         return "unreachable"
     if cell.status == "timed-out" or cell.exit_code == 124:
         return "timeout"
@@ -260,8 +260,8 @@ def write_report(
     pass_count = sum(1 for r in rows if r.status == "passed")
     fail_count = sum(1 for r in rows if r.status == "failed")
     timeout_count = sum(1 for r in rows if r.status == "timed-out")
-    row_skipped_count = sum(1 for r in rows if _is_skipped_status(r.status))
-    row_unreachable_count = sum(1 for r in rows if _is_unreachable_status(r.status))
+    row_skipped_count = sum(1 for r in rows if is_skipped_status(r.status))
+    row_unreachable_count = sum(1 for r in rows if is_unreachable_status(r.status))
     attempted_count = executed_count - row_skipped_count - row_unreachable_count
     skipped_count = row_skipped_count + compatibility_pruned_count + early_stop_pruned_count + registry_pruned_count
     unreachable_count = row_unreachable_count + skipped_unreachable_count
@@ -360,11 +360,11 @@ def _normalized_status(status: str) -> str:
     return status.strip().lower()
 
 
-def _is_skipped_status(status: str) -> bool:
+def is_skipped_status(status: str) -> bool:
     return _normalized_status(status) in _SKIPPED_STATUSES
 
 
-def _is_unreachable_status(status: str) -> bool:
+def is_unreachable_status(status: str) -> bool:
     return _normalized_status(status) in _UNREACHABLE_STATUSES
 
 
