@@ -378,12 +378,20 @@ def run_sweep(  # noqa: C901
                 # explorer_smoke without execute), there is nothing durable
                 # to patch and the stderr warning is the only record -- see
                 # uat-fail-advance-consistency w2.
-                cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
-                print(
-                    "[explorer_smoke] WARNING: node not on PATH -- browser coverage skipped for this sweep "
-                    "(explorer_smoke_status=skipped_no_node)",
-                    file=sys.stderr,
-                )
+                recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
+                if recorded:
+                    print(
+                        "[explorer_smoke] WARNING: node not on PATH -- browser coverage skipped for this sweep "
+                        "(explorer_smoke_status=skipped_no_node recorded in the accounting sidecar)",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        "[explorer_smoke] WARNING: node not on PATH -- browser coverage skipped for this sweep. "
+                        "explorer_smoke_status=skipped_no_node was NOT durably recorded: no accounting sidecar "
+                        "exists for this run (no execute phase wrote one), so this warning is the only record.",
+                        file=sys.stderr,
+                    )
             if getattr(result, "aborted", False):
                 aborted_phase = phase
                 abort_reason = getattr(result, "abort_reason", None)

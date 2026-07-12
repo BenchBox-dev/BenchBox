@@ -142,12 +142,17 @@ def read_cells_jsonl(path: Path) -> list[CellResult]:
     return cells
 
 
-def _read_accounting_payload(cells_jsonl: Path) -> tuple[dict[str, object], bool]:
+def read_accounting_sidecar(cells_jsonl: Path) -> tuple[dict[str, object], bool]:
     """Read the accounting sidecar's raw JSON payload, if present and parseable.
 
-    Shared by every ``read_*_sidecar`` accessor below so they agree on what
-    "sidecar present" means (exists AND parses as JSON), and so a future
-    additive field only needs a new accessor, not a new file read.
+    Returns ``(payload, sidecar_present)``: ``({}, False)`` when the sidecar
+    is absent or unreadable (older artifacts predate it -- every count is
+    then *assumed* 0, not confirmed), and ``(payload, True)`` when it was
+    read successfully. This is the single read shared by every consumer
+    that needs more than one field (e.g. `make uat-report` reads
+    skipped_unreachable_count and startup_failed_count from one call), so
+    all consumers agree on what "sidecar present" means (exists AND parses
+    as JSON) and a multi-count caller does not re-read the file per count.
     """
     sidecar = cells_accounting_path(cells_jsonl)
     if not sidecar.exists():
@@ -169,22 +174,12 @@ def read_skipped_unreachable_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
     read successfully. Callers thread ``sidecar_present`` into
     ``write_report(unreachable_count_is_estimated=...)`` so a regenerated
     report can distinguish "confirmed unreachable=0" from "sidecar missing,
-    unreachable assumed 0."
+    unreachable assumed 0." Single-count convenience over
+    ``read_accounting_sidecar``; callers needing several counts should call
+    that directly instead of stacking one read per count.
     """
-    payload, present = _read_accounting_payload(cells_jsonl)
+    payload, present = read_accounting_sidecar(cells_jsonl)
     return int(payload.get("skipped_unreachable_count", 0)), present
-
-
-def read_startup_failed_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
-    """Read the startup-failed count persisted alongside ``cells.jsonl``.
-
-    Mirrors ``read_skipped_unreachable_sidecar`` -- see
-    uat-fail-advance-consistency w3: startup_failed_count is additive to the
-    sidecar schema and distinct from skipped_unreachable_count (a stack that
-    never started vs. a reachability probe that found nothing listening).
-    """
-    payload, present = _read_accounting_payload(cells_jsonl)
-    return int(payload.get("startup_failed_count", 0)), present
 
 
 def update_accounting_sidecar(cells_jsonl: Path, **fields: object) -> bool:
@@ -202,7 +197,7 @@ def update_accounting_sidecar(cells_jsonl: Path, **fields: object) -> bool:
     caller's opportunistic fields (with the execute-derived counts
     defaulted to 0) would misrepresent an unconfirmed 0 as a real one.
     """
-    payload, present = _read_accounting_payload(cells_jsonl)
+    payload, present = read_accounting_sidecar(cells_jsonl)
     if not present:
         return False
     payload.update(fields)

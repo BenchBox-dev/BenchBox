@@ -272,6 +272,10 @@ def write_report(
     for cell in rows:
         v = _validator_status_for_path(validator_status_by_path, cell.result_path) if validator_status_by_path else ""
         lines.append(render_row(cell, validator_status=v, source_info=source_info) + "\n")
+    # Footer token ordering: the four disjoint components (attempted,
+    # skipped, unreachable, startup_failed) precede their total
+    # (total_defined) -- frozen now, before any parser of these lines
+    # exists, so components-then-total is the stable contract.
     lines.append(
         "# "
         f"rows={len(rows)} "
@@ -282,8 +286,8 @@ def write_report(
         f"attempted={attempted_count} "
         f"skipped={skipped_count} "
         f"unreachable={unreachable_count} "
-        f"total_defined={total_defined_count} "
         f"startup_failed={startup_failed_count} "
+        f"total_defined={total_defined_count} "
         f"passed={pass_count} "
         f"failed={fail_count} "
         f"timed_out={timeout_count} "
@@ -293,7 +297,7 @@ def write_report(
         "# "
         f"release_accounting passed={pass_count} failed={fail_count} timed_out={timeout_count} "
         f"attempted={attempted_count} skipped={skipped_count} unreachable={unreachable_count} "
-        f"total_defined={total_defined_count} startup_failed={startup_failed_count} "
+        f"startup_failed={startup_failed_count} total_defined={total_defined_count} "
         f"registry_pruned={registry_pruned_count}\n"
     )
     if unreachable_count or unreachable_count_is_estimated:
