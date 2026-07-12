@@ -82,7 +82,7 @@ em-dashes or en-dashes, define terms, footnote external facts.
 
 ## 8. Conclusions + Next steps
 - The "200 lines" claim is partly a strawman for a basic Type 2 (real portable form
-  is ~18 lines) and partly fair for hardened production pipelines (40-200+).
+  is ~20 lines) and partly fair for hardened production pipelines (40-200+).
 - The honest axis is portability vs convenience.
 - Invite reproduction; link the BenchBox operation and the verification file.
 

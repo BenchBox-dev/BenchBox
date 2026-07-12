@@ -16,7 +16,7 @@ boilerplate and a class of Slowly Changing Dimension bugs, and that convenience 
 real. But it runs only on Databricks declarative pipelines, while the equivalent
 portable SQL runs unchanged across standard-DML engines such as DuckDB,
 PostgreSQL, Snowflake, and BigQuery (verified here on DuckDB). For a basic Type 2,
-that portable SQL is about 18 lines, not 200. The honest trade-off is convenience
+that portable SQL is about 20 lines, not 200. The honest trade-off is convenience
 versus portability, not lines of code.
 
 ---
@@ -92,10 +92,12 @@ SELECT (SELECT MAX(sk) FROM scd2_ops_dim_customer) + ROW_NUMBER() OVER (ORDER BY
        s.c_custkey, s.c_name, s.c_address, s.c_acctbal, s.c_mktsegment, s.row_hash,
        true, s.effective_ts, DATE '9999-12-31'
 FROM scd2_ops_stage_customer s
-WHERE s.change_type = 'new'
-   OR (s.change_type = 'changed'
-       AND EXISTS (SELECT 1 FROM scd2_ops_dim_customer d
-                   WHERE d.c_custkey = s.c_custkey AND d.is_current = false AND d.valid_to = s.effective_ts));
+WHERE (s.change_type = 'new'
+       OR (s.change_type = 'changed'
+           AND EXISTS (SELECT 1 FROM scd2_ops_dim_customer d
+                       WHERE d.c_custkey = s.c_custkey AND d.is_current = false AND d.valid_to = s.effective_ts)))
+  AND NOT EXISTS (SELECT 1 FROM scd2_ops_dim_customer d2
+                  WHERE d2.c_custkey = s.c_custkey AND d2.is_current = true);
 ```
 
 This is portable standard SQL. It uses a business key (`c_custkey`), a current-version
@@ -119,9 +121,10 @@ end, not just the operation.
 ### The honest line count
 
 Here is where the "200 lines" claim deserves scrutiny. The portable basic Type 2 above
-is 18 lines of SQL, measured from the registry, not hand-counted[^log]. The declarative
-form is about 6 to 7 lines. So the real ratio for a basic Type 2 is closer to 3 to 1
-than 11 to 1.
+is 20 lines of SQL, measured from the registry, not hand-counted[^log] (two of those
+lines are a `NOT EXISTS` guard that makes the insert idempotent on re-run). The
+declarative form is about 6 to 7 lines. So the real ratio for a basic Type 2 is closer
+to 3 to 1 than 11 to 1.
 
 Where does "200" come from? It is Databricks' own figure, but it is a range and it is
 about something larger. Their April 2026 post compares "~6-10 lines of declarative
@@ -261,7 +264,7 @@ Limitations we want to be clear about:
 ## Conclusions
 
 The "~200 lines of MERGE" framing is partly a strawman and partly fair. For a basic
-Type 2 close-and-insert, the portable SQL is about 18 lines, not 200, so the headline
+Type 2 close-and-insert, the portable SQL is about 20 lines, not 200, so the headline
 ratio is overstated. For a hardened production CDC pipeline that also handles ordering,
 deletes, and late data, the 40-200+ range is Databricks' own figure and is reasonable,
 and the declarative form absorbs that complexity for you.
