@@ -625,3 +625,44 @@ def test_gate_check_missing_stage_summary_is_a_hard_error(tmp_path: Path, capsys
     assert rc == 2
     assert not output.exists()
     assert "not found" in capsys.readouterr().err
+
+
+def test_gate_check_same_run_dir_passed_thrice_is_red(tmp_path: Path):
+    """R1(a) at the CLI: pointing all three STAGEn args at one run dir must HOLD."""
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+
+    output = tmp_path / "evidence.json"
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s1), "--stage3", str(s1), "--output", str(output)]
+    )
+
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+    assert any("do not match the expected" in reason for reason in payload["reasons"])
+
+
+def test_gate_check_docker_stage_without_lifecycle_log_is_red(tmp_path: Path):
+    """C1: a Docker stage (2/3) with no uat_lifecycle.log cannot verify ordering -- HOLD, not silent pass."""
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    # Stage 3 has a log; stage 2 does not. Stage 1 never needs one.
+    (s3 / "uat_lifecycle.log").write_text(
+        "2026-07-10T13:00:00 [docker] platform=postgresql action=up status=ok\n", encoding="utf-8"
+    )
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+    assert any(
+        "missing lifecycle log" in violation and "stage2" in violation for violation in payload["ordering_violations"]
+    )
+    assert not any(
+        "stage3" in violation and "missing lifecycle log" in violation for violation in payload["ordering_violations"]
+    )

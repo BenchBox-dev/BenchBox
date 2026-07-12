@@ -244,9 +244,19 @@ def _handle_gate_check(args: argparse.Namespace) -> int:
     # summaries' completed_at fields.
     ordering_violations: list[str] = []
     lifecycle_texts = []
-    for path in stage_paths[1:]:
+    for stage_label, path in zip(("stage2", "stage3"), stage_paths[1:]):
         lifecycle = path.parent / "uat_lifecycle.log"
-        lifecycle_texts.append(lifecycle.read_text(encoding="utf-8") if lifecycle.is_file() else "")
+        if lifecycle.is_file():
+            lifecycle_texts.append(lifecycle.read_text(encoding="utf-8"))
+        else:
+            # A Docker stage (2/3 by definition) with no lifecycle log means
+            # the ordering invariant cannot be verified at all -- that must
+            # HOLD, not silently pass as "no `action=up` events found".
+            # Stage 1 runs no Docker platforms, so it is exempt.
+            lifecycle_texts.append("")
+            ordering_violations.append(
+                f"{stage_label}: docker stage missing lifecycle log ({lifecycle}); ordering not verifiable"
+            )
     try:
         stage1_completed_at = _dt.datetime.fromisoformat(summaries[0].completed_at)
         stage2_completed_at = _dt.datetime.fromisoformat(summaries[1].completed_at)

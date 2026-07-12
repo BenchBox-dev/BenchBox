@@ -450,8 +450,12 @@ workflow: .github/workflows/release-canary.yml
 schedule: daily at 08:00 UTC
 freshness_sla: 48h
 blocking_suite: (slow or resource_heavy) and not (stress or live_integration)
-advisory_suites: stress, live_integration, live cloud credentials, long-running UAT
+advisory_suites: stress, live_integration, live cloud credentials
 ```
+
+Long-running UAT is no longer advisory: release readiness also requires
+committed UAT release-gate evidence — see `docs/operations/release-guide.md`
+"UAT release-gate evidence (required)".
 
 `validate-main-pr.yml` keeps the required context name `validate-base`, but
 that job now also runs `scripts/release_readiness_check.py` for release PRs.

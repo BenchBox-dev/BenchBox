@@ -212,8 +212,10 @@ def _load_uat_gate_evidence(path: str, ref: str) -> dict[str, Any] | None:
     if file_path.is_file():
         return json.loads(file_path.read_text(encoding="utf-8"))
     if ref:
+        # The ref fallback honors a --uat-evidence-path override too; the
+        # path must be repo-relative for `git show` (the default is).
         result = subprocess.run(
-            ["git", "show", f"{ref}:{UAT_GATE_EVIDENCE_RELPATH}"],
+            ["git", "show", f"{ref}:{path}"],
             capture_output=True,
             text=True,
             check=False,

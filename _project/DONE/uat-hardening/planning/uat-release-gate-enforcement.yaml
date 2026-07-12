@@ -188,10 +188,25 @@ work:
       sentence points at the w4 derivation; APPROVE/HOLD section now
       describes the mechanized checklist + the two remaining manual items
       (DuckDB reference green, NO_JSON error text). AGENTS.md release
-      paragraph gains the evidence precondition. Out of scope, noted:
-      docs/operations/repo-admin-settings.md:453 still lists long-running
-      UAT under advisory_suites (file not in scope_limit; ruleset-drift
-      doc owned separately).
+      paragraph gains the evidence precondition. REVIEW FOLLOW-UPS
+      (Opus review, applied pre-PR): R1 defense-in-depth --
+      build_combined_evidence now also requires the exact
+      EXPECTED_RELEASE_GATE_STAGES config-name tuple (kills same-dir-x3
+      and hollow-config substitution) and per-stage armed floor gates
+      (validator_clean_rate_floor + cross_scale_floor not None), both
+      tested; C1 -- gate-check HOLDs when a Docker stage (2/3) presents
+      no uat_lifecycle.log ("ordering not verifiable") instead of
+      silently passing, tested; C3 -- gate_summary module doc notes the
+      readiness checker relies on additive versioning rather than
+      validating `version`; N1 -- the git-show fallback honors
+      --uat-evidence-path; release-guide.md states the one-cycle
+      activation lag plainly. ADDITIONAL DEVIATION (review-mandated,
+      outside scope_limit): docs/operations/repo-admin-settings.md
+      advisory_suites line dropped "long-running UAT" and gained a
+      pointer to the release-guide evidence section -- one-line
+      doc-consistency fix; leaving an operator-facing contradiction was
+      judged worse than the scope breach (line not parsed by
+      ruleset_drift_check.py or any test; verified).
 
 deferred:
   - summary: "Automated scheduled release-gate sweeps in CI (cloud runners with docker stacks)"
@@ -266,6 +281,7 @@ files_affected:
   - tests/uat/gate_summary.py
   modified:
   - .gitignore
+  - docs/operations/repo-admin-settings.md
   - AGENTS.md
   - Makefile
   - docs/operations/release-guide.md

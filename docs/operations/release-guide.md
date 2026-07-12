@@ -85,7 +85,10 @@ full 3-stage sweep costs an operator-day and releases are cut every few
 weeks, so a 48h window would force redundant sweeps). Missing, red, stale,
 non-ancestor, or dirty evidence fails `validate-base` on the release PR.
 Because release trees curate `_project/` away, CI reads the evidence from
-the fetched `origin/develop` ref.
+the fetched `origin/develop` ref. The gate activates on the first release
+whose base branch already carries this script version — i.e. the release
+after the one that ships it; commit evidence to `develop` before that
+second release.
 
 Producing the evidence before cutting a release:
 

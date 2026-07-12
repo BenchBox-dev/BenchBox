@@ -1405,9 +1405,9 @@ def test_combined_evidence_green_when_all_stages_clean():
     from tests.uat import gate_summary
 
     stages = [
-        _stage_summary("stage1", "2026-07-10T10:00:00"),
-        _stage_summary("stage2", "2026-07-10T12:00:00"),
-        _stage_summary("stage3", "2026-07-10T14:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[1], "2026-07-10T12:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
     ]
     evidence = gate_summary.build_combined_evidence(
         stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
@@ -1416,7 +1416,7 @@ def test_combined_evidence_green_when_all_stages_clean():
     assert evidence.reasons == ()
     assert evidence.source_commit_sha == "abc123"
     assert evidence.completed_at == "2026-07-10T10:00:00"
-    assert evidence.stage_verdicts == {"stage1": "green", "stage2": "green", "stage3": "green"}
+    assert evidence.stage_verdicts == dict.fromkeys(gate_summary.EXPECTED_RELEASE_GATE_STAGES, "green")
 
 
 @pytest.mark.parametrize(
@@ -1434,9 +1434,9 @@ def test_combined_evidence_red_on_each_hold_condition(overrides: dict, reason_fr
     from tests.uat import gate_summary
 
     stages = [
-        _stage_summary("stage1", "2026-07-10T10:00:00"),
-        _stage_summary("stage2", "2026-07-10T12:00:00", **overrides),
-        _stage_summary("stage3", "2026-07-10T14:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[1], "2026-07-10T12:00:00", **overrides),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
     ]
     evidence = gate_summary.build_combined_evidence(
         stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
@@ -1449,8 +1449,8 @@ def test_combined_evidence_red_on_wrong_stage_count_and_ordering_violation():
     from tests.uat import gate_summary
 
     stages = [
-        _stage_summary("stage1", "2026-07-10T10:00:00"),
-        _stage_summary("stage2", "2026-07-10T12:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[1], "2026-07-10T12:00:00"),
     ]
     evidence = gate_summary.build_combined_evidence(
         stages,
@@ -1468,15 +1468,65 @@ def test_explorer_smoke_stage_not_flagged_when_not_configured():
 
     stages = [
         _stage_summary(
-            "stage1",
+            gate_summary.EXPECTED_RELEASE_GATE_STAGES[0],
             "2026-07-10T10:00:00",
             phase_exit_codes={"execute": 0, "report": 0},
             explorer_smoke_status="not_run",
         ),
-        _stage_summary("stage2", "2026-07-10T12:00:00"),
-        _stage_summary("stage3", "2026-07-10T14:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[1], "2026-07-10T12:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
     ]
     evidence = gate_summary.build_combined_evidence(
         stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
     )
     assert evidence.verdict == "green"
+
+
+def test_combined_evidence_red_when_stage_names_are_not_the_expected_set():
+    """R1(a): three green summaries from the WRONG configs (or the same config
+    thrice) must never mint release evidence."""
+    from tests.uat import gate_summary
+
+    same_stage_thrice = [
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T12:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        same_stage_thrice, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "red"
+    assert any("do not match the expected" in reason for reason in evidence.reasons), evidence.reasons
+
+    hollow_substitute = [
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary("my-adhoc-config", "2026-07-10T12:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        hollow_substitute, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "red"
+    assert any("do not match the expected" in reason for reason in evidence.reasons), evidence.reasons
+
+
+def test_combined_evidence_red_when_a_stage_has_no_floor_gates():
+    """R1(b): a stage whose config never armed the validator/cross-scale floors
+    is hollow evidence even if every phase exited 0."""
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(
+            gate_summary.EXPECTED_RELEASE_GATE_STAGES[1],
+            "2026-07-10T12:00:00",
+            validator_clean_rate_floor=None,
+            cross_scale_floor=None,
+        ),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "red"
+    assert any("floor gates were not configured" in reason for reason in evidence.reasons), evidence.reasons

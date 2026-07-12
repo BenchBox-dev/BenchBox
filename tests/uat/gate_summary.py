@@ -16,7 +16,10 @@ into the combined, committed release-evidence file that
 Schema is additive-versioned (`version: 1`): existing field names never
 change meaning, and `read_gate_summary`/`read_combined_evidence` ignore
 unknown keys, so a later summary with new fields never breaks an older
-checker -- see the "keystone" TODO's `approach` note.
+checker -- see the "keystone" TODO's `approach` note. Downstream consumers
+(notably `scripts/release_readiness_check.py`) rely on that additive
+contract rather than validating `version` explicitly; bump the version
+constant only alongside a consumer that branches on it.
 
 Per-stage verdict derivation is deliberately narrow: it reduces to "did any
 phase this sweep ran end non-zero" (`derive_verdict`). Every phase already
@@ -51,6 +54,16 @@ VERDICT_DRY_RUN = "dry_run"
 
 EXPLORER_SMOKE_NOT_RUN = "not_run"
 EXPLORER_SMOKE_RAN = "ran"
+
+# The exact stage set (config `name:` fields) release evidence must be built
+# from -- tests/uat/configs/release-gate-0{1,2,3}-*.yaml. Aggregation reasons
+# on any mismatch, which kills both the pass-the-same-run-dir-three-times
+# footgun and substituting a hollow ad-hoc config for a real stage.
+EXPECTED_RELEASE_GATE_STAGES = (
+    "release-gate-01-native-dataframe",
+    "release-gate-02-docker-nonoltp",
+    "release-gate-03-docker-oltp",
+)
 
 
 def gate_summary_path(log_dir: Path) -> Path:
@@ -194,6 +207,17 @@ def build_combined_evidence(
     if len(stage_summaries) != 3:
         reasons.append(f"expected 3 release-gate stage summaries, got {len(stage_summaries)}")
 
+    # Defense-in-depth against honest operator error: the three summaries
+    # must be the three distinct release-gate stage configs, in order --
+    # not the same run dir passed thrice, and not an ad-hoc config standing
+    # in for a real stage.
+    actual_stage_names = tuple(s.config_name for s in stage_summaries)
+    if actual_stage_names != EXPECTED_RELEASE_GATE_STAGES:
+        reasons.append(
+            f"stage config names {list(actual_stage_names)} do not match the expected "
+            f"release-gate stage set {list(EXPECTED_RELEASE_GATE_STAGES)}"
+        )
+
     shas = {s.source_commit_sha for s in stage_summaries}
     source_commit_sha = next(iter(shas)) if len(shas) == 1 else ""
     if len(shas) > 1:
@@ -215,6 +239,8 @@ def build_combined_evidence(
                 f"stage {stage.config_name!r} configured explorer_smoke but it did not run "
                 f"(explorer_smoke_status={stage.explorer_smoke_status!r})"
             )
+        if stage.validator_clean_rate_floor is None or stage.cross_scale_floor is None:
+            reasons.append(f"stage {stage.config_name!r} floor gates were not configured")
 
     if ordering_violations:
         reasons.extend(ordering_violations)
