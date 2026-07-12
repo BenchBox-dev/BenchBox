@@ -2,7 +2,8 @@ id: "write-primitives-postgres-execution-coverage"
 title: "Add PostgreSQL execution coverage for SCD2 write-primitives ops"
 worktree: "scd2-audit-followup"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-11"
 category: "Testing and Quality Assurance"
 description: |
   SCD2 adversarial audit finding C (prior review's Postgres gate item, now
@@ -38,8 +39,9 @@ prior_art:
 
 work:
 - id: w0
-  summary: "Re-validate the audit evidence: re-run the SCD2 surface on a fresh PostgreSQL 16 container and confirm 0 rows deviating from seed."
-  status: pending
+  summary: "Re-validate the audit evidence: re-run the SCD2 surface on a fresh PostgreSQL 16 container and confirm 0 rows
+    deviating from seed."
+  status: done
   notes: |
     Audit result to reproduce: setup DDL + both population bodies + 3 ops + 10
     validations + 3 cleanups all green; final dim identical to pristine seed.
@@ -47,21 +49,24 @@ work:
     deviation count here and in the PR body. Container runtime: Apple
     `container` (docker shim hangs on this host - see MEMORY mocker gotchas).
 - id: w1
-  summary: "Add a postgres SCD2 integration test mirroring TestWritePrimitivesSCD2DuckDB, gated on a container fixture (skip if no PG available)."
+  summary: "Add a postgres SCD2 integration test mirroring TestWritePrimitivesSCD2DuckDB, gated on a container fixture (skip
+    if no PG available)."
   needs: [w0]
-  status: pending
+  status: done
 - id: w2
   summary: "Add a postgresql x write_primitives UAT cell so the surface is enumerated and executed in the matrix."
   needs: [w0]
-  status: pending
+  status: done
 - id: w3
-  summary: "Document in the test that psycopg3's simple query protocol (no params + TEXT format) is what lets the multi-statement write_sql run in one execute()."
+  summary: "Document in the test that psycopg3's simple query protocol (no params + TEXT format) is what lets the multi-statement
+    write_sql run in one execute()."
   needs: [w1]
-  status: pending
+  status: done
 
 must_preserve:
 - "The DuckDB SCD2 integration tests are unchanged and still green."
-- "The new postgres test SKIPS cleanly (not fails) when no PostgreSQL container is available, so local fast-test runs are unaffected."
+- "The new postgres test SKIPS cleanly (not fails) when no PostgreSQL container is available, so local fast-test runs are
+  unaffected."
 - "No change to operation SQL or population SQL - this TODO is coverage only."
 
 approach: |
@@ -72,8 +77,10 @@ approach: |
   simple-protocol) in the test so the next maintainer does not re-derive them.
 
 anti_patterns:
-- "DO NOT hard-require a live PostgreSQL for the default/fast test run - because most local runs have none - skip when the container/DSN is absent."
-- "DO NOT use the docker CLI on this host - because it hangs (mocker shim) - use the Apple `container` runtime or a CI service container."
+- "DO NOT hard-require a live PostgreSQL for the default/fast test run - because most local runs have none - skip when the
+  container/DSN is absent."
+- "DO NOT use the docker CLI on this host - because it hangs (mocker shim) - use the Apple `container` runtime or a CI service
+  container."
 - "DO NOT modify operation/population SQL to 'help' Postgres - because it already passes verbatim - coverage only."
 
 verification:
