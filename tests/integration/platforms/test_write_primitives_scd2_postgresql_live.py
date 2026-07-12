@@ -26,6 +26,8 @@ execute(); a bound-parameter/extended-protocol path would reject them.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from benchbox.write_primitives import WritePrimitives
@@ -45,6 +47,13 @@ SCD2_OPS = (
     "merge_scd_type2_new_keys_only",
 )
 
+# pytest.ini's default -n auto runs this module's parametrized tests across
+# several pytest-xdist worker processes concurrently. A schema name shared by
+# every worker means one worker's `DROP SCHEMA ... CASCADE` can race another
+# worker's in-flight use of the same schema (#1154 review); suffixing with the
+# worker id gives each worker its own isolated schema.
+_SCHEMA_NAME = f"scd2_wp_test_{os.environ.get('PYTEST_XDIST_WORKER', 'master')}"
+
 
 @pytest.fixture
 def pg_scd2_env(temp_dir):
@@ -62,12 +71,14 @@ def pg_scd2_env(temp_dir):
         autocommit=True,
         connect_timeout=5,
     )
-    # Isolate in a dedicated schema so the generic table names (customer, orders,
-    # lineitem, scd2_ops_*) cannot collide with any other test sharing the
-    # benchbox_test database.
-    conn.execute("DROP SCHEMA IF EXISTS scd2_wp_test CASCADE")
-    conn.execute("CREATE SCHEMA scd2_wp_test")
-    conn.execute("SET search_path TO scd2_wp_test")
+    # Isolate in a dedicated, worker-scoped schema so the generic table names
+    # (customer, orders, lineitem, scd2_ops_*) cannot collide with any other
+    # test sharing the benchbox_test database, and so concurrent xdist
+    # workers each get their own schema instead of racing DROP/CREATE against
+    # a name every worker shares (#1154 review).
+    conn.execute(f"DROP SCHEMA IF EXISTS {_SCHEMA_NAME} CASCADE")
+    conn.execute(f"CREATE SCHEMA {_SCHEMA_NAME}")
+    conn.execute(f"SET search_path TO {_SCHEMA_NAME}")
     conn.execute(
         "CREATE TABLE orders (o_orderkey INTEGER PRIMARY KEY, o_custkey INTEGER, "
         "o_orderstatus CHAR(1), o_totalprice DECIMAL(15,2), o_orderdate DATE, "
@@ -103,10 +114,14 @@ def pg_scd2_env(temp_dir):
     )
 
     write_bench = WritePrimitives(scale_factor=0.01, output_dir=temp_dir, quiet=True)
-    write_bench._impl._setup_dialect = "postgres"
-    write_bench.setup(conn, force=True)
+    # WritePrimitives.setup() (the public wrapper) doesn't accept a dialect
+    # kwarg and always forwards the implementation's "standard" default, which
+    # clobbers any dialect pre-set directly on _impl -- call the
+    # implementation itself so the postgres BYTEA sketch-column mapping is
+    # actually applied (#1154 review).
+    write_bench._impl.setup(conn, force=True, dialect="postgres")
     yield write_bench, conn
-    conn.execute("DROP SCHEMA IF EXISTS scd2_wp_test CASCADE")
+    conn.execute(f"DROP SCHEMA IF EXISTS {_SCHEMA_NAME} CASCADE")
     conn.close()
 
 
