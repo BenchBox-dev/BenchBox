@@ -2,7 +2,8 @@ id: "duckdb-merge-token-gate-hardening"
 title: "Harden DuckDB MERGE INTO token gate and reconcile its dead REGISTRY/comments"
 worktree: "scd2-audit-followup"
 priority: "Medium"
-status: "Not Started"
+status: "Completed"
+completed_date: "2026-07-11"
 category: "Core Functionality"
 description: |
   SCD2 adversarial audit findings N6 and N7.
@@ -40,28 +41,34 @@ description: |
     - tests/integration/test_write_primitives_duckdb.py:515 repeats the
       "112 - 20 failing MERGE INTO" arithmetic.
 impact:
-  business_value: "Prevents a future MERGE op from silently hard-erroring on DuckDB instead of skipping, and removes a registry that would mislead any future consumer."
+  business_value: "Prevents a future MERGE op from silently hard-erroring on DuckDB instead of skipping, and removes a registry
+    that would mislead any future consumer."
   user_impact: "New MERGE-family ops will be gated correctly regardless of whitespace/comments; DuckDB skip counts stay honest."
-  technical_debt: "Dead operation-skip dict, write-only registry, and stale comments in both duckdb and postgres execution-filter rules."
+  technical_debt: "Dead operation-skip dict, write-only registry, and stale comments in both duckdb and postgres execution-filter
+    rules."
 prior_art:
 - "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:33-46 the token gate function - harden"
-- "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:49-66 write-only REGISTRY.register loop - decide populate vs delete"
-- "benchbox/sql_compat/rules/execution_filter/postgres_write_primitives.py:97-114 same write-only-registry shape - reconcile consistently"
+- "benchbox/sql_compat/rules/execution_filter/duckdb_write_primitives.py:49-66 write-only REGISTRY.register loop - decide
+  populate vs delete"
+- "benchbox/sql_compat/rules/execution_filter/postgres_write_primitives.py:97-114 same write-only-registry shape - reconcile
+  consistently"
 - "benchbox/core/write_primitives/benchmark.py:421-424 the token-gate call site (before platform_overrides resolution)"
 - "benchbox/sql_compat/context.py:17 Phase.EXECUTION_FILTER - resolved by nothing today"
 
 work:
 - id: w1
-  summary: "Replace substring test with a whitespace-tolerant regex over comment- and string-literal-stripped SQL (MERGE\\s+INTO)."
-  status: pending
+  summary: "Replace substring test with a whitespace-tolerant regex over comment- and string-literal-stripped SQL (MERGE\\\
+    s+INTO)."
+  status: done
   notes: |
     Strip line comments (--...), block comments (/*...*/), and single-quoted
     string literals before matching, then apply re.search(r'\bMERGE\s+INTO\b').
     Cover the exact cases in scratchpad repro3.py ATTACK 6.
 - id: w2
-  summary: "Evaluate the gate against the effective SQL (after platform_overrides), not operation.write_sql, so an override that swaps MERGE in/out is gated correctly."
+  summary: "Evaluate the gate against the effective SQL (after platform_overrides), not operation.write_sql, so an override
+    that swaps MERGE in/out is gated correctly."
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Requires moving the gate call after override resolution in
     benchmark.py:428-432, or passing the resolved SQL into the gate. Keep the
@@ -70,13 +77,15 @@ work:
     write-primitives-sql-override-skip-order; land AFTER that TODO (see
     deps.needs) and rebase on its reordering to avoid a benchmark.py conflict.
 - id: w3
-  summary: "Fix stale comments: :10-19 '20' -> 21 (incl bulk_load_upsert_mode); remove/justify the dead OPERATION_SKIPS entry + :43-45 lookup."
+  summary: "Fix stale comments: :10-19 '20' -> 21 (incl bulk_load_upsert_mode); remove/justify the dead OPERATION_SKIPS entry
+    + :43-45 lookup."
   needs: [w1]
-  status: pending
+  status: done
 - id: w4
-  summary: "Reconcile the write-only REGISTRY: populate token-derived skips or delete the decorative register loop (duckdb + postgres)."
+  summary: "Reconcile the write-only REGISTRY: populate token-derived skips or delete the decorative register loop (duckdb
+    + postgres)."
   needs: [w3]
-  status: pending
+  status: done
   notes: |
     Pick ONE source of truth. The runtime reads the dicts directly, so either
     wire the registry to the same derivation or drop the register loop entirely
@@ -85,7 +94,7 @@ work:
 - id: w5
   summary: "Correct the arithmetic comment at tests/integration/test_write_primitives_duckdb.py:515."
   needs: [w3]
-  status: pending
+  status: done
 
 must_preserve:
 - "All 3 portable SCD2 ops (UPDATE+INSERT) continue to RUN on DuckDB (not skipped)."
@@ -103,9 +112,12 @@ approach: |
   to the postgres rule.
 
 anti_patterns:
-- "DO NOT pull in a SQL parser for the gate - because it is on the per-op resolution path - use a targeted comment/literal-stripped regex."
-- "DO NOT leave both a decorative registry and direct dict imports - because they can silently disagree (1 vs 21) - collapse to one source of truth."
-- "DO NOT widen the gate to the whole merge category - because portable SCD2 ops are merge-category and must keep running on DuckDB - gate on the MERGE INTO token only."
+- "DO NOT pull in a SQL parser for the gate - because it is on the per-op resolution path - use a targeted comment/literal-stripped
+  regex."
+- "DO NOT leave both a decorative registry and direct dict imports - because they can silently disagree (1 vs 21) - collapse
+  to one source of truth."
+- "DO NOT widen the gate to the whole merge category - because portable SCD2 ops are merge-category and must keep running
+  on DuckDB - gate on the MERGE INTO token only."
 
 verification:
 - description: "SCD2 ops still run (not skipped) on DuckDB; all MERGE INTO ops still skip."
