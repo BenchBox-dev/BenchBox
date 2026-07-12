@@ -246,6 +246,76 @@ def test_report_cli_without_sidecar_defaults_unreachable_zero(tmp_path: Path, ca
     assert payload["total_defined"] == 1
 
 
+def test_report_cli_malformed_sidecar_falls_back_to_estimated(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """#1151 review: a sidecar that parses as JSON but has the wrong shape
+    (non-numeric counts, or isn't even a mapping) must not crash report
+    regeneration -- it falls back to an estimated 0, exactly like a missing
+    sidecar, instead of raising out of `int()`/`.get()`.
+    """
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "passed",
+                "exit_code": 0,
+                "elapsed_s": 1.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    sidecar = cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
+    sidecar.write_text(
+        json.dumps({"skipped_unreachable_count": None, "startup_failed_count": "abc"}),
+        encoding="utf-8",
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["unreachable"] == 0
+    assert payload["startup_failed"] == 0
+
+
+def test_report_cli_non_mapping_sidecar_treated_as_absent(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """A sidecar that parses as a JSON array (not a mapping) must be treated
+    like a missing sidecar -- estimated, not crashed."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "passed",
+                "exit_code": 0,
+                "elapsed_s": 1.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    sidecar = cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
+    sidecar.write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["unreachable"] == 0
+    assert payload["unreachable_is_estimated"] is True
+
+
 # ---------------------------------------------------------------------------
 # w1/w4: default-strict exit-code policy.
 # ---------------------------------------------------------------------------

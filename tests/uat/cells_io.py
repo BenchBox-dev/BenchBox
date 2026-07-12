@@ -160,9 +160,30 @@ def read_accounting_sidecar(cells_jsonl: Path) -> tuple[dict[str, object], bool]
     try:
         with sidecar.open(encoding="utf-8") as fh:
             payload = json.load(fh)
+        if not isinstance(payload, dict):
+            # Parses as JSON but isn't a mapping (e.g. an array) -- not a
+            # sidecar this schema can have written. Treat like a missing
+            # sidecar rather than handing callers a payload whose .get()
+            # would raise.
+            return {}, False
         return payload, True
     except (OSError, ValueError, TypeError):
         return {}, False
+
+
+def coerce_accounting_count(value: object, default: int = 0) -> int:
+    """Best-effort ``int`` coercion for a sidecar count field.
+
+    A sidecar can parse as a JSON mapping yet still carry a malformed count
+    (``null``, a non-numeric string, a nested object) -- from manual editing,
+    a future schema change, or a truncated write. That must not crash
+    `make uat-report`; it falls back to ``default`` like an absent sidecar
+    would, rather than propagating ``int()``'s ``TypeError``/``ValueError``.
+    """
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
 
 
 def read_skipped_unreachable_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
@@ -179,7 +200,7 @@ def read_skipped_unreachable_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
     that directly instead of stacking one read per count.
     """
     payload, present = read_accounting_sidecar(cells_jsonl)
-    return int(payload.get("skipped_unreachable_count", 0)), present
+    return coerce_accounting_count(payload.get("skipped_unreachable_count", 0)), present
 
 
 def update_accounting_sidecar(cells_jsonl: Path, **fields: object) -> bool:

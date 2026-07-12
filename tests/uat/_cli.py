@@ -146,7 +146,7 @@ def _handle_preflight(args: argparse.Namespace) -> int:
 
 def _handle_report(args: argparse.Namespace) -> int:
     """Implements `make uat-report`. Reads cells from a JSON-lines stream."""
-    from tests.uat.cells_io import read_accounting_sidecar, read_cells_jsonl
+    from tests.uat.cells_io import coerce_accounting_count, read_accounting_sidecar, read_cells_jsonl
     from tests.uat.phases.report import write_report
 
     cells = read_cells_jsonl(Path(args.cells_jsonl))
@@ -158,10 +158,13 @@ def _handle_report(args: argparse.Namespace) -> int:
     # (older artifacts), the counts default to 0 but are not confirmed -
     # `unreachable_count_is_estimated` makes that distinction visible, and
     # because both counts come from the same sidecar, the one estimated
-    # flag covers startup_failed too.
+    # flag covers startup_failed too. `coerce_accounting_count` (not a bare
+    # `int()`) falls back to 0 for a sidecar that parses as JSON but carries
+    # a malformed count (null, a non-numeric string) instead of crashing
+    # report regeneration.
     accounting, sidecar_present = read_accounting_sidecar(Path(args.cells_jsonl))
-    skipped_unreachable_count = int(accounting.get("skipped_unreachable_count", 0))
-    startup_failed_count = int(accounting.get("startup_failed_count", 0))
+    skipped_unreachable_count = coerce_accounting_count(accounting.get("skipped_unreachable_count", 0))
+    startup_failed_count = coerce_accounting_count(accounting.get("startup_failed_count", 0))
     rungs = _split_csv(args.rungs)
     summary = write_report(
         cells,
