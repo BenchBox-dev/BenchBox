@@ -76,6 +76,21 @@ def test_native_model_compatibility_rules_cover_fast_native_targets():
             assert rule.rule_id == f"uat.compat.{platform}.{benchmark}.benchmark_gate"
 
 
+def test_postgresql_write_primitives_is_a_supported_uat_cell():
+    """postgresql x write_primitives must stay an enumerable (un-pruned) UAT cell.
+
+    The three SCD2 ops run green on live PostgreSQL (see
+    tests/integration/platforms/test_write_primitives_scd2_postgresql_live.py),
+    so the pair must not be compatibility-pruned. This guards audit finding C: the
+    ops were correct-but-unexecuted, and a future benchmark gate must not silently
+    drop the cell without also removing the live coverage.
+    """
+    benchmarks = matrix.load_benchmarks()
+    assert "postgresql" in matrix.DOCKER_PLATFORMS
+    rule = compatibility.compatibility_rule_for("postgresql", "write_primitives", benchmarks["write_primitives"])
+    assert rule is None, f"postgresql x write_primitives unexpectedly pruned: {rule}"
+
+
 def test_resolve_benchmarks_categories():
     out = matrix.resolve_benchmarks(groups=["tpc"])
     assert "tpch" in out
