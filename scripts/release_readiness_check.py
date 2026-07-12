@@ -1,9 +1,22 @@
 #!/usr/bin/env python3
-"""Release canary freshness gate.
+"""Release readiness gate: canary freshness + committed UAT gate evidence.
 
-Used by the release-PR validation workflow. It fails closed unless the latest
-completed release canary workflow run is green, fresh, and, by default, has a
-summary artifact whose checked commit is an ancestor of the release PR head.
+Used by the release-PR validation workflow. It fails closed unless BOTH:
+
+- the latest completed release canary workflow run is green, fresh, and, by
+  default, has a summary artifact whose checked commit is an ancestor of the
+  release PR head; and
+- the committed UAT gate evidence (`_project/release-evidence/
+  uat-gate-summary.json`, written by `make uat-gate-check`) has a green
+  verdict, a clean source tree, a source commit that is an ancestor of the
+  release PR head, and is at most 21 days old. 21 days (vs the canary's 48h)
+  because a full 3-stage release-gate sweep costs an operator-day and
+  releases are cut every few weeks; a 48h window would force redundant
+  sweeps. Release trees curate `_project/` away, so in CI the evidence is
+  read from the fetched `origin/develop` ref via `git show`.
+
+The `RELEASE_READINESS_OVERRIDE_SHA`/`_REASON` admin escape hatch bypasses
+both checks for one exact release head SHA.
 """
 
 from __future__ import annotations
@@ -24,6 +37,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 BOOTSTRAP_REQUIRED_EXIT_CODE = 20
+
+UAT_GATE_EVIDENCE_RELPATH = "_project/release-evidence/uat-gate-summary.json"
 
 
 @dataclass(frozen=True)
@@ -182,6 +197,113 @@ def evaluate_canary_runs(
     return ReadinessResult(True, "Release canary is green, fresh, and applicable.", summary)
 
 
+def _load_uat_gate_evidence(path: str, ref: str) -> dict[str, Any] | None:
+    """Read the committed UAT gate evidence, from the working tree or from `ref`.
+
+    Release branches and the trusted-base checkout curate `_project/` away
+    (see `make release-cut`), so the release-PR workflow cannot read the
+    evidence from its own tree; it reads the committed file from the fetched
+    develop ref instead (`git fetch origin develop` already runs before the
+    readiness step). Returns None when the evidence is absent in both
+    places; raises on unparseable JSON (the caller reports that as an
+    evidence-validation failure, mirroring the canary artifact path).
+    """
+    file_path = Path(path)
+    if file_path.is_file():
+        return json.loads(file_path.read_text(encoding="utf-8"))
+    if ref:
+        result = subprocess.run(
+            ["git", "show", f"{ref}:{UAT_GATE_EVIDENCE_RELPATH}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return json.loads(result.stdout)
+    return None
+
+
+def evaluate_uat_gate_evidence(
+    payload: dict[str, Any] | None,
+    *,
+    now: datetime,
+    max_age_days: float,
+    head_sha: str,
+    require_ancestor: bool = True,
+    is_ancestor: Callable[[str, str], bool] = _is_ancestor_with_git,
+) -> ReadinessResult:
+    """Return the release-readiness verdict for the committed UAT gate evidence.
+
+    Mirrors `evaluate_canary_runs`: fails closed on missing, red, dirty,
+    stale, or non-ancestor evidence.
+    """
+    if payload is None:
+        return ReadinessResult(
+            False,
+            (
+                "No committed UAT gate evidence found; run the 3-stage release-gate "
+                "sweep, `make uat-gate-check`, and commit "
+                f"{UAT_GATE_EVIDENCE_RELPATH} to develop."
+            ),
+            ["- uat_gate: missing"],
+        )
+
+    verdict = str(payload.get("verdict", "")).strip()
+    source_sha = str(payload.get("source_commit_sha", "")).strip()
+    source_dirty = bool(payload.get("source_dirty", True))
+    completed_raw = str(payload.get("completed_at") or "").strip()
+
+    summary = [
+        f"- uat_gate: {UAT_GATE_EVIDENCE_RELPATH}",
+        f"- uat_verdict: {verdict or '(missing)'}",
+        f"- uat_source_commit_sha: {source_sha or '(missing)'}",
+        f"- uat_source_dirty: {str(source_dirty).lower()}",
+        f"- uat_completed_at: {completed_raw or '(missing)'}",
+    ]
+
+    if verdict != "green":
+        return ReadinessResult(False, f"UAT gate evidence verdict is {verdict!r}; release is blocked.", summary)
+    if source_dirty:
+        return ReadinessResult(
+            False, "UAT gate evidence was produced from a dirty source tree; release is blocked.", summary
+        )
+    if not completed_raw:
+        return ReadinessResult(False, "UAT gate evidence records no completed_at; release is blocked.", summary)
+    try:
+        completed_at = datetime.fromisoformat(completed_raw)
+    except ValueError:
+        return ReadinessResult(
+            False, f"UAT gate evidence completed_at {completed_raw!r} is unparseable; release is blocked.", summary
+        )
+    if completed_at.tzinfo is None:
+        # Sweep summaries record operator-local wall-clock time.
+        completed_at = completed_at.astimezone()
+    age_days = (now - completed_at).total_seconds() / 86400
+    summary.append(f"- uat_age: {age_days:.1f}d")
+    if age_days > max_age_days:
+        return ReadinessResult(
+            False,
+            f"UAT gate evidence is stale ({age_days:.1f}d; max {max_age_days:g}d).",
+            summary,
+        )
+    if not source_sha:
+        return ReadinessResult(False, "UAT gate evidence records no source_commit_sha; release is blocked.", summary)
+    if require_ancestor and not is_ancestor(source_sha, head_sha):
+        return ReadinessResult(
+            False,
+            f"UAT gate evidence SHA {source_sha} is not an ancestor of release head {head_sha}.",
+            summary,
+        )
+    return ReadinessResult(True, "UAT gate evidence is green, fresh, and applicable.", summary)
+
+
+def _combined_result(canary: ReadinessResult, uat: ReadinessResult) -> ReadinessResult:
+    summary = [*canary.summary, *uat.summary]
+    if not uat.ok:
+        return ReadinessResult(False, uat.message, summary)
+    return ReadinessResult(True, f"{canary.message} {uat.message}", summary)
+
+
 def _workflow_runs_url(repo: str, workflow: str, branch: str) -> str:
     branch = branch.strip()
     if not branch:
@@ -220,6 +342,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
     parser.add_argument("--checked-ref", default=os.environ.get("RELEASE_CANARY_CHECKED_REF", "develop"))
     parser.add_argument("--no-ancestor-check", action="store_true")
+    parser.add_argument(
+        "--uat-max-age-days",
+        type=float,
+        default=float(os.environ.get("RELEASE_UAT_MAX_AGE_DAYS", "21")),
+        help="Maximum age of the committed UAT gate evidence (default 21 days; see module docstring).",
+    )
+    parser.add_argument(
+        "--uat-evidence-path",
+        default=os.environ.get("RELEASE_UAT_EVIDENCE_PATH", UAT_GATE_EVIDENCE_RELPATH),
+        help="Working-tree path of the committed UAT gate evidence.",
+    )
+    parser.add_argument(
+        "--uat-evidence-ref",
+        default=os.environ.get("RELEASE_UAT_EVIDENCE_REF", "origin/develop"),
+        help="Git ref to read the evidence from when the working tree is curated (release/base checkouts).",
+    )
     parser.add_argument(
         "--bootstrap-on-missing-workflow",
         action="store_true",
@@ -294,6 +432,28 @@ def main(argv: list[str] | None = None) -> int:
                 f"Release canary readiness check failed while validating evidence: {exc}",
                 ["- canary: api-or-ancestor-check-error"],
             )
+    # UAT gate evidence is an ADDITIONAL requirement on top of the canary,
+    # not a replacement (uat-release-gate-enforcement w5). Evaluated only
+    # once the canary itself is green so a canary failure (including the
+    # bootstrap-required path, whose exit code the workflow branches on)
+    # keeps its existing message and semantics.
+    if result.ok:
+        try:
+            evidence = _load_uat_gate_evidence(args.uat_evidence_path, args.uat_evidence_ref)
+            uat_result = evaluate_uat_gate_evidence(
+                evidence,
+                now=datetime.now(UTC),
+                max_age_days=args.uat_max_age_days,
+                head_sha=args.head_sha,
+                require_ancestor=not args.no_ancestor_check,
+            )
+        except Exception as exc:
+            uat_result = ReadinessResult(
+                False,
+                f"UAT gate readiness check failed while validating evidence: {exc}",
+                ["- uat_gate: evidence-read-error"],
+            )
+        result = _combined_result(result, uat_result)
     _write_summary(result, summary_path=os.environ.get("GITHUB_STEP_SUMMARY"))
     if not result.ok:
         print(f"ERROR: {result.message}", file=sys.stderr)

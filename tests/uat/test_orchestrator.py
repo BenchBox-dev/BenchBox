@@ -887,10 +887,14 @@ def test_two_sweeps_in_one_process_land_in_distinct_log_dirs(tmp_path: Path):
             "output": {"logs_dir_template": str(tmp_path / "uat_{date}_{time}")},
         }
     )
+    # Each sweep calls _dt.datetime.now() twice: once for the log-dir stamp
+    # and once for the gate summary's completed_at (uat-release-gate-enforcement w1).
     fixed_times = iter(
         [
             _dt.datetime(2026, 5, 5, 9, 0, 0),
+            _dt.datetime(2026, 5, 5, 9, 0, 0, 500000),
             _dt.datetime(2026, 5, 5, 9, 0, 1),
+            _dt.datetime(2026, 5, 5, 9, 0, 1, 500000),
         ]
     )
     with patch.object(orchestrator, "_dt") as mock_dt:
@@ -1196,3 +1200,283 @@ def test_update_accounting_sidecar_returns_false_on_corrupt_sidecar_without_clob
     # The corrupt sidecar is left untouched for post-mortem inspection, not
     # overwritten with a fabricated payload.
     assert sidecar.read_text(encoding="utf-8") == "{not valid json"
+
+
+# ---------------------------------------------------------------------------
+# uat-release-gate-enforcement w1: every sweep writes uat_gate_summary.json.
+# ---------------------------------------------------------------------------
+
+
+def _read_gate_summary(log_dir: Path) -> dict:
+    return json.loads((log_dir / "uat_gate_summary.json").read_text(encoding="utf-8"))
+
+
+def test_dry_run_sweep_writes_gate_summary_with_dry_run_verdict(tmp_path: Path):
+    """Dry-run sweeps still write the summary; the verdict marks them as non-evidence."""
+    cfg = validate_config({"name": "gate-dry", "dry_run": True, "phases": ["preflight", "execute", "report"]})
+
+    orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    payload = _read_gate_summary(tmp_path)
+    assert payload["version"] == 1
+    assert payload["verdict"] == "dry_run"
+    assert payload["dry_run"] is True
+    assert payload["config_name"] == "gate-dry"
+    assert payload["phase_exit_codes"] == {"preflight": 0, "execute": 0, "report": 0}
+    assert payload["completed_at"]
+    assert payload["source_commit_sha"]
+
+
+def test_green_sweep_writes_green_gate_summary_with_accounting(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "gate-green",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "report": {"cross_scale_coverage_min_pairs": 1},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "startup_failed": (),
+            "compatibility_pruned": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 0,
+        },
+    )()
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.exit_code() == 0
+    payload = _read_gate_summary(tmp_path)
+    assert payload["verdict"] == "green"
+    assert payload["aborted"] is False
+    assert payload["accounting"]["passed"] == 1
+    assert payload["accounting"]["attempted"] == 1
+    assert payload["accounting"]["total_defined"] == 1
+    assert payload["cross_scale_clean_pairs"] == 1
+    assert payload["cross_scale_floor"] == 1
+    assert payload["cross_scale_floor_breached"] is False
+    assert payload["unreachable_is_estimated"] is False
+    assert payload["explorer_smoke_status"] == "not_run"
+
+
+def test_failed_cell_sweep_writes_red_gate_summary(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "gate-red",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="failed",
+        exit_code=1,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=None,
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "startup_failed": (),
+            "compatibility_pruned": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 1,
+        },
+    )()
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.exit_code() == 1
+    payload = _read_gate_summary(tmp_path)
+    assert payload["verdict"] == "red"
+    assert payload["accounting"]["failed"] == 1
+    assert payload["phase_exit_codes"]["execute"] == 1
+
+
+def test_aborted_sweep_writes_red_gate_summary_with_abort_fields(tmp_path: Path):
+    """An abort path also lands in the gate summary (partial-report accounting)."""
+    cfg = validate_config({"name": "gate-abort", "phases": ["report"]})
+
+    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.aborted_phase == "report"
+    payload = _read_gate_summary(tmp_path)
+    assert payload["verdict"] == "red"
+    assert payload["aborted"] is True
+    assert payload["abort_phase"] == "report"
+    assert "execute phase" in payload["abort_reason"]
+
+
+def test_derive_verdict_matrix():
+    from tests.uat import gate_summary
+
+    assert gate_summary.derive_verdict(dry_run=True, aborted=False, phase_exit_codes={"execute": 0}) == "dry_run"
+    assert gate_summary.derive_verdict(dry_run=False, aborted=True, phase_exit_codes={}) == "red"
+    assert gate_summary.derive_verdict(dry_run=False, aborted=False, phase_exit_codes={"execute": 1}) == "red"
+    assert (
+        gate_summary.derive_verdict(dry_run=False, aborted=False, phase_exit_codes={"execute": 0, "report": 0})
+        == "green"
+    )
+
+
+def test_gate_summary_round_trips_and_ignores_unknown_keys(tmp_path: Path):
+    """Forward compat: a later summary with additive fields must still read."""
+    from tests.uat import gate_summary
+
+    cfg = validate_config({"name": "gate-rt", "dry_run": True, "phases": ["execute"]})
+    orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    path = tmp_path / "uat_gate_summary.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["a_future_field"] = "ignored"
+    payload["accounting"]["a_future_count"] = 7
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    summary = gate_summary.read_gate_summary(path)
+    assert summary.config_name == "gate-rt"
+    assert summary.verdict == "dry_run"
+
+
+# ---------------------------------------------------------------------------
+# uat-release-gate-enforcement w3: combined release-gate evidence aggregation.
+# ---------------------------------------------------------------------------
+
+
+def _stage_summary(name: str, completed_at: str, **overrides):
+    from tests.uat import gate_summary
+
+    kwargs = {
+        "config_name": name,
+        "source_commit_sha": "abc123",
+        "source_dirty": False,
+        "container_engine": "docker",
+        "completed_at": completed_at,
+        "dry_run": False,
+        "aborted": False,
+        "abort_phase": None,
+        "abort_reason": None,
+        "phase_exit_codes": {"execute": 0, "validate": 0, "explorer_smoke": 0, "report": 0},
+        "accounting": gate_summary.PhaseAccounting(attempted=5, passed=5, total_defined=5),
+        "unreachable_is_estimated": False,
+        "validator_clean_rate": 1.0,
+        "validator_clean_rate_floor": 1.0,
+        "validator_floor_breached": False,
+        "cross_scale_clean_pairs": 10,
+        "cross_scale_floor": 8,
+        "cross_scale_floor_breached": False,
+        "explorer_smoke_status": "ran",
+        "verdict": "green",
+    }
+    kwargs.update(overrides)
+    return gate_summary.GateSummary(**kwargs)
+
+
+def test_combined_evidence_green_when_all_stages_clean():
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary("stage1", "2026-07-10T10:00:00"),
+        _stage_summary("stage2", "2026-07-10T12:00:00"),
+        _stage_summary("stage3", "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "green"
+    assert evidence.reasons == ()
+    assert evidence.source_commit_sha == "abc123"
+    assert evidence.completed_at == "2026-07-10T10:00:00"
+    assert evidence.stage_verdicts == {"stage1": "green", "stage2": "green", "stage3": "green"}
+
+
+@pytest.mark.parametrize(
+    ("overrides", "reason_fragment"),
+    [
+        ({"verdict": "red"}, "not green"),
+        ({"dry_run": True, "verdict": "dry_run"}, "dry-run summary"),
+        ({"unreachable_is_estimated": True}, "sidecar missing"),
+        ({"explorer_smoke_status": "skipped_no_node"}, "explorer_smoke but it did not run"),
+        ({"source_dirty": True}, "dirty source tree"),
+        ({"source_commit_sha": "other"}, "source_commit_sha differs"),
+    ],
+)
+def test_combined_evidence_red_on_each_hold_condition(overrides: dict, reason_fragment: str):
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary("stage1", "2026-07-10T10:00:00"),
+        _stage_summary("stage2", "2026-07-10T12:00:00", **overrides),
+        _stage_summary("stage3", "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "red"
+    assert any(reason_fragment in reason for reason in evidence.reasons), evidence.reasons
+
+
+def test_combined_evidence_red_on_wrong_stage_count_and_ordering_violation():
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary("stage1", "2026-07-10T10:00:00"),
+        _stage_summary("stage2", "2026-07-10T12:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages,
+        ordering_violations=("stage1 boundary: Docker stack 'x' started early",),
+        generated_at=_dt.datetime(2026, 7, 10, 15),
+    )
+    assert evidence.verdict == "red"
+    assert any("expected 3" in reason for reason in evidence.reasons)
+    assert any("started early" in reason for reason in evidence.reasons)
+
+
+def test_explorer_smoke_stage_not_flagged_when_not_configured():
+    """A stage whose phases list never included explorer_smoke is not held for skipping it."""
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary(
+            "stage1",
+            "2026-07-10T10:00:00",
+            phase_exit_codes={"execute": 0, "report": 0},
+            explorer_smoke_status="not_run",
+        ),
+        _stage_summary("stage2", "2026-07-10T12:00:00"),
+        _stage_summary("stage3", "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "green"

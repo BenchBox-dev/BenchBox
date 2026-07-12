@@ -274,6 +274,9 @@ over global `/commit-push-pr`.
 
 Release flow is `make release-cut VERSION=X.Y.Z` then
 `make release-finalize VERSION=X.Y.Z`; see `docs/operations/release-guide.md`.
+Precondition: committed UAT release-gate evidence ≤21 days old
+(`_project/release-evidence/uat-gate-summary.json`, from the 3-stage sweep +
+`make uat-gate-check`) — `validate-base` fails the release PR without it.
 
 ## Default write-task close-out
 

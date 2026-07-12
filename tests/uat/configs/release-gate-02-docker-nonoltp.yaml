@@ -59,7 +59,13 @@ validate:
 
 report:
   matrix_summary_tsv: "matrix_summary.tsv"
-  cross_scale_coverage_min_pairs: 1
+  # Derivation (uat-release-gate-enforcement w4, 2026-07-12, develop @ acfb89922):
+  # enumerate_cells_with_pruning over this config yields 64 pairs with every
+  # rung (0.01/0.1/1.0) enumerable (83 raw pairs minus 19 whose registry scale
+  # ladder omits a rung). floor = max(4, floor(0.8 * 64)) = 51. The 0.8 slack
+  # absorbs a down docker stack without letting a mass regression sign off;
+  # never set this to the eligible count exactly.
+  cross_scale_coverage_min_pairs: 51
 
 output:
   benchmark_runs_dir_template: "~/Developer/benchmark_runs"

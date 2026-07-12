@@ -179,6 +179,7 @@ def test_subcommands_table_covers_all_make_targets():
         "cell",
         "docker-cleanup",
         "execute",
+        "gate-check",
         "validate",
         "package",
         "explorer-smoke",
@@ -484,3 +485,143 @@ def test_execute_main_reports_success_for_dry_run_config(tmp_path, monkeypatch, 
     assert summary["aborted"] is False
     assert summary["abort_reason"] is None
     assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# uat-release-gate-enforcement w3: gate-check subcommand.
+# ---------------------------------------------------------------------------
+
+
+def _write_stage(tmp_path: Path, index: int, name: str, completed_at: str, **overrides) -> Path:
+    from tests.uat import gate_summary
+
+    kwargs = {
+        "config_name": name,
+        "source_commit_sha": "abc123",
+        "source_dirty": False,
+        "container_engine": "docker",
+        "completed_at": completed_at,
+        "dry_run": False,
+        "aborted": False,
+        "abort_phase": None,
+        "abort_reason": None,
+        "phase_exit_codes": {"execute": 0, "validate": 0, "explorer_smoke": 0, "report": 0},
+        "accounting": gate_summary.PhaseAccounting(attempted=5, passed=5, total_defined=5),
+        "unreachable_is_estimated": False,
+        "validator_clean_rate": 1.0,
+        "validator_clean_rate_floor": 1.0,
+        "validator_floor_breached": False,
+        "cross_scale_clean_pairs": 10,
+        "cross_scale_floor": 8,
+        "cross_scale_floor_breached": False,
+        "explorer_smoke_status": "ran",
+        "verdict": "green",
+    }
+    kwargs.update(overrides)
+    stage_dir = tmp_path / f"stage{index}"
+    stage_dir.mkdir(exist_ok=True)
+    gate_summary.write_gate_summary(stage_dir, gate_summary.GateSummary(**kwargs))
+    return stage_dir
+
+
+def test_gate_check_green_writes_combined_evidence(tmp_path: Path, capsys):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    (s2 / "uat_lifecycle.log").write_text(
+        "2026-07-10T11:00:00 [docker] platform=starrocks action=up status=ok\n", encoding="utf-8"
+    )
+    (s3 / "uat_lifecycle.log").write_text(
+        "2026-07-10T13:00:00 [docker] platform=postgresql action=up status=ok\n", encoding="utf-8"
+    )
+    output = tmp_path / "evidence" / "uat-gate-summary.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "green"
+    assert payload["source_commit_sha"] == "abc123"
+    assert payload["ordering_violations"] == []
+    stdout = capsys.readouterr().out
+    assert "APPROVE" in stdout
+
+
+def test_gate_check_flags_docker_up_before_stage1_completion(tmp_path: Path, capsys):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    # Stage-2 Docker stack came up BEFORE stage 1 completed: the contamination
+    # the 2026-05-28/29 evidence had.
+    (s2 / "uat_lifecycle.log").write_text(
+        "2026-07-10T09:00:00 [docker] platform=starrocks action=up status=ok\n", encoding="utf-8"
+    )
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+    assert any("stage1 boundary" in violation for violation in payload["ordering_violations"])
+
+
+def test_gate_check_flags_stage3_docker_up_before_stage2_completion(tmp_path: Path):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    # After stage 1, but stage 3's stack overlapped stage 2's window.
+    (s3 / "uat_lifecycle.log").write_text(
+        "2026-07-10T11:00:00 [docker] platform=postgresql action=up status=ok\n", encoding="utf-8"
+    )
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert any("stage2 boundary" in violation for violation in payload["ordering_violations"])
+
+
+def test_gate_check_red_stage_blocks_and_reports_reason(tmp_path: Path, capsys):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(
+        tmp_path,
+        2,
+        "release-gate-02-docker-nonoltp",
+        "2026-07-10T12:00:00",
+        verdict="red",
+        phase_exit_codes={"execute": 1, "report": 1},
+    )
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 1
+    assert "HOLD" in capsys.readouterr().err
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+
+
+def test_gate_check_missing_stage_summary_is_a_hard_error(tmp_path: Path, capsys):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    missing = tmp_path / "stage3-not-run"
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(missing), "--output", str(output)]
+    )
+
+    assert rc == 2
+    assert not output.exists()
+    assert "not found" in capsys.readouterr().err

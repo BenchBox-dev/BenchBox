@@ -1349,3 +1349,190 @@ class TestPrConflictScan:
 
         assert "<<<<<<<" in legacy
         assert not any(line.startswith("<<<<<<<") for line in legacy.splitlines())
+
+
+class TestUATGateReleaseEvidence:
+    """uat-release-gate-enforcement w5: committed UAT evidence gates release readiness."""
+
+    @staticmethod
+    def _payload(**overrides) -> dict:
+        payload = {
+            "version": 1,
+            "verdict": "green",
+            "source_commit_sha": "uat-tested-sha",
+            "source_dirty": False,
+            "completed_at": "2026-07-01T10:00:00+00:00",
+            "generated_at": "2026-07-01T18:00:00+00:00",
+            "stage_names": [
+                "release-gate-01-native-dataframe",
+                "release-gate-02-docker-nonoltp",
+                "release-gate-03-docker-oltp",
+            ],
+        }
+        payload.update(overrides)
+        return payload
+
+    @staticmethod
+    def _evaluate(payload, *, now=None, is_ancestor=lambda _a, _h: True, max_age_days=21.0):
+        from datetime import UTC, datetime
+
+        from scripts.release_readiness_check import evaluate_uat_gate_evidence
+
+        return evaluate_uat_gate_evidence(
+            payload,
+            now=now or datetime(2026, 7, 10, 12, tzinfo=UTC),
+            max_age_days=max_age_days,
+            head_sha="release-head",
+            is_ancestor=is_ancestor,
+        )
+
+    def test_missing_evidence_blocks_release(self):
+        result = self._evaluate(None)
+        assert not result.ok
+        assert "No committed UAT gate evidence" in result.message
+        assert "- uat_gate: missing" in result.summary
+
+    def test_red_verdict_blocks_release(self):
+        result = self._evaluate(self._payload(verdict="red"))
+        assert not result.ok
+        assert "verdict is 'red'" in result.message
+
+    def test_dry_run_verdict_blocks_release(self):
+        result = self._evaluate(self._payload(verdict="dry_run"))
+        assert not result.ok
+        assert "verdict is 'dry_run'" in result.message
+
+    def test_dirty_source_tree_blocks_release(self):
+        result = self._evaluate(self._payload(source_dirty=True))
+        assert not result.ok
+        assert "dirty source tree" in result.message
+
+    def test_stale_evidence_blocks_release(self):
+        from datetime import UTC, datetime
+
+        result = self._evaluate(
+            self._payload(completed_at="2026-06-01T10:00:00+00:00"),
+            now=datetime(2026, 7, 10, 12, tzinfo=UTC),
+        )
+        assert not result.ok
+        assert "stale" in result.message
+
+    def test_non_ancestor_evidence_blocks_release(self):
+        result = self._evaluate(self._payload(), is_ancestor=lambda _a, _h: False)
+        assert not result.ok
+        assert "not an ancestor" in result.message
+
+    def test_green_fresh_ancestor_evidence_passes(self):
+        checked: list[tuple[str, str]] = []
+
+        def _is_ancestor(ancestor: str, head: str) -> bool:
+            checked.append((ancestor, head))
+            return True
+
+        result = self._evaluate(self._payload(), is_ancestor=_is_ancestor)
+        assert result.ok
+        assert "green, fresh, and applicable" in result.message
+        assert checked == [("uat-tested-sha", "release-head")]
+
+    def test_missing_completed_at_blocks_release(self):
+        result = self._evaluate(self._payload(completed_at=""))
+        assert not result.ok
+        assert "no completed_at" in result.message
+
+    def test_uat_failure_blocks_after_green_canary(self, monkeypatch, capsys):
+        """main() combines a green canary with UAT evidence; missing UAT blocks."""
+        from datetime import UTC, datetime
+
+        from scripts import release_readiness_check
+
+        now_iso = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+        def _fake_api_json(url: str, _token: str) -> dict:
+            return {
+                "workflow_runs": [
+                    {
+                        "status": "completed",
+                        "conclusion": "success",
+                        "updated_at": now_iso,
+                        "head_sha": "canary-sha",
+                        "html_url": "https://example.test/run",
+                        "display_title": "Release Canary",
+                    }
+                ]
+            }
+
+        monkeypatch.setattr(release_readiness_check, "_api_json", _fake_api_json)
+        monkeypatch.setattr(release_readiness_check, "_is_ancestor_with_git", lambda _a, _h: True)
+        monkeypatch.setattr(release_readiness_check, "_load_uat_gate_evidence", lambda _p, _r: None)
+        monkeypatch.setenv("GITHUB_TOKEN", "token")
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
+
+        rc = release_readiness_check.main(["--head-sha", "release-head", "--no-ancestor-check"])
+
+        assert rc == 1
+        assert "No committed UAT gate evidence" in capsys.readouterr().err
+
+    def test_green_canary_plus_green_uat_passes(self, monkeypatch):
+        from datetime import UTC, datetime, timedelta
+
+        from scripts import release_readiness_check
+
+        now_iso = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+        def _fake_api_json(url: str, _token: str) -> dict:
+            return {
+                "workflow_runs": [
+                    {
+                        "status": "completed",
+                        "conclusion": "success",
+                        "updated_at": now_iso,
+                        "head_sha": "canary-sha",
+                        "html_url": "https://example.test/run",
+                        "display_title": "Release Canary",
+                    }
+                ]
+            }
+
+        payload = self._payload(completed_at=(datetime.now(UTC) - timedelta(days=1)).isoformat())
+        monkeypatch.setattr(release_readiness_check, "_api_json", _fake_api_json)
+        monkeypatch.setattr(release_readiness_check, "_is_ancestor_with_git", lambda _a, _h: True)
+        monkeypatch.setattr(release_readiness_check, "_load_uat_gate_evidence", lambda _p, _r: payload)
+        monkeypatch.setenv("GITHUB_TOKEN", "token")
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_SHA", raising=False)
+        monkeypatch.delenv("RELEASE_READINESS_OVERRIDE_REASON", raising=False)
+
+        rc = release_readiness_check.main(["--head-sha", "release-head", "--no-ancestor-check"])
+
+        assert rc == 0
+
+    def test_override_bypasses_uat_check_too(self, monkeypatch):
+        """The existing admin override covers the UAT evidence requirement as well."""
+        from scripts import release_readiness_check
+
+        monkeypatch.setenv("RELEASE_READINESS_OVERRIDE_SHA", "release-head")
+        monkeypatch.setenv("RELEASE_READINESS_OVERRIDE_REASON", "INC-999 approved")
+        monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+
+        def _boom(*_args, **_kwargs):  # pragma: no cover - must never be called
+            raise AssertionError("override must short-circuit before any evidence lookup")
+
+        monkeypatch.setattr(release_readiness_check, "_load_uat_gate_evidence", _boom)
+        monkeypatch.setattr(release_readiness_check, "_api_json", _boom)
+
+        rc = release_readiness_check.main(["--head-sha", "release-head"])
+
+        assert rc == 0
+
+    def test_gate_check_make_target_is_wired(self):
+        """`make uat-gate-check` must dispatch to the gate-check subcommand."""
+        recipe = _make_target_recipe("uat-gate-check")
+        assert "tests.uat._cli gate-check" in recipe
+        assert "--stage1" in recipe and "--stage2" in recipe and "--stage3" in recipe
+
+    def test_release_evidence_dir_convention_documented(self):
+        readme = (REPO_ROOT / "_project" / "release-evidence" / "README.md").read_text(encoding="utf-8")
+        assert "uat-gate-summary.json" in readme
+        assert "release_readiness_check.py" in readme

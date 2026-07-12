@@ -449,36 +449,42 @@ Run rules:
   from a measured healthy startup (see "Managed Docker startup failures are
   non-fatal") before the stage-2 run.
 
-Ordering check: after the runs, capture the stage-1 completion timestamp (the
-last line of stage 1's `uat_lifecycle.log`, or the stage-1 run-dir completion
-time) and verify no Docker stack came up earlier:
+Every sweep writes a machine-readable `uat_gate_summary.json` beside
+`cells.jsonl` (versioned schema; verdict `green|red`, or `dry_run` for
+dry-run sweeps): config name, source provenance, container engine,
+completion timestamp, per-phase exit codes, accounting counts, validator
+clean rate vs floor, cross-scale pairs vs floor, and explorer-smoke status.
 
-```python
-from tests.uat.phases.report import release_gate_ordering_violations
-violations = release_gate_ordering_violations(
-    [open(stage2_lifecycle_log).read(), open(stage3_lifecycle_log).read()],
-    native_stage_completed_at=stage1_completed_at,
-)
-assert not violations, violations
+Ordering + aggregation check: after the three runs,
+
+```bash
+make uat-gate-check STAGE1=<stage1-run-dir> STAGE2=<stage2-run-dir> STAGE3=<stage3-run-dir>
 ```
 
+reads the three stage summaries, verifies from their machine-recorded
+`completed_at` timestamps that no Docker `action=up` in stages 2/3 preceded
+stage-1 completion (nor stage 3 before stage-2 completion), enforces the
+mechanized APPROVE items below, and writes the combined evidence file to
+`_project/release-evidence/uat-gate-summary.json`. Exit 0 means APPROVE:
+review the evidence file and commit it — `scripts/release_readiness_check.py`
+requires it on the release PR (see `docs/operations/release-guide.md`).
+
 `cross_scale_coverage_min_pairs` in each config is the report-phase teeth: a
-breach forces a non-zero report exit, so a partial or regressed sweep cannot be
-APPROVED. Tune the value to the approved pair count during bring-up.
+breach forces a non-zero report exit, so a partial or regressed sweep cannot
+be APPROVED. The values are derived, not hand-picked: floor =
+max(stage minimum, floor(0.8 × cross-scale-eligible pairs from
+`enumerate_cells_with_pruning`)) — each config carries its derivation comment,
+and `tests/uat/test_config.py` pins the sound band.
 
 ### APPROVE / HOLD gate
 
-APPROVE only if **all** of the following hold for every config:
+`make uat-gate-check` mechanizes this checklist: all stages verdict-green
+(every phase exit 0, incl. validator and cross-scale floors), accounting
+sidecar present (`unreachable_is_estimated=false`), explorer smoke actually
+ran for stages that configure it, one clean `source_commit_sha` across
+stages (`source_dirty=false`), and no ordering violations. Exit 0 = APPROVE;
+any HOLD reason is printed and lands in the evidence file's `reasons`.
 
-- [ ] The run reached the **report** phase with a `# run_status=COMPLETED`
-      footer carrying a `source_commit_sha` (and `source_dirty=false`).
-- [ ] `matrix_summary.tsv` and `validator_rollup.tsv` exist and are non-empty.
-- [ ] Every required, non-pruned cell **passed**; `cross_scale_coverage_min_pairs`
-      is met (no floor breach).
-- [ ] The ordering check returns no violations (no Docker `action=up` before
-      native + dataframe completion).
-- [ ] DuckDB (the reference) is green or its cells are explicitly pruned.
-
-HOLD if **any** of: missing manifests, missing commit SHA, a DuckDB reference
-failure, a Docker zero-cell run, a hung platform, or a `NO_JSON` cell without
-captured error text.
+Still manual before committing the evidence: DuckDB (the reference) is green
+or its cells are explicitly pruned, and no `NO_JSON` cell lacks captured
+error text.
