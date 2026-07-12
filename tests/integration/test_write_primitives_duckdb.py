@@ -1149,6 +1149,41 @@ class TestWritePrimitivesSCD2DuckDB:
         conn.execute(op.cleanup_sql)
         assert self._current_state(conn) == (50, 50, 0)
 
+    def test_new_keys_only_no_rows_closed_scoped_to_new_keys(self, scd2_env):
+        """#1155 review: new_keys_only's no_rows_closed check must not fire on
+        rows a *different*, valid op closed.
+
+        All three staging groups share one effective_ts (DATE '2026-01-01'),
+        so after a valid basic write closes 20 'changed' keys at that
+        timestamp, an unscoped `valid_to IN (SELECT effective_ts FROM stage
+        WHERE change_type='new')` check selects those pre-existing closed rows
+        too (the shared timestamp, not the change_type, was the only filter)
+        and misreports new_keys_only as having wrongly closed rows. Scoping
+        the check to staged new business keys fixes it. Runs only basic's
+        close-old UPDATE directly (bypassing execute_operation's automatic
+        cleanup, and skipping basic's own insert-new half) so the closed
+        'changed' rows are still present when new_keys_only validates --
+        reproducing the exact "another op's closed rows share the batch
+        timestamp" scenario the review describes, without also consuming
+        new_keys_only's own 'new'-key insert workload (running basic's full
+        write_sql would insert those rows too, leaving nothing for
+        new_keys_only itself to insert -- a different effect, #1157's
+        idempotency guard correctly refusing to double-insert an
+        already-current key).
+        """
+        write_bench, conn = scd2_env
+        basic_op = write_bench.get_operation("merge_scd_type2_basic")
+        close_old_update, _, insert_new = basic_op.write_sql.partition(";")
+        assert insert_new.strip().startswith("INSERT"), "expected basic's write_sql to split into UPDATE; INSERT"
+        conn.execute(close_old_update)
+        _, _, closed_after_basic_close = self._current_state(conn)
+        assert closed_after_basic_close == 20
+
+        result = write_bench.execute_operation("merge_scd_type2_new_keys_only", conn)
+
+        assert result.validation_passed is True, result.error
+        assert result.status == "SUCCESS"
+
     def test_failing_validation_reports_validation_failed_not_success(self, scd2_env):
         """A post-condition validation failure must not report SUCCESS/green.
 
@@ -1189,19 +1224,91 @@ class TestWritePrimitivesSCD2DuckDB:
         assert result.error and "every_unchanged_key_has_current_version_matching_hash" in result.error
 
     def test_basic_wrong_insert_count_fails_cardinality_bound(self, scd2_env):
-        """N3: if basic inserts fewer new versions than the batch requires, the
-        cardinality bound fails even though every offending-row check passes.
+        """N3: if basic's write under-inserts new versions relative to what's
+        staged, the cardinality bound catches it even though every offending-row
+        check passes.
 
-        Dropping the 'new' staging rows leaves only the 20 changed-key inserts, so
-        basic inserts 20 new versions instead of 40; basic_inserts_expected_new_version_count
-        (bounded to exactly 40) catches the shortfall.
+        #1155 review: the bound derives its expected count from
+        scd2_ops_stage_customer instead of a hardcoded 40, so a small/custom
+        fixture with fewer than 20 rows per change_type is no longer a false
+        VALIDATION_FAILED. That means tampering with the *staging* table (the
+        prior version of this test) no longer proves anything -- the derived
+        expected count would tamper right along with it. This simulates the
+        *write* under-inserting instead: run the real write SQL, then delete
+        one of the rows it just wrote (independent of staging), and check the
+        cardinality bound still reports the mismatch.
         """
         write_bench, conn = scd2_env
-        conn.execute("DELETE FROM scd2_ops_stage_customer WHERE change_type = 'new'")
+        operation = write_bench.get_operation("merge_scd_type2_basic")
+        effective_sql, skip_reason = write_bench._impl._get_effective_write_sql(operation, connection=conn)
+        assert skip_reason is None
+        conn.execute(write_bench._impl._replace_placeholders(effective_sql))
+        conn.execute("DELETE FROM scd2_ops_dim_customer WHERE sk = (SELECT MAX(sk) FROM scd2_ops_dim_customer)")
+
+        validation_passed, validation_results, _ = write_bench._impl._run_operation_validation(
+            operation, conn, "merge_scd_type2_basic"
+        )
+
+        assert validation_passed is False
+        failed_ids = {r["query_id"] for r in validation_results if not r["passed"]}
+        assert "basic_inserts_expected_new_version_count" in failed_ids
+
+    def test_basic_validates_green_on_small_custom_fixture(self, small_scale_factor, temp_dir):
+        """#1155 review: a valid small/custom fixture (fewer than 20 customers)
+        must not be reported as VALIDATION_FAILED. Before the derived-count
+        fix, basic_inserts_expected_new_version_count/basic_closes_expected_changed_count
+        hard-coded 40/20, so a 10-customer fixture (10 changed-key inserts + 10
+        new-key inserts = 20, not 40; 10 closes, not 20) failed validation even
+        though the write correctly closed/inserted every row that actually
+        exists.
+        """
+        conn = duckdb.connect(":memory:")
+        conn.execute(
+            "CREATE TABLE orders (o_orderkey INTEGER PRIMARY KEY, o_custkey INTEGER, "
+            "o_orderstatus CHAR(1), o_totalprice DECIMAL(15,2), o_orderdate DATE, "
+            "o_orderpriority CHAR(15), o_clerk CHAR(15), o_shippriority INTEGER, o_comment VARCHAR(79))"
+        )
+        conn.execute(
+            "CREATE TABLE lineitem (l_orderkey INTEGER, l_partkey INTEGER, l_suppkey INTEGER, "
+            "l_linenumber INTEGER, l_quantity DECIMAL(15,2), l_extendedprice DECIMAL(15,2), "
+            "l_discount DECIMAL(15,2), l_tax DECIMAL(15,2), l_returnflag CHAR(1), l_linestatus CHAR(1), "
+            "l_shipdate DATE, l_commitdate DATE, l_receiptdate DATE, l_shipinstruct CHAR(25), "
+            "l_shipmode CHAR(10), l_comment VARCHAR(44))"
+        )
+        conn.execute(
+            "CREATE TABLE customer (c_custkey INTEGER PRIMARY KEY, c_name VARCHAR(25), "
+            "c_address VARCHAR(40), c_nationkey INTEGER, c_phone VARCHAR(15), c_acctbal DECIMAL(15,2), "
+            "c_mktsegment VARCHAR(10), c_comment VARCHAR(117))"
+        )
+        conn.execute("INSERT INTO orders VALUES (1, 1, 'O', 10.0, DATE '2024-01-01', '1-URGENT', 'C#1', 0, 'o')")
+        conn.execute(
+            "INSERT INTO lineitem VALUES (1, 1, 1, 1, 1.0, 1.0, 0.0, 0.0, 'N', 'O', "
+            "DATE '2024-01-02', DATE '2024-01-01', DATE '2024-01-03', 'NONE', 'TRUCK', 'c')"
+        )
+        # Only 10 customers: the fixed 'changed'/'new' ranges (custkey 1-20)
+        # both shrink to 10 rows each, and 'unchanged' (custkey 21-40) is empty.
+        conn.execute("""
+            INSERT INTO customer
+            SELECT i, 'Customer#' || CAST(i AS VARCHAR), 'Addr ' || CAST(i AS VARCHAR),
+                   (i % 25), '555-' || CAST(i AS VARCHAR), (i * 10.0),
+                   CASE WHEN i % 2 = 0 THEN 'BUILDING' ELSE 'AUTOMOBILE' END,
+                   'comment ' || CAST(i AS VARCHAR)
+            FROM range(1, 11) t(i)
+        """)
+
+        write_bench = WritePrimitives(scale_factor=small_scale_factor, output_dir=temp_dir, quiet=True)
+        write_bench.setup(conn, force=True)
+
+        stage_counts = dict(
+            conn.execute("SELECT change_type, COUNT(*) FROM scd2_ops_stage_customer GROUP BY change_type").fetchall()
+        )
+        assert stage_counts == {"changed": 10, "new": 10}
+
         result = write_bench.execute_operation("merge_scd_type2_basic", conn)
-        assert result.validation_passed is False
-        assert result.status == "VALIDATION_FAILED"
-        assert result.error and "basic_inserts_expected_new_version_count" in result.error
+
+        assert result.validation_passed is True, result.error
+        assert result.status == "SUCCESS"
+        conn.close()
 
 
 if __name__ == "__main__":
