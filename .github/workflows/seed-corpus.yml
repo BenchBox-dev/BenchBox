@@ -281,8 +281,15 @@ jobs:
           redeploys the results explorer.
           EOF
           )" \
-            --base release \
+            --base develop \
             --head "${{ steps.commit.outputs.branch }}"
+          # Base is develop, NOT the release branch: this PR carries
+          # results-data/bundles/ content, which release-cut curation removes
+          # from the release tree, and its chore/ head would be rejected by
+          # validate-release-pr.yml. (This was `--base main` when main was the
+          # default branch; integration semantics -> develop after the
+          # 2026-07-08 default-branch switch. Maintainer: confirm this is the
+          # intended base.)
 
       - name: No changes to commit
         if: steps.check.outputs.no_changes == 'true'
