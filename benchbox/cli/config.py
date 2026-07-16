@@ -701,7 +701,10 @@ class ConfigManager:
 
         Args:
             config: UnifiedTuningConfiguration to validate
-            platform: Platform to validate against (default: uses configured preferred platform)
+            platform: Canonical platform type key to validate against (e.g.
+                'duckdb', 'clickhouse-local'). Default: the configured
+                preferred platform ('database.preferred'), which is stored as
+                a canonical key -- never pass an adapter display name here.
         """
         if platform is None:
             platform = self.get("database.preferred", "duckdb")
@@ -715,8 +718,15 @@ class ConfigManager:
         if config.foreign_keys.enabled is None:
             constraint_errors.append("foreign_keys.enabled must be explicitly specified (true or false)")
 
-        # Validate platform-specific configuration
-        platform_errors = config.validate_for_platform(platform)
+        # Validate platform-specific configuration. Warnings (constraint-type
+        # mismatches, platforms without compatibility data) are surfaced but
+        # never fail the load; only hard errors do.
+        platform_errors, platform_warnings = config.validate_for_platform_detailed(platform)
+
+        if platform_warnings:
+            console.print(f"[yellow]⚠️ Unified tuning validation warnings for platform '{platform}':[/yellow]")
+            for warning in platform_warnings:
+                console.print(f"  - {warning}")
 
         all_errors = constraint_errors + platform_errors
 

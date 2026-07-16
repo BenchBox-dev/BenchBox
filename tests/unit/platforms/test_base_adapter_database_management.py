@@ -95,7 +95,9 @@ def test_validate_tuning_configuration_for_platform_delegates_to_effective_confi
         validate_for_platform=lambda platform_name: [f"{platform_name} mismatch"]
     )
 
-    assert adapter.validate_tuning_configuration_for_platform() == ["TrackingPlatform mismatch"]
+    # Validation lookups receive the canonical platform type key (normalized
+    # platform_name fallback here), never the display string.
+    assert adapter.validate_tuning_configuration_for_platform() == ["trackingplatform mismatch"]
 
 
 def test_create_external_tables_raises_not_implemented(adapter, tmp_path):

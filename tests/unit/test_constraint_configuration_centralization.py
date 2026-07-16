@@ -33,7 +33,7 @@ class TestTuningConfigurationValidation:
         mock_config = Mock()
         mock_config.primary_keys.enabled = None  # Not explicitly specified
         mock_config.foreign_keys.enabled = True
-        mock_config.validate_for_platform = Mock(return_value=[])
+        mock_config.validate_for_platform_detailed = Mock(return_value=([], []))
 
         # Test validation should fail
         with pytest.raises(ValueError):
@@ -44,7 +44,7 @@ class TestTuningConfigurationValidation:
         mock_config = Mock()
         mock_config.primary_keys.enabled = True
         mock_config.foreign_keys.enabled = False  # Explicit values
-        mock_config.validate_for_platform = Mock(return_value=[])
+        mock_config.validate_for_platform_detailed = Mock(return_value=([], []))
 
         # Test validation should pass
         try:
