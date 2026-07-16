@@ -401,14 +401,15 @@ def _resolve_tuned(
                 resolution.config_file = path.resolve()
                 if path == packaged_candidate:
                     resolution.source = TuningSource.PACKAGED_RESOURCE
-                    # NOTE: #1176 (unmerged as of this change) adds
-                    # resolve_template_reference() for a canonical
-                    # "<ref>:<hash>" provenance string derived from
-                    # config_file across every resolution source. Until that
-                    # lands, record a package-relative ref string directly
-                    # here; once merged, compose the packaged tier through
-                    # that helper instead of this ad hoc string.
-                    template_ref = f"packaged:{platform.lower()}/{benchmark.lower()}_tuned.yaml"
+                    # Same provenance-ref helper used for every other source
+                    # (repo-relative path in a dev checkout; package-relative
+                    # "<basename>:<content-hash>" when running from an
+                    # installed wheel with no repo root to resolve against -
+                    # see resolve_template_reference()'s docstring). This is
+                    # only used for the log/info message here; the actual
+                    # bundle field is computed the same way in run.py's
+                    # _load_unified_tuning_config from resolution.config_file.
+                    template_ref = resolve_template_reference(resolution.config_file)
                     resolution.info_messages.append(
                         f"Tuning: using packaged template resource at {resolution.config_file} (ref: {template_ref})"
                     )
