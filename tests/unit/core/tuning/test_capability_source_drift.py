@@ -438,7 +438,7 @@ CAPABILITY_SUPPORTED_KEYS = _discover_capability_supported_platforms(GENERATOR_R
 
 # Generator-registry keys with no _PLATFORM_COMPATIBILITY_MAP entry. Expected:
 # the generator registry deliberately carries CLI aliases (clickhouse-local/
-# -server/chdb, pg-duckdb/pg_duckdb, pg-mooncake/pg_mooncake), platform
+# -server/-cloud/chdb, pg-duckdb/pg_duckdb, pg-mooncake/pg_mooncake), platform
 # families the compat map has no per-tuning-type opinion on yet (doris,
 # firebolt, azure_synapse/synapse, trino/presto/athena, the Spark/Delta
 # family, questdb, timescaledb). Consolidating these into one canonical key
@@ -450,6 +450,7 @@ EXPECTED_GENERATOR_ONLY_KEYS = frozenset(
         "doris",
         "clickhouse-local",
         "clickhouse-server",
+        "clickhouse-cloud",
         "chdb",
         "firebolt",
         "azure_synapse",
