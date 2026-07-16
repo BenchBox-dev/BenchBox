@@ -1,0 +1,65 @@
+id: tuning-df-ledger-parity-20260716
+title: "DataFrame runtime-tuning ledger parity (applied observations, not config blobs)"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+
+description: |
+  Deferred from tuning-applied-ledger-and-validation-status-20260712 (review
+  finding N10): DataFrame runs record df_tuning_config as a config blob with no
+  applied/validated/hash concept. Extend the applied-ledger model to the DF
+  runner: record the runtime settings actually applied (threads, memory limits,
+  chunk sizes, write_config partition/sort/row-group at write time) as ledger
+  entries with an applied_ledger_hash, and emit the same validation-status
+  vocabulary in DF bundles. A heavily thread/memory-tuned polars run becomes
+  distinguishable from a default run in the bundle and explorer.
+
+work:
+  - id: w0
+    summary: "Start gate: applied-ledger PR merged; map DF runtime application points (tuning_mixin, dataframe_runner, write_config consumers)"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Instrument DF apply points; ledger + hash + status in DF result path"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Bundle/companion export parity; explorer ingest reads DF ledger fields"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Tests: polars/pandas stub runs produce ledgers; default run yields noop; write-config physical layout recorded"
+    status: pending
+    needs: [w1]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "SQL-side ledger semantics unchanged; shared vocabulary reused, not forked"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/dataframe/**"
+    - "benchbox/core/runner/dataframe_runner.py"
+    - "benchbox/platforms/dataframe/**"
+    - "benchbox/core/results/**"
+    - "_project/scripts/explorer_pipeline/**"
+    - "tests/**"
+
+verification:
+  - description: "DF suites green; DF bundle carries ledger fields"
+    command: "uv run -- python -m pytest tests/unit/core/dataframe tests/unit/platforms -q -k 'dataframe or df_'"
+    expected_output: "All passing"
+
+prior_art:
+  - "benchbox/core/tuning/applied_ledger.py: the ledger model - reuse, do not fork"
+  - "benchbox/core/dataframe/tuning/write_config.py: the physical write-layout surface to record"
+
+metadata:
+  owners: ["benchbox-team"]
+  tags: [tuning, dataframe, applied-ledger]
+  estimated_effort: Medium
+  created_date: "2026-07-16"
+  source_review: "tuning remediation batch close-out 2026-07-16 (N10)"
