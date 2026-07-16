@@ -1,25 +1,21 @@
 import {
   FACET_KEYS,
   FACET_URL_KEYS,
+  LEGACY_UNLABELLED_TUNING_MODE,
+  NOT_RECORDED_TUNING_MODE,
+  NULL_TUNING_MODE_SENTINELS,
   dateWindowCutoffIso,
   type DateWindowFacet,
   type FacetKey,
   type FacetState,
 } from "@/lib/facetModel";
 
-/**
- * Explicit facet token for rows whose bundle never recorded a tuning mode.
- *
- * No producer emits this value as a real mode; it exists so "not recorded"
- * is a first-class state instead of a null silently coalesced into a
- * real-looking mode. A row with tuning_mode NULL matches a facet selection
- * only when that selection explicitly includes this sentinel (or the legacy
- * "untuned" token still emitted by existing facet chips / URLs).
- */
-export const NOT_RECORDED_TUNING_MODE = "not-recorded";
-
-/** Legacy unlabelled-tuning facet token; kept so existing chips and URLs keep matching. */
-export const LEGACY_UNLABELLED_TUNING_MODE = "untuned";
+// Re-exported so existing consumers (TuningBadge, tests) keep importing the
+// not-recorded/legacy tuning tokens from here - facetModel.ts is the single
+// source of truth (see NULL_TUNING_MODE_SENTINELS, shared with the SQL-side
+// facetsToWhereClause/queryFilters filters so in-memory matching here can't
+// drift from what the DuckDB-backed pages actually query for).
+export { LEGACY_UNLABELLED_TUNING_MODE, NOT_RECORDED_TUNING_MODE };
 
 export interface FacetMatchRow {
   benchmark?: string | null;
@@ -138,7 +134,7 @@ function matchesTuningMode(value: string | null | undefined, selected: readonly 
     // Not-recorded rows match only an explicit not-recorded selection --
     // never a real mode. The legacy "untuned" token keeps existing chip
     // values and bookmarked URLs matching the same rows as before.
-    return selected.includes(NOT_RECORDED_TUNING_MODE) || selected.includes(LEGACY_UNLABELLED_TUNING_MODE);
+    return NULL_TUNING_MODE_SENTINELS.some((sentinel) => selected.includes(sentinel));
   }
   return selected.includes(value);
 }

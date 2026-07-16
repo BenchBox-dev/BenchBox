@@ -1,4 +1,9 @@
-import { dateWindowCutoffIso, type DateWindowFacet } from "@/lib/facetModel";
+import {
+  NULL_TUNING_MODE_SENTINELS,
+  addNullableSentinelClause,
+  dateWindowCutoffIso,
+  type DateWindowFacet,
+} from "@/lib/facetModel";
 
 export interface QueryFilterState {
   benchmarks: string[];
@@ -107,7 +112,7 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
     clauses.push(`scale_factor IN (${filters.scaleFactors.map(() => "?").join(", ")})`);
     params.push(...filters.scaleFactors.map((value) => Number(value)));
   }
-  expandListFilter("tuning_mode", filters.tuningModes, clauses, params);
+  addNullableSentinelClause("tuning_mode", filters.tuningModes, NULL_TUNING_MODE_SENTINELS, clauses, params);
   expandListFilter("trust_label", filters.trustTiers, clauses, params);
   expandListFilter("validation_status", filters.validationStatuses, clauses, params);
   expandListFilter("cost_status", filters.costStatuses, clauses, params);
