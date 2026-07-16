@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 import pytest
 
@@ -307,3 +307,260 @@ def test_get_metadata_summary_handles_no_data_and_errors(monkeypatch):
     summary = manager.get_metadata_summary()
     assert summary["table_exists"] is False
     assert "boom" in summary["error"]
+
+
+# --- Widened drift persistence: unique/check constraints + platform optimizations ---
+#
+# TuningMetadataManager._as_benchmark_tunings previously only carried pk/fk
+# enable flags + table_tunings; unique/check constraints and ALL platform
+# optimizations (z-ordering, liquid clustering, bloom filters, ...) were
+# invisible to reused-database drift detection. The tests below cover the
+# section-hash marker rows that widen that comparison.
+
+
+def test_hash_section_is_stable_regardless_of_key_order():
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    payload_a = {"b": 1, "a": 2}
+    payload_b = {"a": 2, "b": 1}
+    assert manager._hash_section(payload_a) == manager._hash_section(payload_b)
+    assert manager._hash_section({"a": 3}) != manager._hash_section({"a": 4})
+
+
+def test_build_section_marker_records_shape():
+    manager = TuningMetadataManager(_Adapter("databricks"))
+    unified = UnifiedTuningConfiguration()
+    unified.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
+
+    records = manager._build_section_marker_records(unified, "databricks", datetime(2026, 7, 16))
+
+    assert {r.tuning_type for r in records} == {
+        TuningMetadataManager._TUNING_TYPE_SCHEMA_VERSION,
+        TuningMetadataManager._TUNING_TYPE_CONSTRAINTS_HASH,
+        TuningMetadataManager._TUNING_TYPE_PLATFORM_OPT_HASH,
+    }
+    assert all(r.table_name == TuningMetadataManager._SECTION_MARKER_TABLE for r in records)
+
+    version_record = next(r for r in records if r.tuning_type == TuningMetadataManager._TUNING_TYPE_SCHEMA_VERSION)
+    assert version_record.configuration_hash == str(TuningMetadataManager._METADATA_SCHEMA_VERSION)
+
+
+def test_rebuild_tunings_from_records_skips_section_marker_rows():
+    """A prior version would KeyError here: sentinel tuning_type values like
+    "platform_optimizations_hash" aren't one of the four column-tuning keys
+    the per-table dict is seeded with.
+    """
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    records = [
+        ("orders", TuningType.SORTING.value, "o_orderkey", 1, "h", datetime.now(), "duckdb"),
+        (
+            TuningMetadataManager._SECTION_MARKER_TABLE,
+            TuningMetadataManager._TUNING_TYPE_SCHEMA_VERSION,
+            "schema_version",
+            2,
+            "2",
+            datetime.now(),
+            "duckdb",
+        ),
+        (
+            TuningMetadataManager._SECTION_MARKER_TABLE,
+            TuningMetadataManager._TUNING_TYPE_PLATFORM_OPT_HASH,
+            "platform_optimizations_hash",
+            0,
+            "deadbeef",
+            datetime.now(),
+            "duckdb",
+        ),
+    ]
+
+    tunings = manager._rebuild_tunings_from_records(records, "tpch")
+
+    assert tunings.get_table_names() == ["orders"]
+    assert TuningMetadataManager._SECTION_MARKER_TABLE not in tunings.table_tunings
+
+
+def test_compare_section_hashes_warns_when_no_markers_found(monkeypatch):
+    """must_preserve: a benchbox_tuning_metadata table written before this
+    widening has no section-marker rows at all. That must be a warning
+    (drift for those sections is simply unknown), never an error.
+    """
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    monkeypatch.setattr(manager, "_load_section_markers", dict)
+
+    result = MetadataValidationResult()
+    manager._compare_section_hashes(UnifiedTuningConfiguration(), result)
+
+    assert result.is_valid is True
+    assert not result.drifted_sections
+    assert any("older BenchBox" in w for w in result.warnings)
+
+
+def test_compare_section_hashes_detects_platform_optimization_drift(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("databricks"))
+
+    saved = UnifiedTuningConfiguration()
+    saved.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
+    saved_markers = {
+        record.tuning_type: record.configuration_hash
+        for record in manager._build_section_marker_records(saved, "databricks", datetime.now())
+    }
+    monkeypatch.setattr(manager, "_load_section_markers", lambda: saved_markers)
+
+    # Reused database, now expecting no platform optimizations.
+    drifted = UnifiedTuningConfiguration()
+
+    result = MetadataValidationResult()
+    manager._compare_section_hashes(drifted, result)
+
+    assert result.is_valid is False
+    assert result.drifted_sections == {TuningMetadataManager._PLATFORM_OPTIMIZATIONS_SECTION}
+    assert any("Platform-optimization" in e for e in result.errors)
+
+
+def test_compare_section_hashes_detects_constraint_drift(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+
+    saved = UnifiedTuningConfiguration()
+    saved_markers = {
+        record.tuning_type: record.configuration_hash
+        for record in manager._build_section_marker_records(saved, "duckdb", datetime.now())
+    }
+    monkeypatch.setattr(manager, "_load_section_markers", lambda: saved_markers)
+
+    drifted = UnifiedTuningConfiguration()
+    drifted.unique_constraints.enabled = False
+
+    result = MetadataValidationResult()
+    manager._compare_section_hashes(drifted, result)
+
+    assert result.is_valid is False
+    assert result.drifted_sections == {TuningMetadataManager._CONSTRAINTS_SECTION}
+    assert any("constraint" in e.lower() for e in result.errors)
+
+
+def test_compare_section_hashes_no_drift_when_matching(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+
+    config = UnifiedTuningConfiguration()
+    markers = {
+        record.tuning_type: record.configuration_hash
+        for record in manager._build_section_marker_records(config, "duckdb", datetime.now())
+    }
+    monkeypatch.setattr(manager, "_load_section_markers", lambda: markers)
+
+    result = MetadataValidationResult()
+    manager._compare_section_hashes(config, result)
+
+    assert result.is_valid is True
+    assert not result.drifted_sections
+
+
+class _FakeCursor:
+    """Minimal SQL-shape-aware cursor backed by a shared in-memory row list.
+
+    Only understands the handful of statement shapes TuningMetadataManager
+    actually issues (see metadata.py): CREATE TABLE/INDEX, DELETE FROM,
+    INSERT INTO, the full column-tuning SELECT, the "table exists" COUNT(*)
+    probe, and the section-marker SELECT filtered by table_name.
+    """
+
+    def __init__(self, table: list[tuple]):
+        self._table = table
+        self._result: Any = []
+
+    def execute(self, sql: str, params: Optional[list] = None) -> None:
+        upper = sql.strip().upper()
+        if upper.startswith("CREATE TABLE") or upper.startswith("CREATE INDEX"):
+            self._result = []
+        elif upper.startswith("DELETE FROM"):
+            self._table.clear()
+            self._result = []
+        elif upper.startswith("INSERT INTO"):
+            self._table.append(tuple(params))
+            self._result = []
+        elif "SELECT COUNT(*)" in upper and "LIMIT 1" in upper:
+            self._result = (1,)
+        elif "WHERE TABLE_NAME =" in upper:
+            marker_table = sql.split("'")[1]
+            self._result = [(row[1], row[4]) for row in self._table if row[0] == marker_table]
+        elif upper.startswith("SELECT TABLE_NAME"):
+            self._result = list(self._table)
+        else:
+            self._result = []
+
+    def fetchall(self) -> list:
+        return self._result if isinstance(self._result, list) else []
+
+    def fetchone(self):
+        if isinstance(self._result, tuple):
+            return self._result
+        return self._result[0] if self._result else None
+
+
+class _FakeConn:
+    def __init__(self, table: list[tuple]):
+        self._table = table
+
+    def cursor(self) -> _FakeCursor:
+        return _FakeCursor(self._table)
+
+    def commit(self) -> None:
+        pass
+
+
+class _FakeAdapter:
+    """Stateful fake platform adapter simulating a single persisted table,
+    shared across manager instances -- lets tests exercise a genuine
+    save -> reuse -> validate round trip instead of monkeypatching internals.
+    """
+
+    def __init__(self, platform_name: str = "duckdb"):
+        self.platform_name = platform_name
+        self.canonical_platform_type = platform_name
+        self.platform_config: dict[str, Any] = {}
+        self.table: list[tuple] = []
+
+    def create_connection(self, **_kwargs) -> _FakeConn:
+        return _FakeConn(self.table)
+
+    def close_connection(self, _conn) -> None:
+        return None
+
+
+def test_validate_unified_tunings_detects_platform_optimization_drift_on_reuse():
+    """w3: reused-database drift detection must catch a toggled platform
+    optimization (e.g. z_ordering) that _as_benchmark_tunings previously
+    dropped entirely. Full round trip through save_unified_tunings and
+    validate_unified_tunings against a shared fake database.
+    """
+    adapter = _FakeAdapter("databricks")
+
+    original = UnifiedTuningConfiguration()
+    original.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
+    assert TuningMetadataManager(adapter).save_unified_tunings(original) is True
+
+    # Simulate reusing the same database with a different expected config
+    # (z-ordering no longer requested).
+    drifted = UnifiedTuningConfiguration()
+    result = TuningMetadataManager(adapter).validate_unified_tunings(drifted)
+
+    assert result.is_valid is False
+    assert result.drifted_sections == {TuningMetadataManager._PLATFORM_OPTIMIZATIONS_SECTION}
+    assert any("Platform-optimization" in e for e in result.errors)
+
+
+def test_validate_unified_tunings_old_format_table_loads_without_error():
+    """must_preserve: a benchbox_tuning_metadata table written by a version
+    that predates this widening has no section-marker rows at all. Loading
+    and validating it must not error -- drift for the widened sections is
+    simply unknown (a warning), not a hard failure.
+    """
+    adapter = _FakeAdapter("duckdb")
+    adapter.table.append(("orders", TuningType.SORTING.value, "o_orderkey", 1, "somehash", datetime.now(), "duckdb"))
+
+    unified = UnifiedTuningConfiguration()
+    unified.table_tunings["orders"] = TableTuning(table_name="orders", sorting=[_col("o_orderkey", 1)])
+
+    result = TuningMetadataManager(adapter).validate_unified_tunings(unified)
+
+    assert result.is_valid is True
+    assert any("older BenchBox" in w for w in result.warnings)
