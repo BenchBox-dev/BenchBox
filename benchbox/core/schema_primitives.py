@@ -87,10 +87,12 @@ def get_fk_ordered_table_names(tables: list[Any]) -> list[str]:
     result is deterministic and, for schemas with no FK dependencies,
     identical to the input order.
 
-    A cyclic or self-referencing FK graph cannot be fully ordered; any
-    tables left over once no further progress can be made are appended in
-    their original relative order rather than raising, so callers always
-    get a usable ordering back.
+    A self-referencing FK (a table whose foreign key points at itself) is
+    dropped from its dependency set before the sort runs, so it never blocks
+    that table from being placed. A cycle spanning two or more distinct
+    tables cannot be fully ordered, though; any tables left over once no
+    further progress can be made are appended in their original relative
+    order rather than raising, so callers always get a usable ordering back.
 
     Args:
         tables: Benchmark table definitions exposing ``.name`` and
@@ -109,7 +111,23 @@ def get_fk_ordered_table_names(tables: list[Any]) -> list[str]:
         }
         for table in tables
     }
+    return _stable_topological_order(names, deps)
 
+
+def _stable_topological_order(names: list[str], deps: dict[str, set[str]]) -> list[str]:
+    """Shared Kahn's-algorithm core behind ``get_fk_ordered_table_names`` and
+    ``get_fk_ordered_table_names_from_column_specs``.
+
+    Args:
+        names: All table names to order.
+        deps: ``{table_name: {names of tables it must load after}}``.
+
+    Returns:
+        ``names`` reordered so every dependency precedes its dependent,
+        falling back to input order (see module-level notes above) for any
+        table names not present as keys in ``deps``, and to input order for
+        the leftovers of an unresolvable multi-table cycle.
+    """
     ordered: list[str] = []
     placed: set[str] = set()
     remaining = list(names)
@@ -117,15 +135,63 @@ def get_fk_ordered_table_names(tables: list[Any]) -> list[str]:
     while remaining:
         progressed = False
         for name in list(remaining):
-            if deps[name] <= placed:
+            if deps.get(name, set()) <= placed:
                 ordered.append(name)
                 placed.add(name)
                 remaining.remove(name)
                 progressed = True
         if not progressed:
-            # Cycle (or unresolved self-reference) among the rest: preserve
-            # input order for the leftovers instead of raising.
+            # Cycle spanning two or more tables: preserve input order for
+            # the leftovers instead of raising.
             ordered.extend(remaining)
             break
 
     return ordered
+
+
+class _DottedForeignKeyTable:
+    """Adapts a raw dict-based table spec to the interface
+    ``get_fk_ordered_table_names`` expects.
+
+    Some benchmarks (SSB, CoffeeShop) define their schema as plain dicts
+    loaded from a ``schema_specs.yaml``, where a column's foreign key is a
+    single ``"referenced_table.referenced_column"`` string rather than a
+    ``BaseSchemaTable`` column's ``(table, column)`` tuple. This wraps one
+    such table spec so it can go through the same ordering helper as the
+    ``BaseSchemaTable``-based benchmarks (e.g. TPC-H) without duplicating
+    the topological sort.
+    """
+
+    def __init__(self, name: str, table_spec: dict[str, Any]) -> None:
+        self.name = name
+        self._columns = table_spec.get("columns", [])
+
+    def get_foreign_keys(self) -> dict[str, tuple[str, str]]:
+        """Return ``{column_name: (ref_table, ref_column)}`` for FK columns."""
+        result: dict[str, tuple[str, str]] = {}
+        for column in self._columns:
+            foreign_key = column.get("foreign_key")
+            if foreign_key:
+                ref_table, ref_column = foreign_key.split(".", 1)
+                result[column["name"]] = (ref_table, ref_column)
+        return result
+
+
+def get_fk_ordered_table_names_from_column_specs(tables: dict[str, dict[str, Any]]) -> list[str]:
+    """``get_fk_ordered_table_names``, for dict/YAML-based schemas.
+
+    For benchmarks (SSB, CoffeeShop) whose FK metadata is a dotted
+    ``"table.column"`` string on each column spec rather than a
+    ``BaseSchemaTable`` column's ``(table, column)`` tuple.
+
+    Args:
+        tables: Mapping of table key to table spec dict, in the shape each
+            benchmark's ``schema_specs.yaml`` produces (e.g. ``TABLES`` in
+            ``benchbox.core.ssb.schema`` / ``benchbox.core.coffeeshop.schema``):
+            ``{"columns": [{"name": ..., "foreign_key": "ref_table.ref_col"}, ...]}``.
+
+    Returns:
+        Table names (the dict's keys) in dependency-safe load order.
+    """
+    adapters = [_DottedForeignKeyTable(name, spec) for name, spec in tables.items()]
+    return get_fk_ordered_table_names(adapters)

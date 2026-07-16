@@ -56,6 +56,39 @@ completed_note: |
   cycle-doesn't-raise check). Untuned/no-tuning path re-verified
   end-to-end (`--tuning notuning`) to load successfully in the new
   (dependency, not alphabetical) order with no functional change.
+
+  Post-review extension (Opus review of this branch, same day): SSB
+  defines cross-table FKs (`lineorder` -> `customer`/`part`/`supplier`/
+  `date` in `benchbox/core/ssb/schema_specs.yaml`) with the same
+  alphabetical-fallback exposure -- `examples/tunings/duckdb/
+  ssb_tuned.yaml` ships `foreign_keys.enabled`/
+  `enforce_referential_integrity: true`, so SSB tuned runs would fail
+  identically once PR #1176 merges. CoffeeShop also defines FKs
+  (`order_lines` -> `dim_locations`/`dim_products`) with no explicit
+  ordering (alphabetical happens to be FK-safe for its current 3-table
+  schema by coincidence, not by design). Both SSB and CoffeeShop define
+  their schema as raw dicts from `schema_specs.yaml` (dotted
+  `"table.column"` foreign_key strings), not `BaseSchemaTable`/`Column`
+  objects like TPC-H, so extended `schema_primitives.py` with a
+  `_DottedForeignKeyTable` adapter and
+  `get_fk_ordered_table_names_from_column_specs()` that wraps that dict
+  shape and reuses the existing `get_fk_ordered_table_names` topo-sort
+  unchanged. Added `get_table_loading_order()` to
+  `benchbox.core.ssb.schema` / `benchbox.core.coffeeshop.schema` and
+  `get_table_loading_order(available_tables)` to `SSBBenchmark` /
+  `CoffeeShopBenchmark`, mirroring the TPC-H wiring. Also corrected the
+  `get_fk_ordered_table_names` docstring: self-referencing FKs are
+  excluded from a table's dependency set before the sort runs (so they
+  never reach the "leftover" branch), it's only a cycle spanning two or
+  more distinct tables that lands there. TPC-DS and Data Vault already
+  have their own load ordering and were left untouched. New coverage:
+  `tests/unit/core/ssb/test_ssb_schema.py`,
+  `tests/unit/core/test_schema_primitives_base.py`
+  (`TestGetFkOrderedTableNamesFromColumnSpecs`), plus additions to
+  `tests/unit/core/coffeeshop/test_coffeeshop_schema.py` and
+  `test_coffeeshop_benchmark.py`. Full `tests/unit/core` suite (10069
+  passed) and the `tests/integration/tuning/test_duckdb_fk_load_ordering.py`
+  suite re-run clean after this extension.
 category: Core Functionality
 
 description: |
@@ -115,6 +148,24 @@ work:
       (topo-sort correctness, stability, cycle-safety) and
       tests/unit/core/test_tpch_benchmark_fakes.py (benchmark-level
       ordering against a shuffled available_tables list).
+  - id: w3
+    summary: "Post-review: extend FK-aware load ordering to SSB and CoffeeShop; fix a docstring imprecision"
+    status: done
+    needs: [w1]
+    notes: |
+      Opus review flagged that SSB (lineorder -> customer/part/supplier/
+      date) and CoffeeShop (order_lines -> dim_locations/dim_products)
+      have the same latent defect: no get_table_loading_order, so the
+      alphabetical fallback would violate SSB's FKs the moment tuning
+      delivery is fixed (ssb_tuned.yaml already ships foreign_keys
+      enabled). Added schema_primitives._DottedForeignKeyTable +
+      get_fk_ordered_table_names_from_column_specs() to adapt SSB/
+      CoffeeShop's dict-based schema_specs.yaml (dotted "table.column"
+      foreign_key strings) onto the existing get_fk_ordered_table_names
+      topo-sort unchanged; wired get_table_loading_order into both
+      schema.py modules and both benchmark classes. Also corrected the
+      get_fk_ordered_table_names docstring's self-reference claim.
+      TPC-DS/Data Vault already have ordering and were left alone.
 
 deps:
   needs: []
