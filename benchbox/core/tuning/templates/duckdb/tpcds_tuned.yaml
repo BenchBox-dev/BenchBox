@@ -1,0 +1,181 @@
+# DuckDB TPC-DS Tuned Configuration
+# This configuration enables all DuckDB-supported optimizations for TPC-DS benchmark
+# Provides maximum performance with constraints and table-level tunings enabled
+
+primary_keys:
+  enabled: true
+  enforce_uniqueness: true
+  nullable: false
+
+foreign_keys:
+  enabled: true
+  enforce_referential_integrity: true
+  on_delete_action: CASCADE
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: true
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  auto_optimize_enabled: false
+  auto_compact_enabled: false
+  bloom_filters_enabled: false
+  bloom_filter_columns: []
+  materialized_views_enabled: false
+
+table_tunings:
+  STORE_SALES:
+    table_name: STORE_SALES
+    partitioning:
+    - name: SS_SOLD_DATE_SK
+      type: INTEGER
+      order: 1
+    sorting:
+    - name: SS_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: SS_CUSTOMER_SK
+      type: INTEGER
+      order: 2
+    - name: SS_STORE_SK
+      type: INTEGER
+      order: 3
+    - name: SS_PROMO_SK
+      type: INTEGER
+      order: 4
+    - name: SS_TICKET_NUMBER
+      type: INTEGER
+      order: 5
+
+  STORE_RETURNS:
+    table_name: STORE_RETURNS
+    partitioning:
+    - name: SR_RETURNED_DATE_SK
+      type: INTEGER
+      order: 1
+    sorting:
+    - name: SR_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: SR_CUSTOMER_SK
+      type: INTEGER
+      order: 2
+    - name: SR_STORE_SK
+      type: INTEGER
+      order: 3
+    - name: SR_TICKET_NUMBER
+      type: INTEGER
+      order: 4
+
+  CATALOG_SALES:
+    table_name: CATALOG_SALES
+    partitioning:
+    - name: CS_SOLD_DATE_SK
+      type: INTEGER
+      order: 1
+    sorting:
+    - name: CS_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: CS_SHIP_MODE_SK
+      type: INTEGER
+      order: 2
+
+  CATALOG_RETURNS:
+    table_name: CATALOG_RETURNS
+    partitioning:
+    - name: CR_RETURNED_DATE_SK
+      type: INTEGER
+      order: 1
+    sorting:
+    - name: CR_ITEM_SK
+      type: INTEGER
+      order: 1
+
+  WEB_SALES:
+    table_name: WEB_SALES
+    partitioning:
+    - name: WS_SOLD_DATE_SK
+      type: INTEGER
+      order: 1
+    sorting:
+    - name: WS_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: WS_WEB_PAGE_SK
+      type: INTEGER
+      order: 2
+    - name: WS_WEB_SITE_SK
+      type: INTEGER
+      order: 3
+    - name: WS_SHIP_MODE_SK
+      type: INTEGER
+      order: 4
+
+  WEB_RETURNS:
+    table_name: WEB_RETURNS
+    partitioning:
+    - name: WR_RETURNED_DATE_SK
+      type: INTEGER
+      order: 1
+    sorting:
+    - name: WR_ITEM_SK
+      type: INTEGER
+      order: 1
+
+  DATE_DIM:
+    table_name: DATE_DIM
+    sorting:
+    - name: D_DATE_SK
+      type: INTEGER
+      order: 1
+    - name: D_YEAR
+      type: INTEGER
+      order: 2
+    - name: D_MOY
+      type: INTEGER
+      order: 3
+
+  ITEM:
+    table_name: ITEM
+    sorting:
+    - name: I_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: I_CATEGORY
+      type: VARCHAR
+      order: 2
+    - name: I_CLASS
+      type: VARCHAR
+      order: 3
+
+  CUSTOMER:
+    table_name: CUSTOMER
+    sorting:
+    - name: C_CUSTOMER_SK
+      type: INTEGER
+      order: 1
+    - name: C_CURRENT_ADDR_SK
+      type: INTEGER
+      order: 2
+    - name: C_CURRENT_CDEMO_SK
+      type: INTEGER
+      order: 3
+
+_metadata:
+  version: '2.0'
+  format: unified_tuning
+  database: duckdb
+  benchmark: tpcds
+  configuration_type: tuned
+  description: "DuckDB TPC-DS configuration with all supported optimizations enabled"
+  created: '2025-11-01'
+  generated_by: benchbox-project
