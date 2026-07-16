@@ -57,6 +57,46 @@ def test_generate_create_table_ddl_with_and_without_tuning():
     assert "ORDER BY tuple()" in untuned
 
 
+def test_generate_create_table_ddl_wraps_partition_by_in_parens():
+    """PR #1180 review: ClickHouse requires a single expression for
+    PARTITION BY; multi-column partitioning needs a tuple (parens), else
+    schema creation fails for otherwise-valid tuning configs. The stored
+    clauses.partition_by field stays a bare comma list (see
+    test_generate_tuning_clauses_combines_cluster_sort_and_partition), so the
+    render site must always wrap it - single or multi-column - to be correct
+    for both.
+    """
+    generator = ClickHouseDDLGenerator()
+    columns = [ColumnDefinition("id", "BIGINT", ColumnNullability.NOT_NULL)]
+
+    single = generator.generate_create_table_ddl(
+        "orders",
+        columns,
+        tuning=generator.generate_tuning_clauses(
+            TableTuning(
+                table_name="orders",
+                partitioning=[TuningColumn(name="order_date", type="DATE", order=1)],
+            )
+        ),
+    )
+    assert "PARTITION BY (toYYYYMM(order_date))" in single
+
+    multi = generator.generate_create_table_ddl(
+        "orders",
+        columns,
+        tuning=generator.generate_tuning_clauses(
+            TableTuning(
+                table_name="orders",
+                partitioning=[
+                    TuningColumn(name="region", type="VARCHAR", order=1),
+                    TuningColumn(name="shard", type="INTEGER", order=2),
+                ],
+            )
+        ),
+    )
+    assert "PARTITION BY (region, shard)" in multi
+
+
 def test_column_mapping_generation_and_post_load_statement():
     generator = ClickHouseDDLGenerator()
     assert generator._map_to_clickhouse_type("DOUBLE") == "Float64"

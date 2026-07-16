@@ -419,7 +419,9 @@ class TestClickHouseAdapter:
         statement = "CREATE TABLE lineitem (l_orderkey Int32, l_shipdate Date)"
         rendered = adapter._optimize_table_definition(statement, table_tunings)
 
-        assert "PARTITION BY toYYYYMM(l_shipdate)" in rendered
+        # PARTITION BY is always parenthesized at render time (PR #1180 review:
+        # multi-column partitioning needs a tuple expression, e.g. `(a, b)`).
+        assert "PARTITION BY (toYYYYMM(l_shipdate))" in rendered
         assert "ORDER BY (l_orderkey)" in rendered
 
         # The real proof: chdb must accept this DDL without raising.
@@ -430,7 +432,10 @@ class TestClickHouseAdapter:
 
         # chdb/ClickHouse echoes back the clauses it actually applied to the
         # table (not just what we asked for), so this confirms the engine
-        # accepted -- not silently ignored -- the tuned rendering.
+        # accepted -- not silently ignored -- the tuned rendering. ClickHouse
+        # normalizes away the redundant parens for a single-expression
+        # PARTITION BY on echo (verified empirically), unlike the multi-column
+        # case where they're semantically required and preserved.
         assert "PARTITION BY toYYYYMM(l_shipdate)" in ddl_text
         assert "ORDER BY l_orderkey" in ddl_text
 

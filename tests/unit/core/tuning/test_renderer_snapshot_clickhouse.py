@@ -65,7 +65,7 @@ class TestClickHousePreviewExecutionParity:
         statement = "CREATE TABLE lineitem (l_orderkey INT, l_shipdate DATE)"
         rendered = adapter._optimize_table_definition(statement, table_tunings)
 
-        assert f"PARTITION BY {preview.partition_by}" in rendered
+        assert f"PARTITION BY ({preview.partition_by})" in rendered
         assert f"ORDER BY ({preview.sort_by})" in rendered
 
     def test_no_table_tuning_falls_back_to_engine_mandatory_baseline(self):

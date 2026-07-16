@@ -677,10 +677,13 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
         "redshift": RedshiftDDLGenerator,
         "postgresql": PostgreSQLDDLGenerator,
         "timescaledb": TimescaleDBDDLGenerator,
-        # ClickHouse (all three first-class platform names map to the shared generator)
+        # ClickHouse (all first-class platform names map to the shared generator,
+        # matching workload.py's execution path, which always renders tuned DDL
+        # via the "clickhouse" generator regardless of variant)
         "clickhouse": ClickHouseDDLGenerator,
         "clickhouse-local": ClickHouseDDLGenerator,
         "clickhouse-server": ClickHouseDDLGenerator,
+        "clickhouse-cloud": ClickHouseDDLGenerator,
         "chdb": ClickHouseDDLGenerator,
         # Firebolt
         "firebolt": FireboltDDLGenerator,

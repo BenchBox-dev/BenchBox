@@ -122,7 +122,7 @@ class ClickHouseWorkloadMixin:
         # Include PARTITION BY if not present and the tuned generator produced one.
         statement_upper = statement.upper()
         if "PARTITION BY" not in statement_upper and tuning_clauses is not None and tuning_clauses.partition_by:
-            partition_clause = f" PARTITION BY {tuning_clauses.partition_by}"
+            partition_clause = f" PARTITION BY ({tuning_clauses.partition_by})"
             if statement.endswith(";"):
                 statement = statement[:-1] + partition_clause + ";"
             else:
