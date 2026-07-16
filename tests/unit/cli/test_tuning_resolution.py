@@ -25,6 +25,7 @@ from benchbox.cli.tuning_resolver import (
     get_tuning_template_paths,
     list_available_tuning_templates,
     resolve_tuning,
+    warn_sql_auto_mode,
 )
 
 pytestmark = [
@@ -437,6 +438,58 @@ class TestDisplayFunctions:
         display_tuning_list(mock_console, platform="duckdb")
 
         assert mock_console.print.called
+
+
+@pytest.mark.unit
+class TestWarnSqlAutoMode:
+    """Test warn_sql_auto_mode: the honest --tuning auto messaging on SQL platforms."""
+
+    def _auto_resolution(self) -> TuningResolution:
+        return TuningResolution(
+            mode=TuningMode.AUTO,
+            source=TuningSource.SMART_DEFAULTS,
+            enabled=True,
+        )
+
+    def test_warns_on_sql_platform(self, mock_console):
+        """SQL platforms resolving --tuning auto should get an explicit warning."""
+        warn_sql_auto_mode(self._auto_resolution(), resolved_mode="sql", console=mock_console)
+
+        assert mock_console.print.called
+        printed = " ".join(str(call) for call in mock_console.print.call_args_list)
+        assert "DataFrame-only" in printed
+
+    def test_no_warning_on_dataframe_platform(self, mock_console):
+        """DataFrame platforms have real smart defaults elsewhere; no warning needed."""
+        warn_sql_auto_mode(self._auto_resolution(), resolved_mode="dataframe", console=mock_console)
+
+        assert not mock_console.print.called
+
+    def test_no_warning_for_non_auto_mode(self, mock_console):
+        """Only TuningMode.AUTO triggers the warning, regardless of resolved_mode."""
+        resolution = TuningResolution(
+            mode=TuningMode.NOTUNING,
+            source=TuningSource.BASELINE,
+            enabled=False,
+        )
+
+        warn_sql_auto_mode(resolution, resolved_mode="sql", console=mock_console)
+
+        assert not mock_console.print.called
+
+    def test_quiet_suppresses_console_output(self, mock_console):
+        """quiet=True must not print, even on a SQL platform."""
+        warn_sql_auto_mode(self._auto_resolution(), resolved_mode="sql", console=mock_console, quiet=True)
+
+        assert not mock_console.print.called
+
+    def test_logs_debug_regardless_of_platform(self):
+        """The generic 'using basic unified config' debug log fires for both modes."""
+        logger = MagicMock()
+
+        warn_sql_auto_mode(self._auto_resolution(), resolved_mode="dataframe", console=MagicMock(), logger=logger)
+
+        assert logger.debug.called
 
     def test_display_tuning_list_no_results(self, mock_console):
         """Test display_tuning_list with no matching templates."""
