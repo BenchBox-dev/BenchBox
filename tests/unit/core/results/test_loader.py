@@ -1123,3 +1123,63 @@ class TestTuningProvenanceLoaderFidelity:
         re_exported = build_result_payload(reimported)
         assert re_exported["platform"]["tuning"]["tuning_source"] == "auto_discovered"
         assert canonical_json_text(exported) == canonical_json_text(re_exported)
+
+    def test_requested_constraints_survive_reconstruct_and_reexport_roundtrip(self):
+        """schema.py's _requested_tuning_sections groups primary_keys/foreign_keys/
+        unique_constraints/check_constraints under the companion's
+        requested["constraints"] key on export. _extract_tuning_info must expand
+        that back to the flat UnifiedTuningConfiguration.to_dict() shape
+        tunings_applied is documented to carry (builder.py), or a load ->
+        re-export cycle silently drops every constraint and its
+        platform.tuning.counts entry.
+        """
+        original = make_benchmark_results(
+            benchmark_id="tpch",
+            benchmark_name="tpch",
+            platform="duckdb",
+            scale_factor=0.01,
+            execution_id="tuning-constraints-roundtrip-001",
+            timestamp=datetime(2026, 7, 16, 12, 0, 0),
+            duration_seconds=1.0,
+            total_queries=1,
+            successful_queries=1,
+            failed_queries=0,
+            query_results=[
+                {
+                    "query_id": "1",
+                    "status": "SUCCESS",
+                    "execution_time_ms": 10.0,
+                    "rows_returned": 1,
+                    "iteration": 1,
+                    "stream_id": 0,
+                    "run_type": "measurement",
+                }
+            ],
+            tunings_applied={
+                "primary_keys": {"enabled": True, "enforce_uniqueness": True, "nullable": False},
+                "foreign_keys": {
+                    "enabled": True,
+                    "enforce_referential_integrity": True,
+                    "on_delete_action": "RESTRICT",
+                    "on_update_action": "RESTRICT",
+                },
+            },
+            tuning_source="auto_discovered",
+            tuning_source_file="examples/tunings/duckdb/tpch_tuned.yaml",
+            tuning_config_hash="b" * 64,
+        )
+
+        exported = build_result_payload(original)
+        tuning_companion = build_tuning_payload(original)
+        assert tuning_companion is not None
+        assert tuning_companion["requested"]["constraints"]["primary_keys"]["enabled"] is True
+        assert exported["platform"]["tuning"]["counts"]["tuning_types"] == ["foreign_keys", "primary_keys"]
+
+        reimported = reconstruct_benchmark_results(exported, tuning_data=tuning_companion)
+        assert reimported.tunings_applied["primary_keys"]["enabled"] is True
+        assert reimported.tunings_applied["foreign_keys"]["enabled"] is True
+
+        re_exported = build_result_payload(reimported)
+        assert re_exported["platform"]["tuning"]["counts"]["tuning_types"] == ["foreign_keys", "primary_keys"]
+        assert canonical_json_text(exported) == canonical_json_text(re_exported)
+        assert canonical_json_text(tuning_companion) == canonical_json_text(build_tuning_payload(reimported))

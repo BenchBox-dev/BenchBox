@@ -391,7 +391,21 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
         tuning_source_file = "yaml" if tuning_summary.get("source") == "yaml" else None
 
     if tuning_data:
-        tunings_applied = tuning_data.get("requested") or tuning_data.get("clauses", {})
+        requested = tuning_data.get("requested")
+        if requested:
+            # schema.py's _requested_tuning_sections groups
+            # primary_keys/foreign_keys/unique_constraints/check_constraints
+            # under requested["constraints"] for export. tunings_applied must
+            # carry the flat UnifiedTuningConfiguration.to_dict() shape
+            # (builder.py's documented contract) so a load -> re-export round
+            # trip through build_tuning_payload doesn't drop every constraint
+            # and its platform.tuning.counts entry.
+            tunings_applied = dict(requested.get("constraints") or {})
+            for key in ("platform_optimizations", "table_tunings"):
+                if key in requested:
+                    tunings_applied[key] = requested[key]
+        else:
+            tunings_applied = tuning_data.get("clauses", {})
         tuning_source_file = tuning_data.get("source_file")
         tuning_config_hash = tuning_data.get("requested_config_hash") or tuning_data.get("hash") or tuning_config_hash
         tuning_source = tuning_data.get("tuning_source") or tuning_source
