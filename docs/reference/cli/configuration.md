@@ -201,7 +201,7 @@ benchbox run --platform athena-spark --benchmark tpch \
 
 Example:
 ```bash
-benchbox run --platform clickhouse --benchmark tpch \
+benchbox run --platform clickhouse-local --benchmark tpch \
   --platform-option mode=local \
   --platform-option secure=true \
   --platform-option port=9440
