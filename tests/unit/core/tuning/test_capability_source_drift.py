@@ -34,6 +34,7 @@ from benchbox.core.tuning.ddl_generator import get_ddl_generator
 from benchbox.core.tuning.interface import (
     _KNOWN_COMPATIBILITY_PLATFORMS,
     _PLATFORM_COMPATIBILITY_MAP,
+    TuningType,
 )
 
 pytestmark = [
@@ -75,6 +76,153 @@ EXPECTED_GENERATOR_PLATFORMS_WITHOUT_REGISTRY_ENTRY: frozenset[str] = frozenset(
         "pg_mooncake",
     }
 )
+
+
+# FROZEN 2026-07-16 BASELINE -- copied verbatim (as TuningType.value strings,
+# not TuningType members) from the hand-maintained _PLATFORM_COMPATIBILITY_MAP
+# literal this TODO deleted from interface.py, at the moment it was replaced
+# by capability_registry-derived computation. This is a regression pin, NOT a
+# re-derivation of the registry: test_interface_compatibility_map_matches_registry_derivation
+# above asserts interface.py's map equals capability_registry's own output,
+# which is true by construction (interface.py computes it FROM the registry)
+# and can never fail on its own -- it would pass even if someone silently
+# changed what a platform is compatible with, as long as they changed it
+# consistently in the registry. This dict does not import anything from
+# capability_registry, so a future edit to capability_registry.py's
+# PLATFORM_TUNING_CAPABILITIES data that changes compatibility semantics
+# (adds/drops a TuningType for one of these nine platforms) fails THIS test
+# even though it would still pass the derivation test. Change this literal
+# only as a deliberate, reviewed compatibility decision -- never as a side
+# effect of an unrelated registry edit.
+EXPECTED_PRE_REFACTOR_COMPATIBILITY_BASELINE_20260716: dict[str, frozenset[str]] = {
+    "duckdb": frozenset(
+        {
+            "sorting",
+            "partitioning",
+            "primary_keys",
+            "foreign_keys",
+            "unique_constraints",
+            "check_constraints",
+        }
+    ),
+    "snowflake": frozenset(
+        {
+            "clustering",
+            "partitioning",
+            "primary_keys",
+            "foreign_keys",
+            "unique_constraints",
+            "check_constraints",
+            "materialized_views",
+        }
+    ),
+    "bigquery": frozenset(
+        {
+            "partitioning",
+            "clustering",
+            "primary_keys",
+            "foreign_keys",
+            "check_constraints",
+            "materialized_views",
+        }
+    ),
+    "redshift": frozenset(
+        {
+            "distribution",
+            "sorting",
+            "partitioning",
+            "primary_keys",
+            "foreign_keys",
+            "unique_constraints",
+            "check_constraints",
+            "materialized_views",
+        }
+    ),
+    "clickhouse": frozenset(
+        {
+            "partitioning",
+            "sorting",
+            "clustering",
+            "primary_keys",
+            "unique_constraints",
+            "materialized_views",
+        }
+    ),
+    "databricks": frozenset(
+        {
+            "partitioning",
+            "clustering",
+            "distribution",
+            "primary_keys",
+            "foreign_keys",
+            "unique_constraints",
+            "check_constraints",
+            "z_ordering",
+            "liquid_clustering",
+            "auto_optimize",
+            "auto_compact",
+            "bloom_filters",
+            "materialized_views",
+        }
+    ),
+    "sqlite": frozenset(
+        {
+            "primary_keys",
+            "foreign_keys",
+            "unique_constraints",
+            "check_constraints",
+        }
+    ),
+    "postgresql": frozenset(
+        {
+            "partitioning",
+            "clustering",
+            "primary_keys",
+            "foreign_keys",
+            "unique_constraints",
+            "check_constraints",
+            "bloom_filters",
+            "materialized_views",
+        }
+    ),
+    "mysql": frozenset(
+        {
+            "partitioning",
+            "primary_keys",
+            "foreign_keys",
+            "unique_constraints",
+            "check_constraints",
+        }
+    ),
+}
+
+
+def test_compatibility_matches_frozen_pre_refactor_baseline():
+    """Regression pin: compatibility semantics must match the frozen 2026-07-16 baseline exactly.
+
+    Checked two ways against the same frozen literal: the private
+    `_PLATFORM_COMPATIBILITY_MAP` data, and the public
+    `TuningType.is_compatible_with_platform` API every real caller (including
+    `UnifiedTuningConfiguration.validate_for_platform_detailed`) actually
+    uses. Either one drifting from the frozen baseline is the behavior
+    regression this test exists to catch.
+    """
+    assert frozenset(EXPECTED_PRE_REFACTOR_COMPATIBILITY_BASELINE_20260716) == _KNOWN_COMPATIBILITY_PLATFORMS
+
+    for platform, expected_values in EXPECTED_PRE_REFACTOR_COMPATIBILITY_BASELINE_20260716.items():
+        actual_values = frozenset(tuning_type.value for tuning_type in _PLATFORM_COMPATIBILITY_MAP[platform])
+        assert actual_values == expected_values, (
+            f"{platform}: _PLATFORM_COMPATIBILITY_MAP diverged from the frozen 2026-07-16 baseline "
+            f"(expected {sorted(expected_values)}, got {sorted(actual_values)})"
+        )
+
+        for tuning_type in TuningType:
+            expected_compatible = tuning_type.value in expected_values
+            actual_compatible = tuning_type.is_compatible_with_platform(platform)
+            assert actual_compatible == expected_compatible, (
+                f"{platform}/{tuning_type.value}: is_compatible_with_platform()={actual_compatible} "
+                f"diverges from the frozen 2026-07-16 baseline (expected {expected_compatible})"
+            )
 
 
 def test_interface_compatibility_map_matches_registry_derivation():

@@ -389,6 +389,57 @@ class TestClickHouseAdapter:
             assert "max_memory_usage" in executed_sql
             assert "max_threads" in executed_sql
 
+    @pytest.mark.skipif(not CHDB_AVAILABLE, reason="chDB not installed (required to execute real ClickHouse DDL)")
+    def test_tuned_ddl_executes_against_real_chdb(self, tmp_path):
+        """ClickHouse (via chdb) actually accepts the tuned PARTITION BY/ORDER BY DDL, not just string-matches it.
+
+        Complements the string-parity snapshot test
+        (tests/unit/core/tuning/test_renderer_snapshot_clickhouse.py), which
+        proves dry-run preview and _optimize_table_definition render
+        identical text but never executes anything. This test builds the
+        same tuned CREATE TABLE statement through the real
+        ClickHouseWorkloadMixin._optimize_table_definition path, executes it
+        against a genuine embedded ClickHouse engine (chdb), and confirms via
+        SHOW CREATE TABLE that the engine actually applied the tuned
+        partition/order clauses -- i.e. it is real, engine-accepted DDL, not
+        just a string BenchBox believes is valid.
+        """
+        from benchbox.core.tuning.interface import TableTuning, TuningColumn
+
+        adapter = ClickHouseAdapter(deployment_mode="local", strict_validation=False, data_path=str(tmp_path))
+        connection = adapter.create_connection()
+
+        table_tuning = TableTuning(
+            table_name="lineitem",
+            partitioning=[TuningColumn(name="l_shipdate", type="DATE", order=1)],
+            sorting=[TuningColumn(name="l_orderkey", type="INTEGER", order=1)],
+        )
+        table_tunings = {"lineitem": table_tuning}
+
+        statement = "CREATE TABLE lineitem (l_orderkey Int32, l_shipdate Date)"
+        rendered = adapter._optimize_table_definition(statement, table_tunings)
+
+        assert "PARTITION BY toYYYYMM(l_shipdate)" in rendered
+        assert "ORDER BY (l_orderkey)" in rendered
+
+        # The real proof: chdb must accept this DDL without raising.
+        connection.execute(rendered)
+
+        show_create_rows = connection.execute("SHOW CREATE TABLE lineitem").fetchall()
+        ddl_text = show_create_rows[0][0]
+
+        # chdb/ClickHouse echoes back the clauses it actually applied to the
+        # table (not just what we asked for), so this confirms the engine
+        # accepted -- not silently ignored -- the tuned rendering.
+        assert "PARTITION BY toYYYYMM(l_shipdate)" in ddl_text
+        assert "ORDER BY l_orderkey" in ddl_text
+
+        # And insert/select round-trips through the tuned table, proving it's
+        # not just a syntactically-accepted but functionally broken table.
+        connection.execute("INSERT INTO lineitem VALUES (1, '2026-01-15'), (2, '2026-02-01')")
+        count_rows = connection.execute("SELECT count(*) FROM lineitem").fetchall()
+        assert count_rows[0][0] == 2
+
     def test_get_database_path_server_mode(self):
         """Test database path generation in server mode returns None."""
         with patch("benchbox.platforms.clickhouse.setup.ClickHouseClient"):
