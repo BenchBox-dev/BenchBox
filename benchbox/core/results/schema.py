@@ -1205,6 +1205,85 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     }
 
 
+_YAML_TUNING_SOURCES = frozenset({"explicit_file", "auto_discovered"})
+
+
+def _legacy_tuning_source_bridge(tuning_source: str | None, tuning_source_file: str | None) -> str:
+    """Map the raw TuningSource enum value to the legacy yaml/auto bridge.
+
+    Kept for one generation so the explorer pipeline (which currently reads
+    only "yaml"/"auto") keeps working while it migrates to the richer
+    ``tuning_source`` enum value. See ADR-1.
+    """
+    if tuning_source in _YAML_TUNING_SOURCES or (tuning_source is None and tuning_source_file):
+        return "yaml"
+    return "auto"
+
+
+def _non_default_platform_optimizations(platform_optimizations: dict[str, Any]) -> dict[str, Any]:
+    """Diff a requested platform_optimizations dict against class defaults."""
+    from benchbox.core.tuning.interface import PlatformOptimizationConfiguration
+
+    defaults = PlatformOptimizationConfiguration().to_dict()
+    return {key: value for key, value in platform_optimizations.items() if defaults.get(key) != value}
+
+
+def _requested_tuning_sections(tuning_applied: dict[str, Any]) -> dict[str, Any]:
+    """Build the ``requested`` block from the real UnifiedTuningConfiguration structure.
+
+    Replaces the old dead ``indexes``/``statistics``/``configuration`` clause
+    extraction, which never matched any key ``UnifiedTuningConfiguration.to_dict()``
+    actually produces (its keys are ``primary_keys``, ``foreign_keys``,
+    ``unique_constraints``, ``check_constraints``, ``platform_optimizations``,
+    ``table_tunings``).
+    """
+    requested: dict[str, Any] = {}
+
+    constraints = {
+        key: tuning_applied[key]
+        for key in ("primary_keys", "foreign_keys", "unique_constraints", "check_constraints")
+        if key in tuning_applied
+    }
+    if constraints:
+        requested["constraints"] = constraints
+
+    platform_optimizations = tuning_applied.get("platform_optimizations")
+    if isinstance(platform_optimizations, dict):
+        non_default = _non_default_platform_optimizations(platform_optimizations)
+        if non_default:
+            requested["platform_optimizations"] = non_default
+
+    table_tunings = tuning_applied.get("table_tunings")
+    if table_tunings:
+        requested["table_tunings"] = table_tunings
+
+    return requested
+
+
+def _tuning_types_present(tuning_applied: dict[str, Any]) -> list[str]:
+    """Summarize which tuning categories are actually active (for summary counts)."""
+    types_present: set[str] = set()
+
+    for key in ("primary_keys", "foreign_keys", "unique_constraints", "check_constraints"):
+        block = tuning_applied.get(key)
+        if isinstance(block, dict) and block.get("enabled"):
+            types_present.add(key)
+
+    platform_optimizations = tuning_applied.get("platform_optimizations")
+    if isinstance(platform_optimizations, dict):
+        for key, value in platform_optimizations.items():
+            if key.endswith("_enabled") and value:
+                types_present.add(key[: -len("_enabled")])
+
+    for table_tuning in (tuning_applied.get("table_tunings") or {}).values():
+        if isinstance(table_tuning, dict):
+            for clause in ("partitioning", "clustering", "distribution", "sorting"):
+                if table_tuning.get(clause):
+                    types_present.add(clause)
+
+    return sorted(types_present)
+
+
 def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     """Build companion tuning file payload.
 
@@ -1228,13 +1307,23 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
         "run_id": result.execution_id,
     }
 
-    # Source information
+    # Source information. tuning_source is the raw TuningSource enum value
+    # (e.g. "auto_discovered", "wizard", "fallback"); source_file is a
+    # repo-relative path or "<basename>:<content-hash>" template reference -
+    # never a raw local filesystem path (ADR-1 / must_preserve).
+    tuning_source = getattr(result, "tuning_source", None)
+    if tuning_source:
+        payload["tuning_source"] = tuning_source
     if result.tuning_source_file:
         payload["source_file"] = result.tuning_source_file
-    payload["source"] = "yaml" if result.tuning_source_file else "auto"
+    # Legacy bridge key (one generation) - see _legacy_tuning_source_bridge.
+    payload["source"] = _legacy_tuning_source_bridge(tuning_source, result.tuning_source_file)
 
-    # Hash for comparison
+    # requested_config_hash (ADR-1): canonical SHA-256 over the requested
+    # UnifiedTuningConfiguration.to_dict(). "hash" is a legacy bridge alias
+    # for the same value, kept for one generation.
     if result.tuning_config_hash:
+        payload["requested_config_hash"] = result.tuning_config_hash
         payload["hash"] = result.tuning_config_hash
 
     # Validation status
@@ -1245,17 +1334,9 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     if tuning_profile:
         payload["logical_profile"] = tuning_profile
 
-    # Clauses breakdown
-    clauses: dict[str, Any] = {}
-    if "indexes" in tuning_applied:
-        clauses["indexes"] = tuning_applied["indexes"]
-    if "statistics" in tuning_applied:
-        clauses["statistics"] = tuning_applied["statistics"]
-    if "configuration" in tuning_applied:
-        clauses["configuration"] = tuning_applied["configuration"]
-
-    if clauses:
-        payload["clauses"] = clauses
+    requested = _requested_tuning_sections(tuning_applied)
+    if requested:
+        payload["requested"] = requested
 
     return payload
 
@@ -1349,29 +1430,29 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     if not result.tunings_applied:
         return None
 
+    tuning_applied = result.tunings_applied or {}
     summary: dict[str, Any] = {}
 
-    # Determine source
-    if result.tuning_source_file:
-        summary["source"] = "yaml"
-    else:
-        summary["source"] = "auto"
+    tuning_source = getattr(result, "tuning_source", None)
+    if tuning_source:
+        summary["tuning_source"] = tuning_source
+    # Legacy bridge key (one generation) - see _legacy_tuning_source_bridge.
+    summary["source"] = _legacy_tuning_source_bridge(tuning_source, result.tuning_source_file)
 
-    # Add hash for comparison
+    # requested_config_hash (ADR-1), with a "hash" legacy bridge alias.
     if result.tuning_config_hash:
+        summary["requested_config_hash"] = result.tuning_config_hash
         summary["hash"] = result.tuning_config_hash
 
-    # Count clauses applied
-    clauses_count = 0
-    tuning = result.tunings_applied or {}
-    for key in ("indexes", "statistics", "configuration"):
-        if key in tuning:
-            val = tuning[key]
-            if isinstance(val, (list, dict)):
-                clauses_count += len(val)
-
-    if clauses_count > 0:
-        summary["clauses_applied"] = clauses_count
+    # Counts: replaces the old dead clauses_applied counter (which counted
+    # indexes/statistics/configuration keys that to_dict() never produces).
+    table_tunings = tuning_applied.get("table_tunings") or {}
+    tuning_types = _tuning_types_present(tuning_applied)
+    if table_tunings or tuning_types:
+        summary["counts"] = {
+            "tables_tuned": len(table_tunings),
+            "tuning_types": tuning_types,
+        }
 
     tuning_profile = _extract_tuning_profile_metadata(result)
     if tuning_profile:

@@ -54,6 +54,7 @@ from benchbox.cli.tuning_resolver import (
     TuningMode,
     TuningSource,
     display_tuning_resolution,
+    resolve_template_reference,
     resolve_tuning,
 )
 from benchbox.cli.tuning_runtime import (
@@ -1011,6 +1012,7 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
                     interactive=True,
                 )
                 s.tuning_enabled, s.tuning = infer_runtime_tuning_mode(s.loaded_unified_config)
+                tuning_resolution.source = TuningSource.INTERACTIVE_WIZARD
                 console.print("[green]✅ Tuning configuration completed[/green]")
             else:
                 s.loaded_unified_config = UnifiedTuningConfiguration()
@@ -1022,6 +1024,12 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
         s.loaded_unified_config = UnifiedTuningConfiguration()
         if s.logger:
             s.logger.debug(f"Using basic unified config for mode: {tuning_resolution.mode.value}")
+
+    # Provenance for result-capture (ADR-1): raw TuningSource enum value plus a
+    # shareable template reference (repo-relative path or basename+content-hash -
+    # never a raw local path; see resolve_template_reference()).
+    s.tuning_source_value = tuning_resolution.source.value
+    s.tuning_template_ref = resolve_template_reference(tuning_resolution.config_file)
 
 
 def _resolve_data_organization(s: types.SimpleNamespace) -> None:
@@ -1344,6 +1352,34 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
             console.print(f"  [cyan]{file_path}[/cyan]")
 
 
+def _promote_tuning_to_database_config(database_config: DatabaseConfig | None, s: types.SimpleNamespace) -> None:
+    """Mirror tuning provenance onto top-level DatabaseConfig fields.
+
+    ``db_manager.create_config()`` only folds ``overrides`` into
+    ``database_config.options`` (a nested dict); ``PlatformAdapter.__init__``
+    reads ``tuning_enabled``/``tuning_source``/``tuning_source_file`` as
+    top-level config keys via ``from_config()``. Without this promotion the
+    resolved tuning state never reaches the adapter for the non-interactive
+    (``_run_direct``, dry-run, load-only) paths - only the interactive wizard
+    path promoted these fields (see ``_interactive_tuning_step``). Mirrors
+    that same promotion here so every path is consistent.
+
+    Deliberately does NOT also promote ``unified_tuning_configuration`` as a
+    top-level DatabaseConfig field: DatabaseConfig is a pydantic model, and
+    ``model_dump()`` (used downstream to build the adapter's platform_config)
+    recursively serializes dataclass-valued extra fields into plain dicts,
+    which would hand the adapter a dict instead of a UnifiedTuningConfiguration
+    instance. The unified config instead reaches the adapter unmodified via
+    the ``tuning_config`` kwarg channel (see ``get_platform_config()``, which
+    passes it through as a live object reference, never through model_dump).
+    """
+    if database_config is None:
+        return
+    database_config.tuning_enabled = s.tuning_enabled
+    database_config.tuning_source = getattr(s, "tuning_source_value", None)
+    database_config.tuning_source_file = getattr(s, "tuning_template_ref", None)
+
+
 def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManager) -> DatabaseConfig | None:
     """Create DatabaseConfig for dry run mode (skipped for data-only)."""
     ctx = s.ctx
@@ -1382,6 +1418,7 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
         if logger:
             logger.debug(f"Driver not installed, using minimal config for dry run: {exc}")
         database_config = None
+    _promote_tuning_to_database_config(database_config, s)
     if logger:
         logger.debug("Database configuration created for dry run")
     return database_config
@@ -1434,6 +1471,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         if logger:
             logger.error(f"Database configuration failed: {exc}")
         ctx.exit(1)
+    _promote_tuning_to_database_config(database_config, s)
 
     _driver_version = database_config.driver_version_actual or database_config.driver_version_resolved
     _mode_tag = " \\[external]" if s.table_mode == "external" else ""
@@ -1646,7 +1684,7 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
     if s.df_tuning_config:
         overrides["df_tuning_config"] = s.df_tuning_config
     try:
-        return db_manager.create_config(
+        database_config = db_manager.create_config(
             s.platform_key,
             dict(s.parsed_platform_options),
             overrides,
@@ -1656,7 +1694,9 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
         if logger:
             logger.error(f"Database configuration failed: {exc}")
         ctx.exit(1)
-    return None
+        return None
+    _promote_tuning_to_database_config(database_config, s)
+    return database_config
 
 
 def _data_or_load_validate_inputs(s: types.SimpleNamespace) -> None:
@@ -2272,6 +2312,7 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
 
     from benchbox.cli.tuning import run_tuning_wizard
 
+    tuning_source_value = TuningSource.BASELINE.value
     if sys.stdin.isatty() and sys.stdout.isatty():
         if Confirm.ask("\nWould you like to configure tuning options?", default=True):
             s.loaded_unified_config = run_tuning_wizard(
@@ -2281,6 +2322,7 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
                 interactive=True,
             )
             s.tuning_enabled, s.tuning = infer_runtime_tuning_mode(s.loaded_unified_config)
+            tuning_source_value = TuningSource.INTERACTIVE_WIZARD.value
             console.print("[green]✅ Tuning configuration completed[/green]")
             s.tuning_config_file = None
             s.use_auto_tuning = False
@@ -2302,12 +2344,24 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
     if s.table_mode == "external" and s.tuning.strip().lower() == "tuned":
         _reject_external_tuned(console, s.logger, s.ctx)
 
+    # Provenance for result-capture (ADR-1); no template file in this flow.
+    s.tuning_source_value = tuning_source_value
+    s.tuning_template_ref = None
+
     if getattr(s.database_config, "options", None) is None:
         s.database_config.options = {}
     s.database_config.options["tuning_enabled"] = s.tuning_enabled
     s.database_config.tuning_enabled = s.tuning_enabled
+    s.database_config.tuning_source = s.tuning_source_value
+    s.database_config.tuning_source_file = s.tuning_template_ref
     s.database_config.show_query_plans = s.show_query_plans
-    s.database_config.unified_tuning_configuration = s.loaded_unified_config
+    # Deliberately not promoting unified_tuning_configuration onto database_config:
+    # DatabaseConfig is a pydantic model, and model_dump() (used downstream to
+    # build the adapter's platform_config) recursively serializes dataclass-valued
+    # extra fields to plain dicts, which would hand the adapter a dict instead of
+    # a UnifiedTuningConfiguration instance. The unified config instead reaches the
+    # adapter unmodified via the "tuning_config" kwarg channel below (see
+    # get_platform_config(), which passes it through as a live object reference).
 
     s.benchmark_config.options["unified_tuning_configuration"] = s.loaded_unified_config
     s.benchmark_config.options["tuning_enabled"] = s.tuning_enabled

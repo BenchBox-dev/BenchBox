@@ -24,6 +24,7 @@ from benchbox.cli.tuning_resolver import (
     display_tuning_resolution,
     get_tuning_template_paths,
     list_available_tuning_templates,
+    resolve_template_reference,
     resolve_tuning,
 )
 
@@ -586,3 +587,58 @@ class TestDisplayTuningShowNullSafety:
 
         # Should have called to_dict on the config
         mock_config.to_dict.assert_called_once()
+
+
+class TestResolveTemplateReference:
+    """Tests for resolve_template_reference() - ADR-1's template-ref rule.
+
+    Never a raw local path: repo-relative when under the repo root, otherwise
+    basename + content hash.
+    """
+
+    def test_none_config_file_returns_none(self):
+        assert resolve_template_reference(None) is None
+
+    def test_repo_relative_path_for_file_under_repo_root(self, tmp_path):
+        repo_root = tmp_path / "repo"
+        template = repo_root / "examples" / "tunings" / "duckdb" / "tpch_tuned.yaml"
+        template.parent.mkdir(parents=True)
+        template.write_text("primary_keys:\n  enabled: true\n")
+
+        ref = resolve_template_reference(template, repo_root=repo_root)
+
+        assert ref == "examples/tunings/duckdb/tpch_tuned.yaml"
+        assert not Path(ref).is_absolute()
+
+    def test_basename_and_content_hash_for_file_outside_repo_root(self, tmp_path):
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        outside_dir = tmp_path / "elsewhere"
+        outside_dir.mkdir()
+        template = outside_dir / "custom_tuning.yaml"
+        template.write_text("primary_keys:\n  enabled: true\n")
+
+        ref = resolve_template_reference(template, repo_root=repo_root)
+
+        assert ref is not None
+        assert not ref.startswith("/")
+        assert str(outside_dir) not in ref
+        assert ref.startswith("custom_tuning.yaml:")
+        # 16 hex chars of content hash after the basename separator.
+        digest = ref.split(":", 1)[1]
+        assert len(digest) == 16
+        assert all(c in "0123456789abcdef" for c in digest)
+
+    def test_outside_repo_reference_is_stable_for_identical_content(self, tmp_path):
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        template_a = tmp_path / "a" / "tuning.yaml"
+        template_b = tmp_path / "b" / "tuning.yaml"
+        template_a.parent.mkdir()
+        template_b.parent.mkdir()
+        template_a.write_text("same content\n")
+        template_b.write_text("same content\n")
+
+        assert resolve_template_reference(template_a, repo_root=repo_root) == resolve_template_reference(
+            template_b, repo_root=repo_root
+        )

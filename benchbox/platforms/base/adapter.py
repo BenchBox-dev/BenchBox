@@ -197,8 +197,22 @@ class PlatformAdapter(
         self.driver_runtime_python_executable = config.get("driver_runtime_python_executable")
         self.driver_auto_install_used = bool(config.get("driver_auto_install_used", False))
 
-        # Unified tuning configuration support
-        self.unified_tuning_configuration = config.get("unified_tuning_configuration")
+        # Unified tuning configuration support. ``tuning_config`` is the reliable
+        # channel: get_platform_config() always passes it through as a live object
+        # reference (never round-tripped through DatabaseConfig.model_dump(), which
+        # would serialize a dataclass-valued extra field to a plain dict). Prefer it,
+        # falling back to ``unified_tuning_configuration`` only when that key already
+        # holds a real object rather than such a serialized dict.
+        _legacy_tuning_config = config.get("unified_tuning_configuration")
+        if isinstance(_legacy_tuning_config, dict):
+            _legacy_tuning_config = None
+        self.unified_tuning_configuration = config.get("tuning_config") or _legacy_tuning_config
+        # Provenance for the requested tuning config: raw TuningSource enum value
+        # (e.g. "auto_discovered") and a repo-relative/content-hash template
+        # reference (never a raw local path). Threaded from run.py through the
+        # DatabaseConfig/platform_config channel; see _promote_tuning_to_database_config.
+        self.tuning_source: str | None = config.get("tuning_source")
+        self.tuning_source_file: str | None = config.get("tuning_source_file")
 
         # Verbose logging configuration
         self.apply_verbosity(VerbositySettings.from_mapping(config))
@@ -742,9 +756,13 @@ class PlatformAdapter(
 
             tunings_applied_dict = None
             tuning_validation_status = "NOT_APPLICABLE"
+            requested_config_hash = None
             if self.tuning_enabled and effective_tuning_config:
                 tunings_applied_dict = effective_tuning_config.to_dict()
                 tuning_validation_status = "APPLIED" if tuning_metadata_saved else "FAILED_TO_SAVE"
+                # requested_config_hash (ADR-1): canonical hash of the requested
+                # config, independent of whether every clause actually applied.
+                requested_config_hash = effective_tuning_config.get_configuration_hash()
 
             if self._check_validation_failure(validation_phase):
                 return self._create_failed_benchmark_result(
@@ -757,6 +775,7 @@ class PlatformAdapter(
                     tunings_applied_dict,
                     tuning_validation_status,
                     tuning_metadata_saved,
+                    requested_config_hash,
                 )
 
             quiet_console.print("✅ Data validation passed")
@@ -870,6 +889,9 @@ class PlatformAdapter(
                 tunings_applied=tunings_applied_dict,
                 tuning_validation_status=tuning_validation_status,
                 tuning_metadata_saved=tuning_metadata_saved,
+                tuning_config_hash=requested_config_hash,
+                tuning_source_file=self.tuning_source_file,
+                tuning_source=self.tuning_source,
                 system_profile=system_profile,
                 anonymous_machine_id=anonymous_machine_id,
                 validation_status=self._determine_overall_validation_status(validation_phase),

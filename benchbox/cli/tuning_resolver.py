@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass, field
 from enum import Enum
@@ -25,6 +26,41 @@ if TYPE_CHECKING:
 
     from benchbox.cli.config import ConfigManager
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def resolve_template_reference(config_file: Path | None, repo_root: Path | None = None) -> str | None:
+    """Compute a shareable reference for a tuning template file.
+
+    Returns a repo-relative POSIX path when the file lives inside the
+    BenchBox repository. Otherwise returns ``"<basename>:<16-hex-content-hash>"``
+    so the reference stays stable and identifying without leaking the local
+    filesystem layout. Never returns a raw absolute path - result bundles are
+    shared across machines and users (see ADR-1 / must_preserve).
+
+    Args:
+        config_file: Resolved path to the tuning template file, or None.
+        repo_root: Override for the repo root (tests only); defaults to the
+            BenchBox checkout containing this module.
+
+    Returns:
+        A repo-relative path string, a basename+hash reference, or None if
+        no config file was used.
+    """
+    if config_file is None:
+        return None
+    resolved = Path(config_file).resolve()
+    root = repo_root if repo_root is not None else _REPO_ROOT
+    try:
+        return resolved.relative_to(root).as_posix()
+    except ValueError:
+        pass
+    try:
+        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()[:16]
+    except OSError:
+        digest = "unreadable"
+    return f"{resolved.name}:{digest}"
 
 
 class TuningMode(Enum):
