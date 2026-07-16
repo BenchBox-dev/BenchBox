@@ -258,34 +258,42 @@ class TestClickHouseAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
-    def test_configure_for_benchmark_tuning_disabled(self, mock_client_class):
-        """Test benchmark optimization when tuning is disabled."""
+    def test_configure_for_benchmark_tuning_disabled_is_baseline_only(self, mock_client_class):
+        """Baseline (notuning) never applies the OLAP session pack, even for OLAP benchmark types.
+
+        Per ADR-3 (docs/development/tuning-adr-003-baseline-and-single-renderer.md):
+        notuning = platform defaults + engine-mandatory only. The OLAP
+        session pack (grace_hash join, spill thresholds,
+        optimize_aggregation_in_order) is a curated performance profile, not
+        a baseline default, and must not fire when tuning is disabled --
+        before this fix it fired ONLY when tuning was disabled, exactly
+        backwards.
+        """
         mock_client = Mock()
         mock_client_class.return_value = mock_client
 
         # Use server mode to avoid chdb initialization in unit tests
         adapter = ClickHouseAdapter(deployment_mode="server", strict_validation=False)
-        adapter.tuning_enabled = False  # Explicitly disable tuning
+        adapter.tuning_enabled = False  # Explicitly disable tuning (baseline)
         connection = adapter.create_connection()
-
-        # Should apply OLAP optimizations for OLAP benchmark types
-        adapter.configure_for_benchmark(connection, "olap")
-
-        # Should execute multiple optimization statements (basic + OLAP)
-        assert mock_client.execute.call_count > 5  # basic settings + OLAP settings
-
-        # Reset mock for next test
         mock_client.reset_mock()
 
-        # Should only apply basic optimizations for non-OLAP benchmark types
-        adapter.configure_for_benchmark(connection, "read_primitives")
+        # Baseline: no OLAP pack even for an OLAP benchmark type.
+        adapter.configure_for_benchmark(connection, "olap")
 
-        # Should execute fewer statements (basic settings + cache control + validation = 10)
-        assert mock_client.execute.call_count == 10  # basic (6) + cache (3) + validation (1)
+        # Basic settings (6) + cache control settings (3) + validation query (1) = 10.
+        assert mock_client.execute.call_count == 10
+        executed_sql = " ".join(call[0][0] for call in mock_client.execute.call_args_list)
+        assert "grace_hash" not in executed_sql
+        assert "optimize_aggregation_in_order" not in executed_sql
+
+        mock_client.reset_mock()
+        adapter.configure_for_benchmark(connection, "read_primitives")
+        assert mock_client.execute.call_count == 10
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
-    def test_configure_for_benchmark_tuning_enabled(self, mock_client_class):
-        """Test benchmark optimization when tuning is enabled."""
+    def test_configure_for_benchmark_tuning_enabled_applies_olap_pack(self, mock_client_class):
+        """Tuned OLAP/TPC-H/TPC-DS runs get the curated OLAP session pack."""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
         # Mock database check to return empty list
@@ -299,12 +307,19 @@ class TestClickHouseAdapter:
         # Reset mock to clear the connection setup calls
         mock_client.reset_mock()
 
-        # Should only apply basic settings when tuning is enabled
+        # Should apply the OLAP settings pack for OLAP benchmark types when tuned.
         adapter.configure_for_benchmark(connection, "olap")
 
-        # Should execute only basic optimization statements (no OLAP-specific ones)
-        # Basic settings (6) + cache control settings (3) + validation query (1) = 10
-        assert mock_client.execute.call_count == 10  # basic + cache + validation
+        # Should execute multiple optimization statements (basic + OLAP)
+        assert mock_client.execute.call_count > 5  # basic settings + OLAP settings
+        executed_sql = " ".join(call[0][0] for call in mock_client.execute.call_args_list)
+        assert "grace_hash" in executed_sql
+        assert "optimize_aggregation_in_order" in executed_sql
+
+        mock_client.reset_mock()
+        # Non-OLAP benchmark types don't get the pack even when tuned.
+        adapter.configure_for_benchmark(connection, "read_primitives")
+        assert mock_client.execute.call_count == 10  # basic (6) + cache (3) + validation (1)
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_configure_for_benchmark_join_memory_uses_50_pct_multiplier(self, mock_client_class):
@@ -313,7 +328,7 @@ class TestClickHouseAdapter:
         mock_client_class.return_value = mock_client
 
         adapter = ClickHouseAdapter(deployment_mode="server", strict_validation=False)
-        adapter.tuning_enabled = False  # trigger OLAP settings path
+        adapter.tuning_enabled = True  # tuned path triggers the OLAP settings pack
 
         connection = adapter.create_connection()
         mock_client.reset_mock()
@@ -357,7 +372,7 @@ class TestClickHouseAdapter:
                 strict_validation=False,
                 data_path=tmpdir,
             )
-            adapter.tuning_enabled = False  # Disable tuning to test OLAP optimizations
+            adapter.tuning_enabled = True  # Tuned path applies the OLAP settings pack
 
             # Should apply OLAP optimizations but skip embedded-incompatible settings
             adapter.configure_for_benchmark(mock_connection, "olap")

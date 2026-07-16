@@ -44,11 +44,20 @@ class ClickHouseTuningMixin:
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply ClickHouse-specific optimizations based on benchmark type.
 
-        Respects tuning configuration - if tuning is enabled, only applies basic settings.
-        If tuning is disabled, applies OLAP optimizations with local ClickHouse validation.
+        Per ADR-3 (docs/development/tuning-adr-003-baseline-and-single-renderer.md)
+        baseline policy: the basic settings below (memory/timeout/thread
+        limits, cache control) are harness-operational, not optimization --
+        they apply in every mode so results are measured consistently. The
+        OLAP session pack (grace_hash join, spill thresholds,
+        aggregation-in-order) is a curated performance profile, so it applies
+        only on the TUNED path. Before this fix it fired only when tuning was
+        DISABLED -- "notuning" shipped a curated OLAP profile while an
+        explicit `--tuning tuned` run got none of it, exactly backwards from
+        what the labels promise (see ADR-3's "notuning is not a baseline
+        today" finding).
         """
 
-        # Basic settings that are always safe to apply
+        # Basic settings that are always safe to apply, in every tuning mode.
         settings = {
             "max_memory_usage": self._parse_memory_setting(self.max_memory_usage),
             "max_execution_time": self.max_execution_time,
@@ -70,8 +79,8 @@ class ClickHouseTuningMixin:
                 }
             )
 
-        # Only apply OLAP optimizations if tuning is disabled
-        if not self.tuning_enabled and benchmark_type.lower() in [
+        # Only apply the OLAP session pack on the tuned path (see docstring).
+        if self.tuning_enabled and benchmark_type.lower() in [
             "olap",
             "analytics",
             "tpch",

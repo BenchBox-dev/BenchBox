@@ -506,6 +506,32 @@ def show_tuning(
         ctx.exit(1)
 
 
+def _sql_platform_capability_rows() -> list[tuple[str, str, str]]:
+    """Build (platform, tuning types, rendering notes) rows from the capability registry.
+
+    Per the tuning-renderer-consolidation-and-baseline-policy-20260712 TODO
+    (w3), this table is generated from
+    benchbox.core.tuning.capability_registry.PLATFORM_TUNING_CAPABILITIES
+    instead of a hand-written platform/feature-description list, so it can
+    no longer drift from what the registry (and therefore the rest of the
+    tuning system) actually knows about each platform.
+    """
+    from benchbox.core.tuning.capability_registry import PLATFORM_TUNING_CAPABILITIES
+
+    rows = []
+    for platform in sorted(PLATFORM_TUNING_CAPABILITIES):
+        capabilities = PLATFORM_TUNING_CAPABILITIES[platform]
+        tuning_types = ", ".join(sorted(tuning_type.value for tuning_type in capabilities))
+
+        gaps = sorted(
+            tuning_type.value for tuning_type, capability in capabilities.items() if capability.rendered_via == "none"
+        )
+        notes = f"gap (not yet rendered): {', '.join(gaps)}" if gaps else "fully rendered"
+
+        rows.append((platform, tuning_types, notes))
+    return rows
+
+
 @tuning_group.command("platforms")
 def list_platforms() -> None:
     """List platforms and their tuning capabilities.
@@ -523,20 +549,11 @@ def list_platforms() -> None:
     console.print("\n[bold]SQL Platforms:[/bold]")
     sql_table = Table(show_header=True)
     sql_table.add_column("Platform", style="cyan")
-    sql_table.add_column("Key Tuning Options", style="yellow")
+    sql_table.add_column("Compatible Tuning Types", style="yellow")
+    sql_table.add_column("Rendering", style="white")
 
-    sql_platforms = [
-        ("duckdb", "Memory limits, thread count, temp directory"),
-        ("sqlite", "Cache size, journal mode, synchronous mode"),
-        ("postgresql", "work_mem, shared_buffers, effective_cache_size"),
-        ("snowflake", "Warehouse size, clustering, result caching"),
-        ("databricks", "Cluster config, Photon, Delta optimization"),
-        ("bigquery", "Slot allocation, partitioning, clustering"),
-        ("redshift", "Distribution style, sort keys, compression"),
-    ]
-
-    for name, features in sql_platforms:
-        sql_table.add_row(name, features)
+    for name, tuning_types, notes in _sql_platform_capability_rows():
+        sql_table.add_row(name, tuning_types, notes)
 
     console.print(sql_table)
 
