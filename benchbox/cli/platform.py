@@ -37,8 +37,9 @@ PLATFORM_ALIASES: dict[str, str] = {
     # Trino/Presto ecosystem
     "trinodb": "trino",
     "prestodb": "presto",
-    # ClickHouse
-    "ch": "clickhouse",
+    # ClickHouse (bare 'clickhouse' was removed after its deprecation window;
+    # 'ch' shorthand now resolves to the default first-class local platform)
+    "ch": "clickhouse-local",
     # BigQuery
     "bq": "bigquery",
     "gbq": "bigquery",

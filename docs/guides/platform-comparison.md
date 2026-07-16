@@ -335,7 +335,7 @@ Run platforms in parallel for faster comparisons:
 benchbox compare \
   -p duckdb \
   -p sqlite \
-  -p clickhouse \
+  -p clickhouse-local \
   --parallel \
   --iterations 3
 ```
