@@ -148,7 +148,10 @@ def _sanitize_option_value(value: Any, *, exclude_internal: bool = False) -> Any
         return [_sanitize_option_value(item, exclude_internal=exclude_internal) for item in value]
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
-    to_dict = getattr(value, "to_dict", None)
+    try:
+        to_dict = getattr(value, "to_dict", None)
+    except Exception:
+        return f"<unserializable:{type(value).__name__}>"
     if callable(to_dict):
         try:
             as_dict = to_dict()
