@@ -63,7 +63,7 @@ def _discover_generator_registry_keys() -> frozenset[str]:
 
     Mirrors test_ddl_generator_registry.py's approach of inspecting the dict
     literal's keys (there it inspects the values/class names) so this stays
-    in sync with the real registry without re-declaring it.
+    in sync with the real registry without redeclaring it.
     """
     source = inspect.getsource(get_ddl_generator)
     tree = ast.parse(source)
