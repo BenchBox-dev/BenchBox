@@ -1,11 +1,21 @@
 import {
   FACET_KEYS,
   FACET_URL_KEYS,
+  LEGACY_UNLABELLED_TUNING_MODE,
+  NOT_RECORDED_TUNING_MODE,
+  NULL_TUNING_MODE_SENTINELS,
   dateWindowCutoffIso,
   type DateWindowFacet,
   type FacetKey,
   type FacetState,
 } from "@/lib/facetModel";
+
+// Re-exported so existing consumers (TuningBadge, tests) keep importing the
+// not-recorded/legacy tuning tokens from here - facetModel.ts is the single
+// source of truth (see NULL_TUNING_MODE_SENTINELS, shared with the SQL-side
+// facetsToWhereClause/queryFilters filters so in-memory matching here can't
+// drift from what the DuckDB-backed pages actually query for).
+export { LEGACY_UNLABELLED_TUNING_MODE, NOT_RECORDED_TUNING_MODE };
 
 export interface FacetMatchRow {
   benchmark?: string | null;
@@ -96,7 +106,7 @@ function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: FacetKey, 
     case "execution_mode":
       return matchesOptional(row.execution_mode, facets.execution_mode);
     case "tuning_mode":
-      return matchesRequired(row.tuning_mode ?? "untuned", facets.tuning_mode);
+      return matchesTuningMode(row.tuning_mode, facets.tuning_mode);
     case "trust_tier":
       return matchesRequired(row.trust_label, facets.trust_tier);
     case "validation_status":
@@ -116,6 +126,17 @@ function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: FacetKey, 
     case "date_window":
       return matchesDateWindow(row.run_date, facets.date_window, now);
   }
+}
+
+function matchesTuningMode(value: string | null | undefined, selected: readonly string[]): boolean {
+  if (selected.length === 0) return true;
+  if (value === null || value === undefined) {
+    // Not-recorded rows match only an explicit not-recorded selection --
+    // never a real mode. The legacy "untuned" token keeps existing chip
+    // values and bookmarked URLs matching the same rows as before.
+    return NULL_TUNING_MODE_SENTINELS.some((sentinel) => selected.includes(sentinel));
+  }
+  return selected.includes(value);
 }
 
 function matchesRequired(value: string | null | undefined, selected: readonly string[]): boolean {

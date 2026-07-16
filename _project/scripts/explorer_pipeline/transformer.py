@@ -176,26 +176,50 @@ def _execution_mode(data: dict[str, Any]) -> str | None:
 
 
 def _tuning_mode(data: dict[str, Any]) -> str | None:
-    """Extract tuning mode from schema-v2 bundle config block."""
+    """Extract tuning mode from a schema-v2 bundle.
+
+    Reads ``config.tuning_mode`` first (the current schema location), falling
+    back to ``execution.tuning_mode`` for the seed-corpus generation that
+    wrote the value there instead. When neither location carries a value the
+    result stays ``None`` -- callers must not invent a mode for bundles that
+    never recorded one (see explorer ingest tuning-mode-extraction TODO).
+    """
     config = data.get("config", {})
-    if not isinstance(config, dict):
-        return None
-    val = config.get("tuning_mode")
-    return str(val) if val else None
+    if isinstance(config, dict):
+        val = config.get("tuning_mode")
+        if val:
+            return str(val)
+    execution = data.get("execution", {})
+    if isinstance(execution, dict):
+        val = execution.get("tuning_mode")
+        if val:
+            return str(val)
+    return None
 
 
 def _tuning_hash(data: dict[str, Any]) -> str | None:
     """Compute a stable 8-char hash of the tuning configuration.
 
-    Combines tuning_mode and any tuning config dict so that two runs with
-    identical tuning produce the same hash. Returns None when no tuning info present.
+    Only machine-readable tuning detail is hashed: a dict is hashed
+    canonically (``json.dumps(..., sort_keys=True)``), but a string value
+    (e.g. a Python ``repr()`` of a dataclass, which is not canonical and
+    varies cosmetically between otherwise-identical configs) is dropped
+    rather than hashed. The resolved tuning mode (see ``_tuning_mode``, which
+    includes the ``execution.tuning_mode`` fallback) may still be hashed on
+    its own when no machine-readable detail is present. Returns None when
+    there is neither a mode nor machine-readable detail to hash.
     """
+    mode = _tuning_mode(data)
     config = data.get("config", {})
-    if not isinstance(config, dict):
-        return None
-    mode = config.get("tuning_mode")
-    tuning_detail = config.get("tuning_config") or config.get("tuning")
-    if not mode and not tuning_detail:
+    tuning_detail: dict[str, Any] | None = None
+    if isinstance(config, dict):
+        raw_detail = config.get("tuning_config") or config.get("tuning")
+        if isinstance(raw_detail, dict):
+            tuning_detail = raw_detail
+        # Non-dict detail (e.g. a repr() string) is intentionally not hashed:
+        # it is not canonical, so cosmetic differences would change the hash
+        # even when the underlying tuning configuration is identical.
+    if mode is None and tuning_detail is None:
         return None
     payload = json.dumps({"mode": mode, "detail": tuning_detail}, sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()[:8]

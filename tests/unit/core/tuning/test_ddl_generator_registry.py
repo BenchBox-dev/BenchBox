@@ -69,7 +69,7 @@ def _discover_concrete_generator_classes() -> dict[str, type[BaseDDLGenerator]]:
     Walks the actual submodules (not just generators/__init__.py's __all__)
     so a new generator module is picked up even before anyone remembers to
     export it. Only classes *defined* in the module (not merely imported,
-    e.g. PostgreSQLDDLGenerator re-used by timescaledb.py) are counted, and
+    e.g. PostgreSQLDDLGenerator reused by timescaledb.py) are counted, and
     abstract classes (e.g. SparkBaseDDLGenerator) are excluded.
     """
     discovered: dict[str, type[BaseDDLGenerator]] = {}
@@ -90,7 +90,7 @@ def _registered_generator_class_names() -> set[str]:
     """Statically extract the class names in get_ddl_generator()'s `generators`
     mapping literal, by parsing the function's own source with `ast`.
 
-    This deliberately does not re-import/re-declare the mapping (that would
+    This deliberately does not re-import or redeclare the mapping (that would
     just be a second copy that could drift from the real one) - it inspects
     the actual dict literal inside get_ddl_generator() itself, so this test
     fails the moment a class stops being referenced there.

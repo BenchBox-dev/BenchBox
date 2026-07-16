@@ -374,6 +374,138 @@ class TestExtendedManifestFields:
         assert len(entry.tuning_hash) == 8
         assert all(c in "0123456789abcdef" for c in entry.tuning_hash)
 
+    def test_tuning_mode_falls_back_to_execution_block(self, tmp_path: Path) -> None:
+        """Seed-corpus bundles wrote tuning_mode under execution, not config."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["execution"]["tuning_mode"] = "tuned"
+        bundle = tmp_path / "exec_tuning_mode.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+        detail = transformer.to_detail_result(bundle, result_id="exec-tuning-mode")
+
+        assert entry.tuning_mode == "tuned"
+        assert detail.tuning_mode == "tuned"
+
+    def test_tuning_mode_prefers_config_over_execution(self, tmp_path: Path) -> None:
+        """When both locations carry a value, config.tuning_mode wins."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["config"]["tuning_mode"] = "custom"
+        data["execution"]["tuning_mode"] = "tuned"
+        bundle = tmp_path / "both_tuning_mode.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.tuning_mode == "custom"
+
+    def test_tuning_mode_stays_none_when_absent_everywhere(self, tmp_path: Path) -> None:
+        """A bundle that never recorded tuning_mode must not be assigned a fake mode."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        bundle = tmp_path / "no_tuning_mode.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.tuning_mode is None
+
+    def test_tuning_hash_uses_execution_fallback_mode(self, tmp_path: Path) -> None:
+        """tuning_hash resolves mode via the same execution.tuning_mode fallback."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["execution"]["tuning_mode"] = "tuned"
+        bundle = tmp_path / "exec_tuning_hash.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.tuning_hash is not None
+        assert len(entry.tuning_hash) == 8
+
+    def test_tuning_hash_dict_detail_is_hashed_canonically(self, tmp_path: Path) -> None:
+        """A dict tuning_config is machine-readable, so key order must not affect the hash."""
+        import copy
+
+        data_a = copy.deepcopy(MINIMAL_BUNDLE)
+        data_a["config"]["tuning_mode"] = "tuned"
+        data_a["config"]["tuning_config"] = {"a": 1, "b": 2}
+        bundle_a = tmp_path / "dict_a.json"
+        bundle_a.write_text(json.dumps(data_a), encoding="utf-8")
+
+        data_b = copy.deepcopy(MINIMAL_BUNDLE)
+        data_b["config"]["tuning_mode"] = "tuned"
+        data_b["config"]["tuning_config"] = {"b": 2, "a": 1}
+        bundle_b = tmp_path / "dict_b.json"
+        bundle_b.write_text(json.dumps(data_b), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry_a = transformer.to_manifest_entry(bundle_a)
+        entry_b = transformer.to_manifest_entry(bundle_b)
+
+        assert entry_a.tuning_hash == entry_b.tuning_hash
+        assert entry_a.tuning_hash is not None
+
+    def test_tuning_hash_string_repr_detail_is_not_hashed(self, tmp_path: Path) -> None:
+        """A repr() string is not canonical: it must be dropped, not hashed verbatim.
+
+        Two bundles with cosmetically different repr strings for the same mode
+        must produce the same hash (mode-only), proving the repr text itself
+        is excluded from the hash payload.
+        """
+        import copy
+
+        data_a = copy.deepcopy(MINIMAL_BUNDLE)
+        data_a["config"]["tuning_mode"] = "tuned"
+        data_a["config"]["tuning_config"] = (
+            "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True))"
+        )
+        bundle_a = tmp_path / "repr_a.json"
+        bundle_a.write_text(json.dumps(data_a), encoding="utf-8")
+
+        data_b = copy.deepcopy(MINIMAL_BUNDLE)
+        data_b["config"]["tuning_mode"] = "tuned"
+        data_b["config"]["tuning_config"] = (
+            "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False))"
+        )
+        bundle_b = tmp_path / "repr_b.json"
+        bundle_b.write_text(json.dumps(data_b), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry_a = transformer.to_manifest_entry(bundle_a)
+        entry_b = transformer.to_manifest_entry(bundle_b)
+        mode_only = transformer.to_manifest_entry(bundle_a, data={**data_a, "config": {"tuning_mode": "tuned"}})
+
+        assert entry_a.tuning_hash is not None
+        assert entry_a.tuning_hash == entry_b.tuning_hash
+        assert entry_a.tuning_hash == mode_only.tuning_hash
+
+    def test_tuning_hash_none_when_detail_is_repr_string_and_no_mode(self, tmp_path: Path) -> None:
+        """No mode + a non-canonical repr string detail: nothing machine-readable to hash."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["config"]["tuning_config"] = (
+            "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=True))"
+        )
+        bundle = tmp_path / "repr_no_mode.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.tuning_hash is None
+
     def test_test_type_from_benchmark_block(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
         entry = transformer.to_manifest_entry(bundle_file)
