@@ -54,7 +54,7 @@ def _discover_adapter_assigned_statuses() -> set[str]:
     """Statically extract every string literal assigned to the
     `tuning_validation_status` local anywhere in adapter.py, including both
     arms of the `"APPLIED" if ... else "FAILED_TO_SAVE"` conditional
-    assignment. This walks the real module source instead of re-declaring the
+    assignment. This walks the real module source instead of redeclaring the
     values, so it fails the moment adapter.py's literals change.
     """
     source = inspect.getsource(adapter_module)
