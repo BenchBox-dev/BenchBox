@@ -357,7 +357,7 @@ class TestCLIDataLoadModes:
 
             result = self.runner.invoke(cli, ["run", "--table-mode", "external"])
             assert result.exit_code != 0
-            assert "--table-mode external is incompatible with --tuning tuned" in result.output
+            assert "--table-mode external is incompatible with tuning enabled" in result.output
             mocks["orchestrator"].return_value.execute_benchmark.assert_not_called()
 
     def test_table_mode_external_shows_tag_in_output(self):
@@ -431,7 +431,79 @@ class TestCLIDataLoadModes:
             ],
         )
         assert result.exit_code != 0
-        assert "--table-mode external is incompatible with --tuning tuned" in result.output
+        assert "--table-mode external is incompatible with tuning enabled" in result.output
+
+    def test_table_mode_external_rejects_auto(self):
+        """external table mode should reject --tuning auto (TODO w4: the guard covers every
+        tuning-bearing resolution, not just the literal 'tuned' keyword -- auto's
+        TuningSource.SMART_DEFAULTS is always enabled=True)."""
+        result = self.runner.invoke(
+            cli,
+            [
+                "run",
+                "--platform",
+                "duckdb",
+                "--benchmark",
+                "tpch",
+                "--table-mode",
+                "external",
+                "--tuning",
+                "auto",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "--table-mode external is incompatible with tuning enabled" in result.output
+
+    def test_table_mode_external_rejects_custom_file(self, tmp_path):
+        """external table mode should reject a custom tuning file path (TODO w4)."""
+        tuning_file = tmp_path / "custom.yaml"
+        tuning_file.write_text("constraints: {}\n")
+        result = self.runner.invoke(
+            cli,
+            [
+                "run",
+                "--platform",
+                "duckdb",
+                "--benchmark",
+                "tpch",
+                "--table-mode",
+                "external",
+                "--tuning",
+                str(tuning_file),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "--table-mode external is incompatible with tuning enabled" in result.output
+
+    def test_table_mode_external_allows_notuning(self):
+        """external table mode should still be allowed with --tuning notuning (the default)."""
+        with _mock_run_command_components(include_db_manager=True) as mocks:
+            mock_db_cfg = Mock()
+            mock_db_cfg.type = "duckdb"
+            mock_db_cfg.options = {}
+            mock_db_cfg.driver_version_actual = "1.4.3"
+            mock_db_cfg.driver_version_resolved = "1.4.3"
+            assert mocks["db_mgr"] is not None
+            mocks["db_mgr"].return_value.create_config.return_value = mock_db_cfg
+
+            result = self.runner.invoke(
+                cli,
+                [
+                    "run",
+                    "--platform",
+                    "duckdb",
+                    "--benchmark",
+                    "tpch",
+                    "--scale",
+                    "0.01",
+                    "--table-mode",
+                    "external",
+                    "--tuning",
+                    "notuning",
+                ],
+            )
+            assert result.exit_code == 0
+            assert "incompatible with tuning enabled" not in result.output
 
     def test_enable_postgen_manifest_flag_forwarded(self):
         """Ensure CLI forwards the manifest validation flag into benchmark options."""
