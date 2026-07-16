@@ -97,14 +97,6 @@ COMMAND_SPECS: tuple[CommandSpec, ...] = (
         "Validate BenchBox configuration files for syntax and completeness.",
     ),
     CommandSpec("tuning", "benchbox.cli.commands.tuning_group", "tuning_group", "Tuning configuration commands."),
-    CommandSpec(
-        "create-sample-tuning",
-        "benchbox.cli.commands.tuning",
-        "create_sample_tuning",
-        "Create sample tuning configuration.",
-        True,
-    ),
-    CommandSpec("df-tuning", "benchbox.cli.commands.df_tuning", "df_tuning_group", "DataFrame tuning commands.", True),
     CommandSpec("export", "benchbox.cli.commands.export", "export", "Export benchmark results to various formats."),
     CommandSpec(
         "submit",
@@ -233,8 +225,6 @@ __all__ = [
     "benchmarks",
     "validate",
     "tuning_group",
-    "create_sample_tuning",
-    "df_tuning_group",
     "export",
     "submit",
     "check_dependencies",
