@@ -228,15 +228,25 @@ def _resolve_notuning(logger: Logger | None) -> TuningResolution:
 
 
 def _resolve_auto(logger: Logger | None) -> TuningResolution:
-    """Resolve auto (smart defaults) mode."""
+    """Resolve auto (smart defaults) mode.
+
+    Real system-profile smart defaults are only implemented for DataFrame
+    platforms today (see ``resolve_dataframe_tuning_config`` in
+    ``tuning_runtime.py``); SQL platforms fall back to a basic, untuned
+    configuration. This function does not know the resolved platform/mode, so
+    the concrete "SQL gets a basic config" warning is emitted downstream once
+    that is known (see ``run.py::_load_unified_tuning_config``).
+    """
     resolution = TuningResolution(
         mode=TuningMode.AUTO,
         source=TuningSource.SMART_DEFAULTS,
         enabled=True,
     )
-    resolution.info_messages.append("Tuning mode: auto (using smart defaults based on system profile)")
+    resolution.info_messages.append(
+        "Tuning mode: auto (smart defaults based on system profile - DataFrame platforms only today)"
+    )
     if logger:
-        logger.debug("Tuning mode: auto (smart defaults)")
+        logger.debug("Tuning mode: auto (smart defaults; DataFrame platforms only)")
     return resolution
 
 

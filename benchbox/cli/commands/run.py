@@ -1020,6 +1020,17 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
             s.logger.debug("Using basic constraints-only configuration (fallback)")
     else:
         s.loaded_unified_config = UnifiedTuningConfiguration()
+        if tuning_resolution.mode == TuningMode.AUTO and s.resolved_mode != "dataframe":
+            # Real smart defaults (resolve_dataframe_tuning_config in tuning_runtime.py)
+            # only exist for DataFrame platforms today; SQL platforms land here with a
+            # freshly-constructed, untuned UnifiedTuningConfiguration.
+            if not s.quiet:
+                console.print(
+                    "[yellow]Warning: --tuning auto smart defaults are DataFrame-only today; "
+                    "this SQL run proceeds with a basic (untuned) configuration.[/yellow]"
+                )
+            if s.logger:
+                s.logger.debug("Tuning mode auto on a non-DataFrame platform: using basic unified config")
         if s.logger:
             s.logger.debug(f"Using basic unified config for mode: {tuning_resolution.mode.value}")
 
