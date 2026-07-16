@@ -56,8 +56,8 @@ from .base.adapter import check_isolation_capability
 #   - SQLiteAdapter (stdlib sqlite3)
 #   - DataFusionAdapter (datafusion - ~68 MB native lib, now lazy)
 #   - PolarsAdapter (polars - ~142 MB native lib, now lazy)
-#   - PostgreSQLAdapter (psycopg2 - core dependency)
-#   - TimescaleDBAdapter (psycopg2 - shares core dependency)
+#   - PostgreSQLAdapter (psycopg (v3) - core dependency)
+#   - TimescaleDBAdapter (psycopg (v3) - shares core dependency)
 # ============================================================================
 
 # Cache for lazily loaded adapters and constants
