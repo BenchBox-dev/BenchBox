@@ -67,6 +67,13 @@ export interface ResultRow extends CostDeploymentFields {
   plans_published: boolean;
   has_tuning: boolean;
   bundle_download_url: string;
+  // ADR-2 §3 secondary facet: the physical rendering strategy id for
+  // platforms that expose one (currently TPC benchmarks on Databricks).
+  // Never invented; null/undefined when the bundle never recorded a logical
+  // tuning profile. Optional (like plans_published above) so fixtures and
+  // SQL paths predating this field default to undefined rather than needing
+  // updates everywhere a ResultRow is constructed.
+  physical_rendering_id?: string | null;
 }
 
 export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_eligible" | "visibility"> {
@@ -79,6 +86,9 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   cpu_count: number | null;
   memory_gb: number | null;
   python: string | null;
+  // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
+  // physical_mechanisms in DetailResult); null when none were recorded.
+  physical_mechanisms?: string | null;
 }
 
 export interface QueryDisplayTimingRow {
@@ -304,6 +314,7 @@ const RESULT_COLUMNS = [
   "plans_published",
   "has_tuning",
   "bundle_download_url",
+  "physical_rendering_id",
 ].join(", ");
 
 const RESULT_DETAIL_METRICS_COLUMNS = [
@@ -359,6 +370,8 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "plans_published",
   "has_tuning",
   "bundle_download_url",
+  "physical_mechanisms",
+  "physical_rendering_id",
   "os",
   "arch",
   "cpu_count",
@@ -635,6 +648,8 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     storage_format: wide.storage_format,
     storage_tier: wide.storage_tier,
     compliance_class: wide.compliance_class,
+    physical_mechanisms: wide.physical_mechanisms ? wide.physical_mechanisms.split(",") : [],
+    physical_rendering_id: wide.physical_rendering_id,
   };
 }
 

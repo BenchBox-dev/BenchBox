@@ -422,7 +422,13 @@ class DuckDBSnapshotBuilder:
                 has_plans            BOOLEAN  NOT NULL,
                 plans_published      BOOLEAN  NOT NULL,
                 has_tuning           BOOLEAN  NOT NULL,
-                bundle_download_url  VARCHAR  NOT NULL
+                bundle_download_url  VARCHAR  NOT NULL,
+                -- ADR-2 §3: platform-rendered physical tuning mechanisms
+                -- (comma-joined, sorted) and, for platforms that expose one,
+                -- the physical rendering strategy id. NULL when the bundle
+                -- never recorded a logical tuning profile.
+                physical_mechanisms   VARCHAR,
+                physical_rendering_id VARCHAR
             )
         """)
         con.execute("""
@@ -480,6 +486,8 @@ class DuckDBSnapshotBuilder:
                 r.plans_published,
                 r.has_tuning,
                 r.bundle_download_url,
+                r.physical_mechanisms,
+                r.physical_rendering_id,
                 e.os,
                 e.arch,
                 e.cpu_count,
@@ -735,6 +743,12 @@ class DuckDBSnapshotBuilder:
             plans_published = detail.plans_published if detail is not None else False
             has_tuning = detail.has_tuning if detail is not None else False
             bundle_download_url = f"{bundle_url_prefix}/{entry.result_id}.json"
+            physical_mechanisms = (
+                ",".join(sorted(detail.physical_mechanisms))
+                if detail is not None and detail.physical_mechanisms
+                else None
+            )
+            physical_rendering_id = detail.physical_rendering_id if detail is not None else None
             rows.append(
                 (
                     entry.result_id,
@@ -776,6 +790,8 @@ class DuckDBSnapshotBuilder:
                     plans_published,
                     has_tuning,
                     bundle_download_url,
+                    physical_mechanisms,
+                    physical_rendering_id,
                 )
             )
         if rows:

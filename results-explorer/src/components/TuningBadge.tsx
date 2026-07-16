@@ -23,6 +23,13 @@ export const TUNING_CONFIG: Record<string, TuningEntry> = {
     tone: "success",
     title: "Platform-recommended tuning applied",
   },
+  "tuned-fallback": {
+    label: "Tuned (Fallback)",
+    tone: "warning",
+    title:
+      "tuned was requested but no platform/benchmark template was found - basic constraints-only " +
+      "config was used instead. Does not represent a curated-template tuned run (ADR-2).",
+  },
   notuning: {
     label: "No Tuning",
     tone: "neutral",
@@ -32,6 +39,11 @@ export const TUNING_CONFIG: Record<string, TuningEntry> = {
     label: "Auto",
     tone: "info",
     title: "Automatic tuning selected by the platform",
+  },
+  custom: {
+    label: "Custom Tuning",
+    tone: "warning",
+    title: "User-supplied tuning configuration file",
   },
   [NOT_RECORDED_TUNING_MODE]: NOT_RECORDED_CONFIG,
 };

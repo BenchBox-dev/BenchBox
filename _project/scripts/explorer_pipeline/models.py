@@ -364,6 +364,13 @@ class DetailResult(BaseModel):
     compliance_class: str | None = None
     # Phase durations in seconds (None for pre-pipeline rows).
     phase_durations: dict[str, float] | None = None
+    # ADR-2 §3: the platform-rendered physical tuning mechanisms (e.g.
+    # indexes, clustering keys, distribution styles) and, for platforms that
+    # expose one (currently TPC benchmarks on Databricks), the physical
+    # rendering strategy actually used. None/empty for bundles that never
+    # recorded a logical tuning profile -- never invented.
+    physical_mechanisms: list[str] = Field(default_factory=list)
+    physical_rendering_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
