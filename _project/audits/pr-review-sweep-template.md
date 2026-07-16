@@ -259,6 +259,44 @@ inherited:
 > confirmed, so anyone re-verifying the historical decision (forks,
 > recreated rulesets, future audits) needs them to work.
 
+### Axis 5b — Verification-command antipatterns (silent false-positives)
+
+Some `verification:` commands *pass* while proving nothing — they exit 0
+regardless of whether the behaviour they claim to check holds. These are
+worse than a command that drifted and fails loudly (Axis 5): a green
+false-positive lets a defective TODO land as "verified". A weekly sweep
+flags these patterns in any TODO whose `verification.command` blocks were
+added or touched in the window. The four below were caught retroactively
+by Codex on already-merged TODOs (PRs #110, #117, #121, #122); the
+generator bug they document is fixed, but the *class* recurs, so the sweep
+checks for it going forward:
+
+- **Wildcard `--queries`** — a `--queries '*'` / `--queries` glob (rather
+  than explicit query names) can match zero queries and still exit 0, so an
+  empty run reads as a pass. Require explicit query names in the command.
+  (Embodied by `read-primitives-approximate-aggregate-queries.yaml`.)
+- **`find -newer` with >2 positional args** — `find <dir> -newer A B` is an
+  arity bug: `find` treats the extra path as another search root, not a
+  second reference file, so the freshness comparison it appears to make is
+  not the one that runs. (Embodied by
+  `write-primitives-sketch-persistence-category.yaml`.)
+- **DuckDB filename glob in a command string** — a `*.duckdb` (or similar)
+  shell glob that expands to zero files, or to a stale file, lets the query
+  run against the wrong (or no) database and still exit 0. Name the exact
+  database path. (Embodied by
+  `read-primitives-approximate-aggregates-dataframe-coverage.yaml`.)
+- **`$(date)` / `$(date +...)` inside a verification command** — a date
+  recomputed at run time is not the date the TODO was verified against;
+  a command that embeds `$(date)` can pass on one side of midnight and
+  fail on the other, so it verifies nothing stable. Pin the date literal.
+  (Embodied by `results-explorer-uat-multi-scale-corpus-sweep.yaml`.)
+
+Structural cousins of these are now caught at authoring time by
+`_project/scripts/validate_todo.py` (it rejects `verification.command`
+values that span multiple physical lines without a `|` block scalar). The
+sweep still owns the *semantic* checks above, which a schema linter cannot
+judge.
+
 ## TODO file shape
 
 Use `_project/TODO_ENTRY_TEMPLATE.yaml` as the base. The conventional
