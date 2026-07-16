@@ -31,11 +31,12 @@ which reads `config.tuning_mode` first and falls back to
 
 ## Benchmarks with zero remaining coverage
 
-Three benchmarks had no non-tuned bundles in the corpus at all, so removing
+Four benchmarks had no non-tuned bundles in the corpus at all, so removing
 their tuned bundles drops them from the checked-in corpus entirely until
-regenerated: **ai_primitives**, **tpcds** (the standalone TPC-DS benchmark;
-`tpcds_obt` is unaffected and still has not-recorded coverage), and
-**vector_search**. `results-data/corpus-inventory.json` will not list these
+regenerated: **ai_primitives**, **joinorder_synthetic** (distinct from the
+surviving `joinorder` IMDB benchmark, which keeps 3 not-recorded bundles),
+**tpcds** (the standalone TPC-DS benchmark; `tpcds_obt` is unaffected and
+still has not-recorded coverage), and **vector_search**. `results-data/corpus-inventory.json` will not list these
 benchmark ids again until at least one tuned or not-recorded bundle is
 re-added for each.
 
