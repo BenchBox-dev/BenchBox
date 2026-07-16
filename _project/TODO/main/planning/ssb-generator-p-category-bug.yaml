@@ -1,0 +1,109 @@
+id: ssb-generator-p-category-bug
+title: "Fix SSB generator 3-digit p_category emission (MFGR#212 vs MFGR#12) causing empty Q2/Q3/Q4 results"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  The SSB (Star Schema Benchmark) generator emits a 3-digit p_category value
+  ('MFGR#212') instead of the standard 2-digit value ('MFGR#12'). The
+  standard SSB Q2.1–Q2.3, Q3.3, Q3.4, and Q4.3 predicates filter on the
+  2-digit form, so those queries return empty result sets at any scale factor.
+
+  Surfaced as a deferred item in the DONE file for
+  `cross-surface-oracle-remediation` (completed). The DONE file notes the bug
+  is "Tracked in #870" (a GitHub PR reference), but there is no corresponding
+  open TODO in `_project/TODO/`, and the vacuous cells are handled by allowlisting
+  them in the SSB gate rather than fixing the root cause.
+
+  The empty results are not a platform divergence or query bug — they are a
+  data-generation defect. Every platform correctly returns zero rows because
+  the generator never emits rows with a 2-digit p_category code.
+
+work:
+  - id: w0
+    summary: "Re-validate the generator bug still exists and measure scope"
+    status: pending
+    notes: |
+      Run the SSB generator at SF=0.1 and inspect the part table:
+        SELECT DISTINCT p_category FROM part WHERE p_category LIKE 'MFGR#2%' LIMIT 10
+      Confirm 'MFGR#212' (or similar 3-digit) appears; confirm 'MFGR#12' does NOT.
+      Also count how many of Q2.1–Q2.3, Q3.3, Q3.4, Q4.3 return zero rows.
+      Check whether #870 was merged and whether the fix is already in the generator.
+
+  - id: w1
+    summary: "Identify the generator code path that emits p_category"
+    needs: [w0]
+    status: pending
+    notes: |
+      Locate the SSB data generator (likely a binary in _binaries/ or a Python
+      module). Find where mfgr/category codes are composed. The standard SSB
+      schema assigns p_category as MFGR#{1-5}{1-5} (2-digit suffix), not
+      MFGR#{1-5}{1-9}{1-9} (3-digit).
+
+  - id: w2
+    summary: "Fix the p_category generation or add a post-load normalisation step"
+    needs: [w1]
+    status: pending
+    notes: |
+      Prefer fixing the root cause in the generator. If the generator is a
+      compiled binary with no source available, add a post-load normalisation
+      that maps the 3-digit form to the 2-digit form at load time. Document
+      which approach was taken and why.
+
+  - id: w3
+    summary: "Remove the SSB allowlist entries that paper over the empty cells"
+    needs: [w2]
+    status: pending
+    notes: |
+      After the fix, Q2.1–Q2.3, Q3.3, Q3.4, Q4.3 should return non-empty
+      result sets. Remove the allowlist/known_divergences entries that were
+      added to the SSB gate to silence the vacuous cells. Re-run the full SSB
+      gate and confirm it passes without the exemptions.
+
+  - id: w4
+    summary: "Verify cross-surface oracle still passes after removing vacuous-cell allowlist entries"
+    needs: [w3]
+    status: pending
+    notes: |
+      Run the SSB cross-surface gate across at least two platforms (DuckDB +
+      one cloud platform). Confirm all 13 SSB queries (Q1.1–Q4.3) return
+      non-empty, consistent results.
+
+metadata:
+  tags:
+    - ssb
+    - data-generation
+    - correctness
+    - benchmark-integrity
+  estimated_effort: "Small-Medium"
+  created_date: "2026-07-16"
+
+impact:
+  technical_debt: |
+    Six SSB queries have silently returned empty results at every scale factor.
+    Any benchmark run using SSB Q2.x or Q3.3/Q3.4/Q4.3 is measuring
+    zero-row execution rather than real analytical workloads. This
+    corrupts SSB benchmark results for all platforms.
+
+prior_art:
+  - "cross-surface-oracle-remediation DONE file — deferred this bug; the allowlist approach is the current workaround"
+  - "_binaries/ or benchbox/benchmarks/ssb/ — locate the SSB generator"
+  - "benchbox/benchmarks/ssb/gate*.yaml — the allowlist entries to remove after the fix"
+
+must_preserve:
+  - "All other SSB query results remain unchanged (Q1.x, Q2.x not affected by p_category, Q3.x excluding 3.3/3.4)"
+  - "The cross-surface gate continues to pass for non-SSB benchmarks"
+
+anti_patterns:
+  - "DO NOT widen the allowlist further — the correct fix is in the generator, not in silencing more cells"
+  - "DO NOT fix p_category for only one platform — the generator produces the data before any platform loads it"
+
+verification:
+  - description: "Q2.1 returns non-empty results at SF=0.1"
+    command: "benchbox run --benchmark ssb --query q2_1 --scale-factor 0.1 --platform duckdb"
+    expected_output: "result set contains at least one row"
+  - description: "SSB gate passes without vacuous-cell allowlist entries"
+    command: "uv run -- python -m pytest tests/unit/benchmarks/test_ssb_gate.py -q"
+    expected_output: "all tests pass"
