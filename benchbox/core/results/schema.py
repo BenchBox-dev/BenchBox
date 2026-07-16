@@ -1211,9 +1211,13 @@ _YAML_TUNING_SOURCES = frozenset({"explicit_file", "auto_discovered"})
 def _legacy_tuning_source_bridge(tuning_source: str | None, tuning_source_file: str | None) -> str:
     """Map the raw TuningSource enum value to the legacy yaml/auto bridge.
 
-    Kept for one generation so the explorer pipeline (which currently reads
-    only "yaml"/"auto") keeps working while it migrates to the richer
-    ``tuning_source`` enum value. See ADR-1.
+    Kept for one schema generation so any external consumer of the documented
+    ``platform.tuning.source``/``.hash`` keys (docs/reference/result-formats.md)
+    keeps working while it migrates to the richer ``tuning_source``/
+    ``requested_config_hash`` fields. Note this is NOT the explorer ingest
+    pipeline: it reads tuning facets from ``data["config"]``
+    (``_project/scripts/explorer_pipeline/transformer.py``), never from
+    ``platform.tuning``. See ADR-1.
     """
     if tuning_source in _YAML_TUNING_SOURCES or (tuning_source is None and tuning_source_file):
         return "yaml"

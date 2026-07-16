@@ -383,6 +383,12 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
     if tuning_summary:
         tuning_config_hash = tuning_summary.get("requested_config_hash") or tuning_summary.get("hash")
         tuning_source = tuning_summary.get("tuning_source")
+        # Legacy fidelity: pre-ADR-1 bundles only ever recorded a "yaml"/"auto"
+        # source in the summary block, with no companion .tuning.json carrying
+        # a real source_file. Reconstruct the old "yaml" sentinel here so those
+        # summary-only bundles keep round-tripping a truthy tuning_source_file,
+        # matching this function's pre-existing behavior.
+        tuning_source_file = "yaml" if tuning_summary.get("source") == "yaml" else None
 
     if tuning_data:
         tunings_applied = tuning_data.get("requested") or tuning_data.get("clauses", {})

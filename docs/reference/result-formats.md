@@ -164,7 +164,7 @@ what physically applied (see `docs/development/tuning-adr-001-trust-and-hash-sem
 | `counts.tables_tuned` | number | Number of tables with at least one table-level tuning (partitioning/clustering/distribution/sorting). |
 | `counts.tuning_types` | array | Sorted list of tuning categories actually active (constraint names, platform optimization flags, table-tuning clause types). |
 | `logical_profile` | object | Optional workload-profile coverage metadata (unrelated to the requested-config hash). |
-| `source`, `hash` | string | **Legacy bridge keys**, kept for one generation so older consumers (e.g. the explorer pipeline) keep working. `source` is `"yaml"` when `tuning_source` is `explicit_file`/`auto_discovered`, else `"auto"`. `hash` mirrors `requested_config_hash`. Do not add new readers of these two keys - read `tuning_source`/`requested_config_hash` instead. |
+| `source`, `hash` | string | **Legacy bridge keys**, kept for one schema generation so any external consumer of these documented keys keeps working (this is not the explorer ingest pipeline, which reads tuning facets from `data["config"]`, never from `platform.tuning`). `source` is `"yaml"` when `tuning_source` is `explicit_file`/`auto_discovered`, else `"auto"`. `hash` mirrors `requested_config_hash`. Do not add new readers of these two keys - read `tuning_source`/`requested_config_hash` instead. |
 
 The `.tuning.json` companion file (same base filename, `.tuning.json` suffix)
 carries the full detail: `requested.constraints` (primary/foreign key, unique,
