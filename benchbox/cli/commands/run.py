@@ -105,6 +105,22 @@ def normalize_benchmark_name(name: str) -> str:
     return BENCHMARK_ALIASES.get(normalized, normalized)
 
 
+def _validate_dry_run_output_dir(ctx: click.Context, param: click.Parameter, value: str | None) -> str | None:
+    """Reject option-like values for --dry-run OUTPUT_DIR.
+
+    --dry-run takes a required directory argument, so a following flag (e.g.
+    `--dry-run --non-interactive`) is silently consumed as the directory name,
+    creating a directory literally named "--non-interactive". Fail fast with a
+    clear message instead.
+    """
+    if value is not None and value.startswith("-"):
+        raise click.BadParameter(
+            f"'{value}' looks like a command-line flag, not a directory. "
+            "Pass a directory for --dry-run, e.g. --dry-run ./preview --non-interactive."
+        )
+    return value
+
+
 def _reject_external_tuned(console: Any, logger: logging.Logger | None, ctx: click.Context) -> None:
     """Exit with error when --table-mode external is combined with --tuning tuned."""
     console.print("[red]❌ Error: --table-mode external is incompatible with --tuning tuned[/red]")
@@ -2598,6 +2614,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--dry-run",
     type=str,
     metavar="OUTPUT_DIR",
+    callback=_validate_dry_run_output_dir,
     help="Preview configuration without execution",
 )
 @click.option(
