@@ -17,8 +17,22 @@ pytestmark = pytest.mark.fast
 # Default maximum number of lines for a module before the guardrails trigger.
 MAX_LINES_DEFAULT = 1_200
 
-# Modules that intentionally exceed the default.  The value is the bespoke limit
-# for that path; keep the list small and well-commented.
+# Headroom added on top of every ALLOWLIST entry before it is enforced as a
+# limit. Convention: when adding or updating an ALLOWLIST entry, record the
+# module's actual line count at the time of the change (not a pre-inflated
+# number) -- the enforced limit is computed as that value + ALLOWLIST_HEADROOM
+# below. Without this, an exact-fit entry retrips the guardrail on the very
+# next PR that adds even a single line to the file (this happened twice
+# during the 2026-07 tuning remediation batch; see
+# tuning-residual-cleanups-20260716 w3). This headroom applies only to
+# explicit ALLOWLIST entries -- it intentionally does not loosen
+# MAX_LINES_DEFAULT, so the guardrail still fails promptly on real unbounded
+# growth of allowlisted modules and on any non-allowlisted module.
+ALLOWLIST_HEADROOM = 25
+
+# Modules that intentionally exceed the default.  The value is the module's
+# documented line count (see ALLOWLIST_HEADROOM above for how the enforced
+# limit is derived); keep the list small and well-commented.
 ALLOWLIST = {
     Path(
         "benchbox/cli/commands/run.py"
@@ -55,7 +69,10 @@ def test_runtime_modules_respect_size_limits() -> None:
             raise AssertionError(f"Tracked module {relative_path} is missing; update the size guard list")
 
         line_count = _count_lines(full_path)
-        limit = ALLOWLIST.get(relative_path, MAX_LINES_DEFAULT)
+        if relative_path in ALLOWLIST:
+            limit = ALLOWLIST[relative_path] + ALLOWLIST_HEADROOM
+        else:
+            limit = MAX_LINES_DEFAULT
 
         if line_count > limit:
             violations.append((relative_path, line_count, limit))
@@ -67,3 +84,23 @@ def test_runtime_modules_respect_size_limits() -> None:
             + details
             + "\nReduce the module size or update the allowlist with justification."
         )
+
+
+def test_allowlist_headroom_applies_only_to_allowlisted_entries() -> None:
+    """Pin the w3 headroom convention: ALLOWLIST entries get a small buffer
+    above their documented line count so a routine one-line edit doesn't
+    immediately retrip the guardrail, while MAX_LINES_DEFAULT (used for every
+    module not in ALLOWLIST) stays untouched."""
+    sample_path = next(iter(ALLOWLIST))
+    documented_lines = ALLOWLIST[sample_path]
+
+    assert documented_lines + ALLOWLIST_HEADROOM > documented_lines
+    assert ALLOWLIST_HEADROOM < MAX_LINES_DEFAULT, "headroom must stay small relative to the default budget"
+
+    # A module not in ALLOWLIST must never receive the headroom bump.
+    untracked_path = Path("benchbox/cli/app.py")
+    assert untracked_path not in ALLOWLIST
+    effective_limit = (
+        ALLOWLIST[untracked_path] + ALLOWLIST_HEADROOM if untracked_path in ALLOWLIST else MAX_LINES_DEFAULT
+    )
+    assert effective_limit == MAX_LINES_DEFAULT

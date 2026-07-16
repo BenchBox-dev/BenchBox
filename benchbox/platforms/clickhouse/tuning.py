@@ -440,43 +440,22 @@ class ClickHouseTuningMixin:
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
         """Apply ClickHouse-specific platform optimizations.
 
+        `PlatformOptimizationConfiguration` only models the Databricks/BigQuery
+        style knobs (z-ordering, liquid clustering, auto-optimize, bloom
+        filters, materialized views) -- none of which apply to ClickHouse.
+        ClickHouse's own session settings (memory, threads, join algorithm,
+        cache control) are applied separately via `configure_for_benchmark`,
+        which has direct adapter attributes to read rather than a
+        `platform_config` blob. This hook is therefore an intentional no-op
+        for ClickHouse today.
+
         Args:
             platform_config: Platform optimization configuration
             connection: ClickHouse connection
         """
-        if not platform_config or not platform_config.clickhouse_optimizations:
+        if not platform_config:
             return
-
-        try:
-            # Apply ClickHouse-specific optimizations
-            optimizations = platform_config.clickhouse_optimizations
-
-            # Apply memory settings
-            if hasattr(optimizations, "max_memory_usage") and optimizations.max_memory_usage:
-                memory_bytes = self._parse_memory_setting(optimizations.max_memory_usage)
-                connection.execute(f"SET max_memory_usage = {memory_bytes}")
-                self.logger.info(f"Set max_memory_usage = {memory_bytes}")
-
-            # Apply thread settings
-            if hasattr(optimizations, "max_threads") and optimizations.max_threads:
-                connection.execute(f"SET max_threads = {optimizations.max_threads}")
-                self.logger.info(f"Set max_threads = {optimizations.max_threads}")
-
-            # Apply join algorithm
-            if hasattr(optimizations, "join_algorithm") and optimizations.join_algorithm:
-                if self._apply_setting_with_validation(
-                    connection, "join_algorithm", f"'{optimizations.join_algorithm}'"
-                ):
-                    self.logger.info(f"Set join_algorithm = {optimizations.join_algorithm}")
-
-            # Apply additional settings if available
-            if hasattr(optimizations, "additional_settings") and optimizations.additional_settings:
-                for setting, value in optimizations.additional_settings.items():
-                    if self._apply_setting_with_validation(connection, setting, value):
-                        self.logger.info(f"Set {setting} = {value}")
-
-        except Exception as e:
-            self.logger.error(f"Failed to apply ClickHouse platform optimizations: {e}")
+        self.logger.debug("No ClickHouse-specific platform optimizations to apply")
 
     apply_constraint_configuration = make_informational_constraint_applier(
         "Primary key constraints enabled for ClickHouse (applied during table creation)",

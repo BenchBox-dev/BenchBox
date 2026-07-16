@@ -1,7 +1,7 @@
 ---
 id: 2026-07-12-164408-unpinned-cross-boundary-enums
 date: 2026-07-12
-status: open
+status: actioned
 finding_kind: bug-class
 review_context: "tuning-system deep review / claude/tuning-system-review-7mzapy"
 related_paths:
@@ -31,3 +31,7 @@ phase names, and comparability facets generally.
 ## Suggested next steps
 - [ ] Pin shared vocabularies in one schema artifact consumed by both Python and TS tests.
 - [ ] Make consumers distinguish "value absent" from "value = baseline" instead of defaulting.
+
+## Triage log
+
+- 2026-07-16: actioned — remediated by tuning batch PRs 1164-1183
