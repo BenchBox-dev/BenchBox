@@ -1,0 +1,75 @@
+id: tuning-introspection-receipts-20260716
+title: "Post-load schema introspection receipts: upgrade applied_unverified to applied_verified"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  The last leg of the ADR-001 trust story (docs/development/
+  tuning-adr-001-trust-and-hash-semantics.md names introspection receipts as
+  the design direction; the applied-ledger work deliberately left
+  applied_verified unclaimable). After tuning application and data load,
+  introspect the live schema (SHOW CREATE TABLE / information_schema /
+  duckdb_constraints) per platform, compare against the ledger's executed DDL
+  intents, and emit a receipt into the .tuning.json companion. When every
+  ledgered DDL intent is corroborated, validation_status upgrades to
+  applied_verified; mismatches downgrade with a diff list. Introspection
+  failure is non-fatal and leaves applied_unverified (never blocks a run).
+
+work:
+  - id: w0
+    summary: "Start gate: applied-ledger PR merged; design note mapping ledger entry kinds to per-platform introspection queries"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Receipt model + comparison in core/tuning (platform-agnostic; corroboration rules per entry kind)"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "DuckDB + ClickHouse introspectors (constraints/indexes; SHOW CREATE TABLE partition/order clauses)"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Status upgrade wiring + companion export + explorer receipt display of verified state"
+    status: pending
+    needs: [w2]
+  - id: w4
+    summary: "Tests: corroborated run upgrades to applied_verified; induced mismatch downgrades with diff; introspection failure stays applied_unverified"
+    status: pending
+    needs: [w2]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Introspection never fails or slows a run materially (bounded queries, non-fatal)"
+  - "applied_verified is claimable ONLY via corroboration - never derived from the ledger alone"
+
+anti_patterns:
+  - "No screen-scraping of engine-specific DDL text where a structured catalog exists"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tuning/**"
+    - "benchbox/platforms/**"
+    - "benchbox/core/results/**"
+    - "results-explorer/src/**"
+    - "docs/**"
+    - "tests/**"
+
+verification:
+  - description: "E2E tuned duckdb run reaches applied_verified with a receipt in the companion"
+    command: "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/receipt-check"
+    expected_output: "validation_status applied_verified; receipt lists corroborated intents"
+
+prior_art:
+  - "benchbox/core/tuning/applied_ledger.py: entry kinds the receipts corroborate - extend"
+  - "benchbox/platforms/clickhouse/tuning.py validate_session_cache_control: existing settings-readback pattern - reuse"
+
+metadata:
+  owners: ["benchbox-team"]
+  tags: [tuning, trust, introspection, applied-ledger]
+  estimated_effort: Large
+  created_date: "2026-07-16"
+  source_review: "tuning batch second re-evaluation 2026-07-16; ADR-001 future direction"
