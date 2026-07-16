@@ -102,6 +102,21 @@ class TuningMetadataManager:
         self._metadata_table_name = "benchbox_tuning_metadata"
         self._table_exists = None  # Cache for table existence check
 
+    def _platform_key(self) -> str:
+        """Return the canonical platform type key for lookups and persistence.
+
+        Prefers the adapter's `canonical_platform_type` (the machine-readable
+        CLI/config type key, e.g. 'clickhouse-local'); falls back to a
+        normalized `platform_name` for lightweight adapters/stubs that do not
+        expose the property. The display name (`platform_name`) must never be
+        stored or used for dialect dispatch -- multi-word display strings like
+        'ClickHouse Local' do not match any canonical key.
+        """
+        canonical = getattr(self.platform_adapter, "canonical_platform_type", None)
+        if canonical:
+            return str(canonical).strip().lower()
+        return str(self.platform_adapter.platform_name).strip().lower().replace(" ", "-")
+
     def create_metadata_table(self) -> bool:
         """Create the tunings metadata table if it doesn't exist.
 
@@ -138,7 +153,7 @@ class TuningMetadataManager:
 
     def _get_create_table_sql(self) -> str:
         """Get platform-specific CREATE TABLE SQL."""
-        platform = self.platform_adapter.platform_name.lower()
+        platform = self._platform_key()
 
         # Base table definition
         base_sql = f"""
@@ -171,7 +186,7 @@ class TuningMetadataManager:
 
     def _get_create_index_sql(self) -> Optional[str]:
         """Get platform-specific index creation SQL."""
-        platform = self.platform_adapter.platform_name.lower()
+        platform = self._platform_key()
 
         if platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
             # ClickHouse uses ORDER BY in table definition, no separate index needed
@@ -204,7 +219,8 @@ class TuningMetadataManager:
 
             # Generate configuration hash
             config_hash = benchmark_tunings.get_configuration_hash()
-            platform = self.platform_adapter.platform_name
+            # Persist the canonical platform type key, not the display name
+            platform = self._platform_key()
             current_time = datetime.now()
 
             # Prepare records to insert

@@ -163,6 +163,59 @@ class TuningType(Enum):
         platform_lower = platform.lower()
         return self in compatibility_map.get(platform_lower, set())
 
+    @classmethod
+    def is_known_platform(cls, platform: str) -> bool:
+        """Check whether `platform` has an explicit entry in the compatibility map.
+
+        A platform absent from the map (e.g. 'starrocks', 'doris', or a
+        first-class ClickHouse deployment key like 'clickhouse-local' that
+        doesn't literally match the 'clickhouse' map key) is not necessarily
+        incompatible with a tuning type -- the map simply has no opinion on
+        it. Callers use this to distinguish "genuinely unsupported on a known
+        platform" (hard error) from "no compatibility data for this platform"
+        (warning; see UnifiedTuningConfiguration.validate_for_platform_detailed).
+        """
+        return platform.lower() in _KNOWN_COMPATIBILITY_PLATFORMS
+
+
+# Canonical platform keys with an explicit entry in TuningType's compatibility
+# map. Kept as a module-level constant (not derived from the map inside
+# is_compatible_with_platform, and NOT a class attribute of TuningType -- an
+# Enum class attribute of a non-descriptor type would itself become a bogus
+# enum member) so callers can ask "is this platform known to the map at all"
+# without constructing a throwaway TuningType instance. Per the
+# tuning-platform-identity-canonical-keys TODO: do not add new platforms here
+# as a side effect of fixing lookup keys -- that grows the drift this map is
+# scheduled to be replaced for (ADR-3).
+_KNOWN_COMPATIBILITY_PLATFORMS = frozenset(
+    {
+        "duckdb",
+        "snowflake",
+        "bigquery",
+        "redshift",
+        "clickhouse",
+        "databricks",
+        "sqlite",
+        "postgresql",
+        "mysql",
+    }
+)
+
+
+# Schema-constraint tuning types. Their absence from a platform's compatibility
+# map entry is downgraded to a warning (not an error) even for known
+# platforms: constraints default to enabled=True on UnifiedTuningConfiguration,
+# so treating every platform-specific constraint gap as a hard error would
+# make the default configuration fail validation on many real platforms.
+_CONSTRAINT_TUNING_TYPES = frozenset(
+    {
+        TuningType.PRIMARY_KEYS,
+        TuningType.FOREIGN_KEYS,
+        TuningType.UNIQUE_CONSTRAINTS,
+        TuningType.CHECK_CONSTRAINTS,
+    }
+)
+
 
 # Type aliases for TuningColumn options
 SortOrderType = Literal["ASC", "DESC"]
@@ -1339,23 +1392,58 @@ class UnifiedTuningConfiguration:
         """Validate configuration against platform capabilities.
 
         Args:
-            platform: Target platform name
+            platform: Target platform name (expects a canonical platform type
+                key, e.g. 'duckdb', 'clickhouse-local' -- not a human display
+                string like 'ClickHouse (Local)').
 
         Returns:
-            List of validation error messages
+            List of validation error messages. Constraint-type mismatches and
+            mismatches on platforms absent from the compatibility map are
+            downgraded to warnings and are NOT included here -- call
+            `validate_for_platform_detailed` to see them.
         """
-        errors = []
+        errors, _warnings = self.validate_for_platform_detailed(platform)
+        return errors
+
+    def validate_for_platform_detailed(self, platform: str) -> tuple[list[str], list[str]]:
+        """Validate configuration against platform capabilities, split by severity.
+
+        Table-layout and platform-specific tuning types (partitioning,
+        clustering, distribution, sorting, z-ordering, etc.) are hard errors
+        only when `platform` has an explicit entry in TuningType's
+        compatibility map AND the type is genuinely unsupported there.
+        Schema-constraint types (primary/foreign keys, unique/check
+        constraints) are always downgraded to warnings, since constraints
+        default to enabled=True and the compatibility map is not exhaustive
+        per-constraint. Any tuning type mismatch on a platform absent from the
+        map is also a warning: an unmapped platform is missing compatibility
+        data, not proven incompatible.
+
+        Args:
+            platform: Target platform name (canonical platform type key).
+
+        Returns:
+            Tuple of (errors, warnings) validation message lists.
+        """
+        errors: list[str] = []
+        warnings: list[str] = []
         enabled_types = self.get_enabled_tuning_types()
+        platform_known = TuningType.is_known_platform(platform)
 
         for tuning_type in enabled_types:
-            if not tuning_type.is_compatible_with_platform(platform):
-                errors.append(f"Tuning type '{tuning_type.value}' is not supported by platform '{platform}'")
+            if tuning_type.is_compatible_with_platform(platform):
+                continue
+            message = f"Tuning type '{tuning_type.value}' is not supported by platform '{platform}'"
+            if tuning_type in _CONSTRAINT_TUNING_TYPES or not platform_known:
+                warnings.append(message)
+            else:
+                errors.append(message)
 
         platform_key = platform.lower().replace("_", "-")
         if platform_key == "databricks":
             errors.extend(self._validate_databricks_effective_layout())
 
-        return errors
+        return errors, warnings
 
     def _validate_databricks_effective_layout(self) -> list[str]:
         """Validate Databricks layout combinations that require the full tuning config."""
