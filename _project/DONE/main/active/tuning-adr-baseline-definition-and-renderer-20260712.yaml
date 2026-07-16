@@ -2,7 +2,8 @@ id: tuning-adr-baseline-definition-and-renderer-20260712
 title: "DECISION GATE: what 'notuning' promises, and the single tuning-DDL renderer (ADR-3)"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-07-12"
 category: Architecture Decision
 
 description: |
@@ -30,12 +31,29 @@ description: |
 work:
   - id: w1
     summary: "Draft ADR: baseline definition options + session-pack relocation options; renderer consolidation options with migration cost sketch per platform"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      Done 2026-07-12: docs/development/tuning-adr-003-baseline-and-single-renderer.md
+      drafted with Context (ClickHouse inverted OLAP pack at
+      platforms/clickhouse/tuning.py:74-100, StarRocks unconditional
+      DISTRIBUTED BY injection at platforms/starrocks/workload.py:214-221, the
+      two parallel rendering universes with generators reachable only from
+      dry-run preview and the cloud_spark mixin), a two-bullet Decision, and
+      Rejected Options (record-only status quo; consolidate into adapter
+      mixins instead of generators).
   - id: w2
     summary: "Joe decides; record decisions; annotate databricks-liquid TODO open_questions with the settled policy axis"
-    status: pending
+    status: done
     needs: [w1]
+    notes: |
+      Done 2026-07-12: Joe adopted the recommended defaults for both open
+      questions (baseline = platform defaults + engine-mandatory schema
+      choices only; generators become the single renderer). ADR Status set to
+      Accepted. Both open_questions entries in
+      databricks-liquid-clustering-tuning-review-20260526.yaml annotated with
+      resolved_with pointing at this ADR (warn-first / block only explicit
+      unsafe combinations).
 
 deferred:
   - summary: "Renderer migration and baseline enforcement"
@@ -58,10 +76,12 @@ open_questions:
     gating: true
     affects: [w2]
     default: "No - baseline = platform defaults + engine-mandatory schema choices; session packs move to the tuned path or an explicitly recorded harness-defaults block"
+    resolved_with: "Joe decided 2026-07-12: adopted the recommended default as-is. Recorded in docs/development/tuning-adr-003-baseline-and-single-renderer.md (Decision 1)."
   - question: "Which renderer survives?"
     gating: true
     affects: [w2]
     default: "Generators become the single renderer; adapter mixins consume them"
+    resolved_with: "Joe decided 2026-07-12: adopted the recommended default as-is. Recorded in docs/development/tuning-adr-003-baseline-and-single-renderer.md (Decision 2)."
 
 metadata:
   owners:
