@@ -1,0 +1,59 @@
+id: tuning-fk-load-ordering-fix-20260716
+title: "Fix FK-enforcement table-load-ordering defect surfaced by working tuning"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07 remediation batch (#1176 e2e): once tuning constraints
+  actually reach the engine, loading TPC-H with the shipped tpch_tuned.yaml
+  (foreign_keys.enabled: true) fails because tables load in an order that
+  violates FK references (e.g. lineitem before orders). Invisible for months
+  because tuning never reached the engine. Reproduce (duckdb SF 0.01, shipped
+  template), then fix by dependency-ordering the load sequence from schema FK
+  metadata or deferring FK creation to post-load (choose per-engine semantics;
+  post-load ALTER is the portable default).
+
+work:
+  - id: w0
+    summary: "Reproduce with the shipped template on duckdb SF 0.01; capture the exact failure"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Implement fix (FK-aware load order or post-load constraint application) with rationale"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Tests: tuned run with FK enforcement completes; constraint actually enforced post-load (violation insert rejected)"
+    status: pending
+    needs: [w1]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Untuned/notuning load behavior and timings-attribution (constraint work must not silently inflate load phase without being visible in phase metadata)"
+  - "Applied-ledger records the constraint statements actually executed"
+
+anti_patterns:
+  - "Do not silently disable FK enforcement to make the run pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/**"
+    - "benchbox/core/**"
+    - "tests/**"
+    - "examples/tunings/**"
+
+verification:
+  - description: "E2E tuned run with shipped template passes"
+    command: "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/fk-check"
+    expected_output: "Run completes; bundle status applied_unverified; FK constraints present"
+
+metadata:
+  owners: ["benchbox-team"]
+  tags: [tuning, constraints, data-loading]
+  estimated_effort: Medium
+  created_date: "2026-07-16"
+  source_review: "tuning remediation batch close-out 2026-07-16"

@@ -1,0 +1,61 @@
+id: tuning-corpus-drop-pre-provenance-tuned-bundles-20260716
+title: "Drop pre-provenance 'tuned' seed-corpus bundles (physically untuned runs)"
+worktree: main
+priority: High
+status: Not Started
+category: Data Integrity
+
+description: |
+  Decision by Joe 2026-07-16 (follow-up batch gate): DROP the tuned seed-corpus
+  bundles until regenerated on live platforms.
+
+  Background: the 2026-07 tuning remediation (#1176 w0 discovery) proved the
+  tuning config never reached platform adapters on the direct CLI path, so the
+  325 corpus bundles claiming execution.tuning_mode="tuned" were almost
+  certainly physically untuned. Cross-submission comparisons against them are
+  unsound. The 203 bundles with no tuning_mode stay (they ingest honestly as
+  not-recorded).
+
+work:
+  - id: w1
+    summary: "Enumerate and remove the 325 tuned bundles + their .manifest.json companions"
+    notes: "Reuse the sweep logic (execution.tuning_mode == 'tuned') to build the removal list; commit the deletion with the list in the commit body."
+    status: pending
+    needs: []
+  - id: w2
+    summary: "Re-run explorer ingest over the remaining corpus; verify counts (expect 0 tuned, ~203 not-recorded)"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Record the decision + regeneration path in results-data docs/README"
+    notes: "Note that tuned corpus cells should be regenerated post-#1176/#1180 on live platforms; list the affected platform/benchmark cells so regeneration has a checklist."
+    status: pending
+    needs: [w1]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "The 203 mode-absent bundles and all notuning-era bundles stay untouched"
+  - "Explorer ingest must not fail on the reduced corpus"
+
+anti_patterns:
+  - "Do not rewrite or edit bundle contents - removal only"
+
+scope_limit:
+  only_modify:
+    - "results-data/**"
+    - "_project/scripts/**"
+    - "tests/**"
+
+verification:
+  - description: "Ingest count check after removal"
+    command: "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q"
+    expected_output: "All passing; dataset shows zero tuned rows from the seed corpus"
+
+metadata:
+  owners: ["benchbox-team"]
+  tags: [tuning, corpus, data-integrity]
+  estimated_effort: Small
+  created_date: "2026-07-16"
+  source_review: "tuning remediation batch close-out 2026-07-16; decision by Joe"
