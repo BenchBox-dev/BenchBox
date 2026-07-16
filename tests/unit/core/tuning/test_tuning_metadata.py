@@ -564,3 +564,64 @@ def test_validate_unified_tunings_old_format_table_loads_without_error():
 
     assert result.is_valid is True
     assert any("older BenchBox" in w for w in result.warnings)
+
+
+def test_validate_unified_tunings_section_only_config_matches_is_valid():
+    """Regression: a config with platform optimizations/constraint toggles but
+    ZERO column-based table tunings is exactly the whole-config-sections-only
+    scenario this widening exists for. load_tunings correctly filters sentinel
+    rows and returns a real (but empty, len==0) BenchmarkTunings -- validate_tunings
+    must not treat that falsy-but-not-None object as "no metadata found".
+    """
+    adapter = _FakeAdapter("databricks")
+
+    config = UnifiedTuningConfiguration()
+    config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
+    assert TuningMetadataManager(adapter).save_unified_tunings(config) is True
+
+    # Re-validate the identical config against the same (reused) database.
+    result = TuningMetadataManager(adapter).validate_unified_tunings(config)
+
+    assert result.is_valid is True
+    assert result.errors == []
+    assert not result.drifted_sections
+
+
+def test_validate_unified_tunings_section_only_config_detects_drift_without_false_hard_error():
+    """Companion to the above: when a section-only config *does* drift, the
+    result must carry the drift error/drifted_sections and must NOT also
+    carry the now-fixed false "No tuning metadata found in database" error --
+    that string previously fired at the same time genuine drift did, since
+    both come from the same (0 column-tunings, non-empty metadata) shape.
+    """
+    adapter = _FakeAdapter("databricks")
+
+    saved = UnifiedTuningConfiguration()
+    saved.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
+    assert TuningMetadataManager(adapter).save_unified_tunings(saved) is True
+
+    # Reused database, now expecting no platform optimizations -- still zero
+    # column-based table tunings on both sides.
+    drifted = UnifiedTuningConfiguration()
+    result = TuningMetadataManager(adapter).validate_unified_tunings(drifted)
+
+    assert result.is_valid is False
+    assert result.drifted_sections == {TuningMetadataManager._PLATFORM_OPTIMIZATIONS_SECTION}
+    assert any("Platform-optimization" in e for e in result.errors)
+    assert not any("No tuning metadata found" in e for e in result.errors)
+
+
+def test_validate_tunings_still_hard_errors_on_a_truly_empty_table():
+    """Not every falsy load_tunings() result is the section-only scenario:
+    a table with zero rows at all (nothing ever saved) must still hard-error
+    when the expected config has real column-based table tunings to check.
+    """
+    adapter = _FakeAdapter("duckdb")  # no rows appended -- truly empty
+
+    unified = UnifiedTuningConfiguration()
+    unified.table_tunings["orders"] = TableTuning(table_name="orders", sorting=[_col("o_orderkey", 1)])
+
+    result = TuningMetadataManager(adapter).validate_unified_tunings(unified)
+
+    assert result.is_valid is False
+    assert any("No tuning metadata found in database" in e for e in result.errors)

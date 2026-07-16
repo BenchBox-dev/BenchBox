@@ -722,7 +722,19 @@ class TuningMetadataManager:
             # Load existing tunings from database
             existing_tunings = self.load_tunings(expected_tunings.benchmark_name)
 
-            if not existing_tunings:
+            # `is None` (not a truthiness check): load_tunings returns None
+            # only when the metadata table is missing or truly empty. A
+            # config whose only persisted rows are the section-hash markers
+            # (see _SECTION_MARKER_TABLE) -- i.e. a saved config with
+            # platform optimizations/constraint toggles but zero
+            # column-based table tunings -- loads back as a real, non-None
+            # BenchmarkTunings with an empty table_tunings dict, which is
+            # falsy via __len__. Treating that as "not found" was a false
+            # hard error for exactly the whole-config-sections-only scenario
+            # this widening exists to validate; it must instead fall through
+            # to comparison (which correctly reports "no drift") and let
+            # validate_unified_tunings' _compare_section_hashes do its job.
+            if existing_tunings is None:
                 result.add_error("No tuning metadata found in database")
                 return result
 
