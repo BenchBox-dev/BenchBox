@@ -33,7 +33,8 @@ work:
     needs: [w1]
 
 deps:
-  needs: []
+  needs:
+  - tuning-renderer-consolidation-and-baseline-policy-20260712
 
 must_preserve:
   - "Facet MATCHING unchanged (warning-only, like the mechanisms warning) unless a future ADR says otherwise"
