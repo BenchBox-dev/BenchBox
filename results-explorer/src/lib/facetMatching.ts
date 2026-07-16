@@ -35,6 +35,8 @@ export interface FacetMatchRow {
   storage_format?: string | null;
   cost_status?: string | null;
   run_date?: string | null;
+  /** ADR-2 §3 secondary facet (TPC benchmarks): physical rendering strategy. */
+  physical_rendering_id?: string | null;
 }
 
 export interface FacetMatchOptions {
@@ -137,6 +139,29 @@ function matchesTuningMode(value: string | null | undefined, selected: readonly 
     return NULL_TUNING_MODE_SENTINELS.some((sentinel) => selected.includes(sentinel));
   }
   return selected.includes(value);
+}
+
+/**
+ * ADR-2 §3: `physical_rendering_id` is a secondary, independently matchable
+ * facet for TPC benchmarks -- narrower than the coarse `tuning_mode` facet,
+ * and never a reason two rows fail the *coarse* match on its own. Matching
+ * semantics: absent on either side means "not part of the match" (both rows
+ * pass); present on both sides means they must be equal.
+ *
+ * This does not plug into `matchesFacetKey`/`FACET_KEYS` as a first-class,
+ * URL-persisted facet chip -- ADR-2 frames it as an on-demand narrowing tool,
+ * not a change to the default coarse facet's semantics. Callers that want to
+ * narrow a comparison/selection to a specific physical rendering call this
+ * directly (e.g. when building a TPC comparison cohort).
+ */
+export function physicalRenderingIdsMatch(
+  a: Pick<FacetMatchRow, "physical_rendering_id"> | null | undefined,
+  b: Pick<FacetMatchRow, "physical_rendering_id"> | null | undefined,
+): boolean {
+  const idA = a?.physical_rendering_id;
+  const idB = b?.physical_rendering_id;
+  if (idA === null || idA === undefined || idB === null || idB === undefined) return true;
+  return idA === idB;
 }
 
 function matchesRequired(value: string | null | undefined, selected: readonly string[]): boolean {

@@ -418,6 +418,131 @@ class TestExtendedManifestFields:
 
         assert entry.tuning_mode is None
 
+    def test_legacy_raw_file_path_treated_as_not_recorded(self, tmp_path: Path) -> None:
+        """ADR-2 consequences: a pre-vocabulary-pin bundle with a raw local
+        tuning-file path as `tuning_mode` is not guessed into `custom` -- it's
+        treated as not-recorded, same as if the field were absent."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["config"]["tuning_mode"] = "examples/tunings/duckdb/tpch_tuned.yaml"
+        bundle = tmp_path / "legacy_path_tuning_mode.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.tuning_mode is None
+
+    def test_legacy_balanced_flavor_string_treated_as_not_recorded(self, tmp_path: Path) -> None:
+        """ADR-2 §2: the wizard's old "balanced" flavor string is not a
+        tuning_mode value and must not pass through ingest verbatim."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["config"]["tuning_mode"] = "balanced"
+        bundle = tmp_path / "legacy_balanced_tuning_mode.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.tuning_mode is None
+
+    def test_legacy_config_value_falls_back_to_valid_execution_value(self, tmp_path: Path) -> None:
+        """An unrecognized config.tuning_mode doesn't block a canonical value
+        recorded (redundantly) under execution.tuning_mode on the same bundle."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["config"]["tuning_mode"] = "balanced"
+        data["execution"]["tuning_mode"] = "tuned"
+        bundle = tmp_path / "legacy_config_valid_execution.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.tuning_mode == "tuned"
+
+    def test_physical_mechanisms_and_rendering_id_extracted_from_logical_profile(self, tmp_path: Path) -> None:
+        """ADR-2 §3: platform.tuning.logical_profile feeds DetailResult so the
+        ComparabilityReceipt can warn on mismatched physical mechanisms and
+        facetMatching can offer physical_rendering_id as a secondary facet."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["config"]["tuning_mode"] = "tuned"
+        data["platform"]["tuning"] = {
+            "source": "auto",
+            "logical_profile": {
+                "physical_rendering_id": "databricks_z_order",
+                "physical_mechanisms": ["indexes", "clustering"],
+            },
+        }
+        bundle = tmp_path / "logical_profile.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        detail = transformer.to_detail_result(bundle, result_id="logical-profile")
+
+        assert detail.physical_rendering_id == "databricks_z_order"
+        assert detail.physical_mechanisms == ["indexes", "clustering"]
+
+    def test_physical_mechanisms_none_and_rendering_id_none_when_no_logical_profile_recorded(
+        self, bundle_file: Path
+    ) -> None:
+        """A bundle with no platform.tuning.logical_profile at all is UNKNOWN
+        (None), not "recorded zero mechanisms" ([]). Collapsing these would
+        make a legacy bundle compared against a genuinely zero-mechanism
+        tuned run look like a real "different mechanisms" mismatch instead
+        of "nothing to compare" (see ComparabilityReceipt's undefined-guard,
+        which depends on this distinction surviving ingest)."""
+        transformer = BundleTransformer()
+        detail = transformer.to_detail_result(bundle_file, result_id="no-logical-profile")
+
+        assert detail.physical_mechanisms is None
+        assert detail.physical_rendering_id is None
+
+    def test_physical_mechanisms_empty_list_when_logical_profile_recorded_with_zero_mechanisms(
+        self, tmp_path: Path
+    ) -> None:
+        """A logical_profile object IS present but genuinely has zero
+        mechanisms -- this is the ADR-2 motivating case (one platform
+        renders six mechanisms, another renders zero, for the same tuned
+        template) and must be distinguishable from "no profile recorded"."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["config"]["tuning_mode"] = "tuned"
+        data["platform"]["tuning"] = {
+            "source": "auto",
+            "logical_profile": {"physical_mechanisms": []},
+        }
+        bundle = tmp_path / "logical_profile_empty_mechanisms.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        detail = transformer.to_detail_result(bundle, result_id="empty-mechanisms")
+
+        assert detail.physical_mechanisms == []
+        assert detail.physical_mechanisms is not None
+
+    def test_tuned_fallback_and_custom_pass_through_verbatim(self, tmp_path: Path) -> None:
+        """The two new ADR-2 vocabulary values ingest like any other canonical mode."""
+        import copy
+
+        for mode in ("tuned-fallback", "custom"):
+            data = copy.deepcopy(MINIMAL_BUNDLE)
+            data["config"]["tuning_mode"] = mode
+            bundle = tmp_path / f"mode_{mode}.json"
+            bundle.write_text(json.dumps(data), encoding="utf-8")
+
+            transformer = BundleTransformer()
+            entry = transformer.to_manifest_entry(bundle)
+
+            assert entry.tuning_mode == mode
+
     def test_tuning_hash_uses_execution_fallback_mode(self, tmp_path: Path) -> None:
         """tuning_hash resolves mode via the same execution.tuning_mode fallback."""
         import copy

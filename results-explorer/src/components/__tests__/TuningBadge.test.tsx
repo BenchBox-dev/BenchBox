@@ -9,6 +9,9 @@
  *   (e) Color semantics: tuned=green, notuning=gray, auto=blue
  *   (f) null/undefined and the not-recorded sentinel render the neutral
  *       "Not Recorded" badge (never "Custom Tuning")
+ *   (g) tuned-fallback (ADR-2) renders its own warning-tone badge, distinct
+ *       from both "Tuned" and the generic unknown-mode fallback
+ *   (h) custom is a pinned vocabulary entry, not the generic unknown-mode bucket
  */
 
 import { render } from "@testing-library/preact";
@@ -102,5 +105,26 @@ describe("TuningBadge", () => {
     expect(tuningLabel(null)).toBe("Not Recorded");
     expect(tuningLabel(undefined)).toBe("Not Recorded");
     expect(tuningLabel(NOT_RECORDED_TUNING_MODE)).toBe("Not Recorded");
+  });
+
+  it("tuned-fallback (ADR-2) renders its own warning-tone badge, distinct from 'Tuned'", () => {
+    const { container } = render(<TuningBadge tuningMode="tuned-fallback" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+    expect(badge?.textContent).toBe("Tuned (Fallback)");
+    expect(badge?.getAttribute("title")).toMatch(/no platform\/benchmark template|ADR-2/i);
+  });
+
+  it("custom is a pinned vocabulary entry with its own title, not the generic unknown-mode fallback", () => {
+    const { container } = render(<TuningBadge tuningMode="custom" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+    expect(badge?.textContent).toBe("Custom Tuning");
+    expect(badge?.getAttribute("title")).toBe("User-supplied tuning configuration file");
+  });
+
+  it("tuningLabel() recognizes tuned-fallback and custom as pinned vocabulary", () => {
+    expect(tuningLabel("tuned-fallback")).toBe("Tuned (Fallback)");
+    expect(tuningLabel("custom")).toBe("Custom Tuning");
   });
 });
