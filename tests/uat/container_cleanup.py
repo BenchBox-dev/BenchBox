@@ -473,7 +473,14 @@ def _list_networks(run: ContainerRunner, project_prefix: str) -> list[ContainerR
 
         if labels.get(_BUILDER_ROLE_LABEL) == "builtin" or name == "default":
             category: ContainerCategory = "system"
-        elif _is_owned(project, project_prefix) or _is_owned_image_name(name, project_prefix):
+        elif _is_owned(project, project_prefix) or _is_owned(name, project_prefix):
+            # Name fallback uses _is_owned (separator-aware: exact match or
+            # `<prefix>-`/`<prefix>_` boundary), not _is_owned_image_name
+            # (bare startswith, meant for image repo names like
+            # "benchbox/foo"). A network without a compose project label
+            # named e.g. "benchbox-uatfoo" must NOT match prefix
+            # "benchbox-uat" -- that's a different, unrelated network, and
+            # `MODE=owned APPLY=1` would otherwise delete it (#1158 review).
             category = "owned"
         else:
             category = "shared"
