@@ -31,6 +31,14 @@ Resolution happens in this order (see `benchbox/cli/tuning_resolver.py:resolve_t
       2. `examples/tunings/<platform>/<benchmark>_tuned.yaml`, resolved
          relative to the **current working directory**.
       3. `<platform>/<benchmark>_tuned.yaml`, also cwd-relative.
+      4. **Packaged resource** bundled with the installed `benchbox` package
+         itself (`benchbox/core/tuning/packaged_templates.py`) - last resort,
+         only reached when none of tiers 1-3 exist. Only a subset of
+         platform/benchmark pairs ship a packaged template today (the
+         `duckdb` and `databricks` templates that follow the
+         `<benchmark>_tuned.yaml` naming convention); see
+         `benchbox/core/tuning/templates/README.md` for the exact list and
+         how it's kept in sync with `examples/tunings/`.
    3. If none of those exist, tuning falls back to a basic, untuned
       configuration and prints a warning; in an interactive terminal the user
       is also offered the tuning wizard.
@@ -40,13 +48,18 @@ Resolution happens in this order (see `benchbox/cli/tuning_resolver.py:resolve_t
    `benchbox run` raises an error (with a hint to run `benchbox tuning list`).
 
 ```{note}
-Step 2.2 is **cwd-relative**. `--tuning tuned` only auto-discovers the
-templates bundled in `examples/tunings/` when `benchbox` is run from a
-checkout of this repository (or another directory with its own
-`examples/tunings/`). If BenchBox is installed as a package and run from
-elsewhere, auto-discovery falls through to the basic-config fallback unless
-`BENCHBOX_TUNING_PATH` is set to a directory with the same
-`<platform>/<benchmark>_tuned.yaml` layout.
+Steps 2.2 and 2.3 are **cwd-relative**. `--tuning tuned` only auto-discovers
+the templates bundled in `examples/tunings/` (or a cwd-relative
+`<platform>/` directory) when `benchbox` is run from a checkout of this
+repository (or another directory with its own equivalent template tree). If
+BenchBox is installed as a package and run from elsewhere, auto-discovery
+falls through to step 2.4 - the packaged-resource tier - which resolves for
+the platform/benchmark pairs it covers; otherwise it falls through further to
+the basic-config fallback unless `BENCHBOX_TUNING_PATH` is set to a directory
+with the same `<platform>/<benchmark>_tuned.yaml` layout. A resolution from
+the packaged tier is recorded with a distinct provenance source
+(`TuningSource.PACKAGED_RESOURCE`), never conflated with a cwd/env
+auto-discovered template.
 ```
 
 ```{warning}
@@ -148,7 +161,11 @@ For complete configuration reference, see [DataFrame Platforms - Tuning](../../p
 List the tuning templates found under `examples/tunings/` (cwd-relative,
 same as `--tuning tuned` auto-discovery step 2.2 above), optionally filtered
 by platform and/or benchmark. Unlike `--tuning tuned`, `tuning list` does
-**not** consult `BENCHBOX_TUNING_PATH`.
+**not** consult `BENCHBOX_TUNING_PATH`. If no cwd-relative `examples/tunings/`
+directory exists (e.g. `benchbox` is installed as a package and run outside a
+repository checkout), `tuning list` falls back to the same packaged-resource
+tier as `--tuning tuned` (step 2.4 above), listing whatever packaged templates
+are bundled with the installed package instead of reporting nothing.
 
 ```bash
 benchbox tuning list

@@ -100,10 +100,10 @@ def _prepare_clickhouse_stub(stub_root: Path) -> Path:
 
 @pytest.mark.integration
 @pytest.mark.platform_smoke
-@pytest.mark.parametrize("database", ["duckdb", "sqlite", "clickhouse"])
+@pytest.mark.parametrize("database", ["duckdb", "sqlite", "clickhouse-local"])
 def test_cli_dry_run_generates_expected_artifacts(tmp_path: Path, database: str):
     # Skip clickhouse test if driver not available
-    if database == "clickhouse" and not CLICKHOUSE_DRIVER_AVAILABLE:
+    if database == "clickhouse-local" and not CLICKHOUSE_DRIVER_AVAILABLE:
         pytest.skip("clickhouse-driver not installed")
     output_dir = tmp_path / f"dry_run_{database}"
     output_dir.mkdir()
@@ -122,13 +122,12 @@ def test_cli_dry_run_generates_expected_artifacts(tmp_path: Path, database: str)
 
     env = {}
 
-    if database == "clickhouse":
+    if database == "clickhouse-local":
         chdb_path = tmp_path / "chdb_store"
         chdb_path.mkdir()
+        # clickhouse-local forces local deployment, so no mode option is needed.
         args.extend(
             [
-                "--platform-option",
-                "mode=local",
                 "--platform-option",
                 f"data_path={chdb_path / 'benchbox.chdb'}",
                 "--platform-option",

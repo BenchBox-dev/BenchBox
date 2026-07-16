@@ -256,7 +256,7 @@ benchbox run --help-topic benchmarks
 
 ```bash
 # ClickHouse with local mode and TLS
-benchbox run --platform clickhouse --benchmark tpch \
+benchbox run --platform clickhouse-local --benchmark tpch \
   --platform-option mode=local \
   --platform-option secure=true
 

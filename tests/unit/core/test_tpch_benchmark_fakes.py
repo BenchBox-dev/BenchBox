@@ -75,3 +75,36 @@ def test_tpch_benchmark_generates_data_with_fakes(fake_tpch_components):
 
     ddl = bench.get_create_tables_sql()
     assert "create table" in ddl.lower()
+
+
+def test_get_table_loading_order_is_fk_safe_for_available_subset(fake_tpch_components):
+    """Regression test: DataLoader calls get_table_loading_order(available_tables)
+    with whatever tables were actually generated/discovered (see
+    benchbox/platforms/base/data_loading.py::_load_file_based_data). Before this
+    fix, TPCHBenchmark had no such method, so the loader fell back to
+    alphabetical order -- which loads lineitem before orders/part/supplier and
+    violates FK references once constraints are enforced.
+    """
+    bench = TPCHBenchmark(scale_factor=0.1, output_dir=fake_tpch_components)
+
+    # Deliberately shuffled/alphabetical-ish input, as a dict-keys() snapshot
+    # from disk discovery would be in whatever order the filesystem returns.
+    available = ["supplier", "lineitem", "customer", "orders", "region", "nation", "part", "partsupp"]
+    order = bench.get_table_loading_order(available)
+
+    assert set(order) == set(available)
+    position = {name: i for i, name in enumerate(order)}
+    assert position["region"] < position["nation"]
+    assert position["nation"] < position["customer"]
+    assert position["nation"] < position["supplier"]
+    assert position["customer"] < position["orders"]
+    assert position["orders"] < position["lineitem"]
+    assert position["part"] < position["lineitem"]
+    assert position["supplier"] < position["lineitem"]
+    assert position["part"] < position["partsupp"]
+    assert position["supplier"] < position["partsupp"]
+
+    # A table missing from schema.TABLES (unknown/extra file) must still be
+    # returned rather than dropped.
+    order_with_extra = bench.get_table_loading_order([*available, "some_extra_table"])
+    assert "some_extra_table" in order_with_extra

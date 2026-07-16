@@ -1,0 +1,90 @@
+id: uat-spec-module-loc-table-autogen
+title: "Auto-generate the UAT spec's module/LOC table from the tree"
+worktree: uat-hardening
+priority: Low
+status: Not Started
+category: "Developer Experience / Tooling"
+
+description: |
+  Promoted from the deferred item in
+  [[uat-config-schema-spec-realignment]] (surfaced by the UAT-effort
+  assessment, 2026-07-16). The UAT spec carries a module/LOC table that is
+  maintained by a dated manual re-measure. That table drifts silently between
+  re-measures, and the realignment item chose a manual re-measure as
+  sufficient-for-now ("Tooling nicety; a dated manual re-measure with the
+  realignment is sufficient and the table drifts slowly.").
+
+  This item makes the table generated instead of hand-maintained: a small
+  script measures the LOC of the named UAT modules from the tree and either
+  emits the table or checks it in CI, so the number stops drifting.
+
+  Gated on the realignment item because that item establishes the authoritative
+  module list and the table's current shape; auto-generating a table whose rows
+  are about to be re-scoped would be wasted work.
+
+work:
+  - id: w0
+    summary: "Re-validate the manual table exists post-realignment and pin its module list"
+    status: pending
+    needs: []
+    notes: |
+      Confirm uat-config-schema-spec-realignment landed and read the resulting
+      module/LOC table: which modules are rows, how LOC is counted (with/without
+      tests, blanks, comments). The generator must reproduce that definition.
+  - id: w1
+    summary: "Write the LOC-table generator/checker"
+    status: pending
+    needs: [w0]
+    notes: |
+      Small script (align with existing _project/scripts conventions and the
+      generate_indexes.py style) that measures the pinned modules and renders
+      the spec table, plus a --check mode for CI that fails on drift. Follow the
+      repo rule that count claims in docs are generated/checked, not editorial.
+  - id: w2
+    summary: "Wire the check into the spec/CI and replace the manual table"
+    status: pending
+    needs: [w1]
+    notes: |
+      Replace the hand-maintained table with generated output and add the
+      --check invocation to the appropriate lint/pre-commit path so it cannot
+      drift again.
+
+deferred:
+  - summary: "Generalise the generator to other doc count-tables"
+    reason: "Only the UAT spec module/LOC table is in scope; a general docs-count framework is a separate effort."
+
+deps:
+  needs: [uat-config-schema-spec-realignment]
+
+prior_art:
+  - "_project/scripts/generate_indexes.py — existing generator style/CLI conventions to match for the new LOC-table generator."
+  - "The repo rule (PR template Public Contract Check) that platform/benchmark count claims in docs must be generated/checked from metadata, not editorial — this table should follow the same discipline."
+  - "uat-config-schema-spec-realignment — establishes the authoritative module list this generator measures; consume it, do not re-derive the list."
+
+must_preserve:
+  - "The generated table matches the realignment item's module definitions and LOC-counting rules exactly (no silent redefinition of what counts)."
+
+approach: |
+  Tiny tooling addition. Reuse the generate_indexes.py pattern; the only real
+  decisions are the module list (from the parent) and the LOC-counting rule
+  (from the existing manual table). Add a --check mode so CI enforces freshness.
+
+anti_patterns:
+  - "DO NOT redefine which modules or which lines count — reproduce the parent's table definition, or the generated numbers will disagree with the spec's intent."
+
+verification:
+  - description: "Generator reproduces the spec table and --check fails on drift"
+    command: "uv run --project _project/scripts -- python _project/scripts/<new-loc-table-script>.py --check"
+    expected_output: "check passes against the committed table; a deliberate edit makes it fail"
+
+scope_limit:
+  only_modify:
+    - "_project/scripts/ (new LOC-table generator)"
+    - "_project/specs/uat-framework.md (generated table)"
+    - "CI/pre-commit wiring for the --check mode"
+
+metadata:
+  tags: [uat, tooling, docs-freshness, loc-table, deeper-question]
+  estimated_effort: Small
+  created_date: "2026-07-16"
+  source: "UAT-effort assessment 2026-07-16 (deeper-questions promotion); parent uat-config-schema-spec-realignment deferred item"

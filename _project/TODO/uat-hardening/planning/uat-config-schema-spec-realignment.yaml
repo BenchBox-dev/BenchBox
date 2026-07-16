@@ -91,7 +91,7 @@ work:
 
 deferred:
   - summary: "Auto-generating the spec's module/LOC table from the tree"
-    reason: "Tooling nicety; a dated manual re-measure with the realignment is sufficient and the table drifts slowly."
+    reason: "Tooling nicety; a dated manual re-measure with the realignment is sufficient and the table drifts slowly. Promoted to [[uat-spec-module-loc-table-autogen]] (2026-07-16), which needs this item."
 
 deps:
   needs: [uat-release-gate-enforcement, uat-operator-provisioning, nightly-throughput-gate-restoration]

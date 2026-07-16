@@ -16,32 +16,31 @@ from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.platforms.base.adapter import check_isolation_capability
 from benchbox.platforms.clickhouse.deployment_mode import (
     CLICKHOUSE_CANONICAL_PLATFORM_NAMES,
-    CLICKHOUSE_DEFAULT_CANONICAL_PLATFORM,
     CLICKHOUSE_LEGACY_SELECTOR_MAP,
     clickhouse_legacy_selector_warning,
 )
 from benchbox.utils.runtime_env import ensure_driver_version
 
 
-def _resolve_clickhouse_legacy(
-    platform: str,
-    deployment: Optional[str] = None,
-    config: Optional[dict] = None,
-) -> tuple[str, Optional[str]]:
+def _resolve_clickhouse_legacy(platform: str) -> tuple[str, Optional[str]]:
     """Translate legacy ClickHouse selectors to first-class platform names.
 
     Handles the migration from the old mixed-mode ``clickhouse`` platform to the
     explicit first-class names ``clickhouse-local``, ``clickhouse-server``, and
-    ``clickhouse-cloud``.
+    ``clickhouse-cloud``. The bare ``clickhouse`` alias has been removed and now
+    raises; only the colon-suffix selectors remain as deprecating aliases, so no
+    deployment/config context is needed to resolve them.
 
     Args:
         platform: Raw platform name from the caller.
-        deployment: Explicit deployment argument (e.g. from ``get_adapter(..., deployment=...)``)
-        config: Keyword config dict (may contain ``deployment_mode`` or ``mode`` keys).
 
     Returns:
         Tuple of (resolved_platform_name, deprecation_message | None).
         The message is non-None only when a legacy selector was used.
+
+    Raises:
+        ValueError: If bare ``clickhouse`` is passed (removed after its
+            deprecation window); the message names the first-class replacements.
     """
     lp = platform.lower().strip()
 
@@ -49,21 +48,22 @@ def _resolve_clickhouse_legacy(
     if lp in CLICKHOUSE_CANONICAL_PLATFORM_NAMES:
         return platform, None
 
-    # Explicit colon-suffix legacy selectors
+    # Explicit colon-suffix legacy selectors (still supported)
     if lp in CLICKHOUSE_LEGACY_SELECTOR_MAP:
         target = CLICKHOUSE_LEGACY_SELECTOR_MAP[lp]
         return target, clickhouse_legacy_selector_warning(platform, target)
 
-    # Bare 'clickhouse': resolve to first-class name based on explicit deployment context
+    # Bare 'clickhouse' was a temporary compatibility alias for the split into
+    # first-class platforms (shipped v0.2.1). The deprecation window has elapsed,
+    # so it is now a hard error that names the replacements instead of silently
+    # resolving to a deployment-dependent default.
     if lp == "clickhouse":
-        explicit_mode = deployment
-        if not explicit_mode and config:
-            explicit_mode = config.get("deployment_mode") or config.get("mode")
-        if isinstance(explicit_mode, str) and explicit_mode.strip().lower() in ("server", "self-hosted"):
-            target = "clickhouse-server"
-        else:
-            target = CLICKHOUSE_DEFAULT_CANONICAL_PLATFORM  # clickhouse-local
-        return target, clickhouse_legacy_selector_warning(platform, target)
+        raise ValueError(
+            "Platform 'clickhouse' has been removed. Use 'clickhouse-local' "
+            "(embedded chDB), 'clickhouse-server' (self-hosted), or "
+            "'clickhouse-cloud' (managed). The explicit 'clickhouse:local', "
+            "'clickhouse:server', and 'clickhouse:cloud' selectors also remain available."
+        )
 
     return platform, None
 
@@ -148,7 +148,7 @@ def get_adapter(
     """
     # ClickHouse migration: translate legacy selectors to first-class platform names.
     # Must happen before _normalize_platform_name so colon-suffix parsing is bypassed.
-    resolved_platform, migration_warning = _resolve_clickhouse_legacy(platform, deployment, config)
+    resolved_platform, migration_warning = _resolve_clickhouse_legacy(platform)
     if migration_warning:
         warnings.warn(migration_warning, DeprecationWarning, stacklevel=2)
     if resolved_platform != platform:

@@ -20,6 +20,9 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from benchbox.core.tuning import modes as tuning_modes
+from benchbox.core.tuning.packaged_templates import list_packaged_templates, packaged_template_path
+
 if TYPE_CHECKING:
     from logging import Logger
 
@@ -41,6 +44,7 @@ class TuningSource(Enum):
 
     EXPLICIT_FILE = "explicit_file"  # User provided a file path
     AUTO_DISCOVERED = "auto_discovered"  # Found via template discovery
+    PACKAGED_RESOURCE = "packaged_resource"  # Found via last-resort packaged-template tier
     SMART_DEFAULTS = "smart_defaults"  # Generated from system profile
     BASELINE = "baseline"  # No tuning (all disabled)
     INTERACTIVE_WIZARD = "wizard"  # User configured via wizard
@@ -60,11 +64,35 @@ class TuningResolution:
     info_messages: list[str] = field(default_factory=list)
 
     @property
+    def canonical_mode(self) -> str:
+        """The pinned ADR-2 `tuning_mode` vocabulary value for this resolution.
+
+        Maps this resolver's internal (mode, source) pair onto the shared
+        vocabulary in `benchbox.core.tuning.modes` (see
+        docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md
+        §2): a `--tuning tuned` request that resolved via
+        `TuningSource.FALLBACK` (no template found) is recorded as
+        `tuned-fallback`, distinct from a genuinely curated-template `tuned`
+        run -- this is the fix for finding C4 (fallback runs silently
+        facet-matching curated runs). A resolved custom file is always
+        recorded as `custom`, never the raw local path. Every other
+        (mode, source) pair -- including `TUNED` resolved via
+        `INTERACTIVE_WIZARD`, `AUTO_DISCOVERED`, or an explicit config-file
+        default -- maps to the plain mode value.
+        """
+        if self.mode is TuningMode.TUNED and self.source is TuningSource.FALLBACK:
+            return tuning_modes.TUNED_FALLBACK
+        if self.mode is TuningMode.CUSTOM_FILE:
+            return tuning_modes.CUSTOM
+        return self.mode.value
+
+    @property
     def source_description(self) -> str:
         """Human-readable description of where the config came from."""
         descriptions = {
             TuningSource.EXPLICIT_FILE: f"Loaded from explicit path: {self.config_file}",
             TuningSource.AUTO_DISCOVERED: f"Auto-discovered template: {self.config_file}",
+            TuningSource.PACKAGED_RESOURCE: f"Packaged template resource (bundled with benchbox): {self.config_file}",
             TuningSource.SMART_DEFAULTS: "Generated from system profile (auto mode)",
             TuningSource.BASELINE: "Baseline mode (all optimizations disabled)",
             TuningSource.INTERACTIVE_WIZARD: "Configured via interactive wizard",
@@ -80,6 +108,12 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
     1. BENCHBOX_TUNING_PATH environment variable (if set)
     2. Project-relative path: examples/tunings/{platform}/{benchmark}_tuned.yaml
     3. Current working directory: {platform}/{benchmark}_tuned.yaml
+    4. Packaged resource bundled with the installed benchbox package (last
+       resort - see benchbox.core.tuning.packaged_templates). Only a subset
+       of platform/benchmark pairs ship a packaged template; this tier exists
+       so `--tuning tuned` still resolves a real template when benchbox is
+       installed as a package and run outside a repository checkout, where
+       tiers 2-3 above never exist.
 
     The BENCHBOX_TUNING_PATH can be set to a custom directory containing
     platform-specific tuning templates following the same structure:
@@ -109,6 +143,9 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
     if cwd_template != primary:  # Avoid duplicate if cwd is project root
         paths.append(cwd_template)
 
+    # 4. Packaged resource (last resort; see docstring above)
+    paths.append(packaged_template_path(platform, benchmark))
+
     return paths
 
 
@@ -119,6 +156,14 @@ def list_available_tuning_templates(
 ) -> dict[str, list[Path]]:
     """List all available tuning templates, optionally filtered.
 
+    Mirrors the tier order in `get_tuning_template_paths`: when the
+    default, cwd-relative `examples/tunings/` directory is not present (e.g.
+    benchbox installed as a package and run outside a repository checkout),
+    this falls back to the packaged-resource tier (last resort) instead of
+    reporting no templates. That fallback only applies when `base_path` is
+    left at its default - an explicitly passed `base_path` that doesn't exist
+    returns no templates, same as before.
+
     Args:
         platform: Filter to specific platform (optional)
         benchmark: Filter to specific benchmark (optional)
@@ -127,12 +172,15 @@ def list_available_tuning_templates(
     Returns:
         Dictionary mapping platform names to list of available template paths
     """
+    using_default_base = base_path is None
     if base_path is None:
         base_path = Path("examples/tunings")
 
     templates: dict[str, list[Path]] = {}
 
     if not base_path.exists():
+        if using_default_base:
+            return list_packaged_templates(platform=platform, benchmark=benchmark)
         return templates
 
     for platform_dir in base_path.iterdir():
@@ -297,13 +345,38 @@ def _resolve_tuned(
         search_paths = get_tuning_template_paths(platform, benchmark)
         resolution.searched_paths = search_paths
 
+        # The packaged tier is always the last candidate in search_paths (see
+        # get_tuning_template_paths); compare against it to tell a real,
+        # cwd/env-relative auto-discovered template apart from the packaged
+        # fallback for provenance purposes (must_preserve: packaged-template
+        # provenance is recorded distinctly from AUTO_DISCOVERED).
+        packaged_candidate = packaged_template_path(platform, benchmark)
+
         for path in search_paths:
             if path.exists():
-                resolution.source = TuningSource.AUTO_DISCOVERED
                 resolution.config_file = path.resolve()
-                resolution.info_messages.append(f"Tuning: auto-discovered template at {resolution.config_file}")
-                if logger:
-                    logger.debug(f"Tuning mode: tuned (auto-discovered: {resolution.config_file})")
+                if path == packaged_candidate:
+                    resolution.source = TuningSource.PACKAGED_RESOURCE
+                    # NOTE: #1176 (unmerged as of this change) adds
+                    # resolve_template_reference() for a canonical
+                    # "<ref>:<hash>" provenance string derived from
+                    # config_file across every resolution source. Until that
+                    # lands, record a package-relative ref string directly
+                    # here; once merged, compose the packaged tier through
+                    # that helper instead of this ad hoc string.
+                    template_ref = f"packaged:{platform.lower()}/{benchmark.lower()}_tuned.yaml"
+                    resolution.info_messages.append(
+                        f"Tuning: using packaged template resource at {resolution.config_file} (ref: {template_ref})"
+                    )
+                    if logger:
+                        logger.debug(
+                            f"Tuning mode: tuned (packaged resource: {resolution.config_file}, ref={template_ref})"
+                        )
+                else:
+                    resolution.source = TuningSource.AUTO_DISCOVERED
+                    resolution.info_messages.append(f"Tuning: auto-discovered template at {resolution.config_file}")
+                    if logger:
+                        logger.debug(f"Tuning mode: tuned (auto-discovered: {resolution.config_file})")
                 return resolution
 
         resolution.warnings.append(
@@ -357,7 +430,11 @@ def display_tuning_resolution(
     for msg in resolution.info_messages:
         if resolution.source == TuningSource.BASELINE:
             console.print(f"[dim]{msg}[/dim]")
-        elif resolution.source in (TuningSource.AUTO_DISCOVERED, TuningSource.EXPLICIT_FILE):
+        elif resolution.source in (
+            TuningSource.AUTO_DISCOVERED,
+            TuningSource.EXPLICIT_FILE,
+            TuningSource.PACKAGED_RESOURCE,
+        ):
             console.print(f"[green]{msg}[/green]")
         else:
             console.print(f"[blue]{msg}[/blue]")

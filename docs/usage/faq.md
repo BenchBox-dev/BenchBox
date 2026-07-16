@@ -219,7 +219,7 @@ See [Performance Optimization](../advanced/performance-optimization.md) for tuni
 ### Can I use BenchBox with self-hosted databases?
 
 Yes! BenchBox currently supports:
-- **ClickHouse**: Fully supported via `--platform clickhouse` (local or remote)
+- **ClickHouse**: Fully supported via `--platform clickhouse-server` (local or remote)
 - **DuckDB**: Fully supported for local/embedded use via `--platform duckdb`
 - **SQLite**: Fully supported for local/embedded use via `--platform sqlite`
 

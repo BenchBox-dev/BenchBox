@@ -272,7 +272,7 @@ TPC-Havoc inherits all TPC-H infrastructure:
 benchbox run tpchavoc --platform duckdb --scale-factor 1.0
 
 # Run specific query variants
-benchbox run tpchavoc --platform clickhouse --queries Q1_V1,Q1_V2,Q1_V3
+benchbox run tpchavoc --platform clickhouse-local --queries Q1_V1,Q1_V2,Q1_V3
 
 # Run all variants of specific queries
 benchbox run tpchavoc --platform duckdb --query-pattern "Q8_V*"

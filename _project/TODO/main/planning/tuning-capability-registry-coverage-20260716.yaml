@@ -1,0 +1,57 @@
+id: tuning-capability-registry-coverage-20260716
+title: "Extend the tuning capability registry to the remaining platforms (trino/athena/firebolt/presto/synapse/timescaledb...)"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+
+description: |
+  The capability registry introduced by the renderer consolidation (#1180)
+  covers the 9 legacy compat platforms plus starrocks/doris; platforms with
+  registered DDL generators but no registry entries (trino, presto, athena,
+  firebolt, azure_synapse, timescaledb, pg_duckdb, pg_mooncake, questdb, ...)
+  live as documented allowlist gaps in the capability-source drift test.
+  Add registry entries derived from each platform's real generator +
+  adapter behavior, shrinking the drift-test allowlists to empty as coverage
+  lands. Where a generator exists but the adapter never consumes it, record
+  rendered_via honestly (dry-run-only today) and note the renderer-migration
+  follow-up per platform.
+
+work:
+  - id: w0
+    summary: "Start gate: PR #1180 merged; enumerate the drift-test allowlist entries as the coverage worklist"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Registry entries for the Trino family (trino/presto/athena) + firebolt + synapse + timescaledb, verified against generators and adapters"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Registry entries for the pg extensions (pg_duckdb/pg_mooncake) + questdb; shrink allowlists; strictify tests where emptied"
+    status: pending
+    needs: [w0]
+
+deps:
+  needs:
+  - tuning-renderer-consolidation-and-baseline-policy-20260712
+
+must_preserve:
+  - "Registry entries record REAL behavior (no aspirational ddl claims for adapter paths that do not consume generators yet)"
+  - "Drift test stays fail-on-new-drift throughout"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tuning/**"
+    - "tests/**"
+
+verification:
+  - description: "Drift suite green with shrunken allowlists"
+    command: "uv run -- python -m pytest tests/unit/core/tuning -q -k 'drift or registry'"
+    expected_output: "All passing; allowlists reduced per commit body"
+
+metadata:
+  owners: ["benchbox-team"]
+  tags: [tuning, capability-registry]
+  estimated_effort: Medium
+  created_date: "2026-07-16"
+  source_review: "tuning batch second re-evaluation 2026-07-16"

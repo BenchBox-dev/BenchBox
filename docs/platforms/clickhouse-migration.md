@@ -56,19 +56,24 @@ during the migration window. They will be removed in a future release.
 | `--platform clickhouse --platform-option deployment_mode=local` | `--platform clickhouse-local` |
 | `--platform clickhouse --platform-option deployment_mode=server` | `--platform clickhouse-server` |
 
-### Bare `clickhouse`
+### Bare `clickhouse` (removed)
 
-Bare `--platform clickhouse` resolves to `clickhouse-local` by default (the
-chDB embedded path). If you relied on `--platform clickhouse` for a real
-server, switch to `--platform clickhouse-server`.
+Bare `--platform clickhouse` has been **removed** after its deprecation window
+(shipped v0.2.1, removed after v0.3.1). It now raises an error naming the
+replacements instead of silently defaulting to `clickhouse-local`. Choose the
+first-class name explicitly: `clickhouse-local` (embedded chDB),
+`clickhouse-server` (self-hosted), or `clickhouse-cloud` (managed). The
+explicit `clickhouse:local` / `clickhouse:server` / `clickhouse:cloud`
+selectors still work (they emit a deprecation warning and route to the
+first-class name).
 
 ### Config Files
 
-YAML configuration files that reference `clickhouse` will continue to work
-during the migration window. To silence the warning, update:
+YAML configuration files that use bare `clickhouse` no longer resolve and must
+be updated to a first-class name:
 
 ```yaml
-# Before (deprecated)
+# Before (removed — now errors)
 platform: clickhouse
 deployment_mode: local
 
@@ -77,7 +82,7 @@ platform: clickhouse-local
 ```
 
 ```yaml
-# Before (deprecated)
+# Before (removed — now errors)
 platform: clickhouse
 deployment_mode: server
 
@@ -98,12 +103,16 @@ until after alias removal.
   platform identifiers in the registry, adapter factory, CLI, DDL generator,
   cost calculator, and dependency surfaces.
 - `clickhouse-cloud` was already a first-class platform and is unchanged.
-- Bare `clickhouse` and colon-suffix syntax are compatibility aliases with
-  explicit `DeprecationWarning` emission.
+- Bare `clickhouse` has been removed and now raises an error naming the
+  first-class replacements. Colon-suffix syntax (`clickhouse:local`, etc.)
+  remains a compatibility alias with explicit `DeprecationWarning` emission.
 - Shared ClickHouse SQL dialect, workload, and tuning logic is unchanged and
   shared across all three platform identifiers.
 
 ## Alias Removal Timeline
 
-Alias removal will happen in a follow-up release after the deprecation window.
-Tracked in: `deferred` items of the `first-class-clickhouse-local-server-cloud-platforms` TODO.
+The bare `clickhouse` alias has now been **removed** (after the v0.2.1 → v0.3.1
+deprecation window); passing it raises an error naming the first-class
+replacements. The colon-suffix selectors (`clickhouse:local` / `:server` /
+`:cloud`) remain as deprecating aliases. Bulk relabeling of historical result
+artifacts that carry the legacy `clickhouse` platform label is still deferred.

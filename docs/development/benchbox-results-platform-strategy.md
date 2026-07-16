@@ -549,7 +549,7 @@ The static build pipeline transforms canonical schema-v2 bundles into:
        }
      ],
      "benchmarks": ["tpch", "tpcds", "ssb"],
-     "platforms": ["duckdb", "datafusion", "clickhouse", "polars-df"],
+     "platforms": ["duckdb", "datafusion", "clickhouse-local", "polars-df"],
      "generated_at": "2026-03-29T00:00:00Z"
    }
    ```
