@@ -269,6 +269,23 @@ def test_sanitize_never_raises_when_to_dict_itself_fails() -> None:
     assert sanitized["broken"] == "<unserializable:_Broken>"
 
 
+def test_sanitize_never_raises_when_to_dict_lookup_itself_fails() -> None:
+    """A ``to_dict`` descriptor that raises on attribute access (not just on
+    call) must be caught too -- the ``getattr(value, "to_dict", None)`` lookup
+    happens outside the call's try/except, so a raising property previously
+    escaped uncaught."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    class _BrokenDescriptor:
+        @property
+        def to_dict(self):
+            raise RuntimeError("boom during attribute access")
+
+    sanitized = sanitize_platform_options({"broken": _BrokenDescriptor()})
+
+    assert sanitized["broken"] == "<unserializable:_BrokenDescriptor>"
+
+
 def test_secret_redaction_unaffected_by_internal_key_filtering() -> None:
     """Secret redaction must remain exact regardless of exclude_internal."""
     from benchbox.core.results.platform_options import sanitize_platform_options

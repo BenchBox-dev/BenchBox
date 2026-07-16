@@ -40,23 +40,33 @@ ClickHouse pack above, and equivalent StarRocks query settings) are not
 recorded in the tuning bundle in any mode today — there is no ledger entry a
 later run or an auditor can compare against.
 
-### Two parallel rendering universes
+### Three parallel rendering universes
 
-Tuning DDL is rendered by two independent code paths that do not share logic
-and can drift silently:
+Tuning DDL is rendered by three independent code paths that do not share
+logic and can drift silently:
 
 - `benchbox/core/tuning/generators/*` (one module per platform family,
   reachable through `benchbox/core/tuning/ddl_generator.py:get_ddl_generator`).
-  This path is exercised by exactly two callers: the dry-run preview
-  (`benchbox/core/dryrun.py:1066-1091`) and the cloud_spark adapter mixin
-  (`benchbox/platforms/base/cloud_spark/mixins.py:290`, which calls into
-  `TuningClauses` from the generators module directly).
+  This path is exercised by exactly one caller today: the dry-run preview
+  (`benchbox/core/dryrun.py:1066-1091`).
+- `SparkDDLGeneratorMixin.generate_tuning_clauses`
+  (`benchbox/platforms/base/cloud_spark/mixins.py:290-322`), used by the
+  cloud Spark/Onehouse execution path (`benchbox/platforms/onehouse/quanton_adapter.py`).
+  It returns the same `TuningClauses` dataclass as `core/tuning/generators/*`
+  (imported for the type only, at the fallback branch on line 320) but builds
+  it independently through its own `_generate_delta_tuning` /
+  `_generate_iceberg_tuning` / `_generate_hudi_tuning` /
+  `_generate_parquet_tuning` / `_generate_hive_tuning` methods rather than
+  consuming the generators module's per-format logic — it is a third
+  renderer, not an existing generators caller, and needs its own
+  migration/equivalence pass during consolidation, not just deletion of the
+  dead `generate_tuning_clause` methods below.
 - Per-adapter `generate_tuning_clause` mixin methods (singular — one clause
   string, not the generators' `TuningClauses` object), implemented
   independently on ~20 adapters (ClickHouse, Databricks, Redshift, BigQuery,
   Snowflake, Trino, Spark, DuckDB, Firebolt, Azure Synapse, Athena, Presto,
-  and others). This is the only path that touches real database connections
-  during execution.
+  and others). This is the path that touches real database connections
+  during execution for those (non-Spark) platforms.
 
 Because dry-run preview renders through `generators/*` and execution renders
 through the adapter mixins, a preview can show DDL that the real run never
