@@ -46,6 +46,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Removed dead `BENCHBOX_TUNING_ENABLED` env var** - This variable set the
+  `tuning.enabled` config key, which nothing at runtime ever read (only a unit
+  test did); docs incorrectly claimed it "activates tuned runs in CI". Use
+  `--tuning tuned` / `--tuning auto` on `benchbox run` to actually enable
+  tuning; `BENCHBOX_TUNING_CONFIG` still works to point at a default tuning
+  file. If you were setting `BENCHBOX_TUNING_ENABLED`, it had no effect and can
+  simply be removed.
+- **Honest `--tuning auto` messaging on SQL platforms** - Smart defaults for
+  `--tuning auto` are implemented for DataFrame platforms only today; SQL
+  platform runs now get an explicit warning that they're proceeding with a
+  basic (untuned) configuration instead of a message implying real smart
+  defaults were applied.
 - **`-df` platform names select DataFrame mode** - `benchbox run --platform
   datafusion-df` (and `lakesail-df`) now runs the DataFrame adapter without
   needing `--mode dataframe`; alias normalization previously dropped the

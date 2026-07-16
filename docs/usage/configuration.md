@@ -88,10 +88,9 @@ Some tuning settings can be toggled at deploy time without editing files. The de
 
 | Environment variable | Maps to | Typical values |
 | --- | --- | --- |
-| `BENCHBOX_TUNING_ENABLED` | `tuning.enabled` | `true`, `false` |
 | `BENCHBOX_TUNING_CONFIG` | `tuning.default_config_file` | Path to a YAML file |
 
-Set `BENCHBOX_TUNING_ENABLED=true` to activate tuned runs in CI, or point `BENCHBOX_TUNING_CONFIG` at a configuration checked into your repo.
+Point `BENCHBOX_TUNING_CONFIG` at a configuration checked into your repo to make it the default whenever `--tuning tuned` is used (see [Tuning Commands](../reference/cli/tuning.md) for the full `--tuning` resolution order). To actually enable tuned runs in CI, pass `--tuning tuned` (or `--tuning auto`) on the `benchbox run` command line; there is no environment variable that turns tuning on by itself.
 
 ## Validating Configuration
 

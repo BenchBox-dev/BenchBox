@@ -128,7 +128,6 @@ def _apply_environment_overrides(config_dict: dict[str, Any]) -> dict[str, Any]:
     - BENCHBOX_SCALE_FACTOR: Override benchmarks.default_scale
     - BENCHBOX_VERBOSE: Override execution.verbose
     - BENCHBOX_MAX_WORKERS: Override execution.max_workers
-    - BENCHBOX_TUNING_ENABLED: Override tuning.enabled
     - BENCHBOX_TUNING_CONFIG: Override tuning.default_config_file
 
     Args:
@@ -143,7 +142,6 @@ def _apply_environment_overrides(config_dict: dict[str, Any]) -> dict[str, Any]:
         "BENCHBOX_SCALE_FACTOR": ("benchmarks", "default_scale", float),
         "BENCHBOX_VERBOSE": ("execution", "verbose", lambda v: v.lower() in ["true", "1", "yes", "on"]),
         "BENCHBOX_MAX_WORKERS": ("execution", "max_workers", int),
-        "BENCHBOX_TUNING_ENABLED": ("tuning", "enabled", lambda v: v.lower() in ["true", "1", "yes", "on"]),
         "BENCHBOX_TUNING_CONFIG": ("tuning", "default_config_file", str),
         "BENCHBOX_OUTPUT_DIR": ("output", "directory", str),
         "BENCHBOX_MEMORY_LIMIT_GB": ("execution", "memory_limit_gb", int),
@@ -285,12 +283,10 @@ class ConfigManager:
                 },
             },
             tuning={
-                "enabled": False,
                 "default_config_file": None,
                 "validate_on_load": True,
                 "allow_platform_incompatible": False,
                 "environment_overrides": {
-                    "BENCHBOX_TUNING_ENABLED": "enabled",
                     "BENCHBOX_TUNING_CONFIG": "default_config_file",
                 },
             },
