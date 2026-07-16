@@ -2,7 +2,7 @@ id: tuning-explorer-ingest-mode-extraction-20260712
 title: "Explorer ingest: read tuning_mode from all bundle generations; stop conflating absent with baseline"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -28,20 +28,48 @@ description: |
 work:
   - id: w0
     summary: "Re-validate pinned evidence at current HEAD: rerun the corpus sweep script (scratchpad tuning_sweep.py logic) and confirm field locations; commit compact counts in PR body"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      Re-validated 2026-07-16 against the 528 seed-corpus bundles in
+      results-data/bundles/ (sweep log: /tmp/ingest-sweep.log).
+      config.tuning_mode: 0; execution.tuning_mode: 325 (all "tuned");
+      absent everywhere: 203. config.tuning_config/config.tuning: absent in
+      all 528. The repr-string tuning detail lives at
+      platform.raw_config.tuning_config (python_repr in 468 bundles) and is
+      never machine-readable in this corpus.
   - id: w1
     summary: "transformer.py: read config.tuning_mode with execution.tuning_mode fallback; represent not-recorded explicitly; tuning_hash only from machine-readable config (never repr strings)"
-    status: pending
+    status: done
     needs: [w0]
+    notes: |
+      _tuning_mode: config.tuning_mode first, execution.tuning_mode fallback,
+      missing stays None (no invented mode). _tuning_hash: dict detail hashed
+      canonically (json sort_keys); string/repr detail dropped (not canonical);
+      mode-only hash still emitted. 8 new unit tests in
+      tests/unit/scripts/explorer_pipeline/test_transformer.py.
   - id: w2
     summary: "facetMatching/receipt: surface not-recorded as its own display state (keep current matching rule until ADR-2; remove the invented 'untuned' default token in favor of the explicit state)"
-    status: pending
+    status: done
     needs: [w1]
+    notes: |
+      facetMatching.ts: NOT_RECORDED_TUNING_MODE ("not-recorded") shared
+      sentinel; null rows match only an explicit not-recorded selection
+      (legacy "untuned" token kept so existing chips/URLs match the same
+      rows -- matching semantics unchanged, rule changes gated on ADR-2).
+      TuningBadge: null/undefined/sentinel render neutral "Not Recorded"
+      badge instead of "Custom Tuning". ComparabilityReceipt already showed
+      "Not recorded" -- unchanged. New src/lib/__tests__/facetMatching.test.ts
+      plus TuningBadge test updates.
   - id: w3
     summary: "Re-ingest the seed corpus and verify counts: 325 tuned / 203 not-recorded now visible in the explorer dataset"
-    status: pending
+    status: done
     needs: [w1]
+    notes: |
+      explorer_publish.py build over results-data/ processed 528 results /
+      58 cohorts. results.duckdb: tuning_mode tuned=325, NULL(not-recorded)=203
+      -- matches w0 exactly. tuning_hash: 325 rows share one mode-only hash,
+      203 NULL.
 
 deps:
   needs: []
@@ -65,8 +93,8 @@ scope_limit:
 
 verification:
   - description: "Corpus re-ingest count check"
-    command: "uv run -- python _project/scripts/explorer_pipeline/pipeline.py --help"
-    expected_output: "Pipeline runs against results-data/bundles; dataset shows 325 tuned and 203 not-recorded rows (exact counts from w0 re-validation)"
+    command: "rm -rf /tmp/explorer-ingest-check && uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output /tmp/explorer-ingest-check && uv run -- python -c \"import duckdb; print(duckdb.connect('/tmp/explorer-ingest-check/results.duckdb').execute('SELECT tuning_mode, COUNT(*) FROM results GROUP BY tuning_mode ORDER BY 2 DESC').fetchall())\""
+    expected_output: "Real re-ingest via the explorer_publish.py build entrypoint (pipeline.py is import-only, has no CLI); dataset shows 325 tuned and 203 not-recorded rows (exact counts from w0 re-validation) once this TODO's tuning_mode/not-recorded classification work lands -- pre-implementation, tuning_mode reads NULL for all 528 rows (verified 2026-07-12)"
   - description: "Explorer unit tests green"
     command: "cd results-explorer && npm test -- --run 2>&1 | tail -5"
     expected_output: "All passing incl. new not-recorded state tests"
@@ -81,4 +109,5 @@ metadata:
     - comparability
   estimated_effort: Medium
   created_date: "2026-07-12"
+  completed_date: "2026-07-16"
   source_review: "tuning-system deep review 2026-07-12, finding C6"

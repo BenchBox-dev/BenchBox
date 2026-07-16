@@ -2652,6 +2652,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--dry-run",
     type=str,
     metavar="OUTPUT_DIR",
+    callback=ValidationRules.validate_dry_run_output_dir,
     help="Preview configuration without execution",
 )
 @click.option(

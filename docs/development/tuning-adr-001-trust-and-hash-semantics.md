@@ -124,11 +124,21 @@ Implementing TODOs must honor these decisions as fixed constraints:
   `applied_ledger_hash` from it, and must not conflate `tunings_applied`
   (requested) with what was physically applied. `tuning_validation_status`
   must be able to express partial application, not just
-  `APPLIED`/`FAILED_TO_SAVE`/`NOT_APPLICABLE`.
+  `APPLIED`/`FAILED_TO_SAVE`/`NOT_APPLICABLE`. Owns populating
+  `applied_ledger_hash` onto the bundle: it depends on
+  `tuning-bundle-provenance-and-config-export-20260712` (the bundle's
+  `requested_config_hash` field and export scaffolding must exist
+  first), so it is this TODO — not bundle-provenance — that completes
+  the "both hashes carried on the bundle" requirement below.
 - **`tuning-bundle-provenance-and-config-export-20260712`** — must
-  populate both `requested_config_hash` and `applied_ledger_hash` on the
-  bundle (replacing the never-set `tuning_config_hash` field), and must
-  carry/display the self-attested trust label alongside them.
+  populate `requested_config_hash` on the bundle (replacing the
+  never-set `tuning_config_hash` field) and carry/display the
+  self-attested trust label alongside it. Does **not** populate
+  `applied_ledger_hash`: this TODO has no dependency on
+  `tuning-applied-ledger-and-validation-status-20260712` (the applied
+  statement ledger does not exist yet at this TODO's build time — the
+  dependency runs the other way), so requiring it here would be
+  unsatisfiable in dependency order (review finding, 2026-07-12).
 - **`tuning-mode-vocabulary-and-facet-implementation-20260712`** — any
   facet or mode-derived data surfaced to evaluators must not imply
   verification beyond self-attestation, and must source hash values from

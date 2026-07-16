@@ -158,7 +158,7 @@ scope_limit:
 
 verification:
   - description: "End-to-end: tuned duckdb run at SF 0.01 produces a bundle whose tuning block contains source enum, template ref, requested_config_hash, and the full requested config"
-    command: "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/tuning-export-check && uv run -- python -c \"import json,glob; b=json.load(open(sorted(glob.glob('/tmp/tuning-export-check/*.json'))[-1])); print(json.dumps(b['platform']['tuning'], indent=2))\""
+    command: "BENCHBOX_OUTPUT_DIR=/tmp/tuning-export-check uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive && uv run -- python -c \"import json,glob; b=json.load(open(sorted(glob.glob('/tmp/tuning-export-check/results/*.json'))[-1])); print(json.dumps(b['platform']['tuning'], indent=2))\""
     expected_output: "tuning block with source, template ref/hash, requested_config_hash, and requested config structure"
   - description: "Unit suites green"
     command: "uv run -- python -m pytest tests/unit/core/results tests/unit/core/tuning tests/unit/cli/test_tuning* -q"
