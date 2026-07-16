@@ -360,7 +360,7 @@ def known_registry_platforms() -> frozenset[str]:
 
 # Platforms whose logical-workload-tuning-candidate mapping
 # (`benchbox.core.tuning.platform_capabilities.map_candidate_to_platform`) is
-# implemented. Derived here (rather than re-declared in that module) so the
+# implemented. Derived here (rather than redeclared in that module) so the
 # "which platforms does the TPC template mapper know about" fact has one
 # owner; see platform_capabilities.py.
 WORKLOAD_PROFILE_MAPPED_PLATFORMS: frozenset[str] = frozenset(

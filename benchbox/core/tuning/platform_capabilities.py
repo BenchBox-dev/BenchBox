@@ -73,7 +73,7 @@ def map_candidate_to_platform(
 
     # WORKLOAD_PROFILE_MAPPED_PLATFORMS is the capability registry's record of
     # which platforms this mapper implements -- single source of truth shared
-    # with the registry rather than re-declared as an implicit if/elif chain.
+    # with the registry rather than redeclared as an implicit if/elif chain.
     if platform_key not in WORKLOAD_PROFILE_MAPPED_PLATFORMS:
         return PlatformTuningMapping(
             platform=platform_key,
