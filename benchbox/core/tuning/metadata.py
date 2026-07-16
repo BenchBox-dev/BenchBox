@@ -178,8 +178,11 @@ class TuningMetadataManager:
             # Redshift prefers explicit column encoding
             return base_sql + " ENCODE AUTO"
         elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
-            # ClickHouse uses specific engine and ordering
-            return base_sql.replace(")", ") ENGINE = MergeTree() ORDER BY (table_name, tuning_type)")
+            # ClickHouse uses specific engine and ordering. base_sql always ends
+            # with the CREATE TABLE's closing ")", so appending here is enough -
+            # str.replace(")", ...) would also rewrite every VARCHAR(N) column
+            # width's closing paren, corrupting the column definitions.
+            return base_sql + " ENGINE = MergeTree() ORDER BY (table_name, tuning_type)"
         else:
             # Default for DuckDB, Databricks, etc.
             return base_sql

@@ -113,6 +113,22 @@ def test_create_table_sql_varies_by_platform(platform, needle):
     assert needle in manager._get_create_table_sql()
 
 
+@pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-local", "clickhouse-server"])
+def test_clickhouse_create_table_sql_does_not_corrupt_varchar_columns(platform):
+    """A prior str.replace(")", ...) rewrote every closing paren in the base
+    SQL, including each VARCHAR(N) column-width parenthesis, not just the
+    CREATE TABLE's final closing paren - producing invalid DDL like
+    'VARCHAR(255 ENGINE = MergeTree() ... ) NOT NULL'.
+    """
+    sql = TuningMetadataManager(_Adapter(platform_name=platform))._get_create_table_sql()
+
+    assert "VARCHAR(255) NOT NULL" in sql
+    assert "VARCHAR(50) NOT NULL" in sql
+    assert "VARCHAR(64) NOT NULL" in sql
+    assert sql.count("ENGINE = MergeTree()") == 1
+    assert sql.rstrip().endswith("ENGINE = MergeTree() ORDER BY (table_name, tuning_type)")
+
+
 def test_create_index_sql_skips_platforms_without_indexes():
     assert TuningMetadataManager(_Adapter("clickhouse"))._get_create_index_sql() is None
     assert TuningMetadataManager(_Adapter("bigquery"))._get_create_index_sql() is None

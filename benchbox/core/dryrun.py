@@ -1101,7 +1101,16 @@ class DryRunExecutor:
         if not hasattr(benchmark, "get_schema"):
             return ddl_preview, post_load_statements
 
-        tables = list(benchmark.get_schema().keys())
+        # get_schema() is a dict on core benchmark classes but some public wrapper
+        # classes (e.g. JoinOrder) return a DDL string instead - normalize the same
+        # way _generate_external_schema_sql() does rather than assuming a mapping.
+        raw_schema = benchmark.get_schema()
+        if isinstance(raw_schema, dict):
+            tables = list(raw_schema.keys())
+        elif isinstance(raw_schema, list):
+            tables = [t["name"] for t in raw_schema if isinstance(t, dict) and "name" in t]
+        else:
+            return ddl_preview, post_load_statements
 
         # Benchmark table names are lowercase (e.g. "lineitem") while shipped tuning
         # templates key tables uppercase (e.g. "LINEITEM"); look up case-insensitively
