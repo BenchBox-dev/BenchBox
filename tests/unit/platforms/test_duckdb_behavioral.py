@@ -95,20 +95,19 @@ class TestNormalizeDuckdbVersion:
 
 class TestBuildDuckdbCtasSortSql:
     def test_single_column(self):
+        from benchbox.core.tuning.interface import TuningColumn
         from benchbox.platforms.duckdb import _build_duckdb_ctas_sort_sql
 
-        col = MagicMock()
-        col.name = "l_shipdate"
+        col = TuningColumn(name="l_shipdate", type="DATE", order=1)
         result = _build_duckdb_ctas_sort_sql("lineitem", [col])
         assert result == "CREATE OR REPLACE TABLE lineitem AS SELECT * FROM lineitem ORDER BY l_shipdate;"
 
     def test_multiple_columns(self):
+        from benchbox.core.tuning.interface import TuningColumn
         from benchbox.platforms.duckdb import _build_duckdb_ctas_sort_sql
 
-        col_a = MagicMock()
-        col_a.name = "l_shipdate"
-        col_b = MagicMock()
-        col_b.name = "l_orderkey"
+        col_a = TuningColumn(name="l_shipdate", type="DATE", order=1)
+        col_b = TuningColumn(name="l_orderkey", type="INTEGER", order=2)
         result = _build_duckdb_ctas_sort_sql("lineitem", [col_a, col_b])
         assert "ORDER BY l_shipdate, l_orderkey" in result
 
