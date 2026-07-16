@@ -39,13 +39,32 @@ recommended_resolution: |
 work:
   - id: w0
     summary: "Re-validate the question is still open and inventory the affected columns"
-    status: pending
+    status: done
     needs: []
     notes: |
       Confirm the open_question still gates
       uat-clickhouse-server-loader-type-coverage:w2 and enumerate the TPC-H /
       TPC-DS / SSB columns that are (a) numeric/date and (b) marked nullable vs
       non-nullable in the reference schema. Record a compact table.
+
+      W0 FINDING (2026-07-16): the question is still open (parent's open_question
+      is unresolved, now cross-linked via promoted_to). Two load-bearing facts
+      that arm the recommendation:
+        1. Nullability IS first-class in BenchBox schema specs — columns carry an
+           explicit `nullable: false` (e.g. benchbox/core/clickbench/
+           schema_specs.yaml); absence defaults to nullable. So "preserve
+           Nullable where the schema marks it" is a mechanical read of existing
+           metadata, not a new judgement per column.
+        2. The ClickHouse adapter ALREADY normalises nullability DDL —
+           benchbox/sql_compat/rules/ddl_optimize/clickhouse_ddl_rewrites.py and
+           benchbox/platforms/clickhouse/workload.py strip `Nullable(T) NOT NULL`
+           because ClickHouse rejects the combination. The recommended policy is
+           consistent with this existing surface.
+      A per-column TPC-H/DS/SSB nullable-numeric/date table was NOT fully
+      enumerated here on purpose: that inventory is Bucket-A-specific and belongs
+      with the parent loader item's refinement, where the loader path is in
+      context. w1 (ratification) remains the gate — it is soundness/CODEOWNERS
+      territory and needs Code Owner sign-off; see anti_patterns.
   - id: w1
     summary: "Ratify Nullable-preserve vs default-coerce against benchmark schema nullability"
     status: pending
