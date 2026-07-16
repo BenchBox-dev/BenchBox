@@ -12,10 +12,15 @@ description: |
   applied_verified unclaimable). After tuning application and data load,
   introspect the live schema (SHOW CREATE TABLE / information_schema /
   duckdb_constraints) per platform, compare against the ledger's executed DDL
-  intents, and emit a receipt into the .tuning.json companion. When every
-  ledgered DDL intent is corroborated, validation_status upgrades to
-  applied_verified; mismatches downgrade with a diff list. Introspection
-  failure is non-fatal and leaves applied_unverified (never blocks a run).
+  intents, and emit a receipt into the .tuning.json companion. For tuned
+  ClickHouse runs the applied ledger also records session SETs, not just DDL
+  (benchbox/core/tuning/applied_ledger.py); introspection must corroborate
+  every ledgered entry of every kind, DDL and session-setting readback alike,
+  before validation_status upgrades to applied_verified. A run whose schema
+  matches while a session setting was ignored or reset must not receive
+  applied_verified. Mismatches (of either kind) downgrade with a diff list.
+  Introspection failure is non-fatal and leaves applied_unverified (never
+  blocks a run).
 
 work:
   - id: w0
