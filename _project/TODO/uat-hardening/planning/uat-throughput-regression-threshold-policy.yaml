@@ -1,0 +1,84 @@
+id: uat-throughput-regression-threshold-policy
+title: "Define throughput performance-regression thresholds (Throughput@Size floor per platform/scale)"
+worktree: uat-hardening
+priority: Medium
+status: Not Started
+category: "Testing and Quality Assurance"
+
+description: |
+  Promoted from the deferred item in
+  [[nightly-throughput-gate-restoration]] (surfaced by the UAT-effort
+  assessment, 2026-07-16). Restoring the nightly throughput gate detects
+  breakage (a cell fails / stream count wrong) but NOT gradual slowdown: there
+  is no Throughput@Size floor per platform/scale that a green run must clear.
+  Without it, a platform can regress in performance run-over-run without the
+  gate noticing.
+
+  This item defines that floor policy. It is deliberately gated on the gate
+  itself being restored AND on baseline data existing, because the parent's
+  deferral reason is explicit: "Needs baseline data from several green nightly
+  runs before a floor is defensible; premature thresholds create flake." A
+  threshold set before there is a stable baseline manufactures false failures.
+
+work:
+  - id: w0
+    summary: "Re-validate the gap and confirm baseline availability"
+    status: pending
+    needs: []
+    notes: |
+      Confirm nightly-throughput-gate-restoration has landed and that at least
+      several consecutive green nightly runs exist for DuckDB TPC-H SF1 (the
+      current single covered cell). Record the observed Throughput@Size spread.
+  - id: w1
+    summary: "Choose the threshold model (relative % floor vs absolute floor vs rolling baseline)"
+    status: pending
+    needs: [w0]
+    notes: |
+      Decision unit. Prefer a relative floor (e.g. fail if Throughput@Size drops
+      more than X% below a rolling median of the last N green runs) over a
+      hardcoded absolute number, so the floor tracks hardware/runner drift.
+      X and N are set from the w0 spread, not guessed. Needs sign-off — a
+      too-tight floor flakes the gate; a too-loose floor is decorative.
+  - id: w2
+    summary: "Implement the floor check in the nightly assert step and document the policy"
+    status: pending
+    needs: [w1]
+    notes: |
+      Add the floor evaluation to the nightly throughput assert (alongside the
+      existing stream-count hard gate) and document the chosen model + values in
+      docs/operations/uat-framework.md so the number is not a magic constant.
+
+deferred:
+  - summary: "Extend the floor beyond DuckDB TPC-H SF1"
+    reason: "Coverage widening is tracked separately (nightly-throughput-gate-restoration defers platform widening on runtime-budget grounds); the floor policy should prove out on the one covered cell first."
+
+deps:
+  needs: [nightly-throughput-gate-restoration]
+
+must_preserve:
+  - "The existing stream-count hard gate stays independent — a throughput-floor failure must not mask or replace a stream-count failure."
+
+approach: |
+  Data-first: no threshold is written until w0 shows a stable baseline. The
+  floor is a relative model derived from observed spread, implemented as an
+  additive check in the existing nightly assert step, not a rewrite of it.
+
+anti_patterns:
+  - "DO NOT hardcode an absolute Throughput@Size number from a single run — it will flake on the next runner."
+  - "DO NOT gate on throughput before the gate that produces the baseline (nightly-throughput-gate-restoration) has run green repeatedly."
+
+verification:
+  - description: "Floor check present and documented with a data-derived value"
+    command: "grep -rni 'throughput.*floor\\|Throughput@Size' .github/workflows/nightly.yml docs/operations/uat-framework.md"
+    expected_output: "floor check in the nightly assert + documented model/value"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/nightly.yml"
+    - "docs/operations/uat-framework.md"
+
+metadata:
+  tags: [uat, throughput, nightly-gate, regression-policy, deeper-question]
+  estimated_effort: Small
+  created_date: "2026-07-16"
+  source: "UAT-effort assessment 2026-07-16 (deeper-questions promotion); parent nightly-throughput-gate-restoration deferred item"
