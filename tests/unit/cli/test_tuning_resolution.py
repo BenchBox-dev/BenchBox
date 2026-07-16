@@ -27,6 +27,7 @@ from benchbox.cli.tuning_resolver import (
     resolve_tuning,
     warn_sql_auto_mode,
 )
+from benchbox.core.tuning.packaged_templates import TEMPLATES_ROOT, packaged_template_path
 
 pytestmark = [
     pytest.mark.unit,
@@ -67,6 +68,7 @@ class TestTuningSource:
         """Test that TuningSource has expected values."""
         assert TuningSource.EXPLICIT_FILE.value == "explicit_file"
         assert TuningSource.AUTO_DISCOVERED.value == "auto_discovered"
+        assert TuningSource.PACKAGED_RESOURCE.value == "packaged_resource"
         assert TuningSource.SMART_DEFAULTS.value == "smart_defaults"
         assert TuningSource.BASELINE.value == "baseline"
         assert TuningSource.INTERACTIVE_WIZARD.value == "wizard"
@@ -120,6 +122,27 @@ class TestTuningResolution:
         )
         assert "Auto-discovered" in resolution.source_description
 
+    def test_resolution_source_description_packaged_resource(self):
+        """Test source description for the packaged-resource tier - must be
+        textually distinct from the auto-discovered description so provenance
+        readers can tell the two apart."""
+        resolution = TuningResolution(
+            mode=TuningMode.TUNED,
+            source=TuningSource.PACKAGED_RESOURCE,
+            enabled=True,
+            config_file=Path("/site-packages/benchbox/core/tuning/templates/duckdb/tpch_tuned.yaml"),
+        )
+        assert "Packaged template resource" in resolution.source_description
+        assert (
+            resolution.source_description
+            != TuningResolution(
+                mode=TuningMode.TUNED,
+                source=TuningSource.AUTO_DISCOVERED,
+                enabled=True,
+                config_file=resolution.config_file,
+            ).source_description
+        )
+
 
 @pytest.mark.unit
 class TestGetTuningTemplatePaths:
@@ -148,6 +171,21 @@ class TestGetTuningTemplatePaths:
         path_strs = [p.as_posix() for p in paths]
         # Should be lowercase in paths
         assert any("duckdb/tpch_tuned.yaml" in p for p in path_strs)
+
+    def test_packaged_tier_is_last(self):
+        """The packaged-resource tier must be the last candidate (must_preserve:
+        existing env/cwd precedence, packaged tier is LAST)."""
+        paths = get_tuning_template_paths("duckdb", "tpch")
+
+        assert paths[-1] == packaged_template_path("duckdb", "tpch")
+        assert paths[-1].as_posix().endswith("benchbox/core/tuning/templates/duckdb/tpch_tuned.yaml")
+
+    def test_packaged_tier_after_env_var(self):
+        """Packaged tier stays last even when BENCHBOX_TUNING_PATH is set."""
+        with patch.dict(os.environ, {"BENCHBOX_TUNING_PATH": "/custom/path"}):
+            paths = get_tuning_template_paths("duckdb", "tpch")
+
+        assert paths[-1] == packaged_template_path("duckdb", "tpch")
 
 
 @pytest.mark.unit
@@ -696,3 +734,150 @@ class TestDisplayTuningShowNullSafety:
 
         # Should have called to_dict on the config
         mock_config.to_dict.assert_called_once()
+
+
+# Repo root, three levels up from tests/unit/cli/test_tuning_resolution.py.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+@pytest.mark.unit
+class TestPackagedTemplatesParity:
+    """`benchbox/core/tuning/templates/` ships copies of the `examples/tunings/`
+    dev-time source templates so they're bundled with the installed package
+    (see benchbox/core/tuning/packaged_templates.py and templates/README.md).
+    These must stay byte-identical - this test is the enforcement mechanism
+    the README promises, catching a source template edit that forgot to
+    re-sync the packaged copy.
+    """
+
+    def test_packaged_templates_root_exists(self):
+        assert TEMPLATES_ROOT.exists()
+        assert TEMPLATES_ROOT.is_dir()
+
+    def test_at_least_one_platform_is_packaged(self):
+        platform_dirs = [p for p in TEMPLATES_ROOT.iterdir() if p.is_dir()]
+        assert platform_dirs
+        platform_names = {p.name for p in platform_dirs}
+        # duckdb/databricks are the platforms whose auto-discovery naming
+        # (<benchmark>_tuned.yaml) is packaged today.
+        assert "duckdb" in platform_names
+
+    def test_every_packaged_template_matches_its_examples_source(self):
+        examples_root = _REPO_ROOT / "examples" / "tunings"
+        assert examples_root.exists(), "examples/tunings/ must exist to check parity"
+
+        checked = 0
+        for platform_dir in TEMPLATES_ROOT.iterdir():
+            if not platform_dir.is_dir():
+                continue
+            for packaged_file in platform_dir.glob("*.yaml"):
+                source_file = examples_root / platform_dir.name / packaged_file.name
+                assert source_file.exists(), (
+                    f"Packaged template {packaged_file} has no matching source "
+                    f"file at {source_file} - packaged templates must mirror an "
+                    f"examples/tunings/ file, not be authored independently."
+                )
+                packaged_text = packaged_file.read_text(encoding="utf-8")
+                source_text = source_file.read_text(encoding="utf-8")
+                assert packaged_text == source_text, (
+                    f"{packaged_file} has drifted from its source {source_file}. "
+                    f"Re-sync: cp {source_file} {packaged_file}"
+                )
+                checked += 1
+
+        assert checked > 0, "Expected at least one packaged template to check"
+
+
+@pytest.mark.unit
+class TestSimulatedInstalledEnvironmentDiscovery:
+    """Simulate running benchbox from an installed package outside a
+    repository checkout: no cwd-relative examples/tunings/ directory exists.
+    The packaged-resource tier must still resolve a real template.
+    """
+
+    def test_get_tuning_template_paths_packaged_candidate_exists_without_repo_cwd(self, tmp_path, monkeypatch):
+        """From a cwd with no examples/tunings/, the packaged-tier candidate
+        path returned by get_tuning_template_paths must still point at a real,
+        existing file (it lives inside the installed benchbox package, not
+        relative to cwd)."""
+        monkeypatch.chdir(tmp_path)
+        assert not (tmp_path / "examples" / "tunings").exists()
+
+        paths = get_tuning_template_paths("duckdb", "tpch")
+
+        packaged_candidate = paths[-1]
+        assert packaged_candidate.exists()
+
+    def test_resolve_tuning_tuned_resolves_packaged_tier_without_repo_cwd(
+        self, mock_console, config_manager, tmp_path, monkeypatch
+    ):
+        """--tuning tuned, run from a cwd with no examples/tunings/, must
+        resolve via the packaged tier rather than falling back to a basic
+        untuned configuration."""
+        monkeypatch.chdir(tmp_path)
+
+        resolution = resolve_tuning(
+            tuning_arg="tuned",
+            platform="duckdb",
+            benchmark="tpch",
+            config_manager=config_manager,
+            console=mock_console,
+        )
+
+        assert resolution.mode == TuningMode.TUNED
+        assert resolution.source == TuningSource.PACKAGED_RESOURCE
+        assert resolution.enabled
+        assert resolution.config_file is not None
+        assert resolution.config_file.exists()
+        assert "templates/duckdb/tpch_tuned.yaml" in resolution.config_file.as_posix()
+        assert not resolution.warnings
+        assert any("packaged" in msg.lower() for msg in resolution.info_messages)
+
+    def test_resolve_tuning_still_falls_back_when_no_packaged_template_either(
+        self, mock_console, config_manager, tmp_path, monkeypatch
+    ):
+        """A platform/benchmark with no packaged template must still fall
+        through to the basic-config fallback, not raise."""
+        monkeypatch.chdir(tmp_path)
+
+        resolution = resolve_tuning(
+            tuning_arg="tuned",
+            platform="duckdb",
+            benchmark="nonexistent_benchmark",
+            config_manager=config_manager,
+            console=mock_console,
+        )
+
+        assert resolution.source == TuningSource.FALLBACK
+        assert resolution.config_file is None
+        assert len(resolution.warnings) > 0
+
+    def test_list_available_tuning_templates_falls_back_to_packaged_tier(self, tmp_path, monkeypatch):
+        """`tuning list` (list_available_tuning_templates with the default
+        base_path) must fall back to packaged templates when no cwd-relative
+        examples/tunings/ directory exists, instead of reporting nothing."""
+        monkeypatch.chdir(tmp_path)
+
+        templates = list_available_tuning_templates()
+
+        assert "duckdb" in templates
+        assert any(f.name == "tpch_tuned.yaml" for f in templates["duckdb"])
+
+    def test_list_available_tuning_templates_explicit_missing_base_path_stays_empty(self, tmp_path):
+        """An explicitly-passed base_path that doesn't exist must NOT trigger
+        the packaged-tier fallback - only the default (cwd examples/tunings/)
+        path does. Preserves pre-existing behavior for explicit callers."""
+        missing = tmp_path / "does-not-exist"
+
+        templates = list_available_tuning_templates(base_path=missing)
+
+        assert templates == {}
+
+    def test_display_tuning_list_does_not_crash_without_repo_cwd(self, mock_console, tmp_path, monkeypatch):
+        """display_tuning_list (the `benchbox tuning list` command body) must
+        not error out when run outside a repository checkout."""
+        monkeypatch.chdir(tmp_path)
+
+        display_tuning_list(mock_console, platform="duckdb")
+
+        assert mock_console.print.called

@@ -1,0 +1,82 @@
+# DuckDB SSB Tuned Configuration
+# This configuration enables all DuckDB-supported optimizations for Star Schema Benchmark
+# Provides maximum performance with constraints and table-level tunings enabled
+
+primary_keys:
+  enabled: true
+  enforce_uniqueness: true
+  nullable: false
+
+foreign_keys:
+  enabled: true
+  enforce_referential_integrity: true
+  on_delete_action: CASCADE
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: true
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  auto_optimize_enabled: false
+  auto_compact_enabled: false
+  bloom_filters_enabled: false
+  bloom_filter_columns: []
+  materialized_views_enabled: false
+
+table_tunings:
+  lineorder:
+    table_name: lineorder
+    partitioning:
+    - name: lo_orderdate
+      type: INTEGER
+      order: 1
+    sorting:
+    - name: lo_orderkey
+      type: INTEGER
+      order: 1
+
+  date:
+    table_name: date
+    sorting:
+    - name: d_datekey
+      type: INTEGER
+      order: 1
+
+  customer:
+    table_name: customer
+    sorting:
+    - name: c_custkey
+      type: INTEGER
+      order: 1
+
+  supplier:
+    table_name: supplier
+    sorting:
+    - name: s_suppkey
+      type: INTEGER
+      order: 1
+
+  part:
+    table_name: part
+    sorting:
+    - name: p_partkey
+      type: INTEGER
+      order: 1
+
+_metadata:
+  version: '2.0'
+  format: unified_tuning
+  database: duckdb
+  benchmark: ssb
+  configuration_type: tuned
+  description: "DuckDB SSB configuration with all supported optimizations for star schema queries"
+  created: '2025-11-01'
+  generated_by: benchbox-project
