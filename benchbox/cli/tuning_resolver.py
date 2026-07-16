@@ -398,7 +398,9 @@ def warn_sql_auto_mode(
     if not quiet:
         console.print(
             "[yellow]Warning: --tuning auto smart defaults are DataFrame-only today; "
-            "this SQL run proceeds with a basic (untuned) configuration.[/yellow]"
+            "this SQL run proceeds with a basic constraints-only configuration "
+            "(primary/foreign/unique/check constraints enabled; no other tunings applied), "
+            "not an untuned baseline.[/yellow]"
         )
     if logger:
         logger.debug("Tuning mode auto on a non-DataFrame platform: using basic unified config")

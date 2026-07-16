@@ -459,6 +459,19 @@ class TestWarnSqlAutoMode:
         printed = " ".join(str(call) for call in mock_console.print.call_args_list)
         assert "DataFrame-only" in printed
 
+    def test_warning_does_not_call_the_config_untuned(self, mock_console):
+        """The fallback UnifiedTuningConfiguration() this warning describes has
+        primary/foreign/unique/check constraints enabled by default
+        (ConstraintConfiguration.enabled defaults to True) -- calling it
+        "untuned" misleads a user comparing against --tuning notuning, whose
+        baseline has every constraint disabled.
+        """
+        warn_sql_auto_mode(self._auto_resolution(), resolved_mode="sql", console=mock_console)
+
+        printed = " ".join(str(call) for call in mock_console.print.call_args_list)
+        assert "basic (untuned) configuration" not in printed
+        assert "constraints" in printed.lower()
+
     def test_no_warning_on_dataframe_platform(self, mock_console):
         """DataFrame platforms have real smart defaults elsewhere; no warning needed."""
         warn_sql_auto_mode(self._auto_resolution(), resolved_mode="dataframe", console=mock_console)
