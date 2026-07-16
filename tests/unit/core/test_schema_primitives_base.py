@@ -14,7 +14,10 @@ from typing import NamedTuple
 
 import pytest
 
-from benchbox.core.schema_primitives import BaseSchemaTable
+from benchbox.core.schema_primitives import (
+    BaseSchemaTable,
+    get_fk_ordered_table_names_from_column_specs,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -157,3 +160,40 @@ class TestGetCreateTableSQL:
         sql = t.get_create_table_sql()
         assert "a INTEGER NOT NULL" in sql
         assert "b VARCHAR(10)" in sql
+
+
+class TestGetFkOrderedTableNamesFromColumnSpecs:
+    """Covers the dict/YAML-schema adapter (SSB, CoffeeShop schema_specs.yaml
+    shape: dotted "table.column" foreign_key strings) added for
+    tuning-fk-load-ordering-fix-20260716's SSB/CoffeeShop extension.
+    """
+
+    def test_orders_star_schema_fact_table_last(self) -> None:
+        tables = {
+            "date": {"columns": [{"name": "d_datekey"}]},
+            "customer": {"columns": [{"name": "c_custkey"}]},
+            "supplier": {"columns": [{"name": "s_suppkey"}]},
+            "part": {"columns": [{"name": "p_partkey"}]},
+            "lineorder": {
+                "columns": [
+                    {"name": "lo_custkey", "foreign_key": "customer.c_custkey"},
+                    {"name": "lo_partkey", "foreign_key": "part.p_partkey"},
+                    {"name": "lo_suppkey", "foreign_key": "supplier.s_suppkey"},
+                    {"name": "lo_orderdate", "foreign_key": "date.d_datekey"},
+                ]
+            },
+        }
+        order = get_fk_ordered_table_names_from_column_specs(tables)
+        assert set(order) == set(tables)
+        assert order[-1] == "lineorder"
+
+    def test_tables_with_no_foreign_keys_keep_input_order(self) -> None:
+        tables = {
+            "z_table": {"columns": [{"name": "id"}]},
+            "a_table": {"columns": [{"name": "id"}]},
+        }
+        assert get_fk_ordered_table_names_from_column_specs(tables) == ["z_table", "a_table"]
+
+    def test_missing_columns_key_is_tolerated(self) -> None:
+        tables = {"empty_table": {}}
+        assert get_fk_ordered_table_names_from_column_specs(tables) == ["empty_table"]
