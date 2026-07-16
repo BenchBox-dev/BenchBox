@@ -928,6 +928,7 @@ class DryRunExecutor:
     # or they show up as "enabled" for every platform.
     _PLATFORM_SPECIFIC_OPTIMIZATION_FIELDS: dict[str, str] = {
         "databricks_clustering_strategy": "databricks",
+        "physical_rendering_id": "databricks",
     }
 
     @staticmethod
