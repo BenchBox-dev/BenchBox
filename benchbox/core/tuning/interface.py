@@ -1172,6 +1172,33 @@ class PlatformOptimizationConfiguration:
         )
 
 
+# Platform-specific "effective layout" validators: cross-field checks that
+# need the *entire* tuning config (not just one tuning type against one
+# platform's compatibility set -- see validate_for_platform_detailed above).
+# Per the tuning-renderer-consolidation TODO's w4, this module stays a pure
+# data model; platform-specific validation logic lives in the platform layer
+# (e.g. benchbox.platforms.databricks.tuning_validation) and is reached
+# through this small dispatch hook instead of being implemented here. Maps
+# canonical platform key -> "module.path:function_name"; the function must
+# accept a UnifiedTuningConfiguration and return a list of error strings.
+_PLATFORM_EFFECTIVE_LAYOUT_VALIDATORS: dict[str, str] = {
+    "databricks": "benchbox.platforms.databricks.tuning_validation:validate_effective_layout",
+}
+
+
+def _get_effective_layout_validator(platform_key: str):
+    """Resolve the effective-layout validator callable for a platform key, if any."""
+    target = _PLATFORM_EFFECTIVE_LAYOUT_VALIDATORS.get(platform_key)
+    if target is None:
+        return None
+
+    import importlib
+
+    module_path, _, func_name = target.partition(":")
+    module = importlib.import_module(module_path)
+    return getattr(module, func_name)
+
+
 @dataclass
 class UnifiedTuningConfiguration:
     """Unified configuration that consolidates all tuning options.
@@ -1364,63 +1391,11 @@ class UnifiedTuningConfiguration:
                 errors.append(message)
 
         platform_key = platform.lower().replace("_", "-")
-        if platform_key == "databricks":
-            errors.extend(self._validate_databricks_effective_layout())
+        validator = _get_effective_layout_validator(platform_key)
+        if validator is not None:
+            errors.extend(validator(self))
 
         return errors, warnings
-
-    def _validate_databricks_effective_layout(self) -> list[str]:
-        """Validate Databricks layout combinations that require the full tuning config."""
-        errors: list[str] = []
-        try:
-            self.platform_optimizations.__post_init__()
-        except ValueError as exc:
-            errors.append(str(exc))
-
-        strategy = self.platform_optimizations.databricks_clustering_strategy
-        liquid_requested = (
-            strategy in {"liquid_clustering", "liquid_clustering_auto"}
-            or self.platform_optimizations.liquid_clustering_enabled
-            or bool(self.platform_optimizations.liquid_clustering_columns)
-            or self.platform_optimizations.physical_rendering_id
-            in {"databricks_liquid_manual", "databricks_liquid_auto"}
-        )
-        if not liquid_requested:
-            return errors
-
-        partitioned_tables = sorted(
-            table_name for table_name, table_tuning in self.table_tunings.items() if table_tuning.partitioning
-        )
-        if partitioned_tables:
-            errors.append(
-                "Databricks Liquid Clustering is incompatible with per-table partitioning; "
-                f"move partition columns to Liquid clustering intent or use databricks_z_order. Tables: "
-                f"{', '.join(partitioned_tables)}"
-            )
-
-        distributed_tables = sorted(
-            table_name for table_name, table_tuning in self.table_tunings.items() if table_tuning.distribution
-        )
-        if distributed_tables:
-            errors.append(
-                "Databricks Liquid Clustering has no user-managed distribution key; "
-                f"fold distribution candidates into clustering intent or use databricks_z_order. Tables: "
-                f"{', '.join(distributed_tables)}"
-            )
-
-        if strategy == "liquid_clustering":
-            oversized_tables = sorted(
-                table_name
-                for table_name, table_tuning in self.table_tunings.items()
-                if table_tuning.clustering and len(table_tuning.clustering) > 4
-            )
-            if oversized_tables:
-                errors.append(
-                    "Databricks manual Liquid Clustering supports at most four clustering keys per table; "
-                    f"use databricks_liquid_auto or reduce clustering columns. Tables: {', '.join(oversized_tables)}"
-                )
-
-        return errors
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
