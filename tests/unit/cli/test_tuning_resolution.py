@@ -305,7 +305,11 @@ class TestResolveTuning:
                 console=mock_console,
             )
 
-        assert "Invalid tuning value" in str(exc_info.value)
+        message = str(exc_info.value)
+        assert "Invalid tuning value" in message
+        # The hint must point to the real command, not the invalid value itself.
+        assert "benchbox tuning list" in message
+        assert "--tuning list" not in message
 
     def test_file_not_found(self, mock_console, config_manager):
         """Test file not found raises ValueError."""
@@ -318,7 +322,10 @@ class TestResolveTuning:
                 console=mock_console,
             )
 
-        assert "not found" in str(exc_info.value)
+        message = str(exc_info.value)
+        assert "not found" in message
+        assert "benchbox tuning list" in message
+        assert "--tuning list" not in message
 
     def test_case_insensitive_keywords(self, mock_console, config_manager):
         """Test that keywords are case-insensitive."""
@@ -331,6 +338,43 @@ class TestResolveTuning:
                 console=mock_console,
             )
             assert resolution.mode == TuningMode.NOTUNING
+
+    def test_tuned_keyword_not_shadowed_by_local_path(self, mock_console, config_manager, tmp_path, monkeypatch):
+        """A local file/dir literally named 'tuned' must not shadow the keyword.
+
+        Keyword checks run before the path-existence check, so --tuning tuned
+        always resolves via auto-discovery/fallback, never as an explicit file
+        pointing at a coincidentally-named local path.
+        """
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "tuned").mkdir()
+
+        resolution = resolve_tuning(
+            tuning_arg="tuned",
+            platform="nonexistent-platform",
+            benchmark="nonexistent-benchmark",
+            config_manager=config_manager,
+            console=mock_console,
+        )
+
+        assert resolution.mode == TuningMode.TUNED
+        assert resolution.source != TuningSource.EXPLICIT_FILE
+
+    def test_notuning_keyword_not_shadowed_by_local_path(self, mock_console, config_manager, tmp_path, monkeypatch):
+        """A local file/dir literally named 'notuning' must not shadow the keyword."""
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "notuning").mkdir()
+
+        resolution = resolve_tuning(
+            tuning_arg="notuning",
+            platform="duckdb",
+            benchmark="tpch",
+            config_manager=config_manager,
+            console=mock_console,
+        )
+
+        assert resolution.mode == TuningMode.NOTUNING
+        assert resolution.source == TuningSource.BASELINE
 
 
 @pytest.mark.unit

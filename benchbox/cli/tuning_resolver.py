@@ -189,6 +189,10 @@ def resolve_tuning(
     """
     tuning_lower = tuning_arg.lower()
 
+    # Keyword checks (Cases 1-3) all run before the path-existence check (Case 4)
+    # so that a local file/directory named like a keyword (e.g. "./tuned") can
+    # never shadow the keyword's meaning.
+
     # === Case 1: notuning - baseline mode ===
     if tuning_lower == "notuning":
         return _resolve_notuning(logger)
@@ -197,14 +201,14 @@ def resolve_tuning(
     if tuning_lower == "auto":
         return _resolve_auto(logger)
 
-    # === Case 3: Explicit file path ===
+    # === Case 3: tuned - auto-discovery or fallback ===
+    if tuning_lower == "tuned":
+        return _resolve_tuned(platform, benchmark, config_manager, logger)
+
+    # === Case 4: Explicit file path ===
     tuning_path = Path(tuning_arg)
     if tuning_path.exists():
         return _resolve_explicit_file(tuning_path, logger)
-
-    # === Case 4: tuned - auto-discovery or fallback ===
-    if tuning_lower == "tuned":
-        return _resolve_tuned(platform, benchmark, config_manager, logger)
 
     # === Case 5: Invalid value (not a keyword and file doesn't exist) ===
     _raise_invalid_tuning_value(tuning_arg)
@@ -313,7 +317,7 @@ def _raise_invalid_tuning_value(tuning_arg: str) -> None:
         raise ValueError(
             f"Tuning file not found: '{tuning_arg}'\n"
             f"Please verify the file exists at the specified path.\n"
-            f"Use --tuning list to see available templates."
+            f"Use 'benchbox tuning list' to see available templates."
         )
     else:
         raise ValueError(
@@ -323,7 +327,7 @@ def _raise_invalid_tuning_value(tuning_arg: str) -> None:
             f"  'notuning' - Disable all optimizations (baseline mode)\n"
             f"  'auto'     - Use smart defaults based on system profile\n"
             f"  PATH       - Path to custom YAML config file\n"
-            f"\nUse --tuning list to see available templates."
+            f"\nUse 'benchbox tuning list' to see available templates."
         )
 
 

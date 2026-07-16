@@ -40,6 +40,19 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/config.py",
     "benchbox/cli/display.py",
     "benchbox/cli/dryrun.py",
+    # tuning-author-experience-honesty-quickfixes: reordered resolve_tuning's
+    # keyword checks (notuning/auto/tuned) to run before the path-existence
+    # check, and fixed the invalid-value error hint ("--tuning list" ->
+    # "benchbox tuning list"). Internal resolution logic only; no click
+    # decorators or command signatures touched.
+    "benchbox/cli/tuning_resolver.py",
+    # tuning-author-experience-honesty-quickfixes: added
+    # ValidationRules.validate_dry_run_output_dir, a click callback (moved out
+    # of commands/run.py to keep it under the module size guard) that rejects
+    # option-like --dry-run OUTPUT_DIR values. A plain staticmethod, not a
+    # click.command/option/argument/group-decorated function, so it carries no
+    # CLI surface of its own.
+    "benchbox/cli/exceptions.py",
     "benchbox/cli/help.py",
     "benchbox/cli/main.py",
     "benchbox/cli/orchestrator.py",

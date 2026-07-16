@@ -2,7 +2,8 @@ id: tuning-author-experience-honesty-quickfixes-20260712
 title: "Author-facing honesty quickfixes: dry-run preview lookup, misleading displays, CLI footguns"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-07-16"
 category: Core Functionality
 
 description: |
@@ -30,19 +31,43 @@ description: |
 work:
   - id: w1
     summary: "Case-normalize table-key lookup in _extract_ddl_preview (+ regression test using the shipped duckdb tpch template)"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      Also fixed two co-requisite bugs uncovered while making this fix land
+      end-to-end (both in benchbox/core/dryrun.py, same scope):
+      - _extract_ddl_preview gated on `hasattr(benchmark, "get_tables")`, a
+        method no benchmark class implements (only platform adapters do);
+        switched to `benchmark.get_schema()` (the method _generate_external_
+        schema_sql already uses for the same purpose).
+      - _build_table_ddl_entry referenced TuningClauses.distribution_key /
+        distribution_style, fields that don't exist on the dataclass (it has
+        distribute_by instead), so it raised AttributeError as soon as the
+        lookup fix let it actually run. Now delegates to
+        TuningClauses.get_inline_clauses() (already used by
+        generate_create_table_ddl) instead of re-deriving clause text.
+      Without both fixes the case-insensitive lookup could never be observed
+      to work: the DDL preview was empty for every platform, always, before
+      table_tunings was even consulted.
   - id: w2
     summary: "Suppress platform-foreign optimization rows in dry-run display; only show fields relevant to the target platform"
-    status: pending
+    status: done
     needs: []
+    notes: |
+      _display_platform_optimizations (benchbox/cli/dryrun.py) is out of
+      scope_limit, so the fix is at the data source instead: threaded
+      platform through DryRunExecutor._extract_tuning_config ->
+      _extract_unified_tuning (benchbox/core/dryrun.py) and gated
+      databricks_clustering_strategy on platform == "databricks" via a
+      small field->platform map, so the display code (which just renders
+      whatever is in the dict) no longer sees it for other platforms.
   - id: w3
     summary: "Reject option-like values for --dry-run OUTPUT_DIR (leading '-') with a clear error"
-    status: pending
+    status: done
     needs: []
   - id: w4
     summary: "Resolver: check keywords (tuned/notuning/auto) before path existence; fix the '--tuning list' hint to 'benchbox tuning list'"
-    status: pending
+    status: done
     needs: []
 
 deps:
