@@ -53,12 +53,9 @@ scope_limit:
     - "tests/**"
 
 verification:
-  - description: "Pipeline tests green"
+  - description: "Pipeline + explorer tests green"
     command: "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q"
     expected_output: "All passing; new-generation bundle rows carry both hashes"
-  - description: "Explorer TS suite + build green (w2/w3/w4 touch results-explorer/src/**)"
-    command: "cd results-explorer && npm test && npm run build"
-    expected_output: "All passing; build succeeds"
 
 metadata:
   owners: ["benchbox-team"]

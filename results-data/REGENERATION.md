@@ -44,7 +44,7 @@ re-added for each.
 
 Once a platform's tuned path is verified to actually reach adapters
 (post-#1176/#1180), the following benchmark x scale cells need fresh
-maintainer runs with `--tuning tuned` (or equivalent) to restore tuned
+maintainer runs with `--tuning-mode tuned` (or equivalent) to restore tuned
 coverage. Platforms are listed as they appeared in the dropped bundles for
 that cell; a regenerated cell does not need to reproduce every platform
 below, but each dropped platform's tuned result is no longer represented
@@ -109,7 +109,7 @@ variants both landed under `tuning_mode=tuned`).
 
 1. Confirm the platform's tuned path is fixed and covered by a soundness test
    (see #1176 / #1180 follow-up work).
-2. Re-run: `benchbox run --platform <platform> --benchmark <benchmark> --scale <sf> --tuning tuned --phases generate,load,power`
+2. Re-run: `benchbox run --platform <platform> --benchmark <benchmark> --scale <sf> --tuning-mode tuned --phases generate,load,power`
 3. Package and add the bundle under `results-data/bundles/`.
 4. Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
 5. Re-run `uv run -- python results-data/validate_corpus.py` to confirm the

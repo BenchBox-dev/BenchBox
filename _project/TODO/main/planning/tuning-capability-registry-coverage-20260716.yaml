@@ -32,8 +32,7 @@ work:
     needs: [w0]
 
 deps:
-  needs:
-  - tuning-renderer-consolidation-and-baseline-policy-20260712
+  needs: []
 
 must_preserve:
   - "Registry entries record REAL behavior (no aspirational ddl claims for adapter paths that do not consume generators yet)"

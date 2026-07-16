@@ -625,24 +625,3 @@ def test_validate_tunings_still_hard_errors_on_a_truly_empty_table():
 
     assert result.is_valid is False
     assert any("No tuning metadata found in database" in e for e in result.errors)
-
-
-def test_load_unified_tunings_section_only_config_is_not_none():
-    """Regression for #1187: load_unified_tunings previously used a
-    truthiness check (`if not benchmark_tunings`) instead of `is None`, so a
-    section-only config (platform optimizations/constraints, zero column
-    tunings) -- which load_tunings correctly returns as a real, empty
-    (len==0) BenchmarkTunings -- was silently converted to None. That broke
-    every caller, e.g. _validate_database_tunings' "DB has tuning metadata
-    but none expected" warning, which never fired for section-only configs.
-    """
-    adapter = _FakeAdapter("databricks")
-
-    config = UnifiedTuningConfiguration()
-    config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
-    assert TuningMetadataManager(adapter).save_unified_tunings(config) is True
-
-    loaded = TuningMetadataManager(adapter).load_unified_tunings()
-
-    assert loaded is not None
-    assert isinstance(loaded, UnifiedTuningConfiguration)

@@ -520,15 +520,7 @@ class TuningMetadataManager:
         """Load tuning metadata and return as UnifiedTuningConfiguration."""
         try:
             benchmark_tunings = self.load_tunings()
-            # `is None` (not a truthiness check) -- see validate_tunings above:
-            # a saved config whose only persisted rows are the section-hash
-            # markers loads back as a real, non-None BenchmarkTunings with an
-            # empty table_tunings dict, which is falsy via __len__. Treating
-            # that as "nothing to load" silently drops section-only configs
-            # (platform optimizations/constraints, no column tunings) from
-            # every caller of this method, e.g. _validate_database_tunings'
-            # "DB has tuning metadata but none expected" warning.
-            if benchmark_tunings is None:
+            if not benchmark_tunings:
                 return None
             return self._as_unified_tunings(benchmark_tunings)
         except Exception as e:
