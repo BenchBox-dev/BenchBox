@@ -1,117 +1,132 @@
-# Tuning Configuration Guide
+# Tuning Configuration Examples
 
-This directory contains pre-built tuning configuration files for all benchmark examples in BenchBox. These configurations demonstrate performance comparison between optimized and baseline configurations.
+This directory contains example tuning configuration YAML files consumed by
+`benchbox run --tuning`. They demonstrate a "tuned" configuration (constraints,
+partitioning/sorting, platform-specific optimizations) against a baseline
+"notuning" configuration for the same platform/benchmark pair.
 
-## Available Configurations
+## File layout
 
-### DuckDB Configurations
+SQL platforms follow `examples/tunings/<platform>/<benchmark>_tuned.yaml` (and
+a matching `<benchmark>_notuning.yaml`):
 
-#### TPC-H Benchmark
-- `duckdb_tpch_tuned.yaml` - Maximum performance with all DuckDB-supported optimizations
-- `duckdb_tpch_notuning.yaml` - Baseline performance with all optimizations disabled
+- `duckdb/` - `tpch`, `tpcds`, `clickbench`, `ssb`, `amplab`, `h2odb`,
+  `read_primitives`, `joinorder`, `tpchavoc`
+- `databricks/` - `tpch`, `tpcds`, `ssb`, `read_primitives`, `tpchavoc`, plus
+  `tpch_liquid_tuned.yaml` / `tpcds_liquid_tuned.yaml` (Liquid Clustering AUTO
+  variants of the same logical profile, alongside the legacy Z-ORDER
+  `tpch_tuned.yaml` / `tpcds_tuned.yaml`)
 
-#### TPC-DS Benchmark
-- `duckdb_tpcds_tuned.yaml` - Maximum performance with partitioning on date columns and sorting
-- `duckdb_tpcds_notuning.yaml` - Baseline performance for comparison
+DataFrame platforms live under `dataframe/` with a flat
+`<platform>_<profile>.yaml` naming (e.g. `polars_optimized.yaml`,
+`dask_memory_constrained.yaml`, `cudf_default.yaml`). These are **not**
+auto-discovered (see below) - pass the path to `--tuning` explicitly.
 
-#### ClickBench Benchmark
-- `duckdb_clickbench_tuned.yaml` - Optimized for web analytics workloads with date partitioning
-- `duckdb_clickbench_notuning.yaml` - Unoptimized baseline
+## Using with the CLI
 
-#### Star Schema Benchmark (SSB)
-- `duckdb_ssb_tuned.yaml` - Star schema optimizations with fact table partitioning
-- `duckdb_ssb_notuning.yaml` - Baseline configuration
-
-#### AMPLab Big Data Benchmark
-- `duckdb_amplab_tuned.yaml` - Optimized for big data queries with sorting on key columns
-- `duckdb_amplab_notuning.yaml` - Baseline configuration
-
-#### H2O.ai Database Benchmark
-- `duckdb_h2odb_tuned.yaml` - Optimized for data science workloads
-- `duckdb_h2odb_notuning.yaml` - Baseline configuration
-
-#### Read Primitives Benchmark
-- `duckdb_primitives_tuned.yaml` - Basic OLAP optimizations using TPC-H schema
-- `duckdb_primitives_notuning.yaml` - Baseline configuration
-
-#### Write Primitives Benchmark
-- `duckdb_primitives_tuned.yaml` - Basic OLAP optimizations using TPC-H schema
-- `duckdb_primitives_notuning.yaml` - Baseline configuration
-
-#### Join Order Benchmark
-- `duckdb_joinorder_tuned.yaml` - Optimized for complex join queries
-- `duckdb_joinorder_notuning.yaml` - Baseline configuration
-
-#### TPC-Havoc Benchmark
-- `duckdb_tpchavoc_tuned.yaml` - Optimized for query optimizer stress testing
-- `duckdb_tpchavoc_notuning.yaml` - Baseline configuration
-
-### Databricks Configurations
-
-#### TPC-H Benchmark
-- `databricks/tpch_tuned.yaml` - Legacy Delta Lake Z-ORDER rendering, auto-optimize, and bloom filters
-- `databricks/tpch_liquid_tuned.yaml` - Liquid Clustering AUTO rendering of the same logical TPC profile
-- `databricks/tpch_notuning.yaml` - Baseline performance
-
-#### TPC-DS Benchmark
-- `databricks/tpcds_tuned.yaml` - Legacy Delta Lake Z-ORDER rendering for large-scale analytics
-- `databricks/tpcds_liquid_tuned.yaml` - Liquid Clustering AUTO rendering of the same logical TPC profile
-- `databricks/tpcds_notuning.yaml` - Baseline configuration
-
-#### TPC-Havoc Benchmark
-- `databricks_tpchavoc_tuned.yaml` - Delta Lake optimizations for optimizer stress testing
-- `databricks_tpchavoc_notuning.yaml` - Baseline configuration
-
-#### Star Schema Benchmark (SSB)
-- `databricks_ssb_tuned.yaml` - Delta Lake star schema optimizations
-- `databricks_ssb_notuning.yaml` - Baseline configuration
-
-#### Primitives Benchmark
-- `databricks_primitives_tuned.yaml` - Delta Lake basic OLAP optimizations
-- `databricks_primitives_notuning.yaml` - Baseline configuration
-
-## Usage
-
-### Using with Example Scripts
-
-All example scripts support loading tuning configurations via the `--tuning-config` parameter:
+The `benchbox run` flag is `--tuning` (there is no `--tuning-config` flag).
+It accepts one of the keywords `tuned`, `notuning`, `auto`, or an explicit
+path to a YAML file; it defaults to `notuning` when omitted.
 
 ```bash
-# Run with tuned configuration
-python examples/duckdb_tpch.py --scale 0.01 --tuning-config examples/duckdb_tpch_tuned.yaml
+# Auto-discover the platform/benchmark tuned template (the primary UX)
+benchbox run --platform duckdb --benchmark tpch --tuning tuned
 
-# Run with no-tuning baseline
-python examples/duckdb_tpch.py --scale 0.01 --tuning-config examples/duckdb_tpch_notuning.yaml
+# Explicit baseline (no tuning)
+benchbox run --platform duckdb --benchmark tpch --tuning notuning
 
-# Compare performance between configurations
-python examples/duckdb_tpch.py --scale 0.01 --tuning-config examples/duckdb_tpch_tuned.yaml --save-results tuned_results.json
-python examples/duckdb_tpch.py --scale 0.01 --tuning-config examples/duckdb_tpch_notuning.yaml --save-results baseline_results.json
+# Point directly at a file
+benchbox run --platform duckdb --benchmark tpch \
+  --tuning examples/tunings/duckdb/tpch_tuned.yaml
+
+# DataFrame platform - these files must be referenced explicitly
+benchbox run --platform polars --benchmark tpch --mode dataframe \
+  --tuning examples/tunings/dataframe/polars_optimized.yaml
 ```
 
-### Using with CLI
-
-The BenchBox CLI also supports tuning configurations:
+`examples/unified_runner.py` is a lighter-weight alternative to the `benchbox`
+CLI for scripting/automation; it accepts the same `--tuning` values but
+**defaults to `tuned`** (the main CLI defaults to `notuning`):
 
 ```bash
-# Run benchmark with tuning configuration
-benchbox run --platform duckdb --benchmark tpch --scale 0.01 --tuning-config examples/duckdb_tpch_tuned.yaml
-
-# Compare different configurations
-benchbox run --platform duckdb --benchmark tpch --scale 0.01 --tuning-config examples/duckdb_tpch_notuning.yaml
+python examples/unified_runner.py --platform duckdb --benchmark tpch --scale 0.1 --tuning notuning
 ```
 
-### Environment Variable
+See `examples/features/tuning_comparison.py` for a runnable walkthrough of
+comparing baseline vs. tuned performance.
 
-You can also set a default tuning configuration using an environment variable:
+## Auto-discovery (`--tuning tuned`)
+
+`--tuning tuned` is the primary day-to-day UX: you don't reference a path,
+BenchBox finds the matching template for you. The full resolution order
+(covering every `--tuning` value, not just `tuned`) is documented in
+[docs/reference/cli/tuning.md](../../docs/reference/cli/tuning.md); the part
+relevant to these templates is:
+
+1. `benchbox.yaml`'s `tuning.default_config_file` (overridable with the
+   `BENCHBOX_TUNING_CONFIG` environment variable), if set and the file exists.
+2. `$BENCHBOX_TUNING_PATH/<platform>/<benchmark>_tuned.yaml`, if
+   `BENCHBOX_TUNING_PATH` is set.
+3. `examples/tunings/<platform>/<benchmark>_tuned.yaml`, resolved relative to
+   the current working directory.
+4. `<platform>/<benchmark>_tuned.yaml`, also resolved relative to cwd.
+5. If none of the above exist, the run falls back to a basic, untuned
+   configuration and prints a warning (an interactive terminal is also
+   offered the tuning wizard).
+
+Step 3 is **cwd-relative**, so `--tuning tuned` only auto-discovers the
+templates in this directory when `benchbox` is run from a checkout of this
+repository (or another directory that contains its own `examples/tunings/`).
+If BenchBox is installed as a package and run elsewhere, set
+`BENCHBOX_TUNING_PATH` to a directory with the same
+`<platform>/<benchmark>_tuned.yaml` layout - see the next section.
+
+## Custom tuning directory - `BENCHBOX_TUNING_PATH`
+
+Point `--tuning tuned` at a different template collection without relying on
+the working directory:
 
 ```bash
-export BENCHBOX_TUNING_CONFIG=examples/duckdb_tpch_tuned.yaml
-python examples/duckdb_tpch.py --scale 0.01
+# Directory must use the same <platform>/<benchmark>_tuned.yaml layout
+export BENCHBOX_TUNING_PATH=/path/to/my-tunings
+benchbox run --platform duckdb --benchmark tpch --tuning tuned
 ```
 
-## Configuration Structure
+## Default file via `benchbox.yaml` / `BENCHBOX_TUNING_CONFIG`
 
-All tuning configurations follow the unified tuning format with these sections:
+Set a default file that `--tuning tuned` uses before falling back to
+auto-discovery:
+
+```yaml
+# benchbox.yaml
+tuning:
+  default_config_file: ./tuning/my_tuning.yaml
+```
+
+or override it at runtime without editing the file:
+
+```bash
+export BENCHBOX_TUNING_CONFIG=./tuning/my_tuning.yaml
+benchbox run --platform duckdb --benchmark tpch --tuning tuned
+```
+
+## Inspecting templates
+
+```bash
+# List everything available under examples/tunings/
+benchbox tuning list
+
+# Filter by platform and/or benchmark
+benchbox tuning list --platform duckdb --benchmark tpch
+
+# Show what --tuning would actually resolve to (including which file, if any)
+benchbox tuning show tuned --platform duckdb --benchmark tpch
+```
+
+## Configuration structure
+
+All tuning configurations follow the unified tuning format with these
+sections:
 
 ### Constraint Configuration
 - `primary_keys` - Primary key constraint settings
@@ -164,8 +179,7 @@ basic-constraints fallback as equivalent tuned runs.
 ### Tuned Configurations
 - Enable all appropriate constraints (primary keys, foreign keys, unique constraints, check constraints)
 - Include table-level optimizations (partitioning on date columns, sorting on key columns)
-- Enable platform-specific features (Databricks: Z-ordering, auto-optimize, bloom filters)
-- Optimized for maximum query performance
+- Enable platform-specific features (Databricks: Z-ordering/Liquid Clustering, auto-optimize, bloom filters)
 
 ### No-Tuning Configurations
 - Disable all constraints for fastest data loading
@@ -173,24 +187,15 @@ basic-constraints fallback as equivalent tuned runs.
 - No platform-specific features enabled
 - Provide baseline performance for comparison
 
-## Performance Impact
-
-Tuned configurations typically provide:
-- **Query Performance**: 2-10x faster query execution for analytical workloads
-- **Data Loading**: Slower initial loading due to constraint validation and optimization
-- **Storage**: More efficient storage with partitioning and compression
-- **Maintenance**: Better long-term performance with auto-optimization features
-
-No-tuning configurations provide:
-- **Data Loading**: Fastest possible data loading with no overhead
-- **Query Performance**: Baseline performance without optimizations
-- **Consistency**: Predictable performance for benchmarking baseline
-- **Simplicity**: No complex optimization dependencies
+Actual performance impact varies by platform, benchmark, and data volume; run
+both configurations yourself with `benchbox run --tuning tuned` /
+`--tuning notuning` and compare results rather than relying on a fixed
+multiplier.
 
 ## Best Practices
 
-1. **Development and Testing**: Use no-tuning configurations for fast iteration
-2. **Performance Evaluation**: Use tuned configurations for realistic production performance
+1. **Development and Testing**: Use `--tuning notuning` for fast iteration
+2. **Performance Evaluation**: Use `--tuning tuned` for realistic production performance
 3. **Benchmarking**: Compare both configurations to understand optimization impact
 4. **Production**: Adapt tuned configurations to your specific workload requirements
 
@@ -223,4 +228,6 @@ table_tunings:
       order: 2
 ```
 
-For more information about the unified tuning system, see the main BenchBox documentation.
+For the full `--tuning` precedence order and the `tuning` command group
+(`init`, `validate`, `defaults`, `list`, `show`, `platforms`), see
+[docs/reference/cli/tuning.md](../../docs/reference/cli/tuning.md).

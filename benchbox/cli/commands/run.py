@@ -57,6 +57,7 @@ from benchbox.cli.tuning_resolver import (
     promote_tuning_provenance,
     resolve_template_reference,
     resolve_tuning,
+    warn_sql_auto_mode,
 )
 from benchbox.cli.tuning_runtime import (
     build_baseline_unified_config,
@@ -1033,8 +1034,7 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
             s.logger.debug("Using basic constraints-only configuration (fallback)")
     else:
         s.loaded_unified_config = UnifiedTuningConfiguration()
-        if s.logger:
-            s.logger.debug(f"Using basic unified config for mode: {tuning_resolution.mode.value}")
+        warn_sql_auto_mode(tuning_resolution, s.resolved_mode, console, s.logger, quiet=bool(s.quiet))
 
     s.tuning_source_value = tuning_resolution.source.value
     s.tuning_template_ref = resolve_template_reference(tuning_resolution.config_file)

@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import yaml
 
+from benchbox.core.schema_primitives import get_fk_ordered_table_names_from_column_specs
 from benchbox.core.tuning import BenchmarkTunings, TableTuning, TuningColumn
 
 
@@ -23,6 +24,22 @@ TABLES: dict[str, dict] = {entry["key"]: globals()[symbol] for symbol, entry in 
 _TABLE_ORDER = list(_SCHEMA_SPECS["table_order"])
 
 _SPARK_FAMILY_DIALECTS = {"spark", "lakesail", "pyspark", "velox", "databricks"}
+
+
+def get_table_loading_order() -> list[str]:
+    """Get the FK-safe table load order for the full CoffeeShop schema.
+
+    Derived from each column's ``foreign_key: "table.column"`` metadata in
+    ``schema_specs.yaml`` via a stable topological sort, rather than a
+    hand-maintained constant, so it stays correct if the schema definitions
+    ever change. ``order_lines`` (the fact table) references
+    ``dim_locations``/``dim_products``, so it always sorts after both.
+
+    Returns:
+        All CoffeeShop table names, ordered so a table referenced by a
+        foreign key always precedes the table that references it.
+    """
+    return get_fk_ordered_table_names_from_column_specs(TABLES)
 
 
 def _column_type_for_dialect(column: dict[str, Any], dialect: str) -> str:

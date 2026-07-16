@@ -805,6 +805,26 @@ class TestExtractDdlPreview:
         assert ddl_preview == {}
         assert post_load == {}
 
+    def test_string_schema_does_not_raise(self, tmp_path):
+        """Public wrapper benchmarks (e.g. JoinOrder) return a DDL string from
+        get_schema() rather than a table_name -> columns mapping. Calling
+        .keys() on that string used to raise AttributeError; the preview
+        should instead come back empty rather than crash the dry run.
+        """
+        unified_config = self._load_duckdb_tpch_template()
+        config = MagicMock()
+        config.options = {"unified_tuning_configuration": unified_config}
+        database_config = MagicMock()
+        database_config.type = "duckdb"
+
+        class _StringSchemaBenchmark:
+            def get_schema(self) -> str:
+                return "CREATE TABLE title (id INTEGER, title VARCHAR);"
+
+        ddl_preview, post_load = self.executor._extract_ddl_preview(_StringSchemaBenchmark(), config, database_config)
+        assert ddl_preview == {}
+        assert post_load == {}
+
     def test_unknown_table_is_skipped(self, tmp_path):
         unified_config = self._load_duckdb_tpch_template()
         # Rekey the loaded template so none of its tables match a real TPC-H table.

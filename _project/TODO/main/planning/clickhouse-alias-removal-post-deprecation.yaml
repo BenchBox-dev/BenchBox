@@ -1,0 +1,105 @@
+id: clickhouse-alias-removal-post-deprecation
+title: "Remove temporary clickhouse→clickhouse-local/server compatibility aliases after deprecation window"
+worktree: main
+priority: Low
+status: Not Started
+category: Code Quality and Technical Debt
+
+description: |
+  When ClickHouse support was split into `clickhouse-local` and
+  `clickhouse-server` platforms (`first-class-clickhouse-local-server-cloud-platforms`,
+  DONE 2026-04-11), a set of temporary compatibility aliases were added so
+  that existing `platform: clickhouse` references continue to work during a
+  deprecation window.
+
+  The DONE file defers two cleanup tasks:
+  (a) Remove the temporary `clickhouse` compatibility aliases entirely after
+      one deprecation window.
+  (b) Backfill or rewrite historical result artifacts so old `clickhouse`
+      platform labels are normalized to `clickhouse-local` or `clickhouse-server`.
+
+  This TODO tracks (a). Artifact backfill (b) is a separate larger operation
+  that depends on a decision about whether old result artifacts should be
+  mutated; it should be filed separately if needed.
+
+work:
+  - id: w0
+    summary: "Inventory all current clickhouse alias sites and confirm the deprecation window has passed"
+    status: pending
+    notes: |
+      grep -rn 'clickhouse[^-]' benchbox/ tests/ docs/ --include='*.py' --include='*.yaml' --include='*.md'
+      Identify: adapter registration aliases, platform-name normalisation maps,
+      docs references, test fixtures that use 'clickhouse' without a suffix.
+      Confirm the deprecation window started at the release that landed the
+      first-class-clickhouse TODO (check CHANGELOG for the release date).
+
+  - id: w1
+    summary: "Remove the compatibility alias registrations"
+    needs: [w0]
+    status: pending
+    notes: |
+      Remove the platform alias mapping entries from benchbox/platforms/ (likely
+      a PLATFORM_ALIASES or similar dict). After removal, benchbox run --platform
+      clickhouse should fail with a clear error message naming the replacements
+      (clickhouse-local, clickhouse-server).
+
+  - id: w2
+    summary: "Add a helpful error message for the removed alias"
+    needs: [w1]
+    status: pending
+    notes: |
+      When platform='clickhouse' is passed after alias removal, raise a clear
+      error:
+        "Platform 'clickhouse' has been removed. Use 'clickhouse-local' or
+        'clickhouse-server' instead."
+      This prevents silent breakage for callers who missed the deprecation notice.
+
+  - id: w3
+    summary: "Update docs and remove any remaining clickhouse (unqualified) references"
+    needs: [w2]
+    status: pending
+    notes: |
+      Update docs/platforms/clickhouse.md, README, and any runbook references
+      to use the qualified names. Remove any test fixtures that used the
+      unqualified alias.
+
+deferred:
+  - summary: "Backfill historical result artifacts: rename old clickhouse labels to clickhouse-local or clickhouse-server"
+    reason: "Mutating stored result artifacts requires a separate decision about historical record integrity; file separately if needed."
+
+metadata:
+  tags:
+    - clickhouse
+    - cleanup
+    - backwards-compat
+    - deprecation
+  estimated_effort: "Small"
+  created_date: "2026-07-16"
+
+impact:
+  technical_debt: |
+    Keeping the unqualified 'clickhouse' alias indefinitely prevents users from
+    knowing which ClickHouse deployment type they are targeting, and means the
+    alias must be maintained alongside both clickhouse-local and clickhouse-server
+    adapters forever.
+
+prior_art:
+  - "first-class-clickhouse-local-server-cloud-platforms DONE file — source of the alias and deprecation intent"
+  - "benchbox/platforms/ — location of platform registration and alias maps"
+  - "CHANGELOG — confirm the deprecation start date"
+
+must_preserve:
+  - "clickhouse-local and clickhouse-server platforms continue to work correctly after alias removal"
+  - "Error message for the removed 'clickhouse' alias names the replacements explicitly"
+
+anti_patterns:
+  - "DO NOT remove the alias without the helpful error message — silent 'platform not found' errors are harder to diagnose"
+  - "DO NOT backfill historical result artifacts in this TODO — scope it to alias removal only"
+
+verification:
+  - description: "benchbox run --platform clickhouse produces a clear error message"
+    command: "benchbox run --platform clickhouse --benchmark tpch 2>&1 | head -5"
+    expected_output: "error message mentioning 'clickhouse-local' and 'clickhouse-server'"
+  - description: "No clickhouse (unqualified) alias remains in platform registration"
+    command: "grep -rn \"'clickhouse'\" benchbox/platforms/ | grep -v 'clickhouse-' | grep -v '#'"
+    expected_output: "empty (no unqualified alias registrations remain)"
