@@ -1439,6 +1439,44 @@ class TestUATGateReleaseEvidence:
         assert not result.ok
         assert "no completed_at" in result.message
 
+    @pytest.mark.skipif(not hasattr(__import__("time"), "tzset"), reason="time.tzset() is POSIX-only")
+    def test_naive_completed_at_treated_as_utc_regardless_of_local_timezone(self, monkeypatch):
+        """#1162 review: a naive completed_at must evaluate identically no
+        matter what timezone the evaluating process happens to be running in.
+        `.astimezone()` previously reinterpreted a naive timestamp against
+        *this process's* local timezone (the CI runner's, not the operator's
+        who produced the evidence) -- so evidence near the max-age cutoff
+        could read stale or fresh purely based on where the check ran.
+        """
+        import os
+        import time
+        from datetime import UTC, datetime
+
+        payload = self._payload(completed_at="2026-07-09T10:00:00")  # naive, no offset
+        now = datetime(2026, 7, 10, 12, tzinfo=UTC)
+
+        def _age_line(result):
+            return next(line for line in result.summary if line.startswith("- uat_age:"))
+
+        original_tz = os.environ.get("TZ")
+        try:
+            results = {}
+            for tz in ("UTC", "Etc/GMT+12", "Etc/GMT-14"):
+                monkeypatch.setenv("TZ", tz)
+                time.tzset()
+                results[tz] = self._evaluate(payload, now=now)
+        finally:
+            if original_tz is not None:
+                os.environ["TZ"] = original_tz
+            else:
+                os.environ.pop("TZ", None)
+            time.tzset()
+
+        oks = {tz: r.ok for tz, r in results.items()}
+        ages = {tz: _age_line(r) for tz, r in results.items()}
+        assert len(set(oks.values())) == 1, oks
+        assert len(set(ages.values())) == 1, ages
+
     def test_uat_failure_blocks_after_green_canary(self, monkeypatch, capsys):
         """main() combines a green canary with UAT evidence; missing UAT blocks."""
         from datetime import UTC, datetime

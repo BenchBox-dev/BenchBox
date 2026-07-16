@@ -35,6 +35,19 @@ description: |
   affect change detection; it does change valid_from/valid_to values, so the
   DuckDB and PostgreSQL SCD2 seed-state assertions and the validation queries that
   filter on effective_ts must be re-checked.
+
+  IMPORTANT correction (review finding, 2026-07-12): per-change_type effective_ts
+  alone does NOT isolate the actually-reproduced basic-after-new_keys_only case.
+  merge_scd_type2_basic and merge_scd_type2_new_keys_only both insert from the
+  SAME 'new' staging rows in scd2_ops_stage_customer - population-time
+  differentiation is a property of the STAGE rows, and both ops read the
+  identical s.effective_ts value from those rows into valid_from, so their
+  inserted rows share the exact same cleanup key regardless of which op did the
+  inserting. Distinguishing "which op consumed this stage row" needs a discriminator
+  applied at INSERT time by each operation's own write_sql (e.g. new_keys_only
+  stamping s.effective_ts + a small op-specific INTERVAL offset, or a new
+  provenance column on the dimension table), not just a per-change_type
+  population value. See the revised w1/w2 scope below.
 impact:
   business_value: "Removes the last latent SCD2 correctness gap: one op's cleanup can no longer corrupt another op's rows even when cleanups are skipped or reordered."
   user_impact: "SCD2 operations become independently cleanable regardless of run order, not just under the current catalog ordering."
@@ -48,19 +61,23 @@ prior_art:
 
 work:
 - id: w1
-  summary: "Assign a distinct effective_ts per change_type group in _get_population_sql (changed/unchanged/new)."
+  summary: "Assign a distinct effective_ts per change_type group in _get_population_sql (changed/unchanged/new). Resolves basic-vs-no_change only; see w2 for basic-vs-new_keys_only."
   status: pending
 - id: w2
-  summary: "Qualify basic and no_change cleanup_sql DELETE/UPDATE subqueries by the op's own change_type(s), now that effective_ts distinguishes groups."
+  summary: "Add an op-specific discriminator to new_keys_only's INSERT (e.g. valid_from = s.effective_ts + an op-tagged offset) so its rows differ from basic's inserts of the same shared 'new' staged keys."
   needs: [w1]
   status: pending
 - id: w3
-  summary: "Audit every SCD2 validation query that filters on effective_ts (no_rows_closed_by_batch, no_rows_closed, the N3 cardinality checks) and re-scope to the correct group(s)."
-  needs: [w1]
+  summary: "Qualify basic and no_change cleanup_sql DELETE/UPDATE subqueries by change_type and, where the group is shared, the w2 discriminator."
+  needs: [w1, w2]
   status: pending
 - id: w4
-  summary: "Re-verify DuckDB + live PostgreSQL seed-state and per-op assertions; add a test proving basic's cleanup no longer deletes new_keys_only's rows in a back-to-back run."
-  needs: [w1, w2, w3]
+  summary: "Audit every SCD2 validation query filtering on effective_ts (no_rows_closed_by_batch, no_rows_closed, the N3 cardinality checks) and re-scope using w1/w2."
+  needs: [w1, w2]
+  status: pending
+- id: w5
+  summary: "Re-verify DuckDB + live PostgreSQL seed-state; add a test proving basic's and new_keys_only's cleanups no longer cross-delete each other's rows, in both run orders."
+  needs: [w1, w2, w3, w4]
   status: pending
 
 must_preserve:
@@ -70,16 +87,24 @@ must_preserve:
 - "The fixed-size 20/20/20 change batch and scale-independence are preserved."
 
 approach: |
-  One population-SQL change (distinct effective_ts per group) unlocks meaningful
-  change_type-scoped cleanup. Sequence: differentiate effective_ts first, then
-  re-scope the cleanups and any effective_ts-filtered validations, then re-verify
-  seed-state on both engines. Keep the dates close (consecutive days) so the
+  A population-SQL change (distinct effective_ts per change_type group) unlocks
+  meaningful cleanup scoping for the two ops with disjoint change_types
+  (basic vs no_change). It does NOT unlock basic-vs-new_keys_only isolation,
+  because both consume the same shared 'new' staging rows and would otherwise
+  insert with the identical valid_from. That pair additionally needs an
+  operation-specific discriminator applied at INSERT time by new_keys_only's
+  own write_sql (w2) - a narrow, scoped change to that one op's body, not a
+  rewrite of the ops' logic. Sequence: differentiate population effective_ts
+  (w1), add the new_keys_only discriminator (w2), re-scope the cleanups and
+  any effective_ts-filtered validations using both (w3/w4), then re-verify
+  seed-state on both engines (w5). Keep the dates/offsets close so the
   "single-batch" framing in docs/blog stays accurate.
 
 anti_patterns:
 - "DO NOT put effective_ts into the row_hash fingerprint - because change detection must stay independent of the batch timestamp - keep it out."
-- "DO NOT scope cleanups by c_custkey - because basic and new_keys_only share the same 'new' custkeys - scope by the now-distinct effective_ts / change_type."
-- "DO NOT widen scope to rewrite the op UPDATE/INSERT bodies - the ops are correct; only population effective_ts and cleanup/validation scoping change."
+- "DO NOT scope cleanups by c_custkey - because basic and new_keys_only share the same 'new' custkeys - scope by effective_ts / change_type / the w2 op discriminator instead."
+- "DO NOT assume per-change_type effective_ts alone separates basic's new-key inserts from new_keys_only's - both read s.effective_ts verbatim from the same shared 'new' stage rows, so their inserted valid_from values are identical without w2's per-operation discriminator (review finding, 2026-07-12)."
+- "DO NOT rewrite basic's or no_change's UPDATE/INSERT bodies - only new_keys_only's INSERT needs the w2 discriminator; the other two ops' logic is correct as-is."
 
 verification:
 - description: "SCD2 DuckDB integration green including a new cross-op cleanup-isolation test."
@@ -98,7 +123,8 @@ scope_limit:
 
 success_metrics:
 - "Each change_type group carries a distinct effective_ts."
-- "basic's cleanup run after new_keys_only's write no longer deletes new_keys_only's rows (proven by test)."
+- "new_keys_only's inserted rows carry a discriminator (w2) distinguishing them from basic's inserts of the same staged 'new' keys."
+- "basic's cleanup run after new_keys_only's write no longer deletes new_keys_only's rows, and vice versa (proven by a back-to-back test in both orders)."
 - "All SCD2 ops still validate green and restore the seed on DuckDB and PostgreSQL."
 
 metadata:

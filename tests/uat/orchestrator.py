@@ -500,8 +500,12 @@ def run_sweep(  # noqa: C901
     # release-gate aggregation (`make uat-gate-check`) always has a
     # machine-readable per-stage record beside cells.jsonl. Written last:
     # its completed_at is the sweep-completion timestamp the cross-stage
-    # Docker ordering check keys on.
-    completed_at = _dt.datetime.now()
+    # Docker ordering check keys on. `.astimezone()` attaches the operator
+    # machine's real local UTC offset at capture time, so the age check in
+    # release_readiness_check.py (run later, in CI, in a different timezone)
+    # reads the offset embedded in the ISO string instead of reinterpreting
+    # a naive timestamp against the wrong process's local time (#1162 review).
+    completed_at = _dt.datetime.now().astimezone()
     _write_gate_summary_artifact(
         config=config,
         log_dir=log_dir,

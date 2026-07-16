@@ -319,6 +319,39 @@ def test_network_inventory_owned_vs_shared_vs_system():
     assert "default" not in max_networks  # system network is never a target, even at max
 
 
+def test_network_name_extending_prefix_without_separator_is_not_owned():
+    """#1158 review: a network without a compose project label whose name
+    merely extends project_prefix (no `-`/`_` boundary) must be classified
+    `shared`, not `owned` -- otherwise `MODE=owned APPLY=1` deletes an
+    unrelated network. The name fallback must use the same separator-aware
+    matching as the project-label check (_is_owned), not a bare startswith.
+    """
+    networks = [
+        *_NETWORKS,
+        {"id": "lookalike-net", "configuration": {"name": "benchbox-uatfoo_default", "labels": {}}},
+    ]
+
+    def fake(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        if argv_tuple[:4] == ("container", "image", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(_IMAGES), "")
+        if argv_tuple[:3] == ("container", "ls", "-a"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(_CONTAINERS), "")
+        if argv_tuple[:4] == ("container", "volume", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(_VOLUMES), "")
+        if argv_tuple[:4] == ("container", "network", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(networks), "")
+        if argv_tuple == ("container", "system", "df"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, _SYSTEM_DF, "")
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    owned = container_cleanup.reclaim_container_usage(mode="owned", apply=False, runner=fake)
+    owned_networks = {r.display_name for r in owned.targets if r.kind == "network"}
+    assert "benchbox-uatfoo_default" not in owned_networks
+    retained_networks = {r.display_name for r in owned.retained if r.kind == "network"}
+    assert "benchbox-uatfoo_default" in retained_networks
+
+
 def test_mocker_compose_project_label_is_recognized(monkeypatch):
     """uat-container-engine-routing w4/w0 live-validation finding: a
     `mocker compose up` container/network carries `com.mocker.compose.project`,

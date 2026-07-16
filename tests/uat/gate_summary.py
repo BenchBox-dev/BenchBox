@@ -96,7 +96,7 @@ class GateSummary:
     source_commit_sha: str
     source_dirty: bool
     container_engine: str | None
-    completed_at: str  # ISO 8601, tests.uat.orchestrator._dt.datetime.now().isoformat()
+    completed_at: str  # ISO 8601 with UTC offset, tests.uat.orchestrator._dt.datetime.now().astimezone().isoformat()
     dry_run: bool
     aborted: bool
     abort_phase: str | None
