@@ -750,6 +750,32 @@ class TestPackagedTemplatesParity:
     re-sync the packaged copy.
     """
 
+    # Platforms whose examples/tunings/<benchmark>_tuned.yaml naming is what
+    # get_tuning_template_paths auto-discovers, and are therefore expected to
+    # have a packaged counterpart for every such file (see
+    # test_every_auto_discoverable_examples_template_is_packaged below).
+    AUTO_DISCOVERY_PLATFORMS = ("duckdb", "databricks")
+
+    # (platform, filename) pairs that textually match the `*_tuned.yaml` glob
+    # but are deliberately NOT packaged, each with a reason so future
+    # additions to this set are a deliberate decision, not a silent gap.
+    EXCLUDED_AUTO_DISCOVERY_SOURCES = {
+        ("databricks", "tpch_liquid_tuned.yaml"): (
+            "Liquid Clustering AUTO variant selected via physical_rendering_id "
+            "(see examples/tunings/README.md), not the <benchmark>_tuned.yaml "
+            "auto-discovery pattern get_tuning_template_paths searches for - "
+            "the discoverable stem for benchmark='tpch' is 'tpch_tuned', not "
+            "'tpch_liquid_tuned'."
+        ),
+        ("databricks", "tpcds_liquid_tuned.yaml"): (
+            "Liquid Clustering AUTO variant selected via physical_rendering_id "
+            "(see examples/tunings/README.md), not the <benchmark>_tuned.yaml "
+            "auto-discovery pattern get_tuning_template_paths searches for - "
+            "the discoverable stem for benchmark='tpcds' is 'tpcds_tuned', not "
+            "'tpcds_liquid_tuned'."
+        ),
+    }
+
     def test_packaged_templates_root_exists(self):
         assert TEMPLATES_ROOT.exists()
         assert TEMPLATES_ROOT.is_dir()
@@ -763,6 +789,8 @@ class TestPackagedTemplatesParity:
         assert "duckdb" in platform_names
 
     def test_every_packaged_template_matches_its_examples_source(self):
+        """Packaged -> source direction: every file actually packaged must
+        mirror a real examples/tunings/ file, byte-for-byte."""
         examples_root = _REPO_ROOT / "examples" / "tunings"
         assert examples_root.exists(), "examples/tunings/ must exist to check parity"
 
@@ -786,6 +814,62 @@ class TestPackagedTemplatesParity:
                 checked += 1
 
         assert checked > 0, "Expected at least one packaged template to check"
+
+    def test_every_auto_discoverable_examples_template_is_packaged(self):
+        """Source -> packaged direction (bidirectional guard): every
+        examples/tunings/{duckdb,databricks}/*_tuned.yaml file that matches
+        the get_tuning_template_paths auto-discovery naming must have a
+        byte-identical packaged counterpart, unless explicitly excluded
+        above. Without this direction, a NEW auto-discoverable template
+        added to examples/tunings/ without a packaged copy would ship
+        silently - installed-package users would fall through to the
+        fallback tier for it with no test catching the gap.
+        """
+        examples_root = _REPO_ROOT / "examples" / "tunings"
+        assert examples_root.exists(), "examples/tunings/ must exist to check parity"
+
+        checked = 0
+        for platform in self.AUTO_DISCOVERY_PLATFORMS:
+            platform_dir = examples_root / platform
+            if not platform_dir.exists():
+                continue
+            for source_file in sorted(platform_dir.glob("*_tuned.yaml")):
+                exclusion_reason = self.EXCLUDED_AUTO_DISCOVERY_SOURCES.get((platform, source_file.name))
+                if exclusion_reason is not None:
+                    continue
+
+                packaged_file = TEMPLATES_ROOT / platform / source_file.name
+                assert packaged_file.exists(), (
+                    f"{source_file} matches the <benchmark>_tuned.yaml "
+                    f"auto-discovery pattern but has no packaged counterpart at "
+                    f"{packaged_file}. Either add the packaged copy (see "
+                    f"benchbox/core/tuning/templates/README.md) or add "
+                    f"('{platform}', '{source_file.name}') to "
+                    f"EXCLUDED_AUTO_DISCOVERY_SOURCES with an explicit reason."
+                )
+                assert packaged_file.read_text(encoding="utf-8") == source_file.read_text(encoding="utf-8"), (
+                    f"{packaged_file} has drifted from its source {source_file}. "
+                    f"Re-sync: cp {source_file} {packaged_file}"
+                )
+                checked += 1
+
+        assert checked > 0, "Expected at least one auto-discoverable examples/tunings template to check"
+
+    def test_excluded_auto_discovery_sources_are_real_and_have_reasons(self):
+        """Guard the exclusion list itself: every excluded entry must exist
+        in examples/tunings/ (no exclusions for files that don't exist) and
+        carry a non-empty reason string."""
+        examples_root = _REPO_ROOT / "examples" / "tunings"
+
+        for (platform, filename), reason in self.EXCLUDED_AUTO_DISCOVERY_SOURCES.items():
+            assert isinstance(reason, str) and reason.strip(), (
+                f"Exclusion ({platform!r}, {filename!r}) must carry a non-empty reason string"
+            )
+            excluded_source = examples_root / platform / filename
+            assert excluded_source.exists(), (
+                f"Excluded entry ({platform!r}, {filename!r}) does not exist at "
+                f"{excluded_source} - remove the stale exclusion"
+            )
 
 
 @pytest.mark.unit
