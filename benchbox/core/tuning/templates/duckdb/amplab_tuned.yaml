@@ -1,0 +1,61 @@
+# DuckDB AMPLab Tuned Configuration
+# This configuration enables all DuckDB-supported optimizations for AMPLab Big Data Benchmark
+# Provides maximum performance with constraints and table-level tunings enabled
+
+primary_keys:
+  enabled: false # AMPLab benchmark typically uses generated data without keys
+  enforce_uniqueness: false
+  nullable: false
+
+foreign_keys:
+  enabled: false
+  enforce_referential_integrity: false
+  on_delete_action: RESTRICT
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: false
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  auto_optimize_enabled: false
+  auto_compact_enabled: false
+  bloom_filters_enabled: false
+  bloom_filter_columns: []
+  materialized_views_enabled: false
+
+table_tunings:
+  rankings:
+    table_name: rankings
+    sorting:
+    - name: pagerank
+      type: REAL
+      order: 1
+
+  uservisits:
+    table_name: uservisits
+    partitioning:
+    - name: visitdate
+      type: VARCHAR
+      order: 1
+    sorting:
+    - name: sourceip
+      type: VARCHAR
+      order: 1
+
+_metadata:
+  version: '2.0'
+  format: unified_tuning
+  database: duckdb
+  benchmark: amplab
+  configuration_type: tuned
+  description: "DuckDB AMPLab configuration with supported optimizations for big data queries"
+  created: '2025-11-01'
+  generated_by: benchbox-project

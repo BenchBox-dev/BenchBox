@@ -157,6 +157,17 @@ class TestCanonicalModeMapsResolutionsOntoTheSharedVocabulary:
         resolution = TuningResolution(mode=TuningMode.TUNED, source=TuningSource.EXPLICIT_FILE, enabled=True)
         assert resolution.canonical_mode == tuning_modes.TUNED
 
+    def test_tuned_via_packaged_resource_is_tuned_not_tuned_fallback(self) -> None:
+        # #1188 added the packaged-template discovery tier (TuningSource.
+        # PACKAGED_RESOURCE) as a last-resort template source when benchbox
+        # runs outside a repo checkout. A packaged template is a genuine
+        # curated template (just bundled with the package instead of found
+        # under examples/tunings/), so this must map to plain `tuned`, not
+        # `tuned-fallback` -- pinning the composition of that tier with
+        # canonical_mode (only TUNED+FALLBACK is tuned-fallback).
+        resolution = TuningResolution(mode=TuningMode.TUNED, source=TuningSource.PACKAGED_RESOURCE, enabled=True)
+        assert resolution.canonical_mode == tuning_modes.TUNED
+
     def test_custom_file_is_custom_never_the_raw_path(self) -> None:
         resolution = TuningResolution(
             mode=TuningMode.CUSTOM_FILE,
@@ -193,11 +204,16 @@ class TestFallbackLabelingEndToEnd:
     it were a genuine tuned run."""
 
     def _invoke(self, tmp_path, monkeypatch, *, official: bool = False, scale: str = "0.01"):
-        # Force template discovery to miss regardless of what examples/tunings/
-        # actually contains: point BENCHBOX_TUNING_PATH at a directory that
-        # doesn't exist, and run from an empty cwd so the project-relative and
-        # cwd-relative search candidates in get_tuning_template_paths() also
-        # miss (see benchbox/cli/tuning_resolver.py).
+        # Force template discovery to miss across every tier in
+        # get_tuning_template_paths(): BENCHBOX_TUNING_PATH pointed at a
+        # nonexistent directory, an empty cwd (so the project-relative and
+        # cwd-relative candidates miss too), and `coffeeshop` as the
+        # benchmark -- unlike tpch, it has no template under
+        # examples/tunings/duckdb/ *and* no packaged template under
+        # benchbox/core/tuning/templates/duckdb/ (the #1188 last-resort
+        # tier, which ships templates for tpch/tpcds/ssb/etc. and would
+        # otherwise resolve this to TuningSource.PACKAGED_RESOURCE instead
+        # of FALLBACK).
         monkeypatch.setenv("BENCHBOX_TUNING_PATH", str(tmp_path / "no-such-tuning-dir"))
         monkeypatch.chdir(tmp_path)
 
@@ -208,7 +224,9 @@ class TestFallbackLabelingEndToEnd:
             exporter = stack.enter_context(patch.object(_run_module, "ResultExporter"))
             db_mgr = stack.enter_context(patch.object(_run_module, "DatabaseManager"))
 
-            bench_mgr.return_value.benchmarks = {"tpch": {"display_name": "TPC-H", "estimated_time_range": (2, 10)}}
+            bench_mgr.return_value.benchmarks = {
+                "coffeeshop": {"display_name": "CoffeeShop", "estimated_time_range": (2, 10)}
+            }
             profiler.return_value.get_system_profile.return_value = Mock()
 
             mock_db_cfg = Mock()
@@ -229,7 +247,7 @@ class TestFallbackLabelingEndToEnd:
                 "--platform",
                 "duckdb",
                 "--benchmark",
-                "tpch",
+                "coffeeshop",
                 "--scale",
                 scale,
                 "--tuning",
@@ -242,6 +260,16 @@ class TestFallbackLabelingEndToEnd:
                 args.append("--official")
             result = CliRunner().invoke(cli, args)
             return result, orchestrator
+
+    def test_duckdb_coffeeshop_has_no_template_anywhere(self) -> None:
+        """Guard the premise of these e2e tests: if a duckdb/coffeeshop
+        template is ever added (examples/tunings/ or the packaged tier),
+        these tests would silently stop exercising the fallback path and
+        must switch to a different platform/benchmark pair instead."""
+        from benchbox.core.tuning.packaged_templates import packaged_template_path
+
+        assert not Path("examples/tunings/duckdb/coffeeshop_tuned.yaml").exists()
+        assert not packaged_template_path("duckdb", "coffeeshop").exists()
 
     def test_tuned_with_no_template_records_tuned_fallback(self, tmp_path, monkeypatch) -> None:
         result, orchestrator = self._invoke(tmp_path, monkeypatch, official=False)

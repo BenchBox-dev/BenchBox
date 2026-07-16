@@ -1,0 +1,58 @@
+id: tuning-from-config-forwarding-sweep-20260716
+title: "Sweep all platform from_config implementations to forward tuning configuration"
+worktree: main
+priority: High
+status: Not Started
+category: Core Functionality
+
+description: |
+  From the 2026-07 remediation batch (#1176 w0 discovery): the tuning config
+  never reached adapters on the direct CLI path. #1176 fixed the channel and
+  duckdb; a parallel fix covered questdb. Roughly 48 other platforms'
+  from_config implementations still drop tuning_enabled / the tuning_config
+  object / tuning_source / tuning_source_file, so tuning silently no-ops on
+  them via the direct path. Sweep every from_config to forward the tuning
+  keys, and add a parametrized registry-driven test asserting every registered
+  adapter preserves them (constructing with stub configs, no live connections).
+
+work:
+  - id: w0
+    summary: "Start gate: verify PR #1176 merged; enumerate from_config implementations and classify forwarding status"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Mechanical sweep: forward tuning keys in every from_config (follow the duckdb/questdb pattern)"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Parametrized test over the platform registry: from_config preserves tuning kwargs for every adapter"
+    notes: "Skip-gate platforms whose import needs missing optional deps, matching existing registry-test conventions."
+    status: pending
+    needs: [w1]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Each adapter's existing from_config behavior for its own keys"
+  - "No new required constructor params - forwarding only"
+
+anti_patterns:
+  - "No per-platform bespoke channel names - use the exact keys #1176 established"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/**"
+    - "tests/**"
+
+verification:
+  - description: "Registry-driven forwarding test green across all platforms"
+    command: "uv run -- python -m pytest tests/unit/platforms -q -k 'from_config or forwarding'"
+    expected_output: "All registered adapters preserve tuning kwargs"
+
+metadata:
+  owners: ["benchbox-team"]
+  tags: [tuning, platforms, bug-class-sweep]
+  estimated_effort: Medium
+  created_date: "2026-07-16"
+  source_review: "tuning remediation batch close-out 2026-07-16 (blind-spot: config lost across serialization boundary)"

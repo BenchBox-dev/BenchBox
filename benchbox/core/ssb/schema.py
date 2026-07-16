@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import yaml
 
+from benchbox.core.schema_primitives import get_fk_ordered_table_names_from_column_specs
 from benchbox.core.tuning import BenchmarkTunings, TableTuning, TuningColumn
 
 
@@ -19,6 +20,22 @@ globals().update({symbol: entry["schema"] for symbol, entry in _TABLE_DEFS.items
 
 TABLES: dict[str, dict] = {entry["key"]: globals()[symbol] for symbol, entry in _TABLE_DEFS.items()}
 _TABLE_ORDER = list(_SCHEMA_SPECS["table_order"])
+
+
+def get_table_loading_order() -> list[str]:
+    """Get the FK-safe table load order for the full SSB schema.
+
+    Derived from each column's ``foreign_key: "table.column"`` metadata in
+    ``schema_specs.yaml`` via a stable topological sort, rather than a
+    hand-maintained constant, so it stays correct if the schema definitions
+    ever change. ``lineorder`` (the fact table) references
+    ``customer``/``part``/``supplier``/``date``, so it always sorts last.
+
+    Returns:
+        All SSB table names, ordered so a table referenced by a foreign key
+        always precedes the table that references it.
+    """
+    return get_fk_ordered_table_names_from_column_specs(TABLES)
 
 
 def get_create_table_sql(

@@ -1,0 +1,60 @@
+# DuckDB H2ODB Tuned Configuration
+# This configuration enables all DuckDB-supported optimizations for H2O.ai Database Benchmark
+# Provides maximum performance with constraints and table-level tunings enabled
+
+primary_keys:
+  enabled: false # H2O.ai benchmark uses large flat data structures
+  enforce_uniqueness: false
+  nullable: false
+
+foreign_keys:
+  enabled: false
+  enforce_referential_integrity: false
+  on_delete_action: RESTRICT
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: false
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  auto_optimize_enabled: false
+  auto_compact_enabled: false
+  bloom_filters_enabled: false
+  bloom_filter_columns: []
+  materialized_views_enabled: false
+
+table_tunings:
+  G1_1e6_1e2_0_0:
+    table_name: G1_1e6_1e2_0_0
+    sorting:
+    - name: id1
+      type: VARCHAR
+      order: 1
+    - name: id2
+      type: VARCHAR
+      order: 2
+
+  G1_1e6_1e1_0_0:
+    table_name: G1_1e6_1e1_0_0
+    sorting:
+    - name: id1
+      type: VARCHAR
+      order: 1
+
+_metadata:
+  version: '2.0'
+  format: unified_tuning
+  database: duckdb
+  benchmark: h2odb
+  configuration_type: tuned
+  description: "DuckDB H2O.ai configuration with supported optimizations for data science queries"
+  created: '2025-11-01'
+  generated_by: benchbox-project

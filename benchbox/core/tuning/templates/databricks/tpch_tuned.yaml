@@ -1,0 +1,143 @@
+# Databricks TPC-H Tuned Configuration
+# This configuration enables all Databricks-supported optimizations for TPC-H benchmark
+# Includes Delta Lake features, Z-ordering, auto-optimize, and all constraint types
+
+primary_keys:
+  enabled: true
+  enforce_uniqueness: true
+  nullable: false
+
+foreign_keys:
+  enabled: true
+  enforce_referential_integrity: true
+  on_delete_action: CASCADE
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: true
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: true
+  z_ordering_columns:
+  - L_ORDERKEY
+  - L_PARTKEY
+  - O_ORDERDATE
+  - C_CUSTKEY
+  auto_optimize_enabled: true
+  auto_compact_enabled: true
+  materialized_views_enabled: true
+
+table_tunings:
+  LINEITEM:
+    table_name: LINEITEM
+    partitioning:
+    - name: L_SHIPDATE
+      type: DATE
+      order: 1
+    clustering:
+    - name: L_ORDERKEY
+      type: INTEGER
+      order: 1
+    - name: L_PARTKEY
+      type: INTEGER
+      order: 2
+    - name: L_SUPPKEY
+      type: INTEGER
+      order: 3
+    distribution:
+    - name: L_ORDERKEY
+      type: INTEGER
+      order: 1
+
+  ORDERS:
+    table_name: ORDERS
+    partitioning:
+    - name: O_ORDERDATE
+      type: DATE
+      order: 1
+    clustering:
+    - name: O_ORDERKEY
+      type: INTEGER
+      order: 1
+    - name: O_CUSTKEY
+      type: INTEGER
+      order: 2
+    distribution:
+    - name: O_ORDERKEY
+      type: INTEGER
+      order: 1
+
+  PART:
+    table_name: PART
+    clustering:
+    - name: P_PARTKEY
+      type: INTEGER
+      order: 1
+    - name: P_TYPE
+      type: VARCHAR
+      order: 2
+    - name: P_SIZE
+      type: INTEGER
+      order: 3
+    distribution:
+    - name: P_PARTKEY
+      type: INTEGER
+      order: 1
+
+  SUPPLIER:
+    table_name: SUPPLIER
+    clustering:
+    - name: S_SUPPKEY
+      type: INTEGER
+      order: 1
+    - name: S_NATIONKEY
+      type: INTEGER
+      order: 2
+    distribution:
+    - name: S_SUPPKEY
+      type: INTEGER
+      order: 1
+
+  CUSTOMER:
+    table_name: CUSTOMER
+    clustering:
+    - name: C_CUSTKEY
+      type: INTEGER
+      order: 1
+    - name: C_NATIONKEY
+      type: INTEGER
+      order: 2
+    distribution:
+    - name: C_CUSTKEY
+      type: INTEGER
+      order: 1
+
+  PARTSUPP:
+    table_name: PARTSUPP
+    clustering:
+    - name: PS_PARTKEY
+      type: INTEGER
+      order: 1
+    - name: PS_SUPPKEY
+      type: INTEGER
+      order: 2
+    distribution:
+    - name: PS_PARTKEY
+      type: INTEGER
+      order: 1
+
+_metadata:
+  version: '2.0'
+  format: unified_tuning
+  database: databricks
+  benchmark: tpch
+  configuration_type: tuned
+  description: "Databricks TPC-H configuration with Delta Lake optimizations, Z-ordering, and auto-optimize"
+  created: '2025-11-01'
+  generated_by: benchbox-project

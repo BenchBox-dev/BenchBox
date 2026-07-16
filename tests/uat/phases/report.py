@@ -426,6 +426,16 @@ def release_gate_ordering_violations(
     violations: list[str] = []
     for log_text in docker_stage_lifecycle_logs:
         for timestamp, platform in parse_docker_up_events(log_text):
+            # append_lifecycle_log() writes datetime.now() (naive local
+            # wall-clock time, no offset), but native_stage_completed_at is
+            # offset-aware in production (orchestrator.py's
+            # datetime.now().astimezone(), #1162). Comparing a naive and an
+            # aware datetime raises TypeError, so normalize a naive
+            # timestamp onto native_stage_completed_at's awareness -- via
+            # astimezone(), which interprets a naive datetime as local time
+            # and attaches the current local UTC offset -- before comparing.
+            if timestamp.tzinfo is None and native_stage_completed_at.tzinfo is not None:
+                timestamp = timestamp.astimezone()
             if timestamp <= native_stage_completed_at:
                 violations.append(
                     f"Docker stack '{platform}' started at {timestamp.isoformat()} "
