@@ -75,3 +75,57 @@ class BaseSchemaTable:
         sql += "\n);"
 
         return sql
+
+
+def get_fk_ordered_table_names(tables: list[Any]) -> list[str]:
+    """Return table names ordered so FK-referenced tables load before dependents.
+
+    Performs a stable topological sort (a simplified Kahn's algorithm) using
+    each table's ``get_foreign_keys()`` metadata: a table becomes eligible
+    once every table it references (via a foreign key) has already been
+    placed. Ties are broken by the tables' original relative order, so the
+    result is deterministic and, for schemas with no FK dependencies,
+    identical to the input order.
+
+    A cyclic or self-referencing FK graph cannot be fully ordered; any
+    tables left over once no further progress can be made are appended in
+    their original relative order rather than raising, so callers always
+    get a usable ordering back.
+
+    Args:
+        tables: Benchmark table definitions exposing ``.name`` and
+            ``get_foreign_keys()`` (i.e. ``BaseSchemaTable`` subclasses).
+
+    Returns:
+        Table names in dependency-safe load order.
+    """
+    names = [table.name for table in tables]
+    name_set = set(names)
+    deps: dict[str, set[str]] = {
+        table.name: {
+            ref_table
+            for ref_table, _ref_col in table.get_foreign_keys().values()
+            if ref_table in name_set and ref_table != table.name
+        }
+        for table in tables
+    }
+
+    ordered: list[str] = []
+    placed: set[str] = set()
+    remaining = list(names)
+
+    while remaining:
+        progressed = False
+        for name in list(remaining):
+            if deps[name] <= placed:
+                ordered.append(name)
+                placed.add(name)
+                remaining.remove(name)
+                progressed = True
+        if not progressed:
+            # Cycle (or unresolved self-reference) among the rest: preserve
+            # input order for the leftovers instead of raising.
+            ordered.extend(remaining)
+            break
+
+    return ordered
