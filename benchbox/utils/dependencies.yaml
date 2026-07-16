@@ -238,7 +238,7 @@ dependency_groups:
     - databricks-sql-connector
     - databricks-connect
     - cloudpathlib
-    install_command: uv add benchbox --extra databricks-connect
+    install_command: uv add benchbox --extra cloud-spark-databricks
     use_cases:
     - PySpark DataFrame API
     - Interactive development
@@ -252,7 +252,7 @@ dependency_groups:
     - databricks-sql-connector
     - databricks-connect
     - cloudpathlib
-    install_command: uv add benchbox --extra databricks-connect
+    install_command: uv add benchbox --extra cloud-spark-databricks
     use_cases:
     - Remote Spark execution
     - Local IDE development

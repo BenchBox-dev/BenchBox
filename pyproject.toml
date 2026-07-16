@@ -327,14 +327,6 @@ cloud-spark-databricks = [
     "cloudpathlib>=0.15.0",
 ]
 
-# Legacy alias for databricks-connect (deprecated, use cloud-spark-databricks)
-databricks-connect = [
-    "databricks-sql-connector>=2.0.0",
-    "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",
-    "cloudpathlib>=0.15.0",
-]
-
 # All cloud Spark platforms combined
 cloud-spark = [
     # AWS (Glue, EMR Serverless, Athena Spark)
