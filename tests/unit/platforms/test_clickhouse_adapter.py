@@ -267,7 +267,10 @@ class TestClickHouseAdapter:
         optimize_aggregation_in_order) is a curated performance profile, not
         a baseline default, and must not fire when tuning is disabled --
         before this fix it fired ONLY when tuning was disabled, exactly
-        backwards.
+        backwards. join_use_nulls=1 is a standard-SQL-semantics setting, not
+        part of the performance pack, so it stays in the always-applied basic
+        settings and fires here too (see tpchavoc equivalence regression:
+        anti-join variants need standard NULL semantics on every mode).
         """
         mock_client = Mock()
         mock_client_class.return_value = mock_client
@@ -281,15 +284,16 @@ class TestClickHouseAdapter:
         # Baseline: no OLAP pack even for an OLAP benchmark type.
         adapter.configure_for_benchmark(connection, "olap")
 
-        # Basic settings (6) + cache control settings (3) + validation query (1) = 10.
-        assert mock_client.execute.call_count == 10
+        # Basic settings (7, incl. join_use_nulls) + cache control settings (3) + validation query (1) = 11.
+        assert mock_client.execute.call_count == 11
         executed_sql = " ".join(call[0][0] for call in mock_client.execute.call_args_list)
         assert "grace_hash" not in executed_sql
         assert "optimize_aggregation_in_order" not in executed_sql
+        assert "join_use_nulls" in executed_sql
 
         mock_client.reset_mock()
         adapter.configure_for_benchmark(connection, "read_primitives")
-        assert mock_client.execute.call_count == 10
+        assert mock_client.execute.call_count == 11
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_configure_for_benchmark_tuning_enabled_applies_olap_pack(self, mock_client_class):
@@ -319,7 +323,7 @@ class TestClickHouseAdapter:
         mock_client.reset_mock()
         # Non-OLAP benchmark types don't get the pack even when tuned.
         adapter.configure_for_benchmark(connection, "read_primitives")
-        assert mock_client.execute.call_count == 10  # basic (6) + cache (3) + validation (1)
+        assert mock_client.execute.call_count == 11  # basic (7, incl. join_use_nulls) + cache (3) + validation (1)
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_configure_for_benchmark_join_memory_uses_50_pct_multiplier(self, mock_client_class):
