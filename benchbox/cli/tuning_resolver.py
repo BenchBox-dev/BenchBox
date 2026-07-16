@@ -25,9 +25,41 @@ if TYPE_CHECKING:
     from logging import Logger
 
     from benchbox.cli.config import ConfigManager
+    from benchbox.core.config import DatabaseConfig
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def promote_tuning_provenance(
+    database_config: DatabaseConfig | None,
+    tuning_enabled: bool,
+    tuning_source: str | None,
+    tuning_source_file: str | None,
+) -> None:
+    """Mirror tuning provenance onto top-level DatabaseConfig fields.
+
+    ``DatabaseManager.create_config()`` only folds CLI overrides into
+    ``database_config.options`` (a nested dict); ``PlatformAdapter.__init__``
+    reads ``tuning_enabled``/``tuning_source``/``tuning_source_file`` as
+    top-level config keys via ``from_config()``. Without this promotion the
+    resolved tuning state never reaches the adapter for the CLI's
+    non-interactive run paths.
+
+    Deliberately does NOT also promote ``unified_tuning_configuration``:
+    DatabaseConfig is a pydantic model, and ``model_dump()`` (used downstream
+    to build the adapter's platform_config) recursively serializes
+    dataclass-valued extra fields into plain dicts, which would hand the
+    adapter a dict instead of a UnifiedTuningConfiguration instance. The
+    unified config instead reaches the adapter unmodified via the
+    ``tuning_config`` kwarg channel (``get_platform_config()`` passes it
+    through as a live object reference, never through model_dump).
+    """
+    if database_config is None:
+        return
+    database_config.tuning_enabled = tuning_enabled
+    database_config.tuning_source = tuning_source
+    database_config.tuning_source_file = tuning_source_file
 
 
 def resolve_template_reference(config_file: Path | None, repo_root: Path | None = None) -> str | None:
