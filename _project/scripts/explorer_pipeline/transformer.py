@@ -28,6 +28,7 @@ from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata,
 from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY
 from benchbox.core.results.status import bundle_failed_query_count, bundle_non_clean_reason, normalize_validation_status
+from benchbox.core.tuning.modes import is_canonical_mode
 
 logger = logging.getLogger(__name__)
 
@@ -183,16 +184,27 @@ def _tuning_mode(data: dict[str, Any]) -> str | None:
     wrote the value there instead. When neither location carries a value the
     result stays ``None`` -- callers must not invent a mode for bundles that
     never recorded one (see explorer ingest tuning-mode-extraction TODO).
+
+    ADR-2 (docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md)
+    §2 pins the legal ``tuning_mode`` vocabulary to exactly
+    ``{tuned, tuned-fallback, notuning, auto, custom}``. Older bundles
+    predating that pin may carry a raw local tuning-file path (from before
+    ``--tuning <path>`` runs were required to record ``custom``) or the
+    wizard's old ``"balanced"`` flavor string. Per the ADR's consequences
+    section, ingest does not guess which of the five buckets an
+    unrecognized legacy value belongs in -- it is treated as not-recorded
+    (``None`` here; the explorer surfaces that as the "Not Recorded" state)
+    rather than silently reclassified.
     """
     config = data.get("config", {})
     if isinstance(config, dict):
         val = config.get("tuning_mode")
-        if val:
+        if val and is_canonical_mode(str(val)):
             return str(val)
     execution = data.get("execution", {})
     if isinstance(execution, dict):
         val = execution.get("tuning_mode")
-        if val:
+        if val and is_canonical_mode(str(val)):
             return str(val)
     return None
 
@@ -223,6 +235,32 @@ def _tuning_hash(data: dict[str, Any]) -> str | None:
         return None
     payload = json.dumps({"mode": mode, "detail": tuning_detail}, sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()[:8]
+
+
+def _logical_profile(data: dict[str, Any]) -> dict[str, Any]:
+    """Extract the `platform.tuning.logical_profile` block (ADR-2 §3), or `{}`."""
+    platform = data.get("platform", {})
+    if not isinstance(platform, dict):
+        return {}
+    tuning = platform.get("tuning", {})
+    if not isinstance(tuning, dict):
+        return {}
+    profile = tuning.get("logical_profile", {})
+    return profile if isinstance(profile, dict) else {}
+
+
+def _physical_mechanisms(data: dict[str, Any]) -> list[str]:
+    """Extract the platform-rendered physical tuning mechanisms, if recorded."""
+    mechanisms = _logical_profile(data).get("physical_mechanisms", [])
+    if not isinstance(mechanisms, list):
+        return []
+    return [str(item) for item in mechanisms]
+
+
+def _physical_rendering_id(data: dict[str, Any]) -> str | None:
+    """Extract the physical rendering strategy id (ADR-2 §3 secondary facet)."""
+    val = _logical_profile(data).get("physical_rendering_id")
+    return str(val) if val else None
 
 
 def _test_type(data: dict[str, Any]) -> str | None:
@@ -953,6 +991,8 @@ class BundleTransformer:
             normalized_cost=normalized_cost.to_dict(),
             compliance_class=_compliance_class(bundle_data),
             phase_durations=_phase_durations(bundle_data),
+            physical_mechanisms=_physical_mechanisms(bundle_data),
+            physical_rendering_id=_physical_rendering_id(bundle_data),
         )
         manifest_peer = ManifestEntry(
             result_id=result_id,
