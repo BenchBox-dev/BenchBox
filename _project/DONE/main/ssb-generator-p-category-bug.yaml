@@ -2,8 +2,29 @@ id: ssb-generator-p-category-bug
 title: "Fix SSB generator 3-digit p_category emission (MFGR#212 vs MFGR#12) causing empty Q2/Q3/Q4 results"
 worktree: main
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-07-16"
 category: Testing and Quality Assurance
+
+completion_notes: |
+  Already satisfied in code — this TODO duplicates work completed under
+  `_project/DONE/main/ssb-generator-dimension-value-fidelity.yaml` (Completed).
+  Root cause was fixed at source: `benchbox/core/ssb/generator.py:567` now
+  emits the canonical 2-digit form `f"MFGR#{mfgr_num}{category_num}"` (e.g.
+  'MFGR#12'), not the 3-digit 'MFGR#212'. Verified directly: the generator
+  formula produces exactly the 25 canonical values MFGR#11..MFGR#55, all
+  7-char 2-digit; 'MFGR#12' present, 'MFGR#212' absent.
+
+  w3 (allowlist removal) is also already done: the SSB gate dropped its
+  `legitimately_empty` allowlist, and
+  `tests/integration/test_ssb_cross_surface_equivalence.py:89-98` now pins the
+  six historically-empty queries (#870: Q2.1–Q2.3, Q3.3, Q3.4, Q4.3) to return
+  >=1 reference row, failing if any SSB cell regresses to vacuous. That test
+  passes (2 passed). No generator change, allowlist edit, or platform-specific
+  normalisation was needed. Note: the TODO's verification block referenced
+  `tests/unit/benchmarks/test_ssb_gate.py`, which does not exist — the real
+  gate is the cross-surface equivalence test above. Closing to retire tracking
+  of already-landed work.
 
 description: |
   The SSB (Star Schema Benchmark) generator emits a 3-digit p_category value
@@ -24,7 +45,7 @@ description: |
 work:
   - id: w0
     summary: "Re-validate the generator bug still exists and measure scope"
-    status: pending
+    status: done
     notes: |
       Run the SSB generator at SF=0.1 and inspect the part table:
         SELECT DISTINCT p_category FROM part WHERE p_category LIKE 'MFGR#2%' LIMIT 10
@@ -35,7 +56,7 @@ work:
   - id: w1
     summary: "Identify the generator code path that emits p_category"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Locate the SSB data generator (likely a binary in _binaries/ or a Python
       module). Find where mfgr/category codes are composed. The standard SSB
@@ -45,7 +66,7 @@ work:
   - id: w2
     summary: "Fix the p_category generation or add a post-load normalisation step"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Prefer fixing the root cause in the generator. If the generator is a
       compiled binary with no source available, add a post-load normalisation
@@ -55,7 +76,7 @@ work:
   - id: w3
     summary: "Remove the SSB allowlist entries that paper over the empty cells"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       After the fix, Q2.1–Q2.3, Q3.3, Q3.4, Q4.3 should return non-empty
       result sets. Remove the allowlist/known_divergences entries that were
@@ -65,7 +86,7 @@ work:
   - id: w4
     summary: "Verify cross-surface oracle still passes after removing vacuous-cell allowlist entries"
     needs: [w3]
-    status: pending
+    status: done
     notes: |
       Run the SSB cross-surface gate across at least two platforms (DuckDB +
       one cloud platform). Confirm all 13 SSB queries (Q1.1–Q4.3) return

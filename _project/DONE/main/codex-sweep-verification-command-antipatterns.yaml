@@ -2,8 +2,41 @@ id: codex-sweep-verification-command-antipatterns
 title: "Harden TODO verification commands: audit buggy DONE examples, schema-enforce single-line commands, decide actioned-completion convention"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-07-16"
 category: Developer Tooling
+
+completion_notes: |
+  All three gaps closed.
+
+  w2 (schema-enforce single-line verification commands) was already
+  satisfied before this work: PR #1124 added
+  `_project/scripts/validate_todo.py::_check_verification_command_source`,
+  which rejects any `verification.command` scalar spanning multiple physical
+  lines unless it uses a `|` block scalar. Verified against a synthetic TODO
+  with an embedded inline newline — the validator reports
+  "spans multiple physical lines". No further code change needed for w2.
+
+  w1 (verification-command antipattern checks) was added as
+  "Axis 5b — Verification-command antipatterns (silent false-positives)" in
+  `_project/audits/pr-review-sweep-template.md`. FILENAME RECONCILIATION: the
+  TODO and its prior_art named `codex-weekly-sweep-template.md`, which does
+  not exist — the codex weekly sweep template was renamed to the
+  reviewer-agnostic `pr-review-sweep-template.md` (see its header). Per
+  prior_art ("extend the existing template rather than creating a parallel
+  checklist"), the checks were added there, in the Axis 5 neighbourhood that
+  already governs verification-command drift. The four flagged DONE files and
+  PRs (#110/#117/#121/#122) are cited as concrete examples; the four DONE
+  files are NOT reopened (per anti_pattern).
+
+  w3 (actioned-completion convention) documented under a new
+  "Blind-spot remediation lifecycle" heading in `_project/TODO/README.md`.
+  Decision: `actioned` is a first-class terminal finding state alongside
+  `merged-to-todo` and `dismissed`; a remediation TODO's completion gate must
+  accept it. This matches the existing `pr-review-sweep-template.md`
+  "Closing the loop" step, which already closes cross-linked blind-spots with
+  `--action actioned`. The historical DONE entry was left unamended (the
+  convention doc is the durable fix).
 
 description: |
   Three process gaps were deferred from `codex-pr-review-followups-week-2026-05-03`
@@ -39,7 +72,7 @@ description: |
 work:
   - id: w1
     summary: "Add verification-command antipattern checks to codex-weekly-sweep-template.md"
-    status: pending
+    status: done
     notes: |
       Add negative checks to _project/audits/codex-weekly-sweep-template.md for:
       - Wildcard --queries (should be explicit query names)
@@ -55,7 +88,7 @@ work:
 
   - id: w2
     summary: "Extend validate_todo.py (or schema) to reject verification.command values containing newlines"
-    status: pending
+    status: done
     notes: |
       In _project/scripts/validate_todo.py or _project/TODO_SCHEMA.yaml, add
       validation that rejects verification.command strings containing '\n'.
@@ -66,7 +99,7 @@ work:
 
   - id: w3
     summary: "Document the actioned-completion convention for blind-spot remediation TODOs"
-    status: pending
+    status: done
     notes: |
       Read the existing acceptance criteria pattern in blind-spot remediation
       TODOs. Decide: should 'actioned' be an accepted terminal state alongside

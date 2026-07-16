@@ -2,8 +2,20 @@ id: duckdb-supports-acl-no-acl-set-fix
 title: "Add 'duckdb' to the no_acl set in ddl.py so supports_acl('duckdb') returns False"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-07-16"
 category: Core Functionality
+
+completion_notes: |
+  Already satisfied in code — no new change required. PR #1124 added
+  'duckdb' to the `no_acl` set in
+  `benchbox/core/metadata_primitives/ddl.py:563`
+  ({"sqlite", "datafusion", "spark", "polars", "duckdb"}), so
+  `supports_acl('duckdb')` now returns False. Verified:
+  `supports_acl('duckdb') is False` (target of w1), and the ACL-focused
+  metadata_primitives tests pass (14 passed) with no test still asserting
+  the old True return value (w2 needed no update). Closing the TODO to
+  retire the tracking of already-landed work.
 
 description: |
   `supports_acl('duckdb')` currently returns `True` (or a non-False value)
@@ -25,7 +37,7 @@ description: |
 work:
   - id: w0
     summary: "Confirm supports_acl('duckdb') still returns a non-False value at the cited line"
-    status: pending
+    status: done
     notes: |
       grep -n 'no_acl' benchbox/core/metadata_primitives/ddl.py
       Confirm 'duckdb' is absent from the set. Also verify:
@@ -35,7 +47,7 @@ work:
   - id: w1
     summary: "Add 'duckdb' to the no_acl set in ddl.py:583"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       One-line change: add 'duckdb' to the no_acl frozenset.
       Do NOT touch supports_acl_introspection, role_hierarchy, or column_grants
@@ -44,7 +56,7 @@ work:
   - id: w2
     summary: "Run metadata_primitives tests; update any test that encodes the old True return value"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       uv run -- python -m pytest tests/ -k metadata_primitives -m fast -q
       If any test asserts supports_acl('duckdb') is True, that test was
