@@ -87,7 +87,11 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   memory_gb: number | null;
   python: string | null;
   // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
-  // physical_mechanisms in DetailResult); null when none were recorded.
+  // physical_mechanisms in DetailResult). Tri-state, preserved from the
+  // pipeline: SQL NULL (-> null here) means no logical tuning profile was
+  // recorded at all (unknown); "" means a profile WAS recorded and it
+  // genuinely has zero mechanisms (recorded-empty, a real comparable
+  // value); a non-empty string is the comma-joined mechanism list.
   physical_mechanisms?: string | null;
 }
 
@@ -648,7 +652,16 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     storage_format: wide.storage_format,
     storage_tier: wide.storage_tier,
     compliance_class: wide.compliance_class,
-    physical_mechanisms: wide.physical_mechanisms ? wide.physical_mechanisms.split(",") : [],
+    // Preserve the unknown (null/undefined -> undefined) vs recorded-empty
+    // ("" -> []) distinction from the DB row -- do not collapse both to [],
+    // or a legacy/unrecorded row would look identical to a genuine
+    // zero-mechanism row to ComparabilityReceipt's undefined-guard.
+    physical_mechanisms:
+      wide.physical_mechanisms === null || wide.physical_mechanisms === undefined
+        ? undefined
+        : wide.physical_mechanisms === ""
+          ? []
+          : wide.physical_mechanisms.split(","),
     physical_rendering_id: wide.physical_rendering_id,
   };
 }

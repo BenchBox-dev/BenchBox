@@ -489,12 +489,44 @@ class TestExtendedManifestFields:
         assert detail.physical_rendering_id == "databricks_z_order"
         assert detail.physical_mechanisms == ["indexes", "clustering"]
 
-    def test_physical_mechanisms_empty_and_rendering_id_none_when_absent(self, bundle_file: Path) -> None:
+    def test_physical_mechanisms_none_and_rendering_id_none_when_no_logical_profile_recorded(
+        self, bundle_file: Path
+    ) -> None:
+        """A bundle with no platform.tuning.logical_profile at all is UNKNOWN
+        (None), not "recorded zero mechanisms" ([]). Collapsing these would
+        make a legacy bundle compared against a genuinely zero-mechanism
+        tuned run look like a real "different mechanisms" mismatch instead
+        of "nothing to compare" (see ComparabilityReceipt's undefined-guard,
+        which depends on this distinction surviving ingest)."""
         transformer = BundleTransformer()
         detail = transformer.to_detail_result(bundle_file, result_id="no-logical-profile")
 
-        assert detail.physical_mechanisms == []
+        assert detail.physical_mechanisms is None
         assert detail.physical_rendering_id is None
+
+    def test_physical_mechanisms_empty_list_when_logical_profile_recorded_with_zero_mechanisms(
+        self, tmp_path: Path
+    ) -> None:
+        """A logical_profile object IS present but genuinely has zero
+        mechanisms -- this is the ADR-2 motivating case (one platform
+        renders six mechanisms, another renders zero, for the same tuned
+        template) and must be distinguishable from "no profile recorded"."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["config"]["tuning_mode"] = "tuned"
+        data["platform"]["tuning"] = {
+            "source": "auto",
+            "logical_profile": {"physical_mechanisms": []},
+        }
+        bundle = tmp_path / "logical_profile_empty_mechanisms.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        detail = transformer.to_detail_result(bundle, result_id="empty-mechanisms")
+
+        assert detail.physical_mechanisms == []
+        assert detail.physical_mechanisms is not None
 
     def test_tuned_fallback_and_custom_pass_through_verbatim(self, tmp_path: Path) -> None:
         """The two new ADR-2 vocabulary values ingest like any other canonical mode."""

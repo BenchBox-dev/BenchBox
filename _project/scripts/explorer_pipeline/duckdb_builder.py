@@ -743,10 +743,17 @@ class DuckDBSnapshotBuilder:
             plans_published = detail.plans_published if detail is not None else False
             has_tuning = detail.has_tuning if detail is not None else False
             bundle_download_url = f"{bundle_url_prefix}/{entry.result_id}.json"
+            # Preserve the None (unknown/no logical profile recorded) vs []
+            # (a logical profile WAS recorded and genuinely has zero
+            # mechanisms) distinction from DetailResult.physical_mechanisms:
+            # SQL NULL means unknown; "" (join of an empty list) means
+            # recorded-empty. `if ... else None` would collapse both to
+            # NULL, making a legacy/unrecorded row indistinguishable from a
+            # genuinely zero-mechanism row downstream.
             physical_mechanisms = (
-                ",".join(sorted(detail.physical_mechanisms))
-                if detail is not None and detail.physical_mechanisms
-                else None
+                None
+                if detail is None or detail.physical_mechanisms is None
+                else ",".join(sorted(detail.physical_mechanisms))
             )
             physical_rendering_id = detail.physical_rendering_id if detail is not None else None
             rows.append(

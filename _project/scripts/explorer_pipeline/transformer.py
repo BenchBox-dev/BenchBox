@@ -237,21 +237,41 @@ def _tuning_hash(data: dict[str, Any]) -> str | None:
     return hashlib.sha256(payload.encode()).hexdigest()[:8]
 
 
-def _logical_profile(data: dict[str, Any]) -> dict[str, Any]:
-    """Extract the `platform.tuning.logical_profile` block (ADR-2 §3), or `{}`."""
+def _logical_profile(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Extract the `platform.tuning.logical_profile` block (ADR-2 §3).
+
+    Returns `None` when no logical profile was recorded at all (unknown --
+    e.g. a legacy bundle predating this field), distinct from an empty `{}`
+    profile object, which -- were a bundle ever to emit one -- would mean a
+    profile WAS recorded. Callers use this `None` vs "object present" split
+    to distinguish "unknown" from "recorded, just empty" for fields like
+    physical_mechanisms (see `_physical_mechanisms`).
+    """
     platform = data.get("platform", {})
     if not isinstance(platform, dict):
-        return {}
+        return None
     tuning = platform.get("tuning", {})
     if not isinstance(tuning, dict):
-        return {}
-    profile = tuning.get("logical_profile", {})
-    return profile if isinstance(profile, dict) else {}
+        return None
+    profile = tuning.get("logical_profile")
+    return profile if isinstance(profile, dict) else None
 
 
-def _physical_mechanisms(data: dict[str, Any]) -> list[str]:
-    """Extract the platform-rendered physical tuning mechanisms, if recorded."""
-    mechanisms = _logical_profile(data).get("physical_mechanisms", [])
+def _physical_mechanisms(data: dict[str, Any]) -> list[str] | None:
+    """Extract the platform-rendered physical tuning mechanisms.
+
+    Tri-state (see `DetailResult.physical_mechanisms`): `None` when no
+    logical_profile was recorded at all (unknown), `[]` when a
+    logical_profile IS present but recorded zero mechanisms (a genuine,
+    comparable value -- the ADR-2 motivating case of a platform rendering
+    zero mechanisms for a tuned template). Collapsing these would make an
+    unknown/legacy bundle compared against a genuinely zero-mechanism bundle
+    look like a real mismatch instead of "nothing to compare".
+    """
+    profile = _logical_profile(data)
+    if profile is None:
+        return None
+    mechanisms = profile.get("physical_mechanisms", [])
     if not isinstance(mechanisms, list):
         return []
     return [str(item) for item in mechanisms]
@@ -259,7 +279,10 @@ def _physical_mechanisms(data: dict[str, Any]) -> list[str]:
 
 def _physical_rendering_id(data: dict[str, Any]) -> str | None:
     """Extract the physical rendering strategy id (ADR-2 §3 secondary facet)."""
-    val = _logical_profile(data).get("physical_rendering_id")
+    profile = _logical_profile(data)
+    if profile is None:
+        return None
+    val = profile.get("physical_rendering_id")
     return str(val) if val else None
 
 
