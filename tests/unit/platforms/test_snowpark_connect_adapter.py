@@ -400,6 +400,48 @@ class TestSnowparkConnectAdapterDataFrame:
         assert result[0]["value"] == 100
 
 
+class TestSnowparkConnectAdapterResolveTableNames:
+    """Tests for _resolve_table_names against real (non-Mock) benchmark shapes.
+
+    TPCH/SSB/CoffeeShop/TPCDS's ``get_table_loading_order`` requires an
+    ``available_tables`` argument (no default) -- a plain MagicMock hides a
+    call-with-no-args bug because it never enforces the signature, so these
+    fakes emulate the real required-arg contract instead.
+    """
+
+    class _FakeBenchmarkWithOrdering:
+        def get_available_tables(self):
+            return ["lineitem", "orders", "customer"]
+
+        def get_table_loading_order(self, available_tables):
+            full_order = ["customer", "orders", "lineitem"]
+            return [t for t in full_order if t in available_tables]
+
+    class _FakeBenchmarkWithoutOrdering:
+        def get_table_names(self):
+            return ["region", "nation"]
+
+    def test_resolves_and_orders_via_required_arg_loading_order(self, mock_snowpark):
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        result = SnowparkConnectAdapter._resolve_table_names(self._FakeBenchmarkWithOrdering())
+
+        assert result == ["customer", "orders", "lineitem"]
+
+    def test_falls_back_to_unordered_list_without_loading_order(self, mock_snowpark):
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        result = SnowparkConnectAdapter._resolve_table_names(self._FakeBenchmarkWithoutOrdering())
+
+        assert result == ["region", "nation"]
+
+    def test_raises_when_benchmark_exposes_no_table_names(self, mock_snowpark):
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        with pytest.raises(ConfigurationError):
+            SnowparkConnectAdapter._resolve_table_names(object())
+
+
 class TestSnowparkConnectAdapterSchema:
     """Tests for schema operations."""
 
