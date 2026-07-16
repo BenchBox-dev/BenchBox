@@ -2,7 +2,7 @@ id: tuning-corpus-drop-pre-provenance-tuned-bundles-20260716
 title: "Drop pre-provenance 'tuned' seed-corpus bundles (physically untuned runs)"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Data Integrity
 
 description: |
@@ -20,17 +20,44 @@ work:
   - id: w1
     summary: "Enumerate and remove the 325 tuned bundles + their .manifest.json companions"
     notes: "Reuse the sweep logic (execution.tuning_mode == 'tuned') to build the removal list; commit the deletion with the list in the commit body."
-    status: pending
-    needs: []
+    status: done
+    outcome: |
+      Swept all 528 non-manifest bundles in results-data/bundles/ using the
+      same config.tuning_mode -> execution.tuning_mode fallback as
+      _project/scripts/explorer_pipeline/transformer.py::_tuning_mode.
+      Found exactly 325 with tuning_mode == "tuned", every one with a
+      .manifest.json sidecar (325 sidecars, no orphans). git rm'd all 650
+      files. Regenerated results-data/corpus-inventory.json
+      (`generate_corpus_inventory.py --write`); 203 bundles remain, all with
+      tuning_mode absent (not-recorded). Full removed-file list is in the
+      removal commit body.
   - id: w2
     summary: "Re-run explorer ingest over the remaining corpus; verify counts (expect 0 tuned, ~203 not-recorded)"
-    status: pending
+    status: done
     needs: [w1]
+    outcome: |
+      `uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q`:
+      276 passed. Also ran ExplorerPipeline.run() directly against
+      results-data/ (real corpus, not fixtures): BuildStats(processed=203,
+      skipped=0, cohorts=47). Queried the resulting results.duckdb `results`
+      table: `select tuning_mode, count(*) from results group by 1` ->
+      [(None, 203)] - zero tuned rows, 203 not-recorded, confirming the
+      expected ingest outcome directly against the reduced corpus.
+      results-data/validate_corpus.py also still passes: all 45 remaining
+      cohorts meet the >=3-platform depth gate.
   - id: w3
     summary: "Record the decision + regeneration path in results-data docs/README"
     notes: "Note that tuned corpus cells should be regenerated post-#1176/#1180 on live platforms; list the affected platform/benchmark cells so regeneration has a checklist."
-    status: pending
+    status: done
     needs: [w1]
+    outcome: |
+      Added results-data/REGENERATION.md: decision summary, pointer to the
+      _tuning_mode sweep logic, a 48-row benchmark x scale x platforms-removed
+      checklist table, an explicit callout that ai_primitives, tpcds
+      (standalone), and vector_search now have zero corpus coverage (all
+      their bundles were tuned-only), and step-by-step regeneration
+      instructions. Added a "Tuned bundles dropped (2026-07-16)" section to
+      results-data/README.md pointing at REGENERATION.md.
 
 deps:
   needs: []
@@ -58,4 +85,5 @@ metadata:
   tags: [tuning, corpus, data-integrity]
   estimated_effort: Small
   created_date: "2026-07-16"
+  completed_date: "2026-07-16"
   source_review: "tuning remediation batch close-out 2026-07-16; decision by Joe"
