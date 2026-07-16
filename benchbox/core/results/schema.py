@@ -1205,7 +1205,10 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     }
 
 
-_YAML_TUNING_SOURCES = frozenset({"explicit_file", "auto_discovered"})
+# "packaged_resource" is emitted by the packaged-template discovery tier
+# (feat/tuning-template-packaging); those runs load a real YAML template, so
+# the legacy source bridge must label them "yaml", not "auto".
+_YAML_TUNING_SOURCES = frozenset({"explicit_file", "auto_discovered", "packaged_resource"})
 
 
 def _legacy_tuning_source_bridge(tuning_source: str | None, tuning_source_file: str | None) -> str:

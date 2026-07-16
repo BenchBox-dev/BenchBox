@@ -207,3 +207,14 @@ def test_no_tuning_returns_no_platform_tuning_block_or_companion():
 
     assert build_tuning_payload(result) is None
     assert build_result_payload(result)["platform"].get("tuning") is None
+
+
+def test_packaged_resource_source_maps_to_yaml_legacy_bridge():
+    """A packaged-template run loads a real YAML template; the one-generation
+    legacy `source` key must say "yaml", not "auto" (cross-branch composition
+    with feat/tuning-template-packaging's PACKAGED_RESOURCE tuning source)."""
+    from benchbox.core.results.schema import _legacy_tuning_source_bridge
+
+    assert _legacy_tuning_source_bridge("packaged_resource", "tpch_tuned.yaml:abc123") == "yaml"
+    assert _legacy_tuning_source_bridge("packaged_resource", None) == "yaml"
+    assert _legacy_tuning_source_bridge("smart_defaults", None) == "auto"
