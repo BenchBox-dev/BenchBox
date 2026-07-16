@@ -2,7 +2,7 @@ id: uat-certification-wording-charter-decision
 title: "UAT boundary reset: certification wording reset OR explicit charter decision"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: Completed
 category: Documentation
 
 description: |
@@ -50,17 +50,33 @@ description: |
 work:
   - id: w0
     summary: "Re-validate: confirm zero 'certif' in the spec and inventory all certification-named surfaces"
-    status: pending
+    status: done
     notes: |
       grep -i certif on _project/specs/uat-framework.md (expect empty). Inventory
       the "Certification re-run" doc section, certification-0{1,2,3}-*.yaml
       configs, and any cert vocabulary in docs/operations/uat-framework.md.
       Record a compact summary.
 
+      RE-VALIDATION (2026-07-16): the decision has already been made AND landed.
+      This item was misfiled in DONE with a stale `status: Not Started` field and
+      restored to planning on that basis (PR #1181); the work was executed.
+      Evidence:
+        - _project/specs/uat-framework.md:746-754 carries an explicit
+          "Vocabulary (charter decision, 2026-05-31)" block recording
+          "Decision: Path A — use release-gate vocabulary ... do not charter a
+          standing cert-operations surface beyond the named evidence artifacts."
+        - The mechanical rename landed: docs/operations "Release-gate re-run",
+          tests/uat/configs/release-gate-0{1,2,3}-*.yaml, and
+          tests/uat/phases/report.py:release_gate_ordering_violations.
+        - Zero cert-named configs remain (`ls tests/uat/configs | grep -i cert`
+          -> none). The only surviving 'certif' hit is the historical-record
+          sentence inside the decision block itself, which is expected under
+          path A (it documents the rejected wording).
+
   - id: w1
     summary: "Decide path A (reword to release-gate) vs path B (charter certification in spec)"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       This is a product/scope decision — see open_questions. It must be settled
       before [[uat-loc-budget-reconciliation]] because chartered scope
@@ -68,10 +84,15 @@ work:
       [[uat-certification-rerun-ordering-and-gate]] (which builds the very
       cert-operations surface in question).
 
+      DECIDED (2026-05-31, recorded in spec:746-754): Path A. "Release-gate
+      orchestration" is the chartered term; no standing cert-operations surface
+      beyond the named evidence artifacts. Path B (charter "certification") is
+      recorded as deferred below.
+
   - id: w2
     summary: "Implement the selected charter outcome and record the unchosen path as deferred"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       If w1 chooses path A, reword the "Certification re-run" section and
       cert-named configs to the chartered "release-gate orchestration" language
@@ -79,6 +100,15 @@ work:
       charter section to _project/specs/uat-framework.md defining scope and an
       LOC/operations budget, then defer path A. Keep the named evidence
       artifacts either way.
+
+      DONE (path A): the "Certification re-run" runbook section, the
+      certification-0{1,2,3}-*.yaml configs, and the ordering helper were all
+      reworded to "release-gate" (release-gate-0{1,2,3}-*.yaml,
+      report.py:release_gate_ordering_violations). Named evidence artifacts
+      preserved. Path B recorded as deferred. NOTE: the in-progress
+      [[uat-certification-rerun-ordering-and-gate]] should already reflect the
+      release-gate vocabulary — its wording alignment is tracked there, not a
+      residual work unit of this decision item.
 
 deferred:
   - summary: "Define a formal certification SOP/runbook"
@@ -94,7 +124,14 @@ metadata:
     - release-gate
   estimated_effort: "Small"
   created_date: "2026-05-31"
-  last_updated: "2026-05-31T00:00:00Z"
+  last_updated: "2026-07-16T00:00:00-04:00"
+  completed_date: "2026-07-16"
+  completion_note: |
+    Closed as already-decided-and-implemented. Path A (release-gate vocabulary)
+    was chosen and the rename landed across spec, runbook, configs, and the
+    ordering helper before this item's erroneous DONE-filing; PR #1181 restored
+    it to planning on the stale "Not Started" field. Tree re-validation on
+    2026-07-16 confirms the decision block and rename are present. No new work.
 
 impact:
   technical_debt: |
