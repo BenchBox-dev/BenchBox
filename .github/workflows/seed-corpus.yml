@@ -264,20 +264,20 @@ jobs:
             --body "$(cat <<'EOF'
           ## Seed corpus update
 
-          Automated PR from the \`seed-corpus\` workflow (run [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
+          Automated PR from the `seed-corpus` workflow (run [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})).
 
           ### Bundles included
 
-          New or updated result bundles are committed under \`results-data/bundles/\`.
+          New or updated result bundles are committed under `results-data/bundles/`.
           Review the diff to confirm expected benchmark × platform × scale coverage.
 
           ### Trust label
 
-          All bundles in this PR carry the \`maintainer-run\` / \`public-curated\` trust label.
+          All bundles in this PR carry the `maintainer-run` / `public-curated` trust label.
 
           ### Merging
 
-          Merge triggers the \`docs\` workflow which rebuilds the read model and
+          Merge triggers the `docs` workflow which rebuilds the read model and
           redeploys the results explorer.
           EOF
           )" \
@@ -286,10 +286,10 @@ jobs:
           # Base is develop, NOT the release branch: this PR carries
           # results-data/bundles/ content, which release-cut curation removes
           # from the release tree, and its chore/ head would be rejected by
-          # validate-release-pr.yml. (This was `--base main` when main was the
-          # default branch; integration semantics -> develop after the
-          # 2026-07-08 default-branch switch. Maintainer: confirm this is the
-          # intended base.)
+          # validate-release-pr.yml. (This flag pointed at the old default
+          # branch, main, before the 2026-07-08 default-branch switch;
+          # integration semantics -> develop after that switch. Maintainer:
+          # confirm this is the intended base.)
 
       - name: No changes to commit
         if: steps.check.outputs.no_changes == 'true'
