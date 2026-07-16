@@ -7,6 +7,20 @@ import {
   type FacetState,
 } from "@/lib/facetModel";
 
+/**
+ * Explicit facet token for rows whose bundle never recorded a tuning mode.
+ *
+ * No producer emits this value as a real mode; it exists so "not recorded"
+ * is a first-class state instead of a null silently coalesced into a
+ * real-looking mode. A row with tuning_mode NULL matches a facet selection
+ * only when that selection explicitly includes this sentinel (or the legacy
+ * "untuned" token still emitted by existing facet chips / URLs).
+ */
+export const NOT_RECORDED_TUNING_MODE = "not-recorded";
+
+/** Legacy unlabelled-tuning facet token; kept so existing chips and URLs keep matching. */
+export const LEGACY_UNLABELLED_TUNING_MODE = "untuned";
+
 export interface FacetMatchRow {
   benchmark?: string | null;
   scale_factor?: string | number | null;
@@ -96,7 +110,7 @@ function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: FacetKey, 
     case "execution_mode":
       return matchesOptional(row.execution_mode, facets.execution_mode);
     case "tuning_mode":
-      return matchesRequired(row.tuning_mode ?? "untuned", facets.tuning_mode);
+      return matchesTuningMode(row.tuning_mode, facets.tuning_mode);
     case "trust_tier":
       return matchesRequired(row.trust_label, facets.trust_tier);
     case "validation_status":
@@ -116,6 +130,17 @@ function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: FacetKey, 
     case "date_window":
       return matchesDateWindow(row.run_date, facets.date_window, now);
   }
+}
+
+function matchesTuningMode(value: string | null | undefined, selected: readonly string[]): boolean {
+  if (selected.length === 0) return true;
+  if (value === null || value === undefined) {
+    // Not-recorded rows match only an explicit not-recorded selection --
+    // never a real mode. The legacy "untuned" token keeps existing chip
+    // values and bookmarked URLs matching the same rows as before.
+    return selected.includes(NOT_RECORDED_TUNING_MODE) || selected.includes(LEGACY_UNLABELLED_TUNING_MODE);
+  }
+  return selected.includes(value);
 }
 
 function matchesRequired(value: string | null | undefined, selected: readonly string[]): boolean {
