@@ -35,6 +35,14 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/submit.py",
     "benchbox/cli/commands/tuning.py",
+    # tuning-renderer-consolidation-and-baseline-policy: `benchbox tuning
+    # platforms`'s SQL table body is now generated from
+    # capability_registry.PLATFORM_TUNING_CAPABILITIES
+    # (_sql_platform_capability_rows helper) instead of a hand-written
+    # platform/feature-description list. list_platforms keeps its existing
+    # @tuning_group.command("platforms") decorator and takes no arguments;
+    # only the table's row content changed, not the command's surface.
+    "benchbox/cli/commands/tuning_group.py",
     "benchbox/cli/commands/visualize.py",
     "benchbox/cli/composite_params.py",
     "benchbox/cli/config.py",
