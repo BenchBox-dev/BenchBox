@@ -97,6 +97,13 @@ export interface DetailResult extends CostDeploymentFields {
   validation_status: string | null;
   cost_usd: number | null;
   compliance_class: string | null;
+  // ADR-2 §3: platform-rendered physical tuning mechanisms and, for
+  // platforms that expose one, the physical rendering strategy used. Empty
+  // array / null / undefined for bundles that never recorded a logical
+  // tuning profile. Optional so existing fixtures/factories predating this
+  // field don't need updating.
+  physical_mechanisms?: string[];
+  physical_rendering_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------

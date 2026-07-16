@@ -149,6 +149,7 @@ open_questions:
     gating: true
     affects: ["w2", "success_metrics"]
     default: "Emit or preserve Nullable where benchmark schema marks a column nullable; only coerce to defaults for genuinely non-Nullable fields when source semantics require that."
+    promoted_to: "[[uat-clickhouse-loader-empty-value-nullability]] (2026-07-16) — the decision item that ratifies this default against benchmark schema nullability before w2 implements it."
 
 metadata:
   tags: [clickhouse-server, uat, loader, type-conversion]

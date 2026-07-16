@@ -21,6 +21,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from benchbox.core.tuning import modes as tuning_modes
 from benchbox.core.tuning.packaged_templates import list_packaged_templates, packaged_template_path
 
 if TYPE_CHECKING:
@@ -129,6 +130,29 @@ class TuningResolution:
     searched_paths: list[Path] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     info_messages: list[str] = field(default_factory=list)
+
+    @property
+    def canonical_mode(self) -> str:
+        """The pinned ADR-2 `tuning_mode` vocabulary value for this resolution.
+
+        Maps this resolver's internal (mode, source) pair onto the shared
+        vocabulary in `benchbox.core.tuning.modes` (see
+        docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md
+        §2): a `--tuning tuned` request that resolved via
+        `TuningSource.FALLBACK` (no template found) is recorded as
+        `tuned-fallback`, distinct from a genuinely curated-template `tuned`
+        run -- this is the fix for finding C4 (fallback runs silently
+        facet-matching curated runs). A resolved custom file is always
+        recorded as `custom`, never the raw local path. Every other
+        (mode, source) pair -- including `TUNED` resolved via
+        `INTERACTIVE_WIZARD`, `AUTO_DISCOVERED`, or an explicit config-file
+        default -- maps to the plain mode value.
+        """
+        if self.mode is TuningMode.TUNED and self.source is TuningSource.FALLBACK:
+            return tuning_modes.TUNED_FALLBACK
+        if self.mode is TuningMode.CUSTOM_FILE:
+            return tuning_modes.CUSTOM
+        return self.mode.value
 
     @property
     def source_description(self) -> str:

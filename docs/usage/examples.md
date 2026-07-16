@@ -197,7 +197,7 @@ benchbox run --platform postgres --benchmark tpch --queries "1,6,17" --phases po
 benchbox run --platform duckdb --benchmark tpcds --queries "42" --verbose --phases power
 
 # Test critical production queries only
-benchbox run --platform clickhouse --benchmark tpch --queries "1,6,12,17" --phases power
+benchbox run --platform clickhouse-local --benchmark tpch --queries "1,6,12,17" --phases power
 ```
 
 ### Programmatic Usage

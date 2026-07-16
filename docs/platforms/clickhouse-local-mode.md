@@ -78,7 +78,7 @@ benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
 - `--platform clickhouse-cloud` - Use ClickHouse Cloud (see [ClickHouse Cloud](clickhouse-cloud.md))
 
 ```{deprecated} v0.2.0
-The legacy colon syntax (`clickhouse:local`, `clickhouse:server`) and bare `clickhouse` selector still work but emit deprecation warnings. Use the first-class names above. See [Migration Guide](clickhouse-migration.md).
+The bare `clickhouse` selector has been removed and now raises an error naming the first-class replacements. The legacy colon syntax (`clickhouse:local`, `clickhouse:server`) still works but emits deprecation warnings. Use the first-class names above. See [Migration Guide](clickhouse-migration.md).
 ```
 
 #### Local Mode Specific Arguments

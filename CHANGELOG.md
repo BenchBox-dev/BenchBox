@@ -88,6 +88,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their platform and command examples from the live registry, so the lists stay
   in sync with actually supported platforms.
 
+### Removed
+
+- **BREAKING: bare `clickhouse` platform alias removed** - The temporary
+  compatibility alias that let `--platform clickhouse` (and `get_adapter(
+  "clickhouse")`) resolve to a first-class platform was added in v0.2.1 as a
+  deprecation shim and has now been removed after its deprecation window
+  (v0.2.1 → v0.3.1). Use `clickhouse-local` (embedded chDB), `clickhouse-server`
+  (self-hosted), or `clickhouse-cloud` (managed); the explicit `clickhouse:local`
+  / `clickhouse:server` / `clickhouse:cloud` selectors also remain available.
+  Passing bare `clickhouse` now raises a `ValueError` naming these replacements
+  instead of silently defaulting to a deployment mode. The `ch` CLI shorthand
+  now resolves to `clickhouse-local`.
+
 ## [0.3.0] - 2026-05-16
 
 ### New

@@ -72,7 +72,7 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
 export function buildComparabilityFields(results: DetailResult[]): ComparabilityField[] {
   if (results.length === 0) return [];
 
-  return [
+  const fields: ComparabilityField[] = [
     compareValues("Benchmark", results, (result) => humanizeBenchmark(result.benchmark)),
     compareValues("Scale factor", results, (result) => `SF ${result.scale_factor}`),
     compareValues("Phase", results, (result) => valueOrMissing(result.test_type)),
@@ -88,6 +88,59 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareValues("Cost model", results, costModelSummary),
     compareValues("Cost scope", results, costScopeSummary),
   ];
+
+  const physicalMechanismsField = buildPhysicalMechanismsField(results);
+  if (physicalMechanismsField) fields.push(physicalMechanismsField);
+
+  return fields;
+}
+
+/**
+ * ADR-2 §3: warn (never fail the match) when two or more results labeled
+ * `tuned` rendered different sets of physical tuning mechanisms (indexes,
+ * clustering keys, distribution styles, etc.) -- e.g. one platform renders
+ * six mechanisms for a template and another renders zero, invisibly to the
+ * coarse `tuning_mode` facet. Returns null when there's nothing to compare:
+ * fewer than two `tuned` results, or any of them predates ingest recording
+ * `physical_mechanisms` (undefined, not merely empty -- an empty array is a
+ * meaningful "rendered nothing" value, not "unknown").
+ */
+function buildPhysicalMechanismsField(results: DetailResult[]): ComparabilityField | null {
+  const tunedResults = results.filter((result) => result.tuning_mode === "tuned");
+  if (tunedResults.length < 2) return null;
+  if (tunedResults.some((result) => result.physical_mechanisms === undefined)) return null;
+
+  const sets = tunedResults.map((result) => new Set(result.physical_mechanisms ?? []));
+  const allMatch = sets.every((set) => setsEqual(set, sets[0]!));
+
+  if (allMatch) {
+    const count = sets[0]!.size;
+    return {
+      label: "Physical tuning mechanisms",
+      status: "match",
+      summary: count > 0 ? formatCount(count, "mechanism", "mechanisms") : "None rendered",
+    };
+  }
+
+  return {
+    label: "Physical tuning mechanisms",
+    status: "diff",
+    summary: "Tuned runs rendered different physical mechanisms",
+    detail: formatPerPlatform(
+      tunedResults.map((result) => ({
+        platform: result.platform,
+        value: (result.physical_mechanisms ?? []).join(", ") || "none",
+      })),
+    ),
+  };
+}
+
+function setsEqual(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const item of a) {
+    if (!b.has(item)) return false;
+  }
+  return true;
 }
 
 export function comparabilityWarningFields(fields: readonly ComparabilityField[]): ComparabilityField[] {

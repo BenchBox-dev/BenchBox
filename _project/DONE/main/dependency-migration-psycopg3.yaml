@@ -2,8 +2,34 @@ id: dependency-migration-psycopg3
 title: "Migrate off psycopg2-binary to psycopg3 (asyncpg-compatible driver modernisation)"
 worktree: main
 priority: Low
-status: Not Started
+status: Completed
+completed_date: "2026-07-16"
 category: Code Quality and Technical Debt
+
+completion_notes: |
+  Already migrated in code — no driver swap needed. The PostgreSQL-family
+  adapters already use psycopg3:
+    - benchbox/platforms/postgresql.py, redshift.py: `import psycopg` (v3),
+      `psycopg.connect(...)`, version guidance points at 3.1+.
+    - pyproject.toml pins `psycopg[binary]>=3.1` (core, and the `postgresql`
+      and `questdb` extras); there is no `psycopg2-binary` dependency.
+    - `benchbox/platforms/base/psycopg2_mixin.py` is a psycopg3 wire-protocol
+      connection mixin (its docstring says "psycopg connection mechanics");
+      only its filename is legacy — it imports no driver.
+  Verified (w0/w3):
+    - `grep -rn 'import psycopg2' benchbox/ | wc -l` -> 0 (the TODO's own
+      acceptance target).
+    - `pytest tests/ -k "postgres or redshift" -m fast` -> 884 passed.
+  w1 (compat assessment) and w2 (swap) were therefore no-ops — the codebase
+  is already on psycopg3. Closing to retire tracking of already-landed work.
+
+  Residual, deferred as cosmetic-only (no behaviour impact): the module
+  filename `base/psycopg2_mixin.py` and a handful of "psycopg2 style" /
+  "psycopg2" comments (e.g. base/phase_tracking.py, tpch/tpcds maintenance
+  paramstyle notes). Corrected the two factually-wrong dependency comments in
+  `benchbox/platforms/__init__.py`; a module rename touches the import in
+  `base/__init__.py` and public `PsycopgConnectionMixin` consumers, so it is
+  left as an optional follow-up rather than bundled here.
 
 description: |
   `psycopg2-binary` is a legacy PostgreSQL driver with known packaging
@@ -25,7 +51,7 @@ description: |
 work:
   - id: w0
     summary: "Audit all psycopg2 import sites and connection usage patterns"
-    status: pending
+    status: done
     notes: |
       grep -rn 'psycopg2\|import psycopg' benchbox/ tests/
       Classify each site: direct import, connection factory, cursor type
@@ -35,7 +61,7 @@ work:
   - id: w1
     summary: "Assess psycopg3 API compatibility at each identified call site"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       psycopg3 is largely API-compatible with psycopg2 for synchronous use, but
       there are known differences: parameter placeholders (%s vs %(name)s vs ?),
@@ -45,7 +71,7 @@ work:
   - id: w2
     summary: "Swap psycopg2-binary for psycopg[binary] in pyproject.toml and update imports"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       In pyproject.toml, replace psycopg2-binary with psycopg[binary] (or
       psycopg[c] for the C extension build). Update any `import psycopg2` to
@@ -55,7 +81,7 @@ work:
   - id: w3
     summary: "Run the full Redshift/PostgreSQL test suite and confirm zero regressions"
     needs: [w2]
-    status: pending
+    status: done
     notes: |
       uv run -- python -m pytest tests/ -k 'redshift or postgres or postgresql' -q
       Also run the full unit suite to catch any indirect psycopg2 dependency
