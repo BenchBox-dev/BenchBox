@@ -66,8 +66,22 @@ def map_candidate_to_platform(
     physical_rendering_id: str | None = None,
 ) -> PlatformTuningMapping:
     """Map a logical tuning candidate to one platform's physical tuning vocabulary."""
+    from benchbox.core.tuning.capability_registry import WORKLOAD_PROFILE_MAPPED_PLATFORMS
+
     platform_key = platform.lower().replace("_", "-")
     roles = set(candidate.roles)
+
+    # WORKLOAD_PROFILE_MAPPED_PLATFORMS is the capability registry's record of
+    # which platforms this mapper implements -- single source of truth shared
+    # with the registry rather than re-declared as an implicit if/elif chain.
+    if platform_key not in WORKLOAD_PROFILE_MAPPED_PLATFORMS:
+        return PlatformTuningMapping(
+            platform=platform_key,
+            tuning_types=(),
+            physical_mechanisms=(),
+            decision=UNSUPPORTED,
+            reason=f"{platform_key} has no TPC logical profile mapping yet",
+        )
 
     if platform_key == "databricks":
         return _map_databricks(roles, physical_rendering_id or DATABRICKS_Z_ORDER_RENDERING)
@@ -77,16 +91,7 @@ def map_candidate_to_platform(
         return _map_bigquery(roles)
     if platform_key == "redshift":
         return _map_redshift(roles)
-    if platform_key == "snowflake":
-        return _map_snowflake(roles)
-
-    return PlatformTuningMapping(
-        platform=platform_key,
-        tuning_types=(),
-        physical_mechanisms=(),
-        decision=UNSUPPORTED,
-        reason=f"{platform_key} has no TPC logical profile mapping yet",
-    )
+    return _map_snowflake(roles)
 
 
 def _map_databricks(roles: set[str], physical_rendering_id: str) -> PlatformTuningMapping:

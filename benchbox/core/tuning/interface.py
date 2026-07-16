@@ -95,114 +95,28 @@ class TuningType(Enum):
 
 
 # Platform compatibility mapping, keyed by canonical platform type keys.
-# Module-level (not built inside is_compatible_with_platform, and NOT a class
-# attribute of TuningType -- an Enum class attribute of a non-descriptor type
-# would itself become a bogus enum member) so the key set has a single source
-# of truth shared with _KNOWN_COMPATIBILITY_PLATFORMS below. Per the
-# tuning-platform-identity-canonical-keys TODO: do not add new platforms here
-# as a side effect of fixing lookup keys -- that grows the drift this map is
-# scheduled to be replaced for (ADR-3).
-_PLATFORM_COMPATIBILITY_MAP: dict[str, frozenset[TuningType]] = {
-    "duckdb": frozenset(
-        {
-            TuningType.SORTING,
-            TuningType.PARTITIONING,
-            TuningType.PRIMARY_KEYS,
-            TuningType.FOREIGN_KEYS,
-            TuningType.UNIQUE_CONSTRAINTS,
-            TuningType.CHECK_CONSTRAINTS,
-        }
-    ),
-    "snowflake": frozenset(
-        {
-            TuningType.CLUSTERING,
-            TuningType.PARTITIONING,
-            TuningType.PRIMARY_KEYS,
-            TuningType.FOREIGN_KEYS,
-            TuningType.UNIQUE_CONSTRAINTS,
-            TuningType.CHECK_CONSTRAINTS,
-            TuningType.MATERIALIZED_VIEWS,
-        }
-    ),
-    "bigquery": frozenset(
-        {
-            TuningType.PARTITIONING,
-            TuningType.CLUSTERING,
-            TuningType.PRIMARY_KEYS,
-            TuningType.FOREIGN_KEYS,
-            TuningType.CHECK_CONSTRAINTS,
-            TuningType.MATERIALIZED_VIEWS,
-        }
-    ),
-    "redshift": frozenset(
-        {
-            TuningType.DISTRIBUTION,
-            TuningType.SORTING,
-            TuningType.PARTITIONING,
-            TuningType.PRIMARY_KEYS,
-            TuningType.FOREIGN_KEYS,
-            TuningType.UNIQUE_CONSTRAINTS,
-            TuningType.CHECK_CONSTRAINTS,
-            TuningType.MATERIALIZED_VIEWS,
-        }
-    ),
-    "clickhouse": frozenset(
-        {
-            TuningType.PARTITIONING,
-            TuningType.SORTING,
-            TuningType.CLUSTERING,
-            TuningType.PRIMARY_KEYS,
-            TuningType.UNIQUE_CONSTRAINTS,
-            TuningType.MATERIALIZED_VIEWS,
-        }
-    ),
-    "databricks": frozenset(
-        {
-            TuningType.PARTITIONING,
-            TuningType.CLUSTERING,
-            TuningType.DISTRIBUTION,
-            TuningType.PRIMARY_KEYS,
-            TuningType.FOREIGN_KEYS,
-            TuningType.UNIQUE_CONSTRAINTS,
-            TuningType.CHECK_CONSTRAINTS,
-            TuningType.Z_ORDERING,
-            TuningType.LIQUID_CLUSTERING,
-            TuningType.AUTO_OPTIMIZE,
-            TuningType.AUTO_COMPACT,
-            TuningType.BLOOM_FILTERS,
-            TuningType.MATERIALIZED_VIEWS,
-        }
-    ),
-    "sqlite": frozenset(
-        {
-            TuningType.PRIMARY_KEYS,
-            TuningType.FOREIGN_KEYS,
-            TuningType.UNIQUE_CONSTRAINTS,
-            TuningType.CHECK_CONSTRAINTS,
-        }
-    ),
-    "postgresql": frozenset(
-        {
-            TuningType.PARTITIONING,
-            TuningType.CLUSTERING,
-            TuningType.PRIMARY_KEYS,
-            TuningType.FOREIGN_KEYS,
-            TuningType.UNIQUE_CONSTRAINTS,
-            TuningType.CHECK_CONSTRAINTS,
-            TuningType.BLOOM_FILTERS,
-            TuningType.MATERIALIZED_VIEWS,
-        }
-    ),
-    "mysql": frozenset(
-        {
-            TuningType.PARTITIONING,
-            TuningType.PRIMARY_KEYS,
-            TuningType.FOREIGN_KEYS,
-            TuningType.UNIQUE_CONSTRAINTS,
-            TuningType.CHECK_CONSTRAINTS,
-        }
-    ),
-}
+# Derived from benchbox.core.tuning.capability_registry -- the single
+# capability registry introduced by the tuning-renderer-consolidation TODO --
+# rather than hand-maintained here, so this map and the registry's
+# per-platform capability entries can no longer drift apart. The import is
+# deferred to function scope (see _platform_compatibility_map below) to avoid
+# a module import cycle: capability_registry imports TuningType from this
+# module.
+#
+# Per the tuning-platform-identity-canonical-keys TODO: do not add new
+# platforms here as a side effect of fixing lookup keys -- new platforms are
+# added to capability_registry.PLATFORM_TUNING_CAPABILITIES and, if they
+# should participate in the hard-error-vs-warning distinction below, to
+# capability_registry._INTERFACE_KNOWN_PLATFORMS.
+
+
+def _platform_compatibility_map() -> dict[str, frozenset[TuningType]]:
+    from benchbox.core.tuning.capability_registry import interface_compatibility_map
+
+    return interface_compatibility_map()
+
+
+_PLATFORM_COMPATIBILITY_MAP: dict[str, frozenset[TuningType]] = _platform_compatibility_map()
 
 
 # Canonical platform keys with an explicit entry in the compatibility map.
