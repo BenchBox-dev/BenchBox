@@ -93,8 +93,8 @@ scope_limit:
 
 verification:
   - description: "Corpus re-ingest count check"
-    command: "uv run -- python _project/scripts/explorer_pipeline/pipeline.py --help"
-    expected_output: "Pipeline runs against results-data/bundles; dataset shows 325 tuned and 203 not-recorded rows (exact counts from w0 re-validation)"
+    command: "rm -rf /tmp/explorer-ingest-check && uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output /tmp/explorer-ingest-check && uv run -- python -c \"import duckdb; print(duckdb.connect('/tmp/explorer-ingest-check/results.duckdb').execute('SELECT tuning_mode, COUNT(*) FROM results GROUP BY tuning_mode ORDER BY 2 DESC').fetchall())\""
+    expected_output: "Real re-ingest via the explorer_publish.py build entrypoint (pipeline.py is import-only, has no CLI); dataset shows 325 tuned and 203 not-recorded rows (exact counts from w0 re-validation) once this TODO's tuning_mode/not-recorded classification work lands -- pre-implementation, tuning_mode reads NULL for all 528 rows (verified 2026-07-12)"
   - description: "Explorer unit tests green"
     command: "cd results-explorer && npm test -- --run 2>&1 | tail -5"
     expected_output: "All passing incl. new not-recorded state tests"

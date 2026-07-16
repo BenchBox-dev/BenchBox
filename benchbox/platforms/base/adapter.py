@@ -270,6 +270,40 @@ class PlatformAdapter(
         """
         return self.__class__.__name__
 
+    @property
+    def canonical_platform_type(self) -> str:
+        """Return the canonical, machine-readable platform type key.
+
+        Tuning-capability lookups and metadata persistence must key off a
+        stable identifier (e.g. ``"clickhouse-local"``, ``"duckdb"``) -- not
+        `platform_name`, which is a human-facing display string (e.g.
+        ``"ClickHouse Local"``, ``"StarRocks"``) that varies by adapter and is
+        never guaranteed to match the lowercase, single-word keys used by
+        capability maps such as `TuningType`'s compatibility map.
+
+        Sourced from the ``type`` key in `platform_config` when present.
+        Upstream config plumbing (core/platform_config.py) strips ``type``
+        from DatabaseConfig before adapter construction, so the key does NOT
+        survive that path on its own -- ``get_platform_adapter`` in
+        `benchbox.platforms` re-injects the resolved canonical registry name
+        (`PlatformRegistry.resolve_platform_name`) into the constructor
+        config, which is what this property reads on every factory-built
+        adapter.
+
+        Falls back to a normalized form of `platform_name` (lowercased,
+        spaces collapsed to hyphens) when no config type is available -- e.g.
+        an adapter constructed directly, bypassing the factory, as many unit
+        tests do. This fallback is best-effort only: it does not guarantee a
+        match against any capability map key (a parenthesized display name
+        like ``"ClickHouse (Local)"`` normalizes to ``"clickhouse-(local)"``),
+        it just avoids crashing on multi-word display strings.
+        """
+        platform_config = getattr(self, "platform_config", None)
+        config_type = platform_config.get("type") if isinstance(platform_config, dict) else None
+        if config_type:
+            return str(config_type).strip().lower()
+        return self.platform_name.strip().lower().replace(" ", "-")
+
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get platform information for results traceability.
 
@@ -711,7 +745,11 @@ class PlatformAdapter(
             effective_tuning_config = self.get_effective_tuning_configuration()
             if self.tuning_enabled and effective_tuning_config:
                 quiet_console.print("Validating unified tuning configuration...")
-                tuning_errors = effective_tuning_config.validate_for_platform(self.platform_name)
+                tuning_errors, tuning_warnings = effective_tuning_config.validate_for_platform_detailed(
+                    self.canonical_platform_type
+                )
+                for warning in tuning_warnings:
+                    self.logger.warning(f"Tuning configuration warning: {warning}")
                 if tuning_errors:
                     raise ValueError(f"Invalid tuning configuration: {'; '.join(tuning_errors)}")
                 quiet_console.print("✅ Unified tuning configuration validated")

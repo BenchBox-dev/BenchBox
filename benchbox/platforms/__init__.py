@@ -396,11 +396,25 @@ def get_platform_adapter(platform_name: str, **config) -> PlatformAdapter:
 
     # Use from_config() if adapter supports config-aware initialization (e.g., Databricks, Snowflake)
     # This enables proper schema naming based on benchmark/scale/tuning configuration
+    # Inject the canonical registry key so PlatformAdapter.canonical_platform_type
+    # reflects the resolved platform selector rather than falling back to a
+    # normalized display name. Upstream config plumbing (core/platform_config.py)
+    # strips "type" from DatabaseConfig before adapters are constructed, so this
+    # is the authoritative point where the canonical key reaches the adapter.
+    # Overwrite (not setdefault): any inbound "type" is the raw user selector,
+    # possibly an alias (e.g. "sqlite3"); canonical_name is its resolved form.
+    config["type"] = canonical_name
     if hasattr(adapter_class, "from_config") and callable(adapter_class.from_config):
         adapter_instance = adapter_class.from_config(config)
     else:
         # Simple adapters use direct constructor (e.g., DuckDB, SQLite)
         adapter_instance = adapter_class(**config)
+
+    # Some from_config implementations rebuild their constructor config with
+    # selected keys only, dropping the injected "type" -- restore it on the
+    # stored platform_config so canonical_platform_type works uniformly.
+    if isinstance(getattr(adapter_instance, "platform_config", None), dict):
+        adapter_instance.platform_config.setdefault("type", canonical_name)
 
     # Attach driver metadata for downstream consumers (CLI summaries, exports).
     adapter_instance.driver_package = resolution.package or package_hint

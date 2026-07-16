@@ -2,7 +2,8 @@ id: tuning-adr-mode-vocabulary-fallback-facets-20260712
 title: "DECISION GATE: tuning mode vocabulary, fallback labeling, and facet semantics (ADR-2)"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
+completed_date: "2026-07-12"
 category: Architecture Decision
 
 description: |
@@ -31,12 +32,36 @@ work:
   - id: w1
     summary: "Draft ADR with options and recommendations for fallback labeling, vocabulary pin, facet rule"
     notes: "Recommendations from the review: distinct fallback mode + refuse under --official; pinned shared vocabulary artifact consumed by Python and TS; mode stays coarse facet with mechanism-set warning in receipt and physical_rendering_id promoted to matchable facet for TPC."
-    status: pending
+    status: done
     needs: []
   - id: w2
     summary: "Joe decides; record decisions and the pinned vocabulary in a decision record referenced by both Python and TS test suites"
-    status: pending
+    status: done
     needs: [w1]
+    notes: |
+      Joe adopted the recommended defaults on 2026-07-12. Decision recorded in
+      docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md:
+
+      1. FALLBACK LABELING: a `--tuning tuned` run with no template gets the
+         distinct mode value `tuned-fallback` (not `tuned`), and is refused under
+         `--official`. Wizard-produced configs get source provenance `wizard`.
+      2. VOCABULARY PIN: canonical tuning_mode values are exactly `tuned`,
+         `tuned-fallback`, `notuning`, `auto`, `custom`. Raw file paths are not
+         legal mode values; custom-file runs emit `custom` + a template
+         ref/hash. The wizard's `balanced` string maps into this set as a
+         template flavor, not a mode. Absent/unrecorded is a distinct
+         "not recorded" state in ingest and UI, never coerced to `notuning`.
+         The vocabulary lives in one shared artifact consumed by both Python
+         and TypeScript test suites.
+      3. FACET RULE: tuning_mode stays the coarse comparability facet with
+         exact-match semantics over the pinned vocabulary; ComparabilityReceipt
+         warns when two "tuned" runs have disjoint physical mechanism sets;
+         physical_rendering_id becomes a secondary matchable facet for TPC
+         benchmarks. Unknown/not-recorded never silently matches `notuning`.
+
+      Implementation is deferred to tuning-mode-vocabulary-and-facet-implementation-20260712,
+      tuning-explorer-ingest-mode-extraction-20260712, and
+      tuning-soundness-test-coverage-20260712.
 
 deferred:
   - summary: "Implementation across resolver, schema, explorer"
@@ -59,10 +84,12 @@ open_questions:
     gating: true
     affects: [w2]
     default: "No - distinct mode value; refuse under --official"
+    resolved_with: "Adopted default: distinct mode value `tuned-fallback`; refused under --official. See docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md."
   - question: "Do two 'tuned' runs on different platforms facet-match regardless of physical mechanisms?"
     gating: true
     affects: [w2]
     default: "Coarse facet keeps matching; receipt warns on disjoint mechanism sets; physical_rendering_id becomes a secondary facet for TPC"
+    resolved_with: "Adopted default: coarse facet keeps exact-match semantics; ComparabilityReceipt warns on disjoint mechanism sets; physical_rendering_id promoted to a secondary matchable facet for TPC. See docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md."
 
 metadata:
   owners:
@@ -75,3 +102,4 @@ metadata:
   estimated_effort: Small
   created_date: "2026-07-12"
   source_review: "tuning-system deep review 2026-07-12 (claude/tuning-system-review-7mzapy)"
+  decision_note: "Joe adopted the recommended defaults on 2026-07-12; decision recorded in docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md."
