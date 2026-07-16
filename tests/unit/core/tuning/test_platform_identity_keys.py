@@ -131,6 +131,38 @@ class TestKnownPlatformSemanticsPreserved:
         assert TuningType.is_known_platform("doris") is False
         assert TuningType.is_known_platform("clickhouse-local") is False
 
+    def test_known_platform_set_stays_in_sync_with_compatibility_map(self):
+        from benchbox.core.tuning.interface import (
+            _KNOWN_COMPATIBILITY_PLATFORMS,
+            _PLATFORM_COMPATIBILITY_MAP,
+        )
+
+        # _KNOWN_COMPATIBILITY_PLATFORMS is derived from the map, so these can
+        # never diverge; assert the derivation holds and pin the exact key set
+        # so accidental additions/removals fail loudly (the TODO forbids
+        # growing this map as a fix for unmapped platforms -- see ADR-3).
+        assert frozenset(_PLATFORM_COMPATIBILITY_MAP) == _KNOWN_COMPATIBILITY_PLATFORMS
+        assert (
+            frozenset(
+                {
+                    "duckdb",
+                    "snowflake",
+                    "bigquery",
+                    "redshift",
+                    "clickhouse",
+                    "databricks",
+                    "sqlite",
+                    "postgresql",
+                    "mysql",
+                }
+            )
+            == _KNOWN_COMPATIBILITY_PLATFORMS
+        )
+        # Every mapped tuning type reports compatible for its platform.
+        for platform, tuning_types in _PLATFORM_COMPATIBILITY_MAP.items():
+            for tuning_type in tuning_types:
+                assert tuning_type.is_compatible_with_platform(platform) is True
+
     def test_duckdb_default_config_still_validates_clean(self):
         config = UnifiedTuningConfiguration()
         errors, warnings = config.validate_for_platform_detailed("duckdb")
@@ -199,6 +231,40 @@ class TestCanonicalPlatformType:
     def test_fallback_lowercases_single_word_display_names(self):
         adapter = _StubAdapter(display_name="StarRocks")
         assert adapter.canonical_platform_type == "starrocks"
+
+    def test_fallback_on_parenthesized_display_name_is_not_a_canonical_key(self):
+        # Pin the documented best-effort behavior: without an injected config
+        # type, a parenthesized display name normalizes to a non-canonical
+        # string (no paren-stripping surgery, per the TODO anti-patterns).
+        # This is exactly why get_platform_adapter injects config["type"].
+        adapter = _StubAdapter(display_name="ClickHouse (Local)")
+        assert adapter.canonical_platform_type == "clickhouse-(local)"
+        assert TuningType.is_known_platform(adapter.canonical_platform_type) is False
+
+    def test_injected_config_type_overrides_parenthesized_display_name(self):
+        # Simulates a factory-built adapter: get_platform_adapter sets
+        # config["type"] to the resolved canonical registry key.
+        adapter = _StubAdapter(display_name="ClickHouse (Local)", type="clickhouse")
+        assert adapter.canonical_platform_type == "clickhouse"
+        assert TuningType.is_known_platform(adapter.canonical_platform_type) is True
+
+    def test_registry_constructed_adapter_reports_canonical_type(self, tmp_path):
+        # Live-path regression: core/platform_config.py strips "type" before
+        # construction, so get_platform_adapter must re-inject the canonical
+        # registry key for canonical_platform_type to work on real adapters
+        # (including from_config implementations that rebuild their config
+        # with selected keys only, like DuckDB's).
+        from benchbox.platforms import get_platform_adapter
+
+        adapter = get_platform_adapter("duckdb", database_path=str(tmp_path / "t.duckdb"))
+        assert adapter.canonical_platform_type == "duckdb"
+        assert adapter.platform_config["type"] == "duckdb"
+
+    def test_registry_constructed_adapter_resolves_aliases(self, tmp_path):
+        from benchbox.platforms import get_platform_adapter
+
+        adapter = get_platform_adapter("sqlite3", database_path=str(tmp_path / "t.db"))
+        assert adapter.canonical_platform_type == "sqlite"
 
     def test_validate_tuning_configuration_uses_canonical_key(self):
         adapter = _StubAdapter(display_name="StarRocks", type="starrocks")

@@ -281,19 +281,22 @@ class PlatformAdapter(
         never guaranteed to match the lowercase, single-word keys used by
         capability maps such as `TuningType`'s compatibility map.
 
-        Sourced from the ``type`` key in `platform_config` when present. That
-        key is the raw platform selector the adapter was constructed with
-        (e.g. `DatabaseConfig.type`, passed straight through via
-        ``get_platform_adapter(platform_name, **config)`` /
-        `PlatformRegistry.resolve_platform_name`), so it survives round-trip
-        even for platforms with multi-word display names.
+        Sourced from the ``type`` key in `platform_config` when present.
+        Upstream config plumbing (core/platform_config.py) strips ``type``
+        from DatabaseConfig before adapter construction, so the key does NOT
+        survive that path on its own -- ``get_platform_adapter`` in
+        `benchbox.platforms` re-injects the resolved canonical registry name
+        (`PlatformRegistry.resolve_platform_name`) into the constructor
+        config, which is what this property reads on every factory-built
+        adapter.
 
         Falls back to a normalized form of `platform_name` (lowercased,
         spaces collapsed to hyphens) when no config type is available -- e.g.
-        an adapter constructed directly, bypassing the CLI config pipeline,
-        as many unit tests do. This fallback is best-effort only: it does not
-        guarantee a match against any capability map key, it just avoids
-        crashing on multi-word display strings.
+        an adapter constructed directly, bypassing the factory, as many unit
+        tests do. This fallback is best-effort only: it does not guarantee a
+        match against any capability map key (a parenthesized display name
+        like ``"ClickHouse (Local)"`` normalizes to ``"clickhouse-(local)"``),
+        it just avoids crashing on multi-word display strings.
         """
         platform_config = getattr(self, "platform_config", None)
         config_type = platform_config.get("type") if isinstance(platform_config, dict) else None

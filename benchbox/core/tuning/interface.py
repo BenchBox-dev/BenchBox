@@ -70,98 +70,14 @@ class TuningType(Enum):
         """Check if this tuning type is compatible with the given platform.
 
         Args:
-            platform: The name of the database platform (e.g., 'duckdb', 'snowflake')
+            platform: The canonical platform type key (e.g., 'duckdb',
+                'snowflake') -- not a human display string.
 
         Returns:
             True if the tuning type is supported by the platform
         """
-        # Platform compatibility mapping
-        compatibility_map = {
-            "duckdb": {
-                self.SORTING,
-                self.PARTITIONING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-            },
-            "snowflake": {
-                self.CLUSTERING,
-                self.PARTITIONING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "bigquery": {
-                self.PARTITIONING,
-                self.CLUSTERING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.CHECK_CONSTRAINTS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "redshift": {
-                self.DISTRIBUTION,
-                self.SORTING,
-                self.PARTITIONING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "clickhouse": {
-                self.PARTITIONING,
-                self.SORTING,
-                self.CLUSTERING,
-                self.PRIMARY_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "databricks": {
-                self.PARTITIONING,
-                self.CLUSTERING,
-                self.DISTRIBUTION,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-                self.Z_ORDERING,
-                self.LIQUID_CLUSTERING,
-                self.AUTO_OPTIMIZE,
-                self.AUTO_COMPACT,
-                self.BLOOM_FILTERS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "sqlite": {
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-            },
-            "postgresql": {
-                self.PARTITIONING,
-                self.CLUSTERING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-                self.BLOOM_FILTERS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "mysql": {
-                self.PARTITIONING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-            },
-        }
-
         platform_lower = platform.lower()
-        return self in compatibility_map.get(platform_lower, set())
+        return self in _PLATFORM_COMPATIBILITY_MAP.get(platform_lower, frozenset())
 
     @classmethod
     def is_known_platform(cls, platform: str) -> bool:
@@ -178,28 +94,122 @@ class TuningType(Enum):
         return platform.lower() in _KNOWN_COMPATIBILITY_PLATFORMS
 
 
-# Canonical platform keys with an explicit entry in TuningType's compatibility
-# map. Kept as a module-level constant (not derived from the map inside
-# is_compatible_with_platform, and NOT a class attribute of TuningType -- an
-# Enum class attribute of a non-descriptor type would itself become a bogus
-# enum member) so callers can ask "is this platform known to the map at all"
-# without constructing a throwaway TuningType instance. Per the
+# Platform compatibility mapping, keyed by canonical platform type keys.
+# Module-level (not built inside is_compatible_with_platform, and NOT a class
+# attribute of TuningType -- an Enum class attribute of a non-descriptor type
+# would itself become a bogus enum member) so the key set has a single source
+# of truth shared with _KNOWN_COMPATIBILITY_PLATFORMS below. Per the
 # tuning-platform-identity-canonical-keys TODO: do not add new platforms here
 # as a side effect of fixing lookup keys -- that grows the drift this map is
 # scheduled to be replaced for (ADR-3).
-_KNOWN_COMPATIBILITY_PLATFORMS = frozenset(
-    {
-        "duckdb",
-        "snowflake",
-        "bigquery",
-        "redshift",
-        "clickhouse",
-        "databricks",
-        "sqlite",
-        "postgresql",
-        "mysql",
-    }
-)
+_PLATFORM_COMPATIBILITY_MAP: dict[str, frozenset[TuningType]] = {
+    "duckdb": frozenset(
+        {
+            TuningType.SORTING,
+            TuningType.PARTITIONING,
+            TuningType.PRIMARY_KEYS,
+            TuningType.FOREIGN_KEYS,
+            TuningType.UNIQUE_CONSTRAINTS,
+            TuningType.CHECK_CONSTRAINTS,
+        }
+    ),
+    "snowflake": frozenset(
+        {
+            TuningType.CLUSTERING,
+            TuningType.PARTITIONING,
+            TuningType.PRIMARY_KEYS,
+            TuningType.FOREIGN_KEYS,
+            TuningType.UNIQUE_CONSTRAINTS,
+            TuningType.CHECK_CONSTRAINTS,
+            TuningType.MATERIALIZED_VIEWS,
+        }
+    ),
+    "bigquery": frozenset(
+        {
+            TuningType.PARTITIONING,
+            TuningType.CLUSTERING,
+            TuningType.PRIMARY_KEYS,
+            TuningType.FOREIGN_KEYS,
+            TuningType.CHECK_CONSTRAINTS,
+            TuningType.MATERIALIZED_VIEWS,
+        }
+    ),
+    "redshift": frozenset(
+        {
+            TuningType.DISTRIBUTION,
+            TuningType.SORTING,
+            TuningType.PARTITIONING,
+            TuningType.PRIMARY_KEYS,
+            TuningType.FOREIGN_KEYS,
+            TuningType.UNIQUE_CONSTRAINTS,
+            TuningType.CHECK_CONSTRAINTS,
+            TuningType.MATERIALIZED_VIEWS,
+        }
+    ),
+    "clickhouse": frozenset(
+        {
+            TuningType.PARTITIONING,
+            TuningType.SORTING,
+            TuningType.CLUSTERING,
+            TuningType.PRIMARY_KEYS,
+            TuningType.UNIQUE_CONSTRAINTS,
+            TuningType.MATERIALIZED_VIEWS,
+        }
+    ),
+    "databricks": frozenset(
+        {
+            TuningType.PARTITIONING,
+            TuningType.CLUSTERING,
+            TuningType.DISTRIBUTION,
+            TuningType.PRIMARY_KEYS,
+            TuningType.FOREIGN_KEYS,
+            TuningType.UNIQUE_CONSTRAINTS,
+            TuningType.CHECK_CONSTRAINTS,
+            TuningType.Z_ORDERING,
+            TuningType.LIQUID_CLUSTERING,
+            TuningType.AUTO_OPTIMIZE,
+            TuningType.AUTO_COMPACT,
+            TuningType.BLOOM_FILTERS,
+            TuningType.MATERIALIZED_VIEWS,
+        }
+    ),
+    "sqlite": frozenset(
+        {
+            TuningType.PRIMARY_KEYS,
+            TuningType.FOREIGN_KEYS,
+            TuningType.UNIQUE_CONSTRAINTS,
+            TuningType.CHECK_CONSTRAINTS,
+        }
+    ),
+    "postgresql": frozenset(
+        {
+            TuningType.PARTITIONING,
+            TuningType.CLUSTERING,
+            TuningType.PRIMARY_KEYS,
+            TuningType.FOREIGN_KEYS,
+            TuningType.UNIQUE_CONSTRAINTS,
+            TuningType.CHECK_CONSTRAINTS,
+            TuningType.BLOOM_FILTERS,
+            TuningType.MATERIALIZED_VIEWS,
+        }
+    ),
+    "mysql": frozenset(
+        {
+            TuningType.PARTITIONING,
+            TuningType.PRIMARY_KEYS,
+            TuningType.FOREIGN_KEYS,
+            TuningType.UNIQUE_CONSTRAINTS,
+            TuningType.CHECK_CONSTRAINTS,
+        }
+    ),
+}
+
+
+# Canonical platform keys with an explicit entry in the compatibility map.
+# Derived from the map so the two can never diverge; callers use it (via
+# TuningType.is_known_platform) to ask "is this platform known to the map at
+# all" without constructing a throwaway TuningType instance.
+_KNOWN_COMPATIBILITY_PLATFORMS = frozenset(_PLATFORM_COMPATIBILITY_MAP)
 
 
 # Schema-constraint tuning types. Their absence from a platform's compatibility
