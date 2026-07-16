@@ -1,0 +1,67 @@
+# DuckDB JoinOrder Tuned Configuration
+# This configuration enables all DuckDB-supported optimizations for JoinOrder Benchmark
+# Provides maximum performance with constraints and table-level tunings enabled
+
+primary_keys:
+  enabled: true
+  enforce_uniqueness: true
+  nullable: false
+
+foreign_keys:
+  enabled: true
+  enforce_referential_integrity: true
+  on_delete_action: CASCADE
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: true
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  auto_optimize_enabled: false
+  auto_compact_enabled: false
+  bloom_filters_enabled: false
+  bloom_filter_columns: []
+  materialized_views_enabled: false
+
+table_tunings:
+  movie_info:
+    table_name: movie_info
+    sorting:
+    - name: movie_id
+      type: INTEGER
+      order: 1
+
+  cast_info:
+    table_name: cast_info
+    sorting:
+    - name: movie_id
+      type: INTEGER
+      order: 1
+    - name: person_id
+      type: INTEGER
+      order: 2
+
+  title:
+    table_name: title
+    sorting:
+    - name: id
+      type: INTEGER
+      order: 1
+
+_metadata:
+  version: '2.0'
+  format: unified_tuning
+  database: duckdb
+  benchmark: joinorder
+  configuration_type: tuned
+  description: "DuckDB JoinOrder configuration with optimizations for complex join queries"
+  created: '2025-11-01'
+  generated_by: benchbox-project

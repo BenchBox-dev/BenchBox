@@ -1,0 +1,104 @@
+id: dependency-migration-psycopg3
+title: "Migrate off psycopg2-binary to psycopg3 (asyncpg-compatible driver modernisation)"
+worktree: main
+priority: Low
+status: Not Started
+category: Code Quality and Technical Debt
+
+description: |
+  `psycopg2-binary` is a legacy PostgreSQL driver with known packaging
+  fragility (ships pre-compiled C extensions in a binary wheel, no async
+  support, soft-deprecated in many CI environments). `psycopg3` (package:
+  `psycopg[binary]`) is the successor — async-compatible, PEP 249 v3 compliant,
+  and actively maintained.
+
+  Surfaced as a deferred item in the DONE file for `tighten-dependencies-phase-plan`
+  (completed 2026-04-15): "Migration off psycopg2-binary to psycopg3 — driver
+  modernization — out of scope for an *elimination* audit. File separately when
+  product is ready."
+
+  This is not an elimination audit item — it is a deliberate driver swap that
+  may require updating connection-string parameters, cursor usage, and any
+  code that imports psycopg2 directly. Scope must be confirmed before
+  committing to the swap.
+
+work:
+  - id: w0
+    summary: "Audit all psycopg2 import sites and connection usage patterns"
+    status: pending
+    notes: |
+      grep -rn 'psycopg2\|import psycopg' benchbox/ tests/
+      Classify each site: direct import, connection factory, cursor type
+      assumption, exception type catch. Estimate the change surface.
+      Also check if any tests mock psycopg2 internals that would need updating.
+
+  - id: w1
+    summary: "Assess psycopg3 API compatibility at each identified call site"
+    needs: [w0]
+    status: pending
+    notes: |
+      psycopg3 is largely API-compatible with psycopg2 for synchronous use, but
+      there are known differences: parameter placeholders (%s vs %(name)s vs ?),
+      copy API, server-side cursors, and exception hierarchy. For each call site
+      found in w0, note whether it works unchanged or needs updating.
+
+  - id: w2
+    summary: "Swap psycopg2-binary for psycopg[binary] in pyproject.toml and update imports"
+    needs: [w1]
+    status: pending
+    notes: |
+      In pyproject.toml, replace psycopg2-binary with psycopg[binary] (or
+      psycopg[c] for the C extension build). Update any `import psycopg2` to
+      `import psycopg`. Keep a compatibility shim if the change surface from w1
+      is large — prefer a single incremental swap over a big-bang refactor.
+
+  - id: w3
+    summary: "Run the full Redshift/PostgreSQL test suite and confirm zero regressions"
+    needs: [w2]
+    status: pending
+    notes: |
+      uv run -- python -m pytest tests/ -k 'redshift or postgres or postgresql' -q
+      Also run the full unit suite to catch any indirect psycopg2 dependency
+      via transitive imports. Fix any failures before marking this done.
+
+deferred:
+  - summary: "Migrate to psycopg3 async interface for concurrent query paths"
+    reason: "Async usage is additive and out of scope for the synchronous driver swap; file as a follow-on if async PostgreSQL connections are desired."
+
+metadata:
+  tags:
+    - deps
+    - postgres
+    - driver
+    - modernization
+  estimated_effort: "Small-Medium"
+  created_date: "2026-07-16"
+
+impact:
+  technical_debt: |
+    psycopg2-binary ships pre-compiled C extensions that cause occasional
+    CI failures on non-standard platforms (ARM, Alpine, non-glibc). psycopg3
+    is the upstream successor with active maintenance and async support.
+    Migration future-proofs the PostgreSQL/Redshift adapter against psycopg2
+    going unmaintained.
+
+prior_art:
+  - "benchbox/platforms/postgres*.py, benchbox/platforms/redshift*.py — likely primary psycopg2 consumers"
+  - "pyproject.toml — replace psycopg2-binary here"
+  - "tighten-dependencies-phase-plan DONE file — deferred this item explicitly"
+
+must_preserve:
+  - "All Redshift and PostgreSQL benchmark runs produce identical results before and after the swap"
+  - "Connection factory interface remains unchanged for any callers outside benchbox/platforms/"
+
+anti_patterns:
+  - "DO NOT mix psycopg2 and psycopg3 imports across modules — pick one and complete the migration fully"
+  - "DO NOT use psycopg3 async API in the synchronous adapter path without a separate design decision"
+
+verification:
+  - description: "No psycopg2 imports remain after migration"
+    command: "grep -rn 'import psycopg2' benchbox/ | wc -l"
+    expected_output: "0"
+  - description: "PostgreSQL/Redshift unit tests pass"
+    command: "uv run -- python -m pytest tests/ -k 'redshift or postgres' -q"
+    expected_output: "all tests pass"

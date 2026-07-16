@@ -1,0 +1,65 @@
+id: tuning-explorer-consume-bundle-hashes-20260716
+title: "Explorer consumes requested_config_hash / applied_ledger_hash from bundles instead of computing its own"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Close-out of review finding C3: after #1176 (requested_config_hash) and the
+  applied-ledger PR land, the explorer pipeline should read the bundle's
+  hashes rather than computing its own 8-char mode hash
+  (_project/scripts/explorer_pipeline/transformer.py _tuning_hash). Legacy
+  bundles without the new fields keep the current honest fallback (mode-only
+  or none). Receipt display shows which hash kind it is (requested vs applied)
+  instead of an ambiguous "hash xxxx" suffix; a mode-only fallback displays as
+  mode, not as a pseudo-fingerprint (closes the receipt cosmetic nit from
+  #1170's review).
+
+work:
+  - id: w0
+    summary: "Start gate: verify #1176 and the applied-ledger PR are merged; sample a new-generation bundle"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Transformer/duckdb_builder: ingest requested_config_hash + applied_ledger_hash; legacy fallback unchanged"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Receipt/UI: labeled hash kinds; mode-only fallback stops displaying as a fingerprint"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Tests both sides; corpus re-ingest sanity"
+    status: pending
+    needs: [w1]
+  - id: w4
+    summary: "Surface the physical_rendering_id secondary facet in the UI (chip/filter), deferred from #1182"
+    notes: "The predicate and data plumbing exist (facetMatching.physicalRenderingIdsMatch); this adds the user-facing entry point per ADR-002."
+    status: pending
+    needs: [w1]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Legacy bundle ingest (no new fields) keeps current behavior"
+  - "tuning_hash column remains display-only (never a join/dedup key)"
+
+scope_limit:
+  only_modify:
+    - "_project/scripts/explorer_pipeline/**"
+    - "results-explorer/src/**"
+    - "tests/**"
+
+verification:
+  - description: "Pipeline + explorer tests green"
+    command: "uv run -- python -m pytest tests/unit/scripts/explorer_pipeline -q"
+    expected_output: "All passing; new-generation bundle rows carry both hashes"
+
+metadata:
+  owners: ["benchbox-team"]
+  tags: [tuning, explorer, hashes]
+  estimated_effort: Medium
+  created_date: "2026-07-16"
+  source_review: "tuning remediation batch close-out 2026-07-16 (C3 residual)"

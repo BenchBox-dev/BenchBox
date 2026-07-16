@@ -104,6 +104,35 @@ describe("buildSelectQuery LIMIT", () => {
   });
 });
 
+describe("buildWhereClause - tuning_mode not-recorded/untuned sentinels", () => {
+  it("matches NULL tuning_mode rows for the not-recorded token", () => {
+    const filters: QueryFilterState = { ...EMPTY_FILTERS, tuningModes: ["not-recorded"] };
+
+    const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
+
+    expect(sql).toContain("(tuning_mode IS NULL)");
+    expect(params).toEqual([]);
+  });
+
+  it("still matches NULL tuning_mode rows for the legacy untuned token", () => {
+    const filters: QueryFilterState = { ...EMPTY_FILTERS, tuningModes: ["untuned"] };
+
+    const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
+
+    expect(sql).toContain("(tuning_mode IS NULL)");
+    expect(params).toEqual([]);
+  });
+
+  it("combines a real tuning mode with the not-recorded sentinel via OR", () => {
+    const filters: QueryFilterState = { ...EMPTY_FILTERS, tuningModes: ["tuned", "not-recorded"] };
+
+    const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
+
+    expect(sql).toContain("(tuning_mode IN (?) OR tuning_mode IS NULL)");
+    expect(params).toEqual(["tuned"]);
+  });
+});
+
 describe("buildWhereClause - normalized cost/deployment facets", () => {
   it("filters by normalized cost status and deployment metadata", () => {
     const filters: QueryFilterState = {

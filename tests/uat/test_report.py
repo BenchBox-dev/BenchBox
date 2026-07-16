@@ -292,3 +292,22 @@ def test_release_gate_ordering_flags_docker_up_before_native_completion():
     assert len(violations) == 1
     assert "cedardb" in violations[0]
     assert "at/before native+dataframe stage completion" in violations[0]
+
+
+def test_release_gate_ordering_does_not_raise_against_offset_aware_boundary():
+    """orchestrator.py's completed_at is offset-aware (datetime.now().astimezone(),
+    #1162), but append_lifecycle_log() still writes naive uat_lifecycle.log
+    timestamps. Comparing the two used to raise TypeError; parse_docker_up_events
+    must normalize the naive side so the comparison (and any real violation)
+    still works.
+    """
+    aware_boundary = _dt.datetime(2026, 5, 30, 1, 0, 0).astimezone()
+
+    no_violation = report.release_gate_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=aware_boundary)
+    assert no_violation == []
+
+    violations = report.release_gate_ordering_violations(
+        [_DOCKER_LOG_EARLY, _DOCKER_LOG_OK], native_stage_completed_at=aware_boundary
+    )
+    assert len(violations) == 1
+    assert "cedardb" in violations[0]

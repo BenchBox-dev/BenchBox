@@ -1,0 +1,66 @@
+# DuckDB Primitives Tuned Configuration
+# This configuration enables all DuckDB-supported optimizations for Primitives Benchmark
+# Provides maximum performance with constraints and table-level tunings enabled
+# Note: Primitives benchmark uses TPC-H schema and data generation
+
+primary_keys:
+  enabled: true
+  enforce_uniqueness: true
+  nullable: false
+
+foreign_keys:
+  enabled: true
+  enforce_referential_integrity: true
+  on_delete_action: CASCADE
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: true
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  auto_optimize_enabled: false
+  auto_compact_enabled: false
+  bloom_filters_enabled: false
+  bloom_filter_columns: []
+  materialized_views_enabled: false
+
+table_tunings:
+  LINEITEM:
+    table_name: LINEITEM
+    partitioning:
+    - name: L_SHIPDATE
+      type: DATE
+      order: 1
+    sorting:
+    - name: L_ORDERKEY
+      type: INTEGER
+      order: 1
+
+  ORDERS:
+    table_name: ORDERS
+    partitioning:
+    - name: O_ORDERDATE
+      type: DATE
+      order: 1
+    sorting:
+    - name: O_ORDERKEY
+      type: INTEGER
+      order: 1
+
+_metadata:
+  version: '2.0'
+  format: unified_tuning
+  database: duckdb
+  benchmark: read_primitives
+  configuration_type: tuned
+  description: "DuckDB Primitives configuration with optimizations for basic OLAP operations"
+  created: '2025-11-01'
+  generated_by: benchbox-project
