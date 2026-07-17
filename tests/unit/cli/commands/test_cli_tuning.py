@@ -5,14 +5,10 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-from pathlib import Path
-from unittest.mock import MagicMock
-
 import pytest
 from click.testing import CliRunner
 
 from benchbox.cli.app import cli
-from benchbox.cli.commands.tuning import create_sample_tuning
 
 pytestmark = [
     pytest.mark.unit,
@@ -129,55 +125,26 @@ class TestTuningPlatforms:
         assert "pandas" in result.output.lower()
 
 
-class TestDeprecatedCommands:
-    """Tests for deprecated commands (backwards compatibility)."""
+class TestRetiredShimsNotRegistered:
+    """Pin that the retired create-sample-tuning/df-tuning shims are gone, not merely hidden.
 
-    def test_create_sample_tuning_is_hidden(self):
-        """Test that create-sample-tuning is hidden."""
-        cmd = cli.commands.get("create-sample-tuning")
-        assert cmd is not None, "create-sample-tuning should be registered"
-        assert cmd.hidden, "create-sample-tuning should be hidden"
+    Per the tuning-renderer-consolidation-and-baseline-policy-20260712 TODO's
+    w5, these deprecated CLI shims (and their backing modules
+    benchbox/cli/commands/tuning.py, benchbox/cli/commands/df_tuning.py) were
+    retired outright rather than kept as hidden compatibility commands.
+    """
 
-    def test_df_tuning_is_hidden(self):
-        """Test that df-tuning is hidden."""
-        cmd = cli.commands.get("df-tuning")
-        assert cmd is not None, "df-tuning should be registered"
-        assert cmd.hidden, "df-tuning should be hidden"
+    def test_create_sample_tuning_is_not_registered(self):
+        assert cli.commands.get("create-sample-tuning") is None
+
+    def test_df_tuning_is_not_registered(self):
+        assert cli.commands.get("df-tuning") is None
 
     def test_tuning_is_not_hidden(self):
-        """Test that tuning (new command) is not hidden."""
+        """Test that tuning (the surviving command) is not hidden."""
         cmd = cli.commands.get("tuning")
         assert cmd is not None, "tuning should be registered"
         assert not cmd.hidden, "tuning should not be hidden"
-
-    def test_create_sample_tuning_command_success(self, runner, tmp_path: Path):
-        """Deprecated command should still create a sample tuning file."""
-        config_manager = MagicMock()
-        output_path = tmp_path / "sample.yaml"
-
-        result = runner.invoke(
-            create_sample_tuning,
-            ["--platform", "duckdb", "--output", str(output_path)],
-            obj={"config": config_manager},
-        )
-
-        assert result.exit_code == 0
-        assert "deprecated" in result.output.lower()
-        config_manager.create_sample_unified_tuning_config.assert_called_once_with(output_path, "duckdb")
-
-    def test_create_sample_tuning_command_failure_exits_nonzero(self, runner, tmp_path: Path):
-        """Deprecated command should surface configuration creation failures."""
-        config_manager = MagicMock()
-        config_manager.create_sample_unified_tuning_config.side_effect = RuntimeError("boom")
-
-        result = runner.invoke(
-            create_sample_tuning,
-            ["--platform", "snowflake", "--output", str(tmp_path / "sample.yaml")],
-            obj={"config": config_manager},
-        )
-
-        assert result.exit_code == 1
-        assert "Failed to create tuning configuration: boom" in result.output
 
 
 class TestCommandCategorization:
@@ -189,6 +156,6 @@ class TestCommandCategorization:
         assert result.exit_code == 0
         # tuning should appear after Configuration: header
         assert "tuning" in result.output
-        # Old commands should not appear (hidden)
+        # Retired shims should not appear
         assert "create-sample-tuning" not in result.output
         assert "df-tuning" not in result.output

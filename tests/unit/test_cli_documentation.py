@@ -109,17 +109,6 @@ class TestCLIDocumentation:
         assert "benchbox validate" in result.output
         assert "--config custom.yaml" in result.output
 
-    def test_create_sample_tuning_help_enhanced(self):
-        """Test that create-sample-tuning command help includes examples."""
-        result = self.runner.invoke(cli, ["create-sample-tuning", "--help"])
-        assert result.exit_code == 0
-
-        # Check for enhanced description and examples
-        assert "unified tuning configuration" in result.output
-        assert "YAML configuration file" in result.output
-        assert "Examples:" in result.output
-        assert "--platform databricks" in result.output
-
     def test_export_command_help_enhanced(self):
         """Test that export command help includes examples."""
         result = self.runner.invoke(cli, ["export", "--help"])
@@ -213,7 +202,6 @@ class TestCLIDocumentation:
             (["profile"], ["optimization recommendations", "Examples:"]),
             (["benchmarks", "list"], ["benchmark suites", "TPC standards", "Examples:"]),
             (["validate"], ["syntax and completeness", "Examples:"]),
-            (["create-sample-tuning"], ["unified tuning configuration", "Examples:"]),
             (["export"], ["various formats", "Examples:"]),
             (["check-deps"], ["installation guidance", "Examples:"]),
             (["results"], ["execution history", "Examples:"]),

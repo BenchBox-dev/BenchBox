@@ -44,11 +44,20 @@ class ClickHouseTuningMixin:
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply ClickHouse-specific optimizations based on benchmark type.
 
-        Respects tuning configuration - if tuning is enabled, only applies basic settings.
-        If tuning is disabled, applies OLAP optimizations with local ClickHouse validation.
+        Per ADR-3 (docs/development/tuning-adr-003-baseline-and-single-renderer.md)
+        baseline policy: the basic settings below (memory/timeout/thread
+        limits, cache control, join_use_nulls) are harness-operational, not
+        optimization -- they apply in every mode so results are measured
+        consistently and against standard-SQL semantics. The OLAP session
+        pack (grace_hash join, spill thresholds, aggregation-in-order) is a
+        curated performance profile, so it applies only on the TUNED path.
+        Before this fix it fired only when tuning was DISABLED -- "notuning"
+        shipped a curated OLAP profile while an explicit `--tuning tuned` run
+        got none of it, exactly backwards from what the labels promise (see
+        ADR-3's "notuning is not a baseline today" finding).
         """
 
-        # Basic settings that are always safe to apply
+        # Basic settings that are always safe to apply, in every tuning mode.
         settings = {
             "max_memory_usage": self._parse_memory_setting(self.max_memory_usage),
             "max_execution_time": self.max_execution_time,
@@ -58,6 +67,14 @@ class ClickHouseTuningMixin:
             # Enable correlated subqueries for TPC-H queries 2, 4, 17, 20, 21, 22
             # Experimental in ClickHouse v25.5.x (chdb 3.6.0), enabled by default in v25.8+
             "allow_experimental_correlated_subqueries": 1,
+            # ClickHouse's default (0) fills unmatched LEFT/RIGHT JOIN rows with
+            # column-type defaults (0, '') instead of NULL - a departure from
+            # SQL-standard outer-join semantics. This is a correctness/semantics
+            # setting, not a performance one, so unlike the OLAP pack below it must
+            # apply in every mode: an anti-join query (LEFT JOIN ... WHERE x IS
+            # NULL) needs standard NULL semantics on both baseline and tuned runs
+            # for results to be comparable and standard-SQL-correct.
+            "join_use_nulls": 1,
         }
 
         # Apply cache control settings for accurate benchmarking
@@ -70,8 +87,8 @@ class ClickHouseTuningMixin:
                 }
             )
 
-        # Only apply OLAP optimizations if tuning is disabled
-        if not self.tuning_enabled and benchmark_type.lower() in [
+        # Only apply the OLAP session pack on the tuned path (see docstring).
+        if self.tuning_enabled and benchmark_type.lower() in [
             "olap",
             "analytics",
             "tpch",
@@ -82,7 +99,6 @@ class ClickHouseTuningMixin:
                 "max_bytes_in_join": int(
                     self._parse_memory_setting(self.max_memory_usage) * 0.5
                 ),  # 50% of memory for JOINs - Q5 multi-table join at SF1 needs 2.72 GiB
-                "join_use_nulls": 1,
                 "optimize_aggregation_in_order": 1,
                 "group_by_two_level_threshold": 100000,
                 # Disk spilling for graceful degradation - aggressive thresholds
@@ -350,81 +366,6 @@ class ClickHouseTuningMixin:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:
             raise ValueError(f"Failed to apply tunings to ClickHouse table {table_name}: {e}") from e
-
-    def generate_tuning_clause(self, table_tuning) -> str:
-        """Generate ClickHouse-specific tuning clauses for CREATE TABLE statements.
-
-        ClickHouse tuning is applied through:
-        - PARTITION BY clause for partitioning
-        - ORDER BY clause for sorting and clustering (combined)
-        - PRIMARY KEY clause (optional, derived from ORDER BY)
-
-        Args:
-            table_tuning: TableTuning configuration object
-
-        Returns:
-            SQL clause string to be appended to CREATE TABLE statement
-        """
-        if not table_tuning or not table_tuning.has_any_tuning():
-            return ""
-
-        clauses = []
-
-        try:
-            # Import here to avoid circular imports
-            from benchbox.core.tuning.interface import TuningType
-
-            # Generate PARTITION BY clause
-            partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
-            if partition_columns:
-                # Sort by order and create partition expression
-                sorted_columns = sorted(partition_columns, key=lambda c: c.order)
-                partition_expr = ", ".join(col.name for col in sorted_columns)
-                clauses.append(f"PARTITION BY ({partition_expr})")
-
-            # Generate ORDER BY clause (combines sorting and clustering)
-            order_columns = []
-
-            # Include clustering columns first (they should come before sorting columns in ORDER BY)
-            cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
-            if cluster_columns:
-                order_columns.extend(sorted(cluster_columns, key=lambda c: c.order))
-
-            # Include sorting columns (higher priority in ordering)
-            sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
-            if sort_columns:
-                order_columns.extend(sorted(sort_columns, key=lambda c: c.order))
-
-            if order_columns:
-                # Remove duplicates while preserving order
-                seen = set()
-                unique_columns = []
-                for col in order_columns:
-                    if col.name not in seen:
-                        unique_columns.append(col)
-                        seen.add(col.name)
-
-                order_expr = ", ".join(col.name for col in unique_columns)
-                clauses.append(f"ORDER BY ({order_expr})")
-
-            # Distribution handled by engine type and cluster configuration
-            # Log distribution columns but don't add to CREATE TABLE clause
-            distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
-            if distribution_columns:
-                # Distribution in ClickHouse is handled at the engine level
-                pass
-
-            return " " + " ".join(clauses) if clauses else ""
-
-        except ImportError:
-            # If tuning interface not available, return empty string
-            return ""
-        except Exception as e:
-            if hasattr(table_tuning, "table_name"):
-                self.logger.warning(f"Failed to generate tuning clauses for table {table_tuning.table_name}: {e}")
-            else:
-                self.logger.warning(f"Failed to generate tuning clauses: {e}")
-            return ""
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to ClickHouse.
