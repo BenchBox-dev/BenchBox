@@ -2164,7 +2164,13 @@ class ClickHouseNativeHandler(FileFormatHandler):
         if any(token in type_upper for token in ("DOUBLE", "FLOAT", "REAL")):
             return float(value)
         if is_datetime:
-            return datetime.fromisoformat(value)
+            # datetime.fromisoformat() only accepts a trailing "Z" (RFC 3339
+            # UTC shorthand) starting in Python 3.11; on the supported 3.10
+            # runtime (requires-python >=3.10) it raises ValueError.
+            # Normalize to the explicit "+00:00" offset fromisoformat has
+            # always accepted, matching the pattern used elsewhere in this
+            # codebase (e.g. core/tpc_validation.py, mcp/tools/analytics.py).
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
         if is_date:
             return date.fromisoformat(value)
         return value

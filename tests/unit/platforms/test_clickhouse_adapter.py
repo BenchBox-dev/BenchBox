@@ -613,6 +613,27 @@ class TestClickHouseAdapter:
         assert conv("", "DATETIME") is None
         assert conv("", "TIMESTAMP") is None
 
+    def test_datetime_z_suffix_parses_on_python_3_10(self):
+        """Regression for #1201's follow-up: datetime.fromisoformat() only
+        accepts a trailing "Z" (RFC 3339 UTC shorthand) starting in Python
+        3.11; the repo's minimum supported runtime is 3.10
+        (requires-python >=3.10), where the same call raises ValueError.
+        Verified directly against a real Python 3.10 interpreter
+        (/usr/bin/python3.10): `datetime.fromisoformat("2016-01-01T00:00:00Z")`
+        raises "Invalid isoformat string", while `.replace("Z", "+00:00")`
+        first fixes it -- confirming this is a real cross-version bug this
+        (3.11+) test process cannot reproduce on its own.
+        """
+        from datetime import datetime as dt, timezone
+
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+        conv = handler._convert_field_for_clickhouse
+
+        assert conv("2016-01-01T00:00:00Z", "DATETIME") == dt(2016, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        assert conv("2016-01-01T00:00:00Z", "TIMESTAMP") == dt(2016, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
     def test_empty_numeric_date_fields_become_null_not_default(self):
         """Empty numeric/date source fields convert to NULL, never a default (Bucket A).
 
