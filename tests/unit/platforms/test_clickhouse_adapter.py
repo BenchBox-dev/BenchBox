@@ -569,6 +569,89 @@ class TestClickHouseAdapter:
         # NULL sentinels in an array column become None.
         assert handler._convert_field_for_clickhouse("\\N", "Array(Float32)") is None
 
+    def test_vector_bracket_type_parsed_to_list_not_float(self):
+        """DuckDB bracketed vector/list types route to array parsing (Bucket C).
+
+        A fixed-size vector column typed ``FLOAT[128]`` (or list ``INTEGER[]``)
+        must be parsed into a Python sequence, not passed to ``float("[...]")``
+        which raised ``could not convert string to float`` and dropped rows.
+        """
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+
+        assert handler._convert_field_for_clickhouse("[0.02,0.5,0.9]", "FLOAT[3]") == [0.02, 0.5, 0.9]
+        assert handler._convert_field_for_clickhouse("[1,2,3]", "INTEGER[]") == [1, 2, 3]
+        assert handler._convert_field_for_clickhouse("[0.1,0.2]", "DOUBLE[2]") == [0.1, 0.2]
+        # Empty/NULL sentinels in a bracketed vector column become None.
+        assert handler._convert_field_for_clickhouse("", "FLOAT[3]") is None
+        assert handler._convert_field_for_clickhouse("\\N", "FLOAT[3]") is None
+
+    def test_datetime_and_timestamp_conversion(self):
+        """DateTime/TIMESTAMP classify before the DATE prefix (Bucket B).
+
+        ``"DATETIME".startswith("DATE")`` is True, so a naive DATE check
+        misrouted timestamps into ``date.fromisoformat`` (raised on the time
+        component); bare ``TIMESTAMP`` otherwise fell through as a ``str`` that
+        clickhouse-driver rejected with ``'str' object has no attribute
+        'tzinfo'``. Both must become ``datetime`` objects.
+        """
+        from datetime import date as date_cls, datetime as dt
+
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+        conv = handler._convert_field_for_clickhouse
+
+        assert conv("2020-01-15 12:30:00", "DATETIME") == dt(2020, 1, 15, 12, 30, 0)
+        assert conv("2020-01-15 12:30:00", "TIMESTAMP") == dt(2020, 1, 15, 12, 30, 0)
+        # DateTime64 with a "T"/"Z" ISO form parses (and stays tz-aware).
+        assert conv("2016-01-01T00:00:00Z", "DateTime64(3)").year == 2016
+        # A plain DATE column is unaffected — still a date, not a datetime.
+        assert conv("2020-01-15", "DATE") == date_cls(2020, 1, 15)
+        # Empty datetime/timestamp fields become NULL (Bucket A policy).
+        assert conv("", "DATETIME") is None
+        assert conv("", "TIMESTAMP") is None
+
+    def test_datetime_z_suffix_parses_on_python_3_10(self):
+        """Regression for #1201's follow-up: datetime.fromisoformat() only
+        accepts a trailing "Z" (RFC 3339 UTC shorthand) starting in Python
+        3.11; the repo's minimum supported runtime is 3.10
+        (requires-python >=3.10), where the same call raises ValueError.
+        Verified directly against a real Python 3.10 interpreter
+        (/usr/bin/python3.10): `datetime.fromisoformat("2016-01-01T00:00:00Z")`
+        raises "Invalid isoformat string", while `.replace("Z", "+00:00")`
+        first fixes it -- confirming this is a real cross-version bug this
+        (3.11+) test process cannot reproduce on its own.
+        """
+        from datetime import datetime as dt, timezone
+
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+        conv = handler._convert_field_for_clickhouse
+
+        assert conv("2016-01-01T00:00:00Z", "DATETIME") == dt(2016, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        assert conv("2016-01-01T00:00:00Z", "TIMESTAMP") == dt(2016, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    def test_empty_numeric_date_fields_become_null_not_default(self):
+        """Empty numeric/date source fields convert to NULL, never a default (Bucket A).
+
+        Ratified policy: an empty value in a nullable numeric/date column is
+        absent -> NULL, never coerced to 0/epoch (which would fabricate joinable
+        values and corrupt answer-sets). Empty String fields stay empty strings.
+        """
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler
+
+        handler = ClickHouseNativeHandler(delimiter=",", adapter=None, benchmark=None)
+        conv = handler._convert_field_for_clickhouse
+
+        for type_name in ("INTEGER", "BIGINT", "DECIMAL(10,2)", "DOUBLE", "DATE", "DATETIME"):
+            assert conv("", type_name) is None, f"empty {type_name} must become NULL"
+        # Empty String columns are preserved as empty strings, not turned into NULL.
+        assert conv("", "VARCHAR") == ""
+        assert conv("", "CHAR(16)") == ""
+
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_get_platform_metadata(self, mock_client_class):
         """Test platform metadata collection."""

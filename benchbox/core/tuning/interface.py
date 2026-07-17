@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass, field
 from enum import Enum
@@ -1409,6 +1410,24 @@ class UnifiedTuningConfiguration:
                 table_name: table_tuning.to_dict() for table_name, table_tuning in self.table_tunings.items()
             },
         }
+
+    def get_configuration_hash(self) -> str:
+        """Canonical SHA-256 hash of the requested tuning configuration.
+
+        Per ADR-1 (docs/development/tuning-adr-001-trust-and-hash-semantics.md),
+        this is ``requested_config_hash``: a full 64-hex-character SHA-256 over
+        ``to_dict()`` serialized as JSON with ``sort_keys=True`` and compact
+        separators, so two runs requesting the same template hash identically
+        regardless of platform or dict insertion order. This is the
+        platform-independent *requested* template identity - it does not
+        certify what was physically applied (see the separate, not-yet-built
+        applied-ledger hash).
+
+        Returns:
+            64-character lowercase hex SHA-256 digest.
+        """
+        canonical_json = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "UnifiedTuningConfiguration":
