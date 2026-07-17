@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from importlib import metadata as importlib_metadata
 from pathlib import Path
@@ -1908,6 +1908,17 @@ class DuckDBVortexHandler(FileFormatHandler):
             return row_count
 
 
+# Matches DuckDB bracketed vector/list type suffixes, e.g. "FLOAT[128]",
+# "DOUBLE[3]", or "INTEGER[]" — used to route these to array parsing rather
+# than scalar numeric conversion during ClickHouse client-side inserts.
+# NOTE: the DDL side rewrites the same fixed-size forms to ClickHouse arrays
+# (workload.py: FLOAT[N] -> Array(Float32), DOUBLE[N] -> Array(Float64)); this
+# value-level detector is the insert-time counterpart and additionally covers
+# bracketless-size lists like "INTEGER[]". Keep the two in sync if a new
+# bracketed vector form is added to either surface.
+_CLICKHOUSE_VECTOR_TYPE_RE = re.compile(r"\[\s*\d*\s*\]")
+
+
 class ClickHouseNativeHandler(FileFormatHandler):
     """Handler for ClickHouse's native file() function.
 
@@ -2113,9 +2124,12 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
         type_upper = type_name.upper()
 
-        # Array types: parse the CSV string representation into a Python list so
-        # clickhouse-driver receives a sequence rather than a raw string.
-        if "ARRAY" in type_upper:
+        # Array/vector types: "Array(...)" or DuckDB bracketed vector/list syntax
+        # such as "FLOAT[128]" (fixed-size vector) or "INTEGER[]" (list). Parse
+        # the bracketed CSV string into a Python list so clickhouse-driver
+        # receives a sequence; otherwise "FLOAT[128]" matches the FLOAT branch
+        # below and float("[0.02,...]") raises (Bucket C).
+        if "ARRAY" in type_upper or _CLICKHOUSE_VECTOR_TYPE_RE.search(type_upper):
             if not value or value.upper() in ("\\N", "NULL"):
                 return None
             try:
@@ -2126,10 +2140,19 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 pass
             return value
 
+        # DateTime/DateTime64/TIMESTAMP must be classified BEFORE the DATE prefix:
+        # "DATETIME".startswith("DATE") is True, so a bare DATE check misroutes
+        # timestamps into date.fromisoformat() (raises on the time component),
+        # and plain "TIMESTAMP" otherwise falls through as a str, which the
+        # driver rejects with "'str' object has no attribute 'tzinfo'" (Bucket B).
+        is_datetime = "DATETIME" in type_upper or "TIMESTAMP" in type_upper
+        is_date = not is_datetime and type_upper.startswith("DATE")
+
         needs_non_string_value = (
             "INT" in type_upper
             or any(token in type_upper for token in ("DECIMAL", "NUMERIC", "DOUBLE", "FLOAT", "REAL"))
-            or type_upper.startswith("DATE")
+            or is_date
+            or is_datetime
         )
         if value == "":
             return None if needs_non_string_value else value
@@ -2140,7 +2163,9 @@ class ClickHouseNativeHandler(FileFormatHandler):
             return Decimal(value)
         if any(token in type_upper for token in ("DOUBLE", "FLOAT", "REAL")):
             return float(value)
-        if type_upper.startswith("DATE"):
+        if is_datetime:
+            return datetime.fromisoformat(value)
+        if is_date:
             return date.fromisoformat(value)
         return value
 
