@@ -43,6 +43,7 @@ from benchbox.core.tuning import ddl_generator as ddl_generator_module
 from benchbox.core.tuning.capability_registry import (
     PLATFORM_TUNING_CAPABILITIES,
     WORKLOAD_PROFILE_MAPPED_PLATFORMS,
+    get_capability,
     interface_compatibility_map,
     known_registry_platforms,
     resolve_platform_key,
@@ -407,6 +408,20 @@ def test_coverage_20260716_aliases_resolve_to_canonical_registry_key(alias, cano
     """
     assert resolve_platform_key(alias) == canonical
     assert canonical in PLATFORM_TUNING_CAPABILITIES
+
+
+def test_pg_duckdb_sorting_has_a_registry_entry():
+    """Regression for #1198: PgDuckDBDDLGenerator inherits PostgreSQLDDLGenerator's
+    SUPPORTED_TUNING_TYPES, which includes sorting (postgresql.py:78) -- a tuned
+    SORTING config is processed (as a CLUSTER-index pair, then CLUSTER filtered
+    out), not rejected. The registry entry originally covered only PARTITIONING
+    and CLUSTERING, so get_capability("pg-duckdb", SORTING) returned None
+    (== "not compatible") instead of the correct rendered_via="none"
+    ("compatible, but real execution renders nothing").
+    """
+    capability = get_capability("pg-duckdb", TuningType.SORTING)
+    assert capability is not None
+    assert capability.rendered_via == "none"
 
 
 # ---------------------------------------------------------------------------
