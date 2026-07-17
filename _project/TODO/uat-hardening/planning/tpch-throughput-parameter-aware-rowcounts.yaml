@@ -75,7 +75,10 @@ verification:
 
 scope_limit:
   only_modify:
-    - "tests/uat/throughput.py"
+    - "benchbox/core/tpch/"
+    - "benchbox/core/expected_results/"
+    - "benchbox/core/validation/"
+    - "tests/unit/core/"
     - "tests/uat/test_throughput.py"
 
 metadata:

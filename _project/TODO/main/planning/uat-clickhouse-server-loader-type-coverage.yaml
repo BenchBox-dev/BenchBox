@@ -73,9 +73,12 @@ work:
       Keep server mode on client-side INSERT batches for Docker-host files;
       do not revert to server-side `file()` loading. Preserve shared ClickHouse
       SQL behavior while making type conversion explicit for server inserts.
-      Resolve the nullable-empty-field policy explicitly: prefer preserving
-      NULL when the benchmark schema permits it, and only use type defaults for
-      truly non-Nullable columns when that matches the source semantics.
+      Implement the ratified nullable-empty-field policy (see open_questions
+      below): an empty numeric/date value becomes NULL with Nullable(T) DDL
+      where the reference schema marks the column nullable; NEVER coerce to a
+      type default. An empty landing in a column the reference schema marks
+      NOT NULL must fail loudly as a benchmark data defect, not be silently
+      defaulted.
   - id: w3
     summary: "Verify representative failing cells live against ClickHouse server"
     needs: [w2]
@@ -88,6 +91,7 @@ work:
 deps:
   needs:
     - uat-clickhouse-server-rc1-recovery
+    - uat-clickhouse-loader-empty-value-nullability
 
 must_preserve:
   - "Keep the PR #738 server-mode contract: Docker-host data files load through client-side batches, not server-side `file()` paths."
