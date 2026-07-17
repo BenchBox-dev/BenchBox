@@ -1,0 +1,85 @@
+id: fk-aware-drop-ordering-20260717
+title: "FK-aware table DROP ordering: schema recreation fails on DuckDB when FK constraints were applied"
+worktree: main
+priority: Medium-High
+status: Not Started
+category: Core Functionality
+
+description: |
+  Discovered during PR #1176's E2E verification (2026-07-16). A tuned DuckDB
+  run with the real checked-in FK-enabled template
+  (examples/tunings/duckdb/tpch_tuned.yaml) fails during schema RE-creation
+  with a table-DROP-ordering error:
+
+    Cannot drop entry supplier because ... depends on it
+
+  This is the mirror image of the load-ordering defect fixed by #1189
+  (fk-load-ordering): #1189 made table CREATE/LOAD respect FK topology via
+  get_fk_ordered_table_names(), but the DROP path used when a schema already
+  exists still iterates in schema-declaration order, so parent tables are
+  dropped while dependents still reference them. The defect only bites once
+  tuning constraints are physically applied (post-#1176), which is why it
+  was latent: pre-provenance runs never delivered FK config to the adapter.
+
+  Fix: drop in reverse FK-topological order (reuse
+  get_fk_ordered_table_names() reversed), or drop with dependency awareness
+  per platform where CASCADE semantics differ. Audit the same recreation
+  path on other FK-enforcing platforms (postgres family at minimum) — the
+  bug class is platform-generic even though the repro is DuckDB.
+
+work:
+  - id: w0
+    summary: "Reproduce at HEAD: tuned duckdb tpch run twice into the same database file; second run must fail with the DROP-ordering error; pin exact code path"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Route schema-recreation DROPs through reverse FK-topological order (shared helper, not per-adapter copies); handle cycles the same way get_fk_ordered_table_names does"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Regression tests: recreation with FK constraints applied succeeds on duckdb (real adapter); unit test pins reverse-topo order for tpch/ssb/coffeeshop schemas"
+    status: pending
+    needs: [w1]
+  - id: w3
+    summary: "Audit other FK-enforcing adapters' recreation paths for the same declaration-order DROP; fix or record honest per-platform notes"
+    status: pending
+    needs: [w1]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "#1189 load-ordering behavior (get_fk_ordered_table_names) unchanged"
+  - "Recreation of schemas without FK constraints unchanged"
+
+anti_patterns:
+  - "No blanket DROP ... CASCADE as the fix on platforms where it silently widens the blast radius; ordering is the fix, CASCADE only where semantics are already destructive-safe"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/schema_primitives.py"
+    - "benchbox/platforms/**"
+    - "tests/**"
+
+verification:
+  - description: "Second tuned run into an existing database succeeds"
+    command: "uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/drop-order-check && uv run -- python -m benchbox.cli.main run --platform duckdb --benchmark tpch --scale 0.01 --tuning tuned --non-interactive --output /tmp/drop-order-check"
+    expected_output: "Both runs complete; no 'Cannot drop entry' error"
+  - description: "Unit suites green"
+    command: "uv run -- python -m pytest tests/unit/core tests/unit/platforms -q"
+    expected_output: "All passing"
+
+prior_art:
+  - "benchbox/core/schema_primitives.py get_fk_ordered_table_names: the #1189 topo sort - reverse it for drops"
+  - "_project/DONE/main/planning/tuning-fk-load-ordering-fix-20260716.yaml: the load-side fix this mirrors"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - constraints
+    - schema-management
+  estimated_effort: Small-Medium
+  created_date: "2026-07-17"
+  source_review: "PR #1176 E2E verification follow-up, 2026-07-16"

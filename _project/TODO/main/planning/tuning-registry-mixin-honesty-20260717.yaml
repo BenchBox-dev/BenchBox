@@ -1,0 +1,81 @@
+id: tuning-registry-mixin-honesty-20260717
+title: "Correct capability-registry entries resting on the dead generate_tuning_clause adapter mixin (postgresql, snowflake, redshift, bigquery, mysql)"
+worktree: main
+priority: Medium
+status: Not Started
+category: Core Functionality
+
+description: |
+  Confirmed during PR #1198's implementation and its Opus review (2026-07-17).
+  A repo-wide search finds ZERO production call sites for any adapter's
+  generate_tuning_clause (singular) mixin — every hit is in tests. Production
+  rendering flows through the DDL generators' generate_tuning_clauses
+  (plural; core/dryrun.py, duckdb.py) or #1180's registry-driven paths.
+
+  Yet five pre-existing #1180-era registry entries claim physical DDL
+  rendering via that dead mixin (rendered_via="ddl",
+  mechanism "adapter_mixin:<Platform>Adapter.generate_tuning_clause"):
+  postgresql, snowflake, redshift, bigquery, mysql. For postgresql it is
+  affirmatively false (PostgreSQLAdapter.generate_tuning_clause
+  unconditionally returns "" - postgresql.py:898-903 - and
+  apply_table_tunings is a no-op). The others follow the same pattern and
+  need individual verification. An evaluator consulting the registry (or
+  `benchbox tuning platforms`, now generated from it) would believe tuned
+  runs on these platforms physically render tuning DDL when they may not.
+
+  Fix: verify each of the five against its real execution path; correct each
+  entry to honest rendered_via (likely "none" with per-platform notes, or
+  "ddl" only where a generator is actually consumed at execution); extend
+  the capability-source drift test so a mechanism claim naming a dead
+  code path fails (e.g. assert claimed adapter_mixin symbols have
+  production call sites, or retire the adapter_mixin mechanism vocabulary
+  entirely in favor of generator-backed mechanisms).
+
+work:
+  - id: w0
+    summary: "Verify each of the five platforms' execution paths; table of claim vs reality with file:line evidence"
+    status: pending
+    needs: []
+  - id: w1
+    summary: "Correct the five registry entries to honest rendered_via/mechanism; keep is_compatible_with_platform behavior unchanged unless the honest entry requires otherwise (document any behavior delta)"
+    status: pending
+    needs: [w0]
+  - id: w2
+    summary: "Drift-test hardening: dead-mechanism claims must fail (call-site existence check or mechanism vocabulary retirement)"
+    status: pending
+    needs: [w1]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "PR #1198's 9 rendered_via=none entries and the emptied allowlist"
+  - "validate_for_platform behavior for platforms with real tuned rendering (duckdb, clickhouse per #1180)"
+
+anti_patterns:
+  - "Do not delete the dead generate_tuning_clause mixins in this item without checking the applied-ledger TODO's instrumentation plans - coordinate, don't race"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tuning/**"
+    - "tests/**"
+
+verification:
+  - description: "Registry suite green; corrected entries pinned"
+    command: "uv run -- python -m pytest tests/unit/core/tuning -q -k 'drift or registry'"
+    expected_output: "All passing; per-platform corrections listed in PR body"
+
+prior_art:
+  - "benchbox/core/tuning/capability_registry.py pg-duckdb entry notes: documents the postgresql discrepancy accurately - the pattern for honest notes"
+  - "PR #1198: same verify-against-source method applied to the 9 gap platforms"
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - capability-registry
+    - soundness
+  estimated_effort: Small-Medium
+  created_date: "2026-07-17"
+  source_review: "PR #1198 implementation + Opus review, 2026-07-17"
