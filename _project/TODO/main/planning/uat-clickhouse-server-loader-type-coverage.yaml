@@ -146,10 +146,10 @@ success_metrics:
 
 open_questions:
   - question: "For Bucket A, should empty numeric/date values drive Nullable(...) DDL or default coercion for non-Nullable columns?"
-    gating: true
+    gating: false
+    resolved: true
     affects: ["w2", "success_metrics"]
-    default: "Emit or preserve Nullable where benchmark schema marks a column nullable; only coerce to defaults for genuinely non-Nullable fields when source semantics require that."
-    promoted_to: "[[uat-clickhouse-loader-empty-value-nullability]] (2026-07-16) — the decision item that ratifies this default against benchmark schema nullability before w2 implements it."
+    decision: "RESOLVED 2026-07-16 (repo owner, via [[uat-clickhouse-loader-empty-value-nullability]]): empty numeric/date -> NULL with Nullable(T) DDL where the reference schema marks the column nullable; do NOT coerce to a type default; fail loudly on empty-into-genuinely-NOT-NULL (treat as a benchmark data defect). Grounded in this benchmark's own schema (c_current_cdemo_sk/hdemo_sk/addr_sk and s_rec_start/end_date are nullable:true) and this item's must_preserve/anti_patterns. w2 implements this policy; the code change carries CODEOWNERS review."
 
 metadata:
   tags: [clickhouse-server, uat, loader, type-conversion]

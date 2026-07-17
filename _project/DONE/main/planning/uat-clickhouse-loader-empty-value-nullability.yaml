@@ -2,7 +2,7 @@ id: uat-clickhouse-loader-empty-value-nullability
 title: "Decide ClickHouse-server loader empty-value nullability policy: Nullable(...) DDL vs default coercion"
 worktree: main
 priority: High
-status: Not Started
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -26,15 +26,46 @@ description: |
   deferred so the parent's w2 is unambiguous.
 
 recommended_resolution: |
-  Carried from the parent's documented default, pending ratification:
-  "Emit or preserve Nullable(T) where the benchmark schema marks a column
-  nullable; only coerce to a type default for genuinely non-Nullable fields
-  when source semantics require it." Rationale: benchmark answer-sets are
-  defined against the reference schema's nullability; silently coercing a
-  nullable-empty to a default can shift aggregates/counts and corrupt
-  comparability. This preserves soundness; the coercion path trades soundness
-  for DDL simplicity and should only apply where the schema itself is
-  non-Nullable.
+  RATIFIED (2026-07-16, repo owner). Policy: an empty numeric/date source field
+  becomes NULL, and the column emits Nullable(T) DDL where the reference schema
+  marks it nullable. Do NOT coerce empties to a type default (0 / epoch). When
+  an empty value lands in a column the reference schema marks NOT NULL, FAIL
+  LOUDLY and treat it as a benchmark data defect (split into a benchmark-specific
+  TODO per the parent's approach), rather than fabricating a default.
+
+  This is effectively pre-decided by the schema data + the parent's own
+  guardrails, not a free choice:
+
+    1. The columns that actually fail Bucket A are nullable in BenchBox's own
+       TPC-DS schema (benchbox/core/tpcds/schema/table_specs.yaml; Column tuple
+       field 4 = nullable, per schema/models.py):
+         c_current_cdemo_sk   INTEGER  nullable=true
+         c_current_hdemo_sk   INTEGER  nullable=true
+         c_current_addr_sk    INTEGER  nullable=true
+         s_rec_start_date     DATE     nullable=true
+         s_rec_end_date       DATE     nullable=true
+       So an empty there genuinely means absent -> NULL. Coercing to 0/epoch
+       fabricates a real-looking surrogate key / date that then joins, counts,
+       and aggregates as if real, corrupting query answers (comparability).
+
+    2. The parent already forbids the coercion path:
+       must_preserve "Do not silently coerce invalid data to zero... nullability
+       and parse failures must stay visible", and anti_patterns "DO NOT fabricate
+       default numeric/date values for fields that are genuinely nullable".
+
+    3. DDL is mechanical: emit Nullable(T) where the schema's nullable bit is
+       set; the existing benchbox/sql_compat/rules/ddl_optimize/
+       clickhouse_ddl_rewrites.py already normalises Nullable(T) NOT NULL.
+
+  Empirical note: because every observed failing column is nullable, the
+  NOT-NULL edge (option requiring the fail-loud policy) does not fire for the
+  current corpus. The parent's w0 must re-confirm no genuinely-NOT-NULL column
+  receives empties; if one appears, it is a benchmark data defect, handled by
+  fail-loud, not by silent defaulting.
+
+  IMPLEMENTATION GATE: this ratifies the POLICY only (a TODO-doc change). The
+  loader/DDL code that applies it lives in the parent (loader-type-coverage:w2)
+  and still passes through CODEOWNERS review when that PR is opened.
 
 work:
   - id: w0
@@ -67,22 +98,32 @@ work:
       territory and needs Code Owner sign-off; see anti_patterns.
   - id: w1
     summary: "Ratify Nullable-preserve vs default-coerce against benchmark schema nullability"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Decide per the recommended_resolution unless w0 surfaces a schema column
       where preserving Nullable breaks the reference answer-set. This is the
       decision work unit; it needs Code Owner / soundness review because it
       touches comparator-relevant behaviour (see anti_patterns).
+
+      RATIFIED 2026-07-16 by the repo owner: Nullable-preserve (send NULL, emit
+      Nullable(T)); no default coercion; fail loudly on empty-into-NOT-NULL.
+      w0 confirmed every observed failing column is nullable in the reference
+      schema, so preserving Nullable cannot break their answer-sets. Policy-only
+      ratification; the loader code (parent w2) still gets CODEOWNERS review.
   - id: w2
     summary: "Record the decision in the parent and defer the rejected path"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Write the ratified policy into
       uat-clickhouse-server-loader-type-coverage (resolve its open_question,
       point w2 at the decision) and record the unchosen path as deferred here.
       No loader code changes in this item — implementation stays in the parent.
+
+      DONE: parent open_question marked resolved with the ratified decision +
+      back-reference to this item; the coercion path and the parent's
+      implementation are recorded as deferred below.
 
 deferred:
   - summary: "Implement the chosen policy in the ClickHouse-server loader/DDL"
@@ -118,4 +159,15 @@ metadata:
   tags: [uat, clickhouse-server, loader, schema-decision, soundness, deeper-question]
   estimated_effort: Small
   created_date: "2026-07-16"
+  last_updated: "2026-07-16T00:00:00-04:00"
+  completed_date: "2026-07-16"
+  completion_note: |
+    Decision item resolved. Policy ratified by the repo owner: empty
+    numeric/date -> NULL with Nullable(T) DDL where the reference schema is
+    nullable; no default coercion; fail loudly on empty-into-NOT-NULL. Grounded
+    in BenchBox's own TPC-DS schema (all observed failing columns are nullable)
+    and the parent's existing soundness guardrails. Parent open_question
+    resolved and pointed at this decision. Policy-only; the loader implementation
+    (uat-clickhouse-server-loader-type-coverage:w2) still passes CODEOWNERS
+    review when its PR opens.
   source: "UAT-effort assessment 2026-07-16 (deeper-questions promotion); parent uat-clickhouse-server-loader-type-coverage open_question"
