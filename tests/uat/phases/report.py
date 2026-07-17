@@ -431,11 +431,15 @@ def release_gate_ordering_violations(
             # offset-aware in production (orchestrator.py's
             # datetime.now().astimezone(), #1162). Comparing a naive and an
             # aware datetime raises TypeError, so normalize a naive
-            # timestamp onto native_stage_completed_at's awareness -- via
-            # astimezone(), which interprets a naive datetime as local time
-            # and attaches the current local UTC offset -- before comparing.
+            # timestamp onto native_stage_completed_at's awareness before
+            # comparing. Attach the boundary's own offset directly rather
+            # than calling astimezone() (which would interpret the naive
+            # wall-clock time as being in the *checker process's* current
+            # local timezone, not the producer's) -- both timestamps come
+            # from the same host/sweep run, so the boundary's offset is the
+            # correct one to assume for the naive entry too (#1179).
             if timestamp.tzinfo is None and native_stage_completed_at.tzinfo is not None:
-                timestamp = timestamp.astimezone()
+                timestamp = timestamp.replace(tzinfo=native_stage_completed_at.tzinfo)
             if timestamp <= native_stage_completed_at:
                 violations.append(
                     f"Docker stack '{platform}' started at {timestamp.isoformat()} "

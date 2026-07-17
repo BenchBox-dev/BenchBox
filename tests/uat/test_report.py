@@ -311,3 +311,22 @@ def test_release_gate_ordering_does_not_raise_against_offset_aware_boundary():
     )
     assert len(violations) == 1
     assert "cedardb" in violations[0]
+
+
+def test_release_gate_ordering_uses_boundary_offset_for_naive_docker_timestamps():
+    """Regression for #1179: a valid PDT run must not be flagged as a violation
+    just because the checker process runs under a different timezone (e.g.
+    UTC). astimezone() previously attached the *checker process's* current
+    local offset to the naive Docker timestamp instead of the producer's --
+    for a boundary completed at 2026-05-30T01:00:00-07:00 (PDT) and a Docker
+    naive timestamp of 2026-05-30T02:00:00 (also PDT wall-clock, i.e.
+    genuinely after the boundary), a checker running under UTC would wrongly
+    attach +00:00 to the naive timestamp instead of -07:00, making it appear
+    to be hours *before* the boundary instant and firing a false violation.
+    """
+    pdt = _dt.timezone(_dt.timedelta(hours=-7))
+    boundary = _dt.datetime(2026, 5, 30, 1, 0, 0, tzinfo=pdt)
+
+    violations = report.release_gate_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=boundary)
+
+    assert violations == []
