@@ -55,6 +55,8 @@ from benchbox.cli.tuning_resolver import (
     TuningResolution,
     TuningSource,
     display_tuning_resolution,
+    promote_tuning_provenance,
+    resolve_template_reference,
     resolve_tuning,
     warn_sql_auto_mode,
 )
@@ -761,6 +763,16 @@ def _plan_capture_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
     }
 
 
+def _tuning_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
+    entries: dict[str, Any] = {"tuning_enabled": s.tuning_enabled, "force_upload": bool(s.force_upload)}
+    entries.update(_plan_capture_override_entries(s))
+    if s.loaded_unified_config:
+        entries["unified_tuning_configuration"] = s.loaded_unified_config
+    if s.df_tuning_config:
+        entries["df_tuning_config"] = s.df_tuning_config
+    return entries
+
+
 def _validate_non_interactive(s: types.SimpleNamespace) -> None:
     """Set env flag and validate required args for non-interactive mode."""
     if not s.non_interactive:
@@ -1104,6 +1116,9 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
         s.loaded_unified_config = UnifiedTuningConfiguration()
         warn_sql_auto_mode(tuning_resolution, s.resolved_mode, console, s.logger, quiet=bool(s.quiet))
 
+    s.tuning_source_value = tuning_resolution.source.value
+    s.tuning_template_ref = resolve_template_reference(tuning_resolution.config_file)
+
 
 def _resolve_data_organization(s: types.SimpleNamespace) -> None:
     """Apply platform optimizations, build data organization payload, resolve DF tuning config."""
@@ -1437,16 +1452,7 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
     if logger:
         logger.debug(f"Creating database configuration for: {s.platform}")
     assert s.platform_key is not None
-    overrides = {
-        **s.verbosity_payload,
-        "tuning_enabled": s.tuning_enabled,
-        "force_upload": bool(s.force_upload),
-        **_plan_capture_override_entries(s),
-    }
-    if s.loaded_unified_config:
-        overrides["unified_tuning_configuration"] = s.loaded_unified_config
-    if s.df_tuning_config:
-        overrides["df_tuning_config"] = s.df_tuning_config
+    overrides = {**s.verbosity_payload, **_tuning_override_entries(s)}
     database_config: DatabaseConfig | None = None
     try:
         database_config = db_manager.create_config(
@@ -1463,6 +1469,7 @@ def _dry_run_build_db_config(s: types.SimpleNamespace, db_manager: DatabaseManag
         if logger:
             logger.debug(f"Driver not installed, using minimal config for dry run: {exc}")
         database_config = None
+    promote_tuning_provenance(database_config, s.tuning_enabled, s.tuning_source_value, s.tuning_template_ref)
     if logger:
         logger.debug("Database configuration created for dry run")
     return database_config
@@ -1496,14 +1503,8 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         **s.verbosity_payload,
         "force_recreate": s.force_regenerate,
         "show_query_plans": s.show_query_plans,
-        "tuning_enabled": s.tuning_enabled,
-        "force_upload": bool(s.force_upload),
-        **_plan_capture_override_entries(s),
+        **_tuning_override_entries(s),
     }
-    if s.loaded_unified_config:
-        overrides["unified_tuning_configuration"] = s.loaded_unified_config
-    if s.df_tuning_config:
-        overrides["df_tuning_config"] = s.df_tuning_config
     try:
         database_config = db_manager.create_config(
             s.platform_key,
@@ -1515,6 +1516,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         if logger:
             logger.error(f"Database configuration failed: {exc}")
         ctx.exit(1)
+    promote_tuning_provenance(database_config, s.tuning_enabled, s.tuning_source_value, s.tuning_template_ref)
 
     _driver_version = database_config.driver_version_actual or database_config.driver_version_resolved
     _mode_tag = " \\[external]" if s.table_mode == "external" else ""
@@ -1718,16 +1720,10 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
     overrides = {
         **s.verbosity_payload,
         "force_recreate": s.force_regenerate,
-        "tuning_enabled": s.tuning_enabled,
-        "force_upload": bool(s.force_upload),
-        **_plan_capture_override_entries(s),
+        **_tuning_override_entries(s),
     }
-    if s.loaded_unified_config:
-        overrides["unified_tuning_configuration"] = s.loaded_unified_config
-    if s.df_tuning_config:
-        overrides["df_tuning_config"] = s.df_tuning_config
     try:
-        return db_manager.create_config(
+        database_config = db_manager.create_config(
             s.platform_key,
             dict(s.parsed_platform_options),
             overrides,
@@ -1737,7 +1733,8 @@ def _data_or_load_build_db_config(s: types.SimpleNamespace, db_manager: Database
         if logger:
             logger.error(f"Database configuration failed: {exc}")
         ctx.exit(1)
-    return None
+    promote_tuning_provenance(database_config, s.tuning_enabled, s.tuning_source_value, s.tuning_template_ref)
+    return database_config
 
 
 def _data_or_load_validate_inputs(s: types.SimpleNamespace) -> None:
@@ -2375,6 +2372,7 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
 
     from benchbox.cli.tuning import run_tuning_wizard
 
+    tuning_source_value = TuningSource.BASELINE.value
     if sys.stdin.isatty() and sys.stdout.isatty():
         if Confirm.ask("\nWould you like to configure tuning options?", default=True):
             s.loaded_unified_config = run_tuning_wizard(
@@ -2384,6 +2382,7 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
                 interactive=True,
             )
             s.tuning_enabled, s.tuning = infer_runtime_tuning_mode(s.loaded_unified_config)
+            tuning_source_value = TuningSource.INTERACTIVE_WIZARD.value
             console.print("[green]✅ Tuning configuration completed[/green]")
             s.tuning_config_file = None
             s.use_auto_tuning = False
@@ -2416,12 +2415,12 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
     if s.table_mode == "external" and _tuning_arg_is_tuning_bearing(s.tuning):
         _reject_external_tuned(console, s.logger, s.ctx)
 
+    s.tuning_source_value, s.tuning_template_ref = tuning_source_value, None  # no template file here
     if getattr(s.database_config, "options", None) is None:
         s.database_config.options = {}
     s.database_config.options["tuning_enabled"] = s.tuning_enabled
-    s.database_config.tuning_enabled = s.tuning_enabled
+    promote_tuning_provenance(s.database_config, s.tuning_enabled, s.tuning_source_value, s.tuning_template_ref)
     s.database_config.show_query_plans = s.show_query_plans
-    s.database_config.unified_tuning_configuration = s.loaded_unified_config
 
     s.benchmark_config.options["unified_tuning_configuration"] = s.loaded_unified_config
     s.benchmark_config.options["tuning_enabled"] = s.tuning_enabled
