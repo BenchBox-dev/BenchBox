@@ -652,6 +652,44 @@ class TestClickHouseAdapter:
         assert conv("", "VARCHAR") == ""
         assert conv("", "CHAR(16)") == ""
 
+    def test_object_schema_table_column_count_and_types(self):
+        """BaseSchemaTable object schemas (e.g. DataVault) load, not crash (Bucket D).
+
+        get_schema() returns ``{name: Table}`` for object-schema benchmarks; a
+        bare ``"columns" in table_schema`` raised ``argument of type 'Table' is
+        not iterable`` and aborted the load. Column count and per-column types
+        must both be derived from the object's ``.columns`` instead.
+        """
+        from benchbox.core.datavault import schema as dv
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler, SchemaInspector
+
+        class _ObjectSchemaBenchmark:
+            def get_schema(self):
+                return dv.TABLES_BY_NAME.copy()  # {name: BaseSchemaTable}
+
+        benchmark = _ObjectSchemaBenchmark()
+        table_name, table = next(iter(dv.TABLES_BY_NAME.items()))
+
+        # Column count comes from the object's columns, without crashing.
+        count = SchemaInspector.get_column_count(benchmark, table_name, file_handle=None, delimiter=",")
+        assert count == len(table.columns)
+
+        # Type names are extracted from the Table's Column objects (get_sql_type),
+        # so object-schema loads get real type conversion (not silent skip).
+        handler = ClickHouseNativeHandler.__new__(ClickHouseNativeHandler)
+        type_names = handler._get_column_type_names(benchmark, table_name)
+        assert len(type_names) == len(table.columns)
+        assert type_names == [col.get_sql_type().upper() for col in table.columns]
+
+        # A dict-shaped schema still works (regression guard).
+        class _DictSchemaBenchmark:
+            def get_schema(self):
+                return {"t": {"columns": [{"type": "INTEGER"}, {"type": "VARCHAR"}]}}
+
+        dict_bm = _DictSchemaBenchmark()
+        assert SchemaInspector.get_column_count(dict_bm, "t", file_handle=None, delimiter=",") == 2
+        assert handler._get_column_type_names(dict_bm, "t") == ["INTEGER", "VARCHAR"]
+
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_get_platform_metadata(self, mock_client_class):
         """Test platform metadata collection."""

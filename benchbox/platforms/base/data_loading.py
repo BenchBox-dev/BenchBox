@@ -818,6 +818,29 @@ class NoCompressionHandler(CompressionHandler):
             yield f
 
 
+def _resolve_table_schema(schema: Any, table_name: str) -> Any:
+    """Look up one table's schema, tolerant of case and non-dict schemas."""
+    if not isinstance(schema, dict):
+        return {}
+    return schema.get(table_name, schema.get(table_name.lower(), {}))
+
+
+def _schema_table_columns(table_schema: Any) -> list[Any] | None:
+    """Return a table schema's column list, or None if it has no column list.
+
+    Accepts either a dict shape (``{"columns": [...]}``) or a
+    ``BaseSchemaTable``-like object exposing a ``.columns`` attribute (e.g. the
+    Data Vault / TPC-H / TPC-DS ``Table`` classes). A plain ``"columns" in
+    table_schema`` test raises ``argument of type 'Table' is not iterable`` for
+    the object form, which previously aborted DataVault server-mode loads.
+    """
+    if isinstance(table_schema, dict):
+        columns = table_schema.get("columns")
+    else:
+        columns = getattr(table_schema, "columns", None)
+    return columns if isinstance(columns, list) else None
+
+
 class SchemaInspector:
     """Inspector for determining table schema information."""
 
@@ -836,10 +859,11 @@ class SchemaInspector:
         """
         # Try to get from schema first
         schema = benchmark.get_schema() if hasattr(benchmark, "get_schema") else {}
-        table_schema = schema.get(table_name, schema.get(table_name, {}))
+        table_schema = _resolve_table_schema(schema, table_name)
 
-        if "columns" in table_schema:
-            return len(table_schema["columns"])
+        columns = _schema_table_columns(table_schema)
+        if columns is not None:
+            return len(columns)
 
         # Fallback: read first line to determine column count
         first_line = file_handle.readline().strip()
@@ -2086,8 +2110,11 @@ class ClickHouseNativeHandler(FileFormatHandler):
     def _get_column_type_names(self, benchmark: Any, table_name: str) -> list[str | None]:
         """Return schema type strings for a benchmark table when available."""
         schema = benchmark.get_schema() if hasattr(benchmark, "get_schema") else {}
-        table_schema = schema.get(table_name, schema.get(table_name.lower(), {}))
-        columns = table_schema.get("columns", []) if isinstance(table_schema, dict) else []
+        table_schema = _resolve_table_schema(schema, table_name)
+        # Handles both dict schemas and BaseSchemaTable objects (e.g. DataVault),
+        # so object-schema benchmarks get real column types instead of an empty
+        # list (which silently skipped type conversion for those loads).
+        columns = _schema_table_columns(table_schema) or []
 
         type_names: list[str | None] = []
         for column in columns:
