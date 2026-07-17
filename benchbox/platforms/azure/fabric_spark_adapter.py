@@ -768,14 +768,27 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         Returns:
             FabricSparkAdapter instance.
         """
-        return cls(
-            workspace_id=config.get("workspace_id"),
-            lakehouse_id=config.get("lakehouse_id"),
-            tenant_id=config.get("tenant_id"),
-            livy_endpoint=config.get("livy_endpoint"),
-            onelake_path=config.get("onelake_path"),
-            spark_pool_name=config.get("spark_pool_name"),
-            timeout_minutes=config.get("timeout_minutes", 60),
-            spark_config=config.get("spark_config"),
-            table_format=config.get("table_format"),
-        )
+        params: dict[str, Any] = {
+            "workspace_id": config.get("workspace_id"),
+            "lakehouse_id": config.get("lakehouse_id"),
+            "tenant_id": config.get("tenant_id"),
+            "livy_endpoint": config.get("livy_endpoint"),
+            "onelake_path": config.get("onelake_path"),
+            "spark_pool_name": config.get("spark_pool_name"),
+            "timeout_minutes": config.get("timeout_minutes", 60),
+            "spark_config": config.get("spark_config"),
+            "table_format": config.get("table_format"),
+        }
+
+        # Pass through tuning provenance/config
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+        ]:
+            if key in config:
+                params[key] = config[key]
+
+        return cls(**params)
