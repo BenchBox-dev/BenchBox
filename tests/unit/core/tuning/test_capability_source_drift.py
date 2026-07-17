@@ -45,6 +45,7 @@ from benchbox.core.tuning.capability_registry import (
     WORKLOAD_PROFILE_MAPPED_PLATFORMS,
     interface_compatibility_map,
     known_registry_platforms,
+    resolve_platform_key,
 )
 from benchbox.core.tuning.ddl_generator import get_ddl_generator
 from benchbox.core.tuning.interface import (
@@ -72,28 +73,16 @@ EXPECTED_INTERFACE_VS_REGISTRY_DRIFT: frozenset[str] = frozenset()
 # for at all. These platforms are compatible/warning-only by construction
 # (TuningType.is_known_platform returns False for them, so mismatches
 # downgrade to warnings -- see interface.py's validate_for_platform_detailed
-# docstring) and were out of scope for this TODO's capability-registry
-# coverage: none of them are in this TODO's w2 migration order (duckdb,
-# clickhouse, starrocks), so auditing their adapter execution paths for a
-# registry entry was not attempted this round. Not a regression to fix here;
-# a candidate for the next platform this renderer-consolidation effort picks
-# up.
-EXPECTED_GENERATOR_PLATFORMS_WITHOUT_REGISTRY_ENTRY: frozenset[str] = frozenset(
-    {
-        "trino",
-        "presto",
-        "athena",
-        "firebolt",
-        "azure_synapse",
-        "synapse",
-        "timescaledb",
-        "questdb",
-        "pg-duckdb",
-        "pg_duckdb",
-        "pg-mooncake",
-        "pg_mooncake",
-    }
-)
+# docstring). They were out of scope for the original w1 capability-registry
+# consolidation (none of them were in that TODO's w2 migration order --
+# duckdb, clickhouse, starrocks) but are exactly the worklist the follow-up
+# `tuning-capability-registry-coverage-20260716` TODO closed: every alias
+# below now resolves (via capability_registry.resolve_platform_key) to a
+# real PLATFORM_TUNING_CAPABILITIES entry, so this allowlist is strict/empty.
+# Any future generator-backed platform added without a matching registry
+# entry fails this test immediately instead of silently rotting into a new
+# undocumented gap.
+EXPECTED_GENERATOR_PLATFORMS_WITHOUT_REGISTRY_ENTRY: frozenset[str] = frozenset()
 
 
 # FROZEN 2026-07-16 BASELINE -- copied verbatim (as TuningType.value strings,
@@ -263,16 +252,33 @@ def test_known_compatibility_platforms_is_a_subset_of_registry_platforms():
 
 
 def test_registry_has_platforms_interface_deliberately_excludes():
-    """starrocks/doris get registry entries without becoming interface.py 'known' platforms.
+    """starrocks/doris (+ this TODO's 9) get registry entries without becoming interface.py 'known' platforms.
 
     See capability_registry's module docstring and
     tests/unit/core/tuning/test_platform_identity_keys.py's
     test_known_platform_set_stays_in_sync_with_compatibility_map, which pins
     the exact nine-platform 'known' set. This test documents the converse:
-    the registry is intentionally broader.
+    the registry is intentionally broader. The
+    `tuning-capability-registry-coverage-20260716` TODO added 9 more
+    registry-only platforms (trino/presto/athena/firebolt/azure-synapse/
+    timescaledb/questdb/pg-duckdb/pg-mooncake -- canonical registry keys, not
+    every CLI alias) alongside the original starrocks/doris pair, all under
+    the same non-"known" treatment.
     """
     extra = known_registry_platforms() - _KNOWN_COMPATIBILITY_PLATFORMS
-    assert extra == {"starrocks", "doris"}
+    assert extra == {
+        "starrocks",
+        "doris",
+        "trino",
+        "presto",
+        "athena",
+        "firebolt",
+        "azure-synapse",
+        "timescaledb",
+        "questdb",
+        "pg-duckdb",
+        "pg-mooncake",
+    }
 
 
 def test_workload_profile_mapped_platforms_matches_actual_dispatch():
@@ -308,40 +314,41 @@ def test_workload_profile_mapped_platforms_matches_actual_dispatch():
 def test_ddl_generator_platforms_without_registry_entry_are_the_expected_set():
     """Pin (and force review of) which generator-backed platforms lack a registry entry.
 
-    This is a `keys()`-membership check, not a construction: every generator
-    alias key from get_ddl_generator's own internal mapping is exercised
-    (indirectly, via the alias set below) to confirm the registry gap is
-    exactly the allowlisted one -- no smaller, no larger.
+    This is a membership check, not a construction: EVERY key in
+    get_ddl_generator()'s own `generators` dict literal is checked against
+    the registry -- via `GENERATOR_REGISTRY_KEYS` (module-level below, an AST
+    inspection of that dict's source -- see `_discover_generator_registry_keys`)
+    -- to confirm the registry gap is exactly the allowlisted one, no smaller,
+    no larger. A prior version of this test checked a hand-maintained literal
+    subset instead: a future platform registered in get_ddl_generator without
+    a matching registry entry would never have entered that literal, so the
+    drift guard would have missed it silently. Deriving the checked set from
+    the real registry closes that hole -- get_ddl_generator can't be imported
+    directly at module scope here (its `generators` dict is built with lazy,
+    function-local imports specifically to dodge a circular import with
+    `core.tuning.generators.*`), so AST inspection of its source is the
+    lowest-risk way to introspect it without restructuring that function.
+
+    Coverage resolves through `capability_registry.resolve_platform_key`
+    (the same alias/normalization logic `get_capability` uses at runtime)
+    rather than a hand-rolled hyphen/underscore check: a prior version of
+    this check only normalized hyphen-aliases to underscore-keys, which
+    cannot detect coverage added under a hyphenated canonical key (e.g.
+    "azure-synapse") or resolve a short alias like "synapse" that isn't a
+    hyphen/underscore variant of its canonical key at all.
     """
-    generator_backed_aliases = {
-        "trino",
-        "presto",
-        "athena",
-        "firebolt",
-        "azure_synapse",
-        "synapse",
-        "timescaledb",
-        "questdb",
-        "pg-duckdb",
-        "pg_duckdb",
-        "pg-mooncake",
-        "pg_mooncake",
-        # Platforms covered by the registry, included here as a sanity check
-        # that the two sets are not simply disjoint by construction:
-        "duckdb",
-        "clickhouse",
-    }
+    generator_backed_aliases = GENERATOR_REGISTRY_KEYS
     registry_platforms = known_registry_platforms()
     without_entry = frozenset(
-        alias
-        for alias in generator_backed_aliases
-        if alias not in registry_platforms and alias.replace("-", "_") not in registry_platforms
+        alias for alias in generator_backed_aliases if resolve_platform_key(alias) not in registry_platforms
     )
     assert without_entry == EXPECTED_GENERATOR_PLATFORMS_WITHOUT_REGISTRY_ENTRY
 
-    # Every alias in the allowlist really does resolve to a non-NoOp generator
-    # (guards against the allowlist rotting into a stale list of typos).
-    for alias in EXPECTED_GENERATOR_PLATFORMS_WITHOUT_REGISTRY_ENTRY:
+    # Every alias really does resolve to a non-NoOp generator (guards against
+    # the coverage claim above resting on a typo'd or fallback-NoOp platform
+    # key). Previously this only checked the (now-empty) allowlist; checking
+    # every alias keeps the guard meaningful now that the allowlist is empty.
+    for alias in generator_backed_aliases:
         generator = get_ddl_generator(alias)
         assert type(generator).__name__ != "NoOpDDLGenerator", f"{alias} unexpectedly has no real DDL generator"
 
@@ -351,6 +358,55 @@ def test_w2_migration_order_platforms_have_registry_entries(platform):
     """The three platforms migrated in w2 (plus databricks, registry-only) all have entries."""
     assert platform in PLATFORM_TUNING_CAPABILITIES
     assert PLATFORM_TUNING_CAPABILITIES[platform], f"{platform} has an empty capability entry"
+
+
+@pytest.mark.parametrize(
+    "platform",
+    [
+        "trino",
+        "presto",
+        "athena",
+        "firebolt",
+        "azure-synapse",
+        "timescaledb",
+        "questdb",
+        "pg-duckdb",
+        "pg-mooncake",
+    ],
+)
+def test_coverage_20260716_platforms_have_registry_entries(platform):
+    """The 9 platforms this TODO covers all have non-empty registry entries.
+
+    Companion to test_w2_migration_order_platforms_have_registry_entries:
+    pins presence the same way, for the canonical keys added by
+    `tuning-capability-registry-coverage-20260716`.
+    """
+    assert platform in PLATFORM_TUNING_CAPABILITIES
+    assert PLATFORM_TUNING_CAPABILITIES[platform], f"{platform} has an empty capability entry"
+
+
+@pytest.mark.parametrize(
+    "alias,canonical",
+    [
+        ("azure_synapse", "azure-synapse"),
+        ("synapse", "azure-synapse"),
+        ("pg_duckdb", "pg-duckdb"),
+        ("pg-duckdb", "pg-duckdb"),
+        ("pg_mooncake", "pg-mooncake"),
+        ("pg-mooncake", "pg-mooncake"),
+    ],
+)
+def test_coverage_20260716_aliases_resolve_to_canonical_registry_key(alias, canonical):
+    """Every spelling of the 3 multi-token platforms in this batch resolves identically.
+
+    Guards the specific hyphen/underscore split that made the old ad hoc
+    drift-test check miss "synapse" and "azure_synapse" (see
+    test_ddl_generator_platforms_without_registry_entry_are_the_expected_set's
+    docstring): both must land on the same canonical key real callers
+    (get_capability, the CLI table) would resolve to.
+    """
+    assert resolve_platform_key(alias) == canonical
+    assert canonical in PLATFORM_TUNING_CAPABILITIES
 
 
 # ---------------------------------------------------------------------------
