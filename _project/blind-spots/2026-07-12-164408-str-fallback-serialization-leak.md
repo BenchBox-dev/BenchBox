@@ -1,7 +1,7 @@
 ---
 id: 2026-07-12-164408-str-fallback-serialization-leak
 date: 2026-07-12
-status: open
+status: actioned
 finding_kind: framework-gap
 review_context: "tuning-system deep review / claude/tuning-system-review-7mzapy"
 related_paths:
@@ -29,3 +29,7 @@ exported file should either serialize canonically or fail capture visibly.
 ## Suggested next steps
 - [ ] Audit exported-payload paths for str()/repr fallbacks; replace with explicit to_dict or drop-with-warning.
 - [ ] Decide whether internal option keys should be excluded from raw_config the way _iter_public_options already excludes them elsewhere.
+
+## Triage log
+
+- 2026-07-16: actioned — remediated by tuning batch PRs 1164-1183

@@ -34,6 +34,7 @@ from benchbox.core.tuning.ddl_generator import (
     NoOpDDLGenerator,
     get_ddl_generator,
 )
+from benchbox.core.tuning.generators.clickhouse import ClickHouseDDLGenerator
 from benchbox.core.tuning.generators.pg_duckdb import PgDuckDBDDLGenerator
 from benchbox.core.tuning.generators.pg_mooncake import PgMooncakeDDLGenerator
 from benchbox.core.tuning.generators.questdb import QuestDBDDLGenerator
@@ -182,6 +183,18 @@ class TestNewPlatformGeneratorRegistration:
     def test_pg_mooncake_is_registered(self, platform_key: str) -> None:
         generator = get_ddl_generator(platform_key)
         assert isinstance(generator, PgMooncakeDDLGenerator)
+        assert not isinstance(generator, NoOpDDLGenerator)
+
+    def test_clickhouse_cloud_is_registered(self) -> None:
+        """PR #1180 review: clickhouse-cloud was missing from the registry, so
+        dry-run preview (core/dryrun.py's get_ddl_generator(database_config.type))
+        silently rendered no PARTITION/ORDER clauses for it, while live execution
+        (workload.py, which always resolves the "clickhouse" generator regardless
+        of variant) applied them - a dry-run/execution parity break for a
+        first-class platform.
+        """
+        generator = get_ddl_generator("clickhouse-cloud")
+        assert isinstance(generator, ClickHouseDDLGenerator)
         assert not isinstance(generator, NoOpDDLGenerator)
 
     def test_lookup_is_case_insensitive(self) -> None:

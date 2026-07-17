@@ -780,6 +780,8 @@ jobs:
       MERGED_SHA: ${{ github.sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Close stale auto-revert PRs and develop-red incidents
         shell: bash
         run: |

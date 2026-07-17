@@ -16,7 +16,6 @@ _EXPORTS = {
     "profile": ("benchbox.cli.commands.profile", "profile"),
     "benchmarks": ("benchbox.cli.commands.benchmarks", "benchmarks"),
     "validate": ("benchbox.cli.commands.config", "validate"),
-    "create_sample_tuning": ("benchbox.cli.commands.tuning", "create_sample_tuning"),
     "export": ("benchbox.cli.commands.export", "export"),
     "check_dependencies": ("benchbox.cli.commands.checks", "check_dependencies"),
     "results": ("benchbox.cli.commands.results", "results"),

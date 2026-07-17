@@ -101,9 +101,28 @@ def _build_duckdb_ctas_sort_sql(table_name: str, sort_columns) -> str:
     """Build DuckDB-compatible CTAS sort SQL shared by DuckDB and MotherDuck adapters.
 
     ``sort_columns`` must be pre-sorted by the caller (ascending by ``column.order``).
+
+    Per the tuning-renderer-consolidation TODO (ADR-3 "single renderer"),
+    this delegates to ``core.tuning.generators.duckdb.DuckDBDDLGenerator`` --
+    the same generator dry-run preview uses (see ``core/dryrun.py``'s
+    ``_extract_ddl_preview``) -- instead of building the ORDER BY clause
+    independently. The generator's ``TableTuning`` input requires real
+    ``TuningColumn`` instances (it validates column identifiers), so this
+    only accepts genuine ``TuningColumn`` objects; the one real caller
+    (``SortedIngestionMixin.apply_ctas_sort``) always supplies them.
     """
-    order_by_clause = ", ".join(column.name for column in sort_columns)
-    return f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM {table_name} ORDER BY {order_by_clause};"
+    from benchbox.core.tuning.ddl_generator import get_ddl_generator
+    from benchbox.core.tuning.interface import TableTuning
+
+    generator = get_ddl_generator("duckdb")
+    table_tuning = TableTuning(table_name=table_name, sorting=list(sort_columns))
+    clauses = generator.generate_tuning_clauses(table_tuning)
+    return generator.generate_ctas_ddl(
+        table_name=table_name,
+        source_query=f"SELECT * FROM {table_name}",
+        tuning=clauses,
+        or_replace=True,
+    )
 
 
 def _resolve_external_data_source(benchmark: Any, data_dir: Path, adapter: Any = None) -> Any:

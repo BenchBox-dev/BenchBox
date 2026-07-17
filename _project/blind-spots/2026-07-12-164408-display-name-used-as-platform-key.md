@@ -1,7 +1,7 @@
 ---
 id: 2026-07-12-164408-display-name-used-as-platform-key
 date: 2026-07-12
-status: open
+status: actioned
 finding_kind: assumption
 review_context: "tuning-system deep review / claude/tuning-system-review-7mzapy"
 related_paths:
@@ -31,3 +31,7 @@ system cannot catch a mix-up, and the failure mode is a silent empty lookup rath
 ## Suggested next steps
 - [ ] Sweep all `platform_name` uses that feed comparisons, dict lookups, or persistence and classify display-key vs canonical-key.
 - [ ] Consider a `PlatformKey` newtype or a `canonical_platform_type` property on adapters so the two identities cannot be confused.
+
+## Triage log
+
+- 2026-07-16: actioned — remediated by tuning batch PRs 1164-1183

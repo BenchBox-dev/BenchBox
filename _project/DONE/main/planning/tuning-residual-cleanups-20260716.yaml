@@ -2,7 +2,27 @@ id: tuning-residual-cleanups-20260716
 title: "Tuning batch residual cleanups: display-name path, dead CH optimizations code, guardrail headroom, blind-spot bookkeeping"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-07-16"
+completed_note: |
+  w1: supports_tuning_type now reads canonical_platform_type (getattr
+  fallback to platform_name for hosts predating #1174); test added in
+  tests/unit/platforms/base/test_tuning.py.
+  w2: removed the dead clickhouse_optimizations branch in
+  ClickHouseTuningMixin.apply_platform_optimizations (attribute never
+  existed on PlatformOptimizationConfiguration, so any real config
+  instance raised AttributeError); replaced with a documented no-op,
+  pinned by tests/unit/platforms/test_clickhouse_tuning.py.
+  w3: added ALLOWLIST_HEADROOM=25 convention to
+  tests/system/test_module_size_thresholds.py so allowlisted entries
+  get a documented buffer above their recorded line count instead of
+  exact-fit limits; MAX_LINES_DEFAULT is untouched. Pinned by a new
+  test in the same file.
+  w4: triaged the five 2026-07-12 tuning blind-spots to actioned via
+  sweep_blind_spots.py; added one new capture
+  (2026-07-16-140939-config-lost-across-serialization-boundary.md) for
+  the from_config dropped-kwargs class found in #1176 w0; both
+  validated with validate_blind_spot.py.
 category: Code Quality
 
 description: |
@@ -26,19 +46,19 @@ description: |
 work:
   - id: w1
     summary: "Canonicalize or remove the tuning.py:109 display-name path"
-    status: pending
+    status: done
     needs: []
   - id: w2
     summary: "Fix or delete the dead clickhouse_optimizations branch (decide by reading callers; add test either way)"
-    status: pending
+    status: done
     needs: []
   - id: w3
     summary: "Guardrail headroom convention in test_module_size_thresholds.py with documented policy"
-    status: pending
+    status: done
     needs: []
   - id: w4
     summary: "Blind-spot triage (5x actioned) + new capture for the serialization-boundary config-loss class; validate files"
-    status: pending
+    status: done
     needs: []
 
 deps:

@@ -1,7 +1,7 @@
 ---
 id: 2026-07-12-164408-intent-recorded-as-applied-fact
 date: 2026-07-12
-status: open
+status: actioned
 finding_kind: bug-class
 review_context: "tuning-system deep review / claude/tuning-system-review-7mzapy"
 related_paths:
@@ -31,3 +31,7 @@ class as a broken comparator, but invisible to tests that only check serializati
 ## Suggested next steps
 - [ ] Inventory bundle fields by provenance (intent vs observation) and mark intent-only ones in the schema docs.
 - [ ] Design an applied-statement ledger in the adapter execution path so capture can record observations.
+
+## Triage log
+
+- 2026-07-16: actioned — remediated by tuning batch PRs 1164-1183

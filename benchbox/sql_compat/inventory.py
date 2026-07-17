@@ -146,6 +146,11 @@ _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("athena", "_convert_to_external_table"): ("athena_convert_to_external_table",),
     ("bigquery", "_convert_to_bigquery_table"): ("bigquery_convert_to_bigquery_table",),
     ("clickhouse", "_optimize_table_definition"): ("clickhouse_ddl_optimizer",),
+    # _resolve_tuned_ddl_clauses is a helper invoked by _optimize_table_definition
+    # (line ~120) to compute the PARTITION BY/ORDER BY clauses it splices into the
+    # statement; it is part of the same registered DDL_OPTIMIZE transform, not a
+    # second independent rewrite.
+    ("clickhouse", "_resolve_tuned_ddl_clauses"): ("clickhouse_ddl_optimizer",),
     ("databend", "_optimize_table_definition"): ("databend_ddl_optimizer",),
     ("databricks", "_convert_to_delta_table"): ("databricks_delta_ddl_optimizer",),
     ("doris", "_inject_doris_ddl_clauses"): ("doris_inject_ddl_clauses",),

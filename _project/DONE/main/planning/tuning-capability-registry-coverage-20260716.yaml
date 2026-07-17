@@ -2,7 +2,7 @@ id: tuning-capability-registry-coverage-20260716
 title: "Extend the tuning capability registry to the remaining platforms (trino/athena/firebolt/presto/synapse/timescaledb...)"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
 category: Core Functionality
 
 description: |
@@ -20,15 +20,18 @@ description: |
 work:
   - id: w0
     summary: "Start gate: PR #1180 merged; enumerate the drift-test allowlist entries as the coverage worklist"
-    status: pending
+    status: done
+    work_summary: "Gate confirmed (#1180 merged as 0adcb89e). Worklist: 9 platforms / 12 alias spellings from EXPECTED_GENERATOR_PLATFORMS_WITHOUT_REGISTRY_ENTRY."
     needs: []
   - id: w1
     summary: "Registry entries for the Trino family (trino/presto/athena) + firebolt + synapse + timescaledb, verified against generators and adapters"
-    status: pending
+    status: done
+    work_summary: "6 entries, all rendered_via=none with file:line evidence; adapters never consume TableTuning (dead generate_tuning_clause mixin; synapse DISTRIBUTION is a fixed CLI default)."
     needs: [w0]
   - id: w2
     summary: "Registry entries for the pg extensions (pg_duckdb/pg_mooncake) + questdb; shrink allowlists; strictify tests where emptied"
-    status: pending
+    status: done
+    work_summary: "3 entries; allowlist 12->0 (frozenset()); coverage set now derived from get_ddl_generator via AST; fixed fabric_warehouse/clickhouse-cloud alias bugs; Opus APPROVE, 2 nits applied."
     needs: [w0]
 
 deps:
