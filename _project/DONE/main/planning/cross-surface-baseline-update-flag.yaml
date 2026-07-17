@@ -2,7 +2,8 @@ id: cross-surface-baseline-update-flag
 title: "Build the --update-baseline flag/target promised by cross-surface known-divergence hygiene"
 worktree: main
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-07-05"
 category: Developer Tooling
 
 description: |
@@ -15,6 +16,14 @@ description: |
   untouched in the #903 diff. Manual baseline pruning is exactly the toil that lets
   baselines rot, so this completes the promised affordance.
 
+  COMPLETED via #935 (merged 2026-07-05). Shipped as a YAML data-file baseline
+  (benchbox/core/equivalence/cross_surface_baseline.yaml) loaded and pruned by
+  benchbox/core/equivalence/known_divergences_baseline.py, plus the
+  `cross-surface-update-baseline` Make target and golden tests -- NOT the in-source
+  AST rewrite the original prior_art assumed (that first cut was redesigned in review).
+  The writer lives under core/equivalence/, not benchbox/cli/ as scope_limit listed,
+  to satisfy the utils<core<platforms<cli import layering enforced by #952's lint-imports.
+
 prior_art:
   - ref: "benchbox/core/equivalence/cross_surface.py:1421"
     note: "The known-divergence baseline read/emit path from #903; the --update-baseline writer goes here, reusing the existing baseline file format and loader."
@@ -24,7 +33,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-confirm on fresh develop that no --update-baseline affordance exists and locate the live baseline path"
-    status: pending
+    status: done
     needs: []
     notes: |
       grep Makefile for update-baseline (expect: absent) and locate the current
@@ -34,7 +43,7 @@ work:
 
   - id: w1
     summary: "Add --update-baseline to the cross-surface gate CLI that drops only no-longer-diverging entries"
-    status: pending
+    status: done
     needs: [w0]
     notes: |
       Implement the writer that rewrites the baseline file removing entries that no
@@ -44,7 +53,7 @@ work:
 
   - id: w2
     summary: "Add a make cross-surface-update-baseline target"
-    status: pending
+    status: done
     needs: [w0, w1]
     notes: |
       Wire a Makefile target invoking the flag, placed beside the existing
@@ -52,7 +61,7 @@ work:
 
   - id: w3
     summary: "Golden test: stale entry dropped, live entry preserved, second run idempotent"
-    status: pending
+    status: done
     needs: [w1]
     notes: |
       Seed a baseline with one stale (now-resolved) and one live divergence; run
@@ -92,4 +101,4 @@ metadata:
   tags: [cross-surface, equivalence, baseline, developer-tooling, holistic-review-followup]
   estimated_effort: "Small"
   created_date: "2026-06-30"
-  last_updated: "2026-06-30T00:00:00"
+  last_updated: "2026-07-05T00:00:00"
