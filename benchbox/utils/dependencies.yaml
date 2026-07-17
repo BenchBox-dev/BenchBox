@@ -21,7 +21,7 @@ platform_to_extra:
   bigquery: bigquery
   snowflake: snowflake
   databricks: databricks
-  databricks-connect: databricks-connect
+  databricks-connect: cloud-spark-databricks
   redshift: redshift
   synapse: synapse
   fabric: fabric
