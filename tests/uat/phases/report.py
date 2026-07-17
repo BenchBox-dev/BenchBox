@@ -426,18 +426,19 @@ def release_gate_ordering_violations(
     violations: list[str] = []
     for log_text in docker_stage_lifecycle_logs:
         for timestamp, platform in parse_docker_up_events(log_text):
-            # append_lifecycle_log() writes datetime.now() (naive local
-            # wall-clock time, no offset), but native_stage_completed_at is
-            # offset-aware in production (orchestrator.py's
-            # datetime.now().astimezone(), #1162). Comparing a naive and an
-            # aware datetime raises TypeError, so normalize a naive
-            # timestamp onto native_stage_completed_at's awareness before
-            # comparing. Attach the boundary's own offset directly rather
-            # than calling astimezone() (which would interpret the naive
-            # wall-clock time as being in the *checker process's* current
-            # local timezone, not the producer's) -- both timestamps come
-            # from the same host/sweep run, so the boundary's offset is the
-            # correct one to assume for the naive entry too (#1179).
+            # append_lifecycle_log() now writes offset-aware timestamps
+            # (datetime.now().astimezone(), #1202 follow-up) so each Docker
+            # event carries its own real offset -- correct even across a DST
+            # transition mid-sweep. This branch is a best-effort fallback for
+            # uat_lifecycle.log files written by an older BenchBox version
+            # that recorded naive local wall-clock time with no offset at
+            # all: attach the boundary's own offset, since both timestamps
+            # come from the same host/sweep run and no better information is
+            # available for a legacy naive entry (#1179). A stale log mixing
+            # naive pre-upgrade lines with a DST transition can still
+            # misattribute the offset -- there is no way to recover the true
+            # offset of a naive timestamp after the fact; only fresh
+            # offset-aware logs are exact.
             if timestamp.tzinfo is None and native_stage_completed_at.tzinfo is not None:
                 timestamp = timestamp.replace(tzinfo=native_stage_completed_at.tzinfo)
             if timestamp <= native_stage_completed_at:
