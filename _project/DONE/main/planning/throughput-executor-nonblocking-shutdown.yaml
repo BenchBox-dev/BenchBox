@@ -1,0 +1,160 @@
+id: throughput-executor-nonblocking-shutdown
+title: "Let the throughput executor return without blocking on a hung/leaked stream at shutdown"
+worktree: main
+priority: Medium
+status: Completed
+category: Core Functionality
+completed_date: "2026-07-11"
+
+description: |
+  throughput-timeout-leak-and-success-gates (#1106) fixed the real timeout bug
+  (the per-stream timeout was dead code because `as_completed()` only yields
+  already-done futures) and added opt-in cooperative cancellation. But a residual
+  remains, explicitly accepted by that item as out of scope:
+  `StreamRunner.execute()` runs its streams inside a `with ThreadPoolExecutor(...)`
+  block (benchbox/core/throughput/runner.py), and the context manager's `__exit__`
+  calls `shutdown(wait=True)`. So even though a timed-out stream is now correctly
+  surfaced (logged + recorded in `result.errors`), `execute()` still cannot
+  RETURN until every worker thread finishes. With cooperative cancellation OFF
+  (the default), a genuinely hung stream blocks `execute()` -- and therefore the
+  whole throughput phase, and any subsequent phase (e.g. maintenance) -- for as
+  long as the stream keeps running against the DB.
+
+  Goal: allow the executor to return promptly once its timeout/accounting window
+  closes, without waiting on a zombie stream, while still never hard-killing a
+  thread (Python cannot do so safely). The likely mechanism is to manage the
+  pool manually (`ThreadPoolExecutor(...)` without the `with` block, or
+  `shutdown(wait=False)`) so the leaked thread is abandoned to run out in the
+  background -- with its connection ownership and resource accounting clearly
+  documented -- rather than blocking the main thread. This must compose with the
+  already-shipped leak surfacing and cooperative-cancel opt-in.
+
+  Note the subtlety: abandoning a thread that still holds a DB connection has its
+  own hazards (connection not closed until the thread ends; a later phase running
+  while the zombie hammers the DB). The design must decide and document what
+  happens to the leaked stream's connection and how TTT/accounting treat the
+  overlap -- this is why #1106 deferred it rather than squeezing it in.
+
+prior_art:
+  - "benchbox/core/throughput/runner.py:StreamRunner.execute — the `with ThreadPoolExecutor` block whose implicit shutdown(wait=True) at __exit__ blocks return; the as_completed(timeout=...) classification loop and leaked-stream surfacing already landed here."
+  - "benchbox/core/tpch/throughput_test.py / benchbox/core/tpcds/throughput_test.py — the cooperative-cancel poll (config.cancel_on_timeout, per-stream threading.Event) this must compose with."
+  - "docs/development/throughput-result-alignment.md — documents the timed-out-stream leak behavior; update alongside any change to shutdown semantics."
+
+work:
+  - id: w0
+    summary: "Reproduce the block: a hung stream (sleep past a tiny stream_timeout, cancellation off) keeps execute() from returning until the sleep ends"
+    status: done
+    notes: |
+      Standalone repro script (fake config/stream_fn, no real DB) with a
+      2.0s hung stream and a 0.1s stream_timeout, cancel_on_timeout=False.
+      Before the fix: execute() wall-clock was 2.011s -- bounded by the
+      hung stream, not the timeout -- while result.errors already correctly
+      recorded the leak (confirming #1106's detection fix was intact and
+      this was purely a shutdown-blocking problem). Captured to
+      /tmp/throughput-shutdown-w0.log (before/after sections).
+  - id: w1
+    summary: "Manage the pool so execute() returns once the timeout/accounting window closes, abandoning (not killing) a still-running leaked thread"
+    needs: [w0]
+    status: done
+    notes: |
+      Replaced the `with ThreadPoolExecutor(...) as executor:` block with
+      manual lifecycle management: `executor = ThreadPoolExecutor(...)`
+      followed by `try/finally: executor.shutdown(wait=False)`. All
+      existing submission/as_completed/fallback-classification logic is
+      unchanged inside the try block -- only the block's entry/exit
+      mechanism changed. shutdown(wait=False) only stops new submissions;
+      it never touches, joins, or kills a still-running thread. On the
+      healthy path every future is already done() by the time shutdown()
+      runs, so this is a no-op there (verified via the w0 repro re-run:
+      0.107s post-fix vs 2.011s pre-fix, with the leak still surfaced
+      identically).
+  - id: w2
+    summary: "Decide and document the leaked stream's connection ownership and how TTT/accounting treat a zombie that outlives execute()"
+    needs: [w1]
+    status: done
+    notes: |
+      Documented in docs/development/throughput-result-alignment.md under
+      "Non-Blocking Executor Shutdown": the leaked stream's DB connection
+      is owned by that stream's own _execute_stream implementation (both
+      TPC-H's and TPC-DS's throughput_test.py open/close per-stream
+      connections themselves); StreamRunner.execute() never touched it
+      directly before or after this change, so ownership/closure semantics
+      are unchanged -- only how long execute() waits before returning
+      changes. TTT/accounting: unaffected -- a leaked stream was already
+      excluded from result.stream_results (and therefore TTT and
+      streams_successful) under the old blocking behavior, since
+      _record_completed_future() only runs for done() futures; it only
+      ever contributed to streams_executed and errors, which is unchanged.
+      Documented the residual hazard honestly: execute() returning early
+      means a subsequent phase can now genuinely overlap with a still-
+      running zombie (the old blocking shutdown accidentally provided an
+      unbounded, unreliable de facto serialization that is now gone by
+      design); cancel_on_timeout=True is the recommended mitigation since
+      it bounds the zombie to ~one more query.
+  - id: w3
+    summary: "Test: execute() returns within ~timeout even with a hung stream; leaked stream still surfaced in result.errors; cooperative-cancel path unaffected"
+    needs: [w1, w2]
+    status: done
+    notes: |
+      Added TestStreamRunnerNonBlockingShutdown to
+      tests/unit/core/throughput/test_runner.py (6 new tests, generous
+      20x+ sleep/timeout margins to avoid CI flake):
+      test_execute_returns_near_timeout_not_after_full_hang (wall-clock
+      bound), test_leaked_stream_from_non_blocking_path_still_surfaced_in_errors
+      (leak surfacing unchanged), test_healthy_all_streams_complete_path_unaffected
+      (no-op on healthy path), test_cooperative_cancel_with_real_set_event_still_cancels
+      (a real timeout-set threading.Event still signals cancellation),
+      test_cooperative_cancel_disabled_by_default_never_cancels (default
+      off never attaches cancel machinery), and
+      test_mock_truthy_config_healthy_path_unaffected (a Mock config's
+      truthy-by-default cancel_on_timeout attribute doesn't disturb a
+      healthy run's accounting; the stricter is-True identity guard
+      against spurious cancellation lives in each spec's
+      _resolve_cancel_event, out of this module's scope, and is exercised
+      by tests/unit/tpch/test_tpch_compliance.py and
+      tests/integration/test_throughput_corrections.py). All 24 unit
+      tests, all 10 slow integration tests in
+      test_throughput_corrections.py, all 7 real-DuckDB oracle tests in
+      test_throughput_real_duckdb.py, and all 9 tests in
+      test_tpch_compliance.py pass.
+
+must_preserve:
+  - "The already-shipped leak surfacing: a timed-out/leaked stream is still logged (logger.warning) and recorded in result.errors."
+  - "as_completed accounting semantics (streams_executed / successful / errors) for the normal, non-hung path."
+  - "Opt-in cooperative cancellation (config.cancel_on_timeout default False) keeps working and still bounds a stream to ~one more query."
+  - "The robust cancel-event guard (honor only a real set threading.Event) added in #1106 stays intact."
+
+anti_patterns:
+  - "DO NOT hard-kill or forcibly interrupt threads -- because Python cannot do so safely -- abandon the thread to run out and surface it instead."
+  - "DO NOT silently leak the connection -- because a zombie stream holding a session can starve a later phase -- decide and document ownership explicitly."
+  - "DO NOT change default timeout behavior for healthy runs -- only the hung-stream shutdown path changes."
+
+verification:
+  - description: "execute() returns near the timeout even with a hung stream, and the stream is still surfaced"
+    command: "uv run -- python -m pytest tests/unit/core/throughput/ tests/integration/test_throughput_corrections.py -n 0 -v"
+    expected_output: "execute() wall-clock bounded by timeout not the hung stream; leaked stream in result.errors; cancel tests still pass"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/throughput/runner.py"
+    - "docs/development/throughput-result-alignment.md"
+    - "tests/unit/core/throughput/"
+    - "tests/integration/"
+
+impact:
+  business_value: |
+    A hung stream should not stall the whole throughput phase (and downstream
+    phases) for the full duration of the zombie. Bounding executor return time
+    makes long throughput runs and their timeouts actually meaningful.
+
+files_affected:
+  modified:
+    - "benchbox/core/throughput/runner.py"
+    - "docs/development/throughput-result-alignment.md"
+    - "tests/unit/core/throughput/test_runner.py"
+
+metadata:
+  tags: [concurrency, throughput, robustness, executor, timeout, follow-up]
+  estimated_effort: Medium
+  created_date: "2026-07-11"
+  origin: "Follow-up explicitly deferred by throughput-timeout-leak-and-success-gates (#1106)."

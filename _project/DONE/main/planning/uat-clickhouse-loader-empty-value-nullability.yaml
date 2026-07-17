@@ -1,0 +1,173 @@
+id: uat-clickhouse-loader-empty-value-nullability
+title: "Decide ClickHouse-server loader empty-value nullability policy: Nullable(...) DDL vs default coercion"
+worktree: main
+priority: High
+status: Completed
+category: Testing and Quality Assurance
+
+description: |
+  Promoted from the gating open_question in
+  [[uat-clickhouse-server-loader-type-coverage]] (surfaced by the UAT-effort
+  assessment, 2026-07-16). That item's Bucket A (empty numeric/date source
+  values) cannot land its DDL/loader work (w2, success_metrics) until this
+  policy is decided, because the choice changes both the emitted DDL and the
+  correctness expectation.
+
+  The question: for an empty numeric/date value in the source data, should the
+  ClickHouse-server loader emit/preserve `Nullable(T)` DDL for that column, or
+  coerce the empty to a type default under a non-Nullable column?
+
+  This is a SOUNDNESS-ADJACENT schema decision (it changes stored values and
+  therefore query answers), so it must be ratified against the benchmark
+  schema's own nullability semantics rather than chosen for loader
+  convenience. The parent already records a recommended default (see
+  recommended_resolution); this item exists to make that call explicit,
+  ratify it against TPC schema nullability, and record the rejected path as
+  deferred so the parent's w2 is unambiguous.
+
+recommended_resolution: |
+  RATIFIED (2026-07-16, repo owner). Policy: an empty numeric/date source field
+  becomes NULL, and the column emits Nullable(T) DDL where the reference schema
+  marks it nullable. Do NOT coerce empties to a type default (0 / epoch). When
+  an empty value lands in a column the reference schema marks NOT NULL, FAIL
+  LOUDLY and treat it as a benchmark data defect (split into a benchmark-specific
+  TODO per the parent's approach), rather than fabricating a default.
+
+  This is effectively pre-decided by the schema data + the parent's own
+  guardrails, not a free choice:
+
+    1. The columns that actually fail Bucket A are nullable in BenchBox's own
+       TPC-DS schema (benchbox/core/tpcds/schema/table_specs.yaml; Column tuple
+       field 4 = nullable, per schema/models.py):
+         c_current_cdemo_sk   INTEGER  nullable=true
+         c_current_hdemo_sk   INTEGER  nullable=true
+         c_current_addr_sk    INTEGER  nullable=true
+         s_rec_start_date     DATE     nullable=true
+         s_rec_end_date       DATE     nullable=true
+       So an empty there genuinely means absent -> NULL. Coercing to 0/epoch
+       fabricates a real-looking surrogate key / date that then joins, counts,
+       and aggregates as if real, corrupting query answers (comparability).
+
+    2. The parent already forbids the coercion path:
+       must_preserve "Do not silently coerce invalid data to zero... nullability
+       and parse failures must stay visible", and anti_patterns "DO NOT fabricate
+       default numeric/date values for fields that are genuinely nullable".
+
+    3. DDL is mechanical: emit Nullable(T) where the schema's nullable bit is
+       set; the existing benchbox/sql_compat/rules/ddl_optimize/
+       clickhouse_ddl_rewrites.py already normalises Nullable(T) NOT NULL.
+
+  Empirical note: because every observed failing column is nullable, the
+  NOT-NULL edge (option requiring the fail-loud policy) does not fire for the
+  current corpus. The parent's w0 must re-confirm no genuinely-NOT-NULL column
+  receives empties; if one appears, it is a benchmark data defect, handled by
+  fail-loud, not by silent defaulting.
+
+  IMPLEMENTATION GATE: this ratifies the POLICY only (a TODO-doc change). The
+  loader/DDL code that applies it lives in the parent (loader-type-coverage:w2)
+  and still passes through CODEOWNERS review when that PR is opened.
+
+work:
+  - id: w0
+    summary: "Re-validate the question is still open and inventory the affected columns"
+    status: done
+    needs: []
+    notes: |
+      Confirm the open_question still gates
+      uat-clickhouse-server-loader-type-coverage:w2 and enumerate the TPC-H /
+      TPC-DS / SSB columns that are (a) numeric/date and (b) marked nullable vs
+      non-nullable in the reference schema. Record a compact table.
+
+      W0 FINDING (2026-07-16): the question is still open (parent's open_question
+      is unresolved, now cross-linked via promoted_to). Two load-bearing facts
+      that arm the recommendation:
+        1. Nullability IS first-class in BenchBox schema specs — columns carry an
+           explicit `nullable: false` (e.g. benchbox/core/clickbench/
+           schema_specs.yaml); absence defaults to nullable. So "preserve
+           Nullable where the schema marks it" is a mechanical read of existing
+           metadata, not a new judgement per column.
+        2. The ClickHouse adapter ALREADY normalises nullability DDL —
+           benchbox/sql_compat/rules/ddl_optimize/clickhouse_ddl_rewrites.py and
+           benchbox/platforms/clickhouse/workload.py strip `Nullable(T) NOT NULL`
+           because ClickHouse rejects the combination. The recommended policy is
+           consistent with this existing surface.
+      A per-column TPC-H/DS/SSB nullable-numeric/date table was NOT fully
+      enumerated here on purpose: that inventory is Bucket-A-specific and belongs
+      with the parent loader item's refinement, where the loader path is in
+      context. w1 (ratification) remains the gate — it is soundness/CODEOWNERS
+      territory and needs Code Owner sign-off; see anti_patterns.
+  - id: w1
+    summary: "Ratify Nullable-preserve vs default-coerce against benchmark schema nullability"
+    status: done
+    needs: [w0]
+    notes: |
+      Decide per the recommended_resolution unless w0 surfaces a schema column
+      where preserving Nullable breaks the reference answer-set. This is the
+      decision work unit; it needs Code Owner / soundness review because it
+      touches comparator-relevant behaviour (see anti_patterns).
+
+      RATIFIED 2026-07-16 by the repo owner: Nullable-preserve (send NULL, emit
+      Nullable(T)); no default coercion; fail loudly on empty-into-NOT-NULL.
+      w0 confirmed every observed failing column is nullable in the reference
+      schema, so preserving Nullable cannot break their answer-sets. Policy-only
+      ratification; the loader code (parent w2) still gets CODEOWNERS review.
+  - id: w2
+    summary: "Record the decision in the parent and defer the rejected path"
+    status: done
+    needs: [w1]
+    notes: |
+      Write the ratified policy into
+      uat-clickhouse-server-loader-type-coverage (resolve its open_question,
+      point w2 at the decision) and record the unchosen path as deferred here.
+      No loader code changes in this item — implementation stays in the parent.
+
+      DONE: parent open_question marked resolved with the ratified decision +
+      back-reference to this item; the coercion path and the parent's
+      implementation are recorded as deferred below.
+
+deferred:
+  - summary: "Implement the chosen policy in the ClickHouse-server loader/DDL"
+    reason: "Implementation is owned by uat-clickhouse-server-loader-type-coverage:w2; this item only settles the policy so that work can proceed."
+  - summary: "Execute the rejected nullability path"
+    reason: "The decision is intentionally exclusive; the unchosen option must not remain pending work."
+
+deps:
+  needs: []
+
+prior_art:
+  - "uat-clickhouse-server-loader-type-coverage:open_questions — the gating question and its recommended default; this item resolves it, does not restate it."
+  - "benchbox reference benchmark schemas (TPC-H/TPC-DS/SSB DDL) — the authority on column nullability; derive the decision from these, not from ClickHouse convenience."
+  - "benchbox/core/results comparator/answer-set validation — the soundness surface a wrong coercion would corrupt; consult before ratifying."
+
+anti_patterns:
+  - "DO NOT bake a nullability default into the loader without ratifying against the reference schema — this is comparator-relevant and CODEOWNERS-gated."
+  - "DO NOT duplicate the loader DDL work here — this item is the decision only; the parent implements it."
+
+verification:
+  - description: "Parent open_question is resolved and points to a ratified policy"
+    command: "grep -n 'Nullable\\|open_questions\\|resolved' _project/TODO/main/planning/uat-clickhouse-server-loader-type-coverage.yaml"
+    expected_output: "open_question replaced by a recorded decision referencing this item"
+
+scope_limit:
+  only_modify:
+    - "_project/TODO/main/planning/uat-clickhouse-loader-empty-value-nullability.yaml"
+    - "_project/TODO/main/planning/uat-clickhouse-server-loader-type-coverage.yaml (resolve its open_question)"
+  do_not_modify:
+    - "benchbox/ or tests/ (loader/DDL implementation belongs to the parent item)"
+
+metadata:
+  tags: [uat, clickhouse-server, loader, schema-decision, soundness, deeper-question]
+  estimated_effort: Small
+  created_date: "2026-07-16"
+  last_updated: "2026-07-16T00:00:00-04:00"
+  completed_date: "2026-07-16"
+  completion_note: |
+    Decision item resolved. Policy ratified by the repo owner: empty
+    numeric/date -> NULL with Nullable(T) DDL where the reference schema is
+    nullable; no default coercion; fail loudly on empty-into-NOT-NULL. Grounded
+    in BenchBox's own TPC-DS schema (all observed failing columns are nullable)
+    and the parent's existing soundness guardrails. Parent open_question
+    resolved and pointed at this decision. Policy-only; the loader implementation
+    (uat-clickhouse-server-loader-type-coverage:w2) still passes CODEOWNERS
+    review when its PR opens.
+  source: "UAT-effort assessment 2026-07-16 (deeper-questions promotion); parent uat-clickhouse-server-loader-type-coverage open_question"

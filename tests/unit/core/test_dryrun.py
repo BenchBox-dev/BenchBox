@@ -737,3 +737,151 @@ class TestDryRunBenchmarkIdentityContract:
 
         patched.assert_called_once()
         assert result == {"Q1": "SELECT 1"}
+
+
+# ---------------------------------------------------------------------------
+# _extract_ddl_preview
+# ---------------------------------------------------------------------------
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+class TestExtractDdlPreview:
+    """Regression coverage for the case-insensitive table_tunings lookup.
+
+    Benchmark table names are lowercase (e.g. "lineitem") while shipped tuning
+    templates key tables uppercase (e.g. "LINEITEM"). An exact-key lookup
+    silently drops every table, rendering an empty tuning preview.
+
+    Uses the real TPCHBenchmark and its get_schema() (the actual source of
+    table names in production) rather than a MagicMock benchmark double, so
+    this also pins down that _extract_ddl_preview reads from a method real
+    benchmarks actually implement.
+    """
+
+    def setup_method(self):
+        self.executor = DryRunExecutor()
+
+    def _load_duckdb_tpch_template(self):
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+        template_path = REPO_ROOT / "examples" / "tunings" / "duckdb" / "tpch_tuned.yaml"
+        data = yaml.safe_load(template_path.read_text(encoding="utf-8"))
+        return UnifiedTuningConfiguration.from_dict(data)
+
+    def _make_tpch_benchmark(self, tmp_path):
+        from benchbox.core.tpch.benchmark import TPCHBenchmark
+
+        return TPCHBenchmark(scale_factor=0.01, output_dir=tmp_path, quiet=True)
+
+    def test_lowercase_table_name_matches_uppercase_template_key(self, tmp_path):
+        """Real duckdb/tpch template ("LINEITEM") must resolve for benchmark table "lineitem"."""
+        unified_config = self._load_duckdb_tpch_template()
+        assert "LINEITEM" in unified_config.table_tunings  # sanity: template keys are uppercase
+
+        config = MagicMock()
+        config.options = {"unified_tuning_configuration": unified_config}
+
+        database_config = MagicMock()
+        database_config.type = "duckdb"
+
+        benchmark = self._make_tpch_benchmark(tmp_path)
+        assert "lineitem" in benchmark.get_schema()  # sanity: benchmark tables are lowercase
+
+        ddl_preview, _post_load = self.executor._extract_ddl_preview(benchmark, config, database_config)
+
+        assert "lineitem" in ddl_preview
+        assert ddl_preview["lineitem"]["ddl_clauses"]
+        assert "ORDER BY" in ddl_preview["lineitem"]["ddl_clauses"]
+
+    def test_missing_unified_config_returns_empty(self, tmp_path):
+        config = MagicMock()
+        config.options = {}
+        database_config = MagicMock()
+        database_config.type = "duckdb"
+        benchmark = self._make_tpch_benchmark(tmp_path)
+
+        ddl_preview, post_load = self.executor._extract_ddl_preview(benchmark, config, database_config)
+        assert ddl_preview == {}
+        assert post_load == {}
+
+    def test_string_schema_does_not_raise(self, tmp_path):
+        """Public wrapper benchmarks (e.g. JoinOrder) return a DDL string from
+        get_schema() rather than a table_name -> columns mapping. Calling
+        .keys() on that string used to raise AttributeError; the preview
+        should instead come back empty rather than crash the dry run.
+        """
+        unified_config = self._load_duckdb_tpch_template()
+        config = MagicMock()
+        config.options = {"unified_tuning_configuration": unified_config}
+        database_config = MagicMock()
+        database_config.type = "duckdb"
+
+        class _StringSchemaBenchmark:
+            def get_schema(self) -> str:
+                return "CREATE TABLE title (id INTEGER, title VARCHAR);"
+
+        ddl_preview, post_load = self.executor._extract_ddl_preview(_StringSchemaBenchmark(), config, database_config)
+        assert ddl_preview == {}
+        assert post_load == {}
+
+    def test_unknown_table_is_skipped(self, tmp_path):
+        unified_config = self._load_duckdb_tpch_template()
+        # Rekey the loaded template so none of its tables match a real TPC-H table.
+        unified_config.table_tunings = {
+            f"NOT_A_REAL_TABLE_{i}": tuning for i, tuning in enumerate(unified_config.table_tunings.values())
+        }
+        config = MagicMock()
+        config.options = {"unified_tuning_configuration": unified_config}
+        database_config = MagicMock()
+        database_config.type = "duckdb"
+        benchmark = self._make_tpch_benchmark(tmp_path)
+
+        ddl_preview, _post_load = self.executor._extract_ddl_preview(benchmark, config, database_config)
+        assert ddl_preview == {}
+
+
+# ---------------------------------------------------------------------------
+# _extract_unified_tuning - platform-foreign optimization suppression
+# ---------------------------------------------------------------------------
+
+
+class TestExtractUnifiedTuningPlatformOptimizations:
+    """Databricks-only fields must not leak into non-Databricks platform previews."""
+
+    def setup_method(self):
+        self.executor = DryRunExecutor()
+
+    def _make_unified_config(self):
+        tuning = MagicMock()
+        tuning.primary_keys.enabled = True
+        tuning.primary_keys.enforce_uniqueness = True
+        tuning.primary_keys.nullable = False
+        tuning.foreign_keys.enabled = True
+        tuning.foreign_keys.enforce_referential_integrity = True
+        tuning.foreign_keys.on_delete_action = "CASCADE"
+        tuning.foreign_keys.on_update_action = "RESTRICT"
+        tuning.platform_optimizations.z_ordering_enabled = False
+        tuning.platform_optimizations.databricks_clustering_strategy = "z_order"
+        tuning.platform_optimizations.physical_rendering_id = None
+        tuning.platform_optimizations.liquid_clustering_enabled = False
+        tuning.platform_optimizations.auto_optimize_enabled = False
+        tuning.platform_optimizations.bloom_filters_enabled = False
+        tuning.platform_optimizations.materialized_views_enabled = False
+        tuning.table_tunings = {}
+        return tuning
+
+    def test_databricks_clustering_strategy_hidden_for_duckdb(self):
+        unified_config = self._make_unified_config()
+        result = self.executor._extract_unified_tuning(unified_config, "duckdb")
+        assert "databricks_clustering_strategy" not in result["platform_optimizations"]
+
+    def test_databricks_clustering_strategy_shown_for_databricks(self):
+        unified_config = self._make_unified_config()
+        result = self.executor._extract_unified_tuning(unified_config, "databricks")
+        assert result["platform_optimizations"]["databricks_clustering_strategy"] == "z_order"
+
+    def test_databricks_clustering_strategy_hidden_when_platform_unknown(self):
+        unified_config = self._make_unified_config()
+        result = self.executor._extract_unified_tuning(unified_config, None)
+        assert "databricks_clustering_strategy" not in result["platform_optimizations"]

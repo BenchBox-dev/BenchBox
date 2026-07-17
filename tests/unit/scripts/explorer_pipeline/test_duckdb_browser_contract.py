@@ -107,6 +107,8 @@ class TestG1SchemaContract:
             "plans_published",
             "has_tuning",
             "bundle_download_url",
+            "physical_mechanisms",
+            "physical_rendering_id",
         },
         "result_environment": {"result_id", "os", "arch", "cpu_count", "memory_gb", "python"},
         "result_phase_durations": {"result_id", "phase", "duration_s"},
@@ -139,6 +141,7 @@ class TestG1SchemaContract:
             "platform",
             "short_id",
             "trust_label",
+            "funding",
             "tuning_mode",
             "tuning_hash",
             "execution_mode",
@@ -256,6 +259,8 @@ class TestG1SchemaContract:
             "plans_published",
             "has_tuning",
             "bundle_download_url",
+            "physical_mechanisms",
+            "physical_rendering_id",
             "os",
             "arch",
             "cpu_count",
@@ -284,6 +289,7 @@ class TestG1SchemaContract:
             "comparison_exclusion_reason",
             "ranking_exclusion_reason",
             "trust_label",
+            "funding",
             "tuning_mode",
             "execution_mode",
             "compliance_class",
@@ -427,6 +433,68 @@ class TestSourceFidelity:
         assert cpu_count == 10
         assert memory_gb == pytest.approx(32.0)
         assert python_ver == "3.12.0"
+
+
+# ---------------------------------------------------------------------------
+# ADR-2 §3: physical_mechanisms tri-state must survive the full production
+# ingest path (transformer.py -> duckdb_builder.py `results` table) without
+# collapsing "unknown" (no logical_profile recorded) into "recorded-empty"
+# (a logical_profile recorded genuinely zero mechanisms).
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def two_bundle_physical_mechanisms_db_path(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Build a two-bundle pipeline output: one with no logical_profile at all
+    (unknown), one with a logical_profile recording zero mechanisms
+    (recorded-empty)."""
+    import copy
+    import json
+
+    legacy = copy.deepcopy(MINIMAL_BUNDLE)
+    legacy["run"]["id"] = "legacy-no-profile"
+
+    recorded_empty = copy.deepcopy(MINIMAL_BUNDLE)
+    recorded_empty["run"]["id"] = "recorded-empty-mechanisms"
+    recorded_empty["config"]["tuning_mode"] = "tuned"
+    recorded_empty["platform"]["tuning"] = {
+        "source": "auto",
+        "logical_profile": {"physical_mechanisms": []},
+    }
+
+    base = tmp_path_factory.mktemp("physical_mechanisms_pipeline")
+    data_dir = base / "data"
+    bundles_dir = data_dir / "bundles"
+    bundles_dir.mkdir(parents=True)
+    (bundles_dir / "legacy.json").write_text(json.dumps(legacy), encoding="utf-8")
+    (bundles_dir / "recorded_empty.json").write_text(json.dumps(recorded_empty), encoding="utf-8")
+
+    output_dir = base / "out"
+    ExplorerPipeline().run(data_dir, output_dir, bundle_url_prefix="/results/data/bundles")
+    return output_dir / "results.duckdb"
+
+
+class TestPhysicalMechanismsUnknownVsEmptyThroughFullPipeline:
+    """Runs its own two-bundle pipeline (rather than reusing the shared
+    single-bundle `db_path` fixture) so both the legacy/no-profile and the
+    recorded-empty-profile cases can be asserted against the same DB."""
+
+    def test_unknown_and_recorded_empty_are_distinct_in_the_results_table(
+        self, two_bundle_physical_mechanisms_db_path: Path
+    ) -> None:
+        # Both bundles share every other distinguishing field from
+        # MINIMAL_BUNDLE, so select ordered by physical_mechanisms NULL-ness
+        # (DuckDB sorts non-NULL before NULL by default) to tell them apart.
+        with _connect(two_bundle_physical_mechanisms_db_path) as con:
+            rows = con.execute(
+                "SELECT physical_mechanisms FROM results ORDER BY physical_mechanisms NULLS LAST"
+            ).fetchall()
+
+        assert len(rows) == 2
+        values = [r[0] for r in rows]
+        assert values[0] == "", "a recorded logical_profile with zero mechanisms must store '', not NULL"
+        assert values[1] is None, "no logical_profile at all must store NULL, not ''"
+        assert values[0] != values[1]
 
 
 # ---------------------------------------------------------------------------

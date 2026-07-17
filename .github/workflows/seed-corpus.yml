@@ -277,19 +277,13 @@ jobs:
 
           ### Merging
 
-          Merge triggers the `docs` workflow which rebuilds the read model and
-          redeploys the results explorer.
+          Merge into `develop` triggers `sync-results-data-to-published`, which
+          opens a draft PR mirroring these bundles onto the `published-results`
+          corpus branch.
           EOF
           )" \
             --base develop \
             --head "${{ steps.commit.outputs.branch }}"
-          # Base is develop, NOT the release branch: this PR carries
-          # results-data/bundles/ content, which release-cut curation removes
-          # from the release tree, and its chore/ head would be rejected by
-          # validate-release-pr.yml. (This flag pointed at the old default
-          # branch, main, before the 2026-07-08 default-branch switch;
-          # integration semantics -> develop after that switch. Maintainer:
-          # confirm this is the intended base.)
 
       - name: No changes to commit
         if: steps.check.outputs.no_changes == 'true'

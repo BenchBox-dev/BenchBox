@@ -535,12 +535,12 @@ python examples/unified_runner.py \
 # Platform 2: ClickHouse (self-hosted)
 echo "=== Running on ClickHouse ==="
 python examples/unified_runner.py \
-  --platform clickhouse \
+  --platform clickhouse-server \
   --benchmark tpch \
   --scale $SCALE_FACTOR \
   --phases power \
   --tuning tuned \
-  --output-dir "$OUTPUT_DIR/clickhouse" \
+  --output-dir "$OUTPUT_DIR/clickhouse-server" \
   --formats json,csv,html
 
 # Platform 3: Databricks (cloud)
@@ -559,7 +559,7 @@ python - <<EOF
 import json
 from pathlib import Path
 
-platforms = ["duckdb", "clickhouse", "databricks"]
+platforms = ["duckdb", "clickhouse-server", "databricks"]
 results = {}
 
 for platform in platforms:

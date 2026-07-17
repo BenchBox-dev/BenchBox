@@ -101,3 +101,32 @@ test.describe("Provenance legend", () => {
     await expect(legend.getByText(/disclosure, not a trust signal/i)).toBeVisible();
   });
 });
+
+// ---------------------------------------------------------------------------
+// w5: the same disclosure on the card surfaces, which read the funding
+// projections in platform_index_rows / benchmark_rankings (read model v3).
+// ---------------------------------------------------------------------------
+
+test.describe("Funding on card surfaces", () => {
+  test("@smoke platform index shows a compact funding chip only for the funded run", async ({ page }) => {
+    await page.goto("/results/p/duckdb/");
+    await waitForDataLoaded(page, /DuckDB Results/);
+
+    // The corpus has exactly one DuckDB run disclosing funding (employer); the
+    // legend is collapsed by default, so its sample chips are not in the DOM.
+    const chips = page.getByRole("main").locator('[data-role="funding"]');
+    await expect(chips).toHaveCount(1);
+    // Compact label, not the full "Employer funded".
+    await expect(chips.first()).toHaveText("Employer");
+  });
+
+  test("@smoke the legend is reachable from the platform index", async ({ page }) => {
+    await page.goto("/results/p/duckdb/");
+    await waitForShell(page);
+
+    const toggle = page.getByRole("button", { name: /What do these labels mean\?/i });
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+    await expect(page.getByTestId("provenance-legend").getByRole("heading", { name: "Funding" })).toBeVisible();
+  });
+});

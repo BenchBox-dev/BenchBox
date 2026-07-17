@@ -168,10 +168,12 @@ open_questions:
     gating: true
     affects: [w3]
     default: "warn-first, block by default only for explicit unsafe runtimes"
+    resolved_with: "Policy axis settled by tuning-adr-003 (2026-07-12): warn-first, block only explicit unsafe runtimes / hard-fail for explicit >4 keys stands. See docs/development/tuning-adr-003-baseline-and-single-renderer.md."
   - question: "Should manual mode >4 explicit liquid columns always fail or auto-fallback to auto strategy?"
     gating: true
     affects: [w2]
     default: "hard-fail for explicit >4, preserve deterministic behavior"
+    resolved_with: "Policy axis settled by tuning-adr-003 (2026-07-12): warn-first, block only explicit unsafe runtimes / hard-fail for explicit >4 keys stands. See docs/development/tuning-adr-003-baseline-and-single-renderer.md."
 
 commits:
   - "b56457e17"

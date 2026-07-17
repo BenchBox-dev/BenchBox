@@ -551,7 +551,12 @@ class ResultBuilder:
         measurement_results = [r for r in self._query_results if r.run_type == "measurement" and r.iteration > 0]
         results_for_stats = measurement_results if measurement_results else self._query_results
         successful_queries = [r for r in results_for_stats if r.status == "SUCCESS"]
-        failed_queries = [r for r in results_for_stats if r.status == "FAILED"]
+        # VALIDATION_FAILED (a write/op that ran but failed a post-condition
+        # check, e.g. write_primitives/transaction_primitives) counts as a
+        # failure here too, not just an execution FAILED -- mirroring
+        # execution.py's _log_execution_summary, which already treats the two
+        # the same for the console summary (#1150 review).
+        failed_queries = [r for r in results_for_stats if r.status in ("FAILED", "VALIDATION_FAILED")]
 
         # Use measurement execution times for aggregate timing metrics when possible
         exec_times_all = [r.execution_time_seconds for r in results_for_stats if r.execution_time_seconds > 0]

@@ -36,7 +36,7 @@ By default every BenchBox runtime artefact lands under the shared
 ├── datagen/                       # generated source data; preserved across runs
 ├── databases/                     # loaded DBs; pruned at safe reuse boundaries
 ├── results/                       # per-cell result JSON files
-├── logs/uat_<date>/               # per-cell logs + matrix_summary.tsv
+├── logs/uat_<date>_<time>/         # per-cell logs + matrix_summary.tsv
 └── submissions/<name>/            # local-stage / draft-pr bundles
 ```
 
@@ -171,6 +171,49 @@ prefix. The recovery command still does not run `docker system prune`,
 `docker volume prune`, or `docker image prune`; non-UAT cleanup remains
 an explicit operator decision using the commands printed in the report.
 
+### Container engine resolution
+
+Every UAT Docker command (compose lifecycle, the preflight reachability
+probe, `make uat-bring-up`, and `make uat-docker-cleanup` in its default
+`ENGINE=docker` mode) shells out through one resolved binary, not a
+hardcoded `docker`. Resolution order: `BENCHBOX_CONTAINER_CLI` env override
+(honored verbatim) > platform default -- on macOS, `mocker` (the
+Docker-CLI-compatible shim over Apple Containerization) if it is on `PATH`,
+else `docker`; on every other platform, always `docker` (no mocker probing
+happens off darwin, so a docker-only Linux host is unaffected). A missing
+resolved binary is a hard error, not a silent fallback. The engine is
+resolved once per process and cached.
+
+The resolved binary and its `--version` output are recorded as an `[engine]`
+line in `uat_lifecycle.log` at sweep start, and as `container_engine` in the
+`cells.jsonl.accounting.json` sidecar (`null` when resolution itself failed
+before any Docker-managed platform needed one).
+
+On macOS with mocker resolved, managed teardown also sweeps named volumes
+mocker 0.5.4's `compose down -v` leaks: a project-scoped `mocker volume ls` +
+targeted `volume rm`, never a global prune, run only when the requested
+cleanup mode asked for volume removal (`volumes` or `images`, matching
+docker's own `-v` semantics -- a `containers`-mode teardown keeps volumes for
+platform reuse and is left alone). A `volume-sweep` lifecycle event records
+what, if anything, was removed.
+
+`make uat-docker-cleanup`'s default `ENGINE=docker` mode routes its
+inventory listing through the resolved engine too. When that engine is
+mocker, the Docker-shaped `--format json` inventory it normally relies on is
+unusable (`container`/`image ls --format json` echo the literal string
+`json` instead of JSON; `volume inspect` takes one name at a time and returns
+a lowercase, non-Docker schema) -- rather than crash, it falls back to
+mocker's one faithful plain-text verb (`mocker volume ls`) to find and remove
+leaked named volumes, and the report's `NOTE:` line says container/image/
+network inventory was skipped. On macOS, prefer `ENGINE=container` for
+reliable native inventory and cleanup of images/containers/networks (see
+AGENTS.md "Apple container cleanup"); that mode speaks the native `container`
+CLI directly and does not go through `resolve_container_cli()`. It cannot see
+mocker-managed named volumes, though -- Apple's native `container volume ls`
+is empty for them; mocker tracks its own compose-created volumes separately.
+Use `ENGINE=docker` (the default) for volume cleanup and `ENGINE=container`
+for everything else.
+
 ## Explorer smoke (browser)
 
 `make uat-explorer-smoke` invokes Playwright directly against a freshly
@@ -220,7 +263,16 @@ emits `cells.jsonl`, `compatibility_pruned.jsonl`, and
 per-cell logs also receive a bounded `UAT_FAILURE_TAIL` block so the run
 directory remains debuggable without relying on an operator tee log.
 
-## Disk-budget estimate and resume manifests
+Every durable artifact (`cells.jsonl`, its `.accounting.json` sidecar,
+`compatibility_pruned.jsonl`, `validator_rollup.tsv`, and the
+`matrix_summary` TSVs) is written atomically: content lands in a `.tmp`
+sibling first, gets `fsync`'d, then `os.replace`s the real path. A crash or
+error mid-write leaves the previous good artifact (or nothing, on a first
+write) in place instead of a torn file. `cells.jsonl` is written before its
+accounting sidecar, so a crash between the two writes cannot leave a fresh
+sidecar next to a stale (or absent) cell stream.
+
+## Disk-budget estimate
 
 Preflight prints a disk-budget line and a per-root free-space report before
 workload cells run:
@@ -243,25 +295,28 @@ they are not treated as zero. Treat a large `unknown=` count as a prompt
 to partition the sweep into smaller configs or refresh the table after
 the next run.
 
+The free-space floor and per-cell disk watch are always on for every
+execute-bearing run, independent of the `phases:` list — omitting
+`"preflight"` skips the pre-sweep budget report/abort only, not the
+mid-sweep interlock. A crash inside the budget estimator (bad table row,
+unreadable TSV) is a hard preflight failure with the underlying
+exception, not a silent downgrade to the flat cutoff; unknown cells
+remain advisory and stay a warning.
+
 Operators who know a run fits can override the disk gates by explicitly
 setting `preflight.free_space_min_gib: 0`. Use that only for supervised
 reruns; it disables both the static free-space floor and the budget
-headroom gate.
+headroom gate, prints a `[disk-gate] DISABLED by config` warning at
+sweep start, and records `disk_gate_disabled: true` in the
+`cells.jsonl.accounting.json` sidecar.
 
-When a sweep aborts on the free-space floor after some cells have run,
-the orchestrator writes `<log-dir>/resume.json`. Resume with:
-
-```bash
-uv run -- python -m tests.uat._cli sweep --config <config.yaml> --resume <log-dir>/resume.json
-# or for execute-only debugging:
-uv run -- python -m tests.uat._cli execute --config <config.yaml> --resume <log-dir>/resume.json
-```
-
-The manifest records attempted cell keys plus terminal state, result
-paths, and source commit identity. Resuming reuses those records instead
-of rerunning the cells and continues through the complement. It does not
-delete datagen or loaded DBs, so normal datagen reuse and reuse-aware
-pruning remain intact.
+When a sweep aborts on the free-space floor (or any other phase), it does
+not write a resumable manifest -- resume was retired as fragile (see
+`_project/specs/uat-framework.md` Section 3, "Resume (retired)"). Just
+rerun the config; datagen reuse and reuse-aware database pruning make a
+full rerun cheap, and the abort-safe artifacts (`cells.jsonl`,
+`compatibility_pruned.jsonl`, `matrix_summary.partial.tsv`) from the
+aborted run remain on disk as evidence.
 
 ## Submission terminal states
 
@@ -300,9 +355,9 @@ and timed-out counts, followed by a run-status/source-provenance footer.
 Early-stop pruning is separate from compatibility pruning and must not be
 treated as a pass or a compatibility exclusion.
 
-## Config lifecycle (four classes)
+## Config lifecycle (three classes)
 
-Every file under `tests/uat/configs/` has one of four lifecycle classes. The
+Every file under `tests/uat/configs/` has one of three lifecycle classes. The
 class is signalled by the first-line header and, for generated shards, by
 location:
 
@@ -311,16 +366,12 @@ location:
 2. **Historical evidence** (`# HISTORICAL`) — an immutable replay of a past
    sweep, retained for provenance. Historical configs are evidence: reviewed,
    not re-run as-is. There is no hash ceremony or `.frozen-hashes.json` guard.
-3. **Generated rerun shard** — operational scratch emitted by a single sweep's
-   resume/follow-up (often one file per platform). These are NOT reusable
-   templates. They live under `tests/uat/configs/generated-rerun-shards/` (see
-   that directory's README), not at the top level, so they cannot masquerade as
-   editable starting points.
-4. **Ephemeral resume state** — `resume.json`, written under the run's log dir
-   on a free-space-floor abort and consumed by `--resume <manifest>` (see
-   "Resume manifest" in `_project/specs/uat-framework.md`). It is runtime state,
-   not a config artifact, and is never a reusable file class. A "resume config"
-   is not a category — only the per-run `resume.json` is.
+3. **Generated rerun shard** — operational scratch emitted by an operator's
+   manual follow-up to a sweep (re-running a triaged subset of failed cells,
+   often one file per platform). These are NOT reusable templates. They live
+   under `tests/uat/configs/generated-rerun-shards/` (see that directory's
+   README), not at the top level, so they cannot masquerade as editable
+   starting points.
 
 New sweeps clone a template:
 
@@ -398,36 +449,42 @@ Run rules:
   from a measured healthy startup (see "Managed Docker startup failures are
   non-fatal") before the stage-2 run.
 
-Ordering check: after the runs, capture the stage-1 completion timestamp (the
-last line of stage 1's `uat_lifecycle.log`, or the stage-1 run-dir completion
-time) and verify no Docker stack came up earlier:
+Every sweep writes a machine-readable `uat_gate_summary.json` beside
+`cells.jsonl` (versioned schema; verdict `green|red`, or `dry_run` for
+dry-run sweeps): config name, source provenance, container engine,
+completion timestamp, per-phase exit codes, accounting counts, validator
+clean rate vs floor, cross-scale pairs vs floor, and explorer-smoke status.
 
-```python
-from tests.uat.phases.report import release_gate_ordering_violations
-violations = release_gate_ordering_violations(
-    [open(stage2_lifecycle_log).read(), open(stage3_lifecycle_log).read()],
-    native_stage_completed_at=stage1_completed_at,
-)
-assert not violations, violations
+Ordering + aggregation check: after the three runs,
+
+```bash
+make uat-gate-check STAGE1=<stage1-run-dir> STAGE2=<stage2-run-dir> STAGE3=<stage3-run-dir>
 ```
 
+reads the three stage summaries, verifies from their machine-recorded
+`completed_at` timestamps that no Docker `action=up` in stages 2/3 preceded
+stage-1 completion (nor stage 3 before stage-2 completion), enforces the
+mechanized APPROVE items below, and writes the combined evidence file to
+`_project/release-evidence/uat-gate-summary.json`. Exit 0 means APPROVE:
+review the evidence file and commit it — `scripts/release_readiness_check.py`
+requires it on the release PR (see `docs/operations/release-guide.md`).
+
 `cross_scale_coverage_min_pairs` in each config is the report-phase teeth: a
-breach forces a non-zero report exit, so a partial or regressed sweep cannot be
-APPROVED. Tune the value to the approved pair count during bring-up.
+breach forces a non-zero report exit, so a partial or regressed sweep cannot
+be APPROVED. The values are derived, not hand-picked: floor =
+max(stage minimum, floor(0.8 × cross-scale-eligible pairs from
+`enumerate_cells_with_pruning`)) — each config carries its derivation comment,
+and `tests/uat/test_config.py` pins the sound band.
 
 ### APPROVE / HOLD gate
 
-APPROVE only if **all** of the following hold for every config:
+`make uat-gate-check` mechanizes this checklist: all stages verdict-green
+(every phase exit 0, incl. validator and cross-scale floors), accounting
+sidecar present (`unreachable_is_estimated=false`), explorer smoke actually
+ran for stages that configure it, one clean `source_commit_sha` across
+stages (`source_dirty=false`), and no ordering violations. Exit 0 = APPROVE;
+any HOLD reason is printed and lands in the evidence file's `reasons`.
 
-- [ ] The run reached the **report** phase with a `# run_status=COMPLETED`
-      footer carrying a `source_commit_sha` (and `source_dirty=false`).
-- [ ] `matrix_summary.tsv` and `validator_rollup.tsv` exist and are non-empty.
-- [ ] Every required, non-pruned cell **passed**; `cross_scale_coverage_min_pairs`
-      is met (no floor breach).
-- [ ] The ordering check returns no violations (no Docker `action=up` before
-      native + dataframe completion).
-- [ ] DuckDB (the reference) is green or its cells are explicitly pruned.
-
-HOLD if **any** of: missing manifests, missing commit SHA, a DuckDB reference
-failure, a Docker zero-cell run, a hung platform, or a `NO_JSON` cell without
-captured error text.
+Still manual before committing the evidence: DuckDB (the reference) is green
+or its cells are explicitly pruned, and no `NO_JSON` cell lacks captured
+error text.

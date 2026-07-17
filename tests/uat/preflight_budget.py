@@ -9,6 +9,7 @@ surfacing unknown coverage as an operator warning.
 from __future__ import annotations
 
 import csv
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -17,6 +18,25 @@ from tests.uat.config import UATConfig
 from tests.uat.phases.enumerate import Cell, enumerate_cells
 
 DEFAULT_TABLE_PATH = Path(__file__).resolve().parent / "data" / "disk_budget_table.tsv"
+
+
+def free_space_gib(path: str | Path) -> float:
+    """Return free space at `path` in GiB.
+
+    Single measurement primitive for all three UAT disk-policy sites: the
+    preflight gate (`phases/preflight.py`), execute's platform-boundary check
+    (`phases/execute.py`), and the orchestrator's per-cell disk-floor watch
+    (`orchestrator.py`) -- see uat-execute-path-unification w6. The policy
+    (what threshold, when to check, what to do on shortfall) stays distinct
+    per site; only the measurement is shared.
+    """
+    p = Path(path).expanduser()
+    if not p.exists():
+        # Walk up to first existing ancestor so a missing log dir doesn't
+        # falsely trigger the abort.
+        p = next((ancestor for ancestor in p.parents if ancestor.exists()), Path("/"))
+    usage = shutil.disk_usage(p)
+    return usage.free / (1024**3)
 
 
 @dataclass(frozen=True)

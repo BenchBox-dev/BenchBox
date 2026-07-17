@@ -364,6 +364,23 @@ class DetailResult(BaseModel):
     compliance_class: str | None = None
     # Phase durations in seconds (None for pre-pipeline rows).
     phase_durations: dict[str, float] | None = None
+    # ADR-2 §3: the platform-rendered physical tuning mechanisms (e.g.
+    # indexes, clustering keys, distribution styles) and, for platforms that
+    # expose one (currently TPC benchmarks on Databricks), the physical
+    # rendering strategy actually used.
+    #
+    # Tri-state, deliberately: `None` means the bundle never recorded a
+    # logical tuning profile at all -- unknown, not "rendered nothing" --
+    # e.g. a legacy bundle predating this field. `[]` means a logical
+    # profile WAS recorded and it genuinely rendered zero physical
+    # mechanisms -- a real, comparable value (this is exactly the ADR-2
+    # motivating case: one platform renders six mechanisms, another renders
+    # zero, for the same tuned template). Collapsing these to the same value
+    # anywhere downstream would make a legacy/unknown bundle compared against
+    # a modern zero-mechanism bundle look like a genuine "different
+    # mechanisms" mismatch instead of "nothing to compare".
+    physical_mechanisms: list[str] | None = None
+    physical_rendering_id: str | None = None
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ id: uat-shared-submit-classifier
 title: "UAT boundary reset: extract shared submit-classification policy consumed by CLI and UAT"
 worktree: main
 priority: High
-status: "Not Started"
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -38,17 +38,33 @@ description: |
 work:
   - id: w0
     summary: "Re-validate the duplication still exists at the cited lines"
-    status: pending
+    status: done
     notes: |
       Confirm runner.py:60 policy duplication, runner.py:27 local frozenset,
       submit.py:587-606 inline policy, and bundle.py:46
       CLI_REFUSED_COMPLIANCE_CLASSES. Record a compact summary (file:line,
       matched literals) so the fix targets current code, not the review snapshot.
 
+      RE-VALIDATION (2026-07-16): the finding NO LONGER EXISTS — the extraction
+      already landed in the tree. This item was misfiled in DONE with a stale
+      `status: Not Started` field and later restored to planning on that basis
+      (PR #1181); the engineering work itself was executed. Evidence:
+        - benchbox/core/results/submit_classification.py present (shared policy;
+          exports SubmitTerminalState + classify_result_path).
+        - benchbox/cli/commands/submit.py:37-38 imports the shared module and
+          maps its enum to CLI exit codes (no inline decision tree).
+        - tests/uat/runner.py:74-81 classify_for_submit is a thin adapter over
+          classify_result_path; the local frozenset is GONE
+          (`grep unofficial_nonstandard tests/uat/runner.py` -> absent).
+        - bundle.py:59 CLI_REFUSED_COMPLIANCE_CLASSES remains the single
+          canonical refusal set; no literal re-list anywhere.
+        - tests/unit/core/results/test_submit_classifier_contract.py exists.
+      Verification block re-run clean on 2026-07-16 (see verification:).
+
   - id: w1
     summary: "Extract a single shared submit-classification function in benchbox/core"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       New function returns the terminal-state enum from the result-status
       predicates already in benchbox.core.results.status, importing
@@ -59,7 +75,7 @@ work:
   - id: w2
     summary: "Refactor benchbox/cli/commands/submit.py to consume the shared classifier"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Replace the inline decision branches at submit.py:587-606 with a call to
       the shared classifier; preserve exact CLI exit codes and user-facing
@@ -68,7 +84,7 @@ work:
   - id: w3
     summary: "Refactor tests/uat/runner.py to consume the shared classifier; delete local frozenset"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       classify_for_submit becomes a thin adapter over the shared classifier.
       Delete the local frozenset at runner.py:27. Keep UAT's terminal-state
@@ -77,7 +93,7 @@ work:
   - id: w4
     summary: "Add a CI contract test asserting CLI and UAT agree on terminal state"
     needs: [w2, w3]
-    status: pending
+    status: done
     notes: |
       Drive a matrix of result fixtures (clean, query_failure, schema_violation,
       missing_manifest, unofficial_*) through both surfaces; assert identical
@@ -96,7 +112,15 @@ metadata:
     - tech-debt
   estimated_effort: "1-2 days"
   created_date: "2026-05-31"
-  last_updated: "2026-05-31T00:00:00Z"
+  last_updated: "2026-07-16T00:00:00-04:00"
+  completed_date: "2026-07-16"
+  completion_note: |
+    Closed as already-implemented. The classifier extraction, submit.py and
+    runner.py refactors, frozenset removal, and CLI/UAT contract test were all
+    executed prior to this item's erroneous DONE-filing (status stayed
+    "Not Started"); PR #1181 restored it to planning on that stale field. Tree
+    re-validation on 2026-07-16 confirms every work unit satisfied and the
+    verification block green. No new code required.
 
 impact:
   technical_debt: |

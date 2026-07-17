@@ -52,9 +52,11 @@ from benchbox.cli.shared import console, set_quiet_output, silence_output
 from benchbox.cli.system import SystemProfiler
 from benchbox.cli.tuning_resolver import (
     TuningMode,
+    TuningResolution,
     TuningSource,
     display_tuning_resolution,
     resolve_tuning,
+    warn_sql_auto_mode,
 )
 from benchbox.cli.tuning_runtime import (
     build_baseline_unified_config,
@@ -67,6 +69,7 @@ from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.provenance import FUNDING_SOURCES, RESULT_SOURCES
 from benchbox.core.results.status import result_cli_failure_reason, result_non_clean_reason
 from benchbox.core.schemas import ExecutionContext
+from benchbox.core.tuning import modes as tuning_modes
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
 from benchbox.utils.cloud_storage import is_cloud_path
 from benchbox.utils.compression import CompressionManager
@@ -106,12 +109,50 @@ def normalize_benchmark_name(name: str) -> str:
 
 
 def _reject_external_tuned(console: Any, logger: logging.Logger | None, ctx: click.Context) -> None:
-    """Exit with error when --table-mode external is combined with --tuning tuned."""
-    console.print("[red]❌ Error: --table-mode external is incompatible with --tuning tuned[/red]")
-    console.print("[yellow]Use --table-mode native or choose a non-tuned mode[/yellow]")
+    """Exit with error when --table-mode external is combined with a tuning-bearing --tuning value."""
+    console.print("[red]❌ Error: --table-mode external is incompatible with tuning enabled[/red]")
+    console.print("[yellow]Use --table-mode native, or --tuning notuning[/yellow]")
     if logger:
-        logger.error("Invalid flag combination: --table-mode external with --tuning tuned")
+        logger.error("Invalid flag combination: --table-mode external with tuning enabled")
     ctx.exit(1)
+
+
+def _tuning_arg_is_tuning_bearing(tuning_arg: str | None) -> bool:
+    """Whether a raw `--tuning` argument selects a tuning-bearing resolution.
+
+    Mirrors the outcomes `TuningResolution` can produce without requiring
+    resolution to have already run: `notuning` is the only raw keyword that
+    resolves to a disabled configuration. `tuned` (which may still resolve to
+    either a curated template or `tuned-fallback` -- both tuning-bearing per
+    ADR-2), `auto` (smart defaults, always enabled), and any other value (a
+    custom tuning file path, recorded as `custom`) are all tuning-bearing.
+    """
+    if not tuning_arg:
+        return False
+    return tuning_arg.strip().lower() != "notuning"
+
+
+def _reject_official_fallback(s: types.SimpleNamespace, resolution: TuningResolution) -> None:
+    """Refuse `tuned-fallback` resolutions under `--official` (ADR-2 §1).
+
+    A `--tuning tuned` run that could not find a template resolves to the
+    distinct `tuned-fallback` mode (see `TuningResolution.canonical_mode`)
+    rather than silently recording `tuned`. Official/TPC-compliant runs must
+    either find a real template or explicitly choose `notuning`/a custom
+    file -- they must never submit an unoptimized fallback config labeled as
+    if it were a genuine tuned run.
+    """
+    if not s.official or resolution.canonical_mode != tuning_modes.TUNED_FALLBACK:
+        return
+    console.print("[red]❌ Error: --official runs cannot use a 'tuned-fallback' configuration[/red]")
+    console.print(
+        "[yellow]No tuning template was found for this platform/benchmark. "
+        "Add one under examples/tunings/, or rerun with --tuning notuning "
+        "or an explicit --tuning <file>.[/yellow]"
+    )
+    if s.logger:
+        s.logger.error("Official run refused: tuning resolved to tuned-fallback under --official")
+    s.ctx.exit(1)
 
 
 def _apply_platform_optimization_overrides(
@@ -287,7 +328,11 @@ def _build_execution_context(
         capture_plans: Whether to capture query plans
         strict_plan_capture: Strict plan capture mode
         non_interactive: Non-interactive mode flag
-        tuning: Tuning mode/path
+        tuning: The already-resolved canonical `tuning_mode` (see
+            `_canonical_tuning_mode` / `TuningResolution.canonical_mode`) --
+            one of the ADR-2 pinned vocabulary values (tuned, tuned-fallback,
+            notuning, auto, custom), never a raw `--tuning` CLI argument or
+            local file path (ADR-2 §2 forbids raw paths as a recorded mode).
 
     Returns:
         ExecutionContext populated from CLI parameters
@@ -310,6 +355,31 @@ def _build_execution_context(
         non_interactive=non_interactive,
         tuning_mode=tuning if tuning and tuning != "notuning" else None,
     )
+
+
+def _canonical_tuning_mode(s: types.SimpleNamespace) -> str | None:
+    """Read the ADR-2 canonical `tuning_mode` off `s` for recording, not raw `s.tuning`.
+
+    `s.tuning` is the raw `--tuning` CLI value (a keyword or a local file
+    path) and must never reach a result bundle verbatim (ADR-2 §2). Every
+    dispatch path sets `s.tuning_resolution` before calling
+    `_build_execution_context` (`_resolve_tuning`, the fallback-wizard branch
+    of `_load_unified_tuning_config`, `_interactive_tuning_step`, and the
+    quick-restart re-resolution all keep it current), so this always prefers
+    `TuningResolution.canonical_mode`. The raw-string fallback only guards
+    against a future dispatch path that forgets to set a resolution; it
+    intentionally excludes anything that looks like a file path so a bug
+    upstream fails closed (falls back to `custom`) rather than leaking a path.
+    """
+    resolution = getattr(s, "tuning_resolution", None)
+    if resolution is not None:
+        return resolution.canonical_mode
+    raw = s.tuning
+    if not raw or raw.strip().lower() == "notuning":
+        return None
+    if raw.strip().lower() in {"tuned", "auto"}:
+        return raw.strip().lower()
+    return tuning_modes.CUSTOM
 
 
 def _execute_orchestrated_run(
@@ -614,7 +684,7 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
             f"Arguments: platform={s.platform}, benchmark={s.benchmark}, scale={s.scale}, verbose={s.verbose}"
         )
 
-    if s.table_mode == "external" and s.tuning.strip().lower() == "tuned":
+    if s.table_mode == "external" and _tuning_arg_is_tuning_bearing(s.tuning):
         _reject_external_tuned(console, s.logger, s.ctx)
 
 
@@ -964,6 +1034,8 @@ def _resolve_tuning(s: types.SimpleNamespace) -> None:
     s.tuning_config_file = str(tuning_resolution.config_file) if tuning_resolution.config_file else None
     s.use_auto_tuning = tuning_resolution.mode == TuningMode.AUTO
 
+    _reject_official_fallback(s, tuning_resolution)
+
     if not s.quiet:
         display_tuning_resolution(tuning_resolution, console, verbose=bool(s.verbose))
 
@@ -1011,6 +1083,16 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
                     interactive=True,
                 )
                 s.tuning_enabled, s.tuning = infer_runtime_tuning_mode(s.loaded_unified_config)
+                # A wizard-produced config is no longer the barebones fallback
+                # constraints -- record it with `wizard` provenance (ADR-2 §1)
+                # so `canonical_mode` reports plain `tuned`, not
+                # `tuned-fallback`, for the run the user just configured.
+                if s.tuning_enabled:
+                    tuning_resolution.mode = TuningMode.TUNED
+                    tuning_resolution.source = TuningSource.INTERACTIVE_WIZARD
+                else:
+                    tuning_resolution.mode = TuningMode.NOTUNING
+                    tuning_resolution.source = TuningSource.BASELINE
                 console.print("[green]✅ Tuning configuration completed[/green]")
             else:
                 s.loaded_unified_config = UnifiedTuningConfiguration()
@@ -1020,8 +1102,7 @@ def _load_unified_tuning_config(s: types.SimpleNamespace) -> None:
             s.logger.debug("Using basic constraints-only configuration (fallback)")
     else:
         s.loaded_unified_config = UnifiedTuningConfiguration()
-        if s.logger:
-            s.logger.debug(f"Using basic unified config for mode: {tuning_resolution.mode.value}")
+        warn_sql_auto_mode(tuning_resolution, s.resolved_mode, console, s.logger, quiet=bool(s.quiet))
 
 
 def _resolve_data_organization(s: types.SimpleNamespace) -> None:
@@ -1523,7 +1604,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
         capture_plans=s.capture_plans,
         strict_plan_capture=s.strict_plan_capture,
         non_interactive=s.non_interactive,
-        tuning=s.tuning,
+        tuning=_canonical_tuning_mode(s),
     )
 
     orchestrator = BenchmarkOrchestrator()
@@ -1776,7 +1857,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
         capture_plans=s.capture_plans,
         strict_plan_capture=s.strict_plan_capture,
         non_interactive=s.non_interactive,
-        tuning=s.tuning,
+        tuning=_canonical_tuning_mode(s),
     )
 
     orchestrator = BenchmarkOrchestrator()
@@ -1951,7 +2032,29 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
         s.output = last_run.get("output")
     if not s.table_mode_cli_supplied:
         s.table_mode = str(last_run.get("table_mode", s.table_mode) or "native").lower()
-    if s.table_mode == "external" and s.tuning.strip().lower() == "tuned":
+
+    # `_prepare_run_state()` already ran `_resolve_tuning()` once against the
+    # pre-restart s.platform/s.benchmark/s.tuning (typically the CLI
+    # defaults); re-resolve now that quick-restart has overwritten all three,
+    # so `s.tuning_resolution.canonical_mode` -- and anything recorded from
+    # it later -- reflects the restored run rather than a stale resolution.
+    # non_interactive=True here only suppresses the wizard offer for a
+    # template-less fallback; it does not change s.non_interactive itself.
+    try:
+        s.tuning_resolution = resolve_tuning(
+            tuning_arg=s.tuning,
+            platform=s.platform,
+            benchmark=s.benchmark,
+            config_manager=s.config,
+            console=console,
+            logger=s.logger,
+            quiet=True,
+            non_interactive=True,
+        )
+    except ValueError:
+        pass  # keep the pre-restart resolution rather than fail quick-restart over it
+
+    if s.table_mode == "external" and _tuning_arg_is_tuning_bearing(s.tuning):
         _reject_external_tuned(console, s.logger, s.ctx)
 
     console.print("[green]✓ Using saved configuration[/green]")
@@ -2198,7 +2301,7 @@ def _interactive_collect_flags(
 
     if not s.table_mode_cli_supplied:
         s.table_mode = prompt_table_mode(default_mode=s.table_mode)
-        if s.table_mode == "external" and s.tuning.strip().lower() == "tuned":
+        if s.table_mode == "external" and _tuning_arg_is_tuning_bearing(s.tuning):
             _reject_external_tuned(console, s.logger, s.ctx)
     else:
         console.print(f"[dim]Using table mode from CLI: {s.table_mode}[/dim]")
@@ -2299,7 +2402,18 @@ def _interactive_tuning_step(s: types.SimpleNamespace, system_profile: Any) -> N
         s.tuning_config_file = None
         s.use_auto_tuning = False
 
-    if s.table_mode == "external" and s.tuning.strip().lower() == "tuned":
+    # This step never runs through `resolve_tuning()` (it's the fully
+    # interactive wizard path, not a `--tuning` CLI value), so build a fresh
+    # `TuningResolution` here rather than leaving the stale pre-wizard one
+    # from `_resolve_tuning()` in place -- otherwise `canonical_mode` could
+    # still read as the earlier resolution's mode/source pair.
+    s.tuning_resolution = (
+        TuningResolution(mode=TuningMode.TUNED, source=TuningSource.INTERACTIVE_WIZARD, enabled=True)
+        if s.tuning_enabled
+        else TuningResolution(mode=TuningMode.NOTUNING, source=TuningSource.BASELINE, enabled=False)
+    )
+
+    if s.table_mode == "external" and _tuning_arg_is_tuning_bearing(s.tuning):
         _reject_external_tuned(console, s.logger, s.ctx)
 
     if getattr(s.database_config, "options", None) is None:
@@ -2401,7 +2515,7 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
         capture_plans=s.capture_plans,
         strict_plan_capture=s.strict_plan_capture,
         non_interactive=s.non_interactive,
-        tuning=s.tuning,
+        tuning=_canonical_tuning_mode(s),
     )
 
     orchestrator = BenchmarkOrchestrator()
@@ -2598,6 +2712,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--dry-run",
     type=str,
     metavar="OUTPUT_DIR",
+    callback=ValidationRules.validate_dry_run_output_dir,
     help="Preview configuration without execution",
 )
 @click.option(

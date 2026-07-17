@@ -8,14 +8,19 @@ a live Docker daemon.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import os
 import re
 import shlex
+import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,9 +28,83 @@ DOCKER_PLATFORM_SWITCH_MODES: tuple[str, ...] = ("off", "containers", "volumes",
 DOCKER_FIXED_CONTAINER_NAME_POLICIES: tuple[str, ...] = ("fail", "override", "allow")
 _PROJECT_NAME_MAX_LEN = 63
 
+# Env override honored by resolve_container_cli() -- verbatim, no rewriting.
+# Mirrors the convention _project/scripts/build_joinorder_data.py:879-883
+# already uses for the joinorder Docker build path; this is the UAT-side
+# resolver for the same contract (uat-container-engine-routing prior_art).
+CONTAINER_CLI_ENV_VAR = "BENCHBOX_CONTAINER_CLI"
+
 
 class DockerAssetError(ValueError):
     """Raised when a UAT Docker lifecycle request is unsafe or unsupported."""
+
+
+def _which_container_cli(cli: str) -> str | None:
+    """Thin ``shutil.which`` wrapper so tests can stub PATH lookups without touching the real ``shutil`` module."""
+    return shutil.which(cli)
+
+
+def _current_platform() -> str:
+    """Thin ``sys.platform`` wrapper so tests can stub the OS without mutating the real ``sys`` module."""
+    return sys.platform
+
+
+@functools.lru_cache(maxsize=1)
+def resolve_container_cli() -> str:
+    """Resolve the Docker-CLI-compatible binary UAT lifecycle commands should invoke.
+
+    Resolution order (uat-container-engine-routing, user decision
+    2026-07-11): ``BENCHBOX_CONTAINER_CLI`` env override, honored verbatim >
+    platform default: on macOS, ``mocker`` if it is on PATH, else ``docker``;
+    on every other platform, always ``docker`` (no mocker probing happens off
+    darwin -- this keeps a docker-only Linux host byte-identical to before
+    this resolver existed).
+
+    Resolved once per process and memoized (the engine does not change mid
+    sweep); call ``resolve_container_cli.cache_clear()`` to force
+    re-resolution -- tests use this, production code never does.
+
+    Raises DockerAssetError when the resolved binary is not on PATH -- a
+    missing engine is a hard stop, not a silent fallback.
+    """
+    override = os.environ.get(CONTAINER_CLI_ENV_VAR)
+    if override:
+        candidate, source = override, f"{CONTAINER_CLI_ENV_VAR} override"
+    elif _current_platform() == "darwin" and _which_container_cli("mocker") is not None:
+        candidate, source = "mocker", "darwin mocker-if-present default"
+    else:
+        candidate, source = "docker", "platform default"
+    if _which_container_cli(candidate) is None:
+        raise DockerAssetError(
+            f"Resolved container CLI {candidate!r} ({source}) is not available on PATH; "
+            f"install it or set {CONTAINER_CLI_ENV_VAR} to a Docker-CLI-compatible binary that is."
+        )
+    return candidate
+
+
+def container_engine_identity() -> tuple[str, str]:
+    """Return ``(binary, version_line)`` for the resolved container CLI.
+
+    ``version_line`` is the first line of ``<binary> --version`` output, or a
+    diagnostic placeholder if that command itself fails -- a failed version
+    probe still records engine identity, just without a version string.
+    Raises DockerAssetError (propagated from resolve_container_cli) when no
+    engine binary is available at all.
+    """
+    binary = resolve_container_cli()
+    try:
+        completed = subprocess.run(
+            [binary, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        text = (completed.stdout or completed.stderr or "").strip()
+        version = text.splitlines()[0] if text else f"{binary} --version produced no output"
+    except (OSError, subprocess.SubprocessError) as exc:
+        version = f"{binary} --version failed: {exc}"
+    return binary, version
 
 
 @dataclass(frozen=True)
@@ -62,6 +141,9 @@ class DockerCommandResult:
     def succeeded(self) -> bool:
         """Return True when the command completed successfully."""
         return self.returncode == 0 and not self.timed_out and self.error is None
+
+
+DockerRunner = Callable[..., DockerCommandResult]
 
 
 def _repo_path(relative: str) -> Path:
@@ -358,7 +440,7 @@ def compose_project_name(config_name: str, platform: str, prefix: str = "benchbo
 def _compose_base_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project_name):
         raise DockerAssetError(f"Unsafe Docker compose project name {project_name!r}")
-    argv = ["docker", "compose", "-p", project_name]
+    argv = [resolve_container_cli(), "compose", "-p", project_name]
     for compose_file in spec.compose_files:
         argv.extend(["-f", str(compose_file)])
     return argv
@@ -428,16 +510,150 @@ def compose_environment(
     return {"BENCHBOX_DATA_DIR": str(Path(benchmark_runs_dir).expanduser())}
 
 
+_FORBIDDEN_PRUNE_VERBS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("system", "prune"),
+        ("volume", "prune"),
+        ("image", "prune"),
+        ("builder", "prune"),
+    }
+)
+
+# The Apple-native `container` CLI is exempt from the prune guard: its prune
+# verbs are deliberate, documented operator actions of `make uat-docker-cleanup
+# ENGINE=container MODE=max` (reclaiming the Apple container store), guarded by
+# container_cleanup._is_forbidden instead. The guard below protects the SHARED
+# docker/mocker host state, which the Apple store is not part of.
+_APPLE_CONTAINER_CLI = "container"
+
+
 def command_has_forbidden_prune(argv: Iterable[str]) -> bool:
-    """Return True when argv contains a Docker prune command UAT must never run."""
-    joined = " ".join(argv)
-    forbidden = (
-        "docker system prune",
-        "docker volume prune",
-        "docker image prune",
-        "docker builder prune",
-    )
-    return any(term in joined for term in forbidden)
+    """Return True when argv is a global prune against a shared container host.
+
+    Matches on the verb pair (e.g. ``volume prune``) in the tokens *after*
+    the binary name, not a ``"docker system prune"`` string literal -- the
+    binary is resolved (``docker``, ``mocker``, or a BENCHBOX_CONTAINER_CLI
+    override), so a literal-prefix match would silently stop catching
+    forbidden commands the moment the resolved engine is not ``docker``.
+    The Apple-native ``container`` CLI is exempt (see _APPLE_CONTAINER_CLI):
+    its max-mode prunes are a deliberate documented operator action with its
+    own guard, and blocking them here broke `make uat-docker-cleanup
+    ENGINE=container MODE=max APPLY=1` outright.
+    """
+    tokens = list(argv)
+    if len(tokens) < 3:
+        return False
+    if Path(tokens[0]).name == _APPLE_CONTAINER_CLI:
+        return False
+    rest = tokens[1:]
+    return any(pair in _FORBIDDEN_PRUNE_VERBS for pair in zip(rest, rest[1:]))
+
+
+def list_mocker_volumes_matching(project_prefix: str, *, runner: DockerRunner | None = None) -> tuple[str, ...]:
+    """List (never remove) mocker volumes whose name starts with `project_prefix`.
+
+    ``mocker volume ls`` is the one Docker-shaped inventory verb mocker
+    implements faithfully as plain text (unlike ``container``/``image ls
+    --format json``, which echo the literal string ``json`` instead of
+    JSON -- live-validated in uat-container-engine-routing w0; see
+    container_cleanup.py's module docstring for the same finding on the
+    JSON verbs). No-op (empty) when the resolved engine is not mocker.
+
+    This is PREFIX-scoped by design: its consumer is docker_cleanup's
+    recovery inventory, whose ownership rule is the project *prefix*
+    (`_is_uat_owned`) spanning every project under it -- not one project's
+    exact volume set. For per-project teardown, use
+    `sweep_leaked_mocker_volumes`, which matches exact compose-declared
+    volume names and cannot touch a sibling project.
+    """
+    if resolve_container_cli() != "mocker":
+        return ()
+    run = runner or run_docker_command
+    list_result = run(["mocker", "volume", "ls"])
+    if not list_result.succeeded:
+        return ()
+    pattern = re.compile(rf"{re.escape(project_prefix)}[-_][A-Za-z0-9._-]+")
+    found: list[str] = []
+    for line in list_result.stdout.splitlines():
+        for match in pattern.finditer(line):
+            volume_name = match.group(0)
+            if volume_name not in found:
+                found.append(volume_name)
+    return tuple(found)
+
+
+def compose_declared_volume_names(spec: DockerPlatformSpec) -> tuple[str, ...]:
+    """Return the top-level named-volume keys declared by the spec's compose files."""
+    names: list[str] = []
+    for compose_file in spec.compose_files:
+        try:
+            data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            continue
+        volumes = data.get("volumes") if isinstance(data, dict) else None
+        if isinstance(volumes, dict):
+            names.extend(str(key) for key in volumes)
+    return tuple(dict.fromkeys(names))
+
+
+def expected_mocker_volume_names(project_name: str, spec: DockerPlatformSpec) -> tuple[str, ...]:
+    """Exact volume names one compose project can have created, for both joiners.
+
+    mocker 0.5.4 joins ``<project>-<volume-key>`` with a HYPHEN
+    (live-verified twice in uat-container-engine-routing: scratch project
+    ``sepcheck`` + volume key ``checkvol`` produced ``sepcheck-checkvol``,
+    and the postgresql stack's ``postgresql18-data`` key produced
+    ``benchbox-uat-manual-postgresql-postgresql18-data``); docker compose
+    joins with an underscore. Both joiners are generated so the exact-match
+    set stays correct if mocker ever aligns with docker's convention.
+    """
+    names: list[str] = []
+    for key in compose_declared_volume_names(spec):
+        names.append(f"{project_name}-{key}")
+        names.append(f"{project_name}_{key}")
+    return tuple(names)
+
+
+def sweep_leaked_mocker_volumes(
+    project_name: str,
+    spec: DockerPlatformSpec,
+    *,
+    runner: DockerRunner | None = None,
+    dry_run: bool = False,
+) -> tuple[str, ...]:
+    """Remove named volumes mocker 0.5.4's ``compose down -v`` leaks, for exactly one project.
+
+    Live-validated in uat-container-engine-routing w0: mocker's ``compose
+    down -v`` removes containers but leaves named volumes behind (docker's
+    does not). Matches EXACT names derived from the spec's compose-declared
+    volume keys (`expected_mocker_volume_names`), never a name-prefix scan --
+    a prefix scan on project ``p`` would also match a sibling project
+    ``p-ha``'s volumes (mocker joins project and volume key with ``-``, so
+    ``p-ha-data`` starts with ``p-``), and deleting a sibling's data is the
+    one thing a project-scoped sweep must never do. Never a global prune (w3
+    anti-pattern). No-op when the resolved engine is not mocker (docker
+    already removes named volumes on ``down -v``) or when `dry_run` is set
+    (nothing was actually started, so nothing can have leaked).
+
+    Returns the volume names actually removed; a single volume's removal
+    failure is swallowed (matches the Makefile's ``|| true``) so one stale
+    entry cannot abort the rest of the sweep.
+    """
+    if dry_run or resolve_container_cli() != "mocker":
+        return ()
+    run = runner or run_docker_command
+    list_result = run(["mocker", "volume", "ls"])
+    if not list_result.succeeded:
+        return ()
+    existing = {token for line in list_result.stdout.splitlines() for token in line.split()}
+    removed: list[str] = []
+    for volume_name in expected_mocker_volume_names(project_name, spec):
+        if volume_name not in existing:
+            continue
+        rm_result = run(["mocker", "volume", "rm", volume_name], dry_run=dry_run)
+        if rm_result.succeeded:
+            removed.append(volume_name)
+    return tuple(removed)
 
 
 def run_docker_command(

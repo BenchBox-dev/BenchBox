@@ -14,6 +14,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import logging
 import sqlite3
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Optional
@@ -35,15 +36,76 @@ class TPCDSThroughputTestConfig:
     stream_timeout: int = 7200  # Timeout per stream in seconds (0 = no timeout)
     max_workers: Optional[int] = None
     verbose: bool = False
+    # Opt-in cooperative cancellation (default OFF, behavior-preserving): when
+    # True, a timed-out stream (see StreamRunner.execute()) gets a
+    # threading.Event signalled so its query loop can notice and stop between
+    # queries instead of continuing to run in the background indefinitely.
+    # Python cannot forcibly cancel a running thread, so this is opt-in and
+    # never hard-kills anything -- see benchbox/core/throughput/runner.py's
+    # module docstring ("Timed-out streams") for the full design.
+    cancel_on_timeout: bool = False
     # Number of queries to execute per stream (None = all queries, ~99 for TPC-DS)
     # NOTE: Per TPC-DS spec, full query set should be executed. Use subset only for testing.
     queries_per_stream: Optional[int] = None  # Default: execute all queries
     # Enable preflight validation (validates query generation before execution)
     enable_preflight: bool = True
+    # Minimum fraction of streams (0.0-1.0) that must succeed to declare the
+    # Throughput Test successful, and (per-stream) the minimum fraction of a
+    # single stream's queries that must succeed for that stream to count as
+    # successful. Default 0.70 = 70%. Mirrors TPC-H's configurable
+    # min_success_rate (see TPCHThroughputTestConfig).
+    #
+    # Spec citation: NOT derived from a TPC-DS "acceptable failure rate"
+    # clause -- no such partial-success allowance exists in the TPC-DS
+    # specification v4.0.0. A compliant/audited run requires every stream and
+    # query to complete successfully (mirroring TPC-H specification 5.1.1.6's
+    # "A failed run is defined as a run that did not complete successfully
+    # due to unforeseen system failures"). 0.70 is a BenchBox-internal
+    # tolerance for treating a run as "usable" for iterative development/CI
+    # despite some stream/query failures; it is NOT an official TPC-DS
+    # compliance gate, and results below 100% success are not eligible for
+    # TPC-DS-compliant/audited reporting regardless of this setting.
+    #
+    # COUPLING: this single field now drives BOTH gates -- the run-level
+    # stream-success gate in run() (result.success = streams_successful /
+    # num_streams >= min_success_rate) AND the per-stream query-success gate
+    # in _finalize_stream_success() (stream_result.success = queries_successful
+    # / queries_executed >= min_success_rate). Before this change they were
+    # two independent hardcoded 0.7 literals that happened to share a value;
+    # they are now the same configurable knob, so lowering (or raising) it
+    # to relax/tighten one gate relaxes/tightens the other identically. There
+    # is currently no way to configure the run-level and per-stream
+    # thresholds independently.
+    min_success_rate: float = 0.70
 
 
 # Backward-compatibility alias - ThroughputStreamResult is the canonical type.
 TPCDSThroughputStreamResult = ThroughputStreamResult
+
+
+def _count_cursor_rows(cursor: Any) -> int:
+    """Return a row count without importing benchbox.platforms from core.
+
+    The layering convention `utils < core < platforms < cli` forbids `core`
+    importing from `platforms`, so this duck-types on the `row_count()`
+    method `PlatformAdapterCursor` exposes (see
+    `benchbox.platforms.base.connection_wrappers`) instead of importing
+    `count_query_rows` directly. On the real throughput path the cursor IS
+    a `PlatformAdapterCursor`, so this always resolves there and the
+    "never materialize rows just to count them" behavior is preserved.
+
+    The fallback below only serves raw DB-API cursors / test doubles that
+    lack `row_count()`, and mirrors `count_query_rows`'s truthfulness rule:
+    a `-1` (unknown) rowcount must never be reported as a count.
+    """
+    counter = getattr(cursor, "row_count", None)
+    if callable(counter):
+        return counter()
+
+    rowcount = getattr(cursor, "rowcount", None)
+    if isinstance(rowcount, int) and rowcount >= 0:
+        return rowcount
+    return len(cursor.fetchall())
 
 
 @dataclass
@@ -115,7 +177,6 @@ class TPCDSThroughputTest:
         self._pregenerated_queries: Optional[dict[int, list[tuple[Any, Any]]]] = None
 
         # Lock for concurrent stream capture
-        import threading
 
         self._capture_lock = threading.Lock()
 
@@ -197,14 +258,16 @@ class TPCDSThroughputTest:
             # Calculate metrics
             StreamRunner.compute_metrics(result, config, start_time)
 
-            # TPC-DS success criteria: at least 70% of streams must succeed
+            # TPC-DS success criteria: configurable stream success rate (see
+            # TPCDSThroughputTestConfig.min_success_rate for the spec citation
+            # -- default is 70%, mirroring TPC-H's configurable gate).
             success_rate = result.streams_successful / max(config.num_streams, 1)
-            result.success = success_rate >= 0.7
+            result.success = success_rate >= config.min_success_rate
 
             if config.verbose:
                 self.logger.info(f"Throughput Test completed in {result.total_time:.3f}s")
                 self.logger.info(f"Successful streams: {result.streams_successful}/{config.num_streams}")
-                self.logger.info(f"Stream success rate: {success_rate:.2%}")
+                self.logger.info(f"Stream success rate: {success_rate:.2%} (threshold: {config.min_success_rate:.2%})")
                 self.logger.info(f"Throughput@Size: {result.throughput_at_size:.2f}")
                 self.logger.info(f"Query throughput: {result.query_throughput:.2f} queries/sec")
 
@@ -454,15 +517,20 @@ class TPCDSThroughputTest:
 
     def _run_single_stream_query(
         self, connection, query_text: str, query_display_id: str, stream_id: int
-    ) -> dict[str, Any] | None:
+    ) -> tuple[dict[str, Any] | None, int]:
         if hasattr(connection, "set_query_context"):
             connection.set_query_context(query_display_id, stream_id=stream_id)
         cursor = connection.execute(query_text)
-        if hasattr(cursor, "fetchall"):
-            cursor.fetchall()
+        # _count_cursor_rows() reads the adapter-reported count directly (when
+        # available) instead of materializing the result set via fetchall() -
+        # see PlatformAdapterCursor.row_count() in connection_wrappers.py.
+        # Previously this called cursor.fetchall() and discarded the return
+        # value entirely, so TPC-DS result_count was hardcoded to 0 below
+        # regardless of the true result size.
+        row_count = _count_cursor_rows(cursor)
         if hasattr(connection, "commit"):
             connection.commit()
-        return getattr(cursor, "platform_result", None)
+        return getattr(cursor, "platform_result", None), row_count
 
     def _execute_single_query(
         self,
@@ -497,7 +565,9 @@ class TPCDSThroughputTest:
                 query_text = self._get_stream_query_text(query_id, variant, stream_seed, config.scale_factor)
             label = f"Stream_{stream_id}_Position_{position + 1}_Query_{query_display_id}"
             try:
-                platform_result = self._run_single_stream_query(connection, query_text, query_display_id, stream_id)
+                platform_result, row_count = self._run_single_stream_query(
+                    connection, query_text, query_display_id, stream_id
+                )
             finally:
                 with self._capture_lock:
                     self.captured_items.append((label, query_text))
@@ -513,7 +583,7 @@ class TPCDSThroughputTest:
                 {
                     "execution_time_seconds": elapsed_seconds(query_start),
                     "success": True,
-                    "result_count": 0,
+                    "result_count": row_count,
                 }
             )
             stream_result.queries_successful += 1
@@ -533,21 +603,42 @@ class TPCDSThroughputTest:
         stream_result.queries_executed += 1
 
     def _finalize_stream_success(
-        self, stream_id: int, stream_result: TPCDSThroughputStreamResult, config: TPCDSThroughputTestConfig
+        self,
+        stream_id: int,
+        stream_result: TPCDSThroughputStreamResult,
+        config: TPCDSThroughputTestConfig,
+        cancelled: bool = False,
     ) -> None:
+        if cancelled:
+            # Cooperative cancellation (config.cancel_on_timeout) stopped this
+            # stream before it finished its query subset -- never count a
+            # truncated stream as successful regardless of the per-stream
+            # success-rate gate below.
+            stream_result.success = False
+            stream_result.error = stream_result.error or (
+                f"Stream cancelled cooperatively after timeout ({stream_result.queries_executed} queries completed)"
+            )
+            if config.verbose:
+                self.logger.info(f"Stream {stream_id} completed: cancelled after timeout")
+            return
+
         if stream_result.queries_executed == 0:
             stream_result.success = False
             if config.verbose:
                 self.logger.info(f"Stream {stream_id} completed: no queries executed")
             return
 
+        # Per-stream success rate: same configurable gate as the overall
+        # run-level gate in run() (see TPCDSThroughputTestConfig.
+        # min_success_rate for the spec citation -- single source of truth,
+        # no separate hardcoded threshold here).
         success_rate = stream_result.queries_successful / stream_result.queries_executed
-        stream_result.success = success_rate >= 0.7
+        stream_result.success = success_rate >= config.min_success_rate
         if config.verbose:
             self.logger.info(
                 f"Stream {stream_id} completed: "
                 f"{stream_result.queries_successful}/{stream_result.queries_executed} successful "
-                f"(success rate: {success_rate:.2%})"
+                f"(success rate: {success_rate:.2%}, threshold: {config.min_success_rate:.2%})"
             )
 
     def _close_stream_connection(self, connection, stream_id: int, config: TPCDSThroughputTestConfig) -> None:
@@ -594,10 +685,47 @@ class TPCDSThroughputTest:
             else:
                 query_subset = self._build_stream_queries(stream_id, seed, config)
 
+            # Opt-in cooperative cancellation (config.cancel_on_timeout,
+            # default OFF): StreamRunner.execute() sets this stream's event
+            # when its per-stream timeout elapses. Checked once per query so
+            # a timed-out stream can stop soon instead of running unbounded
+            # in the background. See runner.py's module docstring.
+            #
+            # Gated directly on config.cancel_on_timeout being the literal
+            # True (not just presence of _stream_cancel_events, and not
+            # merely truthy) so a stale/leftover dict from a prior run that
+            # reused this config object (e.g. run 1 with
+            # cancel_on_timeout=True where a stream timed out and its Event
+            # was set(), then run 2 reusing the same config with
+            # cancel_on_timeout=False) can never take effect here -- belt and
+            # suspenders alongside StreamRunner.execute() resetting
+            # _stream_cancel_events to {} whenever cooperative cancel is
+            # disabled. Also requires _stream_cancel_events to be a genuine
+            # dict and the resolved entry to be a genuine threading.Event --
+            # not merely truthy -- so a malformed config (e.g. a MagicMock in
+            # a test double, where every attribute access is truthy by
+            # default) can never be mistaken for a real cancellation signal.
+            cancel_event = None
+            if getattr(config, "cancel_on_timeout", False) is True:
+                cancel_events = getattr(config, "_stream_cancel_events", None)
+                if isinstance(cancel_events, dict):
+                    candidate = cancel_events.get(stream_id)
+                    if isinstance(candidate, threading.Event):
+                        cancel_event = candidate
+
+            cancelled = False
             for position, stream_query in enumerate(query_subset):
+                if cancel_event is not None and cancel_event.is_set():
+                    cancelled = True
+                    if config.verbose:
+                        self.logger.warning(
+                            f"Stream {stream_id} cooperative cancel signalled; stopping after "
+                            f"{position}/{len(query_subset)} queries"
+                        )
+                    break
                 self._execute_single_query(connection, stream_id, position, stream_query, seed, config, stream_result)
 
-            self._finalize_stream_success(stream_id, stream_result, config)
+            self._finalize_stream_success(stream_id, stream_result, config, cancelled=cancelled)
         except Exception as e:
             stream_result.error = str(e)
             stream_result.success = False
@@ -622,10 +750,11 @@ class TPCDSThroughputTest:
         if not result.success:
             return False
 
-        # TPC-DS requires at least 70% stream success rate
+        # Same configurable gate as run() -- see
+        # TPCDSThroughputTestConfig.min_success_rate for the spec citation.
         if result.config.num_streams > 0:
             stream_success_rate = result.streams_successful / result.config.num_streams
-            if stream_success_rate < 0.7:
+            if stream_success_rate < result.config.min_success_rate:
                 return False
 
         return not result.throughput_at_size <= 0

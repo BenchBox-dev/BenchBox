@@ -231,7 +231,14 @@ class TestTPCTestIntegration:
         return mock
 
     def test_tpch_power_test_uses_adapter_reported_row_count(self, tpch_mock_benchmark):
-        """Preserve true cardinality when adapter validation exposes only ``first_row``."""
+        """Preserve true cardinality when adapter validation reports both ``rows_returned``
+        and a single ``first_row`` sample.
+
+        ``rows_returned`` takes priority over ``first_row`` in
+        ``PlatformAdapterCursor._extract_rows()`` (connection_wrappers.py) -
+        ``first_row`` is only a one-row sample, not the whole result, so
+        ``cursor.fetchall()`` must reflect the true count (42), not 1.
+        """
         cursor = PlatformAdapterCursor(
             {
                 "status": "SUCCESS",
@@ -239,7 +246,7 @@ class TestTPCTestIntegration:
                 "first_row": ("sentinel",),
             }
         )
-        assert len(cursor.fetchall()) == 1
+        assert len(cursor.fetchall()) == 42
 
         mock_connection = Mock()
         mock_connection.execute.return_value = cursor

@@ -1,0 +1,138 @@
+id: tuning-repr-serialization-leak-fix-20260712
+title: "Stop publishing Python repr() strings in bundle raw_config; make serialization fallbacks loud"
+worktree: main
+priority: Medium-High
+status: Completed
+category: Core Functionality
+completed_date: "2026-07-12"
+
+description: |
+  From the 2026-07-12 tuning review, finding R9/C2-adjacent (evidence pinned to
+  commit acfb8992).
+
+  sanitize_platform_options (benchbox/core/results/platform_options.py:68-80) is
+  used for platform.raw_config (platforms/base/runtime_metadata.py:105) but does
+  NOT filter _INTERNAL_OPTION_KEYS (only _iter_public_options does), and
+  _sanitize_option_value falls back to str(value) (platform_options.py:138). Net
+  effect: UnifiedTuningConfiguration objects are published as ~900-char Python
+  repr() strings at platform.raw_config.tuning_config - 468 of 528 seed-corpus
+  bundles carry one, and the explorer's tuning hash ends up hashing repr text.
+
+work:
+  - id: w1
+    summary: "Exclude internal option keys from raw_config capture (align sanitize_platform_options call sites with _iter_public_options filtering, or filter at the runtime_metadata call site)"
+    status: done
+    needs: []
+    notes: |
+      Added an opt-in exclude_internal keyword to sanitize_platform_options()
+      (default False, preserving existing call sites' behavior). When True it
+      drops underscore-prefixed keys and _INTERNAL_OPTION_KEYS, matching
+      _iter_public_options semantics, and propagates recursively through
+      nested Mapping values. Set exclude_internal=True at every export-facing
+      call site: runtime_metadata.py:105 (platform_raw_config, the leak site
+      named in the finding), runtime_metadata.py:450 (_raw_platform_metadata,
+      also published in bundles), and platform_options.py's
+      build_platform_options_capture (defense-in-depth; it already filtered
+      via _iter_public_options before calling sanitize, but nested Mapping
+      values weren't covered previously).
+
+  - id: w2
+    summary: "Replace the str() fallback for non-JSON-able values on exported paths: use to_dict() when available, else drop the key with a captured warning marker"
+    status: done
+    needs: [w1]
+    notes: |
+      _sanitize_option_value no longer falls back to str(value)/repr() for
+      any caller. If the value exposes a callable to_dict(), that result is
+      used (recursively sanitized, including secret redaction and, when
+      requested, internal-key filtering); if to_dict() raises, or the value
+      has no to_dict, the key's value becomes the marker string
+      "<unserializable:TypeName>" (key itself is preserved per the
+      anti_patterns note - only the opaque value is replaced). This applies
+      unconditionally (not just when exclude_internal=True) since there is no
+      legitimate reason to publish a raw Python repr from any call site.
+      Wrapped the to_dict() call in try/except so a broken to_dict()
+      implementation can't raise out of bundle emission.
+
+  - id: w3
+    summary: "Tests: a config object placed in options never serializes as a repr string in any exported payload; warning marker asserted for unknown objects"
+    status: done
+    needs: [w2]
+    notes: |
+      tests/unit/core/results/test_platform_options_capture.py: added
+      test_sanitize_excludes_internal_keys_when_requested,
+      test_sanitize_without_exclude_internal_preserves_existing_behavior,
+      test_sanitize_uses_to_dict_for_objects_that_support_it,
+      test_sanitize_marks_unserializable_values_instead_of_using_repr,
+      test_sanitize_never_raises_when_to_dict_itself_fails, and
+      test_secret_redaction_unaffected_by_internal_key_filtering.
+      tests/unit/platforms/test_runtime_metadata_helpers.py: added
+      test_platform_raw_config_excludes_internal_tuning_keys_and_reprs, which
+      exercises build_default_normalized_result_metadata end-to-end with a
+      tuning-config-shaped object with a deliberately repr-leaking
+      __repr__ and asserts platform_raw_config has neither the internal keys
+      nor any repr text.
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Secret redaction behavior (REDACTED_VALUE) exactly as-is"
+  - "Bundle emission must never raise because an option value is unserializable"
+
+anti_patterns:
+  - "Do not silently drop values with no trace - leave an explicit '<unserializable:TypeName>' marker so capture gaps stay visible"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/results/platform_options.py"
+    - "benchbox/platforms/base/runtime_metadata.py"
+    - "tests/unit/**"
+
+verification:
+  - description: "Sweep script over a fresh local run shows no repr strings"
+    command: "uv run -- python -m pytest tests/unit/core/results -q -k 'platform_options or raw_config'"
+    expected_output: "All passing incl. new no-repr assertions"
+
+work_done: |
+  Call sites of sanitize_platform_options audited (grep across the repo):
+    - platform_options.py:115 (build_platform_options_capture) - export-facing
+      (feeds run_config.platform_options -> result payload); already filtered
+      internal keys via _iter_public_options pre-merge, now also passes
+      exclude_internal=True for nested-Mapping defense in depth.
+    - platform_options.py:131/144 (_sanitize_option_value's Mapping branch) -
+      internal recursive helper, not a distinct call site; now propagates
+      exclude_internal from its caller.
+    - runtime_metadata.py:105 (build_default_normalized_result_metadata ->
+      platform_raw_config) - THE leak site named in the finding; now
+      exclude_internal=True.
+    - runtime_metadata.py:450 (_raw_platform_metadata -> platform_raw_metadata)
+      - also published into bundles; now exclude_internal=True.
+  hash_tuning_template's separate default=str escape hatch (mentioned in the
+  source blind-spot) is out of scope_limit and was left untouched.
+
+  Files changed:
+    - benchbox/core/results/platform_options.py
+    - benchbox/platforms/base/runtime_metadata.py
+    - tests/unit/core/results/test_platform_options_capture.py
+    - tests/unit/platforms/test_runtime_metadata_helpers.py
+
+  Verification:
+    - uv run -- python -m pytest tests/unit/core/results -q: 726 passed, 4 skipped
+    - uv run -- python -m pytest tests/unit/platforms -q -k 'runtime_metadata or raw_config or platform_options': 22 passed
+    - uv run -- python -m pytest tests/unit -q -k 'platform_raw_config or raw_config': 1 passed
+    - uv run -- python -m ruff check (changed files): all checks passed
+
+success_metrics:
+  - "No repr()/str()-of-object leaks in any exported raw_config/raw_metadata payload; internal tuning bookkeeping keys never appear in exported bundles; secret redaction unchanged; capture never raises."
+
+metadata:
+  owners:
+    - "benchbox-team"
+  tags:
+    - tuning
+    - serialization
+    - results-schema
+  estimated_effort: Small
+  created_date: "2026-07-12"
+  completed_date: "2026-07-12"
+  source_review: "tuning-system deep review 2026-07-12, finding R9"

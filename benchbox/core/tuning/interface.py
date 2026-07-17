@@ -70,98 +70,75 @@ class TuningType(Enum):
         """Check if this tuning type is compatible with the given platform.
 
         Args:
-            platform: The name of the database platform (e.g., 'duckdb', 'snowflake')
+            platform: The canonical platform type key (e.g., 'duckdb',
+                'snowflake') -- not a human display string.
 
         Returns:
             True if the tuning type is supported by the platform
         """
-        # Platform compatibility mapping
-        compatibility_map = {
-            "duckdb": {
-                self.SORTING,
-                self.PARTITIONING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-            },
-            "snowflake": {
-                self.CLUSTERING,
-                self.PARTITIONING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "bigquery": {
-                self.PARTITIONING,
-                self.CLUSTERING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.CHECK_CONSTRAINTS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "redshift": {
-                self.DISTRIBUTION,
-                self.SORTING,
-                self.PARTITIONING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "clickhouse": {
-                self.PARTITIONING,
-                self.SORTING,
-                self.CLUSTERING,
-                self.PRIMARY_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "databricks": {
-                self.PARTITIONING,
-                self.CLUSTERING,
-                self.DISTRIBUTION,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-                self.Z_ORDERING,
-                self.LIQUID_CLUSTERING,
-                self.AUTO_OPTIMIZE,
-                self.AUTO_COMPACT,
-                self.BLOOM_FILTERS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "sqlite": {
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-            },
-            "postgresql": {
-                self.PARTITIONING,
-                self.CLUSTERING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-                self.BLOOM_FILTERS,
-                self.MATERIALIZED_VIEWS,
-            },
-            "mysql": {
-                self.PARTITIONING,
-                self.PRIMARY_KEYS,
-                self.FOREIGN_KEYS,
-                self.UNIQUE_CONSTRAINTS,
-                self.CHECK_CONSTRAINTS,
-            },
-        }
-
         platform_lower = platform.lower()
-        return self in compatibility_map.get(platform_lower, set())
+        return self in _PLATFORM_COMPATIBILITY_MAP.get(platform_lower, frozenset())
+
+    @classmethod
+    def is_known_platform(cls, platform: str) -> bool:
+        """Check whether `platform` has an explicit entry in the compatibility map.
+
+        A platform absent from the map (e.g. 'starrocks', 'doris', or a
+        first-class ClickHouse deployment key like 'clickhouse-local' that
+        doesn't literally match the 'clickhouse' map key) is not necessarily
+        incompatible with a tuning type -- the map simply has no opinion on
+        it. Callers use this to distinguish "genuinely unsupported on a known
+        platform" (hard error) from "no compatibility data for this platform"
+        (warning; see UnifiedTuningConfiguration.validate_for_platform_detailed).
+        """
+        return platform.lower() in _KNOWN_COMPATIBILITY_PLATFORMS
+
+
+# Platform compatibility mapping, keyed by canonical platform type keys.
+# Derived from benchbox.core.tuning.capability_registry -- the single
+# capability registry introduced by the tuning-renderer-consolidation TODO --
+# rather than hand-maintained here, so this map and the registry's
+# per-platform capability entries can no longer drift apart. The import is
+# deferred to function scope (see _platform_compatibility_map below) to avoid
+# a module import cycle: capability_registry imports TuningType from this
+# module.
+#
+# Per the tuning-platform-identity-canonical-keys TODO: do not add new
+# platforms here as a side effect of fixing lookup keys -- new platforms are
+# added to capability_registry.PLATFORM_TUNING_CAPABILITIES and, if they
+# should participate in the hard-error-vs-warning distinction below, to
+# capability_registry._INTERFACE_KNOWN_PLATFORMS.
+
+
+def _platform_compatibility_map() -> dict[str, frozenset[TuningType]]:
+    from benchbox.core.tuning.capability_registry import interface_compatibility_map
+
+    return interface_compatibility_map()
+
+
+_PLATFORM_COMPATIBILITY_MAP: dict[str, frozenset[TuningType]] = _platform_compatibility_map()
+
+
+# Canonical platform keys with an explicit entry in the compatibility map.
+# Derived from the map so the two can never diverge; callers use it (via
+# TuningType.is_known_platform) to ask "is this platform known to the map at
+# all" without constructing a throwaway TuningType instance.
+_KNOWN_COMPATIBILITY_PLATFORMS = frozenset(_PLATFORM_COMPATIBILITY_MAP)
+
+
+# Schema-constraint tuning types. Their absence from a platform's compatibility
+# map entry is downgraded to a warning (not an error) even for known
+# platforms: constraints default to enabled=True on UnifiedTuningConfiguration,
+# so treating every platform-specific constraint gap as a hard error would
+# make the default configuration fail validation on many real platforms.
+_CONSTRAINT_TUNING_TYPES = frozenset(
+    {
+        TuningType.PRIMARY_KEYS,
+        TuningType.FOREIGN_KEYS,
+        TuningType.UNIQUE_CONSTRAINTS,
+        TuningType.CHECK_CONSTRAINTS,
+    }
+)
 
 
 # Type aliases for TuningColumn options
@@ -1195,6 +1172,33 @@ class PlatformOptimizationConfiguration:
         )
 
 
+# Platform-specific "effective layout" validators: cross-field checks that
+# need the *entire* tuning config (not just one tuning type against one
+# platform's compatibility set -- see validate_for_platform_detailed above).
+# Per the tuning-renderer-consolidation TODO's w4, this module stays a pure
+# data model; platform-specific validation logic lives in the platform layer
+# (e.g. benchbox.platforms.databricks.tuning_validation) and is reached
+# through this small dispatch hook instead of being implemented here. Maps
+# canonical platform key -> "module.path:function_name"; the function must
+# accept a UnifiedTuningConfiguration and return a list of error strings.
+_PLATFORM_EFFECTIVE_LAYOUT_VALIDATORS: dict[str, str] = {
+    "databricks": "benchbox.platforms.databricks.tuning_validation:validate_effective_layout",
+}
+
+
+def _get_effective_layout_validator(platform_key: str):
+    """Resolve the effective-layout validator callable for a platform key, if any."""
+    target = _PLATFORM_EFFECTIVE_LAYOUT_VALIDATORS.get(platform_key)
+    if target is None:
+        return None
+
+    import importlib
+
+    module_path, _, func_name = target.partition(":")
+    module = importlib.import_module(module_path)
+    return getattr(module, func_name)
+
+
 @dataclass
 class UnifiedTuningConfiguration:
     """Unified configuration that consolidates all tuning options.
@@ -1339,76 +1343,59 @@ class UnifiedTuningConfiguration:
         """Validate configuration against platform capabilities.
 
         Args:
-            platform: Target platform name
+            platform: Target platform name (expects a canonical platform type
+                key, e.g. 'duckdb', 'clickhouse-local' -- not a human display
+                string like 'ClickHouse (Local)').
 
         Returns:
-            List of validation error messages
+            List of validation error messages. Constraint-type mismatches and
+            mismatches on platforms absent from the compatibility map are
+            downgraded to warnings and are NOT included here -- call
+            `validate_for_platform_detailed` to see them.
         """
-        errors = []
+        errors, _warnings = self.validate_for_platform_detailed(platform)
+        return errors
+
+    def validate_for_platform_detailed(self, platform: str) -> tuple[list[str], list[str]]:
+        """Validate configuration against platform capabilities, split by severity.
+
+        Table-layout and platform-specific tuning types (partitioning,
+        clustering, distribution, sorting, z-ordering, etc.) are hard errors
+        only when `platform` has an explicit entry in TuningType's
+        compatibility map AND the type is genuinely unsupported there.
+        Schema-constraint types (primary/foreign keys, unique/check
+        constraints) are always downgraded to warnings, since constraints
+        default to enabled=True and the compatibility map is not exhaustive
+        per-constraint. Any tuning type mismatch on a platform absent from the
+        map is also a warning: an unmapped platform is missing compatibility
+        data, not proven incompatible.
+
+        Args:
+            platform: Target platform name (canonical platform type key).
+
+        Returns:
+            Tuple of (errors, warnings) validation message lists.
+        """
+        errors: list[str] = []
+        warnings: list[str] = []
         enabled_types = self.get_enabled_tuning_types()
+        platform_known = TuningType.is_known_platform(platform)
 
         for tuning_type in enabled_types:
-            if not tuning_type.is_compatible_with_platform(platform):
-                errors.append(f"Tuning type '{tuning_type.value}' is not supported by platform '{platform}'")
+            if tuning_type.is_compatible_with_platform(platform):
+                continue
+            message = f"Tuning type '{tuning_type.value}' is not supported by platform '{platform}'"
+            if tuning_type in _CONSTRAINT_TUNING_TYPES or not platform_known:
+                warnings.append(message)
+            else:
+                errors.append(message)
 
         platform_key = platform.lower().replace("_", "-")
-        if platform_key == "databricks":
-            errors.extend(self._validate_databricks_effective_layout())
+        validator = _get_effective_layout_validator(platform_key)
+        if validator is not None:
+            errors.extend(validator(self))
 
-        return errors
-
-    def _validate_databricks_effective_layout(self) -> list[str]:
-        """Validate Databricks layout combinations that require the full tuning config."""
-        errors: list[str] = []
-        try:
-            self.platform_optimizations.__post_init__()
-        except ValueError as exc:
-            errors.append(str(exc))
-
-        strategy = self.platform_optimizations.databricks_clustering_strategy
-        liquid_requested = (
-            strategy in {"liquid_clustering", "liquid_clustering_auto"}
-            or self.platform_optimizations.liquid_clustering_enabled
-            or bool(self.platform_optimizations.liquid_clustering_columns)
-            or self.platform_optimizations.physical_rendering_id
-            in {"databricks_liquid_manual", "databricks_liquid_auto"}
-        )
-        if not liquid_requested:
-            return errors
-
-        partitioned_tables = sorted(
-            table_name for table_name, table_tuning in self.table_tunings.items() if table_tuning.partitioning
-        )
-        if partitioned_tables:
-            errors.append(
-                "Databricks Liquid Clustering is incompatible with per-table partitioning; "
-                f"move partition columns to Liquid clustering intent or use databricks_z_order. Tables: "
-                f"{', '.join(partitioned_tables)}"
-            )
-
-        distributed_tables = sorted(
-            table_name for table_name, table_tuning in self.table_tunings.items() if table_tuning.distribution
-        )
-        if distributed_tables:
-            errors.append(
-                "Databricks Liquid Clustering has no user-managed distribution key; "
-                f"fold distribution candidates into clustering intent or use databricks_z_order. Tables: "
-                f"{', '.join(distributed_tables)}"
-            )
-
-        if strategy == "liquid_clustering":
-            oversized_tables = sorted(
-                table_name
-                for table_name, table_tuning in self.table_tunings.items()
-                if table_tuning.clustering and len(table_tuning.clustering) > 4
-            )
-            if oversized_tables:
-                errors.append(
-                    "Databricks manual Liquid Clustering supports at most four clustering keys per table; "
-                    f"use databricks_liquid_auto or reduce clustering columns. Tables: {', '.join(oversized_tables)}"
-                )
-
-        return errors
+        return errors, warnings
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""

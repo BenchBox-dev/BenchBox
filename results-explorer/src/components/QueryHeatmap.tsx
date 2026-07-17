@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
+import { FundingChip } from "@/components/FundingChip";
 import { fmtMs as formatDurationMs, fmtGeomean } from "@/utils";
 import { formatLatencyMs, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
@@ -542,6 +543,7 @@ export function QueryHeatmap({
 
               <div class="mt-3 flex flex-wrap gap-1.5">
                 <TrustBadge trustLabel={row.trust_label} compact />
+                <FundingChip funding={row.funding} compact />
                 <ValidationBadge validationStatus={row.validation_status} showMissing />
                 {showGeomeanCol && (
                   <span class="rounded-full bg-[var(--bb-surface-app)] px-2 py-0.5 font-mono text-xs text-[var(--bb-data-fg-muted)]">
@@ -696,6 +698,7 @@ export function QueryHeatmap({
                       </summary>
                       <div class="mt-1 flex flex-wrap items-center gap-1">
                         <TrustBadge trustLabel={row.trust_label} compact />
+                        <FundingChip funding={row.funding} compact />
                         <ValidationBadge validationStatus={row.validation_status} showMissing />
                         <a
                           href={`/results/r/${row.result_id}#run-receipt`}

@@ -28,6 +28,7 @@ from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata,
 from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY
 from benchbox.core.results.status import bundle_failed_query_count, bundle_non_clean_reason, normalize_validation_status
+from benchbox.core.tuning.modes import is_canonical_mode
 
 logger = logging.getLogger(__name__)
 
@@ -176,29 +177,113 @@ def _execution_mode(data: dict[str, Any]) -> str | None:
 
 
 def _tuning_mode(data: dict[str, Any]) -> str | None:
-    """Extract tuning mode from schema-v2 bundle config block."""
+    """Extract tuning mode from a schema-v2 bundle.
+
+    Reads ``config.tuning_mode`` first (the current schema location), falling
+    back to ``execution.tuning_mode`` for the seed-corpus generation that
+    wrote the value there instead. When neither location carries a value the
+    result stays ``None`` -- callers must not invent a mode for bundles that
+    never recorded one (see explorer ingest tuning-mode-extraction TODO).
+
+    ADR-2 (docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md)
+    §2 pins the legal ``tuning_mode`` vocabulary to exactly
+    ``{tuned, tuned-fallback, notuning, auto, custom}``. Older bundles
+    predating that pin may carry a raw local tuning-file path (from before
+    ``--tuning <path>`` runs were required to record ``custom``) or the
+    wizard's old ``"balanced"`` flavor string. Per the ADR's consequences
+    section, ingest does not guess which of the five buckets an
+    unrecognized legacy value belongs in -- it is treated as not-recorded
+    (``None`` here; the explorer surfaces that as the "Not Recorded" state)
+    rather than silently reclassified.
+    """
     config = data.get("config", {})
-    if not isinstance(config, dict):
-        return None
-    val = config.get("tuning_mode")
-    return str(val) if val else None
+    if isinstance(config, dict):
+        val = config.get("tuning_mode")
+        if val and is_canonical_mode(str(val)):
+            return str(val)
+    execution = data.get("execution", {})
+    if isinstance(execution, dict):
+        val = execution.get("tuning_mode")
+        if val and is_canonical_mode(str(val)):
+            return str(val)
+    return None
 
 
 def _tuning_hash(data: dict[str, Any]) -> str | None:
     """Compute a stable 8-char hash of the tuning configuration.
 
-    Combines tuning_mode and any tuning config dict so that two runs with
-    identical tuning produce the same hash. Returns None when no tuning info present.
+    Only machine-readable tuning detail is hashed: a dict is hashed
+    canonically (``json.dumps(..., sort_keys=True)``), but a string value
+    (e.g. a Python ``repr()`` of a dataclass, which is not canonical and
+    varies cosmetically between otherwise-identical configs) is dropped
+    rather than hashed. The resolved tuning mode (see ``_tuning_mode``, which
+    includes the ``execution.tuning_mode`` fallback) may still be hashed on
+    its own when no machine-readable detail is present. Returns None when
+    there is neither a mode nor machine-readable detail to hash.
     """
+    mode = _tuning_mode(data)
     config = data.get("config", {})
-    if not isinstance(config, dict):
-        return None
-    mode = config.get("tuning_mode")
-    tuning_detail = config.get("tuning_config") or config.get("tuning")
-    if not mode and not tuning_detail:
+    tuning_detail: dict[str, Any] | None = None
+    if isinstance(config, dict):
+        raw_detail = config.get("tuning_config") or config.get("tuning")
+        if isinstance(raw_detail, dict):
+            tuning_detail = raw_detail
+        # Non-dict detail (e.g. a repr() string) is intentionally not hashed:
+        # it is not canonical, so cosmetic differences would change the hash
+        # even when the underlying tuning configuration is identical.
+    if mode is None and tuning_detail is None:
         return None
     payload = json.dumps({"mode": mode, "detail": tuning_detail}, sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()[:8]
+
+
+def _logical_profile(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Extract the `platform.tuning.logical_profile` block (ADR-2 §3).
+
+    Returns `None` when no logical profile was recorded at all (unknown --
+    e.g. a legacy bundle predating this field), distinct from an empty `{}`
+    profile object, which -- were a bundle ever to emit one -- would mean a
+    profile WAS recorded. Callers use this `None` vs "object present" split
+    to distinguish "unknown" from "recorded, just empty" for fields like
+    physical_mechanisms (see `_physical_mechanisms`).
+    """
+    platform = data.get("platform", {})
+    if not isinstance(platform, dict):
+        return None
+    tuning = platform.get("tuning", {})
+    if not isinstance(tuning, dict):
+        return None
+    profile = tuning.get("logical_profile")
+    return profile if isinstance(profile, dict) else None
+
+
+def _physical_mechanisms(data: dict[str, Any]) -> list[str] | None:
+    """Extract the platform-rendered physical tuning mechanisms.
+
+    Tri-state (see `DetailResult.physical_mechanisms`): `None` when no
+    logical_profile was recorded at all (unknown), `[]` when a
+    logical_profile IS present but recorded zero mechanisms (a genuine,
+    comparable value -- the ADR-2 motivating case of a platform rendering
+    zero mechanisms for a tuned template). Collapsing these would make an
+    unknown/legacy bundle compared against a genuinely zero-mechanism bundle
+    look like a real mismatch instead of "nothing to compare".
+    """
+    profile = _logical_profile(data)
+    if profile is None:
+        return None
+    mechanisms = profile.get("physical_mechanisms", [])
+    if not isinstance(mechanisms, list):
+        return []
+    return [str(item) for item in mechanisms]
+
+
+def _physical_rendering_id(data: dict[str, Any]) -> str | None:
+    """Extract the physical rendering strategy id (ADR-2 §3 secondary facet)."""
+    profile = _logical_profile(data)
+    if profile is None:
+        return None
+    val = profile.get("physical_rendering_id")
+    return str(val) if val else None
 
 
 def _test_type(data: dict[str, Any]) -> str | None:
@@ -929,6 +1014,8 @@ class BundleTransformer:
             normalized_cost=normalized_cost.to_dict(),
             compliance_class=_compliance_class(bundle_data),
             phase_durations=_phase_durations(bundle_data),
+            physical_mechanisms=_physical_mechanisms(bundle_data),
+            physical_rendering_id=_physical_rendering_id(bundle_data),
         )
         manifest_peer = ManifestEntry(
             result_id=result_id,

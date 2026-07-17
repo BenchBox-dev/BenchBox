@@ -475,7 +475,7 @@ Some platforms have special considerations:
 
 ```python
 # ClickHouse - handles large scale factors efficiently
-benchmark = TPCH(scale_factor=100.0, platform="clickhouse")
+benchmark = TPCH(scale_factor=100.0, platform="clickhouse-local")
 
 # DuckDB - configured for analytical workloads
 benchmark = TPCH(scale_factor=10.0, platform="duckdb")

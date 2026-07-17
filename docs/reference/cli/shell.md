@@ -92,7 +92,7 @@ benchbox shell --output ./my-benchmarks --benchmark tpcds --scale 10
 
 ```bash
 # ClickHouse connection
-benchbox shell --platform clickhouse --host localhost --port 9000 \
+benchbox shell --platform clickhouse-server --host localhost --port 9000 \
   --user default --database benchbox
 ```
 

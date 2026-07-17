@@ -12,7 +12,6 @@ Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
-import warnings
 from unittest.mock import patch
 
 import pytest
@@ -228,26 +227,17 @@ class TestAdapterFactoryMigration:
         assert platform == "clickhouse-cloud"
         assert warning is None
 
-    def test_bare_clickhouse_emits_deprecation_and_maps_to_local(self) -> None:
+    def test_bare_clickhouse_is_removed_and_raises_with_replacements(self) -> None:
         from benchbox.platforms.adapter_factory import _resolve_clickhouse_legacy
 
-        platform, warning = _resolve_clickhouse_legacy("clickhouse")
-        assert platform == "clickhouse-local"
-        assert warning is not None
-        assert "deprecated" in warning.lower()
-
-    def test_bare_clickhouse_with_server_mode_maps_to_server(self) -> None:
-        from benchbox.platforms.adapter_factory import _resolve_clickhouse_legacy
-
-        platform, warning = _resolve_clickhouse_legacy("clickhouse", config={"deployment_mode": "server"})
-        assert platform == "clickhouse-server"
-        assert warning is not None
-
-    def test_bare_clickhouse_with_explicit_deployment_server_maps_to_server(self) -> None:
-        from benchbox.platforms.adapter_factory import _resolve_clickhouse_legacy
-
-        platform, warning = _resolve_clickhouse_legacy("clickhouse", deployment="server")
-        assert platform == "clickhouse-server"
+        # Bare 'clickhouse' is now a hard error regardless of any deployment
+        # context (the resolver no longer accepts deployment/config hints for it).
+        with pytest.raises(ValueError) as exc_info:
+            _resolve_clickhouse_legacy("clickhouse")
+        msg = str(exc_info.value)
+        assert "clickhouse-local" in msg
+        assert "clickhouse-server" in msg
+        assert "removed" in msg.lower()
 
     def test_clickhouse_colon_local_maps_to_clickhouse_local(self) -> None:
         from benchbox.platforms.adapter_factory import _resolve_clickhouse_legacy
@@ -280,20 +270,15 @@ class TestAdapterFactoryMigration:
             assert platform == name
             assert warning is None
 
-    def test_get_adapter_emits_deprecation_for_bare_clickhouse(self) -> None:
-        """Integration: get_adapter("clickhouse") emits DeprecationWarning."""
+    def test_get_adapter_rejects_bare_clickhouse_with_helpful_error(self) -> None:
+        """Integration: get_adapter("clickhouse") raises naming the replacements."""
         from benchbox.platforms.adapter_factory import get_adapter
 
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            try:
-                get_adapter("clickhouse")
-            except Exception:
-                pass  # May fail if chDB not installed; we only care about the warning
-        deprecation_warnings = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-        assert any("clickhouse" in str(w.message).lower() for w in deprecation_warnings), (
-            f"Expected a DeprecationWarning about 'clickhouse' but got: {[str(w.message) for w in deprecation_warnings]}"
-        )
+        with pytest.raises(ValueError) as exc_info:
+            get_adapter("clickhouse")
+        msg = str(exc_info.value)
+        assert "clickhouse-local" in msg
+        assert "clickhouse-server" in msg
 
 
 # ---------------------------------------------------------------------------

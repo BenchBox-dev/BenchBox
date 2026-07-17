@@ -70,7 +70,7 @@ Compare performance across different database platforms:
 benchbox datagen --benchmark tpch --scale 1 --output ./data/tpch_1
 
 # Run on multiple platforms
-for platform in duckdb clickhouse; do
+for platform in duckdb clickhouse-local; do
   benchbox run --benchmark tpch --platform $platform --scale 1 \
     --data-dir ./data/tpch_1 \
     --output benchmark_runs/tpch_1_${platform}
@@ -79,7 +79,7 @@ done
 # Compare results
 benchbox compare \
   benchmark_runs/tpch_1_duckdb/results.json \
-  benchmark_runs/tpch_1_clickhouse/results.json
+  benchmark_runs/tpch_1_clickhouse-local/results.json
 ```
 
 **Output**:
@@ -255,11 +255,11 @@ Optimizing query performance with platform-specific tunings:
 
 ```bash
 # 1. Baseline run (no tunings)
-benchbox run --benchmark tpcds --platform clickhouse --scale 10 \
+benchbox run --benchmark tpcds --platform clickhouse-local --scale 10 \
   --output baseline/
 
 # 2. Apply tunings (partitioning, sorting, indexes)
-benchbox run --benchmark tpcds --platform clickhouse --scale 10 \
+benchbox run --benchmark tpcds --platform clickhouse-local --scale 10 \
   --tuning tunings/clickhouse_tpcds.yaml \
   --output tuned/
 

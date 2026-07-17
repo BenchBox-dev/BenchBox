@@ -51,6 +51,8 @@ export interface ResultRow extends CostDeploymentFields {
   comparison_exclusion_reason: string | null;
   ranking_exclusion_reason: string | null;
   trust_label: string;
+  /** Funding disclosure; "unspecified" when the bundle declares none. */
+  funding: string;
   visibility: string;
   platform_version: string | null;
   execution_mode: string | null;
@@ -65,6 +67,13 @@ export interface ResultRow extends CostDeploymentFields {
   plans_published: boolean;
   has_tuning: boolean;
   bundle_download_url: string;
+  // ADR-2 §3 secondary facet: the physical rendering strategy id for
+  // platforms that expose one (currently TPC benchmarks on Databricks).
+  // Never invented; null/undefined when the bundle never recorded a logical
+  // tuning profile. Optional (like plans_published above) so fixtures and
+  // SQL paths predating this field default to undefined rather than needing
+  // updates everywhere a ResultRow is constructed.
+  physical_rendering_id?: string | null;
 }
 
 export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_eligible" | "visibility"> {
@@ -77,6 +86,13 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   cpu_count: number | null;
   memory_gb: number | null;
   python: string | null;
+  // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
+  // physical_mechanisms in DetailResult). Tri-state, preserved from the
+  // pipeline: SQL NULL (-> null here) means no logical tuning profile was
+  // recorded at all (unknown); "" means a profile WAS recorded and it
+  // genuinely has zero mechanisms (recorded-empty, a real comparable
+  // value); a non-empty string is the comma-joined mechanism list.
+  physical_mechanisms?: string | null;
 }
 
 export interface QueryDisplayTimingRow {
@@ -119,6 +135,8 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   platform: string;
   short_id: string;
   trust_label: string;
+  /** Funding disclosure; "unspecified" when the bundle declares none. */
+  funding: string;
   platform_version?: string | null;
   validation_status?: string | null;
   tuning_mode: string | null;
@@ -177,6 +195,8 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   comparison_exclusion_reason: string | null;
   ranking_exclusion_reason: string | null;
   trust_label: string;
+  /** Funding disclosure; "unspecified" when the bundle declares none. */
+  funding: string;
   validation_status?: string | null;
   tuning_mode: string | null;
   execution_mode: string | null;
@@ -266,6 +286,7 @@ const RESULT_COLUMNS = [
   "comparison_exclusion_reason",
   "ranking_exclusion_reason",
   "trust_label",
+  "funding",
   "visibility",
   "platform_version",
   "execution_mode",
@@ -297,6 +318,7 @@ const RESULT_COLUMNS = [
   "plans_published",
   "has_tuning",
   "bundle_download_url",
+  "physical_rendering_id",
 ].join(", ");
 
 const RESULT_DETAIL_METRICS_COLUMNS = [
@@ -352,6 +374,8 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "plans_published",
   "has_tuning",
   "bundle_download_url",
+  "physical_mechanisms",
+  "physical_rendering_id",
   "os",
   "arch",
   "cpu_count",
@@ -399,6 +423,7 @@ const BENCHMARK_RANKING_COLUMNS = [
   "br.platform",
   "br.short_id",
   "br.trust_label",
+  "br.funding",
   "br.tuning_mode",
   "br.tuning_hash",
   "br.execution_mode",
@@ -627,6 +652,17 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     storage_format: wide.storage_format,
     storage_tier: wide.storage_tier,
     compliance_class: wide.compliance_class,
+    // Preserve the unknown (null/undefined -> undefined) vs recorded-empty
+    // ("" -> []) distinction from the DB row -- do not collapse both to [],
+    // or a legacy/unrecorded row would look identical to a genuine
+    // zero-mechanism row to ComparabilityReceipt's undefined-guard.
+    physical_mechanisms:
+      wide.physical_mechanisms === null || wide.physical_mechanisms === undefined
+        ? undefined
+        : wide.physical_mechanisms === ""
+          ? []
+          : wide.physical_mechanisms.split(","),
+    physical_rendering_id: wide.physical_rendering_id,
   };
 }
 
@@ -768,6 +804,7 @@ async function loadBenchmarkSummaryFromDuckDB(
       tuning_hash: row.tuning_hash,
       execution_mode: row.execution_mode,
       trust_label: row.trust_label,
+      funding: row.funding,
       validation_status: row.validation_status ?? null,
       run_date: row.run_date,
       is_ranking_eligible: row.is_ranking_eligible,
@@ -857,6 +894,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.comparison_exclusion_reason," +
     " r.ranking_exclusion_reason," +
     " r.trust_label," +
+    " r.funding," +
     " r.validation_status," +
     " r.tuning_mode," +
     " r.execution_mode," +

@@ -133,7 +133,11 @@ The benchmark includes **112 write operations** across 6 categories:
   (no `APPLY CHANGES INTO` / declarative-pipeline syntax, so it runs unchanged on
   standard-DML engines). The catalog marks only DataFusion unsupported; ClickHouse
   has no standard UPDATE, so only the insert-only op is portable there and the
-  close-old ops would need a mutation rewrite (they are not auto-skipped today)
+  close-old ops would need a mutation rewrite (they are not auto-skipped today).
+  The standard-DML scoping covers the harness setup too, not just the operation
+  SQL: the dimension/stage population uses `||` concatenation and
+  `CAST(... AS VARCHAR)` to build the change-detection fingerprint, so an engine
+  where `||` is not string concatenation would need the setup rewritten as well
 
 **Purpose**: Test UPSERT/MERGE operations for CDC, ETL, slowly-changing
 dimension maintenance, and incremental data loading scenarios.

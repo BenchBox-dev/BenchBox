@@ -17,11 +17,14 @@ continue to work via re-exports in `adapter.py`.
 
 from __future__ import annotations
 
+import logging
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from benchbox.platforms.base.adapter import PlatformAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class DriverIsolationCapability(Enum):
@@ -270,7 +273,45 @@ class PlatformAdapterConnection:
 
 
 class PlatformAdapterCursor:
-    """Cursor-like wrapper around platform adapter execution results."""
+    """Cursor-like wrapper around platform adapter execution results.
+
+    ``platform_result`` (the dict handed in at construction) carries one of
+    three shapes, and every fetch-shaped accessor (``rows``/``fetchall()``/
+    ``fetchone()``) resolves to exactly one of these three branches - see
+    ``_extract_rows()`` for the priority order:
+
+      1. **Explicit rows** - ``platform_result["rows"]`` is a real,
+         fully-materialized list/tuple of row tuples. ``has_real_rows`` is
+         ``True`` and nothing is fabricated.
+      2. **Count + sampled first row** - ``rows_returned`` (an int
+         cardinality) plus ``first_row`` (one real sampled row, per
+         ``sql_execution.execute_sql_query``). Element 0 of the returned
+         list is the real ``first_row``; every remaining element is a
+         fabricated ``(None,)`` placeholder that exists only to preserve
+         list length (#1117). ``has_real_rows`` is ``False`` here even
+         though index 0 is genuine - the list as a whole is not safe to
+         read past index 0.
+      3. **Count only, or first_row only** - either an all-placeholder
+         ``[(None,)] * rows_returned`` list (no sampled row available), or
+         (when no ``rows_returned`` count is present at all) a single real
+         ``[first_row]``. ``has_real_rows`` is ``False`` in both cases: the
+         former is fully fabricated, and the latter - while its one element
+         is real - carries no confirmed cardinality guarantee beyond it.
+
+    Callers that only need a row *count* should use ``row_count()`` (or the
+    module-level ``count_query_rows()``) instead of ``fetchall()``/``.rows``:
+    that path reads ``platform_result`` directly, never builds the
+    placeholder list, and never logs the warning below - it is the sanctioned
+    always-silent, never-materializing path (see #1100).
+
+    Materializing rows that contain fabricated placeholders via
+    ``fetchall()``/``fetchone()``/``.rows`` logs a one-time-per-cursor
+    ``logger.warning`` - added after the 2026-07-10 incident where
+    ``assert fetchall() == [(7,)]`` silently became ``[(None,)]`` in a
+    session-isolation test (see ``has_real_rows`` and
+    ``fix-session-isolation-placeholder-rows``). Use ``has_real_rows`` to
+    check placeholder-ness without triggering the warning.
+    """
 
     def __init__(self, platform_result: dict):
         """Initialize with platform adapter result.
@@ -279,24 +320,120 @@ class PlatformAdapterCursor:
             platform_result: Result dictionary from platform adapter
         """
         self.platform_result = platform_result
-        self.rows = self._extract_rows()
+        # Lazily materialized on first fetchall()/fetchone()/.rows access - see
+        # the `rows` property. Callers that only need a row *count* (e.g. the
+        # TPC-H/TPC-DS throughput drivers) should use count_query_rows()
+        # instead, which reads platform_result directly and never builds this
+        # placeholder list at all.
+        self._rows: list | None = None
+        # Set by _extract_rows() the first time it runs: True iff the
+        # extracted list contains at least one fabricated (None,) placeholder
+        # element (branch 2 with padding, or branch 3's count-only case).
+        # Distinct from has_real_rows: a first_row-only list (branch 3) has
+        # zero fabricated elements but still reports has_real_rows == False,
+        # since it carries no rows_returned cardinality guarantee.
+        self._has_placeholder_padding: bool = False
+        self._placeholder_kind: str | None = None
+        self._warned_placeholder_materialization: bool = False
 
     def _extract_rows(self):
-        """Extract rows from platform result."""
+        """Extract rows (or cardinality-preserving placeholders) from platform result.
+
+        Priority order:
+          1. An explicit ``rows`` list/tuple - already fully materialized upstream.
+          2. ``rows_returned`` int - reconstructs a placeholder list of the *correct
+             length*. This must be checked before ``first_row`` alone determines
+             cardinality: ``first_row`` is only ONE sample row (see
+             ``sql_execution.execute_sql_query``'s
+             ``first_row=results[0] if results else None``), so treating its mere
+             presence as "the whole result" silently collapsed every non-empty result
+             to a length-1 list regardless of the true row count - a real correctness
+             bug (empirically: 21/22 TPC-H throughput queries in a real run reported
+             result_count=1; re-executing query 2's captured SQL returned 3 rows).
+             When both ``rows_returned`` and ``first_row`` are present (the normal
+             payload from ``execute_sql_query``), the first element of the returned
+             list is the real ``first_row`` value, not a placeholder - only the
+             remaining cardinality is padded with ``(None,)``. Fabricating an
+             all-``None`` list here silently discarded a real sampled row (e.g.
+             ``fetchone()``/``fetchall()[0]`` returning ``(None,)`` instead of the
+             adapter-reported value).
+          3. ``first_row`` alone, only when no ``rows_returned`` count is present at
+             all - the last remaining cardinality signal, so it fabricates a
+             single-row list.
+
+        As a side effect, records whether the extracted list contains any
+        fabricated ``(None,)`` placeholder elements (``self._has_placeholder_padding``)
+        and a short ``self._placeholder_kind`` label identifying which branch
+        produced them, for the one-time materialization warning in ``rows``.
+        """
         explicit_rows = self.platform_result.get("rows")
         if isinstance(explicit_rows, (list, tuple)):
             return list(explicit_rows)
 
         first_row = self.platform_result.get("first_row")
+        row_count = self.platform_result.get("rows_returned")
+        if isinstance(row_count, int):
+            if row_count <= 0:
+                return []
+            if first_row is not None:
+                padding = row_count - 1
+                if padding > 0:
+                    self._has_placeholder_padding = True
+                    self._placeholder_kind = "first_row+padding"
+                return [first_row] + [(None,)] * padding
+            self._has_placeholder_padding = True
+            self._placeholder_kind = "rows_returned_only"
+            return [(None,)] * row_count
+
         if first_row is not None:
             return [first_row]
 
-        row_count = self.platform_result.get("rows_returned", 0)
-        if isinstance(row_count, int) and row_count > 0:
-            # Preserve cardinality semantics even when the adapter only reports row counts.
-            return [(None,)] * row_count
-
         return []
+
+    @property
+    def has_real_rows(self) -> bool:
+        """True only when ``platform_result["rows"]`` is a fully-materialized list.
+
+        This does not force materialization of the placeholder-padded list
+        and never logs the warning - it is a cheap, static check of the same
+        condition ``_extract_rows()`` branch 1 tests, so it is safe to call
+        before deciding whether to trust ``fetchall()``/``fetchone()``/``.rows``.
+
+        False for every other case, including the #1117 first_row-in-slot-0
+        case (element 0 is real but the remaining padding is not) and the
+        first_row-alone case (one real row, but no confirmed cardinality).
+        """
+        return isinstance(self.platform_result.get("rows"), (list, tuple))
+
+    @property
+    def rows(self):
+        """Materialized rows, computed lazily on first access.
+
+        Logs a one-time-per-cursor warning the first time this (or
+        ``fetchall()``/``fetchone()``) materializes a list containing
+        fabricated placeholder elements - see the class docstring.
+        """
+        if self._rows is None:
+            self._rows = self._extract_rows()
+        self._warn_if_placeholder_materialized()
+        return self._rows
+
+    def _warn_if_placeholder_materialized(self) -> None:
+        if not self._has_placeholder_padding or self._warned_placeholder_materialization:
+            return
+        self._warned_placeholder_materialization = True
+        query_id = self.platform_result.get("query_id", "unknown")
+        logger.warning(
+            "PlatformAdapterCursor materialized placeholder rows for query_id=%s "
+            "(kind=%s): the platform result carried only a row count (and, in the "
+            "first_row+padding case, one sampled row), so fetchall()/fetchone()/.rows "
+            "fabricated (None,) placeholders to preserve cardinality. These are NOT "
+            "real platform values - check has_real_rows before trusting them, or use "
+            "row_count()/count_query_rows() if only the count is needed. "
+            "(This warning fires once per cursor.)",
+            query_id,
+            self._placeholder_kind,
+        )
 
     def fetchall(self):
         """Return all rows."""
@@ -304,4 +441,64 @@ class PlatformAdapterCursor:
 
     def fetchone(self):
         """Return one row."""
-        return self.rows[0] if self.rows else None
+        rows = self.rows
+        return rows[0] if rows else None
+
+    def row_count(self) -> int:
+        """Return this cursor's row count without forcing full materialization.
+
+        Thin delegate to ``count_query_rows(self)``. Exists so that
+        `benchbox.core` callers (e.g. the TPC-H/TPC-DS throughput drivers)
+        can duck-type on a ``row_count()`` method instead of importing
+        ``count_query_rows`` directly - the layering convention
+        ``utils < core < platforms < cli`` forbids ``core`` importing from
+        ``platforms``. See `benchbox.core.tpch.throughput_test` and
+        `benchbox.core.tpcds.throughput_test` for the call sites.
+
+        Always silent: reads ``platform_result`` directly and never builds
+        the placeholder list, so it never logs the materialization warning.
+        """
+        return count_query_rows(self)
+
+
+def count_query_rows(cursor: Any) -> int:
+    """Return a stream query result's row count without forcing full materialization.
+
+    Used by the TPC-H/TPC-DS throughput drivers in place of
+    ``len(cursor.fetchall())`` so that counting results doesn't add a second,
+    redundant materialization pass under the GIL on top of whatever the
+    platform adapter already did. Priority (cheapest/most-truthful first):
+
+      1. ``cursor.platform_result`` (``PlatformAdapterCursor``, the normal
+         validation-mode path): read the adapter-reported ``rows``/
+         ``rows_returned`` directly. The real driver fetch already happened
+         one layer down (``sql_execution.execute_sql_query``), so this costs
+         nothing extra and never builds a placeholder row list.
+      2. ``cursor.rowcount`` (DB-API 2.0): some drivers populate this without
+         requiring a fetch at all.
+      3. A bounded consume loop over an iterable cursor: counts rows one at a
+         time instead of materializing the whole result set into a single
+         list in memory.
+      4. ``len(cursor.fetchall())``: last resort, for cursors/test-doubles
+         that expose none of the above.
+    """
+    platform_result = getattr(cursor, "platform_result", None)
+    if isinstance(platform_result, dict):
+        explicit_rows = platform_result.get("rows")
+        if isinstance(explicit_rows, (list, tuple)):
+            return len(explicit_rows)
+        reported = platform_result.get("rows_returned")
+        if isinstance(reported, int) and reported >= 0:
+            return reported
+
+    rowcount = getattr(cursor, "rowcount", None)
+    if isinstance(rowcount, int) and rowcount >= 0:
+        return rowcount
+
+    if hasattr(cursor, "__iter__"):
+        return sum(1 for _ in cursor)
+
+    if hasattr(cursor, "fetchall"):
+        return len(cursor.fetchall())
+
+    return 0
