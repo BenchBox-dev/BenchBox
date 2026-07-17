@@ -1237,7 +1237,6 @@ class TestMockBaseBenchmarkResultHelpers:
             tunings_applied={"threads": 8},
             tuning_config_hash="abc123",
             tuning_source_file="tuning.yaml",
-            tuning_source="auto_discovered",
             query_plans_captured=2,
             plan_capture_failures=1,
             plan_capture_errors=[{"query_id": "Q2"}],
@@ -1257,7 +1256,6 @@ class TestMockBaseBenchmarkResultHelpers:
             tunings_applied={"threads": 8},
             config_hash="abc123",
             source_file="tuning.yaml",
-            source="auto_discovered",
         )
         builder.add_plan_capture_stats.assert_called_once_with(2, 1, [{"query_id": "Q2"}])
 

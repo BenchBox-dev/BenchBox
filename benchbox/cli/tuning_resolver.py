@@ -10,7 +10,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import hashlib
 import os
 from dataclasses import dataclass, field
 from enum import Enum
@@ -28,74 +27,7 @@ if TYPE_CHECKING:
     from logging import Logger
 
     from benchbox.cli.config import ConfigManager
-    from benchbox.core.config import DatabaseConfig
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
-
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-
-
-def promote_tuning_provenance(
-    database_config: DatabaseConfig | None,
-    tuning_enabled: bool,
-    tuning_source: str | None,
-    tuning_source_file: str | None,
-) -> None:
-    """Mirror tuning provenance onto top-level DatabaseConfig fields.
-
-    ``DatabaseManager.create_config()`` only folds CLI overrides into
-    ``database_config.options`` (a nested dict); ``PlatformAdapter.__init__``
-    reads ``tuning_enabled``/``tuning_source``/``tuning_source_file`` as
-    top-level config keys via ``from_config()``. Without this promotion the
-    resolved tuning state never reaches the adapter for the CLI's
-    non-interactive run paths.
-
-    Deliberately does NOT also promote ``unified_tuning_configuration``:
-    DatabaseConfig is a pydantic model, and ``model_dump()`` (used downstream
-    to build the adapter's platform_config) recursively serializes
-    dataclass-valued extra fields into plain dicts, which would hand the
-    adapter a dict instead of a UnifiedTuningConfiguration instance. The
-    unified config instead reaches the adapter unmodified via the
-    ``tuning_config`` kwarg channel (``get_platform_config()`` passes it
-    through as a live object reference, never through model_dump).
-    """
-    if database_config is None:
-        return
-    database_config.tuning_enabled = tuning_enabled
-    database_config.tuning_source = tuning_source
-    database_config.tuning_source_file = tuning_source_file
-
-
-def resolve_template_reference(config_file: Path | None, repo_root: Path | None = None) -> str | None:
-    """Compute a shareable reference for a tuning template file.
-
-    Returns a repo-relative POSIX path when the file lives inside the
-    BenchBox repository. Otherwise returns ``"<basename>:<16-hex-content-hash>"``
-    so the reference stays stable and identifying without leaking the local
-    filesystem layout. Never returns a raw absolute path - result bundles are
-    shared across machines and users (see ADR-1 / must_preserve).
-
-    Args:
-        config_file: Resolved path to the tuning template file, or None.
-        repo_root: Override for the repo root (tests only); defaults to the
-            BenchBox checkout containing this module.
-
-    Returns:
-        A repo-relative path string, a basename+hash reference, or None if
-        no config file was used.
-    """
-    if config_file is None:
-        return None
-    resolved = Path(config_file).resolve()
-    root = repo_root if repo_root is not None else _REPO_ROOT
-    try:
-        return resolved.relative_to(root).as_posix()
-    except ValueError:
-        pass
-    try:
-        digest = hashlib.sha256(resolved.read_bytes()).hexdigest()[:16]
-    except OSError:
-        digest = "unreadable"
-    return f"{resolved.name}:{digest}"
 
 
 class TuningMode(Enum):
@@ -425,15 +357,14 @@ def _resolve_tuned(
                 resolution.config_file = path.resolve()
                 if path == packaged_candidate:
                     resolution.source = TuningSource.PACKAGED_RESOURCE
-                    # Same provenance-ref helper used for every other source
-                    # (repo-relative path in a dev checkout; package-relative
-                    # "<basename>:<content-hash>" when running from an
-                    # installed wheel with no repo root to resolve against -
-                    # see resolve_template_reference()'s docstring). This is
-                    # only used for the log/info message here; the actual
-                    # bundle field is computed the same way in run.py's
-                    # _load_unified_tuning_config from resolution.config_file.
-                    template_ref = resolve_template_reference(resolution.config_file)
+                    # NOTE: #1176 (unmerged as of this change) adds
+                    # resolve_template_reference() for a canonical
+                    # "<ref>:<hash>" provenance string derived from
+                    # config_file across every resolution source. Until that
+                    # lands, record a package-relative ref string directly
+                    # here; once merged, compose the packaged tier through
+                    # that helper instead of this ad hoc string.
+                    template_ref = f"packaged:{platform.lower()}/{benchmark.lower()}_tuned.yaml"
                     resolution.info_messages.append(
                         f"Tuning: using packaged template resource at {resolution.config_file} (ref: {template_ref})"
                     )

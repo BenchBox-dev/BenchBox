@@ -213,13 +213,7 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
     assert benchmark_config.options["tuning_enabled"] is True
     assert database_config.options["tuning_enabled"] is True
     assert database_config.tuning_enabled is True
-    # unified_tuning_configuration is deliberately NOT promoted onto database_config
-    # (a pydantic model): model_dump() would serialize the dataclass to a plain
-    # dict, which would break PlatformAdapter's config consumption. The live
-    # object instead reaches the adapter via benchmark_config.options (asserted
-    # above) -> get_platform_config()'s "tuning_config" kwarg.
-    assert database_config.tuning_source == "wizard"
-    assert database_config.tuning_source_file is None
+    assert database_config.unified_tuning_configuration is guided_config
     mock_preview.assert_called_once()
     orchestrator.set_custom_output_dir.assert_called_once_with(str(tmp_path / "normalized"))
     assert mock_execute.call_args.args[4] == ["generate", "load", "power"]
@@ -561,8 +555,7 @@ def test_interactive_dataframe_tuning_acceptance_applies_runtime_defaults(tmp_pa
     mock_df_defaults.assert_called_once_with("polars-df")
     assert benchmark_config.options["df_tuning_config"] is df_tuning_config
     assert database_config.tuning_enabled is True
-    assert benchmark_config.options["unified_tuning_configuration"] is guided_config
-    assert database_config.tuning_source == "wizard"
+    assert database_config.unified_tuning_configuration is guided_config
 
 
 def test_interactive_wizard_baseline_maps_to_notuning_for_external_mode(tmp_path: Path):
@@ -665,8 +658,7 @@ def test_interactive_wizard_baseline_maps_to_notuning_for_external_mode(tmp_path
     assert mock_execute.called
     assert benchmark_config.options["tuning_enabled"] is False
     assert database_config.tuning_enabled is False
-    assert benchmark_config.options["unified_tuning_configuration"] is baseline_config
-    assert database_config.tuning_source == "wizard"
+    assert database_config.unified_tuning_configuration is baseline_config
     mock_preview.assert_called_once()
     assert mock_preview.call_args.kwargs["tuning"] is None
     mock_save_last_run.assert_called_once()
@@ -982,8 +974,7 @@ def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
     assert benchmark_config.options["tuning_enabled"] is False
     assert database_config.options["tuning_enabled"] is False
     assert database_config.tuning_enabled is False
-    assert database_config.tuning_source == "baseline"
-    baseline_config = benchmark_config.options["unified_tuning_configuration"]
+    baseline_config = database_config.unified_tuning_configuration
     assert baseline_config.primary_keys.enabled is False
     assert baseline_config.foreign_keys.enabled is False
     assert baseline_config.unique_constraints.enabled is False

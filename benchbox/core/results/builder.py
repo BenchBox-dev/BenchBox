@@ -274,7 +274,6 @@ class ResultBuilder:
         self._tunings_applied: dict[str, Any] | None = None
         self._tuning_config_hash: str | None = None
         self._tuning_source_file: str | None = None
-        self._tuning_source: str | None = None
 
         # Query plan capture statistics
         self._query_plans_captured: int = 0
@@ -471,22 +470,11 @@ class ResultBuilder:
         tunings_applied: dict[str, Any] | None = None,
         config_hash: str | None = None,
         source_file: str | None = None,
-        source: str | None = None,
     ) -> None:
-        """Set tuning configuration information.
-
-        Args:
-            tunings_applied: The requested UnifiedTuningConfiguration.to_dict().
-            config_hash: requested_config_hash per ADR-1 (SHA-256 over
-                tunings_applied, canonical JSON).
-            source_file: Template reference (repo-relative path or
-                basename+content-hash) - never a raw local path.
-            source: Raw TuningSource enum value (e.g. "auto_discovered").
-        """
+        """Set tuning configuration information."""
         self._tunings_applied = tunings_applied
         self._tuning_config_hash = config_hash
         self._tuning_source_file = source_file
-        self._tuning_source = source
 
     def set_cost_summary(self, cost_summary: dict[str, Any]) -> None:
         """Set cost summary for cloud platforms."""
@@ -690,7 +678,6 @@ class ResultBuilder:
             tunings_applied=self._tunings_applied,
             tuning_config_hash=self._tuning_config_hash,
             tuning_source_file=self._tuning_source_file,
-            tuning_source=self._tuning_source,
             # Query plan stats
             query_plans_captured=self._query_plans_captured,
             plan_capture_failures=self._plan_capture_failures,

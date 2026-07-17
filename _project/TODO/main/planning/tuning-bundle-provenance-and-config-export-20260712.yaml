@@ -2,8 +2,7 @@ id: tuning-bundle-provenance-and-config-export-20260712
 title: "Export tuning provenance, requested config, and requested-config hash into bundles"
 worktree: main
 priority: Critical
-status: Completed
-completed_date: "2026-07-16"
+status: Not Started
 category: Core Functionality
 
 description: |
@@ -33,91 +32,25 @@ description: |
 work:
   - id: w0
     summary: "Re-validate pinned evidence at current HEAD (grep the kwarg call sites and clauses key extraction; note line refs in PR)"
-    status: done
-    notes: |
-      Re-validated against origin/develop @ aea5881c (acfb8992 evidence had moved):
-      - benchbox/base.py:757-761 (`_populate_builder`) still reads
-        `kwargs.get("tuning_config_hash")`/`kwargs.get("tuning_source_file")`
-        with no caller passing them - BUT this method (and
-        `_create_result_builder`) is dead code with zero production callers
-        (only exercised by tests/unit/test_base_advanced.py). The live path is
-        `benchbox/core/benchmark_result_validation.py:26` ->
-        `benchbox/core/results/result_factory.py:build_enhanced_benchmark_result`
-        (`_apply_optional_builder_data`, ~line 122-126), which had the
-        identical bug. result_factory.py was added to scope (see deviation
-        note) since it is the actual call site the evidence describes, just
-        relocated by an intervening refactor.
-      - adapter.py's `run_enhanced_benchmark` (~line 851-881, was ~743-747/
-        851-881 pre-refactor) omitted tuning_config_hash/tuning_source_file/
-        tuning_source exactly as described.
-      - build_tuning_payload/_build_tuning_summary (schema.py, was ~1250-1258/
-        1364-1374, now ~1208-1332/1427-1471) extracted
-        indexes/statistics/configuration - keys UnifiedTuningConfiguration.
-        to_dict() never produces (its keys: primary_keys, foreign_keys,
-        unique_constraints, check_constraints, platform_optimizations,
-        table_tunings) - confirmed dead, clauses always empty.
-      - TuningSource.INTERACTIVE_WIZARD (tuning_resolver.py:46) was indeed
-        never assigned; both wizard call sites (run.py's
-        `_load_unified_tuning_config` fallback branch, and
-        `_interactive_tuning_step`) left the resolution's source at its
-        pre-wizard value.
-      ADDITIONAL finding beyond the pinned evidence (confirmed empirically,
-      not just by inspection - a real `--tuning tuned` duckdb run produced
-      `platform.tuning: null`, not merely hash-absent): `tuning_enabled` and
-      `unified_tuning_configuration` never reached the adapter's `__init__`
-      AT ALL for the CLI's non-interactive/direct run path (`_run_direct`,
-      dry-run, load-only) - `db_manager.create_config()` only folds
-      overrides into `DatabaseConfig.options` (nested), while
-      `PlatformAdapter.__init__` reads them as top-level kwargs via
-      `from_config()`. This meant `effective_tuning_config` was always None
-      and no tuning was ever physically applied for these paths (confirmed
-      for duckdb and postgresql; only questdb's from_config already forwarded
-      both keys correctly). This is a genuinely separate, more severe,
-      pre-existing defect from what this TODO's evidence anticipated - fixing
-      it was a hard prerequisite for verifying w1-w4 end-to-end (otherwise
-      `effective_tuning_config` is always None and there is nothing to attach
-      provenance to). Fixed narrowly: run.py now promotes tuning_enabled/
-      tuning_source/tuning_source_file onto top-level DatabaseConfig fields
-      (mirroring the interactive wizard path, which already did this for
-      tuning_enabled), and adapter.py/duckdb.py read them back correctly.
-      Deliberately did NOT promote unified_tuning_configuration itself onto
-      DatabaseConfig: it is a pydantic model, and model_dump() (used
-      downstream to build platform_config) recursively serializes
-      dataclass-valued extra fields to plain dicts, which would hand the
-      adapter a dict instead of a UnifiedTuningConfiguration instance. Fixed
-      adapter.py to read the config object from the existing, already-
-      reliable `tuning_config` kwarg channel instead (get_platform_config()
-      always passes it through as a live object reference).
-      A companion systemic gap - the SAME tuning_enabled/
-      unified_tuning_configuration forwarding bug exists in ~48 other
-      platforms' from_config() methods (confirmed for postgresql.py,
-      sqlite.py, clickhouse/workload.py, starrocks/workload.py,
-      datafusion.py, motherduck.py; only questdb.py already does it
-      correctly) - out of scope for this TODO (would touch dozens of files
-      well beyond scope_limit); flagged for a dedicated follow-up TODO.
-      Deviations from scope_limit (all narrow, single-purpose, documented in
-      the PR body): benchbox/core/results/result_factory.py (live call-site
-      counterpart of base.py's dead code), benchbox/platforms/duckdb.py
-      (from_config key-forwarding fix, needed to exercise ANY tuning path
-      end-to-end).
+    status: pending
     needs: []
   - id: w1
     summary: "Thread provenance (source enum, template ref, requested-config hash) into result capture kwargs"
     notes: "From run.py through run_config into create_enhanced_benchmark_result kwargs; template ref repo-relative or hashed, never a raw local path; assign INTERACTIVE_WIZARD where the wizard produces the config."
-    status: done
+    status: pending
     needs: [w0]
   - id: w2
     summary: "Rewrite build_tuning_payload/_build_tuning_summary to export the requested config's real structure"
     notes: "Export constraints, platform_optimizations, table_tunings; drop the dead indexes/statistics/configuration extraction that never matches to_dict() keys."
-    status: done
+    status: pending
     needs: [w1]
   - id: w3
     summary: "Schema/docs: document the new fields as REQUESTED (self-attested) values; bump/annotate bundle schema notes; loader round-trip support"
-    status: done
+    status: pending
     needs: [w2]
   - id: w4
     summary: "Tests: bundle for a template run carries source=yaml + template ref + hash; fallback run carries source=fallback; hash is stable across dict ordering and distinct across differing configs"
-    status: done
+    status: pending
     needs: [w2]
 
 deferred:
