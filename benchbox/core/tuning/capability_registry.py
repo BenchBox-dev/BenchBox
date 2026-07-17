@@ -68,8 +68,15 @@ from benchbox.core.tuning.interface import TuningType
 #   "post_load" - a statement run after data load (CTAS reorder, OPTIMIZE,
 #                 ZORDER, etc.).
 #   "session"   - a session-level SET statement.
-#   "none"      - no physical rendering exists yet, even though the type is
-#                 accepted as compatible; a documented gap, not silent scope.
+#   "none"      - no *tuned* rendering of this TuningType exists yet, even
+#                 though the type is accepted as compatible; a documented
+#                 gap, not silent scope. This does NOT mean the platform
+#                 emits no clause at all: some adapters emit a real, fixed
+#                 clause regardless of the tuned configuration (e.g. Azure
+#                 Synapse's DISTRIBUTION always gets a WITH (DISTRIBUTION =
+#                 ...) clause, just never one derived from TableTuning
+#                 columns) -- see each entry's mechanism notes for what, if
+#                 anything, is actually emitted.
 RenderedVia = Literal["ddl", "post_load", "session", "none"]
 
 
@@ -124,18 +131,27 @@ def _constraint_entries() -> dict[TuningType, TuningCapability]:
 # a platform key that already has a real generator.
 #
 # Most alternate spellings never need an entry here: `resolve_platform_key`
-# normalizes underscores to hyphens before consulting this dict, so
+# normalizes underscores to hyphens BEFORE consulting this dict, so
 # "azure_synapse"/"azure-synapse" and "pg_duckdb"/"pg-duckdb" already collapse
-# onto the same canonical (hyphenated) key without help. Only genuinely
-# different tokens -- like Azure Synapse's short alias "synapse", which isn't
-# an underscore/hyphen variant of "azure-synapse" -- need an explicit entry.
+# onto the same canonical (hyphenated) key without help. Two kinds of entry
+# genuinely need to be listed explicitly:
+#   1. A short alias that isn't an underscore/hyphen variant of its canonical
+#      key at all -- e.g. Azure Synapse's "synapse".
+#   2. An alias key that itself contains an underscore -- because
+#      normalization runs first, an underscore in the DICT KEY here can never
+#      match (the input would already have been folded to a hyphen before
+#      lookup); the key must be written hyphenated. "fabric-warehouse" below
+#      was originally stored as "fabric_warehouse" and consequently never
+#      matched any input -- fixed here alongside "clickhouse-cloud", which
+#      get_ddl_generator registers but this dict never listed at all.
 PLATFORM_ALIASES: dict[str, str] = {
     "clickhouse-local": "clickhouse",
     "clickhouse-server": "clickhouse",
+    "clickhouse-cloud": "clickhouse",
     "chdb": "clickhouse",
     "spark": "databricks",
     "delta": "databricks",
-    "fabric_warehouse": "databricks",
+    "fabric-warehouse": "databricks",
     "synapse": "azure-synapse",
 }
 

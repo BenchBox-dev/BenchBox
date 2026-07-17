@@ -314,10 +314,20 @@ def test_workload_profile_mapped_platforms_matches_actual_dispatch():
 def test_ddl_generator_platforms_without_registry_entry_are_the_expected_set():
     """Pin (and force review of) which generator-backed platforms lack a registry entry.
 
-    This is a membership check, not a construction: every generator alias key
-    from get_ddl_generator's own internal mapping is exercised (indirectly,
-    via the alias set below) to confirm the registry gap is exactly the
-    allowlisted one -- no smaller, no larger.
+    This is a membership check, not a construction: EVERY key in
+    get_ddl_generator()'s own `generators` dict literal is checked against
+    the registry -- via `GENERATOR_REGISTRY_KEYS` (module-level below, an AST
+    inspection of that dict's source -- see `_discover_generator_registry_keys`)
+    -- to confirm the registry gap is exactly the allowlisted one, no smaller,
+    no larger. A prior version of this test checked a hand-maintained literal
+    subset instead: a future platform registered in get_ddl_generator without
+    a matching registry entry would never have entered that literal, so the
+    drift guard would have missed it silently. Deriving the checked set from
+    the real registry closes that hole -- get_ddl_generator can't be imported
+    directly at module scope here (its `generators` dict is built with lazy,
+    function-local imports specifically to dodge a circular import with
+    `core.tuning.generators.*`), so AST inspection of its source is the
+    lowest-risk way to introspect it without restructuring that function.
 
     Coverage resolves through `capability_registry.resolve_platform_key`
     (the same alias/normalization logic `get_capability` uses at runtime)
@@ -327,24 +337,7 @@ def test_ddl_generator_platforms_without_registry_entry_are_the_expected_set():
     "azure-synapse") or resolve a short alias like "synapse" that isn't a
     hyphen/underscore variant of its canonical key at all.
     """
-    generator_backed_aliases = {
-        "trino",
-        "presto",
-        "athena",
-        "firebolt",
-        "azure_synapse",
-        "synapse",
-        "timescaledb",
-        "questdb",
-        "pg-duckdb",
-        "pg_duckdb",
-        "pg-mooncake",
-        "pg_mooncake",
-        # Platforms covered by the registry, included here as a sanity check
-        # that the two sets are not simply disjoint by construction:
-        "duckdb",
-        "clickhouse",
-    }
+    generator_backed_aliases = GENERATOR_REGISTRY_KEYS
     registry_platforms = known_registry_platforms()
     without_entry = frozenset(
         alias for alias in generator_backed_aliases if resolve_platform_key(alias) not in registry_platforms
