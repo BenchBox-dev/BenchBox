@@ -2,9 +2,9 @@
 
 This PR was opened by `make release-cut VERSION=X.Y.Z` from `develop`.
 It cuts the release branch, bumps the version sources, generates the
-CHANGELOG entry from the `origin/main` patch delta, drops maintainer paths
+CHANGELOG entry from the `origin/release` patch delta, drops maintainer paths
 (`_project/`, `_blog/`, agent configs, dev-tooling root files), and queues the
-change for a squash-merge into `main`.
+change for a squash-merge into `release`.
 
 ### Reviewer checklist
 
@@ -12,7 +12,7 @@ change for a squash-merge into `main`.
 - [ ] `pyproject.toml` and `benchbox/__init__.py` show the new version
 - [ ] Documentation landing pages and `landing/` show the new version
 - [ ] `_project/`, `_blog/`, agent config dirs, and dev-tooling root files
-      were removed from this branch (verify with `git diff main...HEAD --stat`
+      were removed from this branch (verify with `git diff release...HEAD --stat`
       — the diff should look like a curated subtree, not arbitrary edits)
 - [ ] No surprise file additions (the curation only *removes*)
 - [ ] `validate-base` is green for this release branch
@@ -54,13 +54,13 @@ context is missing, pending, skipped, failed, or canceled, stop and fix the
 release PR or ruleset/workflow contract before rerunning the command.
 
 After that pre-merge check passes, `release-finalize` squash-merges this PR,
-fast-forwards `main`, tags `vX.Y.Z`, and pushes the tag — which fires
+fast-forwards `release`, tags `vX.Y.Z`, and pushes the tag — which fires
 `.github/workflows/release.yml`: `dependency-bounds` → `build` (with
 `SOURCE_DATE_EPOCH` from the tag commit) → `publish` (PyPI trusted
 publisher) → `github-release` → `test-installation` (cross-platform pip
 install verification).
 
-Push-to-main jobs are post-merge signals. They can fail after the tag has
+Push-to-release jobs are post-merge signals. They can fail after the tag has
 already started publication; recovery is a patch release or incident process,
 not treating the public tag as if it had been blocked.
 
@@ -68,7 +68,7 @@ not treating the public tag as if it had been blocked.
 paths (`_project/`, `_blog/`, agent configs, etc.) live only on develop
 by design (per A3 in `_project/decisions/single-repo-migration.md`).
 
-If anything fails downstream, fix on a new branch, PR to `main`, squash-merge,
+If anything fails downstream, fix on a new branch, PR to `release`, squash-merge,
 and bump to the next patch version (PyPI rejects re-uploads of an existing
 version).
 

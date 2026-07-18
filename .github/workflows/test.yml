@@ -3,10 +3,10 @@ name: Tests
 on:
   push:
     branches:
-      - main
+      - release
   pull_request:
     branches:
-      - main
+      - release
 
 concurrency:
   group: test-${{ github.ref }}
@@ -59,12 +59,12 @@ jobs:
 
   compat-test:
     name: compat-test (${{ matrix.os }}, ${{ matrix.python-version }})
-    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || github.base_ref != 'main' || !startsWith(github.head_ref, 'v')) }}
+    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || github.base_ref != 'release' || !startsWith(github.head_ref, 'v')) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        # Additional compatibility coverage for main/push surfaces.
+        # Additional compatibility coverage for release/push surfaces.
         # Develop PRs keep only the required Ubuntu 3.12 test job; broad
         # validation is covered by nightly/manual workflows.
         include:
@@ -170,10 +170,10 @@ jobs:
             uvx pip-audit
           fi
 
-  # Quick integration smoke tests - non-required on main/push; develop broad
+  # Quick integration smoke tests - non-required on release/push; develop broad
   # validation runs through nightly/manual workflows.
   integration-smoke:
-    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || github.base_ref != 'main' || !startsWith(github.head_ref, 'v')) }}
+    if: ${{ (github.event_name != 'pull_request' || github.base_ref != 'develop') && (github.event_name != 'pull_request' || github.base_ref != 'release' || !startsWith(github.head_ref, 'v')) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -205,7 +205,7 @@ jobs:
           # These don't require external credentials and catch common issues
           uv run -- python -m pytest tests/integration -m "platform_smoke or (integration and fast)" --tb=short
 
-  # Table-format dependency lane for main/push validation.
+  # Table-format dependency lane for release/push validation.
   # Nightly/manual workflows cover this lane for develop after Step 3.
   integration-table-formats:
     if: ${{ github.event_name != 'pull_request' || github.base_ref != 'develop' }}
@@ -231,11 +231,11 @@ jobs:
         run: |
           uv run -- python -m pytest -q tests/integration/core/data_organization/test_presorted_generation.py -m "requires_table_formats" --tb=short
 
-  # Credential-free integration suite - release-required for main PRs and runs on main pushes.
+  # Credential-free integration suite - release-required for release PRs and runs on release pushes.
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'release')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -260,7 +260,7 @@ jobs:
     name: correctness-gate
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'release')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -341,7 +341,7 @@ jobs:
 
   release-readiness:
     name: release-readiness
-    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
+    if: ${{ github.event_name == 'pull_request' && github.base_ref == 'release' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -410,7 +410,7 @@ jobs:
   release-required-result:
     name: release-required-result
     needs: [test, integration, correctness-gate, test-package, release-readiness]
-    if: ${{ always() && github.event_name == 'pull_request' && github.base_ref == 'main' }}
+    if: ${{ always() && github.event_name == 'pull_request' && github.base_ref == 'release' }}
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate release-required result

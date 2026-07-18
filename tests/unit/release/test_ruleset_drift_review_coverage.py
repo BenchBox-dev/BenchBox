@@ -107,16 +107,16 @@ def test_develop_review_rule_is_not_checked_after_retirement():
     assert findings == []
 
 
-def test_main_release_only_matches_runbook_expectations():
-    """main-release-only sanity: a live ruleset matching the runbook produces
+def test_release_only_matches_runbook_expectations():
+    """release-only sanity: a live ruleset matching the runbook produces
     no findings."""
     expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
-        "main-release-only"
+        "release-only"
     ]
     live = {
-        "name": "main-release-only",
+        "name": "release-only",
         "enforcement": "active",
-        "conditions": {"ref_name": {"include": ["refs/heads/main"], "exclude": []}},
+        "conditions": {"ref_name": {"include": ["refs/heads/release"], "exclude": []}},
         "bypass_actors": [],
         "rules": [
             {

@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).parent.parent.parent
 
 def _live_ruleset(ref: str, checks: list[str], *, strict: bool = False, bypass: list[dict] | None = None) -> dict:
     return {
-        "name": "main-release-only",
+        "name": "release-only",
         "enforcement": "active",
         "conditions": {"ref_name": {"include": [ref], "exclude": []}},
         "bypass_actors": bypass or [],
@@ -41,26 +41,26 @@ def test_parse_expected_rulesets_from_admin_runbook() -> None:
 
     assert expected["develop-squash-only"].ref == "refs/heads/develop"
     assert expected["develop-squash-only"].required_checks == ("ci-required-result",)
-    assert expected["main-release-only"].ref == "refs/heads/main"
-    assert expected["main-release-only"].required_checks == ("validate-base", "release-required-result")
-    assert expected["main-release-only"].strict_required_status_checks_policy is False
-    assert expected["main-release-only"].bypass_actors_none is True
+    assert expected["release-only"].ref == "refs/heads/release"
+    assert expected["release-only"].required_checks == ("validate-base", "release-required-result")
+    assert expected["release-only"].strict_required_status_checks_policy is False
+    assert expected["release-only"].bypass_actors_none is True
 
 
 def test_matching_ruleset_has_no_drift_findings() -> None:
     expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
-        "main-release-only"
+        "release-only"
     ]
-    live = _live_ruleset("refs/heads/main", ["validate-base", "release-required-result"])
+    live = _live_ruleset("refs/heads/release", ["validate-base", "release-required-result"])
 
     assert compare_ruleset(expected, live) == []
 
 
 def test_required_context_drift_is_reported() -> None:
     expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
-        "main-release-only"
+        "release-only"
     ]
-    live = _live_ruleset("refs/heads/main", ["validate-base"])
+    live = _live_ruleset("refs/heads/release", ["validate-base"])
 
     findings = compare_ruleset(expected, live)
 
@@ -71,10 +71,10 @@ def test_required_context_drift_is_reported() -> None:
 
 def test_ruleset_policy_drift_is_reported() -> None:
     expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
-        "main-release-only"
+        "release-only"
     ]
     live = _live_ruleset(
-        "refs/heads/main",
+        "refs/heads/release",
         ["validate-base", "release-required-result"],
         strict=True,
         bypass=[{"actor_type": "RepositoryRole"}],
@@ -90,9 +90,9 @@ def test_ruleset_policy_drift_is_reported() -> None:
 
 def test_bypass_actor_visibility_can_be_required() -> None:
     expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
-        "main-release-only"
+        "release-only"
     ]
-    live = _live_ruleset("refs/heads/main", ["validate-base", "release-required-result"])
+    live = _live_ruleset("refs/heads/release", ["validate-base", "release-required-result"])
     del live["bypass_actors"]
 
     findings = compare_ruleset(expected, live, require_bypass_actor_visibility=True)

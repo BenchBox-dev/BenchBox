@@ -283,8 +283,8 @@ Bookkeeping consequences, decided explicitly rather than left implicit:
    hand on `v0.3.1` (and, in hindsight, by every prior aborted cut):
 
    ```bash
-   git merge -s ours --allow-unrelated-histories origin/main \
-     -m "Merge main into vX.Y.Z (strategy: ours) to align release histories"
+   git merge -s ours --allow-unrelated-histories origin/release \
+     -m "Merge release into vX.Y.Z (strategy: ours) to align release histories"
    ```
 
    `-s ours` preserves the curated release tree byte-for-byte and only records
@@ -298,7 +298,7 @@ Bookkeeping consequences, decided explicitly rather than left implicit:
    content back into the curated tree). Pinned by
    `tests/unit/test_release_infrastructure.py::TestReleaseInfrastructure::test_release_cut_aligns_release_histories_before_pushing`.
    Ordering matters: the merge must follow `generate_changelog_entry.py
-   --since-ref origin/main`, which needs `main` to still be a non-ancestor.
+   --since-ref origin/release`, which needs `main` to still be a non-ancestor.
 
 2. **`validate-base` bootstrap under-restored its helpers.** The trusted-base
    bootstrap path (taken while `main` lacks `scripts/release_readiness_check.py`)
@@ -306,7 +306,7 @@ Bookkeeping consequences, decided explicitly rather than left implicit:
    not its sibling import `auto_merge_soundness_paths`, so the ruleset-drift
    step died with `ModuleNotFoundError`. Prior cuts never reached that step —
    they failed earlier on the non-fast suite — which is why it stayed latent.
-   Fixed in `.github/workflows/validate-main-pr.yml` and pinned by
+   Fixed in `.github/workflows/validate-release-pr.yml` and pinned by
    `tests/unit/test_release_infrastructure.py::TestReleaseInfrastructure::test_validate_main_pr_restores_ruleset_helper_before_drift_check`.
 
 ### Operational notes for the next release
@@ -364,7 +364,7 @@ and `tests/unit/test_release_infrastructure.py`:
    subjects (trailing `(#NNNN)`), the manual-edit placeholder, or more than
    `MAX_CURATED_BULLETS` bullets fail the cut. The ceiling is 60, set from evidence
    rather than the summarizer prompt's 10-25 target: the largest hand-curated
-   section shipped is `0.2.1` at 39 bullets, while the raw `origin/main..HEAD` delta
+   section shipped is `0.2.1` at 39 bullets, while the raw `origin/release..HEAD` delta
    at `v0.3.1` was 231 conventional commits. `RELEASE_ALLOW_RAW_CHANGELOG=1` accepts
    a raw draft deliberately.
 

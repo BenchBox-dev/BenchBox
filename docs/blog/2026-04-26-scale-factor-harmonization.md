@@ -220,7 +220,7 @@ The `--phases generate` flag stops after data generation, which is useful for sa
 
 ## References
 
-- v0.2.1 changelog entry: [`CHANGELOG.md`](https://github.com/joeharris76/benchbox/blob/main/CHANGELOG.md), "Scale factor harmonization" under Added
+- v0.2.1 changelog entry: [`CHANGELOG.md`](https://github.com/joeharris76/benchbox/blob/v0.2.1/CHANGELOG.md), "Scale factor harmonization" under Added
 - Companion release post: [BenchBox v0.2.1 release summary](2026-04-26-v0-2-1-release-summary.md)
 - Test coverage: `tests/unit/generators/test_scale_factor_harmonization.py` (validates the 0.8-1.3 GB target band per benchmark)
 - Benchmark docs used for calibrated size tables: `docs/benchmarks/{amplab,h2odb,nyctaxi,tsbs-devops,flightdata}.md`

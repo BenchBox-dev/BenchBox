@@ -109,7 +109,7 @@ def _other_properties(section: str, name: str) -> dict[str, str]:
 def parse_expected_rulesets(runbook_text: str) -> dict[str, ExpectedRuleset]:
     """Extract expected ruleset state from docs/operations/repo-admin-settings.md."""
     expected: dict[str, ExpectedRuleset] = {}
-    for name in ("develop-squash-only", "main-release-only"):
+    for name in ("develop-squash-only", "release-only"):
         section = _section_for_ruleset(runbook_text, name)
         ref_match = re.search(r"targets?\s+`([^`]+)`", section)
         if not ref_match:

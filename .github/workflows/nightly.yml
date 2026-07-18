@@ -409,12 +409,12 @@ jobs:
     # exactly how release-canary.yml sat dead while the repo's safety story
     # leaned on it). This job scans the DEVELOP tree (where scheduled
     # workflows are authored) and fails when any of them has no SCHEDULED
-    # run within its cadence-derived window. It executes from main's copy of
-    # nightly.yml, so it takes effect once this file reaches main.
-    # DELIBERATE: a scheduled workflow newly authored on develop goes red
-    # here until it lands on main — that lag is exactly the silent gap this
-    # guard converts to a loud one; land the file (admin/release flow) or
-    # remove the schedule.
+    # run within its cadence-derived window. Scheduled workflows execute from
+    # the DEFAULT branch (develop, as of the 2026-07-08 default-branch switch),
+    # which is where they are authored, so this guard is effective as soon as a
+    # scheduled workflow merges to develop — there is no "until it lands on the
+    # release branch" lag anymore. (Before the switch the default was main, so
+    # a workflow stayed dark until a release carried it there; that gap is gone.)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

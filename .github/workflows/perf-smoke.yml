@@ -2,7 +2,7 @@ name: Performance Smoke
 
 on:
   pull_request:
-    branches: [main]
+    branches: [release]
 
 concurrency:
   group: perf-smoke-${{ github.ref }}
