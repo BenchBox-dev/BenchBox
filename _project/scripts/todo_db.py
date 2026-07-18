@@ -345,15 +345,30 @@ def _git_location() -> tuple[str | None, str | None]:
     return _out("rev-parse", "--show-toplevel"), _out("rev-parse", "--abbrev-ref", "HEAD")
 
 
+def _schema_statements() -> list[str]:
+    # SCHEMA_SQL is our own controlled DDL: no string literals containing ';'.
+    return [statement.strip() for statement in SCHEMA_SQL.split(";") if statement.strip()]
+
+
 def _ensure_schema(conn: sqlite3.Connection) -> None:
     version = _schema_version(conn)
     if version is None:
-        conn.executescript(SCHEMA_SQL)
-        conn.execute(
-            "INSERT INTO meta (key, value) VALUES ('schema_version', ?)",
-            (str(SCHEMA_VERSION),),
-        )
-    elif version < SCHEMA_VERSION:
+        # Atomic bootstrap: per-statement inside one write transaction, so a
+        # mid-DDL failure (network drop on a hosted primary, a racing
+        # first-connect) rolls back completely instead of leaving partial
+        # tables without `meta` that wedge every later connect. Not
+        # executescript: it auto-commits, and some libsql client builds
+        # document it unimplemented.
+        with _write_txn(conn):
+            if _schema_version(conn) is None:  # re-check under the write lock
+                for statement in _schema_statements():
+                    conn.execute(statement)
+                conn.execute(
+                    "INSERT INTO meta (key, value) VALUES ('schema_version', ?)",
+                    (str(SCHEMA_VERSION),),
+                )
+        version = _schema_version(conn)
+    if version < SCHEMA_VERSION:
         raise TodoError(
             f"database schema_version={version}, CLI expects {SCHEMA_VERSION}; run `todo migrate` to upgrade it"
         )
@@ -416,12 +431,17 @@ class _HostedRow:
         return f"_HostedRow({dict(zip(self._names, self._values))!r})"
 
 
-def _map_hosted_error(exc: BaseException) -> sqlite3.Error | None:
-    """Translate libsql's ValueError surface back onto sqlite3 exceptions."""
+def _map_hosted_error(exc: BaseException) -> sqlite3.Error:
+    """Translate libsql's ValueError surface back onto sqlite3 exceptions.
+
+    Constraint violations keep their IntegrityError identity (gates depend on
+    it); everything else — SQLITE_BUSY, network drops mid-statement — becomes
+    OperationalError so main()'s sqlite3.Error boundary turns it into a clean
+    exit 2 instead of a traceback."""
     message = str(exc)
     if "constraint" in message.lower():
         return sqlite3.IntegrityError(message)
-    return None
+    return sqlite3.OperationalError(message)
 
 
 class _HostedCursor:
@@ -461,24 +481,13 @@ class _HostedConnection:
 
     def __init__(self, raw):
         self._raw = raw
+        self.stale = False  # set when the freshness sync at connect failed
 
     def execute(self, sql: str, params=()) -> _HostedCursor:
         try:
             return _HostedCursor(self._raw.execute(sql, tuple(params)))
         except ValueError as exc:
-            mapped = _map_hosted_error(exc)
-            if mapped is not None:
-                raise mapped from exc
-            raise
-
-    def executescript(self, sql: str) -> None:
-        try:
-            self._raw.executescript(sql)
-        except ValueError as exc:
-            mapped = _map_hosted_error(exc)
-            if mapped is not None:
-                raise mapped from exc
-            raise
+            raise _map_hosted_error(exc) from exc
 
     def commit(self) -> None:
         self._raw.commit()
@@ -497,6 +506,10 @@ def _redacted(exc: BaseException, secret: str) -> str:
     return str(exc).replace(secret, "<redacted>") if secret else str(exc)
 
 
+def _auth_token() -> str:
+    return os.environ.get("TODO_DB_AUTH_TOKEN") or ""
+
+
 @contextmanager
 def _replica_setup_lock(replica: Path):
     """Serialize replica open+sync across processes of the same worktree.
@@ -512,12 +525,20 @@ def _replica_setup_lock(replica: Path):
         yield
         return
     lock_path = replica.with_suffix(".db.lock")
-    with open(lock_path, "w", encoding="utf-8") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
+    try:
+        # O_NOFOLLOW: a planted symlink at the lock path must fail loudly,
+        # never truncate its target (lock dirs may live on shared hosts).
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    except OSError as exc:
+        raise TodoError(f"cannot open replica lock {lock_path}: {exc}") from exc
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
         try:
             yield
         finally:
-            fcntl.flock(handle, fcntl.LOCK_UN)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
 
 
 def _hosted_raw_connect(url: str, sync_required: bool) -> _HostedConnection:
@@ -541,6 +562,7 @@ def _hosted_raw_connect(url: str, sync_required: bool) -> _HostedConnection:
                 raise TodoError(f"hosted tracker: cannot sync with the primary: {_redacted(exc, token)}") from exc
             # Degraded mode per spec: reads serve the stale replica with a banner;
             # writes will fail loudly at the primary (no offline write queue).
+            conn.stale = True
             print(
                 f"warning: STALE replica — sync with the primary failed ({_redacted(exc, token)}); "
                 "reads may be outdated and writes will fail",
@@ -553,6 +575,14 @@ def _hosted_raw_connect(url: str, sync_required: bool) -> _HostedConnection:
 
 def connect_hosted(url: str) -> _HostedConnection:
     conn = _hosted_raw_connect(url, sync_required=False)
+    if conn.stale and _schema_version(conn) is None:
+        # A never-synced replica cannot bootstrap the schema while the
+        # primary is down — that would be a delegated write. Fail cleanly.
+        conn.close()
+        raise TodoError(
+            "hosted tracker: the primary is unreachable and this worktree's replica"
+            " has no schema yet; retry when the network is back"
+        )
     _ensure_schema(conn)
     return conn
 
@@ -605,6 +635,29 @@ def _hrana_value(value: Any) -> dict[str, Any]:
     return {"type": "text", "value": str(value)}
 
 
+def _build_no_redirect_opener():
+    """Opener that refuses ALL redirects: urllib preserves the Authorization
+    header across them (even an https->http downgrade), so following one
+    would replay the Bearer token at a response-chosen URL."""
+    import urllib.request
+
+    class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    return urllib.request.build_opener(_RefuseRedirects)
+
+
+_HTTP_OPENER = None
+
+
+def _http_post_response(request, timeout: float):
+    global _HTTP_OPENER
+    if _HTTP_OPENER is None:
+        _HTTP_OPENER = _build_no_redirect_opener()
+    return _HTTP_OPENER.open(request, timeout=timeout)
+
+
 def _post_pipeline(endpoint: str, token: str, payload: dict[str, Any]) -> dict[str, Any]:
     import http.client
     import urllib.request
@@ -615,7 +668,7 @@ def _post_pipeline(endpoint: str, token: str, payload: dict[str, Any]) -> dict[s
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
+        with _http_post_response(request, timeout=60) as response:
             body = response.read()
     # OSError covers URLError, TimeoutError/socket.timeout, and connection
     # resets; HTTPException covers mid-response protocol failures. All must
@@ -704,17 +757,21 @@ def bulk_transfer(
             pass
 
     try:
+        total_sql = "SELECT " + " + ".join(f"(SELECT count(*) FROM {table})" for table in TRANSFER_TABLES)
         guard = _pipeline_execute(
             url,
             token,
-            [("BEGIN IMMEDIATE", []), ("SELECT count(*) FROM items", [])],
+            [("BEGIN IMMEDIATE", []), (total_sql, [])],
             stream=stream,
             post=post,
         )
+        # Counts EVERY transfer table, not just items: an itemless events row
+        # (e.g. from `todo config`) would otherwise pass the guard and abort
+        # mid-transfer on an events.seq collision with a cryptic error.
         existing = int(guard["results"][1]["response"]["result"]["rows"][0][0]["value"])
         if existing and require_empty:
             raise TodoError(
-                f"hosted database already holds {existing} item(s);"
+                f"hosted database is not empty ({existing} tracker row(s));"
                 " rerun with --replace to clear the tracker tables and re-import"
             )
         for batch in batches:
@@ -748,6 +805,11 @@ def migrate_backend(backend: Path | str) -> list[int]:
         for target in sorted(MIGRATIONS):
             if version < target:
                 with _write_txn(conn):
+                    current = _schema_version(conn)
+                    if current is not None and current >= target:
+                        # a concurrent migrator won the race; not an error
+                        version = current
+                        continue
                     for statement in MIGRATIONS[target]:
                         conn.execute(statement)
                     conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(target),))
@@ -793,7 +855,10 @@ def _write_txn(conn: sqlite3.Connection):
     try:
         yield
     except BaseException:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:  # noqa: S110 - never mask the original failure
+            pass
         raise
     else:
         conn.commit()
@@ -911,6 +976,7 @@ def create_item(
     prior_art: list[tuple[str, str, str]] | None = None,
     completed_at: str | None = None,
     completed_pr: int | None = None,
+    _in_txn: bool = False,
 ) -> None:
     if not SLUG_RE.match(item_id):
         raise TodoError(f"invalid item id (slug) {item_id!r}")
@@ -923,7 +989,8 @@ def create_item(
         raise TodoError(f"new items must start planning, active, or done (import), not {state!r}")
     if state != "done" and (completed_at or completed_pr):
         raise TodoError("completed_at/completed_pr are only valid with state='done' (import)")
-    with _write_txn(conn):
+
+    def _write_rows() -> None:
         try:
             conn.execute(
                 "INSERT INTO items (id, title, worktree, priority, state, blocked_reason,"
@@ -982,6 +1049,14 @@ def create_item(
                 (item_id, path, concept, decision),
             )
         log_event(conn, actor, item_id, "create", {"title": title, "state": state})
+
+    if _in_txn:
+        # Caller (promote_deferral) already holds the write transaction, so
+        # the whole promote — gate, item creation, resolution — is one txn.
+        _write_rows()
+    else:
+        with _write_txn(conn):
+            _write_rows()
 
 
 def _insert_work_unit(conn: sqlite3.Connection, item_id: str, unit: dict[str, Any]) -> None:
@@ -1182,28 +1257,36 @@ def promote_deferral(
     worktree: str | None = None,
     description: str | None = None,
 ) -> None:
-    row = _require_deferral(conn, deferral_id)
-    if row["resolution"] != "open":
-        raise TodoError(f"deferral {deferral_id} is already {row['resolution']}")
-    parent = _require_item(conn, row["from_item"])
-    create_item(
-        conn,
-        actor,
-        item_id=new_item_id,
-        title=title or row["summary"][:200],
-        worktree=worktree or parent["worktree"],
-        priority=priority,
-        description=description
-        or (
-            f"Promoted from deferral #{deferral_id} of {parent['id']}.\n"
-            f"Deferred: {row['summary']}\nReason deferred: {row['reason']}"
-        ),
-    )
+    # One transaction end to end: the gate read, the item creation, and the
+    # resolution update. Split phases let two actors promote one deferral
+    # (or a promote overwrite a concurrent dismiss) — found by adversarial
+    # review; the conditional UPDATE is the same defense-in-depth pattern as
+    # claim_item.
     with _write_txn(conn):
-        conn.execute(
-            "UPDATE deferrals SET resolution = 'promoted', resolved_item = ? WHERE id = ?",
+        row = _require_deferral(conn, deferral_id)
+        if row["resolution"] != "open":
+            raise TodoError(f"deferral {deferral_id} is already {row['resolution']}")
+        parent = _require_item(conn, row["from_item"])
+        create_item(
+            conn,
+            actor,
+            item_id=new_item_id,
+            title=title or row["summary"][:200],
+            worktree=worktree or parent["worktree"],
+            priority=priority,
+            description=description
+            or (
+                f"Promoted from deferral #{deferral_id} of {parent['id']}.\n"
+                f"Deferred: {row['summary']}\nReason deferred: {row['reason']}"
+            ),
+            _in_txn=True,
+        )
+        resolved = conn.execute(
+            "UPDATE deferrals SET resolution = 'promoted', resolved_item = ? WHERE id = ? AND resolution = 'open'",
             (new_item_id, deferral_id),
         )
+        if resolved.rowcount != 1:
+            raise TodoError(f"deferral {deferral_id} was resolved concurrently")
         log_event(
             conn,
             actor,
@@ -1327,12 +1410,20 @@ def unblock_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
 def sweep_stale(conn: sqlite3.Connection, actor: str, ttl_hours: float = DEFAULT_LEASE_TTL_HOURS) -> list[str]:
     released = []
     with _write_txn(conn):
-        for row in conn.execute("SELECT id, claimed_by, claimed_at FROM items WHERE claimed_by IS NOT NULL"):
+        rows = conn.execute("SELECT id, claimed_by, claimed_at FROM items WHERE claimed_by IS NOT NULL").fetchall()
+        for row in rows:
             if _lease_expired(row["claimed_at"], ttl_hours):
-                conn.execute(
-                    "UPDATE items SET claimed_by = NULL, claimed_at = NULL WHERE id = ?",
-                    (row["id"],),
+                # Conditional on the exact lease observed (same defense as
+                # claim_item): if the lease changed hands since the read —
+                # e.g. a renewal the sweeping replica had not seen — the
+                # release must not fire on the live claim.
+                swept = conn.execute(
+                    "UPDATE items SET claimed_by = NULL, claimed_at = NULL"
+                    " WHERE id = ? AND claimed_by = ? AND claimed_at IS ?",
+                    (row["id"], row["claimed_by"], row["claimed_at"]),
                 )
+                if swept.rowcount != 1:
+                    continue
                 log_event(
                     conn,
                     actor,
@@ -2072,6 +2163,9 @@ def main(argv: list[str] | None = None) -> int:
         except TodoError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
+        except sqlite3.Error as exc:
+            print(f"error: database failure: {_redacted(exc, _auth_token())}", file=sys.stderr)
+            return 2
         if applied:
             print(f"applied migration(s) to v{', v'.join(str(v) for v in applied)}")
             return 0
@@ -2080,11 +2174,19 @@ def main(argv: list[str] | None = None) -> int:
     except TodoError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    except sqlite3.Error as exc:
+        print(f"error: database failure: {_redacted(exc, _auth_token())}", file=sys.stderr)
+        return 2
 
     try:
         return _dispatch(conn, actor, args)
     except TodoError as exc:
         print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except sqlite3.Error as exc:
+        # SQLITE_BUSY, lock contention, network drops mid-statement: a clean
+        # exit 2 with the token redacted, never a traceback.
+        print(f"error: database failure: {_redacted(exc, _auth_token())}", file=sys.stderr)
         return 2
     except BrokenPipeError:
         # Downstream pipe closed early (e.g. `todo ready | head`); not an error.

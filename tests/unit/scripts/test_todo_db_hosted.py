@@ -86,16 +86,21 @@ def _hrana_wrap(exc: sqlite3.Error) -> ValueError:
 class FakeRawConnection:
     """Mimics libsql.Connection over a real local SQLite file."""
 
-    def __init__(self, database: str, sync_fails: bool = False):
+    def __init__(self, database: str, sync_fails: bool = False, execute_error: str | None = None):
         self._conn = sqlite3.connect(database)
         self._conn.isolation_level = None  # autocommit, like isolation_level=None
         self.statements: list[str] = []
         self.sync_calls = 0
         self.commit_calls = 0
         self._sync_fails = sync_fails
+        self.execute_error = execute_error  # substring: matching statements raise like a busy/network error
 
     def execute(self, sql, params=()):
         self.statements.append(sql if isinstance(sql, str) else str(sql))
+        if self.execute_error and self.execute_error in sql:
+            raise ValueError(
+                'Hrana: `stream error: `Error { message: "SQLite error: database is locked", code: "SQLITE_BUSY" }``'
+            )
         try:
             return FakeRawCursor(self._conn.execute(sql, tuple(params)))
         except sqlite3.IntegrityError as exc:
@@ -122,15 +127,16 @@ class FakeRawConnection:
 
 
 class FakeLibsql(types.ModuleType):
-    def __init__(self, sync_fails: bool = False):
+    def __init__(self, sync_fails: bool = False, execute_error: str | None = None):
         super().__init__("libsql")
         self.connect_calls: list[dict] = []
         self.connections: list[FakeRawConnection] = []
         self._sync_fails = sync_fails
+        self._execute_error = execute_error
 
     def connect(self, database, **kwargs):
         self.connect_calls.append({"database": database, **kwargs})
-        conn = FakeRawConnection(str(database), sync_fails=self._sync_fails)
+        conn = FakeRawConnection(str(database), sync_fails=self._sync_fails, execute_error=self._execute_error)
         self.connections.append(conn)
         return conn
 
@@ -143,6 +149,19 @@ def fake_libsql(monkeypatch, tmp_path):
     monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica" / "replica.db"))
     monkeypatch.delenv("TODO_DB_PATH", raising=False)
     return fake
+
+
+def _seed_replica_schema(replica_path):
+    """Simulate an existing (previously synced) replica with the tracker schema."""
+    import pathlib
+
+    p = pathlib.Path(replica_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    seed = sqlite3.connect(p)
+    seed.executescript(todo_db.SCHEMA_SQL)
+    seed.execute("INSERT INTO meta (key, value) VALUES ('schema_version', ?)", (str(todo_db.SCHEMA_VERSION),))
+    seed.commit()
+    seed.close()
 
 
 def _hosted_conn(fake: FakeLibsql):
@@ -280,6 +299,7 @@ class TestHostedConnect:
         monkeypatch.setitem(sys.modules, "libsql", fake)
         monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "sekrit-token-abc123")
         monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica.db"))
+        _seed_replica_schema(tmp_path / "replica.db")
         # sync failure degrades to the stale replica with a warning, not a crash
         conn = todo_db.connect_backend(HOSTED_URL)
         assert conn.execute("SELECT 1").fetchone()[0] == 1
@@ -289,11 +309,91 @@ class TestHostedConnect:
         monkeypatch.setitem(sys.modules, "libsql", fake)
         monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "test-token-value")
         monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica.db"))
+        _seed_replica_schema(tmp_path / "replica.db")
         conn = todo_db.connect_backend(HOSTED_URL)
         err = capsys.readouterr().err
         assert "STALE" in err
         assert "sekrit" not in err and "test-token-value" not in err
         assert conn.execute("SELECT 1").fetchone()[0] == 1
+
+    def test_degraded_fresh_replica_raises_clean_error(self, monkeypatch, tmp_path):
+        # A replica that has NEVER synced cannot bootstrap the schema while
+        # the primary is down (that would be a delegated write): must be a
+        # clean TodoError, not a raw libsql traceback.
+        fake = FakeLibsql(sync_fails=True)
+        monkeypatch.setitem(sys.modules, "libsql", fake)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "test-token-value")
+        monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "fresh" / "replica.db"))
+        with pytest.raises(todo_db.TodoError, match="unreachable"):
+            todo_db.connect_backend(HOSTED_URL)
+
+    def test_busy_error_maps_to_sqlite_error_and_exit_2(self, monkeypatch, tmp_path, capsys):
+        # Non-constraint libsql failures (SQLITE_BUSY, network drop) must map
+        # onto sqlite3 errors and reach the CLI as exit 2, never a traceback.
+        fake = FakeLibsql(execute_error="INSERT INTO items")
+        monkeypatch.setitem(sys.modules, "libsql", fake)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "sekrit-token-abc123")
+        monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica.db"))
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        conn = todo_db.connect_backend(HOSTED_URL)
+        with pytest.raises(sqlite3.OperationalError, match="SQLITE_BUSY"):
+            _make_item(conn)
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        rc = todo_db.main(
+            [
+                "--actor",
+                "tester",
+                "create",
+                "busy-item",
+                "--title",
+                "Busy mapping check",
+                "--worktree",
+                "spike",
+                "--priority",
+                "low",
+                "--description",
+                "Exercise busy-error mapping.",
+            ]
+        )
+        assert rc == 2
+        err = capsys.readouterr().err
+        assert "database failure" in err
+        assert "sekrit" not in err
+
+    def test_schema_bootstrap_is_atomic(self, monkeypatch, tmp_path):
+        # A mid-bootstrap failure must roll back completely so a retry works
+        # (previously partial tables without `meta` wedged the database).
+        replica = tmp_path / "replica.db"
+        fake = FakeLibsql(execute_error="CREATE TABLE meta")
+        monkeypatch.setitem(sys.modules, "libsql", fake)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "test-token-value")
+        monkeypatch.setenv("TODO_DB_REPLICA", str(replica))
+        with pytest.raises(sqlite3.Error):
+            todo_db.connect_backend(HOSTED_URL)
+        leftover = (
+            sqlite3.connect(replica).execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
+        )
+        assert leftover == 0, "failed bootstrap must not leave partial tables"
+        healthy = FakeLibsql()
+        monkeypatch.setitem(sys.modules, "libsql", healthy)
+        conn = todo_db.connect_backend(HOSTED_URL)
+        assert conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0] == str(
+            todo_db.SCHEMA_VERSION
+        )
+
+    def test_replica_lock_refuses_symlink(self, monkeypatch, tmp_path):
+        fake = FakeLibsql()
+        monkeypatch.setitem(sys.modules, "libsql", fake)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "test-token-value")
+        replica_dir = tmp_path / "replica-dir"
+        replica_dir.mkdir()
+        victim = tmp_path / "victim.txt"
+        victim.write_text("precious", encoding="utf-8")
+        (replica_dir / "replica.db.lock").symlink_to(victim)
+        monkeypatch.setenv("TODO_DB_REPLICA", str(replica_dir / "replica.db"))
+        with pytest.raises(todo_db.TodoError, match="lock"):
+            todo_db.connect_backend(HOSTED_URL)
+        assert victim.read_text(encoding="utf-8") == "precious", "symlink target must not be truncated"
 
     def test_local_connect_is_unchanged(self, monkeypatch, tmp_path):
         monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
@@ -546,25 +646,22 @@ class TestHostedBulkImport:
             todo_db._hrana_endpoint("http://x.turso.io")
 
     def test_post_pipeline_maps_network_errors_to_todo_error(self, monkeypatch):
-        import urllib.request
-
         def _raise_timeout(*args, **kwargs):
             raise TimeoutError("timed out")
 
-        monkeypatch.setattr(urllib.request, "urlopen", _raise_timeout)
+        monkeypatch.setattr(todo_db, "_http_post_response", _raise_timeout)
         with pytest.raises(todo_db.TodoError, match="pipeline request failed"):
             todo_db._post_pipeline("https://x.turso.io/v2/pipeline", "tok", {"requests": []})
 
         def _raise_reset(*args, **kwargs):
             raise ConnectionResetError("peer reset")
 
-        monkeypatch.setattr(urllib.request, "urlopen", _raise_reset)
+        monkeypatch.setattr(todo_db, "_http_post_response", _raise_reset)
         with pytest.raises(todo_db.TodoError, match="pipeline request failed"):
             todo_db._post_pipeline("https://x.turso.io/v2/pipeline", "tok", {"requests": []})
 
     def test_post_pipeline_maps_bad_json_to_todo_error(self, monkeypatch):
         import io
-        import urllib.request
 
         class _FakeResponse(io.BytesIO):
             def __enter__(self):
@@ -573,9 +670,43 @@ class TestHostedBulkImport:
             def __exit__(self, *exc):
                 return False
 
-        monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _FakeResponse(b"<html>gateway error</html>"))
+        monkeypatch.setattr(
+            todo_db, "_http_post_response", lambda *a, **k: _FakeResponse(b"<html>gateway error</html>")
+        )
         with pytest.raises(todo_db.TodoError, match="pipeline"):
             todo_db._post_pipeline("https://x.turso.io/v2/pipeline", "tok", {"requests": []})
+
+    def test_pipeline_refuses_redirects(self):
+        # urllib preserves the Authorization header across redirects (even an
+        # https->http downgrade), so the pipeline opener must refuse them all.
+        import urllib.request
+
+        opener = todo_db._build_no_redirect_opener()
+        handlers = [h for h in opener.handlers if isinstance(h, urllib.request.HTTPRedirectHandler)]
+        assert handlers, "opener must carry a redirect-refusing handler"
+        for handler in handlers:
+            assert handler.redirect_request(None, None, 302, "Found", {}, "http://attacker.example/") is None, (
+                "redirect_request must refuse (return None) so urllib raises instead of re-sending the token"
+            )
+
+    def test_import_guard_counts_all_tracker_tables(self, fake_libsql, monkeypatch, tmp_path, capsys):
+        # An itemless events row (e.g. from `todo config`) must still trip the
+        # emptiness guard with the friendly --replace hint, not a cryptic
+        # events.seq collision mid-transfer.
+        todo_dir = tmp_path / "TODO"
+        todo_dir.mkdir()
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        seed = sqlite3.connect(primary.path)
+        seed.execute("INSERT INTO events (at, actor, item_id, action) VALUES ('t', 'a', NULL, 'config')")
+        seed.commit()
+        monkeypatch.setattr(todo_db, "_post_pipeline", primary.post)
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        rc = todo_db.main(["import-yaml", "--todo-dir", str(todo_dir), "--skip-done"])
+        assert rc == 2
+        err = capsys.readouterr().err
+        assert "--replace" in err
+        assert "UNIQUE" not in err
 
     def test_bulk_transfer_row_parity(self, staging, tmp_path):
         primary = FakePrimary(tmp_path / "primary.sqlite")
@@ -592,8 +723,10 @@ class TestHostedBulkImport:
         assert len(primary.requests) > 3, "batch_size=5 must split into several requests"
         sqls = primary.sqls()
         # guard request: take the write lock and check the target atomically
+        # (a combined count over every tracker table, not just items)
         assert sqls[0][0] == "BEGIN IMMEDIATE"
-        assert "SELECT count(*) FROM items" in sqls[0]
+        assert any("SELECT count(*) FROM items" in sql for sql in sqls[0])
+        assert any("count(*) FROM events" in sql for sql in sqls[0])
         # COMMIT is isolated in its own final request, sent only after every
         # data batch's results were verified clean (Hrana keeps executing
         # later requests in a pipeline after a statement error, so a COMMIT

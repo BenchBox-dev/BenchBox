@@ -28,9 +28,13 @@ DB=https://benchbox-todo-joeharris76.aws-us-east-1.turso.io/v2/pipeline
 curl -s -o /dev/null -w '%{http_code}\n' -X POST "$DB" \
   -H 'Content-Type: application/json' \
   -d '{"requests":[{"type":"execute","stmt":{"sql":"SELECT 1"}},{"type":"close"}]}'
-# authenticated -> HTTP 200; observed 0.15-0.16s per fresh connection
-curl -s -o /dev/null -w '%{http_code} %{time_total}s\n' -X POST "$DB" \
-  -H "Authorization: Bearer $TODO_DB_AUTH_TOKEN" -H 'Content-Type: application/json' \
+# authenticated -> HTTP 200; observed 0.15-0.16s per fresh connection.
+# The auth header goes through curl's stdin config (-K-), NOT argv: argv is
+# world-readable via ps on shared hosts. printf is a shell builtin, so the
+# token never appears in any process's argv.
+printf 'header = "Authorization: Bearer %s"\n' "$TODO_DB_AUTH_TOKEN" | \
+  curl -s -K- -o /dev/null -w '%{http_code} %{time_total}s\n' -X POST "$DB" \
+  -H 'Content-Type: application/json' \
   -d '{"requests":[{"type":"execute","stmt":{"sql":"SELECT 1"}},{"type":"close"}]}'
 ```
 
@@ -41,8 +45,10 @@ default; `TODO_DB_REPLICA` forces distinct paths when replaying from one
 worktree). Expected exit codes in comments.
 
 ```bash
-A() { TODO_DB_REPLICA=/tmp/replicaA/replica.db TODO_ACTOR=actor-a _project/scripts/todo "$@"; }
-B() { TODO_DB_REPLICA=/tmp/replicaB/replica.db TODO_ACTOR=actor-b _project/scripts/todo "$@"; }
+# Repo-local replica dirs (never world-writable /tmp: the lock/replica
+# paths would be symlink-attackable there).
+A() { TODO_DB_REPLICA="$PWD/.todo-db/replay-A/replica.db" TODO_ACTOR=actor-a _project/scripts/todo "$@"; }
+B() { TODO_DB_REPLICA="$PWD/.todo-db/replay-B/replica.db" TODO_ACTOR=actor-b _project/scripts/todo "$@"; }
 A create vis-probe-$(date +%s) --title "Cross-process visibility probe" \
   --worktree spike --priority low --description "Two-replica proof." \
   --work "w1:probe unit"                                   # rc=0
@@ -96,5 +102,15 @@ Failure paths are pinned by `tests/unit/scripts/test_todo_db_hosted.py`
 COMMIT isolated from data batches and withheld on any statement error,
 stream close (rollback) on mid-transfer failure, `base_url` carried across
 baton-chained requests, atomic emptiness guard, network/JSON error mapping
-to exit 2, replica setup flock. Replay: `uv run -- python -m pytest
-tests/unit/scripts/test_todo_db_hosted.py -q`.
+to exit 2, replica setup flock. Second wave: redirect refusal (urllib
+carries Authorization across redirects), transactional `promote` with a
+concurrent-connection lock probe, degraded-mode fresh-replica refusal,
+atomic schema bootstrap, broadened busy/network error mapping with
+redaction at the CLI boundary, whole-tracker import guard, conditional
+`sweep-stale`, migrate re-check under lock, `O_NOFOLLOW` on the lock.
+Replay: `uv run -- python -m pytest
+tests/unit/scripts/test_todo_db_hosted.py
+tests/unit/scripts/test_todo_db_hardening.py -q`. Live counterpart (needs
+`TODO_TEST_DB_URL` + `TODO_DB_AUTH_TOKEN`, a dedicated test database):
+`uv run -- python -m pytest tests/integration/test_todo_db_hosted_live.py
+-m live_integration -q`.

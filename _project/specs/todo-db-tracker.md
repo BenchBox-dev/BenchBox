@@ -547,7 +547,8 @@ either backend. FK enforcement was verified live through write delegation
 (dangling insert refused by the primary). `todo migrate` is backend-aware;
 the hosted path hard-requires a fresh sync before touching the version
 record. TDD: `tests/unit/scripts/test_todo_db_hosted.py` (medium-marked,
-written red first; 40 tests as of PR #1222) pins backend
+written red first; count deliberately unpinned — the file is the record)
+pins backend
 resolution, wiring, adapter semantics, `BEGIN IMMEDIATE` discipline,
 rollback-on-failed-gate, the full gated lifecycle, hosted migration, and
 the bulk-transfer failure paths against a fake libsql module and a fake
@@ -652,6 +653,56 @@ failure injection):
   per worktree (~3.4s at 12.8MB), warm reads unchanged.
 - **Error surfaces:** pipeline network failures (timeouts, resets) and
   non-JSON responses map to the CLI's normal exit-2 error path.
+
+**Hardening round, second wave (2026-07-18, full adversarial review).** A
+deeper review (three independent adversarial passes + live Hrana probes
+that confirmed rollback-on-close and error-continues-pipeline semantics on
+the real primary) surfaced and fixed, TDD:
+
+- **Redirect refusal (security):** urllib preserves the `Authorization`
+  header across redirects — including an https→http downgrade — so the
+  pipeline now uses an opener that refuses all redirects; a redirecting
+  endpoint fails loudly instead of replaying the token.
+- **Transactional `promote` (pre-existing spike defect):** the gate read,
+  item creation, and resolution update now run in ONE `BEGIN IMMEDIATE`
+  transaction with a conditional resolution update — two actors can no
+  longer double-promote one deferral, and a promote can no longer
+  overwrite a concurrent dismiss (pinned by a concurrent-connection test
+  that probes the write lock at the gate read).
+- **Degraded-mode fresh replica:** a never-synced replica with the primary
+  unreachable now fails with a clean exit-2 error instead of attempting a
+  delegated schema write and tracebacking.
+- **Atomic schema bootstrap:** per-statement DDL inside one write
+  transaction (with an under-lock re-check) replaces `executescript` — a
+  mid-bootstrap failure rolls back completely instead of wedging the
+  shared database with partial tables; also removes the client's
+  documented-unimplemented `executescript` from the hosted path entirely.
+- **Broadened error mapping:** non-constraint libsql failures
+  (`SQLITE_BUSY`, network drops mid-statement) map to
+  `sqlite3.OperationalError` and a redacted `database failure` exit 2 at
+  the CLI boundary — previously an unredacted traceback; `_write_txn`'s
+  rollback can no longer mask the original error.
+- **Whole-tracker import guard:** the emptiness check counts every
+  transfer table, so an itemless `events` row (e.g. from `todo config`)
+  trips the friendly `--replace` refusal instead of a cryptic mid-transfer
+  `events.seq` collision.
+- **Conditional `sweep-stale`:** lease release now carries the same
+  observed-lease predicate as `claim` — a renewal the sweeping process had
+  not seen can no longer be clobbered.
+- **Concurrent-migrate safety:** the hosted migrator re-checks the schema
+  version under the write lock; a racing migrator no-ops cleanly.
+- **Lock hardening:** the replica setup lock opens with `O_NOFOLLOW`
+  (0600) — a planted symlink fails loudly instead of truncating its
+  target.
+- **Live coverage:** `tests/integration/test_todo_db_hosted_live.py`
+  (env-gated on `TODO_TEST_DB_URL`, `live_integration`-marked) executes
+  the two-actor lifecycle against a real primary through the shim, so the
+  claim/lastrowid/contention semantics are no longer session testimony.
+
+Threat-model note (recorded, accepted): `todo verify --run` executes
+repo-authored verification commands via the shell — the repository is the
+trust root, the same boundary as `make` or pre-commit hooks. Importing a
+TODO tree from an untrusted source would plant shell commands; do not.
 
 ## Cutover plan
 
