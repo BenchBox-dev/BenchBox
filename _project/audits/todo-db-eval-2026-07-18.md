@@ -1,3 +1,6 @@
+---
+develop_sha: a296177efd5ab1becaab0bc3fb292be418c9f6be
+---
 # Evidence record: YAML-vs-DB tracker head-to-head evaluation (2026-07-18)
 
 Compact, durable record backing the "Head-to-head evaluation" section of
