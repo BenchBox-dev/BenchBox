@@ -372,8 +372,18 @@ class BenchmarkResults:
     platform_info: dict[str, Any] | None = None
     platform_metadata: dict[str, Any] | None = None
     tunings_applied: dict[str, Any] | None = None
-    tuning_config_hash: str | None = None  # SHA-256 hash for config comparison
-    tuning_source_file: str | None = None  # Path to tuning YAML file if applicable
+    # requested_config_hash (ADR-1): full SHA-256 over the requested
+    # UnifiedTuningConfiguration.to_dict(), canonical JSON (sort_keys, compact
+    # separators). Platform-independent template identity - not a certification
+    # of what was physically applied (see the separate applied-ledger hash).
+    tuning_config_hash: str | None = None
+    # Template reference: repo-relative path, or "<basename>:<content-hash>"
+    # for templates outside the repo. Never a raw local filesystem path.
+    tuning_source_file: str | None = None
+    # Raw TuningSource enum value (e.g. "auto_discovered", "explicit_file",
+    # "wizard", "fallback", "smart_defaults", "baseline"); see
+    # benchbox.cli.tuning_resolver.TuningSource.
+    tuning_source: str | None = None
     tuning_validation_status: str = "NOT_VALIDATED"
     tuning_metadata_saved: bool = False
     system_profile: dict[str, Any] | None = None

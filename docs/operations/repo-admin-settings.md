@@ -58,6 +58,8 @@ Required status checks:
 `ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
 that aggregates the required-lane jobs: `ci-paths`, `content-guard`,
 `code-lint`, `code-test`, `correctness-gate`, `plan-capture-gate`,
+`medium-test` (added 2026-07-11, #1139 — the medium tier now gates code
+PRs pre-merge via the same umbrella, no ruleset change needed),
 `explorer-tokens`, `audit-sha`, `package-smoke`, and `dependency-audit`.
 Branch protection deliberately keys off the umbrella so the path-aware
 classifier can skip subordinate jobs without making the protected check
@@ -390,10 +392,20 @@ Live-state note (fill in after applying — do not leave blank):
 
 ```text
 # Tag-creation ruleset live state
-# checked: <YYYY-MM-DD>  by: <admin>
-# ruleset id: <id>  enforcement: <active?>  conditions.ref_name.include: <...>
-# rules: <creation, ...>  bypass_actors: <...>
+# checked: 2026-07-10  by: joeharris76 (admin)
+# ruleset id: 18774756  enforcement: active  conditions.ref_name.include: [refs/tags/v*]
+# rules: [creation]  bypass_actors: [User:57046 (always)]
 ```
+
+Applied 2026-07-10: `v-tag-restricted` (id 18774756) is live and active. The
+bypass list is a single `User` actor (57046, the release-finalize identity) —
+confirmed to be the release identity only, not a broad Write/Admin role, which
+is what `release-finalize`'s `git push origin v$(VERSION)` needs to still
+succeed. With this confirmed, `TAG_RULESET_ENFORCED` in
+`_project/scripts/ruleset_review_enforcement.py` is flipped to `True`, so a
+future regression (ruleset deleted, made inactive, ref narrowed, creation rule
+dropped, or bypass emptied) becomes a blocking drift finding instead of a
+warning.
 
 ### `pypi` environment required-reviewers gate (verify/pending admin action)
 
@@ -443,8 +455,12 @@ workflow: .github/workflows/release-canary.yml
 schedule: daily at 08:00 UTC
 freshness_sla: 48h
 blocking_suite: (slow or resource_heavy) and not (stress or live_integration)
-advisory_suites: stress, live_integration, live cloud credentials, long-running UAT
+advisory_suites: stress, live_integration, live cloud credentials
 ```
+
+Long-running UAT is no longer advisory: release readiness also requires
+committed UAT release-gate evidence — see `docs/operations/release-guide.md`
+"UAT release-gate evidence (required)".
 
 `validate-main-pr.yml` keeps the required context name `validate-base`, but
 that job now also runs `scripts/release_readiness_check.py` for release PRs.

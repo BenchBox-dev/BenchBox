@@ -45,6 +45,7 @@ function makeRow(overrides: Partial<ResultRow> = {}): ResultRow {
     comparison_exclusion_reason: "insufficient_query_coverage",
     ranking_exclusion_reason: "insufficient_query_coverage",
     trust_label: "maintainer-run",
+    funding: "unspecified",
     visibility: "public-curated",
     platform_version: null,
     execution_mode: null,

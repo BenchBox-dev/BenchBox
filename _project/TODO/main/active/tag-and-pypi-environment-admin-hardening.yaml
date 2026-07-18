@@ -1,7 +1,7 @@
 id: tag-and-pypi-environment-admin-hardening
 title: "Apply the two remaining publish-path admin protections: v* tag-creation ruleset and pypi environment required reviewers"
 worktree: main
-priority: Medium
+priority: High
 status: "In Progress"
 category: "Release Tooling"
 

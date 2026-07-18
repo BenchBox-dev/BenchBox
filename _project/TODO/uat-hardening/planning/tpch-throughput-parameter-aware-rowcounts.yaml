@@ -1,0 +1,85 @@
+id: tpch-throughput-parameter-aware-rowcounts
+title: "Parameter-aware expected row counts for TPC-H Q11/16/18/20 (validate instead of exclude)"
+worktree: uat-hardening
+priority: Medium
+status: Not Started
+category: "Testing and Quality Assurance"
+
+description: |
+  Promoted from the deferred item in
+  [[tpch-throughput-seed-validation-fix]] (surfaced by the UAT-effort
+  assessment, 2026-07-16). The seed-validation fix currently EXCLUDES Q11,
+  Q16, Q18, and Q20 from row-count validation because their result cardinality
+  depends on the substitution parameters (the seed), and a single fixed
+  expectation would be wrong for a different seed. Excluding them unblocks the
+  gate but leaves four queries unvalidated for row count.
+
+  This item closes that hole by deriving the expected row count PER SEED rather
+  than excluding the query — computing the parameter-aware answer-set
+  cardinality for the seed in use, so Q11/16/18/20 are validated like the rest.
+
+  Gated on the parent because the exclusion lives in the parent's validation
+  path; this strengthening only makes sense once that path exists and is green.
+
+work:
+  - id: w0
+    summary: "Re-validate the exclusion is still in place and locate the seed→parameter derivation"
+    status: pending
+    needs: []
+    notes: |
+      Confirm Q11/16/18/20 are still excluded post-parent, and find where the
+      substitution parameters for a seed are available (dsqgen/qgen inputs or
+      the stored query parameters) so expected cardinality can be derived.
+  - id: w1
+    summary: "Derive per-seed expected row counts for Q11/16/18/20"
+    status: pending
+    needs: [w0]
+    notes: |
+      Compute the parameter-aware expected cardinality for each of the four
+      queries from the seed's parameters (reference-answer computation), rather
+      than a fixed literal. Mirror the existing correctness-gate derivation
+      approach if one exists.
+  - id: w2
+    summary: "Replace the exclusion with the derived validation and add regression coverage"
+    status: pending
+    needs: [w1]
+    notes: |
+      Remove Q11/16/18/20 from the exclusion set, wire in the derived
+      expectations, and add a test that a wrong-seed expectation fails (proving
+      the validation is parameter-aware, not re-widened to always-pass).
+
+deferred:
+  - summary: "Generalise per-seed cardinality derivation to other benchmarks (TPC-DS parameterised queries)"
+    reason: "TPC-H Q11/16/18/20 is the concrete gap the parent left; a general framework is a larger design not required to close it."
+
+deps:
+  needs: [tpch-throughput-seed-validation-fix]
+
+must_preserve:
+  - "Non-parameterised queries keep their existing fixed expected row counts unchanged."
+  - "The gate stays green for the correct seed and fails for an incorrect expectation (no silent re-widening to always-pass)."
+
+approach: |
+  Reuse the established correctness-gate policy the parent's exclusion mirrors —
+  derive expectations from the seed's parameters instead of excluding. Small,
+  additive change to the validation path, guarded by a wrong-seed regression
+  test.
+
+anti_patterns:
+  - "DO NOT simply widen the row-count tolerance to make Q11/16/18/20 pass — that defeats the validation; expectations must be seed-derived and exact."
+
+verification:
+  - description: "Q11/16/18/20 validated (not excluded) and wrong-seed fails"
+    command: "uv run -- python -m pytest -k 'throughput and (q11 or q16 or q18 or q20 or rowcount)' -q"
+    expected_output: "the four queries are validated per-seed; a wrong-seed expectation fails"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/throughput.py"
+    - "tests/uat/test_throughput.py"
+
+metadata:
+  tags: [uat, throughput, tpch, rowcount-validation, deeper-question]
+  estimated_effort: Medium
+  created_date: "2026-07-16"
+  source: "UAT-effort assessment 2026-07-16 (deeper-questions promotion); parent tpch-throughput-seed-validation-fix deferred item"

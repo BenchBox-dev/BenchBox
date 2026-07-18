@@ -48,12 +48,19 @@ def test_report_cli_reconciles_skipped_and_unreachable_fixture(tmp_path: Path, c
     # carries a `skipped-unreachable` row directly, but the sidecar-derived
     # portion of it is still an assumption, not a confirmation).
     assert payload["unreachable_is_estimated"] is True
+    assert payload["startup_failed"] == 0
     assert payload["total_defined"] == 5
     assert payload["passed"] + payload["failed"] + payload["timed_out"] == payload["attempted"]
-    assert payload["attempted"] + payload["skipped"] + payload["unreachable"] == payload["total_defined"]
+    # w3: total_defined's identity now includes startup_failed as a fourth,
+    # disjoint bucket alongside attempted/skipped/unreachable.
+    assert (
+        payload["attempted"] + payload["skipped"] + payload["unreachable"] + payload["startup_failed"]
+        == payload["total_defined"]
+    )
 
     text = output_tsv.read_text(encoding="utf-8")
-    assert "attempted=3 skipped=1 unreachable=1 total_defined=5" in text
+    # Footer ordering contract: components (incl. startup_failed) precede total_defined.
+    assert "attempted=3 skipped=1 unreachable=1 startup_failed=0 total_defined=5" in text
     assert "# UNREACHABLE_CELLS=1 release_gate_attention=required" in text
 
 
@@ -77,8 +84,87 @@ def test_report_counts_execute_unreachable_cells_outside_rows(tmp_path: Path):
     assert summary.candidate_count == 10
 
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
-    assert "compatibility_pruned=2 early_stop_pruned=1 attempted=3 skipped=3 unreachable=4 total_defined=10" in text
+    assert (
+        "compatibility_pruned=2 early_stop_pruned=1 attempted=3 skipped=3 "
+        "unreachable=4 startup_failed=0 total_defined=10"
+    ) in text
     assert "# UNREACHABLE_CELLS=4 release_gate_attention=required" in text
+
+
+# ---------------------------------------------------------------------------
+# w3: startup_failed_count is disjoint from skipped_unreachable_count.
+# ---------------------------------------------------------------------------
+
+
+def test_report_threads_startup_failed_count_into_total_defined_and_exit_code(tmp_path: Path):
+    """A stack that never started is counted separately from unreachable cells."""
+    summary = report.write_report(
+        [_cell("duckdb", "tpch", 0.01, status="passed")],
+        output_path=tmp_path / "matrix_summary.tsv",
+        skipped_unreachable_count=2,
+        startup_failed_count=3,
+    )
+
+    assert summary.unreachable_count == 2
+    assert summary.startup_failed_count == 3
+    # 1 attempted + 0 skipped + 2 unreachable + 3 startup_failed.
+    assert summary.total_defined_count == 6
+    # startup_failed makes the report exit nonzero like unreachable does,
+    # even with zero fail/timeout/unreachable cells.
+    assert summary.exit_code() == 1
+
+    text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
+    # Footer ordering contract: components precede their total.
+    assert "unreachable=2 startup_failed=3 total_defined=6" in text
+    assert "release_accounting" in text and "startup_failed=3" in text
+    assert "# STARTUP_FAILED_CELLS=3 release_gate_attention=required" in text
+
+
+def test_report_exit_code_clean_when_startup_failed_count_zero(tmp_path: Path):
+    summary = report.write_report(
+        [_cell("duckdb", "tpch", 0.01, status="passed")],
+        output_path=tmp_path / "matrix_summary.tsv",
+    )
+    assert summary.startup_failed_count == 0
+    assert summary.exit_code() == 0
+    text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
+    assert "STARTUP_FAILED_CELLS" not in text
+
+
+def test_report_cli_reads_startup_failed_sidecar(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """A report regenerated from cells.jsonl must read startup_failed back from the durable sidecar."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "passed",
+                "exit_code": 0,
+                "elapsed_s": 1.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    cells_jsonl.with_name("cells.jsonl.accounting.json").write_text(
+        json.dumps({"skipped_unreachable_count": 0, "startup_failed_count": 2}), encoding="utf-8"
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["startup_failed"] == 2
+    assert payload["unreachable"] == 0
+    assert payload["attempted"] == 1
+    assert payload["total_defined"] == 3
+    text = output_tsv.read_text(encoding="utf-8")
+    assert "# STARTUP_FAILED_CELLS=2 release_gate_attention=required" in text
 
 
 def test_report_cli_reads_skipped_unreachable_sidecar(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
@@ -160,6 +246,76 @@ def test_report_cli_without_sidecar_defaults_unreachable_zero(tmp_path: Path, ca
     assert payload["total_defined"] == 1
 
 
+def test_report_cli_malformed_sidecar_falls_back_to_estimated(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """#1151 review: a sidecar that parses as JSON but has the wrong shape
+    (non-numeric counts, or isn't even a mapping) must not crash report
+    regeneration -- it falls back to an estimated 0, exactly like a missing
+    sidecar, instead of raising out of `int()`/`.get()`.
+    """
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "passed",
+                "exit_code": 0,
+                "elapsed_s": 1.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    sidecar = cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
+    sidecar.write_text(
+        json.dumps({"skipped_unreachable_count": None, "startup_failed_count": "abc"}),
+        encoding="utf-8",
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["unreachable"] == 0
+    assert payload["startup_failed"] == 0
+
+
+def test_report_cli_non_mapping_sidecar_treated_as_absent(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """A sidecar that parses as a JSON array (not a mapping) must be treated
+    like a missing sidecar -- estimated, not crashed."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "passed",
+                "exit_code": 0,
+                "elapsed_s": 1.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    sidecar = cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
+    sidecar.write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["unreachable"] == 0
+    assert payload["unreachable_is_estimated"] is True
+
+
 # ---------------------------------------------------------------------------
 # w1/w4: default-strict exit-code policy.
 # ---------------------------------------------------------------------------
@@ -235,3 +391,109 @@ def test_write_report_threads_registry_pruned_count_into_total_defined(tmp_path:
 
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
     assert "registry_pruned=3" in text
+
+
+# ---------------------------------------------------------------------------
+# uat-status-taxonomy-exit-code-fixes w3: failed cells with a resolved result
+# JSON must not read as submission-ready when a report is regenerated from
+# cells.jsonl via `make uat-report`.
+# ---------------------------------------------------------------------------
+
+
+def test_report_cli_marks_failed_cell_with_result_path_not_submittable(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "failed",
+                "exit_code": 1,
+                "elapsed_s": 2.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+                "submit_terminal_state": "submittable",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 1
+    text = output_tsv.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    assert "failed\tfailed:submittable\t" in lines[1]
+    capsys.readouterr()  # drain stdout to keep this test quiet in -s runs
+
+
+# ---------------------------------------------------------------------------
+# uat-status-taxonomy-exit-code-fixes w5: throughput_check must survive a
+# `make uat-report` regeneration from cells.jsonl -- it is the one
+# diagnostic the #1094 stream-count guard exists to surface.
+# ---------------------------------------------------------------------------
+
+
+def test_report_cli_reads_throughput_check_back_from_cells_jsonl(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "failed",
+                "exit_code": 1,
+                "elapsed_s": 2.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+                "submit_terminal_state": "submittable",
+                "throughput_check": "throughput stream count mismatch: requested 3, executed 1",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 1
+    lines = output_tsv.read_text(encoding="utf-8").splitlines()
+    assert lines[0].split("\t")[-1] == "throughput_check"
+    assert lines[1].split("\t")[-1] == "throughput stream count mismatch: requested 3, executed 1"
+    capsys.readouterr()
+
+
+def test_report_cli_throughput_check_defaults_to_none_when_absent(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """Older cells.jsonl artifacts predate throughput_check; the report must still regenerate cleanly."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_jsonl.write_text(
+        json.dumps(
+            {
+                "platform": "duckdb",
+                "benchmark": "tpch",
+                "scale": 0.01,
+                "status": "passed",
+                "exit_code": 0,
+                "elapsed_s": 1.0,
+                "log_path": "/tmp/a.log",
+                "result_path": "/tmp/a.json",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 0
+    lines = output_tsv.read_text(encoding="utf-8").splitlines()
+    assert lines[1].split("\t")[-1] == ""
+    capsys.readouterr()

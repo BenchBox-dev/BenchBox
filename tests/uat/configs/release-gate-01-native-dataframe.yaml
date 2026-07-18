@@ -53,11 +53,19 @@ validate:
 
 report:
   matrix_summary_tsv: "matrix_summary.tsv"
-  # APPROVE gate teeth: require every required (platform, benchmark) pair to be
-  # clean across all three rungs. Set to the count expected after a green run;
-  # a breach forces a non-zero report exit so the gate cannot be APPROVED on a
-  # partial/regressed sweep. Tune to the approved pair count during bring-up.
-  cross_scale_coverage_min_pairs: 1
+  # APPROVE gate teeth: require at least this many (platform, benchmark) pairs
+  # to be passed AND validator-clean across all three rungs; a breach forces a
+  # non-zero report exit so the gate cannot be APPROVED on a partial/regressed
+  # sweep.
+  # Derivation (uat-release-gate-enforcement w4, 2026-07-12, develop @ acfb89922):
+  # enumerate_cells_with_pruning over this config yields 153 pairs with every
+  # rung (0.01/0.1/1.0) enumerable -- the only pairs the cross-scale check can
+  # ever count (208 raw pairs minus 55 whose registry scale ladder omits a
+  # rung, e.g. clickbench/joinorder 1.0-only, read_primitives 0.01/0.1-only).
+  # floor = max(8, floor(0.8 * 153)) = 122. The 0.8 slack absorbs legitimate
+  # environment variance without letting a mass regression sign off; never set
+  # this to the eligible count exactly.
+  cross_scale_coverage_min_pairs: 122
 
 output:
   benchmark_runs_dir_template: "~/Developer/benchmark_runs"

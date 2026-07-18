@@ -74,6 +74,11 @@ def main(argv: list[str] | None = None) -> int:
     spec = docker_assets.docker_platform_spec(platform)
     try:
         docker_assets.validate_managed_start_allowed(spec)
+        # Resolved once, up front, so the operator sees which engine ran this
+        # bring-up before any compose output -- and a missing binary fails
+        # here with a clear message instead of a raw traceback out of
+        # compose_up_command() below (uat-container-engine-routing w1).
+        print(f"resolved container CLI: {docker_assets.resolve_container_cli()}")
     except docker_assets.DockerAssetError as exc:
         print(f"platform {platform!r} cannot be UAT-managed: {exc}", file=sys.stderr)
         return 2

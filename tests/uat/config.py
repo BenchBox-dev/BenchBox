@@ -52,7 +52,7 @@ class ExecuteConfig:
 @dataclass(frozen=True)
 class OutputConfig:
     benchmark_runs_dir_template: str = "~/Developer/benchmark_runs"
-    logs_dir_template: str = "~/Developer/benchmark_runs/logs/uat_{date}"
+    logs_dir_template: str = "~/Developer/benchmark_runs/logs/uat_{date}_{time}"
     submissions_dir_template: str = "~/Developer/benchmark_runs/submissions/{name}"
 
 
@@ -142,6 +142,37 @@ class UATConfig:
     explorer_smoke: ExplorerSmokeConfig = field(default_factory=ExplorerSmokeConfig)
     report: ReportConfig = field(default_factory=ReportConfig)
     compatibility: CompatibilityConfig = field(default_factory=CompatibilityConfig)
+
+    @property
+    def disk_gate_enabled(self) -> bool:
+        """Whether the free-space floor and per-cell disk watch are active.
+
+        Always-on for every execute-bearing run, decoupled from the
+        `phases:` list -- omitting `"preflight"` skips the pre-sweep
+        budget report/abort only, not this safety interlock (see
+        uat-disk-gate-always-on). Reads the raw configured floor
+        (`preflight.free_space_min_gib`), not a budget-resolved value;
+        the pre-sweep gate separately resolves max(flat floor, budget
+        est_peak) in preflight_budget.check_disk_headroom. The sole
+        opt-out is an explicit `preflight.free_space_min_gib: 0`, which
+        callers must pair with a loud warning
+        (`disk_gate_disabled_warning`) since it turns the gate off
+        entirely.
+        """
+        return self.preflight.free_space_min_gib > 0
+
+
+DISK_GATE_DISABLED_WARNING_PREFIX = "[disk-gate] DISABLED by config"
+
+
+def disk_gate_disabled_warning(config: UATConfig) -> str | None:
+    """Return the loud opt-out warning when `disk_gate_enabled` is False."""
+    if config.disk_gate_enabled:
+        return None
+    return (
+        f"{DISK_GATE_DISABLED_WARNING_PREFIX}: preflight.free_space_min_gib=0 -- "
+        "the free-space floor and per-cell disk watch will NOT run for this sweep"
+    )
 
 
 ROOT_FIELDS = frozenset(
@@ -388,7 +419,7 @@ def _validate_output(payload: dict[str, Any]) -> OutputConfig:
         logs_dir_template=str(
             payload.get(
                 "logs_dir_template",
-                "~/Developer/benchmark_runs/logs/uat_{date}",
+                "~/Developer/benchmark_runs/logs/uat_{date}_{time}",
             )
         ),
         submissions_dir_template=str(

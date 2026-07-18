@@ -130,7 +130,7 @@ from benchbox import TPCH
 benchmark = TPCH(scale_factor=0.1)
 
 # Test on multiple platforms
-platforms = ["duckdb", "clickhouse"]
+platforms = ["duckdb", "clickhouse-local"]
 
 for platform_name in platforms:
     print(f"Running on {platform_name}...")

@@ -187,4 +187,53 @@ describe("ComparabilityReceipt", () => {
       detail: "DuckDB: SF 0.1; SQLite: SF 1",
     });
   });
+
+  describe("physical tuning mechanisms warning (ADR-2 §3)", () => {
+    it("warns -- without failing the match -- when two tuned runs render different mechanisms", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", physical_mechanisms: ["indexes", "clustering", "distribution", "sort", "z_order", "stats"] }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: [] }),
+      ]);
+
+      const field = fields.find((f) => f.label === "Physical tuning mechanisms");
+      expect(field).toMatchObject({ status: "diff", summary: "Tuned runs rendered different physical mechanisms" });
+      expect(field?.detail).toContain("DuckDB: indexes, clustering, distribution, sort, z_order, stats");
+      expect(field?.detail).toContain("SQLite: none");
+
+      // A warning, not a match failure: the overall receipt still stays
+      // facet-matchable, it just surfaces in the warning list.
+      const warnings = comparabilityWarningFields(fields);
+      expect(warnings.some((f) => f.label === "Physical tuning mechanisms")).toBe(true);
+    });
+
+    it("matches (no warning) when two tuned runs render the same mechanism set", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", physical_mechanisms: ["indexes", "clustering"] }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: ["clustering", "indexes"] }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toMatchObject({
+        status: "match",
+        summary: "2 mechanisms",
+      });
+    });
+
+    it("is omitted when fewer than two results are labeled tuned", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", physical_mechanisms: ["indexes"] }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "notuning" }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+    });
+
+    it("is omitted when any tuned result predates physical_mechanisms ingest (undefined, not empty)", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", physical_mechanisms: ["indexes"] }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: undefined }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+    });
+  });
 });

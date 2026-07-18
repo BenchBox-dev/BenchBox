@@ -1,0 +1,80 @@
+id: dataframe-csv-coercion-single-shared-step
+title: "Consolidate per-adapter empty-string/null CSV coercion into one shared step"
+worktree: main
+priority: Medium
+status: Not Started
+category: Code Quality and Technical Debt
+
+description: |
+  Follow-up to dataframe-csv-empty-string-null-uniform (#904) and its coverage
+  follow-up dataframe-csv-empty-string-parity-coverage (#936). #904 landed the
+  empty-string-vs-null CSV coercion PER ADAPTER rather than as the single shared
+  step the original YAML specified. It is functionally equivalent today, but it
+  means each DataFrame adapter carries its own copy of the contract — each is an
+  independent risk surface that can drift.
+
+  Consolidate the coercion into one shared step in the common DataFrame CSV load
+  path so the empty-string/null contract has a single source of truth. This is now
+  a safe refactor because #936 pins the contract across every installed adapter
+  (datafusion/pyspark/pandas/polars/dask, plus the SQL<->DataFrame parity case), so
+  the parity tests are the behavior-preservation net.
+
+prior_art:
+  - ref: "benchbox/platforms/dataframe/polars_df.py (missing_utf8_is_empty_string) and the sibling per-adapter coercion sites"
+    note: "The per-adapter coercion this item consolidates; enumerate every site before extracting."
+  - ref: "benchbox/platforms/dataframe/benchmark_mixin.py (DataFrame CSV load path)"
+    note: "The common load path where the single shared coercion step should live."
+  - ref: "tests/integration/test_dataframe_csv_empty_string_null_semantics.py (#936)"
+    note: "The cross-adapter parity net that must stay byte-identical-green through the refactor."
+
+work:
+  - id: w1
+    summary: "Map every per-adapter empty-string/null CSV coercion site"
+    status: pending
+    needs: []
+    notes: |
+      Enumerate where each adapter implements the empty-field -> "" vs null rule
+      (null_marker semantics). Record file:line for each.
+  - id: w2
+    summary: "Extract the coercion to one shared step in the common DataFrame CSV load path"
+    status: pending
+    needs: [w1]
+    notes: |
+      Move the contract into a single shared step each adapter defers to; remove the
+      per-adapter special-casing. Behavior-preserving move only.
+  - id: w3
+    summary: "Confirm byte-identical behavior via the #936 parity tests"
+    status: pending
+    needs: [w2]
+    notes: |
+      The #936 parametrized parity tests (per-adapter + SQL<->DataFrame CSV-path)
+      must stay green unchanged; add a test asserting no per-adapter coercion path
+      remains if useful.
+
+must_preserve:
+  - "The empty-string vs null CSV contract is unchanged for every adapter — proven by the #936 parity tests staying green."
+  - "Behavior-preserving refactor: no adapter's observable CSV-loading semantics change."
+
+anti_patterns:
+  - "DO NOT change any adapter's empty-string/null outcome while consolidating — this is a structural move only."
+
+verification:
+  - description: "Cross-adapter parity holds through the refactor"
+    command: "uv run -- python -m pytest tests/integration/test_dataframe_csv_empty_string_null_semantics.py -q"
+    expected_output: "all per-adapter + cross-surface parity cells pass unchanged; coercion now lives in one shared step"
+
+scope_limit:
+  only_modify:
+    - "benchbox/platforms/dataframe/"
+    - "benchbox/platforms/base/"
+    - "tests/"
+
+success_metrics:
+  - "Empty-string/null CSV coercion lives in exactly one shared step; no per-adapter special-casing of the contract remains."
+  - "The #936 parity suite passes unchanged, confirming the refactor is behavior-preserving."
+
+metadata:
+  tags: [dataframe, csv, refactor, technical-debt, holistic-review-followup]
+  estimated_effort: "Medium"
+  created_date: "2026-07-17"
+  last_updated: "2026-07-17T00:00:00"

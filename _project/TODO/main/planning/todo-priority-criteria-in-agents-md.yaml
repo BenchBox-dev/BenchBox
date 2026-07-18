@@ -1,0 +1,75 @@
+id: todo-priority-criteria-in-agents-md
+title: "Add priority-level criteria to AGENTS.md so automated agents can apply them consistently"
+worktree: main
+priority: Low
+status: Not Started
+category: Process and Workflow
+
+description: |
+  `todo-priority-criteria-definition` (filed in the 2026-06-08 batch) targets
+  `_project/TODO/README.md` and `TODO_ENTRY_TEMPLATE.yaml`. Those files are
+  read by humans authoring TODOs.
+
+  AGENTS.md (at the repo root) is the behavioral guidance file read by
+  automated agents at session start. Without priority criteria in AGENTS.md,
+  agents performing prioritization or triage cannot apply the agreed-upon
+  definitions — they fall back to implicit heuristics that differ from the
+  documented criteria.
+
+  Once `todo-priority-criteria-definition` is done and the criteria are in
+  README.md, add a concise cross-reference or summary section to AGENTS.md
+  so agents have the same definitions available.
+
+deps:
+  needs:
+    - todo-priority-criteria-definition
+
+work:
+  - id: w1
+    summary: "Read AGENTS.md to find the right insertion point"
+    status: pending
+    notes: |
+      Look for an existing section about TODO/backlog management, task
+      prioritization, or agent decision-making. The criteria should live
+      near any existing guidance about how agents should approach TODO items.
+
+  - id: w2
+    summary: "Add a Priority Definitions summary or cross-reference to AGENTS.md"
+    needs: [w1]
+    status: pending
+    notes: |
+      Options in order of preference:
+        1. Short inline table (5 rows, one per level) with the key
+           distinguishing question — avoids agents having to read README.md.
+        2. One-paragraph summary + pointer to _project/TODO/README.md.
+      Do not duplicate the full criteria verbatim; maintain a single source
+      of truth in TODO/README.md.
+
+prior_art:
+  - "AGENTS.md: root-level agent guidance file — extend, do not replace"
+  - "_project/TODO/README.md: source of truth for priority criteria (added by todo-priority-criteria-definition)"
+
+must_preserve:
+  - "AGENTS.md existing sections and their ordering remain intact"
+  - "Criteria in AGENTS.md stay in sync with TODO/README.md (one drives, the other references)"
+
+verification:
+  - description: "AGENTS.md contains a priority-level reference legible without reading README.md"
+    command: "grep -A 10 'Priority' AGENTS.md"
+    expected_output: "Criteria or pointer visible for Critical, High, Medium-High, Medium, Low"
+
+metadata:
+  created_date: "2026-06-08"
+  estimated_effort: "Small"
+  tags:
+    - agents
+    - documentation
+    - process
+    - todo-system
+
+impact:
+  technical_debt: |
+    Without priority criteria in AGENTS.md, automated prioritization passes
+    produce inconsistent results because each agent session starts from
+    different implicit assumptions. A single clear definition in the file
+    agents always read eliminates the divergence.

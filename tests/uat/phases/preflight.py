@@ -8,8 +8,8 @@ local-platform reachability enforcement.
 
 from __future__ import annotations
 
+import csv
 import os
-import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable, Iterable
@@ -27,7 +27,12 @@ from tests.uat.matrix import (
     resolve_platforms,
 )
 from tests.uat.phases import PhaseResult
-from tests.uat.preflight_budget import DiskBudget, DiskHeadroomCheck, DiskRootFreeSpace
+from tests.uat.preflight_budget import (
+    DiskBudget,
+    DiskHeadroomCheck,
+    DiskRootFreeSpace,
+    free_space_gib as free_space_gib,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -65,46 +70,51 @@ class PreflightResult(PhaseResult):
     local_platforms_attempted: tuple[str, ...] = ()
     disk_budget_summary: str | None = None
     free_space_report: tuple[str, ...] = ()
-
-
-def free_space_gib(path: str | Path) -> float:
-    """Return free space at `path` in GiB."""
-    p = Path(path).expanduser()
-    if not p.exists():
-        # Walk up to first existing ancestor so a missing log dir doesn't
-        # falsely trigger the abort.
-        p = next((ancestor for ancestor in p.parents if ancestor.exists()), Path("/"))
-    usage = shutil.disk_usage(p)
-    return usage.free / (1024**3)
+    # Typed cause for `aborted` -- "disk_floor", "docker_required", or
+    # "local_platform_unreachable". None when not aborted. Consumers must
+    # branch on this field, never on substrings of `abort_reason` (a
+    # human-facing message that can be reworded without notice) -- see
+    # uat-execute-path-unification w5.
+    abort_kind: str | None = None
 
 
 def docker_reachable() -> bool:
-    """Return True iff `docker ps` succeeds within 5 s."""
+    """Return True iff the resolved container CLI's `ps` succeeds within 5 s.
+
+    A resolution failure (no engine binary on PATH at all) degrades to the
+    same "not reachable" signal as a missing/unresponsive daemon -- this is
+    a soft preflight probe, not the action that needs a hard error (see
+    uat-container-engine-routing w1; `resolve_container_cli()` itself still
+    hard-errors for the actions that actually shell out to build/start/stop
+    a stack).
+    """
     try:
+        cli = docker_assets.resolve_container_cli()
         subprocess.run(
-            ["docker", "ps"],
+            [cli, "ps"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=5,
             check=True,
         )
         return True
-    except (FileNotFoundError, subprocess.SubprocessError):
+    except (FileNotFoundError, subprocess.SubprocessError, docker_assets.DockerAssetError):
         return False
 
 
 def docker_data_root() -> Path | None:
-    """Return Docker's host-visible data root, when the engine reports one."""
+    """Return the resolved engine's host-visible data root, when it reports one."""
     try:
+        cli = docker_assets.resolve_container_cli()
         completed = subprocess.run(
-            ["docker", "info", "--format", "{{.DockerRootDir}}"],
+            [cli, "info", "--format", "{{.DockerRootDir}}"],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
             timeout=5,
             check=True,
         )
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError, docker_assets.DockerAssetError):
         return None
 
     value = completed.stdout.strip()
@@ -214,8 +224,32 @@ def run_preflight(
                     f"{len(budget_gate.budget.unknown_cells)} unknown largest-scale cell(s); "
                     "estimate may be low"
                 )
-        except Exception as exc:
-            warnings.append(f"disk budget estimate unavailable: {type(exc).__name__}: {exc}")
+        except (OSError, ValueError, TypeError, KeyError, csv.Error) as exc:
+            # The estimator CRASHED (bad table row, unreadable TSV, a
+            # malformed config field) -- distinct from the advisory
+            # unknown_cells case above, which stays a warning. TypeError
+            # covers truncated TSV rows: DictReader fills missing fields
+            # with restval=None and float(None) raises TypeError, not
+            # ValueError. Downgrading a crash to a warning would silently
+            # fall back to the flat free_space_min_gib cutoff below and
+            # disable the stronger budget-aware gate with only a stderr
+            # line (uat-disk-gate-always-on w3). Hard-fail preflight
+            # instead, surfacing which exception fired so the operator can
+            # fix the budget table or set an explicit flat floor.
+            return PreflightResult(
+                phase="preflight",
+                free_space_gib=free_gib,
+                docker_reachable=docker_ok,
+                host_load_1m=load_1m,
+                aborted=True,
+                abort_reason=f"disk budget estimator failed: {type(exc).__name__}: {exc}",
+                abort_kind="disk_floor",
+                warnings=tuple(warnings),
+                local_platforms_checked=(),
+                local_platforms_attempted=(),
+                disk_budget_summary=None,
+                free_space_report=(),
+            )
     if free_space_min_gib <= 0:
         required_gib = 0.0
     elif budget_gate is not None:
@@ -224,9 +258,11 @@ def run_preflight(
         required_gib = free_space_min_gib
     free_space_report = format_free_space_report(free_space_entries, required_gib=required_gib)
 
+    abort_kind: str | None = None
     if free_space_min_gib > 0 and budget_gate is not None and budget_gate.headroom.shortfalls:
         aborted = True
         abort_reason = format_disk_headroom_failure(budget_gate.headroom)
+        abort_kind = "disk_floor"
     elif free_space_min_gib > 0:
         short_roots = tuple(root for root in free_space_entries if root.free_gib < free_space_min_gib)
         if short_roots:
@@ -236,9 +272,15 @@ def run_preflight(
                 for root in short_roots
             )
             abort_reason = f"free space gate failed: {details}"
+            abort_kind = "disk_floor"
     if docker_required and not docker_ok:
         aborted = True
         abort_reason = (abort_reason or "") + ("; docker_required=true but `docker ps` is unreachable")
+        # Disk-floor abort (set above, if any) takes precedence as the typed
+        # cause when both conditions fire in the same run -- it is the more
+        # actionable/primary safety interlock.
+        if abort_kind is None:
+            abort_kind = "docker_required"
     if load_1m is not None and load_1m > noisy_neighbor_warn_load:
         warnings.append(f"host load {load_1m:.1f} > {noisy_neighbor_warn_load:.1f}")
     if not docker_ok and not docker_required:
@@ -255,6 +297,7 @@ def run_preflight(
         if local_abort is not None:
             aborted = True
             abort_reason = local_abort
+            abort_kind = "local_platform_unreachable"
 
     return PreflightResult(
         phase="preflight",
@@ -263,6 +306,7 @@ def run_preflight(
         host_load_1m=load_1m,
         aborted=aborted,
         abort_reason=abort_reason,
+        abort_kind=abort_kind,
         warnings=tuple(warnings),
         local_platforms_checked=checked,
         local_platforms_attempted=attempted,

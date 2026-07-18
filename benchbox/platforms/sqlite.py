@@ -224,7 +224,15 @@ class SQLiteAdapter(PlatformAdapter):
         )
 
         # Pass through other relevant config (verbose settings, tuning config, etc.)
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+            "verbose_enabled",
+            "very_verbose",
+        ]:
             if key in config:
                 adapter_config[key] = config[key]
 

@@ -274,6 +274,7 @@ class ResultBuilder:
         self._tunings_applied: dict[str, Any] | None = None
         self._tuning_config_hash: str | None = None
         self._tuning_source_file: str | None = None
+        self._tuning_source: str | None = None
 
         # Query plan capture statistics
         self._query_plans_captured: int = 0
@@ -470,11 +471,22 @@ class ResultBuilder:
         tunings_applied: dict[str, Any] | None = None,
         config_hash: str | None = None,
         source_file: str | None = None,
+        source: str | None = None,
     ) -> None:
-        """Set tuning configuration information."""
+        """Set tuning configuration information.
+
+        Args:
+            tunings_applied: The requested UnifiedTuningConfiguration.to_dict().
+            config_hash: requested_config_hash per ADR-1 (SHA-256 over
+                tunings_applied, canonical JSON).
+            source_file: Template reference (repo-relative path or
+                basename+content-hash) - never a raw local path.
+            source: Raw TuningSource enum value (e.g. "auto_discovered").
+        """
         self._tunings_applied = tunings_applied
         self._tuning_config_hash = config_hash
         self._tuning_source_file = source_file
+        self._tuning_source = source
 
     def set_cost_summary(self, cost_summary: dict[str, Any]) -> None:
         """Set cost summary for cloud platforms."""
@@ -551,7 +563,12 @@ class ResultBuilder:
         measurement_results = [r for r in self._query_results if r.run_type == "measurement" and r.iteration > 0]
         results_for_stats = measurement_results if measurement_results else self._query_results
         successful_queries = [r for r in results_for_stats if r.status == "SUCCESS"]
-        failed_queries = [r for r in results_for_stats if r.status == "FAILED"]
+        # VALIDATION_FAILED (a write/op that ran but failed a post-condition
+        # check, e.g. write_primitives/transaction_primitives) counts as a
+        # failure here too, not just an execution FAILED -- mirroring
+        # execution.py's _log_execution_summary, which already treats the two
+        # the same for the console summary (#1150 review).
+        failed_queries = [r for r in results_for_stats if r.status in ("FAILED", "VALIDATION_FAILED")]
 
         # Use measurement execution times for aggregate timing metrics when possible
         exec_times_all = [r.execution_time_seconds for r in results_for_stats if r.execution_time_seconds > 0]
@@ -673,6 +690,7 @@ class ResultBuilder:
             tunings_applied=self._tunings_applied,
             tuning_config_hash=self._tuning_config_hash,
             tuning_source_file=self._tuning_source_file,
+            tuning_source=self._tuning_source,
             # Query plan stats
             query_plans_captured=self._query_plans_captured,
             plan_capture_failures=self._plan_capture_failures,

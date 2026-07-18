@@ -22,6 +22,7 @@ MAKE_TARGET_SUBCOMMANDS = (
     "cell",
     "docker-cleanup",
     "execute",
+    "gate-check",
     "validate",
     "package",
     "explorer-smoke",
@@ -75,8 +76,6 @@ def _handle_sweep(args: argparse.Namespace) -> int:
     from tests.uat.orchestrator import run_sweep_from_path
 
     sweep_kwargs = {"dry_run_override": True if args.dry_run else None}
-    if args.resume:
-        sweep_kwargs["resume_manifest"] = Path(args.resume)
     result = run_sweep_from_path(Path(args.config), **sweep_kwargs)
     print(
         json.dumps(
@@ -95,23 +94,22 @@ def _handle_sweep(args: argparse.Namespace) -> int:
 
 def _handle_stress(args: argparse.Namespace) -> int:
     """Implements `make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=]`."""
-    from dataclasses import replace
-
-    from tests.uat.config import load_config
-    from tests.uat.orchestrator import run_sweep
+    from tests.uat.orchestrator import run_sweep_from_path
 
     if args.config is None:
         config_path = Path(__file__).resolve().parent / "configs" / "stress-default.yaml"
     else:
         config_path = Path(args.config)
-    config = load_config(config_path)
-    if args.platform is not None:
-        config = replace(config, platforms=replace(config.platforms, groups=(), include=(args.platform,)))
-    if args.benchmark is not None:
-        config = replace(config, benchmarks=replace(config.benchmarks, groups=(), include=(args.benchmark,)))
-    if args.scale is not None:
-        config = replace(config, scales=replace(config.scales, override=args.scale))
-    result = run_sweep(config)
+    # Same closed override set `run_sweep_from_path` already implements for
+    # `make uat-sweep`'s dry-run path (spec Section 4 override contract) --
+    # this used to be a second, hand-duplicated copy of the platform/
+    # benchmark/scale override logic. Reuse instead of re-implementing.
+    stress_overrides = {
+        "platform": args.platform,
+        "benchmark": args.benchmark,
+        "scale": args.scale,
+    }
+    result = run_sweep_from_path(config_path, stress_overrides=stress_overrides)
     print(
         json.dumps(
             {
@@ -147,67 +145,27 @@ def _handle_preflight(args: argparse.Namespace) -> int:
     return 0
 
 
-def _read_skipped_unreachable_sidecar(cells_jsonl: Path) -> tuple[int, bool]:
-    """Read the skipped-unreachable count persisted alongside ``cells.jsonl``.
-
-    The durable sweep writes ``<cells.jsonl>.accounting.json`` next to the cell
-    stream because skipped-unreachable cells are ``Cell`` records, not
-    ``CellResult`` rows, and so cannot appear in the JSONL. Returns
-    ``(count, sidecar_present)``: ``(0, False)`` when the sidecar is absent or
-    unreadable (older artifacts predate it - the count is *assumed* 0, not
-    confirmed), and ``(count, True)`` when a sidecar was read successfully.
-    The caller threads ``sidecar_present`` into
-    ``write_report(unreachable_count_is_estimated=...)`` so a regenerated
-    report can distinguish "confirmed unreachable=0" from "sidecar missing,
-    unreachable assumed 0."
-    """
-    import json as _json
-
-    sidecar = cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
-    if not sidecar.exists():
-        return 0, False
-    try:
-        with sidecar.open(encoding="utf-8") as fh:
-            payload = _json.load(fh)
-        return int(payload.get("skipped_unreachable_count", 0)), True
-    except (OSError, ValueError, TypeError):
-        return 0, False
-
-
 def _handle_report(args: argparse.Namespace) -> int:
     """Implements `make uat-report`. Reads cells from a JSON-lines stream."""
-    import json as _json
-
+    from tests.uat.cells_io import coerce_accounting_count, read_accounting_sidecar, read_cells_jsonl
     from tests.uat.phases.report import write_report
-    from tests.uat.runner import CellResult
 
-    cells = []
-    with open(args.cells_jsonl, encoding="utf-8") as fh:
-        for line in fh:
-            if not line.strip():
-                continue
-            payload = _json.loads(line)
-            cells.append(
-                CellResult(
-                    platform=payload["platform"],
-                    benchmark=payload["benchmark"],
-                    scale=float(payload["scale"]),
-                    status=payload["status"],
-                    exit_code=int(payload.get("exit_code", 0)),
-                    elapsed_s=float(payload.get("elapsed_s", 0.0)),
-                    log_path=Path(payload.get("log_path", "")),
-                    result_path=(Path(payload["result_path"]) if payload.get("result_path") else None),
-                    submit_terminal_state=payload.get("submit_terminal_state", "submittable"),
-                )
-            )
-    # Skipped-unreachable cells are not JSONL rows; the durable sweep writes
-    # their count to a sidecar next to cells.jsonl. Read it back so a
+    cells = read_cells_jsonl(Path(args.cells_jsonl))
+    # Skipped-unreachable and startup-failed cells are not JSONL rows; the
+    # durable sweep writes their counts to a sidecar next to cells.jsonl.
+    # Read the sidecar ONCE and take both counts from the same payload so a
     # regenerated report keeps `total_defined` faithful instead of printing
     # `unreachable: 0` for an incomplete sweep. When the sidecar is missing
-    # (older artifacts), the count defaults to 0 but is not confirmed -
-    # `unreachable_count_is_estimated` makes that distinction visible instead
-    # of silently looking identical to a confirmed clean run.
-    skipped_unreachable_count, sidecar_present = _read_skipped_unreachable_sidecar(Path(args.cells_jsonl))
+    # (older artifacts), the counts default to 0 but are not confirmed -
+    # `unreachable_count_is_estimated` makes that distinction visible, and
+    # because both counts come from the same sidecar, the one estimated
+    # flag covers startup_failed too. `coerce_accounting_count` (not a bare
+    # `int()`) falls back to 0 for a sidecar that parses as JSON but carries
+    # a malformed count (null, a non-numeric string) instead of crashing
+    # report regeneration.
+    accounting, sidecar_present = read_accounting_sidecar(Path(args.cells_jsonl))
+    skipped_unreachable_count = coerce_accounting_count(accounting.get("skipped_unreachable_count", 0))
+    startup_failed_count = coerce_accounting_count(accounting.get("startup_failed_count", 0))
     rungs = _split_csv(args.rungs)
     summary = write_report(
         cells,
@@ -215,6 +173,7 @@ def _handle_report(args: argparse.Namespace) -> int:
         rungs=rungs,
         cross_scale_floor=args.cross_scale_floor,
         skipped_unreachable_count=skipped_unreachable_count,
+        startup_failed_count=startup_failed_count,
         unreachable_count_is_estimated=not sidecar_present,
     )
     print(
@@ -227,6 +186,7 @@ def _handle_report(args: argparse.Namespace) -> int:
                 "skipped": summary.skipped_count,
                 "unreachable": summary.unreachable_count,
                 "unreachable_is_estimated": summary.unreachable_count_is_estimated,
+                "startup_failed": summary.startup_failed_count,
                 "total_defined": summary.total_defined_count,
                 "registry_pruned": summary.registry_pruned_count,
                 "passed": summary.pass_count,
@@ -240,6 +200,113 @@ def _handle_report(args: argparse.Namespace) -> int:
         )
     )
     return summary.exit_code()
+
+
+def _stage_summary_path(raw: str) -> Path:
+    """Accept either a sweep run dir or a direct uat_gate_summary.json path."""
+    from tests.uat.gate_summary import GATE_SUMMARY_FILENAME
+
+    path = Path(raw).expanduser()
+    if path.is_dir():
+        return path / GATE_SUMMARY_FILENAME
+    return path
+
+
+def _handle_gate_check(args: argparse.Namespace) -> int:
+    """Implements `make uat-gate-check STAGE1=<dir> STAGE2=<dir> STAGE3=<dir>`.
+
+    Aggregates the three release-gate stage summaries (written by each
+    stage's sweep -- see tests.uat.gate_summary), enforces the cross-stage
+    Docker ordering invariant from the stages' machine-recorded completed_at
+    timestamps (replacing the operator-run snippet that used to live in
+    docs/operations/uat-framework.md), enforces the mechanizable APPROVE
+    checklist items, and writes the combined release-evidence file the
+    operator reviews and commits. Exit 0 only on a green combined verdict.
+    """
+    import datetime as _dt
+
+    from tests.uat import gate_summary
+    from tests.uat.phases.report import release_gate_ordering_violations
+
+    stage_paths = [_stage_summary_path(raw) for raw in (args.stage1, args.stage2, args.stage3)]
+    summaries = []
+    for path in stage_paths:
+        if not path.is_file():
+            print(f"[gate-check] ERROR: stage summary not found: {path}", file=sys.stderr)
+            return 2
+        try:
+            summaries.append(gate_summary.read_gate_summary(path))
+        except (ValueError, TypeError) as exc:
+            print(f"[gate-check] ERROR: unreadable stage summary {path}: {exc}", file=sys.stderr)
+            return 2
+
+    # Ordering invariant, machine-derived: no Docker `action=up` in stage 2/3
+    # may precede stage 1's (native + dataframe) completion, and none in
+    # stage 3 may precede stage 2's completion. Docker up events only exist
+    # in each run dir's uat_lifecycle.log; the boundaries come from the
+    # summaries' completed_at fields.
+    ordering_violations: list[str] = []
+    lifecycle_texts = []
+    for stage_label, path in zip(("stage2", "stage3"), stage_paths[1:]):
+        lifecycle = path.parent / "uat_lifecycle.log"
+        if lifecycle.is_file():
+            lifecycle_texts.append(lifecycle.read_text(encoding="utf-8"))
+        else:
+            # A Docker stage (2/3 by definition) with no lifecycle log means
+            # the ordering invariant cannot be verified at all -- that must
+            # HOLD, not silently pass as "no `action=up` events found".
+            # Stage 1 runs no Docker platforms, so it is exempt.
+            lifecycle_texts.append("")
+            ordering_violations.append(
+                f"{stage_label}: docker stage missing lifecycle log ({lifecycle}); ordering not verifiable"
+            )
+    try:
+        stage1_completed_at = _dt.datetime.fromisoformat(summaries[0].completed_at)
+        stage2_completed_at = _dt.datetime.fromisoformat(summaries[1].completed_at)
+    except (TypeError, ValueError) as exc:
+        print(f"[gate-check] ERROR: unparseable completed_at in stage summaries: {exc}", file=sys.stderr)
+        return 2
+    ordering_violations.extend(
+        f"stage1 boundary: {violation}"
+        for violation in release_gate_ordering_violations(
+            lifecycle_texts, native_stage_completed_at=stage1_completed_at
+        )
+    )
+    ordering_violations.extend(
+        f"stage2 boundary: {violation}"
+        for violation in release_gate_ordering_violations(
+            lifecycle_texts[1:], native_stage_completed_at=stage2_completed_at
+        )
+    )
+
+    evidence = gate_summary.build_combined_evidence(
+        summaries,
+        ordering_violations=ordering_violations,
+        generated_at=_dt.datetime.now(),
+    )
+    output = Path(args.output).expanduser()
+    gate_summary.write_combined_evidence(output, evidence)
+    print(
+        json.dumps(
+            {
+                "verdict": evidence.verdict,
+                "source_commit_sha": evidence.source_commit_sha,
+                "source_dirty": evidence.source_dirty,
+                "completed_at": evidence.completed_at,
+                "stage_verdicts": evidence.stage_verdicts,
+                "ordering_violations": list(evidence.ordering_violations),
+                "reasons": list(evidence.reasons),
+                "evidence_path": str(output),
+            },
+            indent=2,
+        )
+    )
+    if evidence.verdict != gate_summary.VERDICT_GREEN:
+        for reason in evidence.reasons:
+            print(f"[gate-check] HOLD: {reason}", file=sys.stderr)
+        return 1
+    print("[gate-check] APPROVE: all release-gate stages green; review and commit the evidence file.")
+    return 0
 
 
 def _handle_explorer_smoke(args: argparse.Namespace) -> int:
@@ -384,53 +451,96 @@ def _handle_verify_tuning_matrix(args: argparse.Namespace) -> int:
 
 
 def _handle_execute(args: argparse.Namespace) -> int:
-    """Implements `make uat-execute CONFIG=path/to/uat.yaml`."""
+    """Implements `make uat-execute CONFIG=path/to/uat.yaml`.
+
+    Routes through the orchestrator's canonical phase loop (`run_sweep`,
+    scoped to `[preflight?, execute]`) instead of a hand-rolled
+    preflight+execute duplicate, so `make uat-execute` gets the same
+    per-cell disk-floor watch and durable cells.jsonl + accounting sidecar a
+    sweep gets -- see uat-execute-path-unification w2. One behavior
+    improvement over the prior standalone implementation: a mid-execute
+    disk-floor abort now also emits the abort-safe cells.jsonl/partial-report
+    artifacts (previously `make uat-execute` had none).
+    """
+    from dataclasses import replace
+
     from tests.uat.config import load_config
-    from tests.uat.phases.execute import default_benchmark_runs_dir, default_log_dir, run_execute
-    from tests.uat.phases.preflight import preflight_kwargs_from_config, run_preflight
+    from tests.uat.orchestrator import run_sweep
+    from tests.uat.phases.execute import default_benchmark_runs_dir
 
     config = load_config(args.config)
     benchmark_runs_dir = default_benchmark_runs_dir(config)
-    if "preflight" in config.phases:
-        preflight = run_preflight(**preflight_kwargs_from_config(config, benchmark_runs_dir=benchmark_runs_dir))
-        if preflight.disk_budget_summary:
-            print(preflight.disk_budget_summary, file=sys.stderr)
-        for line in getattr(preflight, "free_space_report", ()):
-            print(line, file=sys.stderr)
-        for warning in preflight.warnings:
-            print(f"[preflight warn] {warning}", file=sys.stderr)
-        if preflight.aborted:
-            print(f"[preflight] ABORT: {preflight.abort_reason}", file=sys.stderr)
-            return 2
-
     databases_root = Path(args.databases_root).expanduser() if args.databases_root else benchmark_runs_dir / "databases"
-    log_dir = default_log_dir(config)
-    runner = None
-    if args.resume:
-        from tests.uat.orchestrator import build_resume_runner, load_resume_attempts
-        from tests.uat.phases.execute import run_cell
 
-        runner = build_resume_runner(load_resume_attempts(Path(args.resume)), run_cell, log_dir=log_dir)
-    execute_kwargs: dict = {
-        "log_dir": log_dir,
-        "benchmark_runs_dir": benchmark_runs_dir,
-        "databases_root": databases_root,
-        "cleanup_enabled": not args.no_cleanup and config.cleanup.prune_databases,
-        "free_space_checks_enabled": "preflight" in config.phases,
-    }
-    if runner is not None:
-        execute_kwargs["runner"] = runner
-    outcome = run_execute(config, **execute_kwargs)
+    # `make uat-execute` runs preflight only when the config's own `phases:`
+    # list requests it (matching the prior standalone implementation' gating
+    # on `"preflight" in config.phases`), plus execute -- never
+    # validate/package/report/explorer_smoke, which stay `make uat-sweep`'s
+    # job.
+    phases = tuple(phase for phase in ("preflight", "execute") if phase in config.phases)
+    if "execute" not in phases:
+        phases = (*phases, "execute")
+    cleanup_enabled = not args.no_cleanup and config.cleanup.prune_databases
+    scoped_config = replace(
+        config,
+        phases=phases,
+        cleanup=replace(config.cleanup, prune_databases=cleanup_enabled),
+    )
 
+    result = run_sweep(scoped_config, databases_root=databases_root)
+
+    if result.aborted_phase == "preflight":
+        print(f"[preflight] ABORT: {result.abort_reason}", file=sys.stderr)
+        return 2
+
+    outcome = result.execute_outcome
+    if outcome is None:
+        # Reachable only when the execute phase never actually ran -- e.g. a
+        # `dry_run: true` config, where run_sweep records exit 0 per phase
+        # without invoking run_execute. (A mid-execute disk-floor abort does
+        # NOT land here: run_sweep synthesizes an ExecuteOutcome from the
+        # attempted cells for that case, so it flows through the normal
+        # summary path below.) There are no per-cell counts to report.
+        aborted = result.aborted_phase is not None
+        summary = {
+            "name": config.name,
+            "log_dir": str(result.log_dir),
+            "passed": 0,
+            "failed": 0,
+            "timed_out": 0,
+            "pruned": 0,
+            "compatibility_pruned": 0,
+            "skipped_unreachable": 0,
+            "startup_failed": 0,
+            "docker_events": 0,
+            "aborted": aborted,
+            "abort_reason": result.abort_reason,
+        }
+        print(json.dumps(summary, indent=2))
+        if aborted:
+            print(f"[execute] ABORT: {result.abort_reason}", file=sys.stderr)
+        return result.exit_code()
+
+    # Known limitation on the mid-execute disk-floor abort path: run_sweep's
+    # synthesized ExecuteOutcome carries EMPTY skipped_unreachable /
+    # startup_failed tuples (the Cell objects are lost crossing the exception
+    # boundary; only integer counts survive, annotated onto the exception),
+    # so this stdout JSON prints 0 for both on that path. The durable
+    # artifacts are authoritative there: run_sweep threads the exc-annotated
+    # counts into the accounting sidecar and the partial report TSV, which
+    # carry the real numbers. Fixing the JSON would mean count-override
+    # fields on ExecuteOutcome that contradict its own tuples -- not worth
+    # the schema distortion for a summary whose durable twin is correct.
     summary = {
         "name": config.name,
-        "log_dir": str(log_dir),
+        "log_dir": str(result.log_dir),
         "passed": sum(1 for r in outcome.results if r.status == "passed"),
         "failed": sum(1 for r in outcome.results if r.status == "failed"),
         "timed_out": sum(1 for r in outcome.results if r.status == "timed-out"),
         "pruned": len(outcome.pruned),
         "compatibility_pruned": len(getattr(outcome, "compatibility_pruned", ())),
         "skipped_unreachable": len(outcome.skipped_unreachable),
+        "startup_failed": len(getattr(outcome, "startup_failed", ())),
         "docker_events": len(outcome.docker_events),
         "aborted": outcome.aborted,
         "abort_reason": outcome.abort_reason,
@@ -501,7 +611,6 @@ def _build_parser() -> argparse.ArgumentParser:
     sweep = subparsers.add_parser("sweep", help="run a multi-phase UAT sweep from YAML")
     sweep.add_argument("--config", required=True)
     sweep.add_argument("--dry-run", action="store_true", help="Override the YAML config and skip workload phases")
-    sweep.add_argument("--resume", default=None, help="Path to a prior sweep resume.json manifest")
     _set_handler(sweep, _handle_sweep)
 
     stress = subparsers.add_parser("stress", help="run the canned stress preset")
@@ -514,6 +623,20 @@ def _build_parser() -> argparse.ArgumentParser:
     preflight = subparsers.add_parser("preflight", help="print advisory disk and platform preflight status")
     preflight.add_argument("--config", required=True)
     _set_handler(preflight, _handle_preflight)
+
+    gate_check = subparsers.add_parser(
+        "gate-check",
+        help="aggregate the 3 release-gate stage summaries into committed release evidence",
+    )
+    gate_check.add_argument("--stage1", required=True, help="Stage-1 run dir or uat_gate_summary.json path")
+    gate_check.add_argument("--stage2", required=True, help="Stage-2 run dir or uat_gate_summary.json path")
+    gate_check.add_argument("--stage3", required=True, help="Stage-3 run dir or uat_gate_summary.json path")
+    gate_check.add_argument(
+        "--output",
+        default=str(Path(__file__).resolve().parents[2] / "_project" / "release-evidence" / "uat-gate-summary.json"),
+        help="Combined release-evidence output path (default: _project/release-evidence/uat-gate-summary.json)",
+    )
+    _set_handler(gate_check, _handle_gate_check)
 
     report = subparsers.add_parser("report", help="write a TSV report from a cells JSONL")
     report.add_argument("--cells-jsonl", required=True)
@@ -563,7 +686,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional override for ~/Developer/benchmark_runs/databases",
     )
     execute.add_argument("--no-cleanup", action="store_true", help="Disable reuse-aware database cleanup")
-    execute.add_argument("--resume", default=None, help="Path to a prior execute/sweep resume.json manifest")
     _set_handler(execute, _handle_execute)
 
     docker = subparsers.add_parser(

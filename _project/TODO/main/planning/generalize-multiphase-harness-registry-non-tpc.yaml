@@ -1,0 +1,90 @@
+id: generalize-multiphase-harness-registry-non-tpc
+title: "Generalize the multi-phase harness registry so a non-TPC family can register its harnesses"
+worktree: main
+priority: Low
+status: Not Started
+category: Code Quality and Technical Debt
+
+description: |
+  Follow-up to execution-harness-extraction-throughput-maintenance-combined (#937),
+  which routed all four TPC dispatch methods (power/throughput/maintenance/combined)
+  in platforms/base/execution.py through the power_harnesses capability registry, so
+  execution.py carries no literal TPC benchmark names in any dispatch method.
+
+  Today the registry only maps the two TPC families (tpch, tpcds). Generalize the
+  registration API so a NON-TPC benchmark family with multi-phase shapes can register
+  its power/throughput/maintenance/combined harnesses declaratively, without editing
+  execution.py's dispatch.
+
+  Readiness gate (why this is not started immediately): TPC is currently the only
+  benchmark family with multi-phase power/throughput/maintenance shapes, so there is
+  no second consumer to validate the generalized API against. This item is tracked as
+  actionable work that ACTIVATES when a second multi-phase family is introduced —
+  designing the abstraction against a single consumer risks the wrong shape. Do the
+  generalization together with (or immediately before) that second family, using it
+  as the second consumer that proves the API.
+
+prior_art:
+  - ref: "benchbox/core/power_harnesses.py (#937 registry: resolve_power/throughput/maintenance/combined_harness)"
+    note: "The registry to generalize; keep the single-registry design, extend it to register a family's harnesses as data."
+  - ref: "benchbox/platforms/base/execution.py (the four dispatch methods)"
+    note: "Dispatch must stay family-agnostic (no literal family names) for every registered family, not just TPC."
+
+work:
+  - id: w1
+    summary: "Define the generalized family-registration API against the incoming second multi-phase family"
+    status: pending
+    needs: []
+    notes: |
+      When a second multi-phase family lands, define how a family registers its phase
+      harness methods (power/throughput/maintenance + combined label/methods) as data,
+      so both TPC and the new family register uniformly.
+  - id: w2
+    summary: "Migrate TPC and the new family onto the generalized registry"
+    status: pending
+    needs: [w1]
+    notes: |
+      execution.py dispatch resolves harnesses purely by registry lookup for any
+      registered family; no per-family branch remains.
+  - id: w3
+    summary: "Broaden the dispatch-literal guard test to assert no literal family names for ANY registered family"
+    status: pending
+    needs: [w2]
+    notes: |
+      Extend test_dispatch_paths_have_no_literal_tpc_benchmark_names (or a sibling) so
+      the metric holds for the generalized registry, not just TPC.
+
+must_preserve:
+  - "Byte-identical benchmark execution for TPC families through the generalization (the #937 guarantee is not regressed)."
+  - "execution.py dispatch stays family-agnostic — no literal family names for any registered family."
+
+anti_patterns:
+  - "DO NOT design the generalized API against a single (TPC-only) consumer — activate this with the second family as the second consumer."
+  - "DO NOT add a parallel dispatch mechanism; extend the existing power_harnesses registry."
+
+verification:
+  - description: "No literal family names remain in dispatch for any registered family"
+    command: "uv run -- python -m pytest tests/unit/platforms/ -k literal_tpc_benchmark_names -q"
+    expected_output: "the guard asserts family-agnostic dispatch across all registered families"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/power_harnesses.py"
+    - "benchbox/platforms/base/execution.py"
+    - "benchbox/core/"
+    - "tests/unit/platforms/"
+    - "tests/"
+
+success_metrics:
+  - "A non-TPC multi-phase family can register its harnesses without editing execution.py dispatch."
+  - "The dispatch-literal guard holds for every registered family, not only TPC."
+
+deferred:
+  - summary: "Building the generalized API before a second multi-phase family exists."
+    reason: "No second consumer to validate the abstraction against; activate this together with the second family."
+
+metadata:
+  tags: [refactor, execution, tpc, structural-debt, holistic-review-followup]
+  estimated_effort: "Medium"
+  created_date: "2026-07-17"
+  last_updated: "2026-07-17T00:00:00"

@@ -82,3 +82,65 @@ def test_get_tunings_contains_expected_tables_and_columns():
     ot = tunings.get_table_tuning("orders")
     assert ot is not None and ot.partitioning
     assert any(c.name == "o_orderdate" for c in ot.partitioning)
+
+
+def test_get_table_loading_order_respects_fk_dependencies():
+    """Regression test for the FK load-ordering defect (2026-07 tuning batch).
+
+    Reproduced: with FK enforcement on, loading tables in the previous
+    fallback order (alphabetical) violated FK references -- e.g. lineitem
+    (references orders/part/supplier) sorts before orders, part loads fine
+    but partsupp (references part+supplier) sorts before supplier, etc.
+    Every referenced table must precede every table that references it.
+    """
+    order = tpch_schema.get_table_loading_order()
+    assert set(order) == {t.name for t in tpch_schema.TABLES}
+
+    position = {name: i for i, name in enumerate(order)}
+
+    # Verify every FK edge points backward (dependency before dependent).
+    for table in tpch_schema.TABLES:
+        for ref_table, _ref_col in table.get_foreign_keys().values():
+            assert position[ref_table] < position[table.name], (
+                f"{table.name} (pos {position[table.name]}) loads before its FK "
+                f"dependency {ref_table} (pos {position[ref_table]})"
+            )
+
+    # The historically problematic pair must be correctly ordered.
+    assert position["orders"] < position["lineitem"]
+    assert position["part"] < position["lineitem"]
+    assert position["supplier"] < position["lineitem"]
+    assert position["customer"] < position["orders"]
+    assert position["nation"] < position["customer"]
+    assert position["region"] < position["nation"]
+
+    # Alphabetical order (the previous fallback) is NOT FK-safe, confirming
+    # this is a real fix and not a no-op re-derivation of the old behavior.
+    assert order != sorted(order)
+
+
+def test_get_fk_ordered_table_names_is_stable_for_independent_tables():
+    """Tables with no FK relationship keep their input relative order."""
+    from benchbox.core.schema_primitives import get_fk_ordered_table_names
+
+    Column = tpch_schema.Column
+    DataType = tpch_schema.DataType
+    independent = [
+        tpch_schema.Table("z_table", [Column("id", DataType.INTEGER)]),
+        tpch_schema.Table("a_table", [Column("id", DataType.INTEGER)]),
+    ]
+    assert get_fk_ordered_table_names(independent) == ["z_table", "a_table"]
+
+
+def test_get_fk_ordered_table_names_handles_cycles_without_raising():
+    """A cyclic FK graph must not raise; leftover tables append in input order."""
+    from benchbox.core.schema_primitives import get_fk_ordered_table_names
+
+    Column = tpch_schema.Column
+    DataType = tpch_schema.DataType
+    cyclic = [
+        tpch_schema.Table("t1", [Column("ref2", DataType.INTEGER, foreign_key=("t2", "id"))]),
+        tpch_schema.Table("t2", [Column("ref1", DataType.INTEGER, foreign_key=("t1", "id"))]),
+    ]
+    result = get_fk_ordered_table_names(cyclic)
+    assert set(result) == {"t1", "t2"}

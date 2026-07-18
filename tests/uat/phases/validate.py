@@ -9,6 +9,7 @@ from pathlib import Path
 
 from benchbox.validation.bundle import CLI_REFUSED_COMPLIANCE_CLASSES, discover_bundles, validate_bundles
 from tests.uat.phases import PhaseResult
+from tests.uat.phases.report import atomic_write_text
 
 TSV_HEADER = "platform\tbenchmark\tscale\tresult_path\tvalidator_status\terror_count\twarning_count\tfirst_error"
 
@@ -72,7 +73,7 @@ def run_validate(
         return _aborted_validate_result(output_tsv, floor=floor, reason=f"results path not found: {results_dir}")
 
     rows = _build_rows(bundle_paths)
-    output_tsv.write_text(_render_tsv(rows), encoding="utf-8")
+    atomic_write_text(output_tsv, _render_tsv(rows))
     return _result_from_rows(output_tsv, rows, floor=floor)
 
 

@@ -336,3 +336,42 @@ def test_release_gate_configs_load_and_encode_stage_ordering():
         assert "report" in stage.phases
         assert stage.report.cross_scale_coverage_min_pairs is not None
         assert stage.execute.parallel_platforms is False
+
+
+def test_release_gate_cross_scale_floors_are_tuned_and_achievable():
+    """uat-release-gate-enforcement w4: floors derived from enumeration, never placeholder, never exact.
+
+    Recomputes each stage's cross-scale-eligible pair count (pairs whose
+    every configured rung is enumerable) from registry truth and asserts the
+    checked-in floor sits in the sound band: above the stage's absolute
+    minimum, at most floor(0.8 * eligible), and strictly below the eligible
+    count (the anti-pattern: an exact floor lets one flaky docker stack
+    block every release). Registry growth can raise `eligible` without
+    breaking this test; shrinkage that invalidates a floor fails it, which
+    is the prompt to re-run the w4 derivation.
+    """
+    import math
+
+    from tests.uat.phases.enumerate import enumerate_cells_with_pruning
+
+    minimums = {
+        "release-gate-01-native-dataframe.yaml": 8,
+        "release-gate-02-docker-nonoltp.yaml": 4,
+        "release-gate-03-docker-oltp.yaml": 2,
+    }
+    for config_name, minimum in minimums.items():
+        stage = config.load_config(_RELEASE_GATE_CONFIGS_DIR / config_name)
+        floor_value = stage.report.cross_scale_coverage_min_pairs
+        assert floor_value is not None and floor_value > 1, f"{config_name}: placeholder floor"
+
+        rungs = set(stage.scales.rungs)
+        by_pair: dict[tuple[str, str], set[float]] = {}
+        for cell in enumerate_cells_with_pruning(stage).cells:
+            by_pair.setdefault((cell.platform, cell.benchmark), set()).add(cell.scale)
+        eligible = sum(1 for scales in by_pair.values() if rungs.issubset(scales))
+
+        assert floor_value >= minimum, f"{config_name}: floor {floor_value} below absolute minimum {minimum}"
+        assert floor_value <= math.floor(0.8 * eligible), (
+            f"{config_name}: floor {floor_value} exceeds 0.8 * eligible ({eligible}); re-run the w4 derivation"
+        )
+        assert floor_value < eligible, f"{config_name}: floor must never equal the eligible count"

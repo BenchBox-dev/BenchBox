@@ -287,7 +287,15 @@ class DuckLakeAdapter(DuckDBAdapter):
         # docstring above for why nested lookups are needed at all). Check
         # both so a real --force request is never silently dropped to False.
         adapter_config["force_recreate"] = bool(config.get("force") or _resolve_option("force_recreate", False))
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+            "verbose_enabled",
+            "very_verbose",
+        ]:
             if key in config:
                 adapter_config[key] = config[key]
         for key in [

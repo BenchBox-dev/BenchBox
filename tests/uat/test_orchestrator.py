@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from tests.uat import orchestrator
+from tests.uat import cells_io, docker_assets, orchestrator
 from tests.uat.config import validate_config
 from tests.uat.phases import execute as exec_phase
 from tests.uat.phases.enumerate import CompatibilityPrunedCell
@@ -160,6 +161,272 @@ def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
     assert captured["bundles_dir"] == tmp_path / "submissions" / "smoke"
 
 
+# ---------------------------------------------------------------------------
+# uat-fail-advance-consistency w1: report-without-execute must abort.
+# ---------------------------------------------------------------------------
+
+
+def test_report_phase_aborts_when_execute_outcome_missing(tmp_path: Path):
+    """A report phase with no execute phase in this sweep must abort, not print an empty clean report.
+
+    Before this fix, `cells = execute_outcome.results if execute_outcome
+    else []` let the report phase proceed with zero rows and exit 0 -- an
+    empty report reads as a clean sweep. validate/package already abort in
+    this situation; report must match.
+    """
+    cfg = validate_config({"name": "report-only", "phases": ["report"]})
+
+    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "report"
+    assert "execute phase" in (result.abort_reason or "")
+    assert result.exit_code() == 2
+    partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
+    assert "# run_status=ABORTED" in partial_text
+    assert "abort_phase=report" in partial_text
+
+
+def test_dry_run_report_only_sweep_stays_exit_zero(tmp_path: Path):
+    """Dry-run sweeps skip all phases upstream of the phase-specific branches -- must stay exit 0."""
+    cfg = validate_config({"name": "report-only-dry-run", "dry_run": True, "phases": ["report"]})
+
+    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert result.exit_code() == 0
+    assert result.phase_exit_codes == {"report": 0}
+
+
+# ---------------------------------------------------------------------------
+# uat-fail-advance-consistency w2: explorer_smoke corpus failures abort;
+# node-missing is a recorded, visible skip.
+# ---------------------------------------------------------------------------
+
+
+def test_explorer_smoke_corpus_failure_emits_abort_artifacts(tmp_path: Path):
+    """A structured explorer_smoke corpus failure flows through _emit_abort_artifacts, not an uncaught raise."""
+    cfg = validate_config(
+        {
+            "name": "explorer-corpus-fail",
+            "phases": ["execute", "explorer_smoke"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (cell,), "aborted": False, "abort_reason": None, "exit_code": lambda self: 0},
+    )()
+    aborted_result = type(
+        "ExplorerResult",
+        (),
+        {
+            "aborted": True,
+            "abort_reason": "Explorer smoke corpus contract failed:\n  - no result bundles",
+            "skip_reason": None,
+            "exit_code": lambda self: 2,
+        },
+    )()
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=execute_outcome),
+        patch("tests.uat.phases.explorer_smoke.run_explorer_smoke", return_value=aborted_result),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "explorer_smoke"
+    assert result.exit_code() == 2
+    partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
+    assert "# run_status=ABORTED" in partial_text
+    assert "abort_phase=explorer_smoke" in partial_text
+
+
+def test_explorer_smoke_node_missing_records_sidecar_status_and_warns(tmp_path: Path, capsys):
+    """node-missing stays exit 0 but is recorded in the accounting sidecar plus a prominent stderr warning."""
+    cfg = validate_config(
+        {
+            "name": "explorer-node-missing",
+            "phases": ["execute", "explorer_smoke"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (cell,), "aborted": False, "abort_reason": None, "exit_code": lambda self: 0},
+    )()
+    skipped_result = type(
+        "ExplorerResult",
+        (),
+        {
+            "aborted": False,
+            "abort_reason": None,
+            "skipped": True,
+            "skip_reason": "node not on PATH",
+            "exit_code": lambda self: 0,
+        },
+    )()
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=execute_outcome),
+        patch("tests.uat.phases.explorer_smoke.run_explorer_smoke", return_value=skipped_result),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert result.phase_exit_codes["explorer_smoke"] == 0
+    accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert accounting["explorer_smoke_status"] == "skipped_no_node"
+    stderr = capsys.readouterr().err
+    assert "node not on PATH" in stderr
+    assert "skipped_no_node" in stderr
+    # The recorded-path warning must claim durable recording, not hedge.
+    assert "recorded in the accounting sidecar" in stderr
+    assert "NOT durably recorded" not in stderr
+
+
+def test_explorer_smoke_node_missing_warns_not_durably_recorded_without_sidecar(tmp_path: Path, capsys):
+    """When no accounting sidecar exists (no execute phase ran), the warning must say so.
+
+    `update_accounting_sidecar` deliberately refuses to fabricate a sidecar
+    (its presence implies confirmed execute-derived counts), so the stderr
+    warning must state the status was NOT durably recorded instead of
+    implying it was.
+    """
+    cfg = validate_config({"name": "explorer-node-missing-no-sidecar", "phases": ["explorer_smoke"]})
+    skipped_result = type(
+        "ExplorerResult",
+        (),
+        {
+            "aborted": False,
+            "abort_reason": None,
+            "skipped": True,
+            "skip_reason": "node not on PATH",
+            "exit_code": lambda self: 0,
+        },
+    )()
+
+    with patch("tests.uat.phases.explorer_smoke.run_explorer_smoke", return_value=skipped_result):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert result.phase_exit_codes["explorer_smoke"] == 0
+    assert not (tmp_path / "logs" / "cells.jsonl.accounting.json").exists()
+    stderr = capsys.readouterr().err
+    assert "node not on PATH" in stderr
+    assert "NOT durably recorded" in stderr
+
+
+def test_package_phase_excludes_failed_cells_result_paths(tmp_path: Path):
+    """w4 regression: a failed official cell's exported JSON must not be packaged/submitted.
+
+    runner.py resolves a result path for official cells regardless of exit
+    code, so the package-phase input filter must check cell.status, not just
+    `result_path is not None`.
+    """
+    cfg = validate_config(
+        {
+            "name": "smoke",
+            "phases": ["execute", "package"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "package": {"submit_terminal_state": "local-stage"},
+            "output": {"submissions_dir_template": str(tmp_path / "submissions" / "{name}")},
+        }
+    )
+    passed_cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "passed.log",
+        result_path=tmp_path / "passed.json",
+    )
+    failed_cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.1,
+        status="failed",
+        exit_code=1,
+        elapsed_s=1.0,
+        log_path=tmp_path / "failed.log",
+        result_path=tmp_path / "failed.json",
+    )
+    execute_outcome = type(
+        "ExecuteOutcome",
+        (),
+        {"results": (passed_cell, failed_cell), "aborted": False, "abort_reason": None, "exit_code": lambda self: 1},
+    )()
+    captured: dict[str, list[Path]] = {}
+
+    def fake_package(config, *, result_paths, submissions_dir):
+        captured["result_paths"] = list(result_paths)
+        return type("PackageResult", (), {"aborted": False, "abort_reason": None, "exit_code": lambda self: 0})()
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_execute", return_value=execute_outcome),
+        patch("tests.uat.phases.package.run_package", side_effect=fake_package),
+    ):
+        orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert captured["result_paths"] == [passed_cell.result_path]
+    assert failed_cell.result_path not in captured["result_paths"]
+
+
+def test_write_cells_jsonl_persists_throughput_check(tmp_path: Path):
+    """w5 regression: throughput_check must survive the cells.jsonl round-trip.
+
+    Before this, CellResult.throughput_check -- the one diagnostic the
+    stream-count guard exists to surface -- was dropped by
+    cells_io.write_cells_jsonl, so a stream-count failure left durable
+    artifacts saying only failed/exit 1 with no explanation.
+    """
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="failed",
+        exit_code=1,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+        throughput_check="throughput stream count mismatch: requested 3, executed 1",
+    )
+    source_info = orchestrator.RunSourceInfo(commit_sha="abc123", commit_short_sha="abc123", dirty=False)
+
+    cells_io.write_cells_jsonl(tmp_path / "cells.jsonl", (cell,), source_info=source_info)
+
+    lines = [json.loads(line) for line in (tmp_path / "cells.jsonl").read_text().splitlines()]
+    assert lines[0]["throughput_check"] == "throughput stream count mismatch: requested 3, executed 1"
+
+
 def test_orchestrator_uses_output_root_for_preflight_execute_and_cleanup(tmp_path: Path):
     root = tmp_path / "shared-runs"
     cfg = validate_config(
@@ -281,8 +548,8 @@ def test_cells_jsonl_terminal_marker_is_idempotent_after_timeout_marker(tmp_path
     )
     source_info = orchestrator.RunSourceInfo(commit_sha="abc123", commit_short_sha="abc123", dirty=False)
 
-    orchestrator._write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
-    orchestrator._write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
+    cells_io.write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
+    cells_io.write_cells_jsonl(tmp_path / "cells.jsonl", (timed_out_cell,), source_info=source_info)
 
     text = cell_log.read_text(encoding="utf-8")
     assert text.count("# UAT_TERMINAL_STATE terminal_state=timeout") == 1
@@ -344,10 +611,17 @@ def test_orchestrator_writes_compatibility_pruned_jsonl_and_report_count(tmp_pat
     assert "compatibility_pruned=1" in (tmp_path / "logs" / "matrix_summary.tsv").read_text()
 
 
-def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
+def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
+    """A mid-sweep disk-floor abort still emits the #691 abort-safe artifacts.
+
+    Resume machinery (resume.json manifest) was retired -- see
+    uat-resume-retirement-artifact-durability -- but the abort-safe
+    provenance contract (cells.jsonl + partial report on abort) must
+    keep working.
+    """
     cfg = validate_config(
         {
-            "name": "resume-smoke",
+            "name": "disk-floor-smoke",
             "phases": ["preflight", "execute"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
@@ -380,18 +654,14 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
         patch.object(orchestrator.preflight_phase, "run_preflight", return_value=fake_preflight),
         patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
         patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
-        patch.object(orchestrator.preflight_phase, "free_space_gib", return_value=1.0),
+        patch.object(orchestrator.preflight_budget, "free_space_gib", return_value=1.0),
     ):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
     assert result.aborted_phase == "execute"
-    manifest = tmp_path / "logs" / "resume.json"
-    payload = json.loads(manifest.read_text(encoding="utf-8"))
-    assert payload["aborted_phase"] == "execute"
-    assert payload["source"]["commit_sha"]
-    assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
     cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
-    assert cells[0]["source_commit_sha"] == payload["source"]["commit_sha"]
+    assert cells[0]["platform"] == "duckdb"
+    assert cells[0]["source_commit_sha"]
     partial_report = tmp_path / "logs" / "matrix_summary.partial.tsv"
     assert partial_report.exists()
     partial_text = partial_report.read_text(encoding="utf-8")
@@ -399,10 +669,159 @@ def test_resume_manifest_written_on_disk_floor_abort(tmp_path: Path):
     assert "abort_phase=execute" in partial_text
 
 
-def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
+def test_disk_floor_abort_threads_real_compatibility_pruned_without_reenumerating(tmp_path: Path):
+    """w5: abort artifacts on a mid-sweep disk-floor trip must use execute's
+    actual enumeration -- threaded onto the DiskFloorAbort exception -- not a
+    second independent re-enumeration (`_compatibility_pruned_for_config`)
+    that could diverge from what execute actually used.
+    """
     cfg = validate_config(
         {
-            "name": "resume-smoke",
+            "name": "disk-floor-compat-smoke",
+            "phases": ["execute"],
+            "platforms": {"include": ["polars-df"]},
+            "benchmarks": {"include": ["vector_search", "tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="polars-df",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    reenumerate_calls: list[object] = []
+    real_compat_for_config = orchestrator._compatibility_pruned_for_config
+
+    def spy_compat_for_config(config):
+        reenumerate_calls.append(config)
+        return real_compat_for_config(config)
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
+        patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
+        patch.object(orchestrator.preflight_budget, "free_space_gib", return_value=1.0),
+        patch.object(orchestrator, "_compatibility_pruned_for_config", side_effect=spy_compat_for_config),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "execute"
+    assert reenumerate_calls == []  # the disk-floor abort path must not re-enumerate
+    assert result.execute_outcome is not None
+    assert result.execute_outcome.abort_kind == "disk_floor"
+
+    pruned_rows = [
+        json.loads(line)
+        for line in (tmp_path / "logs" / "compatibility_pruned.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert pruned_rows[0]["benchmark"] == "vector_search"
+    assert pruned_rows[0]["rule_id"] == "uat.compat.dataframe.sql_only_benchmark"
+
+
+def test_execute_only_config_still_gets_disk_floor_watch(tmp_path: Path):
+    """An execute-only config (no `preflight` in `phases:`) still aborts on low disk.
+
+    Regression for uat-disk-gate-always-on w1/w4: the mid-sweep per-cell
+    watch and platform-boundary check used to be keyed on
+    `"preflight" in config.phases`, so a legitimate execute-only composition
+    ran with zero disk gating. `free_space_min_gib` defaults to 5.0, so the
+    gate is on by default; there is no `preflight` phase here to have
+    established it.
+    """
+    cfg = validate_config(
+        {
+            "name": "execute-only-disk-smoke",
+            "phases": ["execute"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+
+    with (
+        patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
+        patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
+        patch.object(orchestrator.preflight_budget, "free_space_gib", return_value=1.0),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "execute"
+    assert "free space" in (result.abort_reason or "")
+    partial_report = tmp_path / "logs" / "matrix_summary.partial.tsv"
+    assert partial_report.exists()
+    assert "# run_status=ABORTED" in partial_report.read_text(encoding="utf-8")
+
+
+def test_zero_floor_warns_loudly_and_flags_accounting_sidecar(tmp_path: Path, capsys):
+    """`free_space_min_gib: 0` disables the gate but must say so loudly.
+
+    Regression for uat-disk-gate-always-on w2: the explicit opt-out prints a
+    `[disk-gate] DISABLED by config` warning at sweep start and records
+    `disk_gate_disabled: true` in the `cells.jsonl.accounting.json` sidecar
+    so the opt-out is visible without re-reading the YAML.
+    """
+    cfg = validate_config(
+        {
+            "name": "zero-floor-smoke",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "preflight": {"free_space_min_gib": 0},
+        }
+    )
+    assert cfg.disk_gate_enabled is False
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 0,
+        },
+    )()
+
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    assert "[disk-gate] DISABLED by config" in capsys.readouterr().err
+    accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert accounting["disk_gate_disabled"] is True
+
+
+def test_execute_free_space_abort_emits_partial_artifacts(tmp_path: Path):
+    """An execute-outcome-reported free-space abort still emits abort artifacts (resume machinery retired)."""
+    cfg = validate_config(
+        {
+            "name": "free-space-smoke",
             "phases": ["preflight", "execute"],
             "platforms": {"include": ["duckdb"]},
             "benchmarks": {"include": ["tpch"]},
@@ -449,84 +868,95 @@ def test_resume_manifest_written_on_execute_free_space_abort(tmp_path: Path):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
     assert result.aborted_phase == "execute"
-    manifest = tmp_path / "logs" / "resume.json"
-    payload = json.loads(manifest.read_text(encoding="utf-8"))
-    assert payload["aborted_phase"] == "execute"
-    assert payload["attempted"][0]["cell_key"] == "duckdb|tpch|0.01"
+    cells = [json.loads(line) for line in (tmp_path / "logs" / "cells.jsonl").read_text().splitlines()]
+    assert cells[0]["platform"] == "duckdb"
     assert (tmp_path / "logs" / "matrix_summary.partial.tsv").exists()
 
 
-def test_manifest_runner_reuses_attempted_cells_and_runs_complement(tmp_path: Path):
-    manifest = tmp_path / "resume.json"
-    manifest.write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "attempted": [
-                    {
-                        "cell_key": "duckdb|tpch|0.01",
-                        "platform": "duckdb",
-                        "benchmark": "tpch",
-                        "scale": 0.01,
-                        "terminal_state": "passed",
-                        "exit_code": 0,
-                        "elapsed_s": 1.0,
-                        "log_path": str(tmp_path / "prior.log"),
-                        "result_path": str(tmp_path / "prior.json"),
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
+def test_two_sweeps_in_one_process_land_in_distinct_log_dirs(tmp_path: Path):
+    """Two same-day sweeps (no log_dir_override) land in distinct default dirs.
+
+    Regression test for w3 of uat-resume-retirement-artifact-durability: the
+    default logs_dir_template was {date}-only, so a second same-day sweep of
+    the same config silently overwrote the first run's mode="w" artifacts.
+    """
     cfg = validate_config(
         {
-            "name": "resume-smoke",
-            "platforms": {"include": ["duckdb"]},
-            "benchmarks": {"include": ["tpch"]},
-            "scales": {"rungs": [0.01, 0.1]},
+            "name": "collision-smoke",
+            "dry_run": True,
+            "output": {"logs_dir_template": str(tmp_path / "uat_{date}_{time}")},
         }
     )
-    calls: list[float] = []
-
-    def base_runner(platform, benchmark, scale, **kwargs):
-        calls.append(scale)
-        return CellResult(
-            platform=platform,
-            benchmark=benchmark,
-            scale=scale,
-            status="passed",
-            exit_code=0,
-            elapsed_s=2.0,
-            log_path=tmp_path / f"{scale}.log",
-            result_path=tmp_path / f"{scale}.json",
-        )
-
-    runner = orchestrator.build_resume_runner(
-        orchestrator.load_resume_attempts(manifest),
-        base_runner,
-        log_dir=tmp_path,
+    # Each sweep calls _dt.datetime.now() twice: once for the log-dir stamp
+    # and once for the gate summary's completed_at (uat-release-gate-enforcement w1).
+    fixed_times = iter(
+        [
+            _dt.datetime(2026, 5, 5, 9, 0, 0),
+            _dt.datetime(2026, 5, 5, 9, 0, 0, 500000),
+            _dt.datetime(2026, 5, 5, 9, 0, 1),
+            _dt.datetime(2026, 5, 5, 9, 0, 1, 500000),
+        ]
     )
+    with patch.object(orchestrator, "_dt") as mock_dt:
+        mock_dt.datetime.now.side_effect = lambda: next(fixed_times)
+        result1 = orchestrator.run_sweep(cfg)
+        result2 = orchestrator.run_sweep(cfg)
 
-    outcome = exec_phase.run_execute(
-        cfg,
-        log_dir=tmp_path,
-        databases_root=tmp_path / "databases",
-        runner=runner,
-    )
-
-    assert calls == [0.1]
-    assert [result.scale for result in outcome.results] == [0.01, 0.1]
-    assert outcome.results[0].result_path == tmp_path / "prior.json"
+    assert result1.log_dir != result2.log_dir
 
 
 def _source_info() -> orchestrator.RunSourceInfo:
     return orchestrator.RunSourceInfo(commit_sha="deadbeef", commit_short_sha="deadbee", dirty=False)
 
 
+def test_sweep_records_container_engine_identity_and_sidecar_field(tmp_path: Path):
+    """uat-container-engine-routing w2: engine identity is logged at sweep
+    start and threaded into the cells.jsonl accounting sidecar."""
+    cfg = validate_config(
+        {
+            "name": "engine-identity",
+            "phases": ["execute"],
+            "platforms": {"include": []},
+        }
+    )
+    with patch.object(docker_assets, "container_engine_identity", return_value=("mocker", "mocker 0.5.4")):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.aborted_phase is None
+    lifecycle_log = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
+    assert "[engine] resolved_container_cli=mocker version=mocker 0.5.4" in lifecycle_log
+
+    sidecar = json.loads((tmp_path / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert sidecar["container_engine"] == "mocker"
+
+
+def test_sweep_records_engine_resolution_failure_without_aborting(tmp_path: Path):
+    """A resolution failure (no engine binary at all) is logged, not fatal --
+    a sweep with no Docker-managed platforms never needs one."""
+    cfg = validate_config(
+        {
+            "name": "engine-identity-missing",
+            "phases": ["execute"],
+            "platforms": {"include": []},
+        }
+    )
+    with patch.object(
+        docker_assets,
+        "container_engine_identity",
+        side_effect=docker_assets.DockerAssetError("no engine on PATH"),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.aborted_phase is None
+    lifecycle_log = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
+    assert "[engine] resolution failed: no engine on PATH" in lifecycle_log
+    sidecar = json.loads((tmp_path / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert sidecar["container_engine"] is None
+
+
 def test_write_cells_jsonl_persists_skipped_unreachable_sidecar(tmp_path: Path):
     cells_jsonl = tmp_path / "cells.jsonl"
-    orchestrator._write_cells_jsonl(
+    cells_io.write_cells_jsonl(
         cells_jsonl,
         (),
         source_info=_source_info(),
@@ -535,6 +965,34 @@ def test_write_cells_jsonl_persists_skipped_unreachable_sidecar(tmp_path: Path):
     sidecar = cells_jsonl.with_name("cells.jsonl.accounting.json")
     assert sidecar.exists()
     assert json.loads(sidecar.read_text(encoding="utf-8"))["skipped_unreachable_count"] == 3
+
+
+def test_write_cells_jsonl_writes_cell_stream_before_accounting_sidecar(tmp_path: Path):
+    """cells.jsonl must land before its accounting sidecar (w4).
+
+    A crash between the two writes must never leave a fresh sidecar beside a
+    stale (or absent) cell stream -- see
+    uat-resume-retirement-artifact-durability w4. Record the path order
+    `atomic_write_text` is called in and assert cells.jsonl comes first.
+    """
+    cells_jsonl = tmp_path / "cells.jsonl"
+    written_paths: list[Path] = []
+    real_atomic_write_text = cells_io.atomic_write_text
+
+    def recording_atomic_write_text(path: Path, text: str) -> None:
+        written_paths.append(path)
+        real_atomic_write_text(path, text)
+
+    with patch.object(cells_io, "atomic_write_text", side_effect=recording_atomic_write_text):
+        cells_io.write_cells_jsonl(
+            cells_jsonl,
+            (),
+            source_info=_source_info(),
+            skipped_unreachable_count=1,
+        )
+
+    sidecar = cells_jsonl.with_name("cells.jsonl.accounting.json")
+    assert written_paths == [cells_jsonl, sidecar]
 
 
 def test_abort_artifacts_thread_skipped_unreachable_when_outcome_missing(tmp_path: Path):
@@ -595,3 +1053,497 @@ def test_disk_floor_abort_carries_skipped_unreachable_count():
                 runner=runner,
             )
     assert getattr(excinfo.value, "skipped_unreachable_count", None) == 1
+
+
+def _startup_fail_clickhouse_docker(argv, **kwargs):
+    """Fake docker runner: clickhouse compose-up fails, everything else succeeds."""
+    action = "up" if "up" in argv else "down"
+    compose_file = argv[argv.index("-f") + 1] if "-f" in argv else ""
+    if action == "up" and "/clickhouse/" in compose_file:
+        return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose up failed")
+    return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+
+def test_disk_floor_abort_carries_startup_failed_count(tmp_path: Path):
+    """Mirror of test_disk_floor_abort_carries_skipped_unreachable_count for w3's counter.
+
+    clickhouse-server is processed first: its managed compose-up fails, so
+    its cells accumulate in `startup_failed` (the #700 advance path). The
+    non-Docker duckdb platform then trips the disk-floor runner. The raised
+    abort must carry the already-accumulated startup_failed count (1) via
+    `_annotate_disk_floor_abort`.
+    """
+    cfg = validate_config(
+        {
+            "name": "disk-floor-annotate-startup-failed",
+            "platforms": {"include": ["clickhouse-server", "duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def runner(platform, benchmark, scale, **kwargs):
+        raise orchestrator.DiskFloorAbort("free space 1.0 GiB < cutoff 5.0 GiB")
+
+    with patch.object(exec_phase, "platform_is_reachable", return_value=True):
+        with pytest.raises(orchestrator.DiskFloorAbort) as excinfo:
+            exec_phase.run_execute(
+                cfg,
+                log_dir=tmp_path,
+                databases_root=tmp_path / "databases",
+                runner=runner,
+                docker_runner=_startup_fail_clickhouse_docker,
+            )
+    assert getattr(excinfo.value, "startup_failed_count", None) == 1
+
+
+def test_disk_floor_abort_threads_startup_failed_count_into_sidecar_and_partial_report(tmp_path: Path):
+    """Orchestrator-level: startup_failed survives the synthesized-outcome disk-floor path.
+
+    run_sweep's DiskFloorAbort handler synthesizes an ExecuteOutcome with an
+    EMPTY startup_failed tuple (the Cell objects are lost crossing the
+    exception boundary), so the abort artifacts must be fed from the
+    exc-annotated `startup_failed_count` instead. Assert the durable
+    accounting sidecar and the partial report TSV both carry the real count.
+    """
+    cfg = validate_config(
+        {
+            "name": "disk-floor-startup-failed-artifacts",
+            "phases": ["execute"],
+            "platforms": {"include": ["clickhouse-server", "duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+
+    with (
+        patch.object(exec_phase, "platform_is_reachable", return_value=True),
+        patch.object(exec_phase.docker_assets, "run_docker_command", side_effect=_startup_fail_clickhouse_docker),
+        patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
+        patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
+        patch.object(orchestrator.preflight_budget, "free_space_gib", return_value=1.0),
+    ):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase == "execute"
+    assert result.execute_outcome is not None
+    assert result.execute_outcome.abort_kind == "disk_floor"
+    # The durable sidecar carries the exc-annotated count, not the
+    # synthesized outcome's empty tuple.
+    accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert accounting["startup_failed_count"] == 1
+    # And the partial report accounts for it (components precede the total).
+    partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
+    assert "startup_failed=1" in partial_text
+    assert "attempted=1 skipped=0 unreachable=0 startup_failed=1 total_defined=2" in partial_text
+
+
+# ---------------------------------------------------------------------------
+# cells_io.update_accounting_sidecar unit coverage (review REQUIRED 2).
+# ---------------------------------------------------------------------------
+
+
+def test_update_accounting_sidecar_returns_false_and_creates_no_file_without_sidecar(tmp_path: Path):
+    cells_jsonl = tmp_path / "cells.jsonl"
+
+    recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
+
+    assert recorded is False
+    # No sidecar is fabricated: presence implies confirmed execute-derived
+    # counts, which a patch-only write could not provide.
+    assert not cells_jsonl.with_name("cells.jsonl.accounting.json").exists()
+
+
+def test_update_accounting_sidecar_preserves_existing_counts(tmp_path: Path):
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_io.write_cells_jsonl(
+        cells_jsonl,
+        (),
+        source_info=_source_info(),
+        skipped_unreachable_count=3,
+        startup_failed_count=2,
+    )
+
+    recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
+
+    assert recorded is True
+    payload = json.loads(cells_jsonl.with_name("cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert payload == {
+        "skipped_unreachable_count": 3,
+        "startup_failed_count": 2,
+        "disk_gate_disabled": False,
+        "container_engine": None,
+        "explorer_smoke_status": "skipped_no_node",
+    }
+
+
+def test_update_accounting_sidecar_returns_false_on_corrupt_sidecar_without_clobbering(tmp_path: Path):
+    cells_jsonl = tmp_path / "cells.jsonl"
+    sidecar = cells_jsonl.with_name("cells.jsonl.accounting.json")
+    sidecar.write_text("{not valid json", encoding="utf-8")
+
+    recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
+
+    assert recorded is False
+    # The corrupt sidecar is left untouched for post-mortem inspection, not
+    # overwritten with a fabricated payload.
+    assert sidecar.read_text(encoding="utf-8") == "{not valid json"
+
+
+# ---------------------------------------------------------------------------
+# uat-release-gate-enforcement w1: every sweep writes uat_gate_summary.json.
+# ---------------------------------------------------------------------------
+
+
+def _read_gate_summary(log_dir: Path) -> dict:
+    return json.loads((log_dir / "uat_gate_summary.json").read_text(encoding="utf-8"))
+
+
+def test_dry_run_sweep_writes_gate_summary_with_dry_run_verdict(tmp_path: Path):
+    """Dry-run sweeps still write the summary; the verdict marks them as non-evidence."""
+    cfg = validate_config({"name": "gate-dry", "dry_run": True, "phases": ["preflight", "execute", "report"]})
+
+    orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    payload = _read_gate_summary(tmp_path)
+    assert payload["version"] == 1
+    assert payload["verdict"] == "dry_run"
+    assert payload["dry_run"] is True
+    assert payload["config_name"] == "gate-dry"
+    assert payload["phase_exit_codes"] == {"preflight": 0, "execute": 0, "report": 0}
+    assert payload["completed_at"]
+    assert payload["source_commit_sha"]
+
+
+def test_gate_summary_completed_at_is_offset_aware(tmp_path: Path):
+    """#1162 review: completed_at must carry an explicit UTC offset, not a
+    naive local timestamp -- release_readiness_check.py evaluates the
+    committed evidence in a different process (CI), possibly in a different
+    timezone than the operator who ran the sweep. A naive timestamp there
+    gets reinterpreted against the *evaluating* process's local timezone,
+    which can misjudge freshness near the max-age cutoff.
+    """
+    cfg = validate_config({"name": "gate-tz", "dry_run": True, "phases": ["preflight", "execute", "report"]})
+
+    orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    payload = _read_gate_summary(tmp_path)
+    completed_at = _dt.datetime.fromisoformat(payload["completed_at"])
+    assert completed_at.tzinfo is not None
+
+
+def test_green_sweep_writes_green_gate_summary_with_accounting(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "gate-green",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "report": {"cross_scale_coverage_min_pairs": 1},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "startup_failed": (),
+            "compatibility_pruned": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 0,
+        },
+    )()
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.exit_code() == 0
+    payload = _read_gate_summary(tmp_path)
+    assert payload["verdict"] == "green"
+    assert payload["aborted"] is False
+    assert payload["accounting"]["passed"] == 1
+    assert payload["accounting"]["attempted"] == 1
+    assert payload["accounting"]["total_defined"] == 1
+    assert payload["cross_scale_clean_pairs"] == 1
+    assert payload["cross_scale_floor"] == 1
+    assert payload["cross_scale_floor_breached"] is False
+    assert payload["unreachable_is_estimated"] is False
+    assert payload["explorer_smoke_status"] == "not_run"
+
+
+def test_failed_cell_sweep_writes_red_gate_summary(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "gate-red",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="failed",
+        exit_code=1,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=None,
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "startup_failed": (),
+            "compatibility_pruned": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 1,
+        },
+    )()
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.exit_code() == 1
+    payload = _read_gate_summary(tmp_path)
+    assert payload["verdict"] == "red"
+    assert payload["accounting"]["failed"] == 1
+    assert payload["phase_exit_codes"]["execute"] == 1
+
+
+def test_aborted_sweep_writes_red_gate_summary_with_abort_fields(tmp_path: Path):
+    """An abort path also lands in the gate summary (partial-report accounting)."""
+    cfg = validate_config({"name": "gate-abort", "phases": ["report"]})
+
+    result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.aborted_phase == "report"
+    payload = _read_gate_summary(tmp_path)
+    assert payload["verdict"] == "red"
+    assert payload["aborted"] is True
+    assert payload["abort_phase"] == "report"
+    assert "execute phase" in payload["abort_reason"]
+
+
+def test_derive_verdict_matrix():
+    from tests.uat import gate_summary
+
+    assert gate_summary.derive_verdict(dry_run=True, aborted=False, phase_exit_codes={"execute": 0}) == "dry_run"
+    assert gate_summary.derive_verdict(dry_run=False, aborted=True, phase_exit_codes={}) == "red"
+    assert gate_summary.derive_verdict(dry_run=False, aborted=False, phase_exit_codes={"execute": 1}) == "red"
+    assert (
+        gate_summary.derive_verdict(dry_run=False, aborted=False, phase_exit_codes={"execute": 0, "report": 0})
+        == "green"
+    )
+
+
+def test_gate_summary_round_trips_and_ignores_unknown_keys(tmp_path: Path):
+    """Forward compat: a later summary with additive fields must still read."""
+    from tests.uat import gate_summary
+
+    cfg = validate_config({"name": "gate-rt", "dry_run": True, "phases": ["execute"]})
+    orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    path = tmp_path / "uat_gate_summary.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["a_future_field"] = "ignored"
+    payload["accounting"]["a_future_count"] = 7
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    summary = gate_summary.read_gate_summary(path)
+    assert summary.config_name == "gate-rt"
+    assert summary.verdict == "dry_run"
+
+
+# ---------------------------------------------------------------------------
+# uat-release-gate-enforcement w3: combined release-gate evidence aggregation.
+# ---------------------------------------------------------------------------
+
+
+def _stage_summary(name: str, completed_at: str, **overrides):
+    from tests.uat import gate_summary
+
+    kwargs = {
+        "config_name": name,
+        "source_commit_sha": "abc123",
+        "source_dirty": False,
+        "container_engine": "docker",
+        "completed_at": completed_at,
+        "dry_run": False,
+        "aborted": False,
+        "abort_phase": None,
+        "abort_reason": None,
+        "phase_exit_codes": {"execute": 0, "validate": 0, "explorer_smoke": 0, "report": 0},
+        "accounting": gate_summary.PhaseAccounting(attempted=5, passed=5, total_defined=5),
+        "unreachable_is_estimated": False,
+        "validator_clean_rate": 1.0,
+        "validator_clean_rate_floor": 1.0,
+        "validator_floor_breached": False,
+        "cross_scale_clean_pairs": 10,
+        "cross_scale_floor": 8,
+        "cross_scale_floor_breached": False,
+        "explorer_smoke_status": "ran",
+        "verdict": "green",
+    }
+    kwargs.update(overrides)
+    return gate_summary.GateSummary(**kwargs)
+
+
+def test_combined_evidence_green_when_all_stages_clean():
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[1], "2026-07-10T12:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "green"
+    assert evidence.reasons == ()
+    assert evidence.source_commit_sha == "abc123"
+    assert evidence.completed_at == "2026-07-10T10:00:00"
+    assert evidence.stage_verdicts == dict.fromkeys(gate_summary.EXPECTED_RELEASE_GATE_STAGES, "green")
+
+
+@pytest.mark.parametrize(
+    ("overrides", "reason_fragment"),
+    [
+        ({"verdict": "red"}, "not green"),
+        ({"dry_run": True, "verdict": "dry_run"}, "dry-run summary"),
+        ({"unreachable_is_estimated": True}, "sidecar missing"),
+        ({"explorer_smoke_status": "skipped_no_node"}, "explorer_smoke but it did not run"),
+        ({"source_dirty": True}, "dirty source tree"),
+        ({"source_commit_sha": "other"}, "source_commit_sha differs"),
+    ],
+)
+def test_combined_evidence_red_on_each_hold_condition(overrides: dict, reason_fragment: str):
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[1], "2026-07-10T12:00:00", **overrides),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "red"
+    assert any(reason_fragment in reason for reason in evidence.reasons), evidence.reasons
+
+
+def test_combined_evidence_red_on_wrong_stage_count_and_ordering_violation():
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[1], "2026-07-10T12:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages,
+        ordering_violations=("stage1 boundary: Docker stack 'x' started early",),
+        generated_at=_dt.datetime(2026, 7, 10, 15),
+    )
+    assert evidence.verdict == "red"
+    assert any("expected 3" in reason for reason in evidence.reasons)
+    assert any("started early" in reason for reason in evidence.reasons)
+
+
+def test_explorer_smoke_stage_not_flagged_when_not_configured():
+    """A stage whose phases list never included explorer_smoke is not held for skipping it."""
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary(
+            gate_summary.EXPECTED_RELEASE_GATE_STAGES[0],
+            "2026-07-10T10:00:00",
+            phase_exit_codes={"execute": 0, "report": 0},
+            explorer_smoke_status="not_run",
+        ),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[1], "2026-07-10T12:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "green"
+
+
+def test_combined_evidence_red_when_stage_names_are_not_the_expected_set():
+    """R1(a): three green summaries from the WRONG configs (or the same config
+    thrice) must never mint release evidence."""
+    from tests.uat import gate_summary
+
+    same_stage_thrice = [
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T12:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        same_stage_thrice, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "red"
+    assert any("do not match the expected" in reason for reason in evidence.reasons), evidence.reasons
+
+    hollow_substitute = [
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary("my-adhoc-config", "2026-07-10T12:00:00"),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        hollow_substitute, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "red"
+    assert any("do not match the expected" in reason for reason in evidence.reasons), evidence.reasons
+
+
+def test_combined_evidence_red_when_a_stage_has_no_floor_gates():
+    """R1(b): a stage whose config never armed the validator/cross-scale floors
+    is hollow evidence even if every phase exited 0."""
+    from tests.uat import gate_summary
+
+    stages = [
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[0], "2026-07-10T10:00:00"),
+        _stage_summary(
+            gate_summary.EXPECTED_RELEASE_GATE_STAGES[1],
+            "2026-07-10T12:00:00",
+            validator_clean_rate_floor=None,
+            cross_scale_floor=None,
+        ),
+        _stage_summary(gate_summary.EXPECTED_RELEASE_GATE_STAGES[2], "2026-07-10T14:00:00"),
+    ]
+    evidence = gate_summary.build_combined_evidence(
+        stages, ordering_violations=(), generated_at=_dt.datetime(2026, 7, 10, 15)
+    )
+    assert evidence.verdict == "red"
+    assert any("floor gates were not configured" in reason for reason in evidence.reasons), evidence.reasons

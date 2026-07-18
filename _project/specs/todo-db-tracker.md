@@ -1,0 +1,360 @@
+# TODO Tracker on a Shared Database — Design Spec
+
+Status: proposed (decision-ready; not yet implemented).
+Author: agent session, 2026-07-18, from the TODO-infrastructure review.
+Decision owner: maintainer.
+
+## Problem statement
+
+The YAML-in-git TODO system fails in three recorded ways, all traced (5-whys)
+to a single root cause: **invariants are enforced by prose and model
+compliance instead of by code at a mandatory write chokepoint.**
+
+Evidence base:
+
+- **Deferred work loss.** `deferred[]` is write-only; nothing reads it after
+  an item moves to DONE. Three forensic sweeps recovered 9 + 5 + 5 lost items
+  (PRs #1181, #1210, #1195: "deferred notes were buried inside DONE items —
+  recorded but not surfaced in the ready queue").
+- **Duplicated-state drift.** Done-ness is encoded in the `status` field, the
+  TODO/DONE directory, and the tree. #1181 restored three items on a stale
+  `status: Not Started`; #1186 reversed it ("the restore was driven by the
+  metadata field, not the code/docs/config state").
+- **Silent schema drift.** `validate_todo.py --all` reports 1362/1362 valid
+  while 247 DONE files use deprecated `tasks:`, 93 use `dependencies:`, and
+  `--warn-deprecated` finds 340 issues (non-strict default,
+  `additionalProperties: true`). `migrate_todo_format.py report` claims
+  "COMPLETE" while ignoring the archive.
+- **Standing cost.** 13 MB / 212k lines of DONE YAML; ~3,500 lines of
+  tooling incl. three migration/normalization scripts; ~600 lines of
+  governing prose (skill + references + schema + template) loaded into agent
+  context; 46 TODO/DONE bookkeeping commits since 2026-01-01, each paying a
+  full PR + CI cycle for what is often a pure status change.
+
+## Objective
+
+Replace the file-based tracker with a shared, HTTPS-reachable database whose
+constraints enforce the lifecycle, fronted by a thin `todo` CLI that is the
+**only write path**. Success criteria:
+
+1. A deferred item cannot be silently lost: `complete` refuses while any
+   linked deferral is unresolved (promoted or dismissed), enforced in a
+   transaction.
+2. A dangling inter-item dependency is unrepresentable (FK), and dependency
+   cycles are rejected at insert (recursive-CTE check in the CLI
+   transaction).
+3. Illegal state transitions are rejected by the CLI state machine; there is
+   exactly one encoding of lifecycle state.
+4. Guardrails (`scope_rules`, `verifications`, `preserves`, `anti_patterns`,
+   `prior_art`) are structured rows, assembled into a work order by a single
+   query, and machine-consumable (`check-scope`, `verify --run`, `lint`).
+5. The governing skill prose shrinks to ~10 workflow lines; schema file,
+   entry template, `validate_todo.py`, `generate_indexes.py`, and all
+   migration scripts are deleted.
+6. Cross-session live status: claims and state changes are visible to all
+   sessions immediately, with no PR cycle for status changes.
+7. Provenance survives: append-only `events` table + nightly deterministic
+   export committed to the repo (alerting on failure).
+
+## Design principles
+
+- **Column/row for anything a gate, hook, or query consumes; prose (TEXT)
+  only for genuinely narrative content** (`description`, `approach`).
+- **Mandatory context rides on mandatory commands**: `todo claim` prints the
+  full work order (units, scope globs, preserves, verification commands), so
+  "remember to read X" prose rules become structurally unnecessary.
+- **The DB is the record; the harness session task list is display only.**
+  Durable per-work-unit status stays in the DB so a successor session can
+  resume a dead session's item.
+- **No offline write queue.** Reads degrade to a gitignored local cache with
+  a staleness banner; writes fail loudly. A write queue is a second
+  consistency system and is explicitly rejected.
+
+## Schema (DDL sketch)
+
+Target dialect: libsql/SQLite-compatible SQL (portable to Postgres). Enums
+are CHECK constraints in libsql.
+
+```sql
+CREATE TABLE items (
+  id           TEXT PRIMARY KEY,          -- slug, ^[a-z0-9][a-z0-9-]*[a-z0-9]$
+  title        TEXT NOT NULL CHECK (length(title) BETWEEN 5 AND 200),
+  worktree     TEXT NOT NULL,             -- branch/area grouping
+  priority     TEXT NOT NULL CHECK (priority IN
+                 ('critical','high','medium-high','medium','low')),
+  state        TEXT NOT NULL DEFAULT 'planning' CHECK (state IN
+                 ('planning','active','done','dropped')),
+  blocked_reason TEXT,                    -- NULL = not blocked (annotation, not a state)
+  description  TEXT NOT NULL CHECK (length(description) >= 10),
+  approach     TEXT,                      -- narrative implementation strategy
+  claimed_by   TEXT,                      -- actor id (session/host), NULL = unclaimed
+  claimed_at   TEXT,                      -- ISO8601; lease TTL enforced by CLI sweep
+  created_at   TEXT NOT NULL,
+  completed_at TEXT,
+  completed_pr INTEGER                    -- PR number that landed the work
+);
+
+CREATE TABLE work_units (
+  item_id  TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  wid      TEXT NOT NULL CHECK (wid GLOB 'w[0-9]'
+             OR wid GLOB 'w[0-9][0-9]'
+             OR wid GLOB 'w[0-9][0-9][0-9]'),
+             -- w0..w999; SQLite GLOB '*' matches any chars, so 'w[0-9]*'
+             -- would accept e.g. 'w1abc' — enumerate the digit widths
+  summary  TEXT NOT NULL CHECK (length(summary) BETWEEN 5 AND 200),
+  status   TEXT NOT NULL DEFAULT 'pending' CHECK (status IN
+             ('pending','in_progress','done')),
+  evidence TEXT,                          -- required by `todo done`: command run, commit, PR
+  notes    TEXT,
+  PRIMARY KEY (item_id, wid)
+);
+
+CREATE TABLE work_needs (                  -- intra-item DAG
+  item_id  TEXT NOT NULL,
+  wid      TEXT NOT NULL,
+  needs_wid TEXT NOT NULL,
+  PRIMARY KEY (item_id, wid, needs_wid),
+  FOREIGN KEY (item_id, wid)       REFERENCES work_units(item_id, wid) ON DELETE CASCADE,
+  FOREIGN KEY (item_id, needs_wid) REFERENCES work_units(item_id, wid) ON DELETE CASCADE
+);
+
+CREATE TABLE item_deps (                   -- inter-item DAG; FK kills dangling deps
+  item_id    TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  needs_item TEXT NOT NULL REFERENCES items(id),
+  PRIMARY KEY (item_id, needs_item)
+);
+-- Cycle prevention: SQL cannot express acyclicity; the CLI runs a
+-- recursive-CTE reachability check inside the same transaction as the
+-- insert and aborts on a cycle.
+
+-- Guardrails: first-class, machine-consumable.
+CREATE TABLE scope_rules (
+  item_id   TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  kind      TEXT NOT NULL CHECK (kind IN ('only_modify','do_not_modify')),
+  path_glob TEXT NOT NULL,
+  PRIMARY KEY (item_id, kind, path_glob)
+);
+
+CREATE TABLE verifications (
+  item_id     TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  seq         INTEGER NOT NULL,           -- ladder order: narrowest first
+  description TEXT NOT NULL,
+  command     TEXT,                        -- runnable via `todo verify --run`
+  expected    TEXT,
+  last_run    TEXT,                        -- ISO8601
+  last_result TEXT CHECK (last_result IN ('pass','fail') OR last_result IS NULL),
+  PRIMARY KEY (item_id, seq)
+);
+
+CREATE TABLE preserves (                   -- must_preserve
+  item_id  TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  behavior TEXT NOT NULL,
+  PRIMARY KEY (item_id, behavior)
+);
+
+CREATE TABLE anti_patterns (
+  item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  dont    TEXT NOT NULL,
+  why     TEXT NOT NULL,
+  instead TEXT NOT NULL,
+  PRIMARY KEY (item_id, dont)
+);
+
+CREATE TABLE prior_art (
+  item_id  TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  path     TEXT NOT NULL,                  -- file path or path:symbol
+  concept  TEXT NOT NULL,
+  decision TEXT NOT NULL CHECK (decision IN ('reuse','extend','supersede')),
+  PRIMARY KEY (item_id, path, concept)
+);
+
+-- Deferral is an operation with a mandatory terminal state, not a field.
+CREATE TABLE deferrals (
+  id             INTEGER PRIMARY KEY,
+  from_item      TEXT NOT NULL REFERENCES items(id),
+  summary        TEXT NOT NULL,
+  reason         TEXT NOT NULL,
+  resolution     TEXT NOT NULL DEFAULT 'open' CHECK (resolution IN
+                   ('open','promoted','dismissed')),
+  resolved_item  TEXT REFERENCES items(id), -- set when promoted
+  resolved_reason TEXT,                     -- required when dismissed
+  created_at     TEXT NOT NULL
+);
+
+-- Append-only audit; the provenance record and the export source.
+CREATE TABLE events (
+  seq     INTEGER PRIMARY KEY,
+  at      TEXT NOT NULL,
+  actor   TEXT NOT NULL,                   -- session/host identity from env
+  item_id TEXT,
+  action  TEXT NOT NULL,                   -- create|claim|start|done|defer|dismiss|complete|drop|edit|sweep
+  detail  TEXT                             -- JSON payload of the change
+);
+
+CREATE TABLE meta (                        -- schema_version pin for the CLI
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+```
+
+### Enforced lifecycle invariants (in-CLI transactions)
+
+| Invariant | Mechanism |
+| --- | --- |
+| `complete` requires all work units `done` | txn check in `todo complete` |
+| `complete` refuses with unresolved deferrals | txn check: no `deferrals.resolution='open'` for the item |
+| `done <wid>` requires evidence | NOT-NULL argument on the command; row updated atomically |
+| Legal transitions only: planning→active→done; planning/active→dropped | state-machine table in CLI; illegal transition = error |
+| No dangling deps | FK |
+| No dependency cycles (item and work-unit DAGs) | recursive-CTE check inside insert txn |
+| Ready = state active/planning, unclaimed or own claim, all `item_deps` done, per-unit `work_needs` done | single query behind `todo ready` / `todo claim` |
+| Stale claims | lease TTL (default 24h) + `todo sweep-stale` |
+
+## CLI surface
+
+Single executable `todo` (Python, `_project/scripts` project or standalone
+package), env-configured via `TODO_DB_URL` (never echoed). All writes stamp
+`actor` from session env into `events`.
+
+```
+todo create   --title ... --worktree ... --priority ... [--edit-body]   # opens/accepts structured flags for guardrail rows
+todo show     <id> [--json]                 # full item incl. guardrail rows
+todo claim    <id>                          # atomic claim + prints WORK ORDER:
+                                            #   ready units, scope globs, preserves,
+                                            #   anti-patterns, verification ladder
+todo start    <id> <wid>  |  todo done <id> <wid> --evidence "..."
+todo defer    <id> --summary ... --reason ...          # creates deferral row
+todo promote  <deferral-id> [--to-item <new-slug> ...] # deferral -> planning item, linked
+todo dismiss  <deferral-id> --reason ...
+todo complete <id> --pr <n>                 # gated: units done + deferrals resolved
+todo drop     <id> --reason ...
+todo ready | todo list [filters] | todo stats | todo deps <id>
+todo check-scope <id>                       # git diff --name-only vs scope_rules; exit-coded
+todo verify   <id> [--run [seq]]            # records last_run/last_result
+todo lint     <id>                          # deterministic quality checks (see below)
+todo sweep-stale                            # release expired leases
+todo export   [--out DIR]                   # deterministic JSONL + markdown render
+todo admin migrate                          # only schema-migration path; CLI pins schema_version
+```
+
+`todo lint` mechanical checks (replaces the rubric's mechanical axes):
+verification rows exist and ≥1 has a `command`; scope rules present for code
+items; `prior_art` rows present when the item is tagged new-module/env-var/
+fs-convention; description cites re-runnable evidence (a `w0` unit exists)
+when it pins upstream behavior. Judgment axes (clarity, premise freshness)
+remain agent work in the skill's `review` action.
+
+## Thin-wrapper contract
+
+The `todo` skill shrinks to roughly:
+
+> All TODO state lives in the shared DB; the `todo` CLI is the only write
+> path — never write TODO state to files. Implement flow:
+> `todo claim <id>` → follow the printed work order → per unit
+> `todo done <id> <wid> --evidence ...` → `todo verify <id> --run` →
+> `todo complete <id> --pr <n>`. Defer out-of-scope work with `todo defer`
+> at the moment you decide to skip it. Use the harness session task list for
+> intra-session progress display only; the DB is the record.
+
+Retained LLM actions: `ideate`, `spec`, `from-spec`, judgment half of
+`review`. Deleted artifacts: `TODO_SCHEMA.yaml`, `TODO_ENTRY_TEMPLATE.yaml`,
+`validate_todo.py`, `generate_indexes.py`, `migrate_todos.py`,
+`migrate_todo_format.py`, `normalize_done_yaml.py`, `_indexes/` machinery,
+`references/structure.md`, and the schema-compliance prose in `SKILL.md`.
+
+## Operational design
+
+- **Host requirement: HTTPS-reachable.** Remote sessions tunnel outbound
+  traffic through an HTTPS proxy; raw Postgres wire (TCP 5432) is assumed
+  blocked. Candidates: Turso/libsql (HTTP-native; primary candidate), Neon
+  serverless HTTP driver, Supabase REST. **Gate G1 below verifies
+  reachability from a live remote session before any further build.**
+- **Credentials:** `TODO_DB_URL` (+ auth token) in remote environment config
+  and local `.env`. CLI never prints the DSN; error messages redact it.
+  Read-write token for sessions; read-only token available for ad-hoc tools.
+- **Identity:** `actor` = `${CLAUDE_SESSION_ID:-$(whoami)@$(hostname)}`.
+  Weak identity is acceptable for a single-maintainer project; the audit
+  goal is "which session did this," not authentication.
+- **Degraded mode:** every successful read refreshes a gitignored local
+  cache (`.todo-cache.json`); on connection failure, reads serve the cache
+  with a prominent `STALE (age Xh)` banner; writes fail with a clear error.
+- **Backup / escape hatch:** nightly CI job runs `todo export` and commits
+  the deterministic JSONL + rendered markdown to the repo (stable ordering,
+  stable timestamps from row data → clean diffs). The job **alerts on
+  failure** (it is load-bearing for provenance). Host-side PITR is the
+  second line. The export is the vendor-lock escape: it contains full state.
+- **CI stays DB-free.** No repo CI job queries the DB; all gates live in the
+  CLI (pre-commit/preflight hooks may call `todo check-scope`). The
+  `pr-content-guard` TODO-file checks are retired with the files. The export
+  job is the single exception and uses the read-only token.
+- **Schema evolution:** CLI embeds expected `schema_version`, refuses on
+  mismatch, `todo admin migrate` applies versioned migrations. Migrations
+  ship in the same PR as the CLI change that needs them.
+- **Testing:** CLI test suite runs against in-memory/local SQLite via
+  env-switched DSN; never the production DB. Transition/gate/cycle checks
+  are unit-tested; a small integration test exercises Turso HTTP if
+  `TODO_TEST_DB_URL` is set.
+- **Latency budget:** one network round-trip per CLI call; `show`/`claim`
+  are single multi-join queries. Acceptable at interactive scale.
+
+## Accepted residual risks (maintainer sign-off required)
+
+1. **Availability coupling:** DB outage blocks status writes (reads degrade
+   to cache). The export restores data, not service.
+2. **Backlog edits are no longer PR-reviewed at write time.** Mitigations:
+   `todo lint` gates mechanical quality; the nightly export gives a
+   reviewable diff trail; `review` action remains for judgment.
+3. **New operational surface:** one hosted service, one secret, one
+   migration mechanism.
+
+## Cutover plan
+
+- **G1 — host verification (before any build):** from a live remote session,
+  create the candidate DB (Turso first), verify connect/query/write through
+  the HTTPS proxy, verify from local env, record results in this spec.
+
+  **G1 partial results (2026-07-18, live remote session):**
+  - All three candidate control planes are **denied by the environment's
+    network policy**: CONNECT to `api.turso.tech:443`,
+    `console.neon.tech:443`, and `api.supabase.com:443` each returned a 403
+    policy denial at the gateway (confirmed in agent-proxy relay logs).
+  - Raw TCP egress on 5432 is blocked, confirming the spec's assumption
+    that the Postgres wire protocol is not viable from remote sessions;
+    HTTPS through the proxy is the sanctioned transport.
+  - **New prerequisite for G1 completion (maintainer actions):**
+    (a) add the chosen host's domains to the remote environment's network
+    allowlist (for Turso: `api.turso.tech` and the org's `*.turso.io`
+    database endpoint); (b) create the account/DB and provision the auth
+    token into the environment config — both are account-holder actions an
+    agent session cannot perform. Re-run the reachability probe afterwards
+    to close G1.
+- **G2 — CLI MVP:** schema DDL + `create/show/claim/start/done/defer/
+  promote/dismiss/complete/ready/list/stats/export` + tests. No repo changes
+  to the YAML system yet.
+- **G3 — import:** script maps the 129 open TODO YAMLs onto the tables
+  (fields → columns/rows; `tasks:`/`dependencies:` legacy forms handled by
+  the importer, one-off). Dry-run report → maintainer eyeball → import.
+- **G4 — deferred-debt sweep (one-time):** walk all 278 archived DONE
+  `deferred:` blocks + 34 open-item blocks through `defer` then
+  `promote`/`dismiss`, deduping against existing items. This is the last
+  forensic sweep the project should ever need.
+- **G5 — freeze & delete:** commit a final export snapshot; delete
+  `_project/TODO/`, `_project/DONE/` (history keeps them), the five retired
+  scripts, schema/template files; shrink `SKILL.md`; update `AGENTS.md`
+  "Planning & TODOs" and `CLAUDE.md` pre-approved commands (`todo *`
+  read commands auto-allowed; write commands per current policy).
+- **G6 — export job:** nightly workflow + failure alerting; verify one
+  cycle.
+
+Rollback: before G5, the YAML tree is untouched — abort by discarding the
+DB. After G5, `todo export` output + git history reconstruct the YAML tree.
+
+## Open questions (gating)
+
+1. Host choice pending G1 reachability results (Turso → Neon HTTP →
+   Supabase REST, in that order of preference).
+2. Should `todo lint` failures block `complete` (hard gate) or warn?
+   Recommendation: warn for one month of usage, then hard-gate.
+3. Where does the CLI live: `_project/scripts` (uv project) vs a separate
+   small repo shared by other projects? Recommendation: start in-repo,
+   extract only if a second consumer appears.

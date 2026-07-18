@@ -6,10 +6,11 @@ Migration Contract (as of 2026-04-11):
     - ``clickhouse-server`` - self-hosted ClickHouse via clickhouse-driver (Docker/dedicated)
     - ``clickhouse-cloud``  - managed ClickHouse Cloud via clickhouse-connect
 
-    Bare ``clickhouse`` and colon-suffix syntax (``clickhouse:local``,
-    ``clickhouse:server``) are accepted as deprecating compatibility aliases.
-    They emit a DeprecationWarning and route to the appropriate first-class name.
-    These aliases will be removed after one deprecation window.
+    Bare ``clickhouse`` was a compatibility alias during the migration window
+    (shipped v0.2.1). That window has elapsed: bare ``clickhouse`` is now a hard
+    error that names the first-class replacements. The colon-suffix selectors
+    (``clickhouse:local``, ``clickhouse:server``, ``clickhouse:cloud``) remain
+    accepted and emit a DeprecationWarning while routing to the first-class name.
 """
 
 from __future__ import annotations

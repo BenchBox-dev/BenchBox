@@ -197,8 +197,22 @@ class PlatformAdapter(
         self.driver_runtime_python_executable = config.get("driver_runtime_python_executable")
         self.driver_auto_install_used = bool(config.get("driver_auto_install_used", False))
 
-        # Unified tuning configuration support
-        self.unified_tuning_configuration = config.get("unified_tuning_configuration")
+        # Unified tuning configuration support. ``tuning_config`` is the reliable
+        # channel: get_platform_config() always passes it through as a live object
+        # reference (never round-tripped through DatabaseConfig.model_dump(), which
+        # would serialize a dataclass-valued extra field to a plain dict). Prefer it,
+        # falling back to ``unified_tuning_configuration`` only when that key already
+        # holds a real object rather than such a serialized dict.
+        _legacy_tuning_config = config.get("unified_tuning_configuration")
+        if isinstance(_legacy_tuning_config, dict):
+            _legacy_tuning_config = None
+        self.unified_tuning_configuration = config.get("tuning_config") or _legacy_tuning_config
+        # Provenance for the requested tuning config: raw TuningSource enum value
+        # (e.g. "auto_discovered") and a repo-relative/content-hash template
+        # reference (never a raw local path). Threaded from run.py through the
+        # DatabaseConfig/platform_config channel; see _promote_tuning_to_database_config.
+        self.tuning_source: str | None = config.get("tuning_source")
+        self.tuning_source_file: str | None = config.get("tuning_source_file")
 
         # Verbose logging configuration
         self.apply_verbosity(VerbositySettings.from_mapping(config))
@@ -269,6 +283,40 @@ class PlatformAdapter(
         can rely on this default when no custom name is required.
         """
         return self.__class__.__name__
+
+    @property
+    def canonical_platform_type(self) -> str:
+        """Return the canonical, machine-readable platform type key.
+
+        Tuning-capability lookups and metadata persistence must key off a
+        stable identifier (e.g. ``"clickhouse-local"``, ``"duckdb"``) -- not
+        `platform_name`, which is a human-facing display string (e.g.
+        ``"ClickHouse Local"``, ``"StarRocks"``) that varies by adapter and is
+        never guaranteed to match the lowercase, single-word keys used by
+        capability maps such as `TuningType`'s compatibility map.
+
+        Sourced from the ``type`` key in `platform_config` when present.
+        Upstream config plumbing (core/platform_config.py) strips ``type``
+        from DatabaseConfig before adapter construction, so the key does NOT
+        survive that path on its own -- ``get_platform_adapter`` in
+        `benchbox.platforms` re-injects the resolved canonical registry name
+        (`PlatformRegistry.resolve_platform_name`) into the constructor
+        config, which is what this property reads on every factory-built
+        adapter.
+
+        Falls back to a normalized form of `platform_name` (lowercased,
+        spaces collapsed to hyphens) when no config type is available -- e.g.
+        an adapter constructed directly, bypassing the factory, as many unit
+        tests do. This fallback is best-effort only: it does not guarantee a
+        match against any capability map key (a parenthesized display name
+        like ``"ClickHouse (Local)"`` normalizes to ``"clickhouse-(local)"``),
+        it just avoids crashing on multi-word display strings.
+        """
+        platform_config = getattr(self, "platform_config", None)
+        config_type = platform_config.get("type") if isinstance(platform_config, dict) else None
+        if config_type:
+            return str(config_type).strip().lower()
+        return self.platform_name.strip().lower().replace(" ", "-")
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get platform information for results traceability.
@@ -711,7 +759,11 @@ class PlatformAdapter(
             effective_tuning_config = self.get_effective_tuning_configuration()
             if self.tuning_enabled and effective_tuning_config:
                 quiet_console.print("Validating unified tuning configuration...")
-                tuning_errors = effective_tuning_config.validate_for_platform(self.platform_name)
+                tuning_errors, tuning_warnings = effective_tuning_config.validate_for_platform_detailed(
+                    self.canonical_platform_type
+                )
+                for warning in tuning_warnings:
+                    self.logger.warning(f"Tuning configuration warning: {warning}")
                 if tuning_errors:
                     raise ValueError(f"Invalid tuning configuration: {'; '.join(tuning_errors)}")
                 quiet_console.print("✅ Unified tuning configuration validated")
@@ -742,9 +794,13 @@ class PlatformAdapter(
 
             tunings_applied_dict = None
             tuning_validation_status = "NOT_APPLICABLE"
+            requested_config_hash = None
             if self.tuning_enabled and effective_tuning_config:
                 tunings_applied_dict = effective_tuning_config.to_dict()
                 tuning_validation_status = "APPLIED" if tuning_metadata_saved else "FAILED_TO_SAVE"
+                # requested_config_hash (ADR-1): canonical hash of the requested
+                # config, independent of whether every clause actually applied.
+                requested_config_hash = effective_tuning_config.get_configuration_hash()
 
             if self._check_validation_failure(validation_phase):
                 return self._create_failed_benchmark_result(
@@ -757,6 +813,7 @@ class PlatformAdapter(
                     tunings_applied_dict,
                     tuning_validation_status,
                     tuning_metadata_saved,
+                    requested_config_hash,
                 )
 
             quiet_console.print("✅ Data validation passed")
@@ -870,6 +927,9 @@ class PlatformAdapter(
                 tunings_applied=tunings_applied_dict,
                 tuning_validation_status=tuning_validation_status,
                 tuning_metadata_saved=tuning_metadata_saved,
+                tuning_config_hash=requested_config_hash,
+                tuning_source_file=self.tuning_source_file,
+                tuning_source=self.tuning_source,
                 system_profile=system_profile,
                 anonymous_machine_id=anonymous_machine_id,
                 validation_status=self._determine_overall_validation_status(validation_phase),

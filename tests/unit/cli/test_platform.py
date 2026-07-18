@@ -105,9 +105,13 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("PrestoDB") == "presto"
 
     def test_normalize_clickhouse_alias(self):
-        """Test ClickHouse alias."""
-        assert normalize_platform_name("ch") == "clickhouse"
-        assert normalize_platform_name("CH") == "clickhouse"
+        """Test ClickHouse alias resolves to the first-class local platform.
+
+        Bare 'clickhouse' was removed after its deprecation window, so the 'ch'
+        shorthand now normalizes to 'clickhouse-local' (the default canonical).
+        """
+        assert normalize_platform_name("ch") == "clickhouse-local"
+        assert normalize_platform_name("CH") == "clickhouse-local"
 
     def test_normalize_bigquery_aliases(self):
         """Test BigQuery aliases."""

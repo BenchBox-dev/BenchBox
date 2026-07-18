@@ -177,7 +177,9 @@ uv run -- python -c "from benchbox.core.write_primitives.catalog.loader import \
   print({k: c[k].write_sql.rstrip(chr(10)).count(chr(10))+1 for k in c if k.startswith('merge_scd_type2')})"
 ```
 
-- `merge_scd_type2_basic`: 18 lines of SQL (close-old UPDATE + insert-new INSERT)
+- `merge_scd_type2_basic`: 20 lines of SQL (close-old UPDATE + insert-new INSERT;
+  includes a 2-line NOT EXISTS current-version guard added 2026-07-11 to make the
+  insert idempotent on re-run - see scd2-basic-idempotency-and-cleanup-scoping)
 - `merge_scd_type2_no_change`: 17 lines (idempotent re-run path)
 - `merge_scd_type2_new_keys_only`: 7 lines (insert-only path)
 - Each carries a 3-line cleanup statement.
@@ -185,7 +187,7 @@ uv run -- python -c "from benchbox.core.write_primitives.catalog.loader import \
 The declarative AUTO CDC form for the same Type 2 result (A2) is about 6-7 lines.
 
 Honest reading: for a basic Type 2 close-and-insert, the portable hand-written form
-is roughly 18 lines, not 200. The official "40-200+ lines" range (A6) describes full
+is roughly 20 lines, not 200. The official "40-200+ lines" range (A6) describes full
 custom CDC pipeline logic that also handles out-of-order events, deletes, and
 late-arriving data; AUTO CDC absorbs that hardening, and the BenchBox operation does
 not implement it (it is a single-batch, ordered, portable workload by design). The
@@ -263,7 +265,7 @@ dimension-size-bound, though not perfectly flat.
 
 - Draft claim: "AUTO CDC's SCD Type 2 example is about 6-7 declarative lines."
   - Evidence: A2 verbatim example.
-- Draft claim: "The portable SQL it replaces, for a basic Type 2, is about 18 lines,
+- Draft claim: "The portable SQL it replaces, for a basic Type 2, is about 20 lines,
   not 200."
   - Evidence: Part B registry line count; A6 for the official 40-200+ range framing.
 - Draft claim: "The '200 lines' figure is Databricks' own 40-200+ range for full

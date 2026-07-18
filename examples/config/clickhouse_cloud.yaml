@@ -1,4 +1,4 @@
-type: clickhouse
+type: clickhouse-cloud
 connection:
   host: "your-instance.clickhouse.cloud"
   port: 8443

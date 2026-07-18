@@ -128,7 +128,6 @@ def _apply_environment_overrides(config_dict: dict[str, Any]) -> dict[str, Any]:
     - BENCHBOX_SCALE_FACTOR: Override benchmarks.default_scale
     - BENCHBOX_VERBOSE: Override execution.verbose
     - BENCHBOX_MAX_WORKERS: Override execution.max_workers
-    - BENCHBOX_TUNING_ENABLED: Override tuning.enabled
     - BENCHBOX_TUNING_CONFIG: Override tuning.default_config_file
 
     Args:
@@ -143,7 +142,6 @@ def _apply_environment_overrides(config_dict: dict[str, Any]) -> dict[str, Any]:
         "BENCHBOX_SCALE_FACTOR": ("benchmarks", "default_scale", float),
         "BENCHBOX_VERBOSE": ("execution", "verbose", lambda v: v.lower() in ["true", "1", "yes", "on"]),
         "BENCHBOX_MAX_WORKERS": ("execution", "max_workers", int),
-        "BENCHBOX_TUNING_ENABLED": ("tuning", "enabled", lambda v: v.lower() in ["true", "1", "yes", "on"]),
         "BENCHBOX_TUNING_CONFIG": ("tuning", "default_config_file", str),
         "BENCHBOX_OUTPUT_DIR": ("output", "directory", str),
         "BENCHBOX_MEMORY_LIMIT_GB": ("execution", "memory_limit_gb", int),
@@ -285,12 +283,10 @@ class ConfigManager:
                 },
             },
             tuning={
-                "enabled": False,
                 "default_config_file": None,
                 "validate_on_load": True,
                 "allow_platform_incompatible": False,
                 "environment_overrides": {
-                    "BENCHBOX_TUNING_ENABLED": "enabled",
                     "BENCHBOX_TUNING_CONFIG": "default_config_file",
                 },
             },
@@ -701,7 +697,10 @@ class ConfigManager:
 
         Args:
             config: UnifiedTuningConfiguration to validate
-            platform: Platform to validate against (default: uses configured preferred platform)
+            platform: Canonical platform type key to validate against (e.g.
+                'duckdb', 'clickhouse-local'). Default: the configured
+                preferred platform ('database.preferred'), which is stored as
+                a canonical key -- never pass an adapter display name here.
         """
         if platform is None:
             platform = self.get("database.preferred", "duckdb")
@@ -715,8 +714,15 @@ class ConfigManager:
         if config.foreign_keys.enabled is None:
             constraint_errors.append("foreign_keys.enabled must be explicitly specified (true or false)")
 
-        # Validate platform-specific configuration
-        platform_errors = config.validate_for_platform(platform)
+        # Validate platform-specific configuration. Warnings (constraint-type
+        # mismatches, platforms without compatibility data) are surfaced but
+        # never fail the load; only hard errors do.
+        platform_errors, platform_warnings = config.validate_for_platform_detailed(platform)
+
+        if platform_warnings:
+            console.print(f"[yellow]⚠️ Unified tuning validation warnings for platform '{platform}':[/yellow]")
+            for warning in platform_warnings:
+                console.print(f"  - {warning}")
 
         all_errors = constraint_errors + platform_errors
 

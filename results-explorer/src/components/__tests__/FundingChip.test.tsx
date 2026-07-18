@@ -8,6 +8,7 @@
  *   (d) Tone is uniformly neutral - funding is a disclosure, not a trust signal
  *   (e) data-role="funding" so pages and e2e can target funding chips
  *       independently of the orthogonal trust badge
+ *   (f) compact form uses explicit short labels, never a first-word truncation
  */
 
 import { render, screen } from "@testing-library/preact";
@@ -118,5 +119,34 @@ describe("FundingChip", () => {
   it('sets data-role="funding" so it is targetable apart from the trust badge', () => {
     const { container } = render(<FundingChip funding="grant" />);
     expect(container.querySelector(".badge")?.getAttribute("data-role")).toBe("funding");
+  });
+
+  // -----------------------------------------------------------------------
+  // (f) compact form used on dense card rows
+  // -----------------------------------------------------------------------
+
+  it("uses explicit compact labels rather than truncating to the first word", () => {
+    // "Vendor sponsored" must NOT compact to "Vendor": that is exactly the word
+    // TrustBadge's compact form renders for trust_label="vendor-supplied", and
+    // the two axes are independent. Collapsing them on a dense row would let a
+    // reader infer a trust tier from a funding disclosure.
+    const { container } = render(<FundingChip funding="vendor-sponsored" compact />);
+    expect(container.textContent).toContain("Sponsored");
+    expect(container.textContent).not.toContain("Vendor");
+  });
+
+  it("keeps the full label when not compact", () => {
+    const { container } = render(<FundingChip funding="vendor-sponsored" />);
+    expect(container.textContent).toContain("Vendor sponsored");
+  });
+
+  it("omits the compact chip for the unspecified default", () => {
+    const { container } = render(<FundingChip funding="unspecified" compact />);
+    expect(container.querySelector(".badge")).toBeNull();
+  });
+
+  it("renders an unrecognised token verbatim in compact form", () => {
+    const { container } = render(<FundingChip funding="mystery-fund" compact />);
+    expect(container.textContent).toContain("mystery-fund");
   });
 });

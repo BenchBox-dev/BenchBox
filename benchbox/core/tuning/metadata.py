@@ -9,6 +9,8 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import hashlib
+import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -17,6 +19,21 @@ from typing import Any, Optional
 from .interface import BenchmarkTunings, TableTuning, TuningColumn, TuningType, UnifiedTuningConfiguration
 
 logger = logging.getLogger(__name__)
+
+# The subset of TuningType values that _rebuild_tunings_from_records knows how
+# to place into a TableTuning (column-based, per-table tunings). Any other
+# tuning_type value found in the metadata table -- including the sentinel
+# section-hash / schema-version marker rows written under
+# TuningMetadataManager._SECTION_MARKER_TABLE -- is not column data and must
+# be skipped rather than fed into the table-keyed reconstruction.
+_COLUMN_TUNING_TYPE_VALUES = frozenset(
+    {
+        TuningType.PARTITIONING.value,
+        TuningType.CLUSTERING.value,
+        TuningType.DISTRIBUTION.value,
+        TuningType.SORTING.value,
+    }
+)
 
 
 @dataclass
@@ -63,7 +80,17 @@ class TuningMetadata:
 
 @dataclass
 class MetadataValidationResult:
-    """Result of tuning metadata validation."""
+    """Result of tuning metadata validation.
+
+    `drifted_sections` names the coarse-grained config sections (see
+    `TuningMetadataManager._CONSTRAINTS_SECTION` /
+    `_PLATFORM_OPTIMIZATIONS_SECTION`) whose persisted canonical hash no
+    longer matches the expected `UnifiedTuningConfiguration`. It is additive
+    and safe to ignore for callers that only care about `is_valid`/`errors`;
+    it exists so a richer drift-reporting consumer (e.g. the applied-ledger
+    drift_check companion) can tell *which* section drifted without
+    re-parsing `errors` strings.
+    """
 
     is_valid: bool = True
     errors: list[str] = field(default_factory=list)
@@ -71,6 +98,7 @@ class MetadataValidationResult:
     missing_tables: set[str] = field(default_factory=set)
     extra_tables: set[str] = field(default_factory=set)
     configuration_mismatches: dict[str, str] = field(default_factory=dict)
+    drifted_sections: set[str] = field(default_factory=set)
 
     def add_error(self, message: str) -> None:
         """Add an error and mark validation as failed."""
@@ -87,7 +115,45 @@ class MetadataValidationResult:
 
 
 class TuningMetadataManager:
-    """Manages tuning metadata operations for database validation."""
+    """Manages tuning metadata operations for database validation.
+
+    Widened persistence (unique/check constraints + platform optimizations):
+    `UnifiedTuningConfiguration.unique_constraints`, `.check_constraints`, and
+    `.platform_optimizations` are whole-config toggles/settings, not per-table
+    per-column data like partitioning/clustering/distribution/sorting. Rather
+    than change the `benchbox_tuning_metadata` table's DDL (which would need a
+    migration for every platform adapter), each of those two sections is
+    persisted as a canonical SHA-256 hash in a sentinel data *row* that reuses
+    the existing (table_name, tuning_type, column_name, column_order,
+    configuration_hash, created_at, platform) schema -- see
+    `_SECTION_MARKER_TABLE` / `_build_section_marker_records`. This keeps the
+    schema itself unchanged (additive at the data level only), so tables
+    written by older BenchBox versions -- which simply lack these sentinel
+    rows -- still load without error; `_load_section_markers` returning empty
+    is treated as "no drift data available" (a warning), never an error.
+    """
+
+    # Sentinel `table_name` used for section-hash / schema-version marker
+    # rows. Not a real benchmark table -- `_rebuild_tunings_from_records`
+    # filters it out so it never leaks into a loaded `BenchmarkTunings`.
+    _SECTION_MARKER_TABLE = "__benchbox_tuning_sections__"
+
+    # Sentinel `tuning_type` values for marker rows (never a `TuningType`
+    # enum value, so they can't collide with real column-tuning rows).
+    _TUNING_TYPE_SCHEMA_VERSION = "schema_version"
+    _TUNING_TYPE_CONSTRAINTS_HASH = "constraints_hash"
+    _TUNING_TYPE_PLATFORM_OPT_HASH = "platform_optimizations_hash"
+
+    # Bumped whenever the *shape* of what gets hashed into the section-marker
+    # rows changes (e.g. a new field folded into the constraints payload).
+    # Not currently branched on by the reader -- recorded for forward
+    # compatibility so a future reader can tell old and new hash payloads
+    # apart if the hashed shape ever changes incompatibly.
+    _METADATA_SCHEMA_VERSION = 2
+
+    # `MetadataValidationResult.drifted_sections` values.
+    _CONSTRAINTS_SECTION = "constraints"
+    _PLATFORM_OPTIMIZATIONS_SECTION = "platform_optimizations"
 
     def __init__(self, platform_adapter, database_name: Optional[str] = None):
         """Initialize the metadata manager.
@@ -101,6 +167,168 @@ class TuningMetadataManager:
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
         self._metadata_table_name = "benchbox_tuning_metadata"
         self._table_exists = None  # Cache for table existence check
+
+    def _platform_key(self) -> str:
+        """Return the canonical platform type key for lookups and persistence.
+
+        Prefers the adapter's `canonical_platform_type` (the machine-readable
+        CLI/config type key, e.g. 'clickhouse-local'); falls back to a
+        normalized `platform_name` for lightweight adapters/stubs that do not
+        expose the property. The display name (`platform_name`) must never be
+        stored or used for dialect dispatch -- multi-word display strings like
+        'ClickHouse Local' do not match any canonical key.
+        """
+        canonical = getattr(self.platform_adapter, "canonical_platform_type", None)
+        if canonical:
+            return str(canonical).strip().lower()
+        return str(self.platform_adapter.platform_name).strip().lower().replace(" ", "-")
+
+    @staticmethod
+    def _hash_section(payload: dict[str, Any]) -> str:
+        """Canonical SHA-256 hash of a config section's dict representation.
+
+        Uses the same sort_keys + compact-separator recipe as
+        `BenchmarkTunings.get_configuration_hash` so equal configurations
+        always hash identically regardless of dict insertion order.
+        """
+        blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+    def _build_section_marker_records(
+        self, unified_config: UnifiedTuningConfiguration, platform: str, created_at: datetime
+    ) -> list["TuningMetadata"]:
+        """Build the sentinel rows that carry the constraints/platform-optimizations
+        section hashes plus a schema-version marker, using the existing
+        TuningMetadata row shape (see `_SECTION_MARKER_TABLE`).
+        """
+        constraints_payload = {
+            "unique_constraints": unified_config.unique_constraints.to_dict(),
+            "check_constraints": unified_config.check_constraints.to_dict(),
+        }
+        platform_optimizations_payload = unified_config.platform_optimizations.to_dict()
+
+        return [
+            TuningMetadata(
+                table_name=self._SECTION_MARKER_TABLE,
+                tuning_type=self._TUNING_TYPE_SCHEMA_VERSION,
+                column_name="schema_version",
+                column_order=self._METADATA_SCHEMA_VERSION,
+                configuration_hash=str(self._METADATA_SCHEMA_VERSION),
+                created_at=created_at,
+                platform=platform,
+            ),
+            TuningMetadata(
+                table_name=self._SECTION_MARKER_TABLE,
+                tuning_type=self._TUNING_TYPE_CONSTRAINTS_HASH,
+                column_name="constraints_hash",
+                column_order=0,
+                configuration_hash=self._hash_section(constraints_payload),
+                created_at=created_at,
+                platform=platform,
+            ),
+            TuningMetadata(
+                table_name=self._SECTION_MARKER_TABLE,
+                tuning_type=self._TUNING_TYPE_PLATFORM_OPT_HASH,
+                column_name="platform_optimizations_hash",
+                column_order=0,
+                configuration_hash=self._hash_section(platform_optimizations_payload),
+                created_at=created_at,
+                platform=platform,
+            ),
+        ]
+
+    def _save_section_markers(self, unified_config: UnifiedTuningConfiguration) -> bool:
+        """Persist the constraints/platform-optimizations section-hash markers.
+
+        Best-effort: any failure is logged and swallowed. This is
+        supplementary drift-detection data written *after* `save_tunings`
+        has already committed the column-based table tunings, so a failure
+        here must never be surfaced as an overall save failure (see
+        `save_unified_tunings` and the must_preserve "save failure remains
+        non-fatal" requirement).
+        """
+        try:
+            if not self.create_metadata_table():
+                return False
+
+            platform = self._platform_key()
+            records = self._build_section_marker_records(unified_config, platform, datetime.now())
+            self._batch_insert_records(records)
+            return True
+        except Exception as e:
+            self.logger.warning(f"Failed to save tuning section markers (non-fatal): {e}")
+            return False
+
+    def _load_section_markers(self) -> dict[str, str]:
+        """Load section-hash / schema-version marker rows, keyed by tuning_type.
+
+        Returns an empty dict both when the metadata table doesn't exist and
+        when it exists but predates this widening (no sentinel rows were
+        ever written) -- callers must treat "no markers" as "no drift data
+        available", not as an error.
+        """
+        if not self._table_exists_check():
+            return {}
+
+        query_sql = f"""
+        SELECT tuning_type, configuration_hash
+        FROM {self._metadata_table_name}
+        WHERE table_name = '{self._SECTION_MARKER_TABLE}'
+        """
+        temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
+        try:
+            rows = self._fetch_all(temp_conn, query_sql)
+        finally:
+            self.platform_adapter.close_connection(temp_conn)
+
+        return dict(rows)
+
+    def _compare_section_hashes(
+        self, unified_config: UnifiedTuningConfiguration, result: MetadataValidationResult
+    ) -> None:
+        """Compare persisted constraints/platform-optimizations section hashes.
+
+        Widens drift detection beyond column-based table tunings: unique/check
+        constraints and platform optimizations (z-ordering, liquid clustering,
+        bloom filters, auto-optimize/compact, materialized views, ...) are
+        whole-config sections with no per-table representation, so they are
+        compared here by canonical hash rather than by `_compare_table_tunings`.
+        """
+        existing_markers = self._load_section_markers()
+        if not existing_markers:
+            result.add_warning(
+                "No section-hash metadata found in database (written by an older BenchBox "
+                "version, or no tunings have been saved yet); unique/check constraint and "
+                "platform-optimization drift cannot be detected for this database."
+            )
+            return
+
+        constraints_payload = {
+            "unique_constraints": unified_config.unique_constraints.to_dict(),
+            "check_constraints": unified_config.check_constraints.to_dict(),
+        }
+        expected_constraints_hash = self._hash_section(constraints_payload)
+        expected_platform_opt_hash = self._hash_section(unified_config.platform_optimizations.to_dict())
+
+        existing_constraints_hash = existing_markers.get(self._TUNING_TYPE_CONSTRAINTS_HASH)
+        existing_platform_opt_hash = existing_markers.get(self._TUNING_TYPE_PLATFORM_OPT_HASH)
+
+        if existing_constraints_hash is not None and existing_constraints_hash != expected_constraints_hash:
+            result.drifted_sections.add(self._CONSTRAINTS_SECTION)
+            result.add_error(
+                "Unique/check constraint configuration drift detected: persisted database metadata "
+                "does not match the expected configuration (unique_constraints/check_constraints "
+                "changed since the database was tuned)."
+            )
+
+        if existing_platform_opt_hash is not None and existing_platform_opt_hash != expected_platform_opt_hash:
+            result.drifted_sections.add(self._PLATFORM_OPTIMIZATIONS_SECTION)
+            result.add_error(
+                "Platform-optimization configuration drift detected: persisted database metadata "
+                "does not match the expected configuration (e.g. z-ordering, liquid clustering, "
+                "bloom filters, auto-optimize/compact, or materialized views changed since the "
+                "database was tuned)."
+            )
 
     def create_metadata_table(self) -> bool:
         """Create the tunings metadata table if it doesn't exist.
@@ -138,7 +366,7 @@ class TuningMetadataManager:
 
     def _get_create_table_sql(self) -> str:
         """Get platform-specific CREATE TABLE SQL."""
-        platform = self.platform_adapter.platform_name.lower()
+        platform = self._platform_key()
 
         # Base table definition
         base_sql = f"""
@@ -163,15 +391,18 @@ class TuningMetadataManager:
             # Redshift prefers explicit column encoding
             return base_sql + " ENCODE AUTO"
         elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
-            # ClickHouse uses specific engine and ordering
-            return base_sql.replace(")", ") ENGINE = MergeTree() ORDER BY (table_name, tuning_type)")
+            # ClickHouse uses specific engine and ordering. base_sql always ends
+            # with the CREATE TABLE's closing ")", so appending here is enough -
+            # str.replace(")", ...) would also rewrite every VARCHAR(N) column
+            # width's closing paren, corrupting the column definitions.
+            return base_sql + " ENGINE = MergeTree() ORDER BY (table_name, tuning_type)"
         else:
             # Default for DuckDB, Databricks, etc.
             return base_sql
 
     def _get_create_index_sql(self) -> Optional[str]:
         """Get platform-specific index creation SQL."""
-        platform = self.platform_adapter.platform_name.lower()
+        platform = self._platform_key()
 
         if platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
             # ClickHouse uses ORDER BY in table definition, no separate index needed
@@ -204,7 +435,8 @@ class TuningMetadataManager:
 
             # Generate configuration hash
             config_hash = benchmark_tunings.get_configuration_hash()
-            platform = self.platform_adapter.platform_name
+            # Persist the canonical platform type key, not the display name
+            platform = self._platform_key()
             current_time = datetime.now()
 
             # Prepare records to insert
@@ -264,11 +496,22 @@ class TuningMetadataManager:
         return unified
 
     def save_unified_tunings(self, unified_config: UnifiedTuningConfiguration) -> bool:
-        """Save a UnifiedTuningConfiguration to the metadata table."""
+        """Save a UnifiedTuningConfiguration to the metadata table.
+
+        Persists the column-based table tunings via `save_tunings`, then
+        best-effort persists the constraints/platform-optimizations section
+        hashes used by `validate_unified_tunings` to widen drift detection.
+        A section-marker save failure is logged and swallowed -- it must
+        never turn an otherwise-successful save into a failure (metadata
+        persistence is diagnostic, not required for the run to proceed).
+        """
         try:
             if not isinstance(unified_config, UnifiedTuningConfiguration):
                 raise TypeError("Expected UnifiedTuningConfiguration")
-            return self.save_tunings(self._as_benchmark_tunings(unified_config))
+            saved = self.save_tunings(self._as_benchmark_tunings(unified_config))
+            if saved:
+                self._save_section_markers(unified_config)
+            return saved
         except Exception as e:
             self.logger.error(f"Failed to save unified tunings: {e}")
             return False
@@ -277,7 +520,15 @@ class TuningMetadataManager:
         """Load tuning metadata and return as UnifiedTuningConfiguration."""
         try:
             benchmark_tunings = self.load_tunings()
-            if not benchmark_tunings:
+            # `is None` (not a truthiness check) -- see validate_tunings above:
+            # a saved config whose only persisted rows are the section-hash
+            # markers loads back as a real, non-None BenchmarkTunings with an
+            # empty table_tunings dict, which is falsy via __len__. Treating
+            # that as "nothing to load" silently drops section-only configs
+            # (platform optimizations/constraints, no column tunings) from
+            # every caller of this method, e.g. _validate_database_tunings'
+            # "DB has tuning metadata but none expected" warning.
+            if benchmark_tunings is None:
                 return None
             return self._as_unified_tunings(benchmark_tunings)
         except Exception as e:
@@ -285,11 +536,28 @@ class TuningMetadataManager:
             return None
 
     def validate_unified_tunings(self, unified_config: UnifiedTuningConfiguration) -> MetadataValidationResult:
-        """Validate database metadata against a UnifiedTuningConfiguration."""
+        """Validate database metadata against a UnifiedTuningConfiguration.
+
+        Widened comparison: in addition to the existing table-tunings check
+        (`validate_tunings`), this compares the persisted constraints and
+        platform-optimizations section hashes against `unified_config`, so
+        drift in unique/check constraints or platform optimizations
+        (z-ordering, liquid clustering, bloom filters, auto-optimize/compact,
+        materialized views, ...) on a reused database is no longer invisible.
+        Drifted sections are recorded by name in
+        `MetadataValidationResult.drifted_sections`.
+        """
         try:
             if not isinstance(unified_config, UnifiedTuningConfiguration):
                 raise TypeError("Expected UnifiedTuningConfiguration")
-            return self.validate_tunings(self._as_benchmark_tunings(unified_config))
+            result = self.validate_tunings(self._as_benchmark_tunings(unified_config))
+            # Only attempt the section-hash comparison when the metadata
+            # table actually exists -- otherwise validate_tunings has
+            # already reported "No tuning metadata found in database" and a
+            # second "no section-hash metadata" warning would be noise.
+            if self._table_exists_check():
+                self._compare_section_hashes(unified_config, result)
+            return result
         except Exception as e:
             result = MetadataValidationResult(is_valid=False)
             result.add_error(f"Validation failed with error: {e}")
@@ -405,6 +673,15 @@ class TuningMetadataManager:
                 platform,
             ) = record
 
+            # Skip section-hash / schema-version marker rows (see
+            # _SECTION_MARKER_TABLE): they are not column-tuning data and
+            # their tuning_type values are not TuningType columns, so
+            # including them here would KeyError below.
+            if table_name == self._SECTION_MARKER_TABLE:
+                continue
+            if tuning_type not in _COLUMN_TUNING_TYPE_VALUES:
+                continue
+
             if table_name not in tables:
                 tables[table_name] = {
                     TuningType.PARTITIONING.value: [],
@@ -453,7 +730,19 @@ class TuningMetadataManager:
             # Load existing tunings from database
             existing_tunings = self.load_tunings(expected_tunings.benchmark_name)
 
-            if not existing_tunings:
+            # `is None` (not a truthiness check): load_tunings returns None
+            # only when the metadata table is missing or truly empty. A
+            # config whose only persisted rows are the section-hash markers
+            # (see _SECTION_MARKER_TABLE) -- i.e. a saved config with
+            # platform optimizations/constraint toggles but zero
+            # column-based table tunings -- loads back as a real, non-None
+            # BenchmarkTunings with an empty table_tunings dict, which is
+            # falsy via __len__. Treating that as "not found" was a false
+            # hard error for exactly the whole-config-sections-only scenario
+            # this widening exists to validate; it must instead fall through
+            # to comparison (which correctly reports "no drift") and let
+            # validate_unified_tunings' _compare_section_hashes do its job.
+            if existing_tunings is None:
                 result.add_error("No tuning metadata found in database")
                 return result
 
@@ -577,7 +866,10 @@ class TuningMetadataManager:
             if not self._table_exists_check():
                 return {"table_exists": False}
 
-            # Query summary statistics
+            # Query summary statistics. Section-hash / schema-version marker
+            # rows (table_name == _SECTION_MARKER_TABLE) are excluded so they
+            # don't inflate unique_tables/unique_tuning_types with sentinel
+            # bookkeeping data that isn't a real benchmark table.
             summary_sql = f"""
             SELECT
                 COUNT(*) as total_records,
@@ -587,6 +879,7 @@ class TuningMetadataManager:
                 MIN(created_at) as oldest_record,
                 MAX(created_at) as newest_record
             FROM {self._metadata_table_name}
+            WHERE table_name != '{self._SECTION_MARKER_TABLE}'
             """
 
             temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)

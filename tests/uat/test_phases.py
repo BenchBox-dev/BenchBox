@@ -16,8 +16,9 @@ from tests.uat.phases import (
     execute as exec_phase,
     package as package_phase,
     preflight as preflight_phase,
+    report as report_phase,
 )
-from tests.uat.runner import CellResult
+from tests.uat.runner import CellResult, classify_for_submit, submit_state_is_cell_failure
 
 pytestmark = pytest.mark.fast
 
@@ -443,6 +444,9 @@ def test_execute_skips_unreachable_platform(tmp_path):
         )
     assert len(outcome.results) == 0
     assert len(outcome.skipped_unreachable) == 1
+    # w2 regression: `all(...)` over an empty `results` tuple is vacuously
+    # True, so an all-unreachable sweep (zero cells run) must not exit 0.
+    assert outcome.exit_code() == 1
 
 
 def _docker_platform_from_argv(argv: list[str]) -> str:
@@ -509,6 +513,122 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
     assert any(event.action == "down" and event.status == "ok" for event in outcome.docker_events)
     down_commands = [event.result.argv for event in outcome.docker_events if event.action == "down" and event.result]
     assert all("-v" in argv and "--remove-orphans" in argv for argv in down_commands)
+
+
+def test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_mocker(tmp_path, monkeypatch):
+    """uat-container-engine-routing w3: mocker's `compose down -v` leaks named
+    volumes; teardown must sweep them project-scoped when volumes/images mode
+    requested `-v` and the resolved engine is mocker."""
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        cfg = validate_config(
+            {
+                "name": "mocker volume sweep",
+                "platforms": {"include": ["postgresql"]},
+                "benchmarks": {"include": ["tpch"]},
+                "scales": {"rungs": [0.01]},
+                "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+            }
+        )
+        volume_calls: list[tuple[str, ...]] = []
+
+        # Exact leaked name mocker 0.5.4 creates for this project: the
+        # postgresql spec declares volume key `postgresql18-data`, and
+        # mocker joins <project>-<key> with a hyphen (live-verified).
+        leaked_volume = "benchbox-uat-mocker-volume-sweep-postgresql-postgresql18-data"
+
+        def fake_docker(argv, **kwargs):
+            argv_tuple = tuple(argv)
+            if argv_tuple == ("mocker", "volume", "ls"):
+                volume_calls.append(argv_tuple)
+                return docker_assets.DockerCommandResult(argv_tuple, 0, f"local    {leaked_volume}\n", "")
+            if argv_tuple[:3] == ("mocker", "volume", "rm"):
+                volume_calls.append(argv_tuple)
+                return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+            return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+        def recording_runner(platform, benchmark, scale, **kwargs):
+            return CellResult(
+                platform=platform,
+                benchmark=benchmark,
+                scale=scale,
+                status="passed",
+                exit_code=0,
+                elapsed_s=1.0,
+                log_path=tmp_path / f"{platform}.log",
+                result_path=None,
+            )
+
+        with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+            outcome = exec_phase.run_execute(
+                cfg,
+                log_dir=tmp_path,
+                databases_root=tmp_path / "databases",
+                runner=recording_runner,
+                docker_runner=fake_docker,
+            )
+
+        assert outcome.aborted is False
+        sweep_events = [e for e in outcome.docker_events if e.action == "volume-sweep"]
+        assert len(sweep_events) == 1
+        assert sweep_events[0].status == "ok"
+        assert leaked_volume in sweep_events[0].message
+        assert ("mocker", "volume", "ls") in volume_calls
+        assert ("mocker", "volume", "rm", leaked_volume) in volume_calls
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
+
+
+def test_execute_teardown_skips_mocker_volume_sweep_for_containers_mode(tmp_path, monkeypatch):
+    """The sweep only runs when `-v` was requested (volumes/images mode) --
+    `containers` mode intentionally keeps volumes for platform-reuse, and the
+    sweep must not defeat that."""
+    monkeypatch.setenv(docker_assets.CONTAINER_CLI_ENV_VAR, "mocker")
+    monkeypatch.setattr(docker_assets, "_which_container_cli", lambda cli: f"/opt/homebrew/bin/{cli}")
+    docker_assets.resolve_container_cli.cache_clear()
+    try:
+        cfg = validate_config(
+            {
+                "name": "mocker containers mode",
+                "platforms": {"include": ["postgresql"]},
+                "benchmarks": {"include": ["tpch"]},
+                "scales": {"rungs": [0.01]},
+                "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "containers"},
+            }
+        )
+        calls: list[tuple[str, ...]] = []
+
+        def fake_docker(argv, **kwargs):
+            calls.append(tuple(argv))
+            return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+        def recording_runner(platform, benchmark, scale, **kwargs):
+            return CellResult(
+                platform=platform,
+                benchmark=benchmark,
+                scale=scale,
+                status="passed",
+                exit_code=0,
+                elapsed_s=1.0,
+                log_path=tmp_path / f"{platform}.log",
+                result_path=None,
+            )
+
+        with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+            outcome = exec_phase.run_execute(
+                cfg,
+                log_dir=tmp_path,
+                databases_root=tmp_path / "databases",
+                runner=recording_runner,
+                docker_runner=fake_docker,
+            )
+
+        assert not any(e.action == "volume-sweep" for e in outcome.docker_events)
+        assert not any(c[:2] == ("mocker", "volume") for c in calls)
+    finally:
+        docker_assets.resolve_container_cli.cache_clear()
 
 
 def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
@@ -611,13 +731,232 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
         ("cell", "run", "postgresql"),
         ("docker", "down", "postgresql"),
     ]
-    # The failed platform's cells are recorded as unreachable (not silently dropped),
-    # and the compose-up failure is captured in the lifecycle events.
-    assert any(cell.platform == "clickhouse-server" for cell in outcome.skipped_unreachable)
+    # The failed platform's cells are recorded as startup_failed (not
+    # skipped_unreachable -- uat-fail-advance-consistency w3 splits the two
+    # so accounting can tell "stack failed to start" from "TCP probe found
+    # nothing listening"), not silently dropped, and the compose-up failure
+    # is captured in the lifecycle events.
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
+    assert len(outcome.skipped_unreachable) == 0
     assert any(
         event.platform == "clickhouse-server" and event.action == "up" and event.status == "failed"
         for event in outcome.docker_events
     )
+
+
+def test_execute_teardown_failure_after_startup_failure_advances_instead_of_aborting(tmp_path):
+    """w4: teardown failing on a stack whose OWN startup already failed must not defeat #700's advance.
+
+    Regression for uat-fail-advance-consistency w4: `started=True` is set
+    unconditionally after a compose-up so the finally-teardown still runs on
+    a broken stack (it can still leak containers/volumes); before this fix,
+    a teardown failure on that same broken stack was treated exactly like a
+    healthy-stack teardown failure and turned into a GLOBAL abort, defeating
+    the #700 advance-past-broken-stack intent. Policy: only a stack that
+    started successfully makes an undoable teardown failure a resource-leak
+    emergency worth a global abort.
+    """
+    cfg = validate_config(
+        {
+            "name": "docker startup and teardown both fail",
+            "platforms": {"include": ["clickhouse-server", "postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    sequence: list[tuple[str, str, str]] = []
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        platform = _docker_platform_from_argv(argv)
+        sequence.append(("docker", action, platform))
+        # clickhouse-server's compose-up fails AND its teardown also fails.
+        if platform == "clickhouse-server":
+            return docker_assets.DockerCommandResult(tuple(argv), 1, "", f"{action} failed")
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        sequence.append(("cell", "run", platform))
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / f"{platform}.log",
+            result_path=None,
+        )
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=fake_docker,
+            free_space_checks_enabled=True,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    # The sweep advances past the broken stack instead of a global abort.
+    assert outcome.aborted is False
+    assert outcome.abort_reason is None
+    assert sequence == [
+        ("docker", "up", "clickhouse-server"),
+        ("docker", "down", "clickhouse-server"),
+        ("docker", "up", "postgresql"),
+        ("cell", "run", "postgresql"),
+        ("docker", "down", "postgresql"),
+    ]
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
+    # Both the raw teardown failure and the FAIL-and-advance policy decision
+    # are recorded as lifecycle events for auditability.
+    assert any(
+        event.platform == "clickhouse-server" and event.action == "down" and event.status == "failed"
+        for event in outcome.docker_events
+    )
+    assert any(
+        event.platform == "clickhouse-server"
+        and event.action == "down-policy"
+        and event.status == "advance-after-startup-failed"
+        for event in outcome.docker_events
+    )
+
+
+def test_execute_healthy_stack_teardown_failure_still_aborts_after_startup_failed_regression_guard(tmp_path):
+    """w4 must_preserve: a HEALTHY stack's teardown failure still aborts globally.
+
+    Companion to test_execute_docker_teardown_failure_aborts_before_next_platform:
+    that test already pins this behavior, but is duplicated here explicitly
+    alongside the new startup-failed-teardown-advances test so the two
+    directions of the w4 policy are visible side by side.
+    """
+    cfg = validate_config(
+        {
+            "name": "healthy stack teardown failure",
+            "platforms": {"include": ["clickhouse-server", "postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        if action == "down":
+            return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose down failed")
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    assert outcome.aborted is True
+    assert "Docker cleanup failed" in (outcome.abort_reason or "")
+    assert len(outcome.startup_failed) == 0
+
+
+def test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails(tmp_path):
+    """w2 regression: every managed compose-up failing means zero cells run.
+
+    A single-platform sweep whose only compose-up fails ends with an empty
+    `results` tuple, same as the all-unreachable case -- `all([])` must not
+    read as a clean sweep here either.
+    """
+    cfg = validate_config(
+        {
+            "name": "docker all compose-up failed",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def fake_docker(argv, **kwargs):
+        action = "up" if "up" in argv else "down"
+        if action == "up":
+            return docker_assets.DockerCommandResult(
+                tuple(argv), 1, "", "docker command timed out after 300s", timed_out=True
+            )
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def fail_runner(platform, benchmark, scale, **kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError("no cell should run when the only compose-up failed")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=fail_runner,
+            docker_runner=fake_docker,
+            free_space_checks_enabled=True,
+            free_space_reader=lambda _path: 100.0,
+        )
+
+    assert outcome.aborted is False
+    assert len(outcome.results) == 0
+    assert len(outcome.skipped_unreachable) == 0
+    assert len(outcome.startup_failed) == 1
+    assert outcome.exit_code() == 1
+
+
+def test_execute_outcome_exit_code_zero_only_when_all_passed(tmp_path):
+    """Sanity check the guard did not change the ordinary passed/failed behavior."""
+    all_passed = exec_phase.ExecuteOutcome(
+        phase="execute",
+        results=(
+            CellResult(
+                platform="duckdb",
+                benchmark="tpch",
+                scale=0.01,
+                status="passed",
+                exit_code=0,
+                elapsed_s=1.0,
+                log_path=tmp_path / "cell.log",
+                result_path=None,
+            ),
+        ),
+        pruned=(),
+        skipped_unreachable=(),
+    )
+    assert all_passed.exit_code() == 0
+
+    one_failed = exec_phase.ExecuteOutcome(
+        phase="execute",
+        results=(
+            CellResult(
+                platform="duckdb",
+                benchmark="tpch",
+                scale=0.01,
+                status="failed",
+                exit_code=1,
+                elapsed_s=1.0,
+                log_path=tmp_path / "cell.log",
+                result_path=None,
+            ),
+        ),
+        pruned=(),
+        skipped_unreachable=(),
+    )
+    assert one_failed.exit_code() == 1
+
+    no_results = exec_phase.ExecuteOutcome(
+        phase="execute",
+        results=(),
+        pruned=(),
+        skipped_unreachable=(),
+    )
+    assert no_results.exit_code() == 1
 
 
 def test_execute_unmanaged_docker_keeps_skip_probe_without_commands(tmp_path):
@@ -866,6 +1205,14 @@ def test_execute_outcome_carries_compatibility_pruned_cells(tmp_path):
 
 
 def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
+    """A passed cell whose result JSON refuses submission surfaces as FAILED.
+
+    Submit classification is the runner's job (run_cell, runner.py:256-260);
+    execute.py no longer re-applies it. The fake runner therefore mirrors
+    run_cell's classification step against the real fixture JSON, and the
+    test pins that the classified failure flows through run_execute's
+    pipeline (ladder, results aggregation) unmangled.
+    """
     result_path = tmp_path / "benchmark_runs" / "results" / "failed-query.json"
     _write_submit_result(result_path, failed=1)
     cfg = validate_config(
@@ -878,15 +1225,21 @@ def test_execute_downgrades_passed_cell_with_query_failure_result(tmp_path):
     )
 
     def fake_runner(platform, benchmark, scale, **kwargs):
+        # Same classification sequence as the real run_cell: classify the
+        # exported result JSON, downgrade a passed status when the submit
+        # state is a cell failure.
+        submit_state = classify_for_submit(result_path)
+        is_failure = submit_state_is_cell_failure(submit_state)
         return CellResult(
             platform=platform,
             benchmark=benchmark,
             scale=scale,
-            status="passed",
-            exit_code=0,
+            status="failed" if is_failure else "passed",
+            exit_code=1 if is_failure else 0,
             elapsed_s=1.0,
             log_path=tmp_path / "cell.log",
             result_path=result_path,
+            submit_terminal_state=submit_state.value,
         )
 
     outcome = exec_phase.run_execute(
@@ -930,6 +1283,97 @@ def test_default_log_dir_substitutes_date_and_name():
     out = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5))
     assert "20260505" in str(out)
     assert "uat-2026-05-02" not in str(out)  # default template uses {date} only
+
+
+def test_default_log_dir_substitutes_time_component():
+    """The DEFAULT template's {time} placeholder expands to HHMMSS."""
+    cfg = validate_config({"name": "uat-smoke"})
+    out = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 14, 30, 7))
+    assert "143007" in str(out)
+
+
+def test_default_log_dir_time_avoids_same_day_collision():
+    """Two same-day sweeps at different times land in distinct default dirs.
+
+    Prior to uat-resume-retirement-artifact-durability the default template
+    was {date}-only, so a second same-day run silently overwrote the
+    first run's evidence (mode "w" on every durable artifact).
+    """
+    cfg = validate_config({"name": "uat-smoke"})
+    first = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 9, 0, 0))
+    second = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 9, 0, 1))
+    assert first != second
+
+
+def test_default_log_dir_same_second_collision_gets_disambiguated(tmp_path: Path):
+    """#1143 review: {time} truncates to HHMMSS, so two sweeps starting in the
+    same second (e.g. automation kicking off multiple configs at once)
+    resolved to the same directory pre-fix, silently combining/overwriting
+    durable artifacts. A path that already exists on disk now gets a
+    numeric suffix instead.
+    """
+    cfg = validate_config(
+        {
+            "name": "collision-smoke",
+            "output": {"logs_dir_template": str(tmp_path / "uat_{date}_{time}")},
+        }
+    )
+    now = _dt.datetime(2026, 5, 5, 9, 0, 0)
+    first = exec_phase.default_log_dir(cfg, now=now)
+    first.mkdir(parents=True)
+    second = exec_phase.default_log_dir(cfg, now=now)
+
+    assert first != second
+    assert second.name == f"{first.name}-2"
+
+
+def test_default_log_dir_explicit_date_only_template_still_works():
+    """Existing configs with an explicit {date}-only template keep working verbatim."""
+    cfg = validate_config(
+        {
+            "name": "uat-smoke",
+            "output": {"logs_dir_template": "~/Developer/benchmark_runs/logs/uat_custom_{date}"},
+        }
+    )
+    out = exec_phase.default_log_dir(cfg, now=_dt.datetime(2026, 5, 5, 9, 0, 0))
+    assert str(out).endswith("uat_custom_20260505")
+
+
+def test_atomic_write_text_writes_content_and_cleans_up_tmp(tmp_path: Path):
+    target = tmp_path / "nested" / "cells.jsonl"
+    report_phase.atomic_write_text(target, "line-one\nline-two\n")
+
+    assert target.read_text(encoding="utf-8") == "line-one\nline-two\n"
+    assert not target.with_name(target.name + ".tmp").exists()
+
+
+def test_atomic_write_text_overwrites_existing_content(tmp_path: Path):
+    target = tmp_path / "matrix_summary.tsv"
+    report_phase.atomic_write_text(target, "first\n")
+    report_phase.atomic_write_text(target, "second\n")
+
+    assert target.read_text(encoding="utf-8") == "second\n"
+
+
+def test_atomic_write_text_survives_a_failed_write_without_torn_output(tmp_path: Path):
+    """A write failure must not clobber the previous good artifact.
+
+    The temp-file + os.replace design means a crash or exception while
+    building/writing the new content leaves the last successfully written
+    artifact untouched -- unlike the prior mode="w" writes, which truncated
+    the destination file before any new content was available. The failed
+    write's .tmp sibling must also be cleaned up, not orphaned in the run
+    directory.
+    """
+    target = tmp_path / "validator_rollup.tsv"
+    report_phase.atomic_write_text(target, "good-content\n")
+
+    with patch("tests.uat.phases.report.os.replace", side_effect=OSError("disk full")):
+        with pytest.raises(OSError):
+            report_phase.atomic_write_text(target, "new-content-that-never-lands\n")
+
+    assert target.read_text(encoding="utf-8") == "good-content\n"
+    assert not target.with_name(target.name + ".tmp").exists()
 
 
 def test_default_benchmark_runs_dir_substitutes_date_and_name(tmp_path):

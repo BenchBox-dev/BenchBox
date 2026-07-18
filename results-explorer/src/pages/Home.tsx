@@ -16,6 +16,7 @@ import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import type { MetaLeaderboardMode } from "@/components/MetaLeaderboard";
+import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import {
   FACET_KEYS,
   useFacetState,
@@ -569,7 +570,8 @@ export function Home(_: RoutableProps) {
           />
         </div>
       </div>
-    </div>
+      <ProvenanceLegend />
+</div>
   );
 }
 
@@ -879,7 +881,7 @@ function formatFacetValue(
 ): string {
   if (key === "benchmark") return humanizeBenchmark(value);
   if (key === "platform") return platformIdToName.get(value) ?? value;
-  if (key === "tuning_mode" && value === UNLABELLED_TUNING_VALUE) return "not labelled";
+  if (key === "tuning_mode" && value === UNLABELLED_TUNING_VALUE) return "not recorded";
   return formatFacetDisplayValue(key, value);
 }
 
@@ -913,24 +915,24 @@ function benchmarkFilterDescription(publicBenchmarksOutsideLeaderboard: readonly
 
 function formatTuningModeOption(value: string): string {
   if (value === "all") return "All tuning labels";
-  if (value === UNLABELLED_TUNING_VALUE) return "Not labelled";
+  if (value === UNLABELLED_TUNING_VALUE) return "Not Recorded";
   return formatFacetDisplayValue("tuning_mode", value);
 }
 
 function tuningModeOptionTitle(value: string, summary: TuningModeSummary): string {
-  if (value === "all") return "Include labelled and not-labelled tuning metadata.";
+  if (value === "all") return "Include recorded and not-recorded tuning metadata.";
   if (value === UNLABELLED_TUNING_VALUE) {
-    return `${summary.unlabelledCount.toLocaleString()} public result ${plural(summary.unlabelledCount, "has", "have")} no tuning label.`;
+    return `${summary.unlabelledCount.toLocaleString()} public result ${plural(summary.unlabelledCount, "has", "have")} no recorded tuning mode.`;
   }
   return `Filter to tuning label: ${formatFacetDisplayValue("tuning_mode", value)}.`;
 }
 
 function tuningFilterDescription(summary: TuningModeSummary): string {
-  if (summary.unlabelledCount === 0) return "All public results in this view have tuning labels.";
+  if (summary.unlabelledCount === 0) return "All public results in this view have a recorded tuning mode.";
   if (summary.labelledOptions.length === 0) {
-    return `${summary.unlabelledCount.toLocaleString()} public result ${plural(summary.unlabelledCount, "has", "have")} no tuning label.`;
+    return `${summary.unlabelledCount.toLocaleString()} public result ${plural(summary.unlabelledCount, "has", "have")} no recorded tuning mode.`;
   }
-  return `${summary.unlabelledCount.toLocaleString()} of ${summary.totalCount.toLocaleString()} public ${plural(summary.totalCount, "result", "results")} ${plural(summary.unlabelledCount, "is", "are")} not labelled for tuning.`;
+  return `${summary.unlabelledCount.toLocaleString()} of ${summary.totalCount.toLocaleString()} public ${plural(summary.totalCount, "result", "results")} ${plural(summary.unlabelledCount, "is", "are")} not recorded for tuning.`;
 }
 
 function plural(count: number, singular: string, pluralValue: string): string {

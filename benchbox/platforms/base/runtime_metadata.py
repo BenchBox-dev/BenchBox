@@ -102,7 +102,7 @@ def build_default_normalized_result_metadata(
     metadata: dict[str, Any] = {
         "execution_environment": execution_environment,
         "platform_deployment": deployment,
-        "platform_raw_config": sanitize_platform_options(config),
+        "platform_raw_config": sanitize_platform_options(config, exclude_internal=True),
     }
 
     cloud = _cloud_metadata(platform_key, info, config)
@@ -447,7 +447,7 @@ def _raw_platform_metadata(info: Mapping[str, Any]) -> dict[str, Any]:
     raw = {
         str(key): value for key, value in info.items() if key not in _STANDARD_PLATFORM_INFO_KEYS and value is not None
     }
-    return sanitize_platform_options(raw)
+    return sanitize_platform_options(raw, exclude_internal=True)
 
 
 def _platform_key(adapter: Any | None, info: Mapping[str, Any]) -> str:

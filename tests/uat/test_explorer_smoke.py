@@ -93,18 +93,25 @@ def test_explorer_corpus_contract_runs_regardless_of_node(tmp_path: Path):
 
 
 def test_explorer_corpus_contract_fails_loudly_on_empty_bundles_without_node(tmp_path: Path):
-    """The minimal corpus contract is a real gate: empty corpus fails even with no Node/explorer."""
+    """The minimal corpus contract is a real gate: empty corpus fails even with no Node/explorer.
+
+    uat-fail-advance-consistency w2: corpus problems are a structured phase
+    failure (aborted=True), not an uncaught RuntimeError -- so the failure
+    flows through the orchestrator's abort-artifact machinery.
+    """
     with (
         patch.object(explorer_smoke, "explorer_present", return_value=False),
         patch.object(explorer_smoke, "has_node", return_value=False),
     ):
-        with pytest.raises(RuntimeError, match="no result bundles"):
-            explorer_smoke.run_explorer_smoke(
-                bundles_dir=tmp_path / "empty",
-                output_dir=tmp_path / "out",
-                log_dir=tmp_path / "logs",
-                runner=Mock(),
-            )
+        result = explorer_smoke.run_explorer_smoke(
+            bundles_dir=tmp_path / "empty",
+            output_dir=tmp_path / "out",
+            log_dir=tmp_path / "logs",
+            runner=Mock(),
+        )
+    assert result.aborted is True
+    assert result.exit_code() == 2
+    assert "no result bundles" in (result.abort_reason or "")
 
 
 def test_explorer_smoke_uses_data_dir_flag():
@@ -288,14 +295,53 @@ def test_requested_browser_projects_are_not_silently_dropped(tmp_path: Path):
 
 
 def test_external_corpus_contract_fails_before_playwright_for_empty_bundles(tmp_path: Path):
+    sentinel = Mock(side_effect=AssertionError("no subprocess should run when the corpus contract fails"))
     with patch.object(explorer_smoke, "has_node", return_value=True):
-        with pytest.raises(RuntimeError, match="no result bundles"):
-            explorer_smoke.run_explorer_smoke(
-                bundles_dir=tmp_path / "empty",
-                output_dir=tmp_path / "out",
-                log_dir=tmp_path / "logs",
-                runner=Mock(),
-            )
+        result = explorer_smoke.run_explorer_smoke(
+            bundles_dir=tmp_path / "empty",
+            output_dir=tmp_path / "out",
+            log_dir=tmp_path / "logs",
+            runner=sentinel,
+        )
+    assert result.aborted is True
+    assert result.exit_code() == 2
+    assert "no result bundles" in (result.abort_reason or "")
+    sentinel.assert_not_called()
+
+
+def test_explorer_smoke_reports_malformed_bundle_as_structured_abort(tmp_path: Path):
+    """A malformed (not just empty) corpus also becomes a structured abort, not a raise.
+
+    uat-fail-advance-consistency w2 covers both raise sites in
+    `_validate_external_corpus`: no bundles at all, and bundles present but
+    failing the contract (missing required fields here).
+    """
+    bundles_dir = tmp_path / "b"
+    bundles_dir.mkdir(parents=True)
+    (bundles_dir / "broken.json").write_text(json.dumps({"queries": []}), encoding="utf-8")
+    sentinel = Mock(side_effect=AssertionError("no subprocess should run when the corpus contract fails"))
+
+    with patch.object(explorer_smoke, "has_node", return_value=True):
+        result = explorer_smoke.run_explorer_smoke(
+            bundles_dir=bundles_dir,
+            output_dir=tmp_path / "out",
+            log_dir=tmp_path / "logs",
+            runner=sentinel,
+        )
+
+    assert result.aborted is True
+    assert result.exit_code() == 2
+    assert "missing benchmark.id" in (result.abort_reason or "")
+    sentinel.assert_not_called()
+    # The corpus contract JSON still lands with the errors on the abort path.
+    contract = json.loads((tmp_path / "logs" / "explorer_corpus_contract.json").read_text(encoding="utf-8"))
+    assert contract["errors"]
+
+
+def test_validate_external_corpus_returns_errors_list_instead_of_raising(tmp_path: Path):
+    contract = explorer_smoke._validate_external_corpus(bundles_dir=tmp_path / "empty")
+    assert contract["errors"] == [f"Explorer smoke corpus has no result bundles: {tmp_path / 'empty'}"]
+    assert contract["bundles"] == 0
 
 
 def test_package_root_resolves_to_bundle_subdirectory(tmp_path: Path):

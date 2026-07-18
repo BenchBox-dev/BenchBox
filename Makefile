@@ -454,13 +454,17 @@ COMPOSE := $(CONTAINER_ENGINE) compose
 
 # `compose down -v` extended to also remove leaked named volumes on a SUCCESSFUL
 # down. mocker 0.5.4's `compose down -v` removes containers but LEAKS named
-# volumes (a stale-data risk across runs); this prunes any volume with the
-# project prefix afterward. A no-op beyond `down -v` on docker (which already
-# removes them). Scoped to the project so it never touches unrelated volumes.
-# Grepping the project-prefixed name directly avoids assuming `volume ls` emits a
-# header or a fixed column layout. $(1)=project $(2)=compose file.
+# volumes (a stale-data risk across runs); this removes the project's volumes
+# afterward. A no-op beyond `down -v` on docker (which already removes them).
+# EXACT-NAME matching: volume keys are read from the compose file's top-level
+# `volumes:` block and joined as <project>-<key> (mocker's live-verified
+# joiner) and <project>_<key> (docker compose's, future-proofing). A
+# name-prefix grep here would also match a sibling project whose name extends
+# this one (`p` vs `p-ha`) and delete its data -- same fix as
+# tests/uat/docker_assets.py sweep_leaked_mocker_volumes.
+# $(1)=project $(2)=compose file.
 define compose_down_fresh
-$(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then mocker volume ls 2>/dev/null | grep -oE "$(1)[-_][A-Za-z0-9._-]+" | while read -r _v; do mocker volume rm "$$_v" >/dev/null 2>&1 || true; done; fi
+$(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then awk '/^volumes:/{f=1;next} f&&/^[^ ]/{f=0} f&&/^  [A-Za-z0-9._-]+:/{k=$$1;sub(/:.*/,"",k);print k}' "$(2)" 2>/dev/null | while read -r _k; do mocker volume rm "$(1)-$$_k" >/dev/null 2>&1 || true; mocker volume rm "$(1)"_"$$_k" >/dev/null 2>&1 || true; done; fi
 endef
 
 test-docker-up-%:
@@ -2102,7 +2106,7 @@ blind-spots-sweep: blind-spots-report
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
 # project-developer concern, benchbox is a project-user concern.
 # ----------------------------------------------------------------------
-.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup uat-artifact-hygiene
+.PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-stress uat-bring-up uat-docker-cleanup uat-artifact-hygiene uat-gate-check
 
 # Local-artifact hygiene gate. No-op unless an external output root is
 # configured (BENCHBOX_OUTPUT_DIR or OUTPUT=); when it is, fails if the
@@ -2219,6 +2223,22 @@ uat-stress:
 		$(if $(PLATFORM),--platform "$(PLATFORM)",) \
 		$(if $(BENCHMARK),--benchmark "$(BENCHMARK)",) \
 		$(if $(SCALE),--scale "$(SCALE)",)
+
+# make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]
+# Aggregates the three release-gate stage summaries (uat_gate_summary.json in
+# each stage's run dir) into _project/release-evidence/uat-gate-summary.json,
+# enforcing cross-stage Docker ordering and the mechanized APPROVE checklist.
+# Review and commit the evidence file yourself; nothing here touches git.
+uat-gate-check:
+	@if [ -z "$(STAGE1)" ] || [ -z "$(STAGE2)" ] || [ -z "$(STAGE3)" ]; then \
+		echo "Usage: make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]" >&2; \
+		exit 2; \
+	fi
+	@uv run --no-sync -- python -m tests.uat._cli gate-check \
+		--stage1 "$(STAGE1)" \
+		--stage2 "$(STAGE2)" \
+		--stage3 "$(STAGE3)" \
+		$(if $(OUTPUT),--output "$(OUTPUT)",)
 
 # make uat-execute CONFIG=tests/uat/configs/uat.yaml
 uat-execute:

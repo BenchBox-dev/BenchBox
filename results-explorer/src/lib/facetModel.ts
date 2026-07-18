@@ -22,6 +22,26 @@ export const FACET_KEYS = [
 export type FacetKey = (typeof FACET_KEYS)[number];
 export type DateWindowFacet = "all" | "30d" | "90d" | "365d";
 
+/**
+ * Explicit facet token for rows whose bundle never recorded a tuning mode.
+ *
+ * No producer emits this value as a real mode; it exists so "not recorded"
+ * is a first-class state instead of a null silently coalesced into a
+ * real-looking mode. Defined here (not in facetMatching.ts, which imports
+ * from this module) so every SQL- and in-memory-filtering consumer shares
+ * one source of truth instead of drifting.
+ */
+export const NOT_RECORDED_TUNING_MODE = "not-recorded";
+
+/** Legacy unlabelled-tuning facet token; kept so existing chips and URLs keep matching. */
+export const LEGACY_UNLABELLED_TUNING_MODE = "untuned";
+
+/** Every facet token that must match a NULL tuning_mode row, in SQL and in-memory alike. */
+export const NULL_TUNING_MODE_SENTINELS = [
+  NOT_RECORDED_TUNING_MODE,
+  LEGACY_UNLABELLED_TUNING_MODE,
+] as const;
+
 export interface FacetState {
   benchmark: string[];
   scale_factor: string[];
@@ -331,7 +351,7 @@ export function facetsToWhereClause(
   addListClause("test_type", facets.phase, clauses, params);
   addPlatformClause(facets.platform, clauses, params);
   addListClause("execution_mode", facets.execution_mode, clauses, params);
-  addNullableSentinelClause("tuning_mode", facets.tuning_mode, "untuned", clauses, params);
+  addNullableSentinelClause("tuning_mode", facets.tuning_mode, NULL_TUNING_MODE_SENTINELS, clauses, params);
   addListClause("trust_label", facets.trust_tier, clauses, params);
   addListClause("validation_status", facets.validation_status, clauses, params);
   addListClause(FACET_FILTER_COLUMNS.deployment_class, facets.deployment_class, clauses, params);
@@ -471,21 +491,21 @@ function addPlatformClause(values: readonly string[], clauses: string[], params:
   params.push(...values, ...values);
 }
 
-function addNullableSentinelClause(
+export function addNullableSentinelClause(
   column: string,
   values: readonly string[],
-  nullSentinel: string,
+  nullSentinels: readonly string[],
   clauses: string[],
   params: unknown[],
 ) {
   if (values.length === 0) return;
-  const concreteValues = values.filter((value) => value !== nullSentinel);
+  const concreteValues = values.filter((value) => !nullSentinels.includes(value));
   const subclauses: string[] = [];
   if (concreteValues.length > 0) {
     subclauses.push(`${column} IN (${concreteValues.map(() => "?").join(", ")})`);
     params.push(...concreteValues);
   }
-  if (values.includes(nullSentinel)) {
+  if (values.some((value) => nullSentinels.includes(value))) {
     subclauses.push(`${column} IS NULL`);
   }
   if (subclauses.length > 0) clauses.push(`(${subclauses.join(" OR ")})`);

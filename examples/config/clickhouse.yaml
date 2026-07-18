@@ -1,4 +1,4 @@
-type: clickhouse
+type: clickhouse-server
 connection:
   host: localhost
   port: 9000
