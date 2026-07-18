@@ -248,3 +248,154 @@ class TestCreateFromPayload:
         monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(self.PAYLOAD)))
         assert todo_db.main(["--db", db, "--actor", "t", "create", "--from", "-"]) == 0
         assert "payload-item" in capsys.readouterr().out
+
+
+class TestActorChain:
+    """The actor identity must be resolvable from any agent harness."""
+
+    def test_todo_actor_wins_over_harness_vars(self, monkeypatch):
+        monkeypatch.setenv("TODO_ACTOR", "neutral-actor")
+        monkeypatch.setenv("CLAUDE_SESSION_ID", "claude-session")
+        assert todo_db.default_actor() == "neutral-actor"
+
+    def test_non_claude_harness_session_var_is_recognized(self, monkeypatch):
+        for var in todo_db.ACTOR_ENV_VARS:
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setenv("CODEX_SESSION_ID", "codex-session")
+        assert todo_db.default_actor() == "codex-session"
+
+    def test_fallback_is_user_at_host(self, monkeypatch):
+        for var in todo_db.ACTOR_ENV_VARS:
+            monkeypatch.delenv(var, raising=False)
+        assert "@" in todo_db.default_actor()
+
+
+class TestLintConfigGating:
+    """Project-convention lint rules must be per-database configuration."""
+
+    def _mk_pinned(self, conn):
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="pinned-item",
+            title="Item citing point-in-time evidence",
+            worktree="spike",
+            priority="medium",
+            description="Behavior verified on develop @ fc31f3604 with a PASS run.",
+            work=[{"id": "w1", "summary": "first unit"}],
+        )
+
+    def test_convention_rules_default_on(self, conn):
+        self._mk_pinned(conn)
+        findings = todo_db.lint_item(conn, "pinned-item")
+        assert any("w0" in f for f in findings)
+        assert any("scope rules" in f for f in findings)
+
+    def test_rules_can_be_disabled_per_db(self, conn):
+        self._mk_pinned(conn)
+        todo_db.set_config(conn, "tester", "lint.require_w0_revalidation", "off")
+        todo_db.set_config(conn, "tester", "lint.require_scope_rules", "off")
+        findings = todo_db.lint_item(conn, "pinned-item")
+        assert not any("w0" in f for f in findings)
+        assert not any("scope rules" in f for f in findings)
+
+    def test_unknown_config_key_rejected(self, conn):
+        with pytest.raises(todo_db.TodoError, match="unknown config key"):
+            todo_db.set_config(conn, "tester", "lint.no_such_rule", "off")
+
+    def test_schema_version_not_settable_via_config(self, conn):
+        with pytest.raises(todo_db.TodoError, match="unknown config key"):
+            todo_db.set_config(conn, "tester", "schema_version", "99")
+
+    def test_invalid_value_rejected(self, conn):
+        with pytest.raises(todo_db.TodoError, match="on.*off|off.*on"):
+            todo_db.set_config(conn, "tester", "lint.require_w0_revalidation", "maybe")
+
+    def test_config_command_registered(self):
+        assert "config" in todo_db._HANDLERS
+
+
+class TestInstructiveGateErrors:
+    """Every gate refusal must name its recovery command — the error messages
+    are the harness-portable instruction layer."""
+
+    def _mk_flow(self, conn):
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="gate-item",
+            title="Gate error message item",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            work=[
+                {"id": "w1", "summary": "first unit"},
+                {"id": "w2", "summary": "second unit", "needs": ["w1"]},
+            ],
+        )
+
+    def _err(self, fn, *args, **kwargs) -> str:
+        with pytest.raises(todo_db.TodoError) as excinfo:
+            fn(*args, **kwargs)
+        return str(excinfo.value)
+
+    def test_missing_evidence_names_flag(self, conn):
+        self._mk_flow(conn)
+        assert "--evidence" in self._err(todo_db.done_unit, conn, "t", "gate-item", "w1", " ")
+
+    def test_unfinished_needs_names_done_command(self, conn):
+        self._mk_flow(conn)
+        message = self._err(todo_db.done_unit, conn, "t", "gate-item", "w2", "evidence")
+        assert "todo done" in message
+
+    def test_complete_with_undone_units_names_done_command(self, conn):
+        self._mk_flow(conn)
+        todo_db.claim_item(conn, "t", "gate-item")
+        assert "todo done" in self._err(todo_db.complete_item, conn, "t", "gate-item", None)
+
+    def test_complete_with_open_deferral_names_both_commands(self, conn):
+        self._mk_flow(conn)
+        todo_db.claim_item(conn, "t", "gate-item")
+        todo_db.done_unit(conn, "t", "gate-item", "w1", "ok")
+        todo_db.done_unit(conn, "t", "gate-item", "w2", "ok")
+        todo_db.defer_work(conn, "t", "gate-item", "later", "reason")
+        message = self._err(todo_db.complete_item, conn, "t", "gate-item", None)
+        assert "todo promote" in message and "todo dismiss" in message
+
+    def test_drop_with_open_deferral_names_both_commands(self, conn):
+        self._mk_flow(conn)
+        todo_db.defer_work(conn, "t", "gate-item", "later", "reason")
+        message = self._err(todo_db.drop_item, conn, "t", "gate-item", "not needed")
+        assert "todo promote" in message and "todo dismiss" in message
+
+    def test_blocked_complete_names_unblock(self, conn):
+        self._mk_flow(conn)
+        todo_db.claim_item(conn, "t", "gate-item")
+        todo_db.done_unit(conn, "t", "gate-item", "w1", "ok")
+        todo_db.done_unit(conn, "t", "gate-item", "w2", "ok")
+        todo_db.block_item(conn, "t", "gate-item", "waiting")
+        assert "todo unblock" in self._err(todo_db.complete_item, conn, "t", "gate-item", None)
+
+    def test_live_claim_conflict_names_sweep_and_ready(self, conn):
+        self._mk_flow(conn)
+        todo_db.claim_item(conn, "alice", "gate-item")
+        message = self._err(todo_db.claim_item, conn, "bob", "gate-item")
+        assert "todo sweep-stale" in message and "todo ready" in message
+
+    def test_unmet_dependency_names_ready(self, conn):
+        self._mk_flow(conn)
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="downstream-item",
+            title="Depends on the gate item",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            deps=["gate-item"],
+        )
+        assert "todo ready" in self._err(todo_db.claim_item, conn, "t", "downstream-item")
+
+    def test_complete_from_planning_names_claim(self, conn):
+        self._mk_flow(conn)
+        assert "todo claim" in self._err(todo_db.complete_item, conn, "t", "gate-item", None)

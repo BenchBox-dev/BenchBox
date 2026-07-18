@@ -191,12 +191,42 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# Harness-neutral actor resolution: TODO_ACTOR is the universal override any
+# agent harness can set; the session vars cover known harnesses.
+ACTOR_ENV_VARS = ("TODO_ACTOR", "CLAUDE_SESSION_ID", "CODEX_SESSION_ID", "AGENT_SESSION_ID")
+
+
 def default_actor() -> str:
-    for var in ("TODO_ACTOR", "CLAUDE_SESSION_ID"):
+    for var in ACTOR_ENV_VARS:
         value = os.environ.get(var)
         if value:
             return value
     return f"{getpass.getuser()}@{socket.gethostname()}"
+
+
+# Per-database configuration, stored in `meta`. Convention-flavored lint rules
+# are opt-out so the tracker stays generic outside this project.
+CONFIG_KEYS: dict[str, tuple[str, ...]] = {
+    "lint.require_w0_revalidation": ("on", "off"),
+    "lint.require_scope_rules": ("on", "off"),
+}
+
+
+def get_config(conn: sqlite3.Connection, key: str) -> str:
+    if key not in CONFIG_KEYS:
+        raise TodoError(f"unknown config key {key!r}; known: {', '.join(sorted(CONFIG_KEYS))}")
+    row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else "on"
+
+
+def set_config(conn: sqlite3.Connection, actor: str, key: str, value: str) -> None:
+    if key not in CONFIG_KEYS:
+        raise TodoError(f"unknown config key {key!r}; known: {', '.join(sorted(CONFIG_KEYS))}")
+    if value not in CONFIG_KEYS[key]:
+        raise TodoError(f"config {key} accepts 'on' or 'off', got {value!r}")
+    with _write_txn(conn):
+        conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, value))
+        log_event(conn, actor, None, "config", {"key": key, "value": value})
 
 
 def git_root() -> Path:
@@ -398,7 +428,10 @@ def _lease_expired(claimed_at: str | None, ttl_hours: float) -> bool:
 
 def _transition(conn: sqlite3.Connection, item: sqlite3.Row, new_state: str) -> None:
     if (item["state"], new_state) not in TRANSITIONS:
-        raise TodoError(f"illegal transition {item['state']!r} -> {new_state!r} for {item['id']!r}")
+        hint = ""
+        if item["state"] == "planning" and new_state == "done":
+            hint = f"; claim it first via `todo claim {item['id']}`"
+        raise TodoError(f"illegal transition {item['state']!r} -> {new_state!r} for {item['id']!r}{hint}")
     conn.execute("UPDATE items SET state = ? WHERE id = ?", (new_state, item["id"]))
 
 
@@ -550,7 +583,11 @@ def claim_item(
             raise TodoError(f"{item_id!r} is {item['state']}; cannot claim")
         holder = item["claimed_by"]
         if holder and holder != actor and not _lease_expired(item["claimed_at"], ttl_hours):
-            raise TodoError(f"{item_id!r} is claimed by {holder!r} since {item['claimed_at']}")
+            raise TodoError(
+                f"{item_id!r} is claimed by {holder!r} since {item['claimed_at']};"
+                " expired leases release via `todo sweep-stale`,"
+                " or pick another item from `todo ready`"
+            )
         unmet = [
             row["needs_item"]
             for row in conn.execute(
@@ -560,7 +597,10 @@ def claim_item(
             )
         ]
         if unmet:
-            raise TodoError(f"{item_id!r} has unmet dependencies: {', '.join(unmet)}")
+            raise TodoError(
+                f"{item_id!r} has unmet dependencies: {', '.join(unmet)};"
+                " finish those first, or pick another item from `todo ready`"
+            )
         # BEGIN IMMEDIATE already serializes this block; the conditional
         # predicate + rowcount check is defense-in-depth so a future caller
         # that skips the txn still cannot silently overwrite a live claim.
@@ -607,7 +647,7 @@ def start_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str) -> 
 
 def done_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str, evidence: str) -> None:
     if not evidence or not evidence.strip():
-        raise TodoError("evidence is required to mark a work unit done")
+        raise TodoError('evidence is required to mark a work unit done; pass --evidence "<command run / commit / PR>"')
     with _write_txn(conn):
         _require_item(conn, item_id)
         _require_unit(conn, item_id, wid)
@@ -644,7 +684,10 @@ def _require_unit_needs_done(conn: sqlite3.Connection, item_id: str, wid: str) -
         )
     ]
     if unmet:
-        raise TodoError(f"{item_id}:{wid} needs unfinished units: {', '.join(unmet)}")
+        raise TodoError(
+            f"{item_id}:{wid} needs unfinished units: {', '.join(unmet)};"
+            f" finish them first via `todo done {item_id} <wid> --evidence ...`"
+        )
 
 
 def defer_work(
@@ -747,6 +790,11 @@ def _require_deferral(conn: sqlite3.Connection, deferral_id: int) -> sqlite3.Row
 def complete_item(conn: sqlite3.Connection, actor: str, item_id: str, pr: int | None) -> None:
     with _write_txn(conn):
         item = _require_item(conn, item_id)
+        # State legality first: "claim it" is more fundamental guidance than
+        # any unit-level detail on an item that was never started.
+        if item["state"] != "active":
+            hint = f"; claim it first via `todo claim {item_id}`" if item["state"] == "planning" else ""
+            raise TodoError(f"illegal transition {item['state']!r} -> 'done' for {item_id!r}{hint}")
         undone = [
             row["wid"]
             for row in conn.execute(
@@ -755,7 +803,10 @@ def complete_item(conn: sqlite3.Connection, actor: str, item_id: str, pr: int | 
             )
         ]
         if undone:
-            raise TodoError(f"cannot complete {item_id!r}: work units not done: {', '.join(undone)}")
+            raise TodoError(
+                f"cannot complete {item_id!r}: work units not done: {', '.join(undone)};"
+                f" mark each via `todo done {item_id} <wid> --evidence ...`"
+            )
         open_deferrals = [
             f"#{row['id']} {row['summary']}"
             for row in conn.execute(
@@ -765,11 +816,15 @@ def complete_item(conn: sqlite3.Connection, actor: str, item_id: str, pr: int | 
         ]
         if open_deferrals:
             raise TodoError(
-                f"cannot complete {item_id!r}: unresolved deferrals — promote or dismiss"
-                f" first: {'; '.join(open_deferrals)}"
+                f"cannot complete {item_id!r}: unresolved deferrals: {'; '.join(open_deferrals)};"
+                " resolve each via `todo promote <deferral-id> --to-item <slug>`"
+                ' or `todo dismiss <deferral-id> --reason "..."`'
             )
         if item["blocked_reason"]:
-            raise TodoError(f"cannot complete {item_id!r} while blocked: {item['blocked_reason']}")
+            raise TodoError(
+                f"cannot complete {item_id!r} while blocked: {item['blocked_reason']};"
+                f" clear it via `todo unblock {item_id}`"
+            )
         _transition(conn, item, "done")
         conn.execute(
             "UPDATE items SET completed_at = ?, completed_pr = ?, claimed_by = NULL, claimed_at = NULL WHERE id = ?",
@@ -788,7 +843,11 @@ def drop_item(conn: sqlite3.Connection, actor: str, item_id: str, reason: str) -
             (item_id,),
         ).fetchone()["n"]
         if open_deferrals:
-            raise TodoError(f"cannot drop {item_id!r}: {open_deferrals} unresolved deferral(s)")
+            raise TodoError(
+                f"cannot drop {item_id!r}: {open_deferrals} unresolved deferral(s);"
+                " resolve each via `todo promote <deferral-id> --to-item <slug>`"
+                ' or `todo dismiss <deferral-id> --reason "..."`'
+            )
         _transition(conn, item, "dropped")
         conn.execute("UPDATE items SET claimed_by = NULL, claimed_at = NULL WHERE id = ?", (item_id,))
         log_event(conn, actor, item_id, "drop", {"reason": reason})
@@ -1040,9 +1099,13 @@ def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
         findings.append("no verification steps recorded")
     elif not any(v["command"] for v in item["verifications"]):
         findings.append("verification steps exist but none has a runnable command")
-    if item["work"] and not item["scope"]:
+    if get_config(conn, "lint.require_scope_rules") == "on" and item["work"] and not item["scope"]:
         findings.append("has work units but no scope rules (only_modify/do_not_modify)")
-    if EVIDENCE_PIN_RE.search(item["description"] or "") and not any(unit["wid"] == "w0" for unit in item["work"]):
+    if (
+        get_config(conn, "lint.require_w0_revalidation") == "on"
+        and EVIDENCE_PIN_RE.search(item["description"] or "")
+        and not any(unit["wid"] == "w0" for unit in item["work"])
+    ):
         findings.append("description cites point-in-time evidence but has no w0 re-validation unit")
     if not item["work"] and item["state"] in ("planning", "active"):
         findings.append("no work breakdown")
@@ -1530,6 +1593,10 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("migrate", help="apply pending schema migrations to the database")
 
+    p = sub.add_parser("config", help="list, get, or set per-database configuration")
+    p.add_argument("key", nargs="?")
+    p.add_argument("value", nargs="?")
+
     p = sub.add_parser("export", help="deterministic JSONL + markdown index")
     p.add_argument("--out", default=None)
 
@@ -1868,6 +1935,18 @@ def _cmd_export(conn, actor, args):
     return 0
 
 
+def _cmd_config(conn, actor, args):
+    if args.key is None:
+        for key in sorted(CONFIG_KEYS):
+            print(f"{key}={get_config(conn, key)}")
+    elif args.value is None:
+        print(get_config(conn, args.key))
+    else:
+        set_config(conn, actor, args.key, args.value)
+        print(f"{args.key}={args.value}")
+    return 0
+
+
 def _cmd_migrate(conn, actor, args):
     # Reached only when the DB is already current (main() migrates before
     # connecting for this command); report the no-op for clarity.
@@ -1901,6 +1980,7 @@ _HANDLERS = {
     "sweep-stale": _cmd_sweep_stale,
     "export": _cmd_export,
     "migrate": _cmd_migrate,
+    "config": _cmd_config,
 }
 
 

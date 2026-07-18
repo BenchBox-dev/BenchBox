@@ -434,6 +434,23 @@ eval's tool findings were implemented TDD-first
 - Schema v2 migration path: `connect` refuses an outdated DB with a
   `todo migrate` hint; migrations are additive and idempotent.
 
+**Portability round (same day, TDD):** groundwork for using the tracker
+outside BenchBox and under non-Claude harnesses (Codex, etc.):
+
+- **Per-database config** (`todo config [key] [value]`, stored in `meta`):
+  the two BenchBox-convention lint rules (`lint.require_w0_revalidation`,
+  `lint.require_scope_rules`) are now opt-out per project, defaulting on.
+- **Harness-neutral actor chain**: `TODO_ACTOR` (universal override) →
+  `CLAUDE_SESSION_ID` → `CODEX_SESSION_ID` → `AGENT_SESSION_ID` →
+  `user@host`. Lease/claim mechanics are actor-based and harness-blind.
+- **Self-teaching gate errors**: every refusal now names its recovery
+  command (`todo done ... --evidence`, `todo promote`/`todo dismiss`,
+  `todo unblock`, `todo claim`, `todo sweep-stale`/`todo ready`), pinned
+  by tests — the error messages are the harness-portable instruction
+  layer, so an agent with no skill loaded is still steered by the CLI
+  itself. Gate ordering fixed so "claim it first" precedes unit-level
+  detail on never-started items.
+
 ## Head-to-head evaluation: legacy YAML vs DB tracker (2026-07-18)
 
 **Durable evidence:** `_project/audits/todo-db-eval-2026-07-18.md` — the
