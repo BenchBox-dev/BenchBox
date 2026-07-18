@@ -1,0 +1,250 @@
+"""Tests for the tracker v2 improvements driven by the head-to-head eval.
+
+Covers (see _project/specs/todo-db-tracker.md, post-eval improvements):
+- shared database across git worktrees (resolve via the common git dir);
+- `check-scope` exempts the tracker's own state directory;
+- `start`/`done` record the worktree and branch so another agent can
+  resume or recover partial work, surfaced in the work order;
+- schema v1 -> v2 migration path (`todo migrate`);
+- `create --from -` JSON payload creation.
+
+Marked medium (not fast): the fast lane is budget-gated and several tests
+shell out to git.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import io
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.medium,
+]
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_script():
+    name = "todo_db_v2_under_test"
+    path = REPO_ROOT / "_project" / "scripts" / "todo_db.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+todo_db = _load_script()
+
+
+def _git(cwd: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+@pytest.fixture()
+def git_repo(tmp_path):
+    """A real git repo with one linked worktree on its own branch."""
+    main = tmp_path / "main"
+    main.mkdir()
+    _git(main, "init", "-q", "-b", "trunk")
+    _git(main, "commit", "--allow-empty", "-q", "-m", "root")
+    _git(main, "worktree", "add", "-q", "-b", "feat-resume", str(tmp_path / "wt"))
+    return {"main": main, "worktree": tmp_path / "wt"}
+
+
+@pytest.fixture()
+def conn(tmp_path):
+    connection = todo_db.connect(tmp_path / "todo.sqlite")
+    yield connection
+    connection.close()
+
+
+def _mk(conn, item_id="resume-item", **overrides):
+    kwargs = {
+        "item_id": item_id,
+        "title": "A resumable tracked item",
+        "worktree": "spike",
+        "priority": "medium",
+        "description": "A description longer than ten characters.",
+        "work": [{"id": "w1", "summary": "first unit"}],
+    }
+    kwargs.update(overrides)
+    todo_db.create_item(conn, "tester", **kwargs)
+    return item_id
+
+
+class TestSharedDbAcrossWorktrees:
+    def test_worktree_resolves_to_main_repo_db(self, git_repo, monkeypatch):
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        expected = git_repo["main"] / ".todo-db" / "todo.sqlite"
+        monkeypatch.chdir(git_repo["worktree"])
+        assert todo_db.resolve_db_path(None).resolve() == expected.resolve()
+        monkeypatch.chdir(git_repo["main"])
+        assert todo_db.resolve_db_path(None).resolve() == expected.resolve()
+
+    def test_env_override_still_wins(self, git_repo, monkeypatch):
+        monkeypatch.setenv("TODO_DB_PATH", "/elsewhere/todo.sqlite")
+        monkeypatch.chdir(git_repo["worktree"])
+        assert todo_db.resolve_db_path(None) == Path("/elsewhere/todo.sqlite")
+
+
+class TestScopeSelfExemption:
+    def test_tracker_state_never_violates_scope(self):
+        rules = [{"kind": "only_modify", "path_glob": "src/*"}]
+        violations = todo_db.check_paths(
+            [".todo-db/todo.sqlite", ".todo-db/export/items.jsonl", "docs/x.md"],
+            rules,
+        )
+        assert violations == ["docs/x.md: outside only_modify allowlist"]
+
+    def test_tracker_state_ignored_even_under_do_not_modify(self):
+        rules = [{"kind": "do_not_modify", "path_glob": ".todo-db/*"}]
+        assert todo_db.check_paths([".todo-db/todo.sqlite"], rules) == []
+
+
+class TestResumeLocation:
+    def test_start_records_worktree_and_branch(self, conn, git_repo, monkeypatch):
+        monkeypatch.chdir(git_repo["worktree"])
+        _mk(conn)
+        todo_db.claim_item(conn, "alice", "resume-item")
+        todo_db.start_unit(conn, "alice", "resume-item", "w1")
+        unit = todo_db.get_item(conn, "resume-item")["work"][0]
+        assert unit["status"] == "in_progress"
+        assert unit["started_at"]
+        assert Path(unit["started_worktree"]).resolve() == git_repo["worktree"].resolve()
+        assert unit["started_branch"] == "feat-resume"
+
+    def test_done_without_start_stamps_location_implicitly(self, conn, git_repo, monkeypatch):
+        monkeypatch.chdir(git_repo["main"])
+        _mk(conn)
+        todo_db.claim_item(conn, "alice", "resume-item")
+        todo_db.done_unit(conn, "alice", "resume-item", "w1", "ran the checks")
+        unit = todo_db.get_item(conn, "resume-item")["work"][0]
+        assert unit["status"] == "done"
+        assert Path(unit["started_worktree"]).resolve() == git_repo["main"].resolve()
+        assert unit["started_branch"] == "trunk"
+
+    def test_done_after_start_keeps_original_location(self, conn, git_repo, monkeypatch):
+        monkeypatch.chdir(git_repo["worktree"])
+        _mk(conn)
+        todo_db.claim_item(conn, "alice", "resume-item")
+        todo_db.start_unit(conn, "alice", "resume-item", "w1")
+        monkeypatch.chdir(git_repo["main"])
+        todo_db.done_unit(conn, "bob", "resume-item", "w1", "finished elsewhere")
+        unit = todo_db.get_item(conn, "resume-item")["work"][0]
+        assert unit["started_branch"] == "feat-resume"
+
+    def test_work_order_surfaces_resume_info(self, conn, git_repo, monkeypatch, capsys):
+        monkeypatch.chdir(git_repo["worktree"])
+        _mk(conn)
+        todo_db.claim_item(conn, "alice", "resume-item")
+        todo_db.start_unit(conn, "alice", "resume-item", "w1")
+        order = todo_db.work_order(conn, "resume-item")
+        in_progress = [u for u in order["ready_units"] if u["status"] == "in_progress"]
+        assert in_progress and in_progress[0]["started_branch"] == "feat-resume"
+        todo_db._print_work_order(order)
+        printed = capsys.readouterr().out
+        assert "resumable" in printed
+        assert "feat-resume" in printed
+
+
+class TestSchemaMigration:
+    def _make_v1_db(self, tmp_path):
+        """Reconstruct a v1 database: current schema minus the v2 columns."""
+        import sqlite3
+
+        v1_sql = "\n".join(
+            line
+            for line in todo_db.SCHEMA_SQL.splitlines()
+            if "started_at" not in line and "started_worktree" not in line and "started_branch" not in line
+        )
+        db_path = tmp_path / "v1.sqlite"
+        raw = sqlite3.connect(db_path)
+        raw.executescript(v1_sql)
+        raw.execute("INSERT INTO meta (key, value) VALUES ('schema_version', '1')")
+        raw.commit()
+        raw.close()
+        return db_path
+
+    def test_connect_refuses_old_schema_with_migrate_hint(self, tmp_path):
+        db_path = self._make_v1_db(tmp_path)
+        with pytest.raises(todo_db.TodoError, match="migrate"):
+            todo_db.connect(db_path)
+
+    def test_migrate_upgrades_v1_to_current(self, tmp_path):
+        db_path = self._make_v1_db(tmp_path)
+        applied = todo_db.migrate_db(db_path)
+        assert applied  # at least one migration ran
+        conn = todo_db.connect(db_path)  # no longer refuses
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(work_units)")}
+        assert {"started_at", "started_worktree", "started_branch"} <= columns
+        conn.close()
+
+    def test_migrate_is_idempotent(self, tmp_path):
+        db_path = self._make_v1_db(tmp_path)
+        todo_db.migrate_db(db_path)
+        assert todo_db.migrate_db(db_path) == []
+
+    def test_migrate_command_registered(self):
+        assert "migrate" in todo_db._HANDLERS
+
+
+class TestCreateFromPayload:
+    PAYLOAD = {
+        "id": "payload-item",
+        "title": "Created from a JSON payload",
+        "worktree": "spike",
+        "priority": "high",
+        "description": "Structured creation without flag soup.",
+        "work": [
+            {"id": "w1", "summary": "implement the thing"},
+            {"id": "w2", "summary": "verify the thing", "needs": ["w1"]},
+        ],
+        "scope": {"only_modify": ["src/*"], "do_not_modify": ["docs/*"]},
+        "verifications": [{"description": "unit gate", "command": "true"}],
+        "preserves": ["existing behavior stays"],
+        "anti_patterns": [{"dont": "widen scope", "why": "risk", "instead": "defer it"}],
+        "prior_art": [{"path": "src/x.py", "concept": "pattern", "decision": "reuse"}],
+    }
+
+    def test_create_from_payload_roundtrip(self, conn):
+        todo_db.create_from_payload(conn, "tester", self.PAYLOAD)
+        item = todo_db.get_item(conn, "payload-item")
+        assert item["priority"] == "high"
+        assert [u["wid"] for u in item["work"]] == ["w1", "w2"]
+        assert item["work"][1]["needs"] == ["w1"]
+        assert {(s["kind"], s["path_glob"]) for s in item["scope"]} == {
+            ("only_modify", "src/*"),
+            ("do_not_modify", "docs/*"),
+        }
+        assert item["verifications"][0]["command"] == "true"
+        assert item["anti_patterns"][0]["instead"] == "defer it"
+        assert item["prior_art"][0]["decision"] == "reuse"
+
+    def test_create_from_payload_missing_required_field(self, conn):
+        payload = dict(self.PAYLOAD)
+        del payload["title"]
+        with pytest.raises(todo_db.TodoError, match="title"):
+            todo_db.create_from_payload(conn, "tester", payload)
+
+    def test_cli_create_from_stdin(self, tmp_path, monkeypatch, capsys):
+        db = str(tmp_path / "cli.sqlite")
+        monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(self.PAYLOAD)))
+        assert todo_db.main(["--db", db, "--actor", "t", "create", "--from", "-"]) == 0
+        assert "payload-item" in capsys.readouterr().out

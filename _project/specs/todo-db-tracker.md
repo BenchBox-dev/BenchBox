@@ -411,6 +411,29 @@ piped output. The spike is single-clone by construction — it validates the
 enforcement design (G2), not the shared-visibility goal, which still
 requires the hosted step after G1.
 
+**Post-eval improvements (2026-07-18, fourth round — schema v2).** The
+eval's tool findings were implemented TDD-first
+(`tests/unit/scripts/test_todo_db_v2.py`, 15 tests written red):
+
+- **Shared database across worktrees**: the default DB path now resolves
+  through `git rev-parse --git-common-dir`, so every worktree of a clone
+  shares the main repository's tracker (the eval exposed that per-worktree
+  DBs fragment state into invisible islands).
+- **Resume/recovery metadata**: `start` records `started_at`,
+  `started_worktree`, and `started_branch` on the work unit (`done` stamps
+  them implicitly if `start` was skipped, and never overwrites an earlier
+  stamp). The work order renders in-progress units as
+  `(resumable: branch X @ <worktree>, since T)`, so another agent can
+  locate and recover partial work after a dead session — verified live
+  across a real worktree pair. `start` is now explicitly optional for
+  single-sitting units.
+- **`check-scope` exempts `.todo-db/`** unconditionally (eval false
+  positive on stale-gitignore worktrees).
+- **`create --from -`** accepts a structured JSON payload on stdin as an
+  alternative to flag-soup item creation.
+- Schema v2 migration path: `connect` refuses an outdated DB with a
+  `todo migrate` hint; migrations are additive and idempotent.
+
 ## Head-to-head evaluation: legacy YAML vs DB tracker (2026-07-18)
 
 **Durable evidence:** `_project/audits/todo-db-eval-2026-07-18.md` — the
