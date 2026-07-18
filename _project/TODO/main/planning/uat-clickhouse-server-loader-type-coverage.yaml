@@ -2,7 +2,7 @@ id: uat-clickhouse-server-loader-type-coverage
 title: "Fix ClickHouse-server client-insert type coverage exposed by corpus UAT"
 worktree: main
 priority: High
-status: Identified
+status: In Progress
 category: Platform Expansion
 
 description: |
@@ -48,7 +48,7 @@ prior_art:
 work:
   - id: w0
     summary: "Re-derive the four loader buckets against current develop and pin compact evidence"
-    status: pending
+    status: done
     notes: |
       Before changing code, drive the conversion/introspection helpers directly
       where possible and preserve a compact command/result summary in this
@@ -56,19 +56,46 @@ work:
       Expected signatures to re-confirm: empty numeric/date handling, raw
       DATETIME/TIMESTAMP string fallthrough, bracketed array/vector parsing,
       and Table-valued schema introspection.
+
+      RE-VALIDATION (2026-07-16, helper boundary, no Docker). The conversion
+      helper is benchbox/platforms/base/data_loading.py:
+      ClickHouseNativeHandler._convert_field_for_clickhouse (landed in the Jul-10
+      import ded0a94b, AFTER this TODO's 2026-06-01 corpus evidence — the
+      "Identified" status was stale). Driving the helper directly:
+        - Bucket A (empty numeric/date -> NULL): ALREADY IMPLEMENTED and matches
+          the ratified policy. `if value == "": return None if
+          needs_non_string_value else value`; empty String stays "". No change
+          needed.
+        - Bucket B (DATETIME/TIMESTAMP): BROKEN. "DATETIME".startswith("DATE") is
+          True so `date.fromisoformat("2020-01-15 12:30:00")` raised; bare
+          "TIMESTAMP" fell through as str -> driver 'str' has no 'tzinfo'.
+        - Bucket C (array/vector): PARTIAL. "Array(...)" parsed, but DuckDB
+          "FLOAT[128]" matched the FLOAT branch -> float("[...]") raised.
+        - Bucket D (Table-valued schema introspection): NOT re-reproduced here;
+          needs the live DataVault schema object. `_get_column_type_names`
+          returns [] for non-dict schemas (silent no-conversion) rather than the
+          observed `'Table' is not iterable`, so the crash site is elsewhere in
+          the DataVault load path. Deferred (see deferred + w2 notes).
   - id: w1
     summary: "Add focused unit coverage for ClickHouse-server value conversion"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Cover nullable integer fields with blank/null-like inputs, Date and
       DateTime/DateTime64 values supplied as strings, ClickHouse arrays such
       as `Array(Float32)` from bracketed literals, and schemas represented by
       benchmark `Table` objects instead of simple dicts.
+
+      DONE for Buckets A/B/C in tests/unit/platforms/test_clickhouse_adapter.py:
+      test_empty_numeric_date_fields_become_null_not_default (A),
+      test_datetime_and_timestamp_conversion (B),
+      test_vector_bracket_type_parsed_to_list_not_float (C). The Table-object
+      schema case (Bucket D) is NOT covered yet — it depends on the Bucket D fix
+      site, which is deferred.
   - id: w2
     summary: "Fix the client-batch conversion path without regressing clickhouse-local"
     needs: [w1]
-    status: pending
+    status: in_progress
     notes: |
       Keep server mode on client-side INSERT batches for Docker-host files;
       do not revert to server-side `file()` loading. Preserve shared ClickHouse
@@ -76,6 +103,17 @@ work:
       Resolve the nullable-empty-field policy explicitly: prefer preserving
       NULL when the benchmark schema permits it, and only use type defaults for
       truly non-Nullable columns when that matches the source semantics.
+
+      DONE (Buckets B + C): _convert_field_for_clickhouse now classifies
+      DATETIME/DateTime64/TIMESTAMP before the DATE prefix and parses to Python
+      datetime; DuckDB bracketed vector/list types (FLOAT[128], INTEGER[]) route
+      to array parsing via the new _CLICKHOUSE_VECTOR_TYPE_RE. Bucket A was
+      already correct (nullable-empty -> NULL, ratified policy) and is unchanged.
+      All at the helper boundary per anti_patterns; clickhouse-local path
+      untouched (server-mode-only helper).
+      REMAINING (Bucket D): Table-valued schema introspection for DataVault is
+      NOT fixed — its crash site needs live repro (see deferred). w2 stays
+      in_progress until D lands or is split into its own item.
   - id: w3
     summary: "Verify representative failing cells live against ClickHouse server"
     needs: [w2]
@@ -84,6 +122,31 @@ work:
       Use UAT-managed Docker and the same benchmark output root. Representative
       cells should include TPC-DS SF=0.01, one DateTime-heavy cell, DataVault
       SF=0.01, and Vector Search SF=0.01 before broadening to the corpus.
+
+      NOT RUN in the 2026-07-16 session: no Docker daemon in the remote
+      container, so live cells could not execute. Buckets A/B/C are proven at
+      the unit/helper boundary only; a live run of the TPC-DS, DateTime-heavy,
+      and Vector Search cells is still required to close this. DataVault stays
+      blocked on the Bucket D fix.
+
+      Code-review checkpoints to confirm on the live run (from the w2 review):
+        - tz-AWARE datetime round-trip: a source timestamp with a 'Z'/offset
+          (e.g. TSBS RFC3339) parses to a tz-aware Python datetime;
+          clickhouse-driver converts it to the column timezone. Verify the
+          stored instant is NOT shifted vs the naive-string benchmarks (a
+          non-UTC DateTime column would otherwise corrupt time aggregates). If a
+          shift is observed, normalise to naive-UTC before insert.
+        - Non-ISO/epoch DateTime formats: datetime.fromisoformat parses only
+          ISO-8601, so epoch-seconds or locale timestamps raise (loud, per
+          guardrails). Confirm the actual ClickBench/TSBS/H2O timestamp formats
+          are ISO; if any emit epoch/other, extend the parser (tracked in
+          deferred).
+
+deferred:
+  - summary: "Bucket D: harden Table-valued schema introspection for DataVault"
+    reason: "The observed `'Table' is not iterable` crash is outside _convert_field_for_clickhouse (which safely no-ops on non-dict schemas); pinning the real crash site needs a live DataVault load, unavailable this session. Split candidate if it grows."
+  - summary: "Bucket B follow-up: non-ISO / epoch-integer DateTime source formats"
+    reason: "datetime.fromisoformat covers the observed ISO forms; epoch-seconds or locale formats, if any benchmark emits them, would raise (loud, per guardrails) and can be handled when a real case appears."
 
 deps:
   needs:
