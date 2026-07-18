@@ -31,6 +31,7 @@ import socket
 import sqlite3
 import subprocess
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -211,21 +212,40 @@ def connect(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    # Autocommit mode: every multi-statement write goes through _write_txn,
+    # which takes the write lock up front (BEGIN IMMEDIATE) so check-then-act
+    # gates cannot race a concurrent writer.
+    conn.isolation_level = None
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
     version = _schema_version(conn)
     if version is None:
-        with conn:
-            conn.executescript(SCHEMA_SQL)
-            conn.execute(
-                "INSERT INTO meta (key, value) VALUES ('schema_version', ?)",
-                (str(SCHEMA_VERSION),),
-            )
+        conn.executescript(SCHEMA_SQL)
+        conn.execute(
+            "INSERT INTO meta (key, value) VALUES ('schema_version', ?)",
+            (str(SCHEMA_VERSION),),
+        )
     elif version != SCHEMA_VERSION:
         raise TodoError(
             f"database schema_version={version}, CLI expects {SCHEMA_VERSION}; "
             "run a newer CLI or re-create the spike database"
         )
     return conn
+
+
+@contextmanager
+def _write_txn(conn: sqlite3.Connection):
+    """Serialize a check-then-act write: BEGIN IMMEDIATE holds the write lock
+    for the whole block, so gates (deferral check, lease check, dep check)
+    cannot be invalidated by a concurrent writer between read and update."""
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield
+    except BaseException:
+        conn.rollback()
+        raise
+    else:
+        conn.commit()
 
 
 def _schema_version(conn: sqlite3.Connection) -> int | None:
@@ -335,19 +355,26 @@ def create_item(
     preserves: list[str] | None = None,
     anti_patterns: list[tuple[str, str, str]] | None = None,
     prior_art: list[tuple[str, str, str]] | None = None,
+    completed_at: str | None = None,
+    completed_pr: int | None = None,
 ) -> None:
     if not SLUG_RE.match(item_id):
         raise TodoError(f"invalid item id (slug) {item_id!r}")
     if priority not in PRIORITIES:
         raise TodoError(f"invalid priority {priority!r}; one of {', '.join(PRIORITIES)}")
-    if state not in ("planning", "active"):
-        raise TodoError(f"new items must start planning or active, not {state!r}")
-    with conn:
+    # 'done' is importer-only: the archive bridge records already-finished
+    # items directly. Live work must still travel planning -> active -> done
+    # through the gated transitions.
+    if state not in ("planning", "active", "done"):
+        raise TodoError(f"new items must start planning, active, or done (import), not {state!r}")
+    if state != "done" and (completed_at or completed_pr):
+        raise TodoError("completed_at/completed_pr are only valid with state='done' (import)")
+    with _write_txn(conn):
         try:
             conn.execute(
                 "INSERT INTO items (id, title, worktree, priority, state, blocked_reason,"
-                " category, description, approach, created_at)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " category, description, approach, created_at, completed_at, completed_pr)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     item_id,
                     title,
@@ -359,6 +386,8 @@ def create_item(
                     description,
                     approach,
                     created_at or utc_now(),
+                    completed_at,
+                    completed_pr,
                 ),
             )
         except sqlite3.IntegrityError as exc:
@@ -373,7 +402,7 @@ def create_item(
             add_item_dep(conn, item_id, dep)
         for kind, glob in scope or []:
             conn.execute(
-                "INSERT INTO scope_rules (item_id, kind, path_glob) VALUES (?, ?, ?)",
+                "INSERT OR IGNORE INTO scope_rules (item_id, kind, path_glob) VALUES (?, ?, ?)",
                 (item_id, kind, glob),
             )
         for seq, ver in enumerate(verifications or [], start=1):
@@ -447,7 +476,7 @@ def claim_item(
     item_id: str,
     ttl_hours: float = DEFAULT_LEASE_TTL_HOURS,
 ) -> dict[str, Any]:
-    with conn:
+    with _write_txn(conn):
         item = _require_item(conn, item_id)
         if item["state"] not in ("planning", "active"):
             raise TodoError(f"{item_id!r} is {item['state']}; cannot claim")
@@ -464,10 +493,18 @@ def claim_item(
         ]
         if unmet:
             raise TodoError(f"{item_id!r} has unmet dependencies: {', '.join(unmet)}")
-        conn.execute(
-            "UPDATE items SET claimed_by = ?, claimed_at = ? WHERE id = ?",
-            (actor, utc_now(), item_id),
+        # BEGIN IMMEDIATE already serializes this block; the conditional
+        # predicate + rowcount check is defense-in-depth so a future caller
+        # that skips the txn still cannot silently overwrite a live claim.
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=ttl_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        acquired = conn.execute(
+            "UPDATE items SET claimed_by = ?, claimed_at = ? WHERE id = ?"
+            " AND (claimed_by IS NULL OR claimed_by = ? OR claimed_at < ?)",
+            (actor, utc_now(), item_id, actor, cutoff),
         )
+        if acquired.rowcount != 1:
+            current = _require_item(conn, item_id)
+            raise TodoError(f"{item_id!r} was claimed concurrently by {current['claimed_by']!r}")
         if item["state"] == "planning":
             _transition(conn, item, "active")
         log_event(conn, actor, item_id, "claim", {"previous_holder": holder})
@@ -475,7 +512,7 @@ def claim_item(
 
 
 def release_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
-    with conn:
+    with _write_txn(conn):
         item = _require_item(conn, item_id)
         if item["claimed_by"] is None:
             return
@@ -484,7 +521,7 @@ def release_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
 
 
 def start_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str) -> None:
-    with conn:
+    with _write_txn(conn):
         _require_item(conn, item_id)
         unit = _require_unit(conn, item_id, wid)
         if unit["status"] == "done":
@@ -500,7 +537,7 @@ def start_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str) -> 
 def done_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str, evidence: str) -> None:
     if not evidence or not evidence.strip():
         raise TodoError("evidence is required to mark a work unit done")
-    with conn:
+    with _write_txn(conn):
         _require_item(conn, item_id)
         _require_unit(conn, item_id, wid)
         _require_unit_needs_done(conn, item_id, wid)
@@ -532,9 +569,24 @@ def _require_unit_needs_done(conn: sqlite3.Connection, item_id: str, wid: str) -
         raise TodoError(f"{item_id}:{wid} needs unfinished units: {', '.join(unmet)}")
 
 
-def defer_work(conn: sqlite3.Connection, actor: str, item_id: str, summary: str, reason: str) -> int:
-    with conn:
-        _require_item(conn, item_id)
+def defer_work(
+    conn: sqlite3.Connection,
+    actor: str,
+    item_id: str,
+    summary: str,
+    reason: str,
+    allow_terminal: bool = False,
+) -> int:
+    """Record deferred work. `allow_terminal` is importer-only: it lets the
+    archive bridge attach historical deferrals to already-done items; the CLI
+    path must refuse, or terminal items regrow the buried-deferral class."""
+    with _write_txn(conn):
+        item = _require_item(conn, item_id)
+        if item["state"] in ("done", "dropped") and not allow_terminal:
+            raise TodoError(
+                f"{item_id!r} is {item['state']}; deferrals on terminal items would be"
+                " invisible — create a planning item instead (todo create / promote)"
+            )
         cursor = conn.execute(
             "INSERT INTO deferrals (from_item, summary, reason, created_at) VALUES (?, ?, ?, ?)",
             (item_id, summary, reason, utc_now()),
@@ -573,7 +625,7 @@ def promote_deferral(
             f"Deferred: {row['summary']}\nReason deferred: {row['reason']}"
         ),
     )
-    with conn:
+    with _write_txn(conn):
         conn.execute(
             "UPDATE deferrals SET resolution = 'promoted', resolved_item = ? WHERE id = ?",
             (new_item_id, deferral_id),
@@ -590,7 +642,7 @@ def promote_deferral(
 def dismiss_deferral(conn: sqlite3.Connection, actor: str, deferral_id: int, reason: str) -> None:
     if not reason.strip():
         raise TodoError("a dismissal reason is required")
-    with conn:
+    with _write_txn(conn):
         row = _require_deferral(conn, deferral_id)
         if row["resolution"] != "open":
             raise TodoError(f"deferral {deferral_id} is already {row['resolution']}")
@@ -615,7 +667,7 @@ def _require_deferral(conn: sqlite3.Connection, deferral_id: int) -> sqlite3.Row
 
 
 def complete_item(conn: sqlite3.Connection, actor: str, item_id: str, pr: int | None) -> None:
-    with conn:
+    with _write_txn(conn):
         item = _require_item(conn, item_id)
         undone = [
             row["wid"]
@@ -651,7 +703,7 @@ def complete_item(conn: sqlite3.Connection, actor: str, item_id: str, pr: int | 
 def drop_item(conn: sqlite3.Connection, actor: str, item_id: str, reason: str) -> None:
     if not reason.strip():
         raise TodoError("a drop reason is required")
-    with conn:
+    with _write_txn(conn):
         item = _require_item(conn, item_id)
         open_deferrals = conn.execute(
             "SELECT count(*) AS n FROM deferrals WHERE from_item = ? AND resolution = 'open'",
@@ -667,7 +719,7 @@ def drop_item(conn: sqlite3.Connection, actor: str, item_id: str, reason: str) -
 def block_item(conn: sqlite3.Connection, actor: str, item_id: str, reason: str) -> None:
     if not reason.strip():
         raise TodoError("a block reason is required")
-    with conn:
+    with _write_txn(conn):
         item = _require_item(conn, item_id)
         if item["state"] in ("done", "dropped"):
             raise TodoError(f"{item_id!r} is {item['state']}; cannot block")
@@ -676,7 +728,7 @@ def block_item(conn: sqlite3.Connection, actor: str, item_id: str, reason: str) 
 
 
 def unblock_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
-    with conn:
+    with _write_txn(conn):
         _require_item(conn, item_id)
         conn.execute("UPDATE items SET blocked_reason = NULL WHERE id = ?", (item_id,))
         log_event(conn, actor, item_id, "unblock", None)
@@ -684,7 +736,7 @@ def unblock_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
 
 def sweep_stale(conn: sqlite3.Connection, actor: str, ttl_hours: float = DEFAULT_LEASE_TTL_HOURS) -> list[str]:
     released = []
-    with conn:
+    with _write_txn(conn):
         for row in conn.execute("SELECT id, claimed_by, claimed_at FROM items WHERE claimed_by IS NOT NULL"):
             if _lease_expired(row["claimed_at"], ttl_hours):
                 conn.execute(
@@ -876,7 +928,7 @@ def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: in
     if passed and row["expected"]:
         passed = row["expected"] in output
     result = "pass" if passed else "fail"
-    with conn:
+    with _write_txn(conn):
         conn.execute(
             "UPDATE verifications SET last_run = ?, last_result = ? WHERE item_id = ? AND seq = ?",
             (utc_now(), result, item_id, seq),
@@ -1013,58 +1065,131 @@ def _parse_yaml_tree(todo_dir: Path, report: dict[str, Any]) -> list[dict[str, A
     return parsed
 
 
-def _coerce_work_units(data: dict[str, Any], report: dict[str, Any]) -> list[dict[str, Any]] | None:
+def _coerce_work_units(
+    data: dict[str, Any], report: dict[str, Any], lenient: bool = False
+) -> list[dict[str, Any]] | None:
+    """Coerce work[] into insertable units.
+
+    Strict (open items): any invalid unit id rejects the whole item (None).
+    Lenient (archive): invalid units are dropped with a warning — the record
+    matters more than a perfect work graph for finished items.
+    """
     work = []
     for unit in data.get("work") or []:
         wid = str(unit.get("id", ""))
-        if not WID_RE.match(wid):
-            report["warnings"].append(f"{data['_path']}: invalid work id {wid!r}; item skipped")
-            return None
+        summary = str(unit.get("summary", "")).strip() or "(no summary recorded)"
+        if len(summary) < 5:
+            summary = f"(w) {summary}"
+        status = unit.get("status", "pending")
+        duplicate = any(existing["id"] == wid for existing in work)
+        if not WID_RE.match(wid) or status not in UNIT_STATUSES or duplicate:
+            if not lenient:
+                report["warnings"].append(f"{data['_path']}: invalid work unit {wid!r}; item skipped")
+                return None
+            report["warnings"].append(f"{data['_path']}: invalid archive work unit {wid!r} dropped")
+            continue
         work.append(
             {
                 "id": wid,
-                "summary": str(unit.get("summary", ""))[:200],
-                "status": unit.get("status", "pending"),
+                "summary": summary[:200],
+                "status": status,
                 "needs": [str(n) for n in unit.get("needs") or []],
                 "notes": unit.get("notes"),
             }
         )
+    if lenient:
+        # Dropped units must not leave dangling needs edges behind.
+        surviving = {unit["id"] for unit in work}
+        for unit in work:
+            unit["needs"] = [n for n in unit["needs"] if n in surviving]
     return work
+
+
+def _effective_state(data: dict[str, Any], report: dict[str, Any]) -> tuple[str, str | None]:
+    """Resolve (state, blocked_reason), warning on tree/status drift."""
+    path = data["_path"]
+    status = str(data.get("status", "Not Started")).strip().lower()
+    if data.get("_archive"):
+        if status != "completed":
+            report["warnings"].append(
+                f"{path}: archive file has status {status!r} (tree/status drift); imported as done"
+            )
+        return "done", None
+    if status == "completed":
+        report["warnings"].append(
+            f"{path}: status Completed inside the open tree (tree/status drift); imported as done"
+        )
+        return "done", None
+    state, blocked_reason = STATUS_MAP.get(status, ("planning", None))
+    if status not in STATUS_MAP:
+        report["warnings"].append(f"{path}: unknown status {status!r}; imported as planning")
+    return state, blocked_reason
+
+
+def _archive_title_description(data: dict[str, Any]) -> tuple[str, str]:
+    """Title/description with archive-lenient fallbacks (legacy files miss both)."""
+    stem = data["_path"].stem
+    title = str(data.get("title") or "").strip() or f"Archived item {stem}"
+    if len(title) < 5:
+        title = f"Archived: {title}"
+    description = str(data.get("description") or "").strip()
+    if len(description) < 10:
+        description = (description + "\n(no description recorded in archive)").strip()
+    return title[:200], description
+
+
+def _legacy_dep_candidates(data: dict[str, Any], report: dict[str, Any]) -> list[str]:
+    """Extract dep slugs from the deprecated `dependencies:` forms (blocked_by paths)."""
+    raw = data.get("dependencies")
+    if not raw:
+        return []
+    report["counts"]["legacy_dependencies_field"] += 1
+    if not isinstance(raw, dict):
+        return []
+    return [Path(str(entry)).stem for entry in raw.get("blocked_by") or []]
 
 
 def _import_one(conn: sqlite3.Connection, actor: str, data: dict[str, Any], report: dict[str, Any]) -> bool:
     """Create one item (plus deferrals) from parsed YAML; True when imported."""
     path = data["_path"]
-    status = str(data.get("status", "Not Started")).strip().lower()
-    state, blocked_reason = STATUS_MAP.get(status, ("planning", None))
-    if status not in STATUS_MAP:
-        report["warnings"].append(f"{path}: unknown status {status!r}; imported as planning")
+    is_archive = bool(data.get("_archive"))
+    state, blocked_reason = _effective_state(data, report)
     priority = str(data.get("priority", "medium")).strip().lower()
     if priority not in PRIORITIES:
         report["warnings"].append(f"{path}: unknown priority {priority!r}; using medium")
         priority = "medium"
-    work = _coerce_work_units(data, report)
+    work = _coerce_work_units(data, report, lenient=state == "done")
     if work is None:
         report["skipped"].append(str(path))
         return False
+    if data.get("tasks") and not data.get("work"):
+        report["counts"]["legacy_tasks_structure"] += 1
     scope_limit = data.get("scope_limit") or {}
     scope = [(kind, str(glob)) for kind in ("only_modify", "do_not_modify") for glob in scope_limit.get(kind) or []]
     created = str((data.get("metadata") or {}).get("created_date") or "") or None
     created_at = f"{created}T00:00:00Z" if created and "T" not in created else created
+    completed = str(data.get("completed_date") or "") or None
+    completed_at = f"{completed}T00:00:00Z" if completed and "T" not in completed else completed
+    if is_archive:
+        title, description = _archive_title_description(data)
+    else:
+        title = str(data.get("title", ""))[:200]
+        description = str(data.get("description", ""))
     try:
         create_item(
             conn,
             actor,
             item_id=data["_id"],
-            title=str(data.get("title", ""))[:200],
+            title=title,
             worktree=str(data.get("worktree") or path.parent.parent.name),
             priority=priority,
-            description=str(data.get("description", "")),
+            description=description,
             category=data.get("category"),
             approach=data.get("approach"),
             state=state,
             blocked_reason=blocked_reason,
             created_at=created_at or utc_now(),
+            completed_at=completed_at if state == "done" else None,
             work=work,
             scope=scope,
             verifications=_coerce_verifications(data.get("verification")),
@@ -1083,40 +1208,82 @@ def _import_one(conn: sqlite3.Connection, actor: str, data: dict[str, Any], repo
                 data["_id"],
                 str(entry.get("summary", "(no summary)")),
                 str(entry.get("reason") or "(none recorded)"),
+                allow_terminal=state == "done",
             )
     return True
 
 
-def import_yaml_tree(conn: sqlite3.Connection, actor: str, todo_dir: Path, dry_run: bool = False) -> dict[str, Any]:
-    report: dict[str, Any] = {"imported": [], "skipped": [], "warnings": []}
+def _assign_unique_ids(parsed: list[dict[str, Any]], report: dict[str, Any]) -> None:
+    """Resolve id collisions: open-tree items win; archive duplicates get a suffix."""
+    seen: set[str] = set()
+    for data in parsed:
+        item_id = data["_id"]
+        if item_id in seen:
+            base = f"{item_id}-archived" if data.get("_archive") else f"{item_id}-2"
+            candidate, n = base, 2
+            while candidate in seen:
+                n += 1
+                candidate = f"{base}-{n}"
+            report["warnings"].append(f"{data['_path']}: id {item_id!r} already imported; stored as {candidate!r}")
+            data["_id"] = candidate
+        seen.add(data["_id"])
+
+
+def import_yaml_tree(
+    conn: sqlite3.Connection,
+    actor: str,
+    todo_dir: Path,
+    done_dir: Path | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    report: dict[str, Any] = {
+        "imported": [],
+        "skipped": [],
+        "warnings": [],
+        "counts": {
+            "open_items": 0,
+            "done_items": 0,
+            "deps_resolved": 0,
+            "deps_dangling": 0,
+            "legacy_tasks_structure": 0,
+            "legacy_dependencies_field": 0,
+        },
+    }
     parsed = _parse_yaml_tree(todo_dir, report)
+    if done_dir is not None:
+        archive = _parse_yaml_tree(done_dir, report)
+        for data in archive:
+            data["_archive"] = True
+        parsed.extend(archive)
+    _assign_unique_ids(parsed, report)
     known_ids = {data["_id"] for data in parsed}
 
-    # Two passes so item_deps can point at any imported sibling.
+    # Two passes so item_deps can point at any imported item, open or archived.
     deferred_deps: list[tuple[str, str, Path]] = []
     for data in parsed:
-        status = str(data.get("status", "Not Started")).strip().lower()
-        if status == "completed":
-            report["skipped"].append(f"{data['_path']}: status Completed (belongs in the archive)")
-            continue
         if dry_run:
-            if _coerce_work_units(data, report) is None:
+            if _coerce_work_units(data, report, lenient=bool(data.get("_archive"))) is None:
                 report["skipped"].append(str(data["_path"]))
                 continue
         elif not _import_one(conn, actor, data, report):
             continue
         for dep in (data.get("deps") or {}).get("needs") or []:
             deferred_deps.append((data["_id"], str(dep), data["_path"]))
+        for dep in _legacy_dep_candidates(data, report):
+            deferred_deps.append((data["_id"], dep, data["_path"]))
         report["imported"].append(data["_id"])
+        report["counts"]["done_items" if data.get("_archive") else "open_items"] += 1
 
     if not dry_run:
         for item_id, dep, path in deferred_deps:
             if dep not in known_ids:
-                report["warnings"].append(f"{path}: dependency {dep!r} not in import set (done or dangling); skipped")
+                report["counts"]["deps_dangling"] += 1
+                report["warnings"].append(f"{path}: dependency {dep!r} not in import set (dangling); skipped")
                 continue
             try:
-                with conn:
+                with _write_txn(conn):
                     add_item_dep(conn, item_id, dep)
+                report["counts"]["deps_resolved"] += 1
             except TodoError as exc:
                 report["warnings"].append(f"{path}: dependency {dep!r} rejected: {exc}")
     return report
@@ -1170,9 +1337,12 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("init", help="create the database schema")
 
-    p = sub.add_parser("import-yaml", help="import the legacy _project/TODO tree")
+    p = sub.add_parser("import-yaml", help="import the legacy _project/TODO and _project/DONE trees")
     p.add_argument("--todo-dir", default=None)
+    p.add_argument("--done-dir", default=None)
+    p.add_argument("--skip-done", action="store_true", help="import only the open TODO tree")
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--verbose", action="store_true", help="print every skip/warning line")
 
     p = sub.add_parser("create", help="create an item")
     p.add_argument("id")
@@ -1282,16 +1452,26 @@ def _cmd_init(conn, actor, args):
     return 0
 
 
+def _print_capped(label: str, lines: list[str], verbose: bool, cap: int = 25) -> None:
+    shown = lines if verbose else lines[:cap]
+    for line in shown:
+        print(f"  {label}: {line}")
+    if len(lines) > len(shown):
+        print(f"  {label}: ... +{len(lines) - len(shown)} more (use --verbose)")
+
+
 def _cmd_import_yaml(conn, actor, args):
     todo_dir = Path(args.todo_dir) if args.todo_dir else git_root() / "_project" / "TODO"
-    report = import_yaml_tree(conn, actor, todo_dir, dry_run=args.dry_run)
+    done_dir = None
+    if not args.skip_done:
+        done_dir = Path(args.done_dir) if args.done_dir else git_root() / "_project" / "DONE"
+    report = import_yaml_tree(conn, actor, todo_dir, done_dir=done_dir, dry_run=args.dry_run)
     print(
         f"imported: {len(report['imported'])}  skipped: {len(report['skipped'])}  warnings: {len(report['warnings'])}"
     )
-    for line in report["skipped"]:
-        print(f"  skip: {line}")
-    for line in report["warnings"]:
-        print(f"  warn: {line}")
+    print(f"  counts: {json.dumps(report['counts'], sort_keys=True)}")
+    _print_capped("skip", report["skipped"], args.verbose)
+    _print_capped("warn", report["warnings"], args.verbose)
     return 0
 
 

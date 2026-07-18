@@ -418,11 +418,12 @@ class TestImporter:
         assert item["deferrals"][0]["resolution"] == "open"
         assert item["verifications"][0]["command"] == "make test-fast"
 
-    def test_import_completed_item_skipped(self, conn, tmp_path):
+    def test_import_completed_in_open_tree_becomes_done_with_drift_warning(self, conn, tmp_path):
         content = self.SAMPLE.replace("status: Not Started", "status: Completed")
         report = self._import(conn, tmp_path, content)
-        assert report["imported"] == []
-        assert len(report["skipped"]) == 1
+        assert report["imported"] == ["sample-import"]
+        assert any("tree/status drift" in warning for warning in report["warnings"])
+        assert todo_db.get_item(conn, "sample-import")["state"] == "done"
 
     def test_import_blocked_status_maps_to_annotation(self, conn, tmp_path):
         content = self.SAMPLE.replace("status: Not Started", "status: Blocked")
@@ -434,8 +435,155 @@ class TestImporter:
     def test_import_dangling_dep_warns(self, conn, tmp_path):
         content = self.SAMPLE + "deps:\n  needs: [not-imported-item]\n"
         report = self._import(conn, tmp_path, content)
-        assert any("not in import set" in warning for warning in report["warnings"])
+        assert any("dangling" in warning for warning in report["warnings"])
+        assert report["counts"]["deps_dangling"] == 1
         assert todo_db.get_item(conn, "sample-import")["deps"] == []
+
+
+class TestArchiveImport:
+    ARCHIVED = textwrap.dedent(
+        """
+        id: archived-item
+        title: "An archived item"
+        worktree: spike
+        priority: Medium
+        status: Completed
+        completed_date: "2025-11-29"
+        description: |
+          Finished work kept for the record.
+        deferred:
+          - summary: "Buried follow-up from the archive"
+            reason: "Was never promoted"
+        """
+    )
+
+    LEGACY = textwrap.dedent(
+        """
+        id: legacy-item
+        title: "A legacy archive entry"
+        worktree: spike
+        priority: Medium
+        status: Completed
+        description: |
+          Legacy entry using the deprecated structures.
+        tasks:
+          phases:
+            - name: "Phase 1"
+        dependencies:
+          blocked_by:
+            - "_project/DONE/spike/archived-item.yaml"
+        """
+    )
+
+    def _import_both(self, conn, tmp_path, open_files=(), done_files=()):
+        todo_tree = tmp_path / "TODO" / "spike" / "planning"
+        done_tree = tmp_path / "DONE" / "spike"
+        todo_tree.mkdir(parents=True)
+        done_tree.mkdir(parents=True)
+        for name, content in open_files:
+            (todo_tree / name).write_text(content, encoding="utf-8")
+        for name, content in done_files:
+            (done_tree / name).write_text(content, encoding="utf-8")
+        return todo_db.import_yaml_tree(conn, "importer", tmp_path / "TODO", done_dir=tmp_path / "DONE")
+
+    def test_archive_item_imported_done_with_open_deferral(self, conn, tmp_path):
+        report = self._import_both(conn, tmp_path, done_files=[("archived-item.yaml", self.ARCHIVED)])
+        assert report["counts"]["done_items"] == 1
+        item = todo_db.get_item(conn, "archived-item")
+        assert item["state"] == "done"
+        assert item["completed_at"] == "2025-11-29T00:00:00Z"
+        assert item["deferrals"][0]["resolution"] == "open"
+
+    def test_legacy_structures_counted_not_fatal(self, conn, tmp_path):
+        report = self._import_both(
+            conn,
+            tmp_path,
+            done_files=[("archived-item.yaml", self.ARCHIVED), ("legacy-item.yaml", self.LEGACY)],
+        )
+        assert report["counts"]["legacy_tasks_structure"] == 1
+        assert report["counts"]["legacy_dependencies_field"] == 1
+        # blocked_by path resolved to the sibling archive item.
+        assert todo_db.get_item(conn, "legacy-item")["deps"] == ["archived-item"]
+
+    def test_open_dep_on_archived_item_resolves_and_is_ready(self, conn, tmp_path):
+        open_item = TestImporter.SAMPLE + "deps:\n  needs: [archived-item]\n"
+        report = self._import_both(
+            conn,
+            tmp_path,
+            open_files=[("sample-import.yaml", open_item)],
+            done_files=[("archived-item.yaml", self.ARCHIVED)],
+        )
+        assert report["counts"]["deps_resolved"] == 1
+        assert todo_db.get_item(conn, "sample-import")["deps"] == ["archived-item"]
+        # The archived dep is state=done, so the open item is claimable.
+        ready_ids = [i["id"] for i in todo_db.ready_items(conn, "importer")]
+        assert "sample-import" in ready_ids
+
+    def test_id_collision_gets_archive_suffix(self, conn, tmp_path):
+        clash = self.ARCHIVED.replace("id: archived-item", "id: sample-import")
+        report = self._import_both(
+            conn,
+            tmp_path,
+            open_files=[("sample-import.yaml", TestImporter.SAMPLE)],
+            done_files=[("sample-import.yaml", clash)],
+        )
+        assert any("already imported" in warning for warning in report["warnings"])
+        assert todo_db.get_item(conn, "sample-import")["state"] == "planning"
+        assert todo_db.get_item(conn, "sample-import-archived")["state"] == "done"
+
+    def test_archive_missing_title_description_fallbacks(self, conn, tmp_path):
+        minimal = "id: bare-item\nworktree: spike\nstatus: Completed\n"
+        report = self._import_both(conn, tmp_path, done_files=[("bare-item.yaml", minimal)])
+        assert report["counts"]["done_items"] == 1
+        item = todo_db.get_item(conn, "bare-item")
+        assert "Archived item" in item["title"]
+        assert "no description recorded" in item["description"]
+
+
+class TestTerminalDeferralGuard:
+    def test_defer_rejected_on_done_item(self, conn):
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="finished-item",
+            title="Already finished item",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            state="done",
+            completed_at="2026-01-01T00:00:00Z",
+        )
+        with pytest.raises(todo_db.TodoError, match="terminal items"):
+            todo_db.defer_work(conn, "tester", "finished-item", "late follow-up", "found later")
+
+    def test_importer_bypass_allows_terminal(self, conn):
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="finished-item",
+            title="Already finished item",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            state="done",
+        )
+        deferral_id = todo_db.defer_work(
+            conn, "importer", "finished-item", "historical deferral", "archive record", allow_terminal=True
+        )
+        assert deferral_id == 1
+
+    def test_completed_pr_requires_done_state(self, conn):
+        with pytest.raises(todo_db.TodoError, match="only valid with state='done'"):
+            todo_db.create_item(
+                conn,
+                "tester",
+                item_id="bad-item",
+                title="Planning item with completion metadata",
+                worktree="spike",
+                priority="medium",
+                description="A description longer than ten characters.",
+                completed_pr=99,
+            )
 
 
 class TestCliSmoke:

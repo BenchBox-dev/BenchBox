@@ -341,6 +341,36 @@ uv run --project _project/scripts -- python _project/scripts/todo_db.py claim <i
 - The deferral gate, dependency gate, lease claims, and `check-scope` all
   fired correctly against real items via the CLI.
 
+**Full-history import (2026-07-18, second round):** the importer now covers
+`_project/DONE` as well, so the database holds the complete record and the
+archive becomes deletable (G5). Results of importing **all 1,362 files**
+(129 open + 1,233 archived, ~21s):
+
+- **0 skipped.** Archive-lenient fallbacks absorb every legacy shape
+  (247 `tasks:` structures and 93 `dependencies:` fields counted, not
+  fatal; invalid archive work units dropped with warnings, never the item).
+- **The open tree's 51 "dangling" dependencies collapse to 1**: 538 edges
+  resolve against the full item set; the single survivor
+  (`test-stdout-datagen` → `integrate-stdout-datagen`) is the only truly
+  orphaned reference in the project's history. Answering the evaluation
+  question directly: yes — the archive import validates them.
+- **18 warnings total, each a real historical defect**: the 11
+  Completed-in-`planning/` files; 4 status-drifted archive files (3 "Under
+  Review", 1 "Not Started" *inside DONE* — among them
+  `todo-sweep-completed-items-from-open-tree.yaml`, a drift-cleanup TODO
+  that itself drifted); 2 genuine dependency cycles in legacy archive data
+  (single-repo-migration phases 6/7 ↔ 5), rejected by the cycle check; and
+  the 1 dangling edge.
+- **629 open deferrals** across full history (53 from open items + 576
+  buried in the archive) — the complete G4 sweep backlog, now one query.
+
+Concurrency hardening applied in the same round (from PR review findings):
+all check-then-act writes run under `BEGIN IMMEDIATE` (autocommit
+connection + explicit write transactions, `busy_timeout=5000`), claim
+acquisition is additionally a conditional UPDATE with a rowcount check, and
+`defer` refuses terminal items on the CLI path (importer-only bypass for
+historical archive deferrals).
+
 **Spike deviations from the DDL above** (fold back into the final design):
 `items.category` column added so the import is lossless; scope matching
 uses `fnmatch` semantics (`*` crosses `/`) pending the final glob contract;
