@@ -371,6 +371,38 @@ acquisition is additionally a conditional UPDATE with a rowcount check, and
 `defer` refuses terminal items on the CLI path (importer-only bypass for
 historical archive deferrals).
 
+**Thin wrapper + UAT (2026-07-18, third round).** The wrapper was built
+TDD-first: `tests/unit/scripts/test_todo_wrapper.py` pins the contract
+(10 tests written red), then the implementation turned them green —
+`_project/scripts/todo` (7-line shim, works from any cwd, propagates gate
+exit codes) and `.claude/skills/todo-db/SKILL.md` (the thin skill). The
+contract tests enforce thinness structurally: ≤40 non-empty body lines,
+every referenced `todo <cmd>` must exist in the CLI's handler table, the
+mandatory workflow verbs must be present, and schema/validation vocabulary
+is banned from the body — the wrapper cannot silently regrow prose duties.
+The skill body landed at ~30 non-empty lines (vs ~600 lines of governing
+prose in the legacy system). An 11th test is an automated UAT: the skill's
+numbered workflow executed end-to-end through the shim (create → ready →
+claim → ordered done-with-evidence → verify --run → defer →
+complete-refused → promote → complete → export determinism → terminal-defer
+refusal). All wrapper tests are `medium`-marked to stay out of the
+budget-gated fast lane.
+
+Live UAT against the real imported database (shim only): full import
+(1,362/0/18), ready-queue ordering, a real work-order render for the
+critical DuckLake credential-redaction item, claim contention correctly
+refused for a second actor (exit 2), the deferral gate blocking `drop`
+until dismissal, and `lint --all`/`export` at full scale. The UAT surfaced
+and fixed one real defect: `check-scope` used `git diff HEAD`, which is
+blind to untracked files, so brand-new out-of-scope files escaped the
+check; it now unions in `git ls-files --others --exclude-standard`
+(verified live: the wrapper's own four uncommitted files were correctly
+flagged outside a claimed item's allowlist).
+
+Note for cutover: `todo-db` is deliberately an unmanaged sibling of the
+skill-synced `todo` skill during the spike; at G5 it is adopted into the
+skill-sync source and replaces the legacy skill's tracker actions.
+
 **Spike deviations from the DDL above** (fold back into the final design):
 `items.category` column added so the import is lossless; scope matching
 uses `fnmatch` semantics (`*` crosses `/`) pending the final glob contract;

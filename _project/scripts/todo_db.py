@@ -913,7 +913,18 @@ def changed_files(base: str | None) -> list[str]:
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise TodoError(f"git diff failed: {result.stderr.strip()}")
-    return [line for line in result.stdout.splitlines() if line.strip()]
+    files = [line for line in result.stdout.splitlines() if line.strip()]
+    # Untracked files are invisible to `git diff` but are still scope-relevant:
+    # a brand-new out-of-scope file must not slip past the check (live-UAT finding).
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if untracked.returncode == 0:
+        files.extend(line for line in untracked.stdout.splitlines() if line.strip())
+    return sorted(set(files))
 
 
 def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: int) -> tuple[str, str]:
