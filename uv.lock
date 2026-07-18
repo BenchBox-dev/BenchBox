@@ -473,13 +473,6 @@ databricks = [
     { name = "databricks-sdk" },
     { name = "databricks-sql-connector" },
 ]
-databricks-connect = [
-    { name = "cloudpathlib" },
-    { name = "databricks-connect", version = "16.1.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "databricks-connect", version = "18.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "databricks-sdk" },
-    { name = "databricks-sql-connector" },
-]
 dataframe-all = [
     { name = "dask", extra = ["distributed"] },
     { name = "datafusion" },
@@ -709,7 +702,7 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'redshift'", specifier = ">=1.20.0" },
     { name = "chdb", marker = "sys_platform != 'win32' and extra == 'all'", specifier = ">=0.10.0" },
     { name = "chdb", marker = "sys_platform != 'win32' and extra == 'clickhouse-local'", specifier = ">=0.10.0" },
-    { name = "click", specifier = ">=8.0.0,<9.0.0" },
+    { name = "click", specifier = ">=8.3.3,<9.0.0" },
     { name = "clickhouse-connect", marker = "extra == 'all'", specifier = ">=0.10.0" },
     { name = "clickhouse-connect", marker = "extra == 'clickhouse-cloud'", specifier = ">=0.10.0" },
     { name = "clickhouse-driver", marker = "extra == 'all'", specifier = ">=0.2.0" },
@@ -722,7 +715,6 @@ requires-dist = [
     { name = "cloudpathlib", marker = "extra == 'cloud-spark-databricks'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'cloudstorage'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'databricks'", specifier = ">=0.15.0" },
-    { name = "cloudpathlib", marker = "extra == 'databricks-connect'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'firebolt'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'presto'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'redshift'", specifier = ">=0.15.0" },
@@ -737,19 +729,16 @@ requires-dist = [
     { name = "databricks-connect", marker = "extra == 'all'", specifier = ">=14.0.0" },
     { name = "databricks-connect", marker = "extra == 'cloud-spark'", specifier = ">=14.0.0" },
     { name = "databricks-connect", marker = "extra == 'cloud-spark-databricks'", specifier = ">=14.0.0" },
-    { name = "databricks-connect", marker = "extra == 'databricks-connect'", specifier = ">=14.0.0" },
     { name = "databricks-sdk", marker = "extra == 'all'", specifier = ">=0.20.0" },
     { name = "databricks-sdk", marker = "extra == 'cloud'", specifier = ">=0.20.0" },
     { name = "databricks-sdk", marker = "extra == 'cloud-spark'", specifier = ">=0.20.0" },
     { name = "databricks-sdk", marker = "extra == 'cloud-spark-databricks'", specifier = ">=0.20.0" },
     { name = "databricks-sdk", marker = "extra == 'databricks'", specifier = ">=0.20.0" },
-    { name = "databricks-sdk", marker = "extra == 'databricks-connect'", specifier = ">=0.20.0" },
     { name = "databricks-sql-connector", marker = "extra == 'all'", specifier = ">=2.0.0" },
     { name = "databricks-sql-connector", marker = "extra == 'cloud'", specifier = ">=2.0.0" },
     { name = "databricks-sql-connector", marker = "extra == 'cloud-spark'", specifier = ">=2.0.0" },
     { name = "databricks-sql-connector", marker = "extra == 'cloud-spark-databricks'", specifier = ">=2.0.0" },
     { name = "databricks-sql-connector", marker = "extra == 'databricks'", specifier = ">=2.0.0" },
-    { name = "databricks-sql-connector", marker = "extra == 'databricks-connect'", specifier = ">=2.0.0" },
     { name = "datafusion", marker = "extra == 'all'", specifier = ">=50.1.0" },
     { name = "datafusion", marker = "extra == 'dataframe-all'", specifier = ">=50.1.0" },
     { name = "datafusion", marker = "extra == 'dataframe-datafusion'", specifier = ">=50.1.0" },
@@ -778,7 +767,7 @@ requires-dist = [
     { name = "influxdb3-python", marker = "extra == 'all'", specifier = ">=0.10.0" },
     { name = "influxdb3-python", marker = "extra == 'influxdb'", specifier = ">=0.10.0" },
     { name = "keyring", specifier = ">=25.0.0" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.2.0" },
+    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.28.1" },
     { name = "modin", extras = ["ray"], marker = "extra == 'all'", specifier = ">=0.32.0" },
     { name = "modin", extras = ["ray"], marker = "extra == 'dataframe-all'", specifier = ">=0.32.0" },
     { name = "modin", extras = ["ray"], marker = "extra == 'dataframe-modin'", specifier = ">=0.32.0" },
@@ -877,7 +866,7 @@ requires-dist = [
     { name = "vortex-data", marker = "extra == 'table-formats'", specifier = ">=0.29.0" },
     { name = "zstandard", specifier = ">=0.20.0" },
 ]
-provides-extras = ["dev", "docs", "viz", "explorer", "all", "cloud", "cloudstorage", "duckdb", "clickhouse", "clickhouse-server", "clickhouse-cloud", "databricks", "bigquery", "redshift", "snowflake", "trino", "presto", "postgresql", "questdb", "synapse", "fabric", "athena", "datafusion", "firebolt", "databend", "doris", "influxdb", "starrocks", "singlestore", "tpcdi", "clickhouse-local", "table-formats", "ai-primitives", "pandas", "dataframe-pandas", "modin", "dataframe-modin", "dask", "dataframe-dask", "cudf", "dataframe-cudf", "polars", "dataframe-polars", "pyspark", "lakesail", "velox", "dataframe-pyspark", "dataframe-datafusion", "dataframe-pandas-family", "dataframe-expression-family", "dataframe-all", "quick-start", "cloud-spark-aws", "cloud-spark-gcp", "cloud-spark-azure", "cloud-spark-snowflake", "cloud-spark-databricks", "databricks-connect", "cloud-spark", "mcp", "spark"]
+provides-extras = ["dev", "docs", "viz", "explorer", "all", "cloud", "cloudstorage", "duckdb", "clickhouse", "clickhouse-server", "clickhouse-cloud", "databricks", "bigquery", "redshift", "snowflake", "trino", "presto", "postgresql", "questdb", "synapse", "fabric", "athena", "datafusion", "firebolt", "databend", "doris", "influxdb", "starrocks", "singlestore", "tpcdi", "clickhouse-local", "table-formats", "ai-primitives", "pandas", "dataframe-pandas", "modin", "dataframe-modin", "dask", "dataframe-dask", "cudf", "dataframe-cudf", "polars", "dataframe-polars", "pyspark", "lakesail", "velox", "dataframe-pyspark", "dataframe-datafusion", "dataframe-pandas-family", "dataframe-expression-family", "dataframe-all", "quick-start", "cloud-spark-aws", "cloud-spark-gcp", "cloud-spark-azure", "cloud-spark-snowflake", "cloud-spark-databricks", "cloud-spark", "mcp", "spark"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -898,11 +887,11 @@ dev = [
     { name = "furo", specifier = ">=2025.9.25" },
     { name = "import-linter", specifier = ">=2.13" },
     { name = "influxdb3-python", specifier = ">=0.10.0" },
-    { name = "mcp", specifier = ">=1.2.0" },
+    { name = "mcp", specifier = ">=1.28.1" },
     { name = "mutmut", specifier = ">=3.5.0" },
     { name = "myst-parser", specifier = ">=3.0.1" },
     { name = "pandas", specifier = ">=2.0.0" },
-    { name = "pillow", specifier = ">=10.0.0" },
+    { name = "pillow", specifier = ">=12.3.0" },
     { name = "polars", specifier = ">=1.35.2" },
     { name = "pre-commit", specifier = ">=4.6.0" },
     { name = "presto-python-client", specifier = ">=0.8.4" },

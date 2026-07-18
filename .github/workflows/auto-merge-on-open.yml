@@ -18,14 +18,16 @@ name: Auto-enable auto-merge
 # execution + self-touch override): they are BEST-EFFORT for same-repo PRs.
 # GitHub executes the PR's OWN copy of a pull_request-triggered workflow
 # file, so a PR that edits this workflow can delete these checks in the
-# same commit that would have triggered them. The durable control is the
-# CODEOWNERS entries covering this file and the predicate
-# (SOUNDNESS_PREFIXES in _project/scripts/auto_merge_soundness_paths.py
-# includes both, mirrored 1:1 into .github/CODEOWNERS) combined with the
-# develop ruleset's require_code_owner_review (pending admin action; see
-# docs/operations/repo-admin-settings.md). The checks below remain useful
-# as defense-in-depth and as an honest triage signal for PRs that don't
-# tamper with the workflow itself.
+# same commit that would have triggered them. There is deliberately NO
+# repo-layer rule backing this up: the develop ruleset's
+# require_code_owner_review target was RETIRED 2026-07-18 (the sole code
+# owner authors every PR and GitHub forbids self-approval, so the rule
+# would deadlock soundness PRs, not gate them — see
+# docs/operations/repo-admin-settings.md, "Soundness-path review
+# enforcement (RETIRED 2026-07-18)"). The operative control is what this
+# workflow does: soundness PRs never merge hands-free; the owner reviews
+# the diff and merges manually. The residual workflow-tamper risk is
+# recorded and accepted in that runbook section.
 
 on:
   pull_request:

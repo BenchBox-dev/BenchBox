@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Thin entry point for the DB-backed TODO tracker spike
+# (_project/specs/todo-db-tracker.md). All TODO state changes go through this
+# command; the CLI and database enforce the lifecycle rules.
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+exec uv run --project "$ROOT/_project/scripts" -- python "$ROOT/_project/scripts/todo_db.py" "$@"

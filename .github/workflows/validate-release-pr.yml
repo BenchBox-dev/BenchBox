@@ -129,9 +129,11 @@ jobs:
           # scripts/ruleset_drift_check.py imports the enforcement helper from
           # _project/scripts, but both the release head and the trusted release
           # base are curated (no _project/) once the release-cut curation
-          # step removes it. Pull the helper AND its _project/scripts
-          # dependency (auto_merge_soundness_paths) from develop, which always
-          # has them, so bootstrap evidence doesn't ModuleNotFoundError.
+          # step removes it. Pull the helper from develop, which always has
+          # it, so bootstrap evidence doesn't ModuleNotFoundError. Also
+          # restore auto_merge_soundness_paths.py: the current helper no
+          # longer imports it, but keeping the pair together costs nothing
+          # and protects any older curated tree whose helper version did.
           mkdir -p _project/scripts
           if [ ! -f _project/scripts/ruleset_review_enforcement.py ]; then
             git show origin/develop:_project/scripts/ruleset_review_enforcement.py > _project/scripts/ruleset_review_enforcement.py
@@ -139,6 +141,15 @@ jobs:
           if [ ! -f _project/scripts/auto_merge_soundness_paths.py ]; then
             git show origin/develop:_project/scripts/auto_merge_soundness_paths.py > _project/scripts/auto_merge_soundness_paths.py
           fi
+          # Version-skew guard: the helper restored above is always
+          # develop-HEAD, but this curated release tree's copy of
+          # scripts/ruleset_drift_check.py is frozen at release-cut time. If
+          # the helper's exports change on develop between cut and
+          # validation (e.g. the 2026-07-18 review-rule retirement removed
+          # extract_rules/review_enforcement_findings), the stale consumer
+          # ImportErrors. Overwrite the checker from origin/develop too so
+          # consumer and helper are always the same vintage.
+          git show origin/develop:scripts/ruleset_drift_check.py > scripts/ruleset_drift_check.py
 
       - name: Bootstrap ruleset drift evidence
         if: steps.release-readiness.outputs.bootstrap_required == 'true'
