@@ -85,3 +85,39 @@ work:
       Add the w1 repro as a standing regression test. Once green, this unblocks
       (or de-risks) graduate-browser-smoke-to-blocking-gates, whose 10-green
       criterion this flake was defeating on the WebKit lane.
+
+approach: |
+  Fix inside results-explorer/src/db.ts, not in the tests. The e2e "No result
+  found" symptom is downstream of the readiness contract: prefer making the gate
+  keyed (w2 option a) over papering over it with retries, unless a keyed probe is
+  shown to be too slow on cold CDN loads. Reuse the existing transient-retry
+  machinery (isTransientDuckDbSnapshotError, QUERY_RETRY_ATTEMPTS,
+  SNAPSHOT_READY_ATTEMPTS) rather than inventing a second retry path.
+
+must_preserve:
+  - "A genuinely-absent result id still surfaces 'No result found' promptly - the fix must not turn a real not-found into an indefinite spinner or a swallowed error."
+  - "queryRows keeps THROWING on non-transient errors; do not broaden the transient-error classifier to hide real query failures."
+  - "Warm-load latency does not regress: the readiness gate must not add a blocking keyed probe to the steady-state path once the snapshot is hot."
+
+verification:
+  - description: "The new cold-window repro (w1) fails on develop HEAD and passes after the fix"
+    command: "cd results-explorer && npx vitest run src/lib/__tests__/db.test.ts"
+    expected_output: "the cold zero-row keyed-lookup assertion is present and green"
+  - description: "Full explorer e2e is green cold (fresh build, single worker = worst-case cold path)"
+    command: "cd results-explorer && npm run test:e2e:chromium"
+    expected_output: "0 failed; no 'No result found' or heading toBeVisible timeout"
+  - description: "Existing readiness/version-guard unit tests still pass"
+    command: "cd results-explorer && npx vitest run src/lib/__tests__/read-model-version-mismatch.test.ts"
+    expected_output: "all pass"
+
+scope_limit:
+  only_modify:
+    - "results-explorer/src/db.ts"
+    - "results-explorer/src/lib/duckdbQueries.ts"
+    - "results-explorer/src/pages/ResultDetail.tsx"
+    - "results-explorer/src/lib/__tests__/"
+    - "results-explorer/e2e/"
+
+anti_patterns:
+  - "Do NOT 'fix' this by raising Playwright timeouts or adding sleeps in the specs - that hides the readiness defect and leaves real users exposed on cold CDN loads."
+  - "Do NOT mark the id as missing/dangling and regenerate fixtures - the id is present; this is a readiness race, not a corpus bug (see project_explorer_cold_snapshot_race)."

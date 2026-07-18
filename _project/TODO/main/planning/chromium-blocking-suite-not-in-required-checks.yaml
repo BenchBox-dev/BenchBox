@@ -15,10 +15,11 @@ description: |
     - The develop ruleset `develop-squash-only` (id 15611785) has exactly ONE
       required status check: `ci-required-result`
       (`gh api repos/joeharris76/BenchBox/rulesets/15611785`).
-    - `ci-required-result` (.github/workflows/pr.yml:949) aggregates only:
-      ci-paths, content-guard, code-lint, code-test, correctness-gate,
-      plan-capture-gate, medium-test, explorer-tokens, audit-sha, package-smoke,
-      dependency-audit, parity-check.
+    - the `ci-required-result:` job in .github/workflows/pr.yml (grep the job
+      key, not a line number — it drifts) aggregates only these via its
+      `needs:` list: ci-paths, content-guard, code-lint, code-test,
+      correctness-gate, plan-capture-gate, medium-test, explorer-tokens,
+      audit-sha, package-smoke, dependency-audit, parity-check.
     - The browser jobs — "Chromium (full suite, blocking)", WebKit @smoke,
       Firefox @smoke — live in a SEPARATE workflow
       (.github/workflows/results-explorer-browser.yml) and are NOT in that
@@ -47,18 +48,34 @@ success_metrics:
   - "The wiring is self-healing / drift-checked so removing Chromium from the gate turns a required job red rather than silently regressing."
 
 work:
-  - id: w1
-    summary: "Confirm the gap live and decide the wiring point (aggregate job vs ruleset required-checks)"
+  - id: w0
+    summary: "Re-validate the gap live and commit a compact evidence summary"
     status: pending
     needs: []
     notes: |
-      Re-read the develop ruleset required_status_checks and ci-required-result's
-      needs list. Decide between: (a) add the Chromium full-suite job to
-      ci-required-result's needs + aggregation with correct skip-as-pass
-      handling (keeps one roll-up check in the ruleset — preferred, matches the
-      existing pattern); or (b) add the Chromium context directly to the ruleset
-      required_status_checks (admin action, and must handle path-skip). Record
-      the choice and why in the PR body.
+      The description's evidence (ruleset id 15611785, the ci-required-result
+      needs list, the browser jobs living in a separate workflow) was captured
+      2026-07-10 and can drift. Before designing, re-capture and record a compact
+      summary (command + result, not raw dumps) in the implementing PR body:
+        gh api repos/joeharris76/BenchBox/rulesets/15611785 \
+          --jq '.rules[]|select(.type=="required_status_checks")|.parameters.required_status_checks[].context'
+        # confirm it still lists only ci-required-result (or note what changed)
+      Then confirm the browser suite is still absent from ci-required-result's
+      needs list in .github/workflows/pr.yml, and that the browser jobs are still
+      in .github/workflows/results-explorer-browser.yml. If the gap is already
+      closed, mark this item Completed with the evidence and stop.
+
+  - id: w1
+    summary: "Decide the wiring point (aggregate job vs ruleset required-checks)"
+    status: pending
+    needs: [w0]
+    notes: |
+      Decide between: (a) add the Chromium full-suite job to ci-required-result's
+      needs + aggregation with correct skip-as-pass handling (keeps one roll-up
+      check in the ruleset — preferred, matches the existing pattern); or (b) add
+      the Chromium context directly to the ruleset required_status_checks (admin
+      action, and must handle path-skip). Record the choice and why in the PR
+      body.
 
   - id: w2
     summary: "Implement the chosen wiring so a red Chromium full suite blocks merge"
@@ -79,6 +96,32 @@ work:
       drift steps) that fails if the Chromium full suite ever falls out of the
       required set. Verify with a throwaway PR that forces a Chromium failure and
       confirm it cannot merge, and that a non-explorer code-only PR still can.
+
+must_preserve:
+  - "A code-only PR that does not trigger the browser workflow must still be able to merge - a correctly-skipped Chromium job counts as pass, never as pending/fail. This is the load-bearing constraint; getting it wrong wedges every non-explorer PR."
+  - "The existing ci-required-result skip-as-pass handling for path-gated jobs (ci-paths gating) is the model; do not regress it while extending it."
+
+anti_patterns:
+  - "Do NOT hard-require the raw 'Chromium (full suite, blocking)' context in the ruleset without skip handling - it turns every path-skipped PR into a permanently-pending required check that can never merge."
+  - "Do NOT make the browser workflow run on every PR just to satisfy the gate - that inflates CI time on Python-only changes; keep it path-gated and handle the skip in the aggregate."
+
+verification:
+  - description: "The aggregate now fails when the Chromium full suite fails (option a)"
+    command: "gh api repos/joeharris76/BenchBox/actions/workflows/pr.yml # inspect ci-required-result needs, or run a throwaway PR with a forced Chromium failure"
+    expected_output: "ci-required-result concludes failure when Chromium (full suite, blocking) fails; PR cannot squash-auto-merge"
+  - description: "A non-explorer, code-only PR still reaches mergeable (skip = pass)"
+    command: "open a docs- or python-only PR and confirm ci-required-result is green with the browser suite skipped"
+    expected_output: "mergeable; ci-required-result green; browser jobs skipped, not pending"
+  - description: "Drift guard fails if the Chromium gate is removed"
+    command: "uv run -- python -m pytest tests/unit/release/ -k 'required_checks or ci_required' -q # (new test added by w3)"
+    expected_output: "asserts Chromium full suite is in the required aggregate; red if it is ever dropped"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/pr.yml"
+    - ".github/workflows/results-explorer-browser.yml"
+    - "tests/unit/release/"
+    - "docs/"
 
 deferred:
   - summary: "If wiring via the ruleset (option b): apply the develop ruleset required_status_checks change to include the Chromium gate."
