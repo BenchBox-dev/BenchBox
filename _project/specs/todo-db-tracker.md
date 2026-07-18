@@ -526,9 +526,10 @@ hosted) → `TODO_DB_PATH` (local file) → `TODO_DB_URL` (hosted; requires
 outranks `TODO_DB_URL` so a test or tool that pins a local file can never be
 silently redirected at the shared database.
 
-Hosted mode uses the `libsql` Python client (0.1.11) with an **embedded
-replica** at `<git main root>/.todo-db/replica.db` (override:
-`TODO_DB_REPLICA`): reads serve from the local replica after one freshness
+Hosted mode uses the `libsql` Python client (0.1.11) with a **per-worktree
+embedded replica** at `<git root>/.todo-db/replica.db` (override:
+`TODO_DB_REPLICA`; originally the main-root path, moved per-worktree in the
+hardening round below): reads serve from the local replica after one freshness
 `sync()` at connect; writes — including every `BEGIN IMMEDIATE` interactive
 transaction — are delegated statement-by-statement to the primary, so the
 check-then-act gates serialize against all other writers exactly as they do
@@ -544,12 +545,15 @@ mapping — so every gate, query, and transaction above it runs unchanged on
 either backend. FK enforcement was verified live through write delegation
 (dangling insert refused by the primary). `todo migrate` is backend-aware;
 the hosted path hard-requires a fresh sync before touching the version
-record. TDD: 22 new tests (`tests/unit/scripts/test_todo_db_hosted.py`,
-medium-marked, written red first) pin backend resolution, wiring, adapter
-semantics, `BEGIN IMMEDIATE` discipline, rollback-on-failed-gate, the full
-gated lifecycle, and hosted migration against a fake libsql module that
-reproduces the real client's quirks; the pre-existing tracker suite (93
-tests across `test_todo_db*.py` + `test_todo_wrapper.py`) passes unchanged.
+record. TDD: `tests/unit/scripts/test_todo_db_hosted.py` (medium-marked,
+written red first; 38 tests after the hardening round below) pins backend
+resolution, wiring, adapter semantics, `BEGIN IMMEDIATE` discipline,
+rollback-on-failed-gate, the full gated lifecycle, hosted migration, and
+the bulk-transfer failure paths against a fake libsql module and a fake
+Hrana primary that reproduce the real client's quirks; the pre-existing
+tracker suite (93 tests across `test_todo_db*.py` + `test_todo_wrapper.py`)
+passes unchanged. Replayable acceptance protocol:
+`_project/audits/todo-db-hosted-acceptance-2026-07-18.md`.
 
 **Shared-visibility proof (live, two processes × two replicas × two
 actors).** The one property the local spike could not demonstrate, run
@@ -617,6 +621,31 @@ identically to local mode. Final stats coherent: open deferrals 629
 (unchanged), promoted 1, done 1,248. Cleanup: the promoted follow-up
 (`uat-hosted-item-followup`) was dropped with reason "UAT artifact";
 the UAT parent remains as `done` audit trail.
+
+**Hardening round (2026-07-18, post-merge review follow-up).** Confirmed
+findings from the PR #1219 review, fixed TDD (red first, fake-primary
+failure injection):
+
+- **Plaintext refusal:** `http://` hosted URLs are rejected at connect and
+  at the pipeline layer — the Bearer token never travels unencrypted.
+- **Commit discipline:** Hrana keeps executing later requests in a
+  pipeline after a statement error, so `COMMIT` no longer rides with data
+  batches; it is sent alone, only after every batch's results came back
+  clean, and any failure explicitly closes the stream (server-side
+  rollback). Regression-tested with injected statement errors in final and
+  non-final batches.
+- **Atomic import guard:** the target-must-be-empty check (without
+  `--replace`) moved inside the transfer's `BEGIN IMMEDIATE` transaction —
+  no writer can populate the database between check and transfer.
+- **Protocol correctness:** the response `base_url` is carried alongside
+  the baton across batched requests, per the Hrana HTTP v2 spec.
+- **Replica concurrency:** the embedded replica moved from the shared
+  main-root path to per-worktree (`<git root>/.todo-db/replica.db`), and
+  replica open+sync is serialized by an advisory flock — concurrent
+  processes no longer sync one shared replica file. Cost: one cold sync
+  per worktree (~3.4s at 12.8MB), warm reads unchanged.
+- **Error surfaces:** pipeline network failures (timeouts, resets) and
+  non-JSON responses map to the CLI's normal exit-2 error path.
 
 ## Cutover plan
 

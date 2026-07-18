@@ -224,14 +224,36 @@ class TestHostedConnect:
             todo_db.SCHEMA_VERSION
         )
 
-    def test_default_replica_path_is_todo_db_dir(self, monkeypatch, tmp_path):
+    def test_default_replica_path_is_per_worktree(self, monkeypatch, tmp_path):
+        # Per-worktree deliberately (NOT git_main_root): every process syncing
+        # one shared replica file is a cross-process corruption hazard; the
+        # shared state lives on the primary, the replica is only a cache.
         fake = FakeLibsql()
         monkeypatch.setitem(sys.modules, "libsql", fake)
         monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "test-token-value")
         monkeypatch.delenv("TODO_DB_REPLICA", raising=False)
-        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        monkeypatch.setattr(todo_db, "git_root", lambda: tmp_path)
         todo_db.connect_backend(HOSTED_URL)
         assert fake.connect_calls[0]["database"] == str(tmp_path / ".todo-db" / "replica.db")
+
+    def test_replica_setup_lock_taken_and_released(self, fake_libsql, tmp_path):
+        todo_db.connect_backend(HOSTED_URL)
+        lock_path = Path(todo_db.hosted_replica_path()).with_suffix(".db.lock")
+        assert lock_path.exists(), "connect must serialize replica setup via a lock file"
+        import fcntl
+
+        with open(lock_path, "w", encoding="utf-8") as handle:
+            # non-blocking acquire succeeds only if connect released the lock
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+    def test_plaintext_http_url_is_refused(self, fake_libsql, capsys):
+        with pytest.raises(todo_db.TodoError, match="https"):
+            todo_db.connect_backend("http://example-db.turso.io")
+        assert not fake_libsql.connect_calls
+        rc = todo_db.main(["--db", "http://example-db.turso.io", "stats"])
+        assert rc == 2
+        assert "https" in capsys.readouterr().err
 
     def test_error_message_never_contains_the_token(self, monkeypatch, tmp_path):
         fake = FakeLibsql(sync_fails=True)
@@ -390,12 +412,14 @@ class FakePrimary:
     Mimics the wire contract: parameterized statements, baton chaining, and
     Hrana-typed result rows."""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, base_url: str | None = None, fail_on: str | None = None):
         self.path = path
         self.requests: list[dict] = []
         self._conn = sqlite3.connect(path)
         self._conn.isolation_level = None
         self._baton = 0
+        self.base_url = base_url
+        self.fail_on = fail_on  # substring: statements matching it return an error result
 
     def post(self, endpoint: str, token: str, payload: dict) -> dict:
         assert token, "post called without an auth token"
@@ -403,10 +427,17 @@ class FakePrimary:
         results = []
         for request in payload["requests"]:
             if request["type"] == "close":
+                # Hrana semantics: closing a stream with an open transaction
+                # rolls it back.
+                if self._conn.in_transaction:
+                    self._conn.rollback()
                 results.append({"type": "ok", "response": {"type": "close"}})
                 continue
             stmt = request["stmt"]
             args = [self._decode(a) for a in stmt.get("args", [])]
+            if self.fail_on and self.fail_on in stmt["sql"]:
+                results.append({"type": "error", "error": {"message": f"injected failure for {self.fail_on!r}"}})
+                continue
             try:
                 cur = self._conn.execute(stmt["sql"], args)
                 rows = [[self._encode(v) for v in row] for row in cur.fetchall()]
@@ -419,7 +450,17 @@ class FakePrimary:
             except sqlite3.Error as exc:
                 results.append({"type": "error", "error": {"message": str(exc)}})
         self._baton += 1
-        return {"baton": f"baton-{self._baton}", "results": results}
+        response = {"baton": f"baton-{self._baton}", "results": results}
+        if self.base_url:
+            response["base_url"] = self.base_url
+        return response
+
+    def sqls(self) -> list[list[str]]:
+        """Per-request executed SQL, for assertions."""
+        return [
+            [r["stmt"]["sql"] for r in request["payload"]["requests"] if r["type"] == "execute"]
+            for request in self.requests
+        ]
 
     @staticmethod
     def _decode(arg: dict):
@@ -479,6 +520,43 @@ class TestHostedBulkImport:
         assert todo_db._hrana_endpoint(HOSTED_URL) == ("https://example-db.aws-us-east-1.turso.io/v2/pipeline")
         assert todo_db._hrana_endpoint("https://x.turso.io") == "https://x.turso.io/v2/pipeline"
 
+    def test_hrana_endpoint_refuses_plaintext_http(self):
+        # a Bearer token must never travel over plaintext
+        with pytest.raises(todo_db.TodoError, match="https"):
+            todo_db._hrana_endpoint("http://x.turso.io")
+
+    def test_post_pipeline_maps_network_errors_to_todo_error(self, monkeypatch):
+        import urllib.request
+
+        def _raise_timeout(*args, **kwargs):
+            raise TimeoutError("timed out")
+
+        monkeypatch.setattr(urllib.request, "urlopen", _raise_timeout)
+        with pytest.raises(todo_db.TodoError, match="pipeline request failed"):
+            todo_db._post_pipeline("https://x.turso.io/v2/pipeline", "tok", {"requests": []})
+
+        def _raise_reset(*args, **kwargs):
+            raise ConnectionResetError("peer reset")
+
+        monkeypatch.setattr(urllib.request, "urlopen", _raise_reset)
+        with pytest.raises(todo_db.TodoError, match="pipeline request failed"):
+            todo_db._post_pipeline("https://x.turso.io/v2/pipeline", "tok", {"requests": []})
+
+    def test_post_pipeline_maps_bad_json_to_todo_error(self, monkeypatch):
+        import io
+        import urllib.request
+
+        class _FakeResponse(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: _FakeResponse(b"<html>gateway error</html>"))
+        with pytest.raises(todo_db.TodoError, match="pipeline"):
+            todo_db._post_pipeline("https://x.turso.io/v2/pipeline", "tok", {"requests": []})
+
     def test_bulk_transfer_row_parity(self, staging, tmp_path):
         primary = FakePrimary(tmp_path / "primary.sqlite")
         sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
@@ -491,16 +569,52 @@ class TestHostedBulkImport:
         primary = FakePrimary(tmp_path / "primary.sqlite")
         sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
         todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post, batch_size=5)
-        assert len(primary.requests) > 2, "batch_size=5 must split into several requests"
-        first_sqls = [r["stmt"]["sql"] for r in primary.requests[0]["payload"]["requests"] if r["type"] == "execute"]
-        assert first_sqls[0] == "BEGIN"
-        last_payload = primary.requests[-1]["payload"]
-        last_sqls = [r["stmt"]["sql"] for r in last_payload["requests"] if r["type"] == "execute"]
-        assert last_sqls[-1] == "COMMIT"
-        assert last_payload["requests"][-1]["type"] == "close"
+        assert len(primary.requests) > 3, "batch_size=5 must split into several requests"
+        sqls = primary.sqls()
+        # guard request: take the write lock and check the target atomically
+        assert sqls[0][0] == "BEGIN IMMEDIATE"
+        assert "SELECT count(*) FROM items" in sqls[0]
+        # COMMIT is isolated in its own final request, sent only after every
+        # data batch's results were verified clean (Hrana keeps executing
+        # later requests in a pipeline after a statement error, so a COMMIT
+        # riding with data could commit a partial transfer)
+        assert sqls[-1] == ["COMMIT"]
+        assert primary.requests[-1]["payload"]["requests"][-1]["type"] == "close"
+        assert all("COMMIT" not in batch for batch in sqls[:-1])
         # every request after the first chains the previous baton
         for i, request in enumerate(primary.requests[1:], start=1):
             assert request["payload"]["baton"] == f"baton-{i}"
+
+    def test_statement_error_rolls_back_and_never_commits(self, staging, tmp_path):
+        primary = FakePrimary(tmp_path / "primary.sqlite", fail_on="INSERT INTO deferrals")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        with pytest.raises(todo_db.TodoError, match="injected failure"):
+            todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post, batch_size=5)
+        sqls = primary.sqls()
+        assert all("COMMIT" not in batch for batch in sqls), "a failed transfer must never COMMIT"
+        # the stream is explicitly closed so the primary rolls back promptly
+        assert primary.requests[-1]["payload"]["requests"][-1]["type"] == "close"
+        # nothing survived on the target
+        remaining = sqlite3.connect(primary.path).execute("SELECT count(*) FROM items").fetchone()[0]
+        assert remaining == 0
+
+    def test_nonfinal_batch_error_also_closes_the_stream(self, staging, tmp_path):
+        # fail early (items is the first transferred table) with small batches,
+        # so the error lands well before the final batch
+        primary = FakePrimary(tmp_path / "primary.sqlite", fail_on="INSERT INTO items")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        with pytest.raises(todo_db.TodoError, match="injected failure"):
+            todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post, batch_size=3)
+        assert primary.requests[-1]["payload"]["requests"][-1]["type"] == "close"
+        assert all("COMMIT" not in batch for batch in primary.sqls())
+
+    def test_base_url_from_response_is_used_for_subsequent_requests(self, staging, tmp_path):
+        primary = FakePrimary(tmp_path / "primary.sqlite", base_url="https://shard-7.example.turso.io")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post, batch_size=5)
+        endpoints = [request["endpoint"] for request in primary.requests]
+        assert endpoints[0] == todo_db._hrana_endpoint(HOSTED_URL)
+        assert all(e == "https://shard-7.example.turso.io/v2/pipeline" for e in endpoints[1:]), endpoints
 
     def test_import_yaml_hosted_stages_locally_and_bulk_transfers(self, fake_libsql, monkeypatch, tmp_path, capsys):
         todo_dir = tmp_path / "TODO" / "area" / "planning"
