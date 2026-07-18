@@ -62,6 +62,18 @@ For the up-to-date per-cohort breakdown, see
 `results-data/SEED_CORPUS_SPEC.md` documents the seed-lane workflow target
 matrix and the validator gate.
 
+### Tuned bundles dropped (2026-07-16)
+
+The 325 seed-corpus bundles that claimed `execution.tuning_mode == "tuned"`
+were removed: the 2026-07 tuning remediation (#1176 w0 discovery) found the
+tuning config never reached platform adapters on the direct CLI path, so
+those bundles were almost certainly physically untuned and unsound for
+cross-submission comparison. The 203 bundles with no `tuning_mode` recorded
+were left in place - they ingest honestly as "not recorded". See
+`results-data/REGENERATION.md` for the full removed-cell checklist and the
+regeneration procedure once the tuned path is fixed and verified
+(post-#1176/#1180).
+
 ## Contributing via Pull Request (Phase 2)
 
 Community contributions are not yet open. When Phase 2 launches:

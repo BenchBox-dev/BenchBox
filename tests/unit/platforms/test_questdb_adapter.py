@@ -420,6 +420,24 @@ class TestQuestDBAdapter:
 
         assert adapter.platform_config.get("tuning_enabled") is True
 
+    def test_from_config_passes_tuning_provenance(self, questdb_stubs):
+        """from_config must forward tuning_source/tuning_source_file (ADR-1)
+        the same way it already forwards tuning_enabled/tuning_config -- a
+        --tuning tuned QuestDB run should be able to compute a requested hash
+        and still export tuning_source/source_file instead of silently
+        falling back to the legacy "auto" bridge for a real YAML template run.
+        """
+        config = {
+            "tuning_enabled": True,
+            "tuning_source": "explicit_file",
+            "tuning_source_file": "examples/tunings/questdb/tpch_tuned.yaml",
+        }
+
+        adapter = QuestDBAdapter.from_config(config)
+
+        assert adapter.tuning_source == "explicit_file"
+        assert adapter.tuning_source_file == "examples/tunings/questdb/tpch_tuned.yaml"
+
     def test_create_schema_skips_foreign_keys(self, questdb_stubs):
         """Schema creation should skip foreign key constraints."""
         mock_conn = Mock()

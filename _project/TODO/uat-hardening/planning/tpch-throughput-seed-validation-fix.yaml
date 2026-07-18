@@ -68,7 +68,7 @@ work:
 
 deferred:
   - summary: "Parameter-aware expected row counts for Q11/16/18/20 (deriving expectations per seed instead of excluding)"
-    reason: "Requires per-parameter answer-set computation; the exclusion mirrors the established correctness-gate policy and unblocks the gate now. Track as a future strengthening."
+    reason: "Requires per-parameter answer-set computation; the exclusion mirrors the established correctness-gate policy and unblocks the gate now. Track as a future strengthening. Promoted to [[tpch-throughput-parameter-aware-rowcounts]] (2026-07-16), which needs this item."
 
 deps:
   needs: []

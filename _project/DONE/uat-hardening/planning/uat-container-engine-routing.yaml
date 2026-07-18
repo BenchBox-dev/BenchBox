@@ -1,0 +1,342 @@
+id: uat-container-engine-routing
+title: "Route UAT container lifecycle through a resolved engine (mocker on macOS, docker elsewhere); record engine provenance; fix cleanup gaps"
+worktree: uat-hardening
+priority: High
+status: Completed
+completed_date: "2026-07-11"
+category: "Operations / Container Runtime"
+
+description: |
+  DECISION (user, 2026-07-11): the supported engine is mocker (Apple
+  Containerization Docker-CLI shim) on macOS and docker elsewhere.
+
+  Current state, verified on develop @ fc31f3604:
+
+  1. HARDCODED BINARY: UAT's managed lifecycle, preflight probes, and
+     recovery cleanup all hardcode the `docker` binary
+     (tests/uat/docker_assets.py:361, phases/preflight.py:85/:100,
+     docker_cleanup.py:181-184). BENCHBOX_CONTAINER_CLI (honored by
+     _project/scripts/build_joinorder_data.py:879-883) is ignored by UAT;
+     CONTAINER_ENGINE is honored only by the Makefile test-docker-*
+     targets (Makefile:452-463). The engine used to produce historical
+     gate evidence is recorded nowhere.
+
+  2. MOCKER VOLUME LEAK: mocker 0.5.4's `compose down -v` does not remove
+     named volumes; the workaround exists only in the Makefile
+     compose_down_fresh macro (Makefile:463), so UAT-managed teardown leaks
+     named volumes on every platform switch under mocker.
+
+  3. APPLE-CONTAINER CLEANUP DEFECTS (make uat-docker-cleanup
+     ENGINE=container):
+     - PREFIX= silently ignored: reclaim_container_usage(project_prefix=..)
+       never threads it; classifiers hardcode DEFAULT_UAT_PROJECT_PREFIX
+       (container_cleanup.py:344, :379-380, :407). ENGINE=container
+       PREFIX=custom APPLY=1 reports the custom prefix but deletes by the
+       default one. No test covers the passthrough.
+     - networks never inventoried in any mode (_inventory_resources lists
+       only images/containers/volumes, container_cleanup.py:324-329).
+     - ownership overreach: image-name prefix matching (`benchbox-`) can
+       classify a non-UAT dev container as owned even in `owned` mode
+       (container_cleanup.py:56, :244-248).
+
+  4. DOCKER-ENGINE GAP: images pulled (not built) by compose carry no
+     compose label and are never reclaimed by any automated path --
+     multi-GB platform images accumulate forever (docker_cleanup.py:294-321
+     reports them as non-UAT; compose down --rmi local skips registry
+     images, docker_assets.py:392-393).
+
+  End state: one engine-resolution function (env override
+  BENCHBOX_CONTAINER_CLI > platform default: mocker-if-present on darwin,
+  docker otherwise; hard error if the resolved binary is missing) used by
+  docker_assets, preflight, uat_bring_up, and docker_cleanup; the resolved
+  engine name+version recorded in uat_lifecycle.log and the accounting
+  sidecar; mocker teardown gains the named-volume sweep; the three
+  Apple-container cleanup defects fixed.
+
+prior_art:
+  - "_project/scripts/build_joinorder_data.py:879-883 -- existing BENCHBOX_CONTAINER_CLI resolution; lift the convention (env var name and semantics) into tests/uat/docker_assets.py as the single resolver. Extend (UAT-side implementation, same contract)."
+  - "Makefile:452-463 compose_down_fresh -- the known-good mocker named-volume sweep to port into UAT teardown. Reuse the command sequence."
+  - "tests/uat/docker_cleanup.py:103 -- the Docker-engine prefix threading done right; mirror it for container_cleanup.py. Reuse pattern."
+
+work:
+  - id: w0
+    summary: "Re-validate the mocker gotchas (down -v volume leak, JSON verb fidelity) against the installed mocker; record version + observed behavior in notes (evidence dates from mocker 0.5.4)"
+    status: done
+    needs: []
+    notes: >
+      mocker 0.5.4 confirmed installed (`mocker --version` -> 0.5.4).
+      Scratch compose project (`benchbox-uat-w0test`, alpine + a named
+      volume) via `mocker compose up -d` then `down -v`: containers were
+      removed but the named volume (`benchbox-uat-w0test-scratchvol`)
+      survived `down -v` and required a manual `mocker volume rm` --
+      confirms the leak evidence dates from 0.5.4 still hold on this
+      install. `mocker network --help` and `container network --help`
+      both exist and produce structured `--format json` output
+      (`container network ls --format json` verified working; `mocker
+      network ls` verified working, plain text). Also discovered (not
+      previously documented) during w0/live-smoke re-runs: `mocker
+      container ls`/`image ls --format json` echo the literal string
+      "json" instead of producing JSON (fully broken, not just
+      incomplete); `mocker volume inspect` takes exactly one name (not
+      docker's variadic form) and returns a lowercase, non-Docker-shaped
+      schema; `container volume ls` (the native Apple CLI) is EMPTY for
+      mocker-managed named volumes -- mocker tracks its own volumes in a
+      separate store invisible to the native `container` CLI. These
+      findings drove w1/w3's docker_cleanup.py mocker-fallback design and
+      the AGENTS.md/docs notes on ENGINE=docker vs ENGINE=container
+      coverage. Scratch project fully torn down and cleaned after testing.
+  - id: w1
+    summary: "Add resolve_container_cli() in docker_assets (env override, darwin->mocker-if-present, else docker; error when missing); thread through docker_assets, preflight, uat_bring_up, docker_cleanup"
+    status: done
+    needs: [w0]
+    notes: >
+      `resolve_container_cli()` added to tests/uat/docker_assets.py:
+      `functools.lru_cache`-memoized, env override
+      (BENCHBOX_CONTAINER_CLI) > darwin mocker-if-present > docker
+      default, hard DockerAssetError when the resolved binary is missing
+      from PATH. PATH/platform checks go through thin `_which_container_cli`/
+      `_current_platform` wrappers so tests can stub them without touching
+      real `shutil`/`sys`. Threaded into: `_compose_base_command` (compose
+      up/down argv), `docker_cleanup.py`'s per-resource cleanup_command()
+      and all `_list_*`/`_inspect_images` argv builders (now
+      engine-parameterized), `preflight.py`'s `docker_reachable()`/
+      `docker_data_root()` (DockerAssetError folded into the existing
+      soft-fail probe semantics), and `uat_bring_up.py` (resolved +
+      printed before compose-up, DockerAssetError caught with a clean
+      message). Also fixed a latent must_preserve risk while threading
+      this through: `command_has_forbidden_prune()` matched a literal
+      `"docker system prune"` substring, which would have silently
+      stopped catching forbidden prunes the moment the resolved binary
+      wasn't literally "docker" -- rewrote it to a pairwise verb-pair
+      scan over the tokens after the binary name, covering docker,
+      mocker, and any BENCHBOX_CONTAINER_CLI override. Review fix: the
+      Apple-native `container` CLI is EXEMPT from this guard -- its
+      max-mode prunes (`container prune` / `volume prune` / `network
+      prune`) are a deliberate documented operator action of
+      `uat-docker-cleanup ENGINE=container MODE=max`, guarded by
+      container_cleanup._is_forbidden instead; a fully engine-agnostic
+      guard blocked them and broke max-mode APPLY outright (regression
+      test: test_max_mode_apply_passes_the_real_forbidden_prune_guard
+      runs max/apply through the real run_docker_command with only the
+      subprocess layer mocked). New tests in
+      test_docker_assets.py cover env override, darwin mocker-present/
+      absent, non-darwin never probes mocker (must_preserve), missing
+      binary hard error, and memoization. A new autouse fixture in
+      tests/uat/conftest.py (isolate_container_cli_resolution) defaults
+      every test to a clean cache + docker resolved, so the existing
+      argv-literal assertions stay host-independent (this dev mac
+      resolves to mocker by default without it).
+  - id: w2
+    summary: "Record engine binary + version in uat_lifecycle.log at sweep start and as container_engine in the accounting sidecar"
+    status: done
+    needs: [w1]
+    notes: >
+      `docker_assets.container_engine_identity()` resolves the engine and
+      shells `<binary> --version`, returning (binary, first-line-of-output)
+      with a diagnostic placeholder on a failed version probe.
+      `orchestrator.run_sweep()` calls a new `_record_container_engine_identity()`
+      right after `log_dir.mkdir()` -- unconditionally, before any phase
+      runs, so even a preflight-abort sweep gets the `[engine]` lifecycle
+      line. `execute.py`'s private `_append_lifecycle_log` was promoted to
+      public `append_lifecycle_log` so orchestrator.py can reuse it (single
+      writer, no duplicated file-append logic). `cells_io.write_cells_jsonl`
+      gained an additive `container_engine: str | None = None` parameter,
+      threaded through both the normal end-of-execute write and
+      `_emit_abort_artifacts` (all 9 call sites in orchestrator.py, one
+      `replace_all` mechanical edit for the 8 identical ones + the
+      DiskFloorAbort variant). New tests:
+      test_sweep_records_container_engine_identity_and_sidecar_field and
+      test_sweep_records_engine_resolution_failure_without_aborting in
+      test_orchestrator.py; updated
+      test_update_accounting_sidecar_preserves_existing_counts for the new
+      additive field.
+  - id: w3
+    summary: "Port the compose_down_fresh named-volume sweep into UAT managed teardown when the resolved engine is mocker (project-scoped volume list + rm, never a global prune)"
+    status: done
+    needs: [w1]
+    notes: >
+      `sweep_leaked_mocker_volumes(project_name, spec)` in docker_assets,
+      wired into `execute.py`'s `_run_docker_teardown()` after the compose
+      `down` call, gated on BOTH the resolved engine being mocker AND the
+      cleanup mode having requested `-v` (`volumes`/`images`, matching
+      docker's own semantics) -- a `containers`-mode teardown intentionally
+      keeps volumes for platform reuse and must not have them swept out
+      from under it. Runs best-effort regardless of the `down` command's
+      own success (mirrors the Makefile's `;` sequencing). Records a
+      `volume-sweep` DockerLifecycleEvent either way. Review fix
+      (deletion-scope): the sweep matches EXACT names derived from the
+      spec's compose-declared top-level volume keys
+      (compose_declared_volume_names/expected_mocker_volume_names, both
+      joiners: `-` is mocker 0.5.4's live-verified joiner, `_` is docker
+      compose's) instead of a name-prefix regex -- a prefix scan on
+      project `p` would also match a sibling project `p-ha`'s volumes and
+      delete its data. The same latent overreach existed in the Makefile's
+      compose_down_fresh grep (`$(1)[-_]...`); it now awk-extracts the
+      compose file's volume keys and removes exact `<project>-<key>` /
+      `<project>_<key>` names. Note: the review proposed tightening the
+      separator to `_`-only on the premise that compose joins with `_`;
+      live evidence (scratch project `sepcheck` + key `checkvol` ->
+      volume `sepcheck-checkvol`) shows mocker 0.5.4 joins with `-`, so
+      `_`-only would have made the sweep match nothing and silently
+      reintroduced the leak -- exact-name matching fixes the actual risk
+      without that regression. `list_mocker_volumes_matching()` stays
+      prefix-scoped by design for docker_cleanup's recovery inventory,
+      whose ownership rule is the project PREFIX spanning all UAT
+      projects (mirrors _is_uat_owned). New tests in test_docker_assets.py
+      (incl. test_sweep_leaked_mocker_volumes_never_touches_hyphen_sibling_project)
+      and test_phases.py:
+      test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_mocker
+      and
+      test_execute_teardown_skips_mocker_volume_sweep_for_containers_mode.
+      Live-validated end-to-end via the TODO's smoke command (see
+      verification section).
+  - id: w4
+    summary: "Fix container_cleanup PREFIX passthrough (thread project_prefix into _inventory_resources and all classifiers) with a regression test that a custom prefix changes classification"
+    status: done
+    needs: []
+    notes: >
+      `project_prefix` threaded from `reclaim_container_usage` into
+      `_inventory_resources` and each `_list_images`/`_list_containers`/
+      `_list_volumes`/`_list_networks`, replacing every internal
+      `DEFAULT_UAT_PROJECT_PREFIX` reference (was previously the exact bug
+      described: the caller's prefix was accepted but silently ignored).
+      New regression test test_custom_prefix_changes_classification proves
+      a non-default prefix changes what gets classified as owned. Also
+      fixed a second, previously-undocumented classification bug found via
+      the w0/live-smoke path: `mocker compose up`-created
+      containers/networks carry the compose project under
+      `com.mocker.compose.project`, NOT the Docker-compatible
+      `com.docker.compose.project` container_cleanup.py checked --
+      real mocker-managed resources were silently misclassified as
+      `shared` (never reclaimed even in `owned` mode). Added
+      `MOCKER_COMPOSE_PROJECT_LABEL` + a `_compose_project_label()` helper
+      that checks both keys; covered by
+      test_mocker_compose_project_label_is_recognized and confirmed live
+      (the postgresql stack from the smoke test was correctly classified
+      "owned" and reclaimed by `ENGINE=container APPLY=1` after the fix,
+      versus "shared"/untouched before it).
+  - id: w5
+    summary: "Apple-container network handling: inventory networks if the CLI has a network verb (verify, do not guess); otherwise state the limitation in the cleanup report output"
+    status: done
+    needs: [w4]
+    notes: >
+      `container network --help`/`container network ls --format json`
+      verified working live (w0) -- full inventory implemented, not a
+      fallback message: `_list_networks` added to container_cleanup.py,
+      the builtin default network classified `system` (role label
+      `com.apple.container.resource.role=builtin`, name=="default"
+      fallback), compose-labeled networks classified via the same
+      `_compose_project_label` helper as containers. `_plan_commands`
+      grouped-removal + `max`-mode `container network prune` added.
+      `ContainerResourceKind` gained "network"; `cleanup_command()`
+      handles it. New tests:
+      test_network_inventory_owned_vs_shared_vs_system,
+      updated test_owned_mode_targets_only_benchbox_owned and
+      test_apply_runs_grouped_removals_in_dependency_order for the new
+      resource kind.
+  - id: w6
+    summary: "Tighten Apple-container owned-mode ownership to full benchbox-uat project prefix (drop bare `benchbox-` image-name matching from owned mode; keep it only in max mode) with tests"
+    status: done
+    needs: [w4]
+    notes: >
+      Dropped the bare `"benchbox-"` entry from `_OWNED_IMAGE_PREFIXES`
+      (kept `"benchbox/"` and `"local/benchbox"`, the unambiguous
+      publisher-namespace prefixes, plus the project_prefix match).
+      `max` mode's existing catch-all (every non-system resource is a
+      target regardless of name/category, per `_partition_targets`)
+      already reclaims a bare-`benchbox-`-named resource, so dropping it
+      from `_OWNED_IMAGE_PREFIXES` satisfies "keep it only in max mode"
+      without any special-casing. New test
+      test_benchbox_experiment_dev_container_survives_owned_mode proves a
+      `benchbox-experiment`-named dev image/container is retained in
+      `owned` AND `images` mode and only reclaimed at `max`.
+
+deferred:
+  - summary: "Automated reclamation of pulled (unlabeled) Docker registry images"
+    reason: "Deleting unlabeled images by name-pattern risks non-UAT images; the report-only listing stands. Revisit with an explicit image allowlist derived from the compose files if disk pressure recurs."
+  - summary: "SIGTERM/SIGINT handler for orphaned compose stacks on hard kill"
+    reason: "finally-scoped teardown covers Python-level failures; hard-kill recovery has a documented manual path (uat-docker-cleanup). A signal handler interacts with the timeout process-group kill ladder and needs its own design."
+
+deps:
+  needs: [uat-execute-path-unification, uat-fail-advance-consistency]
+
+must_preserve:
+  - "Default behavior on a docker-only Linux host is byte-identical (docker resolved, no mocker probing beyond a which() check on darwin)."
+  - "Forbidden-command guard (docker_assets.py:431-459 refuses global prunes) applies to every engine."
+  - "docker_cleanup label-scoped ownership for the Docker engine (never mutate non-UAT labeled resources)."
+  - "make uat-docker-cleanup remains report-only without APPLY=1."
+
+approach: |
+  w0 first -- the engine decision hinges on current mocker behavior; run
+  `mocker --version`, create a throwaway named volume via a scratch compose
+  project, verify down -v behavior, and record findings. Then w1 as one
+  mechanical threading change. Keep engine resolution lazy (resolve once
+  per process, cache) so tests can monkeypatch it. w5 requires checking the
+  Apple container CLI surface -- do not guess verbs; run `container network
+  --help` (or mocker equivalent) and cite the output in the work notes.
+
+anti_patterns:
+  - "DO NOT add per-call engine switches -- one resolver, resolved once, injected everywhere."
+  - "DO NOT widen any cleanup mode's deletion scope while fixing classification -- these are precision fixes."
+  - "DO NOT global-prune volumes under mocker to fix the leak -- project-scoped list+rm only."
+
+verification:
+  - description: "Engine resolution + cleanup regression suite"
+    command: "uv run -- python -m pytest tests/uat/test_docker_assets.py tests/uat/test_docker_cleanup.py tests/uat/test_container_cleanup.py tests/uat/test_preflight.py -q"
+    expected_output: "pass, including new prefix-passthrough, owned-mode-tightening, engine-resolution tests"
+  - description: "Live smoke on this mac (resolved engine = mocker): bring up one platform, clean up via the resolved engine, verify no leaked volumes"
+    command: "make uat-bring-up PLATFORM=postgresql TIMEOUT_S=120 && make uat-docker-cleanup APPLY=1 && mocker volume ls"
+    expected_output: "no benchbox-uat-* volumes remain (cleanup runs through the resolved engine, not a hardcoded ENGINE=)"
+
+deviations:
+  - "scope_limit did not list tests/uat/test_orchestrator.py, tests/uat/test_phases.py, or tests/uat/conftest.py, but w2 (orchestrator.py) and w3 (phases/execute.py) -- both in scope_limit as source files -- needed test coverage in their existing test files, and every uat test needed the new autouse conftest fixture (isolate_container_cli_resolution) to stay host-independent once resolve_container_cli() existed (this dev mac resolves to mocker by default, which would otherwise nondeterministically break every test asserting a literal 'docker' argv). All three are net-new test/fixture code, not behavior changes to anything outside the declared scope."
+  - "docker_cleanup.py's mocker fallback (list-only `list_mocker_volumes_matching` + a `_mocker_volume_resources`/`inventory_note` path in `recover_abandoned_uat_docker_usage`) was not explicitly named in the original w1/w3 work units, but was required to meet the TODO's own live-smoke verification target: the first live run of `make uat-docker-cleanup APPLY=1` post-w1 crashed with a JSON parse error, because mocker's `container`/`image ls --format json` echo the literal string 'json' instead of JSON (a limitation only fully characterized during live verification, not foreseeable from the original plan). Threading the resolved engine into docker_cleanup.py's inventory without this fallback would have made `make uat-docker-cleanup` (the default ENGINE=docker path) crash outright on every macOS-with-mocker host -- a regression, not neutral. The fallback degrades to volume-only cleanup + a clear inventory_note pointing at ENGINE=container, and is covered by two new tests."
+  - "w4's live-smoke follow-through surfaced a second, previously-undocumented container_cleanup.py bug: mocker-created containers/networks label the compose project under com.mocker.compose.project, not com.docker.compose.project, so every mocker-managed resource was silently classified 'shared' (never reclaimed by ENGINE=container in owned mode) before this fix. This was not in the original findings list; fixed and covered by test_mocker_compose_project_label_is_recognized, and confirmed by re-running the live smoke's ENGINE=container cleanup before and after the fix."
+  - "Review-round override of must_preserve's 'forbidden-command guard applies to every engine': the guard now exempts the Apple-native `container` CLI (only), because an engine-agnostic verb-pair guard blocked `container prune`/`volume prune`/`network prune` and broke `make uat-docker-cleanup ENGINE=container MODE=max APPLY=1` -- an active regression versus the pre-diff literal-'docker' match, which never fired for the container binary. The Apple store's max-mode prunes are a deliberate documented operator action with their own _is_forbidden guard; the run_docker_command guard's intent is protecting the shared docker/mocker host. Covered by test_max_mode_apply_passes_the_real_forbidden_prune_guard."
+  - "Review-round REQUIRED-2 was applied with a corrected premise: the reviewer proposed tightening the sweep separator to '_' only ('compose always joins with _'), but mocker 0.5.4 -- the only engine the sweep runs on -- joins <project>-<volume-key> with a HYPHEN (live-verified twice: sepcheck+checkvol -> sepcheck-checkvol, and the postgresql stack's benchbox-uat-manual-postgresql-postgresql18-data). A '_'-only separator would have made the sweep match nothing and silently reintroduced the volume leak w3 exists to fix. The sibling-project deletion risk the reviewer identified is real and is eliminated more strongly than the proposed fix: exact-name matching against compose-declared volume keys (both joiners), in both docker_assets.sweep_leaked_mocker_volumes and the Makefile's compose_down_fresh macro."
+
+scope_limit:
+  only_modify:
+    - "tests/uat/docker_assets.py"
+    - "tests/uat/docker_cleanup.py"
+    - "tests/uat/container_cleanup.py"
+    - "tests/uat/cells_io.py"
+    - "tests/uat/phases/preflight.py"
+    - "tests/uat/phases/execute.py"
+    - "tests/uat/orchestrator.py"
+    - "tests/uat/_cli.py"
+    - "scripts/uat-bring-up/uat_bring_up.py"
+    - "tests/uat/test_docker_assets.py"
+    - "tests/uat/test_docker_cleanup.py"
+    - "tests/uat/test_container_cleanup.py"
+    - "tests/uat/test_preflight.py"
+    - "tests/uat/test_cli_dispatch.py"
+    - "Makefile"
+    - "docs/operations/uat-framework.md"
+    - "AGENTS.md"
+
+metadata:
+  tags: [uat, container-runtime, mocker, cleanup, provenance]
+  estimated_effort: Large
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), findings E1-E4 + user decision Q4"
+
+files_affected:
+  modified:
+  - AGENTS.md
+  - Makefile
+  - docs/operations/uat-framework.md
+  - scripts/uat-bring-up/uat_bring_up.py
+  - tests/uat/cells_io.py
+  - tests/uat/conftest.py
+  - tests/uat/container_cleanup.py
+  - tests/uat/docker_assets.py
+  - tests/uat/docker_cleanup.py
+  - tests/uat/orchestrator.py
+  - tests/uat/phases/execute.py
+  - tests/uat/phases/preflight.py
+  - tests/uat/test_container_cleanup.py
+  - tests/uat/test_docker_assets.py
+  - tests/uat/test_docker_cleanup.py
+  - tests/uat/test_orchestrator.py
+  - tests/uat/test_phases.py

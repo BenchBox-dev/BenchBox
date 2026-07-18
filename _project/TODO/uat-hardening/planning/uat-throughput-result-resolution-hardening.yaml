@@ -57,7 +57,7 @@ work:
 
 deferred:
   - summary: "Replace glob resolution entirely with a result-path manifest emitted by run-official"
-    reason: "Requires a benchbox CLI surface change (run-official output contract) which the no-CLI-surface-drift constraint makes a bigger conversation; the hardened glob is sufficient for sequential UAT."
+    reason: "Requires a benchbox CLI surface change (run-official output contract) which the no-CLI-surface-drift constraint makes a bigger conversation; the hardened glob is sufficient for sequential UAT. Promoted to [[uat-throughput-result-path-manifest]] (2026-07-16), which needs this item."
 
 deps:
   needs: [uat-status-taxonomy-exit-code-fixes, tpch-throughput-seed-validation-fix]

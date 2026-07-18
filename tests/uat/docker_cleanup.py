@@ -44,14 +44,15 @@ class DockerUsageResource:
         return self.name or self.identifier
 
     def cleanup_command(self) -> tuple[str, ...]:
-        """Return the manual cleanup command for this single resource."""
+        """Return the manual cleanup command for this single resource, using the resolved engine binary."""
+        cli = docker_assets.resolve_container_cli()
         if self.kind == "container":
-            return ("docker", "rm", "-f", self.identifier)
+            return (cli, "rm", "-f", self.identifier)
         if self.kind == "volume":
-            return ("docker", "volume", "rm", self.identifier)
+            return (cli, "volume", "rm", self.identifier)
         if self.kind == "network":
-            return ("docker", "network", "rm", self.identifier)
-        return ("docker", "image", "rm", self.identifier)
+            return (cli, "network", "rm", self.identifier)
+        return (cli, "image", "rm", self.identifier)
 
     def cleanup_command_text(self) -> str:
         return shlex.join(self.cleanup_command())
@@ -84,6 +85,8 @@ class DockerCleanupReport:
     uat_owned: tuple[DockerUsageResource, ...]
     non_uat: tuple[DockerUsageResource, ...]
     cleanup_commands: tuple[CleanupCommandResult, ...]
+    engine: str = "docker"
+    inventory_note: str | None = None
 
 
 def recover_abandoned_uat_docker_usage(
@@ -97,12 +100,40 @@ def recover_abandoned_uat_docker_usage(
     UAT ownership is determined only by Docker Compose's project label with the
     configured UAT prefix. Non-UAT resources are never mutated by this function;
     their cleanup commands are reported for manual operator review.
+
+    Engine-dependent inventory (uat-container-engine-routing w1/w3): when the
+    resolved engine is mocker, the Docker-shaped JSON inventory this function
+    otherwise relies on is not usable -- ``container``/``image ls --format
+    json`` echo the literal string ``json`` instead of JSON, and ``volume
+    inspect`` takes a single name and returns a lowercase, non-Docker schema
+    (live-validated in w0; see container_cleanup.py's module docstring for the
+    same finding). Rather than crash, this falls back to mocker's one
+    faithful plain-text verb (`mocker volume ls`) to find leaked named
+    volumes, and reports (via `inventory_note`) that container/image/network
+    inventory is unavailable on this engine -- use `ENGINE=container` for
+    full native inventory on macOS.
     """
     run = runner or docker_assets.run_docker_command
-    resources = tuple(_inventory_resources(run))
+    cli = docker_assets.resolve_container_cli()
+    inventory_note: str | None = None
+    # Gate on `!= "mocker"` rather than `== "docker"`: mocker is the one
+    # engine KNOWN to break the Docker-shaped JSON inventory; a
+    # BENCHBOX_CONTAINER_CLI override pointing at some other
+    # docker-compatible binary should take the full inventory path, not
+    # silently degrade to the volume-only fallback.
+    if cli != "mocker":
+        resources = tuple(_inventory_resources(run, cli))
+    else:
+        resources = tuple(_mocker_volume_resources(run, project_prefix))
+        inventory_note = (
+            f"container/image/network inventory is not available on engine {cli!r} "
+            "(non-Docker-compatible --format json output); only named-volume "
+            "cleanup ran. Use `make uat-docker-cleanup ENGINE=container` for full "
+            "native inventory on macOS."
+        )
     uat_owned = tuple(r for r in resources if _is_uat_owned(r, project_prefix))
     non_uat = tuple(r for r in resources if not _is_uat_owned(r, project_prefix))
-    commands = tuple(_cleanup_commands_for(uat_owned))
+    commands = tuple(_cleanup_commands_for(uat_owned, cli))
 
     results: list[CleanupCommandResult] = []
     if apply:
@@ -120,17 +151,40 @@ def recover_abandoned_uat_docker_usage(
         uat_owned=uat_owned,
         non_uat=non_uat,
         cleanup_commands=tuple(results),
+        engine=cli,
+        inventory_note=inventory_note,
     )
+
+
+def _mocker_volume_resources(run: DockerRunner, project_prefix: str) -> list[DockerUsageResource]:
+    """Named volumes matching `project_prefix`, listed via mocker's one faithful plain-text verb."""
+    names = docker_assets.list_mocker_volumes_matching(project_prefix, runner=run)
+    return [
+        DockerUsageResource(
+            kind="volume",
+            identifier=name,
+            name=name,
+            created_at="",
+            # Inferred from the name-prefix match, not a compose label --
+            # mocker's volume listing carries no label data (see docstring).
+            project=project_prefix,
+        )
+        for name in names
+    ]
 
 
 def format_cleanup_report(report: DockerCleanupReport) -> str:
     """Render a human-readable recovery/report summary."""
     lines = [
         "Docker UAT cleanup report",
+        f"engine: {report.engine}",
         f"project_prefix: {report.project_prefix}",
         f"mode: {'apply' if report.apply else 'dry-run'}",
         "",
     ]
+    if report.inventory_note:
+        lines.append(f"NOTE: {report.inventory_note}")
+        lines.append("")
     if report.uat_owned:
         verb = "Cleaned" if report.apply else "Would clean"
         lines.append(f"{verb} UAT-owned resources:")
@@ -175,13 +229,13 @@ def _is_uat_owned(resource: DockerUsageResource, project_prefix: str) -> bool:
     return resource.project == project_prefix or resource.project.startswith(f"{project_prefix}-")
 
 
-def _cleanup_commands_for(resources: tuple[DockerUsageResource, ...]) -> list[tuple[str, ...]]:
+def _cleanup_commands_for(resources: tuple[DockerUsageResource, ...], cli: str) -> list[tuple[str, ...]]:
     commands: list[tuple[str, ...]] = []
     for kind, base in (
-        ("container", ("docker", "rm", "-f")),
-        ("volume", ("docker", "volume", "rm")),
-        ("network", ("docker", "network", "rm")),
-        ("image", ("docker", "image", "rm")),
+        ("container", (cli, "rm", "-f")),
+        ("volume", (cli, "volume", "rm")),
+        ("network", (cli, "network", "rm")),
+        ("image", (cli, "image", "rm")),
     ):
         seen: set[str] = set()
         ids: list[str] = []
@@ -195,17 +249,17 @@ def _cleanup_commands_for(resources: tuple[DockerUsageResource, ...]) -> list[tu
     return commands
 
 
-def _inventory_resources(run: DockerRunner) -> list[DockerUsageResource]:
+def _inventory_resources(run: DockerRunner, cli: str) -> list[DockerUsageResource]:
     resources: list[DockerUsageResource] = []
-    resources.extend(_list_containers(run))
-    resources.extend(_list_volumes(run))
-    resources.extend(_list_networks(run))
-    resources.extend(_list_images(run))
+    resources.extend(_list_containers(run, cli))
+    resources.extend(_list_volumes(run, cli))
+    resources.extend(_list_networks(run, cli))
+    resources.extend(_list_images(run, cli))
     return resources
 
 
-def _list_containers(run: DockerRunner) -> list[DockerUsageResource]:
-    result = _run_required(run, ["docker", "container", "ls", "-a", "--no-trunc", "--format", "json"])
+def _list_containers(run: DockerRunner, cli: str) -> list[DockerUsageResource]:
+    result = _run_required(run, [cli, "container", "ls", "-a", "--no-trunc", "--format", "json"])
     out: list[DockerUsageResource] = []
     for row in _json_lines(result.stdout):
         labels = _parse_label_string(str(row.get("Labels", "")))
@@ -223,13 +277,13 @@ def _list_containers(run: DockerRunner) -> list[DockerUsageResource]:
     return out
 
 
-def _list_volumes(run: DockerRunner) -> list[DockerUsageResource]:
-    names_result = _run_required(run, ["docker", "volume", "ls", "-q"])
+def _list_volumes(run: DockerRunner, cli: str) -> list[DockerUsageResource]:
+    names_result = _run_required(run, [cli, "volume", "ls", "-q"])
     names = [line.strip() for line in names_result.stdout.splitlines() if line.strip()]
     if not names:
         return []
 
-    inspect_result = _run_required(run, ["docker", "volume", "inspect", *names])
+    inspect_result = _run_required(run, [cli, "volume", "inspect", *names])
     try:
         rows = json.loads(inspect_result.stdout or "[]")
     except json.JSONDecodeError as exc:
@@ -254,12 +308,12 @@ def _list_volumes(run: DockerRunner) -> list[DockerUsageResource]:
     return out
 
 
-def _list_networks(run: DockerRunner) -> list[DockerUsageResource]:
-    result = _run_required(run, ["docker", "network", "ls", "-q", "--no-trunc"])
+def _list_networks(run: DockerRunner, cli: str) -> list[DockerUsageResource]:
+    result = _run_required(run, [cli, "network", "ls", "-q", "--no-trunc"])
     network_ids = [line.strip() for line in result.stdout.splitlines() if line.strip()]
     if not network_ids:
         return []
-    inspect_result = _run_required(run, ["docker", "network", "inspect", *network_ids])
+    inspect_result = _run_required(run, [cli, "network", "inspect", *network_ids])
     try:
         rows = json.loads(inspect_result.stdout or "[]")
     except json.JSONDecodeError as exc:
@@ -291,11 +345,11 @@ def _list_networks(run: DockerRunner) -> list[DockerUsageResource]:
     return out
 
 
-def _list_images(run: DockerRunner) -> list[DockerUsageResource]:
-    list_result = _run_required(run, ["docker", "image", "ls", "--no-trunc", "--format", "json"])
+def _list_images(run: DockerRunner, cli: str) -> list[DockerUsageResource]:
+    list_result = _run_required(run, [cli, "image", "ls", "--no-trunc", "--format", "json"])
     rows = _json_lines(list_result.stdout)
     image_ids = [str(row.get("ID", "")) for row in rows if row.get("ID")]
-    inspect_by_id = _inspect_images(run, image_ids)
+    inspect_by_id = _inspect_images(run, cli, image_ids)
 
     out: list[DockerUsageResource] = []
     for row in rows:
@@ -321,10 +375,10 @@ def _list_images(run: DockerRunner) -> list[DockerUsageResource]:
     return out
 
 
-def _inspect_images(run: DockerRunner, image_ids: list[str]) -> dict[str, dict[str, object]]:
+def _inspect_images(run: DockerRunner, cli: str, image_ids: list[str]) -> dict[str, dict[str, object]]:
     if not image_ids:
         return {}
-    result = _run_required(run, ["docker", "image", "inspect", *image_ids])
+    result = _run_required(run, [cli, "image", "inspect", *image_ids])
     try:
         rows = json.loads(result.stdout or "[]")
     except json.JSONDecodeError as exc:

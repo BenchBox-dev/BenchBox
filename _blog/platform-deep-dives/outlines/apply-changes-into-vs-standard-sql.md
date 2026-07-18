@@ -54,9 +54,11 @@ em-dashes or en-dashes, define terms, footnote external facts.
   invocable from a SQL warehouse via standalone streaming tables, but always on
   Databricks/serverless pipelines, never on other engines, and not a standalone
   statement (A3, with the 2026 correction, stated carefully).
-- The portable form runs unchanged across DuckDB, PostgreSQL, Snowflake, BigQuery,
-  ClickHouse. Concrete proof: DuckDB rejects MERGE INTO entirely, yet runs the
-  portable UPDATE+INSERT SCD2 op (C1).
+- The portable form runs unchanged on standard-DML engines: DuckDB, PostgreSQL,
+  Snowflake, BigQuery. ClickHouse is the exception (no standard UPDATE; only the
+  insert-only op is portable there, the close-old step needs a mutation rewrite),
+  and DataFusion is marked unsupported in the catalog. Concrete proof: DuckDB
+  rejects MERGE INTO entirely, yet runs the portable UPDATE+INSERT SCD2 op (C1).
 
 ## 5. What we measured (results, BenchBox, portable form only)
 - Methodology: DuckDB 1.3.2, Apple M4, real TPC-H via dbgen, operation API (explain
@@ -80,7 +82,7 @@ em-dashes or en-dashes, define terms, footnote external facts.
 
 ## 8. Conclusions + Next steps
 - The "200 lines" claim is partly a strawman for a basic Type 2 (real portable form
-  is ~18 lines) and partly fair for hardened production pipelines (40-200+).
+  is ~20 lines) and partly fair for hardened production pipelines (40-200+).
 - The honest axis is portability vs convenience.
 - Invite reproduction; link the BenchBox operation and the verification file.
 

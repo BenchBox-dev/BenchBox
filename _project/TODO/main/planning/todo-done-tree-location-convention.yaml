@@ -1,0 +1,90 @@
+id: todo-done-tree-location-convention
+title: "Document and enforce a consistent location convention for items moved to the DONE tree"
+worktree: main
+priority: Low
+status: Not Started
+category: Repository Maintenance
+
+description: |
+  `_project/DONE/README.md` documents the canonical placement convention:
+  `DONE/{worktree}/{lifecycle-phase}/{slug}.yaml`, preserving the `planning/`
+  or `active/` subdirectory from the source TODO tree.
+
+  At least one file violates this convention as of 2026-06-08:
+
+  - `DONE/main/benchmark-runs-output-root-propagation.yaml` — placed flat
+    under `DONE/main/` with no lifecycle subdirectory. Per the README it
+    should be `DONE/main/planning/benchmark-runs-output-root-propagation.yaml`.
+
+  `todo-sweep-completed-items-from-open-tree` needs the convention to be
+  consistently enforced before it can reliably move items. `todo_cli.py` may
+  also miscount items if some live outside the documented path structure.
+
+  Audit the DONE tree for all flat-placed items, normalize them to the
+  documented convention, and confirm `todo_cli.py` still resolves them
+  correctly after the move.
+
+work:
+  - id: w0
+    summary: "Audit DONE tree for all flat-placed items (not in planning/ or active/)"
+    status: pending
+    notes: |
+      Run: find _project/DONE -name "*.yaml" | grep -vE "/(planning|active|_indexes)/" | grep -v README
+      Known violator: DONE/main/benchmark-runs-output-root-propagation.yaml
+      Check all worktree subdirs for additional flat items.
+
+  - id: w1
+    summary: "Verify todo_cli.py path assumptions before moving files"
+    needs: [w0]
+    status: pending
+    notes: |
+      grep -n "DONE\|planning\|active" _project/scripts/todo_cli.py | head -20
+      Confirm the CLI uses the documented {worktree}/{phase}/ structure and
+      will find items after they are moved.
+
+  - id: w2
+    summary: "Move all flat-placed items to their correct {worktree}/{phase}/ location"
+    needs: [w1]
+    status: pending
+    notes: |
+      Known case:
+        git mv _project/DONE/main/benchmark-runs-output-root-propagation.yaml \
+               _project/DONE/main/planning/benchmark-runs-output-root-propagation.yaml
+      Use git mv so history is preserved. Repeat for any additional violators
+      found in w0.
+
+  - id: w3
+    summary: "Run validate_todo.py --all and todo_cli.py check-graph; regenerate indexes"
+    needs: [w2]
+    status: pending
+    notes: |
+      uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all
+      uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph
+      make todo-reindex
+
+prior_art:
+  - "_project/DONE/README.md: already documents the {worktree}/{phase}/{slug} convention"
+  - "_project/scripts/todo_cli.py: check path assumptions before moving any files"
+
+must_preserve:
+  - "Existing DONE items remain findable by todo_cli.py after any renaming"
+  - "Cross-item deps.needs references that point to DONE items remain resolvable"
+
+verification:
+  - description: "No flat-placed .yaml items remain directly under a worktree directory"
+    command: "find _project/DONE -name '*.yaml' | grep -vE '/(planning|active|_indexes)/' | grep -v README"
+    expected_output: "Empty (all items in planning/ or active/ subdirectories)"
+
+metadata:
+  created_date: "2026-06-08"
+  estimated_effort: "Small"
+  tags:
+    - housekeeping
+    - todo-system
+    - conventions
+
+impact:
+  technical_debt: |
+    Without a documented convention, every sweep or migration places items
+    inconsistently, making the DONE tree unreliable as a historical record
+    and potentially breaking CLI path resolution for completed items.

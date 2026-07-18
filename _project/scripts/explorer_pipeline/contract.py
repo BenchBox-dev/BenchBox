@@ -9,7 +9,12 @@ EXPLORER_BUILD_CONTRACT_VERSION = "4"
 #     projections, and passes a version check that only compares base columns -
 #     so the shape of every view the UI reads is what this number tracks, not
 #     just the shape of `results`.
-EXPLORER_READ_MODEL_VERSION = 3
+# v4: added results.physical_rendering_id (ADR-2 secondary facet). A v3
+#     snapshot lacks the column, and duckdbQueries.ts's listResults()/detail
+#     projections now select it unconditionally - a v3 snapshot passing this
+#     check would hit a DuckDB binder error instead of the intended rebuild
+#     message.
+EXPLORER_READ_MODEL_VERSION = 4
 
 EXPLORER_BUILD_CONTRACT = {
     "version": EXPLORER_BUILD_CONTRACT_VERSION,

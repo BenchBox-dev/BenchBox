@@ -106,7 +106,13 @@ class TuningHooksMixin:
         if TuningType is None:
             return False
 
-        return tuning_type.is_compatible_with_platform(self.platform_name)
+        # is_compatible_with_platform expects the canonical, machine-readable
+        # platform type key (e.g. "clickhouse-local"), not `platform_name`,
+        # which is a human-facing display string (e.g. "ClickHouse Local").
+        # Fall back to `platform_name` via getattr for hosts that predate
+        # `canonical_platform_type` (added on PlatformAdapter in #1174).
+        platform_key = getattr(self, "canonical_platform_type", self.platform_name)
+        return tuning_type.is_compatible_with_platform(platform_key)
 
     def generate_tuning_clause(self, table_tuning: TableTuning) -> str:
         """Generate platform-specific tuning clauses for CREATE TABLE statements.

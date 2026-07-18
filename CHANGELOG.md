@@ -46,6 +46,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Removed dead `BENCHBOX_TUNING_ENABLED` env var** - This variable set the
+  `tuning.enabled` config key, which nothing at runtime ever read (only a unit
+  test did); docs incorrectly claimed it "activates tuned runs in CI". Use
+  `--tuning tuned` / `--tuning auto` on `benchbox run` to actually enable
+  tuning; `BENCHBOX_TUNING_CONFIG` still works to point at a default tuning
+  file. If you were setting `BENCHBOX_TUNING_ENABLED`, it had no effect and can
+  simply be removed.
+- **Honest `--tuning auto` messaging on SQL platforms** - Smart defaults for
+  `--tuning auto` are implemented for DataFrame platforms only today; SQL
+  platform runs now get an explicit warning that they're proceeding with a
+  basic (untuned) configuration instead of a message implying real smart
+  defaults were applied.
 - **`-df` platform names select DataFrame mode** - `benchbox run --platform
   datafusion-df` (and `lakesail-df`) now runs the DataFrame adapter without
   needing `--mode dataframe`; alias normalization previously dropped the
@@ -75,6 +87,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Registry-derived platform lists** - Landing and prompt pages now derive
   their platform and command examples from the live registry, so the lists stay
   in sync with actually supported platforms.
+
+### Removed
+
+- **BREAKING: bare `clickhouse` platform alias removed** - The temporary
+  compatibility alias that let `--platform clickhouse` (and `get_adapter(
+  "clickhouse")`) resolve to a first-class platform was added in v0.2.1 as a
+  deprecation shim and has now been removed after its deprecation window
+  (v0.2.1 → v0.3.1). Use `clickhouse-local` (embedded chDB), `clickhouse-server`
+  (self-hosted), or `clickhouse-cloud` (managed); the explicit `clickhouse:local`
+  / `clickhouse:server` / `clickhouse:cloud` selectors also remain available.
+  Passing bare `clickhouse` now raises a `ValueError` naming these replacements
+  instead of silently defaulting to a deployment mode. The `ch` CLI shorthand
+  now resolves to `clickhouse-local`.
 
 ## [0.3.0] - 2026-05-16
 

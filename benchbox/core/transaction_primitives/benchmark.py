@@ -21,6 +21,7 @@ from benchbox.core.connection import DatabaseConnection
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
     quote_identifier,
+    summarize_validation_failures,
     table_exists,
 )
 from benchbox.core.transaction_primitives.generator import TransactionPrimitivesDataGenerator
@@ -806,9 +807,13 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
             cleanup_duration_ms = (time.perf_counter() - cleanup_start) * 1000
 
+            # A failed post-condition validation means the operation did not do
+            # what it claims even though the write SQL did not raise. Report it as
+            # VALIDATION_FAILED (distinct from an execution FAILED), mirroring
+            # write_primitives, so it cannot render as a passing operation.
             return OperationResult(
                 operation_id=operation_id,
-                success=True,
+                success=validation_passed,
                 write_duration_ms=write_duration_ms,
                 rows_affected=rows_affected,
                 validation_duration_ms=validation_duration_ms,
@@ -816,6 +821,11 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 validation_results=validation_results,
                 cleanup_duration_ms=cleanup_duration_ms,
                 cleanup_success=cleanup_success,
+                # Preserve this benchmark's "status None on normal success"
+                # idiom (derived to SUCCESS downstream); only stamp an explicit
+                # status when a post-condition validation fails.
+                status=None if validation_passed else "VALIDATION_FAILED",
+                error=None if validation_passed else summarize_validation_failures(validation_results),
                 cleanup_warning=cleanup_warning,
                 executed_sql=write_sql,
             )

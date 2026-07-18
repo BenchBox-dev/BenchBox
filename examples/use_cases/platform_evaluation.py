@@ -21,13 +21,13 @@ Evaluation criteria:
 
 Usage:
     # Evaluate multiple platforms
-    python use_cases/platform_evaluation.py --platforms duckdb,sqlite,clickhouse
+    python use_cases/platform_evaluation.py --platforms duckdb,sqlite,clickhouse-local
 
     # Dry-run first (preview without execution)
     python use_cases/platform_evaluation.py --platforms databricks,bigquery --dry-run
 
     # Custom scale factor
-    python use_cases/platform_evaluation.py --platforms duckdb,clickhouse --scale 1.0
+    python use_cases/platform_evaluation.py --platforms duckdb,clickhouse-local --scale 1.0
 """
 
 from __future__ import annotations

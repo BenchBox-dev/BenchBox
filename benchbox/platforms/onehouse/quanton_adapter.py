@@ -628,7 +628,16 @@ class QuantonAdapter(
         }
 
         # Pass through other config options
-        for key in ["force_recreate", "show_query_plans", "capture_plans"]:
+        for key in [
+            "force_recreate",
+            "show_query_plans",
+            "capture_plans",
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+        ]:
             if key in config:
                 params[key] = config[key]
 

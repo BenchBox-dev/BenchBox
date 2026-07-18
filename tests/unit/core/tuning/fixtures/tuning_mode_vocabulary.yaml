@@ -1,0 +1,25 @@
+# ADR-2 canonical tuning_mode vocabulary
+# (docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md).
+#
+# Single shared source of truth asserted by both:
+#   - tests/unit/core/tuning/test_tuning_mode_vocabulary.py (Python)
+#   - results-explorer/src/lib/__tests__/tuningModeVocabulary.test.ts
+#     (TypeScript, via a `uv run -- python -c` subprocess that loads this
+#     same file -- see db-remediation-pin.test.ts for the established
+#     shell-out pattern this follows)
+#
+# This pins the ADR-2 TARGET vocabulary as a shared TEST CONTRACT. It does
+# NOT assert that current production code already emits/consumes only these
+# values: benchbox/cli/tuning.py still emits the wizard's "balanced" string
+# and results-explorer/src/components/TuningBadge.tsx still only recognizes
+# tuned/notuning/auto. Migrating production emitters/consumers to this
+# vocabulary is tuning-mode-vocabulary-and-facet-implementation-20260712
+# (unstarted as of this artifact's authorship in
+# tuning-soundness-test-coverage-20260712).
+modes:
+  - tuned
+  - tuned-fallback
+  - notuning
+  - auto
+  - custom
+not_recorded_sentinel: not-recorded

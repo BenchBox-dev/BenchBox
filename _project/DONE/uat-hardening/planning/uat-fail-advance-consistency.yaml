@@ -1,0 +1,237 @@
+id: uat-fail-advance-consistency
+title: "Make FAIL-and-advance vs abort semantics consistent: report-without-execute, explorer-smoke failures, startup-failed accounting, teardown abort policy"
+worktree: uat-hardening
+priority: Medium
+status: Completed
+completed_date: "2026-07-11"
+category: "Error Handling / Consistency"
+
+description: |
+  Four inconsistencies in the abort/advance decision matrix, verified on
+  develop @ fc31f3604:
+
+  1. REPORT WITHOUT EXECUTE SILENTLY SUCCEEDS: validate and package abort
+     when execute has not run (orchestrator.py:369-372, :408-411) but
+     report proceeds with empty rows (`cells = ... if execute_outcome else
+     []`, orchestrator.py:460) and exits 0 -- an empty report reads as a
+     clean sweep.
+
+  2. EXPLORER SMOKE IS BOTH TOO LOUD AND TOO QUIET: empty/malformed corpus
+     raises uncaught RuntimeError (phases/explorer_smoke.py:305, :343; no
+     try in run_sweep's branch, orchestrator.py:447-457) -- a crash with no
+     abort artifacts. Meanwhile a missing `node` binary returns
+     skipped-with-exit-0 (explorer_smoke.py:160-169) -- a sweep on a
+     machine without Node silently drops all browser coverage. Both ends
+     need structured results: corpus problems become a structured phase
+     failure (abort artifacts emitted); node-missing becomes a recorded
+     skip that downstream accounting can see (explorer_smoke_status in the
+     sidecar) instead of an invisible exit 0.
+
+  3. STARTUP-FAILED INDISTINGUISHABLE FROM UNREACHABLE: managed compose-up
+     failure routes cells into skipped_unreachable (execute.py:176-186) --
+     correct advance semantics (#700), but accounting cannot distinguish
+     "stack failed to start" from "TCP probe found nothing listening"; the
+     distinction survives only in uat_lifecycle.log. Add a separate
+     startup_failed count to ExecuteOutcome and the accounting sidecar.
+
+  4. BROKEN STACK DEFEATS ITS OWN ADVANCE: after startup-failed,
+     started=True is set unconditionally (execute.py:315-320) so the
+     finally teardown runs; if `compose down` on that same broken stack
+     also fails, teardown_abort_reason becomes a GLOBAL abort
+     (execute.py:236-241) -- the advance-past-broken-stack intent
+     (comment at execute.py:176-185) is defeated by the same broken
+     stack's teardown. Policy fix: teardown failure aborts only for stacks
+     that STARTED successfully (a healthy stack we cannot tear down is a
+     real resource-leak emergency); teardown failure after startup-failed
+     records a lifecycle event and advances.
+
+prior_art:
+  - "tests/uat/phases/execute.py:176-186 -- the #700 FAIL-and-advance pattern; findings 3/4 refine it, keeping its shape. Extend."
+  - "tests/uat/orchestrator.py:_emit_abort_artifacts -- structured-abort machinery the explorer-smoke failure path should flow through instead of raising raw RuntimeError. Reuse."
+  - "cells.jsonl.accounting.json sidecar (written via the cells_io module after uat-execute-path-unification) -- where startup_failed and explorer_smoke_status counters land. Extend."
+
+work:
+  - id: w1
+    summary: "Report phase aborts (like validate/package) when execute is absent from the sweep run; standalone `make uat-report` from cells.jsonl unaffected"
+    status: done
+    needs: []
+    notes: >
+      orchestrator.py's `report` branch now checks `execute_outcome is None`
+      first and aborts with `aborted_phase="report"`, exit 2, via
+      `_emit_abort_artifacts` -- identical shape to the validate/package
+      guards. Past the guard, `cells = execute_outcome.results` is
+      unconditional (dropped the `if execute_outcome else []` ternary and
+      the three sibling `if execute_outcome else 0` ternaries for
+      compatibility_pruned/pruned/skipped_unreachable counts, replaced with
+      plain `getattr(execute_outcome, ..., ())` since execute_outcome is
+      guaranteed non-None there). Dry-run sweeps are unaffected: the
+      per-phase loop's `if config.dry_run: ...; continue` short-circuits
+      before the phase-specific branches ever run, so a dry-run
+      `phases: [report]` config never reaches the new guard. Standalone
+      `make uat-report` (`_cli.py:_handle_report`) reads an existing
+      cells.jsonl directly and never calls `run_sweep`, so it is a
+      different code path entirely and untouched. New tests:
+      test_report_phase_aborts_when_execute_outcome_missing (phases:
+      [report] alone aborts, exit 2, partial report + abort_phase=report)
+      and test_dry_run_report_only_sweep_stays_exit_zero (dry-run
+      phases: [report] stays exit 0). test_replay_2026_05_02.py's
+      dry-run-through-report structural test still passes unchanged.
+  - id: w2
+    summary: "Explorer-smoke corpus errors become a structured phase failure with abort artifacts; node-missing becomes a recorded sidecar skip with a prominent warning, not an invisible exit 0"
+    status: done
+    needs: []
+    notes: >
+      `_validate_external_corpus` (explorer_smoke.py) no longer raises
+      RuntimeError at either of the two former raise sites (empty corpus,
+      contract errors); both now land in a `contract["errors"]` list
+      (empty on success), and the corpus contract JSON is always written
+      before that list is inspected. `run_explorer_smoke` checks
+      `contract["errors"]` and returns a structured
+      `ExplorerSmokeResult(aborted=True, abort_reason=...)` instead of
+      letting the exception propagate; `ExplorerSmokeResult.exit_code()`
+      already returned 2 for `aborted` (no change needed there).
+      orchestrator.py's explorer_smoke branch now checks
+      `getattr(result, "aborted", False)` and calls
+      `_emit_abort_artifacts` + breaks, matching every other phase. For
+      node-missing: orchestrator.py detects
+      `result.skip_reason == "node not on PATH"`, calls the new
+      `cells_io.update_accounting_sidecar(cells_jsonl,
+      explorer_smoke_status="skipped_no_node")` (patches the sidecar the
+      execute phase already wrote -- additive field, no second sidecar
+      file), and always prints a `[explorer_smoke] WARNING: ...
+      (explorer_smoke_status=skipped_no_node)` line to stderr regardless of
+      whether a sidecar existed to patch. `update_accounting_sidecar`
+      returns False (no-op, no fabricated sidecar) when no sidecar exists
+      yet -- documented in its docstring per the TODO's "else document"
+      fallback for the case where explorer_smoke runs in a `phases:` list
+      that never ran `execute`. Two former
+      `pytest.raises(RuntimeError, ...)` tests in test_explorer_smoke.py
+      converted to structured-result assertions; added a malformed-bundle
+      variant, a `_validate_external_corpus` direct-call regression test,
+      and two orchestrator-level tests (corpus-failure abort-artifacts,
+      node-missing sidecar+stderr visibility).
+  - id: w3
+    summary: "Split startup_failed out of skipped_unreachable: new counter on ExecuteOutcome, sidecar, and report accounting footer; report exit code treats startup_failed like unreachable (nonzero)"
+    status: done
+    needs: []
+    notes: >
+      Added `ExecuteOutcome.startup_failed: tuple[Cell, ...]`; the
+      docker_startup_failed branch in execute.py's `run_execute` now
+      extends `startup_failed` instead of `skipped_unreachable` for a
+      platform whose managed compose-up failed (the #700 path).
+      `cells_io.write_cells_jsonl` gained `startup_failed_count` (additive
+      sidecar field, alongside a new shared `_read_accounting_payload`
+      helper and `read_startup_failed_sidecar`, mirroring
+      `read_skipped_unreachable_sidecar`). `report.write_report` gained
+      `startup_failed_count` (default 0): it feeds
+      `total_defined_count = attempted + skipped + unreachable +
+      startup_failed`, a `startup_failed=N` token in both the per-line and
+      release_accounting footer comments, a `# STARTUP_FAILED_CELLS=N
+      release_gate_attention=required` marker line (only emitted when
+      nonzero, mirroring UNREACHABLE_CELLS), and
+      `ReportSummary.exit_code()` now treats `startup_failed_count > 0` as
+      uncleared (nonzero exit), same tier as fail/timeout/unreachable.
+      orchestrator.py threads `startup_failed_count` through every
+      write_cells_jsonl/write_report call site (execute-phase success,
+      `_emit_abort_artifacts`, the DiskFloorAbort synthesized outcome via
+      `exc.startup_failed_count` annotated by
+      `_annotate_disk_floor_abort`, and the report phase). `_cli.py`'s
+      `_handle_report`/`_handle_execute` also thread/print the new field.
+      Updated the #700 regression tests
+      (test_execute_docker_startup_failure_records_and_advances_to_next_platform,
+      test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails)
+      to assert cells land in `startup_failed`, not `skipped_unreachable`
+      -- the TODO's explicit intent, not a preservation violation.
+      test_report_accounting.py's identity assertion updated to
+      `attempted + skipped + unreachable + startup_failed ==
+      total_defined`. New tests cover write_report threading/exit-code,
+      the CLI sidecar round-trip, and a bare exit-code-clean-when-zero
+      case.
+  - id: w4
+    summary: "Teardown-failure policy: global abort only when the stack had started successfully; startup-failed stacks record the teardown failure as a lifecycle event and advance; tests for both directions"
+    status: done
+    needs: [w3]
+    notes: >
+      `_teardown_docker_platform_if_needed` (execute.py) now captures
+      `stack_started_successfully = docker_state.cleanup_status ==
+      "started"` before running `_run_docker_teardown` (the incoming
+      cleanup_status is "startup-failed" for a stack whose own compose-up
+      already failed -- set in `_start_docker_platform_if_needed`). On a
+      teardown failure: if the stack started successfully, behavior is
+      unchanged (global abort, `abort_kind="docker_teardown"`). If the
+      stack never started, the teardown failure is recorded as an extra
+      `DockerLifecycleEvent(action="down-policy",
+      status="advance-after-startup-failed", message=...)` (the raw
+      `down status=failed` event from `_run_docker_teardown` is still
+      recorded too) and execution falls through to the existing
+      free-space check + normal advance, instead of returning an abort
+      reason/kind. Two new tests:
+      test_execute_teardown_failure_after_startup_failure_advances_instead_of_aborting
+      (startup-failed + teardown-failed on the same stack -> aborted=False,
+      next platform runs, both lifecycle events present) and
+      test_execute_healthy_stack_teardown_failure_still_aborts_after_startup_failed_regression_guard
+      (explicit companion pinning the must_preserve healthy-stack-aborts
+      direction alongside the new advance direction). The pre-existing
+      test_execute_docker_teardown_failure_aborts_before_next_platform
+      continues to pass unchanged.
+
+deferred:
+  - summary: "phases: list order/duplicate validation at config load"
+    reason: "Config-load validation is consolidated in uat-config-schema-spec-realignment to keep schema changes in one PR."
+
+deps:
+  needs: [uat-execute-path-unification]
+
+must_preserve:
+  - "#700 semantics: compose-up failure never aborts the whole sweep."
+  - "#699 semantics: dask cluster death stays FAIL-and-advance."
+  - "Healthy-stack teardown failure remains a global abort (resource-leak emergency)."
+  - "Standalone make uat-report over an existing cells.jsonl keeps working without an execute phase in the same process."
+
+approach: |
+  Four small, independent behavior fixes; w3 touches the accounting
+  identity so update test_report_accounting.py's identity assertions in
+  the same commit. The sidecar gains fields -- additive only, and the
+  missing-sidecar default (estimated flag) behavior from #902 stays.
+
+anti_patterns:
+  - "DO NOT fold startup_failed into the fail count -- it is an environment condition, not a cell failure; it gets its own counter and its own exit-code contribution."
+  - "DO NOT make node-missing a hard failure -- macOS operator machines legitimately lack node for non-explorer sweeps; visibility, not blockage."
+
+verification:
+  - description: "Abort/advance decision-matrix regression tests"
+    command: "uv run -- python -m pytest tests/uat/test_orchestrator.py tests/uat/test_phases.py tests/uat/test_explorer_smoke.py tests/uat/test_report_accounting.py -q"
+    expected_output: "pass, including report-without-execute abort, corpus-failure structured abort, startup_failed accounting, teardown-policy both directions"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/orchestrator.py"
+    - "tests/uat/cells_io.py"
+    - "tests/uat/phases/execute.py"
+    - "tests/uat/phases/explorer_smoke.py"
+    - "tests/uat/phases/report.py"
+    - "tests/uat/_cli.py"
+    - "tests/uat/test_orchestrator.py"
+    - "tests/uat/test_phases.py"
+    - "tests/uat/test_explorer_smoke.py"
+    - "tests/uat/test_report.py"
+    - "tests/uat/test_report_accounting.py"
+
+metadata:
+  tags: [uat, error-handling, abort-semantics, accounting]
+  estimated_effort: Medium
+  created_date: "2026-07-11"
+  source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), findings C1-C4 (F4.1-F4.4)"
+
+files_affected:
+  modified:
+  - tests/uat/orchestrator.py
+  - tests/uat/cells_io.py
+  - tests/uat/phases/execute.py
+  - tests/uat/phases/explorer_smoke.py
+  - tests/uat/phases/report.py
+  - tests/uat/_cli.py
+  - tests/uat/test_orchestrator.py
+  - tests/uat/test_phases.py
+  - tests/uat/test_explorer_smoke.py
+  - tests/uat/test_report_accounting.py

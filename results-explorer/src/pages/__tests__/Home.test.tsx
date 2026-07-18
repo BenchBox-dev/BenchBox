@@ -455,7 +455,7 @@ describe("Home", () => {
 
     fireEvent.click(screen.getByText("Advanced filters"));
     expect(within(selector).getByRole("button", { name: "All tuning labels" })).toBeTruthy();
-    expect(within(selector).getByRole("button", { name: "Not labelled" })).toBeTruthy();
+    expect(within(selector).getByRole("button", { name: "Not Recorded" })).toBeTruthy();
   });
 
   it("distinguishes supported benchmark coverage from published public corpus counts", async () => {
@@ -532,7 +532,7 @@ describe("Home", () => {
     expect(screen.getAllByText(/Benchmark options cover 2 of 3 public benchmark sets/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/SSB/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 public platform ID is outside the current leaderboard scope/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/1 of 4 public results is not labelled for tuning/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/1 of 4 public results is not recorded for tuning/).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Browse Public Benchmark Results" })).toBeTruthy();
     expect(
       screen.getByText("3 public benchmark sets. Leaderboard filters above include 2 ranked leaderboards."),

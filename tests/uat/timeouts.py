@@ -11,7 +11,7 @@ import signal
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import Any, Mapping
 
 EXIT_TIMEOUT = 124  # POSIX coreutils convention: SIGTERM after timeout.
 
@@ -121,22 +121,3 @@ def _kill_process_group(proc: subprocess.Popen) -> None:
         os.killpg(proc.pid, signal.SIGKILL)
     except (ProcessLookupError, PermissionError):
         return
-
-
-def env_without_pythonpath(extra: Mapping[str, str] | None = None) -> dict[str, str]:
-    """Build a child env that inherits the parent's env but drops PYTHONPATH.
-
-    Convenience for tests that subprocess `uv run` without inheriting the
-    parent's PYTHONPATH. Used by `tests/uat/runner.py` callers.
-    """
-    base = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
-    if extra:
-        base.update(extra)
-    return base
-
-
-def iter_argv_for_log(argv: Iterable[str]) -> str:
-    """Render argv as a single-line shell-escaped string for log files."""
-    import shlex
-
-    return " ".join(shlex.quote(a) for a in argv)

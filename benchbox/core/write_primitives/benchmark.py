@@ -25,6 +25,7 @@ from benchbox.core.connection import DatabaseConnection
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
     quote_identifier,
+    summarize_validation_failures,
     table_exists,
 )
 from benchbox.core.transactional.benchmark_base import TransactionalBenchmarkBase
@@ -394,10 +395,14 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             Tuple of (effective_sql, skip_reason). If skip_reason is not None,
             the operation should be skipped.
         """
-        # Adapter-preprocessed SQL takes priority
-        if sql_override is not None:
-            return sql_override, None
-
+        # Skip decisions depend on (operation, platform_key), NOT on the SQL body,
+        # so they run BEFORE any adapter ``sql_override`` is honored. An override
+        # is a dialect rewrite of the operation body (e.g. a bulk_load COPY ->
+        # CREATE EXTERNAL TABLE rewrite), not a signal that the operation is
+        # supported. Evaluating it first would let an operation marked unsupported
+        # (``platform_overrides {platform: null}``) still execute on that platform
+        # whenever the adapter also returns a preprocessed body - the override
+        # side-channel bypass (audit finding N8).
         if getattr(operation, "aggregate_state", None) is not None:
             platform_label = platform_key or "SQL"
             return None, (
@@ -418,25 +423,42 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     f"{POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS[operation.id]}"
                 )
 
-        if (platform_key or "").lower() == "duckdb":
-            duckdb_skip_reason = duckdb_write_primitive_skip_reason(operation)
-            if duckdb_skip_reason is not None:
-                return None, (f"Operation '{operation.id}' is skipped on DuckDB: {duckdb_skip_reason}")
-
-        effective_sql = operation.write_sql
-
+        # A ``null`` platform override is an unsupported-on-this-platform skip; a
+        # string override is a per-platform SQL body used only when the adapter
+        # did not supply its own ``sql_override`` below.
+        platform_override_sql: str | None = None
         if platform_key and operation.platform_overrides and platform_key in operation.platform_overrides:
             override = operation.platform_overrides[platform_key]
             if override is None:
                 return None, f"Operation '{operation.id}' is unsupported on platform '{platform_key}'."
-            effective_sql = override
+            platform_override_sql = override
 
         if (missing_file := self._check_bulk_load_file_dependencies(operation)) is not None:
             return None, (
                 f"Operation '{operation.id}' is skipped because required bulk-load files are missing: {missing_file}"
             )
 
-        if (empty_reason := self._check_staging_table_population(effective_sql, connection)) is not None:
+        # Body precedence once the operation is confirmed runnable: adapter
+        # ``sql_override`` (preprocessed) wins, then a platform override, then the
+        # catalog default. The staging-population guard uses the catalog default,
+        # which names the logical staging tables regardless of any dialect rewrite.
+        if sql_override is not None:
+            effective_sql = sql_override
+        elif platform_override_sql is not None:
+            effective_sql = platform_override_sql
+        else:
+            effective_sql = operation.write_sql
+
+        # Gate against the SQL DuckDB will actually run: bundled DuckDB rejects
+        # MERGE INTO, but a per-platform override that removes it (or one that
+        # introduces it) must be judged on the effective body, not the catalog
+        # default.
+        if (platform_key or "").lower() == "duckdb":
+            duckdb_skip_reason = duckdb_write_primitive_skip_reason(operation, effective_sql)
+            if duckdb_skip_reason is not None:
+                return None, (f"Operation '{operation.id}' is skipped on DuckDB: {duckdb_skip_reason}")
+
+        if (empty_reason := self._check_staging_table_population(operation.write_sql, connection)) is not None:
             return None, f"Operation '{operation.id}' is skipped because {empty_reason}"
 
         return effective_sql, None
@@ -1208,9 +1230,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 operation, connection, operation_id
             )
 
+            # The write SQL executed without raising, but a failed post-condition
+            # validation means the operation did not do what it claims. Report it
+            # as VALIDATION_FAILED (distinct from an execution FAILED) rather than
+            # SUCCESS, so a corrupting or no-op operation cannot render green.
             return OperationResult(
                 operation_id=operation_id,
-                success=True,
+                success=validation_passed,
                 write_duration_ms=write_duration_ms,
                 rows_affected=rows_affected,
                 validation_duration_ms=validation_duration_ms,
@@ -1218,7 +1244,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 validation_results=validation_results,
                 cleanup_duration_ms=cleanup_duration_ms,
                 cleanup_success=cleanup_success,
-                status="SUCCESS",
+                status="SUCCESS" if validation_passed else "VALIDATION_FAILED",
+                error=None if validation_passed else summarize_validation_failures(validation_results),
                 cleanup_warning=cleanup_warning,
                 executed_sql=write_sql,
             )

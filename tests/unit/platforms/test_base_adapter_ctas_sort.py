@@ -238,17 +238,18 @@ class TestDataLoaderTuningConfig:
 
 class TestMotherDuckSqlHook:
     def test_motherduck_builds_duckdb_compatible_ctas_sql(self):
+        from benchbox.core.tuning.interface import TuningColumn
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         adapter = MotherDuckAdapter.__new__(MotherDuckAdapter)
 
-        col1 = Mock()
-        col1.name = "l_shipdate"
-        col1.order = 1
-
-        col2 = Mock()
-        col2.name = "l_orderkey"
-        col2.order = 2
+        # Real TuningColumn instances (not Mocks): the shared
+        # _build_duckdb_ctas_sort_sql helper delegates to
+        # DuckDBDDLGenerator via a TableTuning, which validates that sorting
+        # columns are genuine TuningColumn instances -- see the
+        # renderer-consolidation TODO's w2 duckdb migration.
+        col1 = TuningColumn(name="l_shipdate", type="DATE", order=1)
+        col2 = TuningColumn(name="l_orderkey", type="INTEGER", order=2)
 
         sql = adapter._build_ctas_sort_sql("lineitem", [col1, col2])
 
