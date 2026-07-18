@@ -96,7 +96,11 @@ CREATE TABLE items (
 
 CREATE TABLE work_units (
   item_id  TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-  wid      TEXT NOT NULL CHECK (wid GLOB 'w[0-9]*'),
+  wid      TEXT NOT NULL CHECK (wid GLOB 'w[0-9]'
+             OR wid GLOB 'w[0-9][0-9]'
+             OR wid GLOB 'w[0-9][0-9][0-9]'),
+             -- w0..w999; SQLite GLOB '*' matches any chars, so 'w[0-9]*'
+             -- would accept e.g. 'w1abc' — enumerate the digit widths
   summary  TEXT NOT NULL CHECK (length(summary) BETWEEN 5 AND 200),
   status   TEXT NOT NULL DEFAULT 'pending' CHECK (status IN
              ('pending','in_progress','done')),
