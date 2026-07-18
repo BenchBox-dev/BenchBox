@@ -22,8 +22,10 @@ Default write-task close-out: implement → `code review` (fix every finding,
 incl. nits) → `make pr-open` (see AGENTS.md).
 **Dev PRs land via squash auto-merge once CI passes** — `make pr-open`
 enables it automatically except for soundness-critical comparator and
-plan-parser paths covered by `.github/CODEOWNERS`; those PRs wait for
-Code Owner review before merge. In remote/cloud sessions (no `make`/`gh`,
+plan-parser paths covered by `.github/CODEOWNERS`; those PRs get no
+auto-merge — the maintainer reviews the diff and merges manually (no
+ruleset forces an approval; that target was retired 2026-07-18, see
+docs/operations/repo-admin-settings.md). In remote/cloud sessions (no `make`/`gh`,
 PRs created via GitHub MCP), enable squash auto-merge right after
 opening the PR instead of waiting for a manual merge instruction unless
 that soundness-path exception applies.

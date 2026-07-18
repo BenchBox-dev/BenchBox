@@ -247,11 +247,15 @@ make pr-open
 `pr-open` is idempotent: pushes, opens/reuses a PR to `develop`, and enables
 squash auto-merge when CI passes. Do not poll; post-merge safety opens a
 revert PR or incident issue if `develop` goes red.
-PRs touching `benchbox/core/**/validation.py`, `benchbox/core/equivalence/**`,
-or `benchbox/core/query_plans/parsers/**` are the exception: `pr-open` and the
-GitHub auto-merge backstop leave auto-merge disabled so Code Owner review can
-gate the merge. GitHub branch protection on `develop` must require Code Owner
-review for `.github/CODEOWNERS` to enforce that precondition.
+PRs touching the soundness paths in
+`_project/scripts/auto_merge_soundness_paths.py` (comparators, plan parsers,
+expected-results oracle, sql_compat dispatch core, the gate machinery itself)
+are the exception: `pr-open` and the GitHub auto-merge backstop leave
+auto-merge disabled and the maintainer reviews the diff and merges manually.
+No ruleset forces a Code Owner approval — that target was retired 2026-07-18
+(the sole owner authors every PR and GitHub forbids self-approval; see
+docs/operations/repo-admin-settings.md, "Soundness-path review enforcement
+(RETIRED 2026-07-18)").
 Run `make pr-preflight` and `make pr-open` through a low-effort subagent when
 the agent environment supports it.
 

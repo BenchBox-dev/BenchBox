@@ -21,6 +21,11 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/benchmarks.py",
     "benchbox/cli/commands/__init__.py",
     "benchbox/cli/commands/calculate_qphh.py",
+    # tighten-dependencies-phase-3-extras-deprecation: repoints check-deps'
+    # missing-dependency message at dep_info.extra_name (databricks-connect
+    # extra removal renamed the attribute); display string only, no click
+    # decorators or command signature touched.
+    "benchbox/cli/commands/checks.py",
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
     # fix-plan-consumption-phases-and-loader-reattach: internal-only fix repointing

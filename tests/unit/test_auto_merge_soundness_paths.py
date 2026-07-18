@@ -141,8 +141,9 @@ def test_codeowners_covers_soundness_paths() -> None:
 
 def test_codeowners_matches_soundness_prefixes_1to1() -> None:
     """CODEOWNERS must list exactly the same widened path set as
-    SOUNDNESS_PREFIXES -- a mismatch means require_code_owner_review
-    silently does nothing for a prefix that only exists on one side."""
+    SOUNDNESS_PREFIXES -- a mismatch means the documented soundness surface
+    (and its review-request routing) silently diverges from what the
+    auto-merge withholding actually gates."""
     codeowners = (ROOT / ".github/CODEOWNERS").read_text(encoding="utf-8")
     owned_paths = {
         line.rsplit(" ", 1)[0].strip()

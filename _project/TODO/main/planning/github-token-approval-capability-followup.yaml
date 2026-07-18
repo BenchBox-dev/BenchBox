@@ -16,7 +16,17 @@ description: |
   approval call — the setting is currently unused for approvals, only enabling
   the *capability*).
 
-  Once the review requirement from auto-merge-review-gate-admin-enforcement is
+  NOTE (2026-07-18): the review requirement this item's premise waits on was
+  RETIRED without being applied (see docs/operations/repo-admin-settings.md,
+  "Soundness-path review enforcement (RETIRED 2026-07-18)", and the closed
+  _project/DONE/main/planning/auto-merge-review-gate-admin-enforcement.yaml).
+  This item therefore stays dormant UNLESS a retirement revisit trigger fires
+  — in particular, agent PRs moving to a separate bot identity, at which
+  point require_code_owner_review becomes enforceable and this loophole
+  analysis becomes live again. Re-read it then; do not act on it before.
+
+  Original premise: once the review requirement from
+  auto-merge-review-gate-admin-enforcement is
   actually enforced at the ruleset layer (required_approving_review_count>=1,
   require_code_owner_review=true), this dormant capability becomes a live
   self-approval loophole: any workflow running with a `pull-requests: write`
