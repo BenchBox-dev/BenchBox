@@ -1,0 +1,1556 @@
+#!/usr/bin/env python3
+"""todo_db.py - Local-SQLite spike of the DB-backed TODO tracker.
+
+Implements the G2 gate of _project/specs/todo-db-tracker.md against a local
+SQLite file so the approach can be evaluated end-to-end without provisioning
+a hosted database. The CLI is the only sanctioned write path; every
+lifecycle invariant lives in code here, not in skill prose.
+
+Usage:
+    uv run --project _project/scripts -- python _project/scripts/todo_db.py <command> ...
+
+Default database path: <git root>/.todo-db/todo.sqlite (gitignored).
+Override with --db PATH or the TODO_DB_PATH environment variable.
+
+Spike deviations from the spec DDL (recorded in the spec's spike section):
+- `items.category` column added (nullable) so the importer is lossless.
+- scope-rule matching uses fnmatch semantics ('*' crosses '/'), which is
+  slightly more permissive than the final glob contract.
+- No network/degraded-mode layer: the database is a local file.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import getpass
+import json
+import os
+import re
+import socket
+import sqlite3
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+
+SCHEMA_VERSION = 1
+
+PRIORITIES = ("critical", "high", "medium-high", "medium", "low")
+STATES = ("planning", "active", "done", "dropped")
+# Legal item-state transitions; everything else is rejected.
+TRANSITIONS = {
+    ("planning", "active"),
+    ("active", "done"),
+    ("planning", "dropped"),
+    ("active", "dropped"),
+}
+UNIT_STATUSES = ("pending", "in_progress", "done")
+SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
+WID_RE = re.compile(r"^w[0-9]{1,3}$")
+DEFAULT_LEASE_TTL_HOURS = 24
+
+SCHEMA_SQL = """
+CREATE TABLE items (
+  id             TEXT PRIMARY KEY,
+  title          TEXT NOT NULL CHECK (length(title) BETWEEN 5 AND 200),
+  worktree       TEXT NOT NULL,
+  priority       TEXT NOT NULL CHECK (priority IN
+                   ('critical','high','medium-high','medium','low')),
+  state          TEXT NOT NULL DEFAULT 'planning' CHECK (state IN
+                   ('planning','active','done','dropped')),
+  blocked_reason TEXT,
+  category       TEXT,
+  description    TEXT NOT NULL CHECK (length(description) >= 10),
+  approach       TEXT,
+  claimed_by     TEXT,
+  claimed_at     TEXT,
+  created_at     TEXT NOT NULL,
+  completed_at   TEXT,
+  completed_pr   INTEGER
+);
+
+CREATE TABLE work_units (
+  item_id  TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  wid      TEXT NOT NULL CHECK (wid GLOB 'w[0-9]'
+             OR wid GLOB 'w[0-9][0-9]'
+             OR wid GLOB 'w[0-9][0-9][0-9]'),
+  summary  TEXT NOT NULL CHECK (length(summary) BETWEEN 5 AND 200),
+  status   TEXT NOT NULL DEFAULT 'pending' CHECK (status IN
+             ('pending','in_progress','done')),
+  evidence TEXT,
+  notes    TEXT,
+  PRIMARY KEY (item_id, wid)
+);
+
+CREATE TABLE work_needs (
+  item_id   TEXT NOT NULL,
+  wid       TEXT NOT NULL,
+  needs_wid TEXT NOT NULL,
+  PRIMARY KEY (item_id, wid, needs_wid),
+  FOREIGN KEY (item_id, wid)       REFERENCES work_units(item_id, wid) ON DELETE CASCADE,
+  FOREIGN KEY (item_id, needs_wid) REFERENCES work_units(item_id, wid) ON DELETE CASCADE
+);
+
+CREATE TABLE item_deps (
+  item_id    TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  needs_item TEXT NOT NULL REFERENCES items(id),
+  PRIMARY KEY (item_id, needs_item)
+);
+
+CREATE TABLE scope_rules (
+  item_id   TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  kind      TEXT NOT NULL CHECK (kind IN ('only_modify','do_not_modify')),
+  path_glob TEXT NOT NULL,
+  PRIMARY KEY (item_id, kind, path_glob)
+);
+
+CREATE TABLE verifications (
+  item_id     TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  seq         INTEGER NOT NULL,
+  description TEXT NOT NULL,
+  command     TEXT,
+  expected    TEXT,
+  last_run    TEXT,
+  last_result TEXT CHECK (last_result IN ('pass','fail') OR last_result IS NULL),
+  PRIMARY KEY (item_id, seq)
+);
+
+CREATE TABLE preserves (
+  item_id  TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  behavior TEXT NOT NULL,
+  PRIMARY KEY (item_id, behavior)
+);
+
+CREATE TABLE anti_patterns (
+  item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  dont    TEXT NOT NULL,
+  why     TEXT NOT NULL,
+  instead TEXT NOT NULL,
+  PRIMARY KEY (item_id, dont)
+);
+
+CREATE TABLE prior_art (
+  item_id  TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+  path     TEXT NOT NULL,
+  concept  TEXT NOT NULL,
+  decision TEXT NOT NULL CHECK (decision IN ('reuse','extend','supersede')),
+  PRIMARY KEY (item_id, path, concept)
+);
+
+CREATE TABLE deferrals (
+  id              INTEGER PRIMARY KEY,
+  from_item       TEXT NOT NULL REFERENCES items(id),
+  summary         TEXT NOT NULL,
+  reason          TEXT NOT NULL,
+  resolution      TEXT NOT NULL DEFAULT 'open' CHECK (resolution IN
+                    ('open','promoted','dismissed')),
+  resolved_item   TEXT REFERENCES items(id),
+  resolved_reason TEXT,
+  created_at      TEXT NOT NULL
+);
+
+CREATE TABLE events (
+  seq     INTEGER PRIMARY KEY,
+  at      TEXT NOT NULL,
+  actor   TEXT NOT NULL,
+  item_id TEXT,
+  action  TEXT NOT NULL,
+  detail  TEXT
+);
+
+CREATE TABLE meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE INDEX idx_items_state ON items(state);
+CREATE INDEX idx_deferrals_open ON deferrals(from_item, resolution);
+"""
+
+
+class TodoError(Exception):
+    """Lifecycle or validation violation; rendered to stderr, exit 2."""
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def default_actor() -> str:
+    for var in ("TODO_ACTOR", "CLAUDE_SESSION_ID"):
+        value = os.environ.get(var)
+        if value:
+            return value
+    return f"{getpass.getuser()}@{socket.gethostname()}"
+
+
+def git_root() -> Path:
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return Path.cwd()
+    return Path(result.stdout.strip())
+
+
+def resolve_db_path(explicit: str | None) -> Path:
+    if explicit:
+        return Path(explicit)
+    env = os.environ.get("TODO_DB_PATH")
+    if env:
+        return Path(env)
+    return git_root() / ".todo-db" / "todo.sqlite"
+
+
+def connect(db_path: Path) -> sqlite3.Connection:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    version = _schema_version(conn)
+    if version is None:
+        with conn:
+            conn.executescript(SCHEMA_SQL)
+            conn.execute(
+                "INSERT INTO meta (key, value) VALUES ('schema_version', ?)",
+                (str(SCHEMA_VERSION),),
+            )
+    elif version != SCHEMA_VERSION:
+        raise TodoError(
+            f"database schema_version={version}, CLI expects {SCHEMA_VERSION}; "
+            "run a newer CLI or re-create the spike database"
+        )
+    return conn
+
+
+def _schema_version(conn: sqlite3.Connection) -> int | None:
+    row = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='meta'").fetchone()
+    if row is None:
+        return None
+    got = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+    return int(got["value"]) if got else None
+
+
+def log_event(
+    conn: sqlite3.Connection,
+    actor: str,
+    item_id: str | None,
+    action: str,
+    detail: dict[str, Any] | None = None,
+) -> None:
+    conn.execute(
+        "INSERT INTO events (at, actor, item_id, action, detail) VALUES (?, ?, ?, ?, ?)",
+        (utc_now(), actor, item_id, action, json.dumps(detail or {}, sort_keys=True)),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Graph helpers
+
+
+def _reachable(edges: dict[str, set[str]], start: str, target: str) -> bool:
+    """True if `target` is reachable from `start` following `edges`."""
+    seen: set[str] = set()
+    stack = [start]
+    while stack:
+        node = stack.pop()
+        if node == target:
+            return True
+        if node in seen:
+            continue
+        seen.add(node)
+        stack.extend(edges.get(node, ()))
+    return False
+
+
+def _check_no_cycle(edges: dict[str, set[str]], src: str, dst: str, kind: str) -> None:
+    """Reject adding edge src->dst if dst can already reach src."""
+    if src == dst:
+        raise TodoError(f"{kind} dependency of {src!r} on itself")
+    if _reachable(edges, dst, src):
+        raise TodoError(f"{kind} dependency cycle: {src!r} -> {dst!r} closes a loop")
+
+
+def _item_dep_edges(conn: sqlite3.Connection) -> dict[str, set[str]]:
+    edges: dict[str, set[str]] = {}
+    for row in conn.execute("SELECT item_id, needs_item FROM item_deps"):
+        edges.setdefault(row["item_id"], set()).add(row["needs_item"])
+    return edges
+
+
+def _work_need_edges(conn: sqlite3.Connection, item_id: str) -> dict[str, set[str]]:
+    edges: dict[str, set[str]] = {}
+    for row in conn.execute("SELECT wid, needs_wid FROM work_needs WHERE item_id = ?", (item_id,)):
+        edges.setdefault(row["wid"], set()).add(row["needs_wid"])
+    return edges
+
+
+# ---------------------------------------------------------------------------
+# Core operations (the write chokepoint)
+
+
+def _require_item(conn: sqlite3.Connection, item_id: str) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+    if row is None:
+        raise TodoError(f"no such item: {item_id!r}")
+    return row
+
+
+def _lease_expired(claimed_at: str | None, ttl_hours: float) -> bool:
+    if not claimed_at:
+        return True
+    then = datetime.strptime(claimed_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - then > timedelta(hours=ttl_hours)
+
+
+def _transition(conn: sqlite3.Connection, item: sqlite3.Row, new_state: str) -> None:
+    if (item["state"], new_state) not in TRANSITIONS:
+        raise TodoError(f"illegal transition {item['state']!r} -> {new_state!r} for {item['id']!r}")
+    conn.execute("UPDATE items SET state = ? WHERE id = ?", (new_state, item["id"]))
+
+
+def create_item(
+    conn: sqlite3.Connection,
+    actor: str,
+    *,
+    item_id: str,
+    title: str,
+    worktree: str,
+    priority: str,
+    description: str,
+    category: str | None = None,
+    approach: str | None = None,
+    state: str = "planning",
+    blocked_reason: str | None = None,
+    created_at: str | None = None,
+    work: list[dict[str, Any]] | None = None,
+    deps: list[str] | None = None,
+    scope: list[tuple[str, str]] | None = None,
+    verifications: list[dict[str, str]] | None = None,
+    preserves: list[str] | None = None,
+    anti_patterns: list[tuple[str, str, str]] | None = None,
+    prior_art: list[tuple[str, str, str]] | None = None,
+) -> None:
+    if not SLUG_RE.match(item_id):
+        raise TodoError(f"invalid item id (slug) {item_id!r}")
+    if priority not in PRIORITIES:
+        raise TodoError(f"invalid priority {priority!r}; one of {', '.join(PRIORITIES)}")
+    if state not in ("planning", "active"):
+        raise TodoError(f"new items must start planning or active, not {state!r}")
+    with conn:
+        try:
+            conn.execute(
+                "INSERT INTO items (id, title, worktree, priority, state, blocked_reason,"
+                " category, description, approach, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    item_id,
+                    title,
+                    worktree,
+                    priority,
+                    state,
+                    blocked_reason,
+                    category,
+                    description,
+                    approach,
+                    created_at or utc_now(),
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise TodoError(f"cannot create {item_id!r}: {exc}") from exc
+        for unit in work or []:
+            _insert_work_unit(conn, item_id, unit)
+        # Needs edges only after all units exist so FK failures are ours to phrase.
+        for unit in work or []:
+            for needs in unit.get("needs", []):
+                _insert_work_need(conn, item_id, unit["id"], needs)
+        for dep in deps or []:
+            add_item_dep(conn, item_id, dep)
+        for kind, glob in scope or []:
+            conn.execute(
+                "INSERT INTO scope_rules (item_id, kind, path_glob) VALUES (?, ?, ?)",
+                (item_id, kind, glob),
+            )
+        for seq, ver in enumerate(verifications or [], start=1):
+            conn.execute(
+                "INSERT INTO verifications (item_id, seq, description, command, expected) VALUES (?, ?, ?, ?, ?)",
+                (item_id, seq, ver["description"], ver.get("command"), ver.get("expected")),
+            )
+        for behavior in preserves or []:
+            conn.execute(
+                "INSERT OR IGNORE INTO preserves (item_id, behavior) VALUES (?, ?)",
+                (item_id, behavior),
+            )
+        for dont, why, instead in anti_patterns or []:
+            conn.execute(
+                "INSERT OR IGNORE INTO anti_patterns (item_id, dont, why, instead) VALUES (?, ?, ?, ?)",
+                (item_id, dont, why, instead),
+            )
+        for path, concept, decision in prior_art or []:
+            if decision not in ("reuse", "extend", "supersede"):
+                raise TodoError(f"invalid prior_art decision {decision!r}")
+            conn.execute(
+                "INSERT OR IGNORE INTO prior_art (item_id, path, concept, decision) VALUES (?, ?, ?, ?)",
+                (item_id, path, concept, decision),
+            )
+        log_event(conn, actor, item_id, "create", {"title": title, "state": state})
+
+
+def _insert_work_unit(conn: sqlite3.Connection, item_id: str, unit: dict[str, Any]) -> None:
+    wid = unit["id"]
+    if not WID_RE.match(wid):
+        raise TodoError(f"invalid work-unit id {wid!r} on {item_id!r} (expect w0..w999)")
+    status = unit.get("status", "pending")
+    if status not in UNIT_STATUSES:
+        raise TodoError(f"invalid work-unit status {status!r} on {item_id}:{wid}")
+    try:
+        conn.execute(
+            "INSERT INTO work_units (item_id, wid, summary, status, evidence, notes) VALUES (?, ?, ?, ?, ?, ?)",
+            (item_id, wid, unit["summary"], status, unit.get("evidence"), unit.get("notes")),
+        )
+    except sqlite3.IntegrityError as exc:
+        raise TodoError(f"cannot add work unit {item_id}:{wid}: {exc}") from exc
+
+
+def _insert_work_need(conn: sqlite3.Connection, item_id: str, wid: str, needs_wid: str) -> None:
+    edges = _work_need_edges(conn, item_id)
+    _check_no_cycle(edges, wid, needs_wid, "work-unit")
+    try:
+        conn.execute(
+            "INSERT INTO work_needs (item_id, wid, needs_wid) VALUES (?, ?, ?)",
+            (item_id, wid, needs_wid),
+        )
+    except sqlite3.IntegrityError as exc:
+        raise TodoError(f"work need {item_id}:{wid} -> {needs_wid} references a missing unit: {exc}") from exc
+
+
+def add_item_dep(conn: sqlite3.Connection, item_id: str, needs_item: str) -> None:
+    edges = _item_dep_edges(conn)
+    _check_no_cycle(edges, item_id, needs_item, "item")
+    try:
+        conn.execute(
+            "INSERT INTO item_deps (item_id, needs_item) VALUES (?, ?)",
+            (item_id, needs_item),
+        )
+    except sqlite3.IntegrityError as exc:
+        raise TodoError(f"dependency {item_id!r} -> {needs_item!r} references a missing item: {exc}") from exc
+
+
+def claim_item(
+    conn: sqlite3.Connection,
+    actor: str,
+    item_id: str,
+    ttl_hours: float = DEFAULT_LEASE_TTL_HOURS,
+) -> dict[str, Any]:
+    with conn:
+        item = _require_item(conn, item_id)
+        if item["state"] not in ("planning", "active"):
+            raise TodoError(f"{item_id!r} is {item['state']}; cannot claim")
+        holder = item["claimed_by"]
+        if holder and holder != actor and not _lease_expired(item["claimed_at"], ttl_hours):
+            raise TodoError(f"{item_id!r} is claimed by {holder!r} since {item['claimed_at']}")
+        unmet = [
+            row["needs_item"]
+            for row in conn.execute(
+                "SELECT d.needs_item FROM item_deps d JOIN items n ON n.id = d.needs_item"
+                " WHERE d.item_id = ? AND n.state != 'done'",
+                (item_id,),
+            )
+        ]
+        if unmet:
+            raise TodoError(f"{item_id!r} has unmet dependencies: {', '.join(unmet)}")
+        conn.execute(
+            "UPDATE items SET claimed_by = ?, claimed_at = ? WHERE id = ?",
+            (actor, utc_now(), item_id),
+        )
+        if item["state"] == "planning":
+            _transition(conn, item, "active")
+        log_event(conn, actor, item_id, "claim", {"previous_holder": holder})
+    return work_order(conn, item_id)
+
+
+def release_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
+    with conn:
+        item = _require_item(conn, item_id)
+        if item["claimed_by"] is None:
+            return
+        conn.execute("UPDATE items SET claimed_by = NULL, claimed_at = NULL WHERE id = ?", (item_id,))
+        log_event(conn, actor, item_id, "release", {"holder": item["claimed_by"]})
+
+
+def start_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str) -> None:
+    with conn:
+        _require_item(conn, item_id)
+        unit = _require_unit(conn, item_id, wid)
+        if unit["status"] == "done":
+            raise TodoError(f"{item_id}:{wid} is already done")
+        _require_unit_needs_done(conn, item_id, wid)
+        conn.execute(
+            "UPDATE work_units SET status = 'in_progress' WHERE item_id = ? AND wid = ?",
+            (item_id, wid),
+        )
+        log_event(conn, actor, item_id, "start", {"wid": wid})
+
+
+def done_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str, evidence: str) -> None:
+    if not evidence or not evidence.strip():
+        raise TodoError("evidence is required to mark a work unit done")
+    with conn:
+        _require_item(conn, item_id)
+        _require_unit(conn, item_id, wid)
+        _require_unit_needs_done(conn, item_id, wid)
+        conn.execute(
+            "UPDATE work_units SET status = 'done', evidence = ? WHERE item_id = ? AND wid = ?",
+            (evidence, item_id, wid),
+        )
+        log_event(conn, actor, item_id, "done", {"wid": wid, "evidence": evidence})
+
+
+def _require_unit(conn: sqlite3.Connection, item_id: str, wid: str) -> sqlite3.Row:
+    unit = conn.execute("SELECT * FROM work_units WHERE item_id = ? AND wid = ?", (item_id, wid)).fetchone()
+    if unit is None:
+        raise TodoError(f"no such work unit: {item_id}:{wid}")
+    return unit
+
+
+def _require_unit_needs_done(conn: sqlite3.Connection, item_id: str, wid: str) -> None:
+    unmet = [
+        row["needs_wid"]
+        for row in conn.execute(
+            "SELECT n.needs_wid FROM work_needs n JOIN work_units u"
+            " ON u.item_id = n.item_id AND u.wid = n.needs_wid"
+            " WHERE n.item_id = ? AND n.wid = ? AND u.status != 'done'",
+            (item_id, wid),
+        )
+    ]
+    if unmet:
+        raise TodoError(f"{item_id}:{wid} needs unfinished units: {', '.join(unmet)}")
+
+
+def defer_work(conn: sqlite3.Connection, actor: str, item_id: str, summary: str, reason: str) -> int:
+    with conn:
+        _require_item(conn, item_id)
+        cursor = conn.execute(
+            "INSERT INTO deferrals (from_item, summary, reason, created_at) VALUES (?, ?, ?, ?)",
+            (item_id, summary, reason, utc_now()),
+        )
+        deferral_id = cursor.lastrowid
+        log_event(conn, actor, item_id, "defer", {"deferral_id": deferral_id, "summary": summary})
+    assert deferral_id is not None
+    return deferral_id
+
+
+def promote_deferral(
+    conn: sqlite3.Connection,
+    actor: str,
+    deferral_id: int,
+    *,
+    new_item_id: str,
+    title: str | None = None,
+    priority: str = "medium",
+    worktree: str | None = None,
+    description: str | None = None,
+) -> None:
+    row = _require_deferral(conn, deferral_id)
+    if row["resolution"] != "open":
+        raise TodoError(f"deferral {deferral_id} is already {row['resolution']}")
+    parent = _require_item(conn, row["from_item"])
+    create_item(
+        conn,
+        actor,
+        item_id=new_item_id,
+        title=title or row["summary"][:200],
+        worktree=worktree or parent["worktree"],
+        priority=priority,
+        description=description
+        or (
+            f"Promoted from deferral #{deferral_id} of {parent['id']}.\n"
+            f"Deferred: {row['summary']}\nReason deferred: {row['reason']}"
+        ),
+    )
+    with conn:
+        conn.execute(
+            "UPDATE deferrals SET resolution = 'promoted', resolved_item = ? WHERE id = ?",
+            (new_item_id, deferral_id),
+        )
+        log_event(
+            conn,
+            actor,
+            row["from_item"],
+            "promote",
+            {"deferral_id": deferral_id, "new_item": new_item_id},
+        )
+
+
+def dismiss_deferral(conn: sqlite3.Connection, actor: str, deferral_id: int, reason: str) -> None:
+    if not reason.strip():
+        raise TodoError("a dismissal reason is required")
+    with conn:
+        row = _require_deferral(conn, deferral_id)
+        if row["resolution"] != "open":
+            raise TodoError(f"deferral {deferral_id} is already {row['resolution']}")
+        conn.execute(
+            "UPDATE deferrals SET resolution = 'dismissed', resolved_reason = ? WHERE id = ?",
+            (reason, deferral_id),
+        )
+        log_event(
+            conn,
+            actor,
+            row["from_item"],
+            "dismiss",
+            {"deferral_id": deferral_id, "reason": reason},
+        )
+
+
+def _require_deferral(conn: sqlite3.Connection, deferral_id: int) -> sqlite3.Row:
+    row = conn.execute("SELECT * FROM deferrals WHERE id = ?", (deferral_id,)).fetchone()
+    if row is None:
+        raise TodoError(f"no such deferral: {deferral_id}")
+    return row
+
+
+def complete_item(conn: sqlite3.Connection, actor: str, item_id: str, pr: int | None) -> None:
+    with conn:
+        item = _require_item(conn, item_id)
+        undone = [
+            row["wid"]
+            for row in conn.execute(
+                "SELECT wid FROM work_units WHERE item_id = ? AND status != 'done'",
+                (item_id,),
+            )
+        ]
+        if undone:
+            raise TodoError(f"cannot complete {item_id!r}: work units not done: {', '.join(undone)}")
+        open_deferrals = [
+            f"#{row['id']} {row['summary']}"
+            for row in conn.execute(
+                "SELECT id, summary FROM deferrals WHERE from_item = ? AND resolution = 'open'",
+                (item_id,),
+            )
+        ]
+        if open_deferrals:
+            raise TodoError(
+                f"cannot complete {item_id!r}: unresolved deferrals — promote or dismiss"
+                f" first: {'; '.join(open_deferrals)}"
+            )
+        if item["blocked_reason"]:
+            raise TodoError(f"cannot complete {item_id!r} while blocked: {item['blocked_reason']}")
+        _transition(conn, item, "done")
+        conn.execute(
+            "UPDATE items SET completed_at = ?, completed_pr = ?, claimed_by = NULL, claimed_at = NULL WHERE id = ?",
+            (utc_now(), pr, item_id),
+        )
+        log_event(conn, actor, item_id, "complete", {"pr": pr})
+
+
+def drop_item(conn: sqlite3.Connection, actor: str, item_id: str, reason: str) -> None:
+    if not reason.strip():
+        raise TodoError("a drop reason is required")
+    with conn:
+        item = _require_item(conn, item_id)
+        open_deferrals = conn.execute(
+            "SELECT count(*) AS n FROM deferrals WHERE from_item = ? AND resolution = 'open'",
+            (item_id,),
+        ).fetchone()["n"]
+        if open_deferrals:
+            raise TodoError(f"cannot drop {item_id!r}: {open_deferrals} unresolved deferral(s)")
+        _transition(conn, item, "dropped")
+        conn.execute("UPDATE items SET claimed_by = NULL, claimed_at = NULL WHERE id = ?", (item_id,))
+        log_event(conn, actor, item_id, "drop", {"reason": reason})
+
+
+def block_item(conn: sqlite3.Connection, actor: str, item_id: str, reason: str) -> None:
+    if not reason.strip():
+        raise TodoError("a block reason is required")
+    with conn:
+        item = _require_item(conn, item_id)
+        if item["state"] in ("done", "dropped"):
+            raise TodoError(f"{item_id!r} is {item['state']}; cannot block")
+        conn.execute("UPDATE items SET blocked_reason = ? WHERE id = ?", (reason, item_id))
+        log_event(conn, actor, item_id, "block", {"reason": reason})
+
+
+def unblock_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
+    with conn:
+        _require_item(conn, item_id)
+        conn.execute("UPDATE items SET blocked_reason = NULL WHERE id = ?", (item_id,))
+        log_event(conn, actor, item_id, "unblock", None)
+
+
+def sweep_stale(conn: sqlite3.Connection, actor: str, ttl_hours: float = DEFAULT_LEASE_TTL_HOURS) -> list[str]:
+    released = []
+    with conn:
+        for row in conn.execute("SELECT id, claimed_by, claimed_at FROM items WHERE claimed_by IS NOT NULL"):
+            if _lease_expired(row["claimed_at"], ttl_hours):
+                conn.execute(
+                    "UPDATE items SET claimed_by = NULL, claimed_at = NULL WHERE id = ?",
+                    (row["id"],),
+                )
+                log_event(
+                    conn,
+                    actor,
+                    row["id"],
+                    "sweep",
+                    {"stale_holder": row["claimed_by"], "claimed_at": row["claimed_at"]},
+                )
+                released.append(row["id"])
+    return released
+
+
+# ---------------------------------------------------------------------------
+# Read side
+
+
+def ready_items(
+    conn: sqlite3.Connection,
+    actor: str,
+    ttl_hours: float = DEFAULT_LEASE_TTL_HOURS,
+) -> list[dict[str, Any]]:
+    out = []
+    for row in conn.execute(
+        "SELECT * FROM items WHERE state IN ('planning','active') AND blocked_reason IS NULL ORDER BY priority, id"
+    ):
+        holder = row["claimed_by"]
+        if holder and holder != actor and not _lease_expired(row["claimed_at"], ttl_hours):
+            continue
+        unmet = conn.execute(
+            "SELECT count(*) AS n FROM item_deps d JOIN items n2 ON n2.id = d.needs_item"
+            " WHERE d.item_id = ? AND n2.state != 'done'",
+            (row["id"],),
+        ).fetchone()["n"]
+        if unmet:
+            continue
+        out.append(dict(row))
+    priority_rank = {p: i for i, p in enumerate(PRIORITIES)}
+    out.sort(key=lambda item: (priority_rank[item["priority"]], item["id"]))
+    return out
+
+
+def ready_units(conn: sqlite3.Connection, item_id: str) -> tuple[list[dict], list[dict]]:
+    ready, blocked = [], []
+    for unit in conn.execute(
+        "SELECT * FROM work_units WHERE item_id = ? AND status != 'done' ORDER BY wid",
+        (item_id,),
+    ):
+        unmet = [
+            row["needs_wid"]
+            for row in conn.execute(
+                "SELECT n.needs_wid FROM work_needs n JOIN work_units u"
+                " ON u.item_id = n.item_id AND u.wid = n.needs_wid"
+                " WHERE n.item_id = ? AND n.wid = ? AND u.status != 'done'",
+                (item_id, unit["wid"]),
+            )
+        ]
+        entry = dict(unit)
+        if unmet:
+            entry["unmet"] = unmet
+            blocked.append(entry)
+        else:
+            ready.append(entry)
+    return ready, blocked
+
+
+def get_item(conn: sqlite3.Connection, item_id: str) -> dict[str, Any]:
+    item = dict(_require_item(conn, item_id))
+    item["work"] = [
+        {
+            **dict(row),
+            "needs": [
+                n["needs_wid"]
+                for n in conn.execute(
+                    "SELECT needs_wid FROM work_needs WHERE item_id = ? AND wid = ? ORDER BY needs_wid",
+                    (item_id, row["wid"]),
+                )
+            ],
+        }
+        for row in conn.execute("SELECT * FROM work_units WHERE item_id = ? ORDER BY wid", (item_id,))
+    ]
+    item["deps"] = [
+        row["needs_item"]
+        for row in conn.execute(
+            "SELECT needs_item FROM item_deps WHERE item_id = ? ORDER BY needs_item",
+            (item_id,),
+        )
+    ]
+    item["scope"] = [
+        dict(row)
+        for row in conn.execute(
+            "SELECT kind, path_glob FROM scope_rules WHERE item_id = ? ORDER BY kind, path_glob",
+            (item_id,),
+        )
+    ]
+    item["verifications"] = [
+        dict(row) for row in conn.execute("SELECT * FROM verifications WHERE item_id = ? ORDER BY seq", (item_id,))
+    ]
+    item["preserves"] = [
+        row["behavior"]
+        for row in conn.execute("SELECT behavior FROM preserves WHERE item_id = ? ORDER BY behavior", (item_id,))
+    ]
+    item["anti_patterns"] = [
+        dict(row)
+        for row in conn.execute(
+            "SELECT dont, why, instead FROM anti_patterns WHERE item_id = ? ORDER BY dont",
+            (item_id,),
+        )
+    ]
+    item["prior_art"] = [
+        dict(row)
+        for row in conn.execute(
+            "SELECT path, concept, decision FROM prior_art WHERE item_id = ? ORDER BY path, concept",
+            (item_id,),
+        )
+    ]
+    item["deferrals"] = [
+        dict(row) for row in conn.execute("SELECT * FROM deferrals WHERE from_item = ? ORDER BY id", (item_id,))
+    ]
+    return item
+
+
+def work_order(conn: sqlite3.Connection, item_id: str) -> dict[str, Any]:
+    item = get_item(conn, item_id)
+    ready, blocked = ready_units(conn, item_id)
+    item["ready_units"] = ready
+    item["blocked_units"] = blocked
+    return item
+
+
+def stats(conn: sqlite3.Connection) -> dict[str, Any]:
+    def counts(query: str) -> dict[str, int]:
+        return {row[0]: row[1] for row in conn.execute(query)}
+
+    return {
+        "items_by_state": counts("SELECT state, count(*) FROM items GROUP BY state"),
+        "open_by_priority": counts(
+            "SELECT priority, count(*) FROM items WHERE state IN ('planning','active') GROUP BY priority"
+        ),
+        "open_by_worktree": counts(
+            "SELECT worktree, count(*) FROM items WHERE state IN ('planning','active') GROUP BY worktree"
+        ),
+        "deferrals_by_resolution": counts("SELECT resolution, count(*) FROM deferrals GROUP BY resolution"),
+        "claimed": counts("SELECT claimed_by, count(*) FROM items WHERE claimed_by IS NOT NULL GROUP BY claimed_by"),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Scope check, verify, lint
+
+
+def check_paths(files: list[str], rules: list[dict[str, str]]) -> list[str]:
+    """Return violation messages for changed files vs scope rules."""
+    only = [r["path_glob"] for r in rules if r["kind"] == "only_modify"]
+    deny = [r["path_glob"] for r in rules if r["kind"] == "do_not_modify"]
+    violations = []
+    for path in files:
+        if any(fnmatch.fnmatch(path, glob) for glob in deny):
+            violations.append(f"{path}: matches do_not_modify")
+        elif only and not any(fnmatch.fnmatch(path, glob) for glob in only):
+            violations.append(f"{path}: outside only_modify allowlist")
+    return violations
+
+
+def changed_files(base: str | None) -> list[str]:
+    if base:
+        cmd = ["git", "diff", "--name-only", f"{base}...HEAD"]
+    else:
+        cmd = ["git", "diff", "--name-only", "HEAD"]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise TodoError(f"git diff failed: {result.stderr.strip()}")
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: int) -> tuple[str, str]:
+    row = conn.execute("SELECT * FROM verifications WHERE item_id = ? AND seq = ?", (item_id, seq)).fetchone()
+    if row is None:
+        raise TodoError(f"no verification seq={seq} on {item_id!r}")
+    if not row["command"]:
+        raise TodoError(f"verification seq={seq} on {item_id!r} has no command")
+    proc = subprocess.run(row["command"], shell=True, capture_output=True, text=True, check=False)
+    output = (proc.stdout or "") + (proc.stderr or "")
+    passed = proc.returncode == 0
+    if passed and row["expected"]:
+        passed = row["expected"] in output
+    result = "pass" if passed else "fail"
+    with conn:
+        conn.execute(
+            "UPDATE verifications SET last_run = ?, last_result = ? WHERE item_id = ? AND seq = ?",
+            (utc_now(), result, item_id, seq),
+        )
+        log_event(conn, actor, item_id, "verify", {"seq": seq, "result": result})
+    return result, output
+
+
+EVIDENCE_PIN_RE = re.compile(r"verified on|@ [0-9a-f]{7,}|\bPASS\b", re.IGNORECASE)
+
+
+def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
+    item = get_item(conn, item_id)
+    findings = []
+    if not item["verifications"]:
+        findings.append("no verification steps recorded")
+    elif not any(v["command"] for v in item["verifications"]):
+        findings.append("verification steps exist but none has a runnable command")
+    if item["work"] and not item["scope"]:
+        findings.append("has work units but no scope rules (only_modify/do_not_modify)")
+    if EVIDENCE_PIN_RE.search(item["description"] or "") and not any(unit["wid"] == "w0" for unit in item["work"]):
+        findings.append("description cites point-in-time evidence but has no w0 re-validation unit")
+    if not item["work"] and item["state"] in ("planning", "active"):
+        findings.append("no work breakdown")
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# Export
+
+
+def export_all(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    return [get_item(conn, row["id"]) for row in conn.execute("SELECT id FROM items ORDER BY id")]
+
+
+def write_export(conn: sqlite3.Connection, out_dir: Path) -> tuple[Path, Path]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    jsonl_path = out_dir / "items.jsonl"
+    with open(jsonl_path, "w", encoding="utf-8") as handle:
+        for item in export_all(conn):
+            handle.write(json.dumps(item, sort_keys=True) + "\n")
+    index_path = out_dir / "index.md"
+    with open(index_path, "w", encoding="utf-8") as handle:
+        handle.write("# TODO export\n\n| id | state | priority | worktree | title |\n")
+        handle.write("|---|---|---|---|---|\n")
+        for row in conn.execute("SELECT id, state, priority, worktree, title FROM items ORDER BY id"):
+            handle.write(f"| {row['id']} | {row['state']} | {row['priority']} | {row['worktree']} | {row['title']} |\n")
+    return jsonl_path, index_path
+
+
+# ---------------------------------------------------------------------------
+# YAML importer (one-off bridge from the legacy tree)
+
+STATUS_MAP = {
+    "not started": ("planning", None),
+    "identified": ("planning", None),
+    "in progress": ("active", None),
+    "under review": ("active", None),
+    "blocked": ("active", "imported from YAML status: Blocked"),
+}
+
+
+def _slugify(raw: str) -> str:
+    slug = re.sub(r"[^a-z0-9-]+", "-", raw.lower()).strip("-")
+    return re.sub(r"-{2,}", "-", slug)
+
+
+def _parse_anti_pattern(text: str) -> tuple[str, str, str]:
+    """Split 'DO NOT x -- because y -- do z instead' free text into (dont, why, instead).
+
+    Real entries use '--' or '-' separators and often omit the 'instead' part.
+    """
+    cleaned = re.sub(r"(?i)^\s*do not\s+", "", text.strip())
+    parts = re.split(r"\s+--\s+|\s+[-—]\s+", cleaned, maxsplit=2)
+    dont = parts[0].strip()
+    why = re.sub(r"(?i)^because\s+", "", parts[1].strip()) if len(parts) > 1 else "(unstated)"
+    instead = parts[2].strip() if len(parts) > 2 else "(not specified)"
+    return dont, why, instead
+
+
+def _parse_prior_art(text: str) -> tuple[str, str, str]:
+    decision = "reuse"
+    for candidate in ("supersede", "extend", "reuse"):
+        if re.search(rf"\b{candidate}\b", text, re.IGNORECASE):
+            decision = candidate
+            break
+    first = text.split()[0].rstrip(":,;") if text.split() else text
+    return first, text.strip(), decision
+
+
+def _coerce_verifications(raw: Any) -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
+    if isinstance(raw, dict) and "commands" in raw:
+        for command in raw.get("commands") or []:
+            out.append({"description": str(command), "command": str(command)})
+    elif isinstance(raw, list):
+        for entry in raw:
+            if isinstance(entry, dict):
+                out.append(
+                    {
+                        "description": str(entry.get("description", "")) or "(no description)",
+                        "command": entry.get("command"),
+                        "expected": entry.get("expected_output"),
+                    }
+                )
+            else:
+                out.append({"description": str(entry)})
+    return out
+
+
+def _parse_yaml_tree(todo_dir: Path, report: dict[str, Any]) -> list[dict[str, Any]]:
+    import yaml  # deferred: only the importer needs it
+
+    parsed: list[dict[str, Any]] = []
+    for path in sorted(todo_dir.rglob("*.yaml")):
+        if "_indexes" in path.parts:
+            continue
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            report["warnings"].append(f"{path}: unparseable YAML: {exc}")
+            continue
+        if not isinstance(data, dict):
+            report["skipped"].append(f"{path}: not a mapping")
+            continue
+        data["_path"] = path
+        parsed.append(data)
+    for data in parsed:
+        raw_id = str(data.get("id") or data["_path"].stem)
+        item_id = raw_id if SLUG_RE.match(raw_id) else _slugify(raw_id)
+        if item_id != raw_id:
+            report["warnings"].append(f"{data['_path']}: id {raw_id!r} sanitized to {item_id!r}")
+        data["_id"] = item_id
+    return parsed
+
+
+def _coerce_work_units(data: dict[str, Any], report: dict[str, Any]) -> list[dict[str, Any]] | None:
+    work = []
+    for unit in data.get("work") or []:
+        wid = str(unit.get("id", ""))
+        if not WID_RE.match(wid):
+            report["warnings"].append(f"{data['_path']}: invalid work id {wid!r}; item skipped")
+            return None
+        work.append(
+            {
+                "id": wid,
+                "summary": str(unit.get("summary", ""))[:200],
+                "status": unit.get("status", "pending"),
+                "needs": [str(n) for n in unit.get("needs") or []],
+                "notes": unit.get("notes"),
+            }
+        )
+    return work
+
+
+def _import_one(conn: sqlite3.Connection, actor: str, data: dict[str, Any], report: dict[str, Any]) -> bool:
+    """Create one item (plus deferrals) from parsed YAML; True when imported."""
+    path = data["_path"]
+    status = str(data.get("status", "Not Started")).strip().lower()
+    state, blocked_reason = STATUS_MAP.get(status, ("planning", None))
+    if status not in STATUS_MAP:
+        report["warnings"].append(f"{path}: unknown status {status!r}; imported as planning")
+    priority = str(data.get("priority", "medium")).strip().lower()
+    if priority not in PRIORITIES:
+        report["warnings"].append(f"{path}: unknown priority {priority!r}; using medium")
+        priority = "medium"
+    work = _coerce_work_units(data, report)
+    if work is None:
+        report["skipped"].append(str(path))
+        return False
+    scope_limit = data.get("scope_limit") or {}
+    scope = [(kind, str(glob)) for kind in ("only_modify", "do_not_modify") for glob in scope_limit.get(kind) or []]
+    created = str((data.get("metadata") or {}).get("created_date") or "") or None
+    created_at = f"{created}T00:00:00Z" if created and "T" not in created else created
+    try:
+        create_item(
+            conn,
+            actor,
+            item_id=data["_id"],
+            title=str(data.get("title", ""))[:200],
+            worktree=str(data.get("worktree") or path.parent.parent.name),
+            priority=priority,
+            description=str(data.get("description", "")),
+            category=data.get("category"),
+            approach=data.get("approach"),
+            state=state,
+            blocked_reason=blocked_reason,
+            created_at=created_at or utc_now(),
+            work=work,
+            scope=scope,
+            verifications=_coerce_verifications(data.get("verification")),
+            preserves=[str(p) for p in data.get("must_preserve") or []],
+            anti_patterns=[_parse_anti_pattern(str(a)) for a in data.get("anti_patterns") or []],
+            prior_art=[_parse_prior_art(str(p)) for p in data.get("prior_art") or []],
+        )
+    except TodoError as exc:
+        report["skipped"].append(f"{path}: {exc}")
+        return False
+    for entry in data.get("deferred") or []:
+        if isinstance(entry, dict):
+            defer_work(
+                conn,
+                actor,
+                data["_id"],
+                str(entry.get("summary", "(no summary)")),
+                str(entry.get("reason") or "(none recorded)"),
+            )
+    return True
+
+
+def import_yaml_tree(conn: sqlite3.Connection, actor: str, todo_dir: Path, dry_run: bool = False) -> dict[str, Any]:
+    report: dict[str, Any] = {"imported": [], "skipped": [], "warnings": []}
+    parsed = _parse_yaml_tree(todo_dir, report)
+    known_ids = {data["_id"] for data in parsed}
+
+    # Two passes so item_deps can point at any imported sibling.
+    deferred_deps: list[tuple[str, str, Path]] = []
+    for data in parsed:
+        status = str(data.get("status", "Not Started")).strip().lower()
+        if status == "completed":
+            report["skipped"].append(f"{data['_path']}: status Completed (belongs in the archive)")
+            continue
+        if dry_run:
+            if _coerce_work_units(data, report) is None:
+                report["skipped"].append(str(data["_path"]))
+                continue
+        elif not _import_one(conn, actor, data, report):
+            continue
+        for dep in (data.get("deps") or {}).get("needs") or []:
+            deferred_deps.append((data["_id"], str(dep), data["_path"]))
+        report["imported"].append(data["_id"])
+
+    if not dry_run:
+        for item_id, dep, path in deferred_deps:
+            if dep not in known_ids:
+                report["warnings"].append(f"{path}: dependency {dep!r} not in import set (done or dangling); skipped")
+                continue
+            try:
+                with conn:
+                    add_item_dep(conn, item_id, dep)
+            except TodoError as exc:
+                report["warnings"].append(f"{path}: dependency {dep!r} rejected: {exc}")
+    return report
+
+
+# ---------------------------------------------------------------------------
+# CLI
+
+
+def _print_work_order(order: dict[str, Any]) -> None:
+    print(f"== {order['id']} [{order['priority']}] {order['title']}")
+    print(f"state={order['state']} worktree={order['worktree']} claimed_by={order['claimed_by'] or '-'}")
+    if order["blocked_reason"]:
+        print(f"BLOCKED: {order['blocked_reason']}")
+    if order["scope"]:
+        print("-- scope")
+        for rule in order["scope"]:
+            print(f"   {rule['kind']}: {rule['path_glob']}")
+    if order["preserves"]:
+        print("-- must preserve")
+        for behavior in order["preserves"]:
+            print(f"   {behavior}")
+    if order["anti_patterns"]:
+        print("-- anti-patterns")
+        for anti in order["anti_patterns"]:
+            print(f"   DO NOT {anti['dont']} — {anti['why']} — instead: {anti['instead']}")
+    if order["verifications"]:
+        print("-- verification ladder (narrowest first)")
+        for ver in order["verifications"]:
+            cmd = f" :: {ver['command']}" if ver["command"] else ""
+            print(f"   {ver['seq']}. {ver['description']}{cmd}")
+    ready = order.get("ready_units", [])
+    blocked = order.get("blocked_units", [])
+    print("-- ready units" if ready else "-- no ready units")
+    for unit in ready:
+        print(f"   {unit['wid']} [{unit['status']}] {unit['summary']}")
+    for unit in blocked:
+        print(f"   {unit['wid']} BLOCKED on {','.join(unit['unmet'])}: {unit['summary']}")
+    open_defs = [d for d in order["deferrals"] if d["resolution"] == "open"]
+    if open_defs:
+        print("-- open deferrals (must be promoted/dismissed before complete)")
+        for deferral in open_defs:
+            print(f"   #{deferral['id']} {deferral['summary']}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Local-SQLite TODO tracker (spike)")
+    parser.add_argument("--db", help="database path (default: <git root>/.todo-db/todo.sqlite)")
+    parser.add_argument("--actor", help="override actor identity for the audit log")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sub.add_parser("init", help="create the database schema")
+
+    p = sub.add_parser("import-yaml", help="import the legacy _project/TODO tree")
+    p.add_argument("--todo-dir", default=None)
+    p.add_argument("--dry-run", action="store_true")
+
+    p = sub.add_parser("create", help="create an item")
+    p.add_argument("id")
+    p.add_argument("--title", required=True)
+    p.add_argument("--worktree", required=True)
+    p.add_argument("--priority", required=True, choices=PRIORITIES)
+    p.add_argument("--description", required=True)
+    p.add_argument("--category")
+    p.add_argument("--approach")
+    p.add_argument("--work", action="append", default=[], metavar="WID:SUMMARY[:needs=w1,w2]")
+    p.add_argument("--needs", action="append", default=[], metavar="ITEM_ID")
+    p.add_argument("--only-modify", action="append", default=[], metavar="GLOB")
+    p.add_argument("--do-not-modify", action="append", default=[], metavar="GLOB")
+    p.add_argument("--preserve", action="append", default=[], metavar="BEHAVIOR")
+    p.add_argument("--verify", action="append", default=[], metavar="DESC[::COMMAND[::EXPECTED]]")
+
+    for name, help_text in (
+        ("show", "show one item"),
+        ("claim", "claim an item and print its work order"),
+        ("release", "release a claim"),
+        ("deps", "show dependency edges"),
+        ("unblock", "clear the blocked flag"),
+    ):
+        p = sub.add_parser(name, help=help_text)
+        p.add_argument("id")
+        if name == "show":
+            p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("start", help="mark a work unit in progress")
+    p.add_argument("id")
+    p.add_argument("wid")
+    p = sub.add_parser("done", help="mark a work unit done (evidence required)")
+    p.add_argument("id")
+    p.add_argument("wid")
+    p.add_argument("--evidence", required=True)
+
+    p = sub.add_parser("defer", help="record deferred work on an item")
+    p.add_argument("id")
+    p.add_argument("--summary", required=True)
+    p.add_argument("--reason", required=True)
+    p = sub.add_parser("promote", help="promote a deferral to a planning item")
+    p.add_argument("deferral_id", type=int)
+    p.add_argument("--to-item", required=True)
+    p.add_argument("--title")
+    p.add_argument("--priority", default="medium", choices=PRIORITIES)
+    p.add_argument("--worktree")
+    p.add_argument("--description")
+    p = sub.add_parser("dismiss", help="dismiss a deferral with a reason")
+    p.add_argument("deferral_id", type=int)
+    p.add_argument("--reason", required=True)
+
+    p = sub.add_parser("complete", help="complete an item (gated)")
+    p.add_argument("id")
+    p.add_argument("--pr", type=int)
+    p = sub.add_parser("drop", help="drop an item with a reason")
+    p.add_argument("id")
+    p.add_argument("--reason", required=True)
+    p = sub.add_parser("block", help="flag an item blocked")
+    p.add_argument("id")
+    p.add_argument("--reason", required=True)
+
+    p = sub.add_parser("list", help="list items")
+    p.add_argument("--state", choices=STATES)
+    p.add_argument("--worktree")
+    p.add_argument("--priority", choices=PRIORITIES)
+    sub.add_parser("ready", help="project-wide ready queue")
+    sub.add_parser("stats", help="counts by state/priority/worktree/deferral")
+
+    p = sub.add_parser("check-scope", help="git diff --name-only vs scope rules")
+    p.add_argument("id")
+    p.add_argument("--base", help="diff BASE...HEAD instead of the working tree")
+
+    p = sub.add_parser("verify", help="list or run verification steps")
+    p.add_argument("id")
+    p.add_argument("--run", type=int, metavar="SEQ")
+
+    p = sub.add_parser("lint", help="mechanical quality checks")
+    p.add_argument("id", nargs="?")
+    p.add_argument("--all", action="store_true")
+
+    p = sub.add_parser("sweep-stale", help="release expired claims")
+    p.add_argument("--ttl-hours", type=float, default=DEFAULT_LEASE_TTL_HOURS)
+
+    p = sub.add_parser("export", help="deterministic JSONL + markdown index")
+    p.add_argument("--out", default=None)
+
+    args = parser.parse_args(argv)
+    actor = args.actor or default_actor()
+    conn = connect(resolve_db_path(args.db))
+
+    try:
+        return _dispatch(conn, actor, args)
+    except TodoError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except BrokenPipeError:
+        # Downstream pipe closed early (e.g. `todo ready | head`); not an error.
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, sys.stdout.fileno())
+        return 0
+    finally:
+        conn.close()
+
+
+def _cmd_init(conn, actor, args):
+    print(f"schema v{SCHEMA_VERSION} ready")
+    return 0
+
+
+def _cmd_import_yaml(conn, actor, args):
+    todo_dir = Path(args.todo_dir) if args.todo_dir else git_root() / "_project" / "TODO"
+    report = import_yaml_tree(conn, actor, todo_dir, dry_run=args.dry_run)
+    print(
+        f"imported: {len(report['imported'])}  skipped: {len(report['skipped'])}  warnings: {len(report['warnings'])}"
+    )
+    for line in report["skipped"]:
+        print(f"  skip: {line}")
+    for line in report["warnings"]:
+        print(f"  warn: {line}")
+    return 0
+
+
+def _parse_work_flag(specs: list[str]) -> list[dict[str, Any]]:
+    work = []
+    for spec in specs:
+        parts = spec.split(":", 2)
+        if len(parts) < 2:
+            raise TodoError(f"--work expects WID:SUMMARY[:needs=...], got {spec!r}")
+        needs = []
+        if len(parts) == 3 and parts[2].startswith("needs="):
+            needs = [n for n in parts[2][len("needs=") :].split(",") if n]
+        work.append({"id": parts[0], "summary": parts[1], "needs": needs})
+    return work
+
+
+def _parse_verify_flag(specs: list[str]) -> list[dict[str, str]]:
+    verifications = []
+    for spec in specs:
+        fields = spec.split("::")
+        entry = {"description": fields[0]}
+        if len(fields) > 1:
+            entry["command"] = fields[1]
+        if len(fields) > 2:
+            entry["expected"] = fields[2]
+        verifications.append(entry)
+    return verifications
+
+
+def _cmd_create(conn, actor, args):
+    scope = [("only_modify", g) for g in args.only_modify]
+    scope += [("do_not_modify", g) for g in args.do_not_modify]
+    create_item(
+        conn,
+        actor,
+        item_id=args.id,
+        title=args.title,
+        worktree=args.worktree,
+        priority=args.priority,
+        description=args.description,
+        category=args.category,
+        approach=args.approach,
+        work=_parse_work_flag(args.work),
+        deps=args.needs,
+        scope=scope,
+        verifications=_parse_verify_flag(args.verify),
+        preserves=args.preserve,
+    )
+    print(f"created {args.id}")
+    return 0
+
+
+def _cmd_show(conn, actor, args):
+    if args.json:
+        print(json.dumps(get_item(conn, args.id), indent=2, sort_keys=True))
+    else:
+        _print_work_order(work_order(conn, args.id))
+    return 0
+
+
+def _cmd_claim(conn, actor, args):
+    _print_work_order(claim_item(conn, actor, args.id))
+    return 0
+
+
+def _cmd_release(conn, actor, args):
+    release_item(conn, actor, args.id)
+    print(f"released {args.id}")
+    return 0
+
+
+def _cmd_start(conn, actor, args):
+    start_unit(conn, actor, args.id, args.wid)
+    print(f"{args.id}:{args.wid} in_progress")
+    return 0
+
+
+def _cmd_done(conn, actor, args):
+    done_unit(conn, actor, args.id, args.wid, args.evidence)
+    print(f"{args.id}:{args.wid} done")
+    return 0
+
+
+def _cmd_defer(conn, actor, args):
+    deferral_id = defer_work(conn, actor, args.id, args.summary, args.reason)
+    print(f"deferral #{deferral_id} recorded on {args.id} (must be promoted or dismissed before complete)")
+    return 0
+
+
+def _cmd_promote(conn, actor, args):
+    promote_deferral(
+        conn,
+        actor,
+        args.deferral_id,
+        new_item_id=args.to_item,
+        title=args.title,
+        priority=args.priority,
+        worktree=args.worktree,
+        description=args.description,
+    )
+    print(f"deferral #{args.deferral_id} promoted to {args.to_item}")
+    return 0
+
+
+def _cmd_dismiss(conn, actor, args):
+    dismiss_deferral(conn, actor, args.deferral_id, args.reason)
+    print(f"deferral #{args.deferral_id} dismissed")
+    return 0
+
+
+def _cmd_complete(conn, actor, args):
+    complete_item(conn, actor, args.id, args.pr)
+    print(f"{args.id} done" + (f" (PR #{args.pr})" if args.pr else ""))
+    return 0
+
+
+def _cmd_drop(conn, actor, args):
+    drop_item(conn, actor, args.id, args.reason)
+    print(f"{args.id} dropped")
+    return 0
+
+
+def _cmd_block(conn, actor, args):
+    block_item(conn, actor, args.id, args.reason)
+    print(f"{args.id} blocked")
+    return 0
+
+
+def _cmd_unblock(conn, actor, args):
+    unblock_item(conn, actor, args.id)
+    print(f"{args.id} unblocked")
+    return 0
+
+
+def _cmd_deps(conn, actor, args):
+    item = get_item(conn, args.id)
+    for dep in item["deps"]:
+        state = conn.execute("SELECT state FROM items WHERE id = ?", (dep,)).fetchone()
+        print(f"{args.id} needs {dep} [{state['state'] if state else '?'}]")
+    if not item["deps"]:
+        print(f"{args.id} has no dependencies")
+    return 0
+
+
+def _cmd_list(conn, actor, args):
+    query = "SELECT id, state, priority, worktree, title FROM items WHERE 1=1"
+    params: list[Any] = []
+    for field in ("state", "worktree", "priority"):
+        value = getattr(args, field)
+        if value:
+            query += f" AND {field} = ?"
+            params.append(value)
+    query += " ORDER BY state, priority, id"
+    for row in conn.execute(query, params):
+        print(f"{row['id']:55s} {row['state']:8s} {row['priority']:12s} {row['worktree']}")
+    return 0
+
+
+def _cmd_ready(conn, actor, args):
+    for item in ready_items(conn, actor):
+        claim_note = " (claimed by you)" if item["claimed_by"] == actor else ""
+        print(f"{item['id']:55s} {item['priority']:12s} {item['worktree']}{claim_note}")
+    return 0
+
+
+def _cmd_stats(conn, actor, args):
+    print(json.dumps(stats(conn), indent=2, sort_keys=True))
+    return 0
+
+
+def _cmd_check_scope(conn, actor, args):
+    item = get_item(conn, args.id)
+    files = changed_files(args.base)
+    violations = check_paths(files, item["scope"])
+    for violation in violations:
+        print(violation)
+    if violations:
+        return 1
+    print(f"scope OK ({len(files)} changed file(s))")
+    return 0
+
+
+def _cmd_verify(conn, actor, args):
+    if args.run is not None:
+        result, output = run_verification(conn, actor, args.id, args.run)
+        tail = "\n".join(output.splitlines()[-10:])
+        print(f"seq {args.run}: {result}")
+        if tail:
+            print(tail)
+        return 0 if result == "pass" else 1
+    item = get_item(conn, args.id)
+    for ver in item["verifications"]:
+        status = f" [{ver['last_result']} @ {ver['last_run']}]" if ver["last_result"] else ""
+        print(f"{ver['seq']}. {ver['description']}" + (f" :: {ver['command']}" if ver["command"] else "") + status)
+    return 0
+
+
+def _cmd_lint(conn, actor, args):
+    targets = (
+        [row["id"] for row in conn.execute("SELECT id FROM items WHERE state IN ('planning','active') ORDER BY id")]
+        if args.all
+        else [args.id]
+    )
+    if targets == [None]:
+        raise TodoError("lint requires an item id or --all")
+    total = 0
+    for target in targets:
+        findings = lint_item(conn, target)
+        total += len(findings)
+        for finding in findings:
+            print(f"{target}: {finding}")
+    print(f"{total} finding(s) across {len(targets)} item(s)")
+    return 1 if total else 0
+
+
+def _cmd_sweep_stale(conn, actor, args):
+    released = sweep_stale(conn, actor, args.ttl_hours)
+    print(f"released {len(released)} stale claim(s)" + (f": {', '.join(released)}" if released else ""))
+    return 0
+
+
+def _cmd_export(conn, actor, args):
+    out_dir = Path(args.out) if args.out else git_root() / ".todo-db" / "export"
+    jsonl_path, index_path = write_export(conn, out_dir)
+    print(f"wrote {jsonl_path} and {index_path}")
+    return 0
+
+
+_HANDLERS = {
+    "init": _cmd_init,
+    "import-yaml": _cmd_import_yaml,
+    "create": _cmd_create,
+    "show": _cmd_show,
+    "claim": _cmd_claim,
+    "release": _cmd_release,
+    "start": _cmd_start,
+    "done": _cmd_done,
+    "defer": _cmd_defer,
+    "promote": _cmd_promote,
+    "dismiss": _cmd_dismiss,
+    "complete": _cmd_complete,
+    "drop": _cmd_drop,
+    "block": _cmd_block,
+    "unblock": _cmd_unblock,
+    "deps": _cmd_deps,
+    "list": _cmd_list,
+    "ready": _cmd_ready,
+    "stats": _cmd_stats,
+    "check-scope": _cmd_check_scope,
+    "verify": _cmd_verify,
+    "lint": _cmd_lint,
+    "sweep-stale": _cmd_sweep_stale,
+    "export": _cmd_export,
+}
+
+
+def _dispatch(conn: sqlite3.Connection, actor: str, args: argparse.Namespace) -> int:
+    return _HANDLERS[args.command](conn, actor, args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

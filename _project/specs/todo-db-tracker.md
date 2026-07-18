@@ -307,6 +307,48 @@ Retained LLM actions: `ideate`, `spec`, `from-spec`, judgment half of
 3. **New operational surface:** one hosted service, one secret, one
    migration mechanism.
 
+## Local-SQLite spike (2026-07-18)
+
+To evaluate the design without provisioning a hosted service, the full G2
+scope was built as a spike against a **local SQLite file**:
+`_project/scripts/todo_db.py` (schema v1 + complete CLI) with
+`tests/unit/scripts/test_todo_db.py` (41 tests covering every enforced
+invariant). Database path: `<git root>/.todo-db/todo.sqlite` (gitignored);
+override with `--db` / `TODO_DB_PATH`.
+
+```bash
+uv run --project _project/scripts -- python _project/scripts/todo_db.py import-yaml
+uv run --project _project/scripts -- python _project/scripts/todo_db.py ready
+uv run --project _project/scripts -- python _project/scripts/todo_db.py claim <id>
+```
+
+**Results of importing the real `_project/TODO` tree (129 files):**
+
+- 118 items imported cleanly with work graphs, guardrails, and deferrals.
+- **11 files in `planning/` carry `status: Completed`** (query-plan-capture
+  02–12): completed work that never moved to DONE — fresh, live evidence of
+  the status/directory drift class this spec eliminates (the spike's state
+  machine makes that divergence unrepresentable).
+- **51 dependency edges point at items absent from the open tree** (done or
+  dangling) — silently tolerated by the YAML system, surfaced as explicit
+  warnings here; under FK enforcement they cannot be created.
+- **53 open deferrals** became a single queryable number
+  (`stats.deferrals_by_resolution.open`) — the buried-deferral debt the
+  forensic sweeps kept recovering manually, now permanently visible.
+- `lint --all` found 39 mechanical findings across the 118 items (missing
+  runnable verification, missing scope rules, evidence cited without a w0
+  re-validation unit).
+- The deferral gate, dependency gate, lease claims, and `check-scope` all
+  fired correctly against real items via the CLI.
+
+**Spike deviations from the DDL above** (fold back into the final design):
+`items.category` column added so the import is lossless; scope matching
+uses `fnmatch` semantics (`*` crosses `/`) pending the final glob contract;
+no network/degraded-mode layer (local file); `BrokenPipeError` handled for
+piped output. The spike is single-clone by construction — it validates the
+enforcement design (G2), not the shared-visibility goal, which still
+requires the hosted step after G1.
+
 ## Cutover plan
 
 - **G1 — host verification (before any build):** from a live remote session,
