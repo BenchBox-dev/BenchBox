@@ -33,7 +33,7 @@ dependencies = [
     "sqlglot>=25.6.0,<31.0.0",
     # CLI essentials
     # click: capped <9 - historically click majors rename decorators/context APIs.
-    "click>=8.0.0,<9.0.0",
+    "click>=8.3.3,<9.0.0",  # >=8.3.3: PYSEC-2026-2132 fix
     "rich>=13.0.0",
     "keyring>=25.0.0",
     "psutil>=5.9.0",
@@ -352,7 +352,7 @@ cloud-spark = [
 # Note: mcp requires Python 3.10+, so this extra only works on 3.10+
 # Includes visualization deps since MCP server exposes chart generation tools
 mcp = [
-    "mcp>=1.2.0",
+    "mcp>=1.28.1",  # >=1.28.1: CVE-2026-52870/52869/59950 fixes
 ]
 spark = [
     "pyspark>=4.0.1",
@@ -419,7 +419,7 @@ dev = [
     "ruff==0.11.13",  # pinned: preview = true is active globally; ruff upgrades may activate new rules
     "ty>=0.0.1a14",
     "ansi2html>=1.8.0",  # scripts/capture_chart_images.py - ANSI→HTML conversion for chart captures
-    "pillow>=10.0.0",  # scripts/capture_chart_images.py - PIL.Image for chart PNG output
+    "pillow>=12.3.0",  # scripts/capture_chart_images.py - PIL.Image for chart PNG output; >=12.3.0: PYSEC-2026-2253..3453 fixes
     # Explorer fixture and deployment snapshots use the default v1.0.0 on-disk format,
     # readable by @duckdb/duckdb-wasm regardless of writer version; cap <2 to catch
     # the next-major API break in CI.
@@ -444,7 +444,7 @@ dev = [
     "influxdb3-python>=0.10.0", # Databricks SDK (needed for tests/unit/platforms/test_databricks_copy_into.py UC volumes)
     "databricks-sdk>=0.20.0", # PySpark (needed for tests/unit/platforms/dataframe/test_pyspark_df.py and related)
     "pyspark>=3.5.0", # XML parsing (needed for tests/unit/core/tpcdi/test_etl_sources.py)
-    "mcp>=1.2.0",
+    "mcp>=1.28.1",  # >=1.28.1: CVE-2026-52870/52869/59950 fixes
     "sphinx>=7.4.7", # Documentation
     "roman-numerals<4.0", # Sphinx 9 needs roman_numerals module; v4.x broke the import
     "myst-parser>=3.0.1",
