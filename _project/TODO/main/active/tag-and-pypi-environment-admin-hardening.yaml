@@ -75,7 +75,8 @@ work:
     notes: |
       In _project/scripts/ruleset_review_enforcement.py (or a sibling
       function it calls), assert a target="tag" ruleset covering
-      refs/tags/v* with a creation rule exists; mirror the existing
+      refs/tags/v* with a creation rule exists; mirror the (since-removed,
+      2026-07-18 — the develop review rule it flagged was retired)
       DEVELOP_REVIEW_RULE_ENFORCED warn-until-enforced flag pattern so the
       check lands before the admin acts without going red. Extend
       tests/unit/release/test_ruleset_drift_review_coverage.py for the new
