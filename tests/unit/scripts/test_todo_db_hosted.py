@@ -1,0 +1,613 @@
+"""Hosted-mode (Turso/libsql embedded replica) tests for todo_db.py.
+
+The hosted backend must be behaviorally identical to the local-SQLite path:
+same write-transaction discipline (BEGIN IMMEDIATE around every check-then-act
+write), same lifecycle gates, same error surfaces. These tests pin that via a
+fake `libsql` module that reproduces the real client's API quirks observed
+live against Turso (libsql==0.1.11):
+
+- rows come back as plain tuples (no row_factory support);
+- cursors are not iterable;
+- constraint violations raise ValueError, remotely wrapped in Hrana text
+  (`... "SQLite error: FOREIGN KEY constraint failed", code: "SQLITE_CONSTRAINT" ...`);
+- the connection exposes sync() and accepts sync_url/auth_token/isolation_level.
+
+Marked medium (not fast) deliberately: the fast lane is budget-gated.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import sqlite3
+import sys
+import types
+from pathlib import Path
+
+import pytest
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.medium,
+]
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+HOSTED_URL = "libsql://example-db.aws-us-east-1.turso.io"
+
+
+def _load_script():
+    name = "todo_db"
+    path = REPO_ROOT / "_project" / "scripts" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+todo_db = _load_script()
+
+
+# ---------------------------------------------------------------------------
+# Fake libsql client, faithful to the real API surface
+
+
+class FakeRawCursor:
+    """Mimics libsql's cursor: tuple rows, NOT iterable, has description."""
+
+    def __init__(self, cur: sqlite3.Cursor):
+        self._cur = cur
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    @property
+    def description(self):
+        return self._cur.description
+
+    @property
+    def lastrowid(self):
+        return self._cur.lastrowid
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+
+def _hrana_wrap(exc: sqlite3.Error) -> ValueError:
+    return ValueError(f'Hrana: `stream error: `Error {{ message: "SQLite error: {exc}", code: "SQLITE_CONSTRAINT" }}``')
+
+
+class FakeRawConnection:
+    """Mimics libsql.Connection over a real local SQLite file."""
+
+    def __init__(self, database: str, sync_fails: bool = False):
+        self._conn = sqlite3.connect(database)
+        self._conn.isolation_level = None  # autocommit, like isolation_level=None
+        self.statements: list[str] = []
+        self.sync_calls = 0
+        self.commit_calls = 0
+        self._sync_fails = sync_fails
+
+    def execute(self, sql, params=()):
+        self.statements.append(sql if isinstance(sql, str) else str(sql))
+        try:
+            return FakeRawCursor(self._conn.execute(sql, tuple(params)))
+        except sqlite3.IntegrityError as exc:
+            raise _hrana_wrap(exc) from None
+
+    def executescript(self, sql):
+        self.statements.append("<script>")
+        self._conn.executescript(sql)
+
+    def commit(self):
+        self.commit_calls += 1
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+    def sync(self):
+        self.sync_calls += 1
+        if self._sync_fails:
+            raise ValueError("Hrana: `api error: `connection refused``")
+
+
+class FakeLibsql(types.ModuleType):
+    def __init__(self, sync_fails: bool = False):
+        super().__init__("libsql")
+        self.connect_calls: list[dict] = []
+        self.connections: list[FakeRawConnection] = []
+        self._sync_fails = sync_fails
+
+    def connect(self, database, **kwargs):
+        self.connect_calls.append({"database": database, **kwargs})
+        conn = FakeRawConnection(str(database), sync_fails=self._sync_fails)
+        self.connections.append(conn)
+        return conn
+
+
+@pytest.fixture()
+def fake_libsql(monkeypatch, tmp_path):
+    fake = FakeLibsql()
+    monkeypatch.setitem(sys.modules, "libsql", fake)
+    monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "test-token-value")
+    monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica" / "replica.db"))
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    return fake
+
+
+def _hosted_conn(fake: FakeLibsql):
+    return todo_db.connect_backend(HOSTED_URL)
+
+
+def _make_item(conn, item_id="hosted-item", work=None):
+    todo_db.create_item(
+        conn,
+        "tester",
+        item_id=item_id,
+        title="Hosted-mode lifecycle item",
+        worktree="spike",
+        priority="high",
+        description="Exercises hosted-mode gate behavior.",
+        work=work,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Backend resolution
+
+
+class TestBackendResolution:
+    def test_explicit_db_path_stays_local_even_with_url_env(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        backend = todo_db.resolve_backend(str(tmp_path / "todo.sqlite"))
+        assert isinstance(backend, Path)
+
+    def test_env_db_path_wins_over_env_url(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        monkeypatch.setenv("TODO_DB_PATH", str(tmp_path / "todo.sqlite"))
+        backend = todo_db.resolve_backend(None)
+        assert isinstance(backend, Path)
+
+    def test_env_url_selects_hosted(self, monkeypatch):
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        assert todo_db.resolve_backend(None) == HOSTED_URL
+
+    def test_explicit_url_selects_hosted(self, monkeypatch):
+        monkeypatch.delenv("TODO_DB_URL", raising=False)
+        assert todo_db.resolve_backend(HOSTED_URL) == HOSTED_URL
+        assert todo_db.resolve_backend("https://example-db.turso.io") == ("https://example-db.turso.io")
+
+    def test_no_env_defaults_to_local_path(self, monkeypatch):
+        monkeypatch.delenv("TODO_DB_URL", raising=False)
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        assert isinstance(todo_db.resolve_backend(None), Path)
+
+
+# ---------------------------------------------------------------------------
+# Hosted connection wiring
+
+
+class TestHostedConnect:
+    def test_requires_auth_token(self, monkeypatch, tmp_path):
+        fake = FakeLibsql()
+        monkeypatch.setitem(sys.modules, "libsql", fake)
+        monkeypatch.delenv("TODO_DB_AUTH_TOKEN", raising=False)
+        monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica.db"))
+        with pytest.raises(todo_db.TodoError, match="TODO_DB_AUTH_TOKEN"):
+            todo_db.connect_backend(HOSTED_URL)
+        assert not fake.connect_calls
+
+    def test_wires_replica_sync_url_auth_and_autocommit(self, fake_libsql, tmp_path):
+        conn = _hosted_conn(fake_libsql)
+        call = fake_libsql.connect_calls[0]
+        assert call["database"].endswith("replica.db")
+        assert call["sync_url"] == HOSTED_URL
+        assert call["auth_token"] == "test-token-value"
+        assert call["isolation_level"] is None
+        # replica parent directory is created
+        assert Path(call["database"]).parent.is_dir()
+        # one freshness sync at connect; schema bootstrap happened
+        raw = fake_libsql.connections[0]
+        assert raw.sync_calls == 1
+        assert conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0] == str(
+            todo_db.SCHEMA_VERSION
+        )
+
+    def test_default_replica_path_is_todo_db_dir(self, monkeypatch, tmp_path):
+        fake = FakeLibsql()
+        monkeypatch.setitem(sys.modules, "libsql", fake)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "test-token-value")
+        monkeypatch.delenv("TODO_DB_REPLICA", raising=False)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        todo_db.connect_backend(HOSTED_URL)
+        assert fake.connect_calls[0]["database"] == str(tmp_path / ".todo-db" / "replica.db")
+
+    def test_error_message_never_contains_the_token(self, monkeypatch, tmp_path):
+        fake = FakeLibsql(sync_fails=True)
+        monkeypatch.setitem(sys.modules, "libsql", fake)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "sekrit-token-abc123")
+        monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica.db"))
+        # sync failure degrades to the stale replica with a warning, not a crash
+        conn = todo_db.connect_backend(HOSTED_URL)
+        assert conn.execute("SELECT 1").fetchone()[0] == 1
+
+    def test_sync_failure_warns_and_serves_stale_reads(self, monkeypatch, tmp_path, capsys):
+        fake = FakeLibsql(sync_fails=True)
+        monkeypatch.setitem(sys.modules, "libsql", fake)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "test-token-value")
+        monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica.db"))
+        conn = todo_db.connect_backend(HOSTED_URL)
+        err = capsys.readouterr().err
+        assert "STALE" in err
+        assert "sekrit" not in err and "test-token-value" not in err
+        assert conn.execute("SELECT 1").fetchone()[0] == 1
+
+    def test_local_connect_is_unchanged(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        conn = todo_db.connect(tmp_path / "todo.sqlite")
+        assert isinstance(conn, sqlite3.Connection)
+
+
+# ---------------------------------------------------------------------------
+# Adapter semantics
+
+
+class TestHostedAdapter:
+    def test_rows_support_name_access_index_access_and_dict(self, fake_libsql):
+        conn = _hosted_conn(fake_libsql)
+        _make_item(conn)
+        row = conn.execute("SELECT id, state FROM items").fetchone()
+        assert row["id"] == "hosted-item"
+        assert row[1] == "planning"
+        as_dict = dict(conn.execute("SELECT id, state FROM items").fetchone())
+        assert as_dict == {"id": "hosted-item", "state": "planning"}
+
+    def test_cursor_is_iterable(self, fake_libsql):
+        conn = _hosted_conn(fake_libsql)
+        _make_item(conn, item_id="iter-one")
+        _make_item(conn, item_id="iter-two")
+        ids = [row["id"] for row in conn.execute("SELECT id FROM items ORDER BY id")]
+        assert ids == ["iter-one", "iter-two"]
+
+    def test_fetchone_returns_none_on_empty(self, fake_libsql):
+        conn = _hosted_conn(fake_libsql)
+        assert conn.execute("SELECT id FROM items").fetchone() is None
+
+    def test_unique_violation_maps_to_integrity_error(self, fake_libsql):
+        conn = _hosted_conn(fake_libsql)
+        _make_item(conn)
+        with pytest.raises(todo_db.TodoError, match="cannot create"):
+            _make_item(conn)
+
+    def test_fk_violation_maps_to_integrity_error(self, fake_libsql):
+        conn = _hosted_conn(fake_libsql)
+        _make_item(conn)
+        conn.execute("PRAGMA foreign_keys = ON")
+        with pytest.raises(todo_db.TodoError, match="missing item"):
+            with todo_db._write_txn(conn):
+                todo_db.add_item_dep(conn, "hosted-item", "does-not-exist")
+
+    def test_lastrowid_survives_the_adapter(self, fake_libsql):
+        conn = _hosted_conn(fake_libsql)
+        _make_item(conn)
+        deferral_id = todo_db.defer_work(conn, "tester", "hosted-item", "follow-up", "later")
+        assert deferral_id == 1
+
+
+# ---------------------------------------------------------------------------
+# Write-transaction discipline
+
+
+class TestHostedWriteDiscipline:
+    def test_writes_run_under_begin_immediate(self, fake_libsql):
+        conn = _hosted_conn(fake_libsql)
+        raw = fake_libsql.connections[0]
+        before = raw.commit_calls
+        raw.statements.clear()
+        _make_item(conn)
+        assert raw.statements[0] == "BEGIN IMMEDIATE"
+        insert_pos = next(i for i, s in enumerate(raw.statements) if s.startswith("INSERT INTO items"))
+        assert insert_pos > raw.statements.index("BEGIN IMMEDIATE")
+        assert raw.commit_calls == before + 1
+
+    def test_failed_gate_rolls_back(self, fake_libsql):
+        conn = _hosted_conn(fake_libsql)
+        _make_item(conn, work=[{"id": "w1", "summary": "only unit here"}])
+        with pytest.raises(todo_db.TodoError):
+            todo_db.complete_item(conn, "tester", "hosted-item", None)
+        # nothing half-committed: item still planning, no completed_at
+        row = conn.execute("SELECT state, completed_at FROM items").fetchone()
+        assert row["state"] == "planning"
+        assert row["completed_at"] is None
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle gates behave identically in hosted mode
+
+
+class TestHostedLifecycleGates:
+    def test_full_gated_lifecycle(self, fake_libsql):
+        conn = _hosted_conn(fake_libsql)
+        _make_item(
+            conn,
+            work=[
+                {"id": "w1", "summary": "implement the thing"},
+                {"id": "w2", "summary": "verify the thing", "needs": ["w1"]},
+            ],
+        )
+        # claim contention: second actor refused while the lease is live
+        todo_db.claim_item(conn, "actor-a", "hosted-item")
+        with pytest.raises(todo_db.TodoError, match="claimed by 'actor-a'"):
+            todo_db.claim_item(conn, "actor-b", "hosted-item")
+        # unit ordering gate
+        with pytest.raises(todo_db.TodoError, match="needs unfinished units"):
+            todo_db.done_unit(conn, "actor-a", "hosted-item", "w2", "premature")
+        # evidence gate
+        with pytest.raises(todo_db.TodoError, match="evidence is required"):
+            todo_db.done_unit(conn, "actor-a", "hosted-item", "w1", "  ")
+        todo_db.done_unit(conn, "actor-a", "hosted-item", "w1", "pytest passed")
+        todo_db.done_unit(conn, "actor-a", "hosted-item", "w2", "ladder pass")
+        # deferral gate blocks completion until promoted/dismissed
+        deferral_id = todo_db.defer_work(conn, "actor-a", "hosted-item", "polish", "out of scope")
+        with pytest.raises(todo_db.TodoError, match="unresolved deferrals"):
+            todo_db.complete_item(conn, "actor-a", "hosted-item", 999)
+        todo_db.promote_deferral(conn, "actor-a", deferral_id, new_item_id="hosted-item-followup")
+        todo_db.complete_item(conn, "actor-a", "hosted-item", 999)
+        # terminal-defer guard
+        with pytest.raises(todo_db.TodoError, match="terminal items"):
+            todo_db.defer_work(conn, "actor-a", "hosted-item", "too late", "nope")
+        # end state is coherent
+        got = todo_db.stats(conn)
+        assert got["items_by_state"] == {"done": 1, "planning": 1}
+        assert got["deferrals_by_resolution"] == {"promoted": 1}
+
+    def test_cli_main_routes_hosted_via_env(self, fake_libsql, monkeypatch, capsys):
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        rc = todo_db.main(["--actor", "tester", "stats"])
+        assert rc == 0
+        assert fake_libsql.connect_calls, "main() did not open the hosted backend"
+        assert "items_by_state" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Hosted migrations
+
+
+class FakePrimary:
+    """Hrana-pipeline stand-in: executes posted statements on a local SQLite
+    file so bulk-transfer fidelity is testable end to end without a network.
+    Mimics the wire contract: parameterized statements, baton chaining, and
+    Hrana-typed result rows."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.requests: list[dict] = []
+        self._conn = sqlite3.connect(path)
+        self._conn.isolation_level = None
+        self._baton = 0
+
+    def post(self, endpoint: str, token: str, payload: dict) -> dict:
+        assert token, "post called without an auth token"
+        self.requests.append({"endpoint": endpoint, "payload": payload})
+        results = []
+        for request in payload["requests"]:
+            if request["type"] == "close":
+                results.append({"type": "ok", "response": {"type": "close"}})
+                continue
+            stmt = request["stmt"]
+            args = [self._decode(a) for a in stmt.get("args", [])]
+            try:
+                cur = self._conn.execute(stmt["sql"], args)
+                rows = [[self._encode(v) for v in row] for row in cur.fetchall()]
+                results.append(
+                    {
+                        "type": "ok",
+                        "response": {"type": "execute", "result": {"rows": rows, "affected_row_count": cur.rowcount}},
+                    }
+                )
+            except sqlite3.Error as exc:
+                results.append({"type": "error", "error": {"message": str(exc)}})
+        self._baton += 1
+        return {"baton": f"baton-{self._baton}", "results": results}
+
+    @staticmethod
+    def _decode(arg: dict):
+        kind = arg["type"]
+        if kind == "null":
+            return None
+        if kind == "integer":
+            return int(arg["value"])
+        if kind == "float":
+            return float(arg["value"])
+        return arg["value"]
+
+    @staticmethod
+    def _encode(value) -> dict:
+        if value is None:
+            return {"type": "null"}
+        if isinstance(value, int):
+            return {"type": "integer", "value": str(value)}
+        if isinstance(value, float):
+            return {"type": "float", "value": value}
+        return {"type": "text", "value": str(value)}
+
+
+def _dump(path: Path) -> dict[str, list]:
+    conn = sqlite3.connect(path)
+    tables = [
+        row[0]
+        for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name != 'meta' ORDER BY name")
+    ]
+    out = {t: conn.execute(f"SELECT * FROM {t} ORDER BY rowid").fetchall() for t in tables}
+    conn.close()
+    return out
+
+
+class TestHostedBulkImport:
+    @pytest.fixture()
+    def staging(self, tmp_path):
+        conn = todo_db.connect(tmp_path / "staging.sqlite")
+        _make_item(
+            conn,
+            item_id="bulk-one",
+            work=[{"id": "w1", "summary": "first unit"}, {"id": "w2", "summary": "second unit", "needs": ["w1"]}],
+        )
+        _make_item(conn, item_id="bulk-two")
+        todo_db.defer_work(conn, "tester", "bulk-two", "deferred bit", "later")
+        with todo_db._write_txn(conn):
+            todo_db.add_item_dep(conn, "bulk-two", "bulk-one")
+        return conn
+
+    def test_hrana_value_encoding(self):
+        assert todo_db._hrana_value(None) == {"type": "null"}
+        assert todo_db._hrana_value(7) == {"type": "integer", "value": "7"}
+        assert todo_db._hrana_value(1.5) == {"type": "float", "value": 1.5}
+        assert todo_db._hrana_value("x") == {"type": "text", "value": "x"}
+
+    def test_hrana_endpoint_translation(self):
+        assert todo_db._hrana_endpoint(HOSTED_URL) == ("https://example-db.aws-us-east-1.turso.io/v2/pipeline")
+        assert todo_db._hrana_endpoint("https://x.turso.io") == "https://x.turso.io/v2/pipeline"
+
+    def test_bulk_transfer_row_parity(self, staging, tmp_path):
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        summary = todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post)
+        assert _dump(tmp_path / "staging.sqlite") == _dump(primary.path)
+        assert summary["rows"] > 0
+        assert summary["batches"] >= 1
+
+    def test_bulk_transfer_wraps_in_one_transaction_with_baton(self, staging, tmp_path):
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post, batch_size=5)
+        assert len(primary.requests) > 2, "batch_size=5 must split into several requests"
+        first_sqls = [r["stmt"]["sql"] for r in primary.requests[0]["payload"]["requests"] if r["type"] == "execute"]
+        assert first_sqls[0] == "BEGIN"
+        last_payload = primary.requests[-1]["payload"]
+        last_sqls = [r["stmt"]["sql"] for r in last_payload["requests"] if r["type"] == "execute"]
+        assert last_sqls[-1] == "COMMIT"
+        assert last_payload["requests"][-1]["type"] == "close"
+        # every request after the first chains the previous baton
+        for i, request in enumerate(primary.requests[1:], start=1):
+            assert request["payload"]["baton"] == f"baton-{i}"
+
+    def test_import_yaml_hosted_stages_locally_and_bulk_transfers(self, fake_libsql, monkeypatch, tmp_path, capsys):
+        todo_dir = tmp_path / "TODO" / "area" / "planning"
+        todo_dir.mkdir(parents=True)
+        (todo_dir / "bulk-import-item.yaml").write_text(
+            "id: bulk-import-item\n"
+            "title: Bulk import end-to-end item\n"
+            "priority: medium\n"
+            "status: Not Started\n"
+            "description: Hosted bulk import path exercise.\n",
+            encoding="utf-8",
+        )
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        monkeypatch.setattr(todo_db, "_post_pipeline", primary.post)
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        rc = todo_db.main(["import-yaml", "--todo-dir", str(tmp_path / "TODO"), "--skip-done"])
+        out = capsys.readouterr().out
+        assert rc == 0, out
+        assert "imported: 1" in out
+        assert "bulk transfer" in out
+        row = sqlite3.connect(primary.path).execute("SELECT id, state FROM items").fetchone()
+        assert row == ("bulk-import-item", "planning")
+
+    def test_import_yaml_hosted_refuses_nonempty_target_without_replace(
+        self, fake_libsql, monkeypatch, tmp_path, capsys
+    ):
+        todo_dir = tmp_path / "TODO"
+        todo_dir.mkdir()
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        seed = sqlite3.connect(primary.path)
+        seed.execute(
+            "INSERT INTO items (id, title, worktree, priority, description, created_at)"
+            " VALUES ('leftover', 'Leftover row here', 'spike', 'low', 'pre-existing row', '2026-07-18T00:00:00Z')"
+        )
+        seed.commit()
+        monkeypatch.setattr(todo_db, "_post_pipeline", primary.post)
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        rc = todo_db.main(["import-yaml", "--todo-dir", str(todo_dir), "--skip-done"])
+        assert rc == 2
+        assert "--replace" in capsys.readouterr().err
+
+    def test_import_yaml_hosted_replace_clears_target_first(self, fake_libsql, monkeypatch, tmp_path, capsys):
+        todo_dir = tmp_path / "TODO" / "area" / "planning"
+        todo_dir.mkdir(parents=True)
+        (todo_dir / "fresh-item.yaml").write_text(
+            "id: fresh-item\n"
+            "title: Fresh item after replace\n"
+            "priority: low\n"
+            "status: Not Started\n"
+            "description: Replaces the leftover rows.\n",
+            encoding="utf-8",
+        )
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        seed = sqlite3.connect(primary.path)
+        seed.execute(
+            "INSERT INTO items (id, title, worktree, priority, description, created_at)"
+            " VALUES ('leftover', 'Leftover row here', 'spike', 'low', 'pre-existing row', '2026-07-18T00:00:00Z')"
+        )
+        seed.execute("INSERT INTO events (at, actor, item_id, action) VALUES ('t', 'a', 'leftover', 'create')")
+        seed.commit()
+        monkeypatch.setattr(todo_db, "_post_pipeline", primary.post)
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        rc = todo_db.main(["import-yaml", "--todo-dir", str(tmp_path / "TODO"), "--skip-done", "--replace"])
+        assert rc == 0
+        ids = [r[0] for r in sqlite3.connect(primary.path).execute("SELECT id FROM items").fetchall()]
+        assert ids == ["fresh-item"]
+        # replaced events too: only the fresh import's audit trail remains
+        actions = {r[0] for r in sqlite3.connect(primary.path).execute("SELECT item_id FROM events").fetchall()}
+        assert "leftover" not in actions
+
+    def test_dry_run_never_posts(self, fake_libsql, monkeypatch, tmp_path, capsys):
+        todo_dir = tmp_path / "TODO"
+        todo_dir.mkdir()
+        calls = []
+        monkeypatch.setattr(todo_db, "_post_pipeline", lambda *a, **k: calls.append(a))
+        monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+        rc = todo_db.main(["import-yaml", "--todo-dir", str(todo_dir), "--skip-done", "--dry-run"])
+        assert rc == 0
+        assert not calls
+
+
+class TestHostedMigrate:
+    def _v1_schema(self) -> str:
+        script = todo_db.SCHEMA_SQL
+        for column in ("started_at TEXT", "started_worktree TEXT", "started_branch TEXT"):
+            script = script.replace(f"  {column},\n", "")
+        assert "started_at" not in script
+        return script
+
+    def test_migrate_backend_upgrades_hosted_schema(self, fake_libsql, monkeypatch, tmp_path):
+        # Build a v1 database behind the fake, as if created by an old CLI.
+        replica = tmp_path / "replica" / "replica.db"
+        replica.parent.mkdir(parents=True, exist_ok=True)
+        seed = sqlite3.connect(replica)
+        seed.executescript(self._v1_schema())
+        seed.execute("INSERT INTO meta (key, value) VALUES ('schema_version', '1')")
+        seed.commit()
+        seed.close()
+        # current CLI must refuse it ...
+        with pytest.raises(todo_db.TodoError, match="todo migrate"):
+            todo_db.connect_backend(HOSTED_URL)
+        # ... and migrate must fix it in place
+        applied = todo_db.migrate_backend(HOSTED_URL)
+        assert applied == [2]
+        conn = todo_db.connect_backend(HOSTED_URL)
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(work_units)").fetchall()]
+        assert "started_at" in cols

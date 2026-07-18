@@ -517,6 +517,107 @@ silently-lost deferred work versus two follow-ups already buried. The gap
 is not agent skill; it is prose-enforced invariants vs code-enforced
 invariants, demonstrated rather than argued.
 
+## Hosted backend (2026-07-18, fifth round — Turso/libsql, TDD)
+
+With G1 closed, `connect()` grew a second mode (PR: see below). Backend
+selection, first match wins: `--db` (a `libsql://`/`https://` value selects
+hosted) → `TODO_DB_PATH` (local file) → `TODO_DB_URL` (hosted; requires
+`TODO_DB_AUTH_TOKEN`) → default local path. `TODO_DB_PATH` deliberately
+outranks `TODO_DB_URL` so a test or tool that pins a local file can never be
+silently redirected at the shared database.
+
+Hosted mode uses the `libsql` Python client (0.1.11) with an **embedded
+replica** at `<git main root>/.todo-db/replica.db` (override:
+`TODO_DB_REPLICA`): reads serve from the local replica after one freshness
+`sync()` at connect; writes — including every `BEGIN IMMEDIATE` interactive
+transaction — are delegated statement-by-statement to the primary, so the
+check-then-act gates serialize against all other writers exactly as they do
+against the local file. On sync failure, reads degrade to the stale replica
+with a `STALE` banner and writes fail loudly (no offline queue, per design).
+
+The client is close to sqlite3 but not close enough (verified live): rows
+are plain tuples with no `row_factory`, cursors are not iterable, and
+constraint violations raise `ValueError` (remotely wrapped in Hrana text
+with `SQLITE_CONSTRAINT`). A ~100-line adapter closes exactly those gaps —
+named-row access, cursor iteration, constraint→`sqlite3.IntegrityError`
+mapping — so every gate, query, and transaction above it runs unchanged on
+either backend. FK enforcement was verified live through write delegation
+(dangling insert refused by the primary). `todo migrate` is backend-aware;
+the hosted path hard-requires a fresh sync before touching the version
+record. TDD: 22 new tests (`tests/unit/scripts/test_todo_db_hosted.py`,
+medium-marked, written red first) pin backend resolution, wiring, adapter
+semantics, `BEGIN IMMEDIATE` discipline, rollback-on-failed-gate, the full
+gated lifecycle, and hosted migration against a fake libsql module that
+reproduces the real client's quirks; the pre-existing tracker suite (93
+tests across `test_todo_db*.py` + `test_todo_wrapper.py`) passes unchanged.
+
+**Shared-visibility proof (live, two processes × two replicas × two
+actors).** The one property the local spike could not demonstrate, run
+against the real Turso primary through the shim only:
+
+| Step | Result |
+|---|---|
+| A creates item (replica A) | created, 4.3s (first sync + schema pull) |
+| B `ready` (replica B) | item visible cross-replica, 1.7s |
+| A claims | work order printed |
+| B claims | **refused, exit 2** — "claimed by 'actor-a'", 1.5s |
+| A `done w1`, A defers | recorded, 1.9–2.4s |
+| B `complete` | **refused, exit 2** — deferral gate held cross-process, 1.9s |
+| B dismisses A's deferral, A completes | both succeed; B reads final state `done`/`dismissed` |
+
+Claim contention and the deferral gate are enforced by the primary for
+every actor regardless of process, worktree, or replica — the
+shared-visibility objective (success criterion 6) is met. (The probe
+item's rows were later cleared by the G3 `--replace` import; this table
+is the durable record of the proof.)
+
+**Command latency vs. local baseline** (same machine, same tree):
+local-SQLite `todo stats`/`ready` ≈ **0.04s**; hosted ≈ **0.7–4.1s** per
+command — reads (`ready` over the full 1,366-item database: 0.7–0.8s)
+pay uv startup + one sync round-trip; writes add per-statement
+delegation at ~0.15s RTT (single-gate writes 1.5–2.6s; claim/promote/
+complete with their larger transactions 2.3–3.3s). Interactive-scale
+acceptable per the latency budget.
+
+**Bulk import path (measured necessity).** The row-by-row importer over
+per-statement write delegation ran at ~10 items/min against the live
+primary (≈2.5h projected for the full tree — unfit). `import-yaml` on a
+hosted backend therefore stages into a temp local SQLite **through the
+exact same gated code**, then copies all rows to the primary as batched
+parameterized statements over the Hrana HTTP pipeline, inside a single
+baton-chained transaction (stream close without COMMIT = full rollback).
+`--replace` (hosted-only flag) clears the tracker tables in that same
+transaction; a non-empty target without `--replace` is refused. Covered
+by the same TDD round (fake-primary replay asserts row-for-row parity
+between staging and target).
+
+**G3 CLOSED (2026-07-18, live).** `todo import-yaml --replace` against
+the hosted primary: **imported 1,364 / skipped 0 / warnings 18; 539 deps
+resolved, 1 dangling; 629 open deferrals; 32,595 rows in 82 batches,
+44s wall** — report-identical to a same-tree local-SQLite control run
+(4s wall). Counts drifted from the recorded 1,362/538 of the earlier
+rounds because five PRs (#1114, #1142, #1194, #1215, #1217) added/moved
+TODO/DONE files on `develop` in between; warnings (18), skipped (0),
+dangling (1), and open deferrals (629) are unchanged. Post-import hosted
+`stats` matches the local control exactly (done 1,247 / active 31 /
+planning 86 — the +11 over `done_items=1,236` are the known
+Completed-in-planning drift files, imported as done).
+
+**Hosted UAT (2026-07-18, live, shim only).** The
+`TestWrapperUatLifecycle` protocol executed end-to-end against the
+imported hosted database (actor `uat-hosted-session`): create with work
+graph/scope/preserve/verify ladder → `ready` shows it (0.7s) → claim
+prints the full work order → out-of-order `done w2` refused (exit 2) →
+start/done with evidence → `verify --run 1` pass recorded → defer
+(deferral **#630** — the counter itself demonstrates full-scale
+operation) → `complete` refused on the open deferral (exit 2) → promote
+→ complete → `export` twice over all 1,366 items **byte-identical** →
+late defer on the done item refused (exit 2). Every gate fired
+identically to local mode. Final stats coherent: open deferrals 629
+(unchanged), promoted 1, done 1,248. Cleanup: the promoted follow-up
+(`uat-hosted-item-followup`) was dropped with reason "UAT artifact";
+the UAT parent remains as `done` audit trail.
+
 ## Cutover plan
 
 - **G1 — host verification (before any build):** from a live remote session,
@@ -538,12 +639,40 @@ invariants, demonstrated rather than argued.
     token into the environment config — both are account-holder actions an
     agent session cannot perform. Re-run the reachability probe afterwards
     to close G1.
+
+  **G1 CLOSED (2026-07-18, local session).** Both maintainer prerequisites
+  landed and the round-trip is verified end to end against the provisioned
+  database `libsql://benchbox-todo-joeharris76.aws-us-east-1.turso.io`:
+
+  - **Remote allowlist:** `*.turso.io`, `*.aws-us-east-1.turso.io`, and
+    `api.turso.tech` are on the remote environment's network allowlist;
+    unauthenticated HTTPS probes through the proxy returned 401 from both
+    the DB endpoint and `api.turso.tech` on 2026-07-18 (auth required —
+    the 403 policy denial is gone).
+  - **Local round-trip (this session):** unauthenticated control
+    `POST /v2/pipeline` → **401** in 0.15s; authenticated
+    `CREATE TABLE` + `INSERT ... RETURNING` → **200** with `rows_written`
+    confirmed server-side and `last_insert_rowid=1`; read-back
+    `count(*)=1`; probe table dropped. Authenticated `SELECT 1` latency
+    over five fresh connections: **0.15–0.16s** each (server-side
+    `query_duration_ms` < 1ms — the cost is the network round-trip).
+  - **Credential provisioning deviation:** `TODO_DB_URL` /
+    `TODO_DB_AUTH_TOKEN` are provisioned in the *remote* environment
+    config only; they were verified **absent** from this local session's
+    environment. Local access authenticated via the maintainer's
+    logged-in `turso` CLI, minting short-lived DB tokens per invocation
+    (`turso db tokens create benchbox-todo`), never stored or echoed.
+    Open provisioning item for the maintainer: add the two variables to
+    local `.env` (per the Credentials bullet above) so local sessions
+    don't depend on the turso CLI login.
 - **G2 — CLI MVP:** schema DDL + `create/show/claim/start/done/defer/
   promote/dismiss/complete/ready/list/stats/export` + tests. No repo changes
   to the YAML system yet.
 - **G3 — import:** script maps the 129 open TODO YAMLs onto the tables
   (fields → columns/rows; `tasks:`/`dependencies:` legacy forms handled by
   the importer, one-off). Dry-run report → maintainer eyeball → import.
+  **CLOSED 2026-07-18** — full-history import (open + archive) executed
+  against the hosted primary; results in the "Hosted backend" round above.
 - **G4 — deferred-debt sweep (one-time):** walk all 278 archived DONE
   `deferred:` blocks + 34 open-item blocks through `defer` then
   `promote`/`dismiss`, deduping against existing items. This is the last

@@ -1,22 +1,32 @@
 #!/usr/bin/env python3
-"""todo_db.py - Local-SQLite spike of the DB-backed TODO tracker.
+"""todo_db.py - DB-backed TODO tracker (local SQLite or hosted libsql/Turso).
 
-Implements the G2 gate of _project/specs/todo-db-tracker.md against a local
-SQLite file so the approach can be evaluated end-to-end without provisioning
-a hosted database. The CLI is the only sanctioned write path; every
-lifecycle invariant lives in code here, not in skill prose.
+Implements the G2 gate of _project/specs/todo-db-tracker.md. The CLI is the
+only sanctioned write path; every lifecycle invariant lives in code here, not
+in skill prose.
 
 Usage:
     uv run --project _project/scripts -- python _project/scripts/todo_db.py <command> ...
 
-Default database path: <git root>/.todo-db/todo.sqlite (gitignored).
-Override with --db PATH or the TODO_DB_PATH environment variable.
+Backend selection (first match wins):
+- --db PATH_OR_URL          explicit; libsql:// or https:// selects hosted
+- TODO_DB_PATH              local SQLite file (also what tests use)
+- TODO_DB_URL               hosted libsql database (Turso); requires
+                            TODO_DB_AUTH_TOKEN; embedded replica at
+                            <git main root>/.todo-db/replica.db
+                            (override: TODO_DB_REPLICA)
+- default                   <git main root>/.todo-db/todo.sqlite (gitignored)
+
+Hosted mode keeps the exact write-transaction discipline of local mode:
+BEGIN IMMEDIATE write transactions are delegated statement-by-statement to
+the primary, so check-then-act gates serialize against every other writer.
+On sync failure, reads degrade to the stale replica with a banner; writes
+fail loudly (no offline queue, by design).
 
 Spike deviations from the spec DDL (recorded in the spec's spike section):
 - `items.category` column added (nullable) so the importer is lossless.
 - scope-rule matching uses fnmatch semantics ('*' crosses '/'), which is
   slightly more permissive than the final glob contract.
-- No network/degraded-mode layer: the database is a local file.
 """
 
 from __future__ import annotations
@@ -269,6 +279,33 @@ def resolve_db_path(explicit: str | None) -> Path:
     return git_main_root() / ".todo-db" / "todo.sqlite"
 
 
+def _is_hosted_url(value: str) -> bool:
+    return value.startswith(("libsql://", "https://", "http://"))
+
+
+def resolve_backend(explicit: str | None) -> Path | str:
+    """Pick the database backend: a Path (local SQLite) or a URL (hosted).
+
+    Precedence: --db > TODO_DB_PATH > TODO_DB_URL > default local path.
+    TODO_DB_PATH outranks TODO_DB_URL deliberately: a test or tool that pins
+    a local file must never be silently redirected at the shared database.
+    """
+    if explicit:
+        return explicit if _is_hosted_url(explicit) else Path(explicit)
+    env_path = os.environ.get("TODO_DB_PATH")
+    if env_path:
+        return Path(env_path)
+    env_url = os.environ.get("TODO_DB_URL")
+    if env_url:
+        return env_url
+    return git_main_root() / ".todo-db" / "todo.sqlite"
+
+
+def hosted_replica_path() -> Path:
+    env = os.environ.get("TODO_DB_REPLICA")
+    return Path(env) if env else git_main_root() / ".todo-db" / "replica.db"
+
+
 def _git_location() -> tuple[str | None, str | None]:
     """(worktree toplevel, branch) of the CWD, for resume/recovery stamps."""
 
@@ -279,16 +316,7 @@ def _git_location() -> tuple[str | None, str | None]:
     return _out("rev-parse", "--show-toplevel"), _out("rev-parse", "--abbrev-ref", "HEAD")
 
 
-def connect(db_path: Path) -> sqlite3.Connection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    # Autocommit mode: every multi-statement write goes through _write_txn,
-    # which takes the write lock up front (BEGIN IMMEDIATE) so check-then-act
-    # gates cannot race a concurrent writer.
-    conn.isolation_level = None
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA busy_timeout = 5000")
+def _ensure_schema(conn: sqlite3.Connection) -> None:
     version = _schema_version(conn)
     if version is None:
         conn.executescript(SCHEMA_SQL)
@@ -302,7 +330,333 @@ def connect(db_path: Path) -> sqlite3.Connection:
         )
     elif version > SCHEMA_VERSION:
         raise TodoError(f"database schema_version={version} is newer than this CLI ({SCHEMA_VERSION}); use a newer CLI")
+
+
+def connect(db_path: Path) -> sqlite3.Connection:
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    # Autocommit mode: every multi-statement write goes through _write_txn,
+    # which takes the write lock up front (BEGIN IMMEDIATE) so check-then-act
+    # gates cannot race a concurrent writer.
+    conn.isolation_level = None
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    _ensure_schema(conn)
     return conn
+
+
+# ---------------------------------------------------------------------------
+# Hosted backend (Turso / libsql embedded replica)
+#
+# The libsql Python client is close to sqlite3 but not close enough (observed
+# live against Turso, libsql==0.1.11): rows are plain tuples with no
+# row_factory, cursors are not iterable, and constraint violations surface as
+# ValueError (locally "UNIQUE constraint failed: ...", remotely wrapped in
+# Hrana text with code SQLITE_CONSTRAINT). The adapter below closes exactly
+# those gaps so every code path above runs unchanged on either backend.
+
+
+class _HostedRow:
+    """sqlite3.Row stand-in: index + name access, dict(row) via keys()."""
+
+    __slots__ = ("_names", "_values")
+
+    def __init__(self, names: list[str], values: tuple):
+        self._names = names
+        self._values = values
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            try:
+                return self._values[self._names.index(key)]
+            except ValueError:
+                raise IndexError(f"no such column: {key}") from None
+        return self._values[key]
+
+    def keys(self) -> list[str]:
+        return list(self._names)
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self) -> int:
+        return len(self._values)
+
+    def __repr__(self) -> str:
+        return f"_HostedRow({dict(zip(self._names, self._values))!r})"
+
+
+def _map_hosted_error(exc: BaseException) -> sqlite3.Error | None:
+    """Translate libsql's ValueError surface back onto sqlite3 exceptions."""
+    message = str(exc)
+    if "constraint" in message.lower():
+        return sqlite3.IntegrityError(message)
+    return None
+
+
+class _HostedCursor:
+    def __init__(self, raw):
+        self._raw = raw
+
+    def _wrap(self, values) -> _HostedRow | None:
+        if values is None:
+            return None
+        names = [column[0] for column in (self._raw.description or [])]
+        return _HostedRow(names, tuple(values))
+
+    def fetchone(self) -> _HostedRow | None:
+        return self._wrap(self._raw.fetchone())
+
+    def fetchall(self) -> list[_HostedRow]:
+        return [self._wrap(values) for values in self._raw.fetchall()]
+
+    def __iter__(self):
+        while True:
+            row = self.fetchone()
+            if row is None:
+                return
+            yield row
+
+    @property
+    def lastrowid(self):
+        return self._raw.lastrowid
+
+    @property
+    def rowcount(self):
+        return self._raw.rowcount
+
+
+class _HostedConnection:
+    """Duck-typed subset of sqlite3.Connection over the libsql client."""
+
+    def __init__(self, raw):
+        self._raw = raw
+
+    def execute(self, sql: str, params=()) -> _HostedCursor:
+        try:
+            return _HostedCursor(self._raw.execute(sql, tuple(params)))
+        except ValueError as exc:
+            mapped = _map_hosted_error(exc)
+            if mapped is not None:
+                raise mapped from exc
+            raise
+
+    def executescript(self, sql: str) -> None:
+        try:
+            self._raw.executescript(sql)
+        except ValueError as exc:
+            mapped = _map_hosted_error(exc)
+            if mapped is not None:
+                raise mapped from exc
+            raise
+
+    def commit(self) -> None:
+        self._raw.commit()
+
+    def rollback(self) -> None:
+        self._raw.rollback()
+
+    def close(self) -> None:
+        self._raw.close()
+
+    def sync(self) -> None:
+        self._raw.sync()
+
+
+def _redacted(exc: BaseException, secret: str) -> str:
+    return str(exc).replace(secret, "<redacted>") if secret else str(exc)
+
+
+def _hosted_raw_connect(url: str, sync_required: bool) -> _HostedConnection:
+    token = os.environ.get("TODO_DB_AUTH_TOKEN") or ""
+    if not token:
+        raise TodoError("hosted tracker: set TODO_DB_AUTH_TOKEN when TODO_DB_URL points at a remote database")
+    try:
+        import libsql  # deferred: only hosted mode needs it
+    except ImportError as exc:
+        raise TodoError("hosted tracker requires the `libsql` package; run `uv sync` in _project/scripts") from exc
+    replica = hosted_replica_path()
+    replica.parent.mkdir(parents=True, exist_ok=True)
+    raw = libsql.connect(str(replica), sync_url=url, auth_token=token, isolation_level=None)
+    conn = _HostedConnection(raw)
+    try:
+        conn.sync()
+    except Exception as exc:
+        if sync_required:
+            raise TodoError(f"hosted tracker: cannot sync with the primary: {_redacted(exc, token)}") from exc
+        # Degraded mode per spec: reads serve the stale replica with a banner;
+        # writes will fail loudly at the primary (no offline write queue).
+        print(
+            f"warning: STALE replica — sync with the primary failed ({_redacted(exc, token)}); "
+            "reads may be outdated and writes will fail",
+            file=sys.stderr,
+        )
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    return conn
+
+
+def connect_hosted(url: str) -> _HostedConnection:
+    conn = _hosted_raw_connect(url, sync_required=False)
+    _ensure_schema(conn)
+    return conn
+
+
+# ---------------------------------------------------------------------------
+# Hosted bulk transfer (Hrana pipeline)
+#
+# Interactive write transactions round-trip per statement (~0.15s RTT), which
+# is correct for CLI-scale writes but hopeless for the one-shot YAML import:
+# measured live, the row-by-row path ran at ~10 items/min (≈2.5h for the full
+# tree). The importer therefore stages into a temp local SQLite through the
+# exact same gated code, then bulk-copies rows to the primary with batched
+# parameterized statements over the Hrana HTTP pipeline — one round-trip per
+# few hundred statements, all inside a single baton-chained transaction.
+
+# Insert order respects foreign keys; DELETE (--replace) runs in reverse.
+TRANSFER_TABLES = (
+    "items",
+    "work_units",
+    "work_needs",
+    "item_deps",
+    "scope_rules",
+    "verifications",
+    "preserves",
+    "anti_patterns",
+    "prior_art",
+    "deferrals",
+    "events",
+)
+
+
+def _hrana_endpoint(url: str) -> str:
+    if url.startswith("libsql://"):
+        url = "https://" + url[len("libsql://") :]
+    return url.rstrip("/") + "/v2/pipeline"
+
+
+def _hrana_value(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {"type": "null"}
+    if isinstance(value, bool) or isinstance(value, int):
+        return {"type": "integer", "value": str(int(value))}
+    if isinstance(value, float):
+        return {"type": "float", "value": value}
+    if isinstance(value, (bytes, bytearray)):
+        import base64
+
+        return {"type": "blob", "base64": base64.b64encode(bytes(value)).decode("ascii")}
+    return {"type": "text", "value": str(value)}
+
+
+def _post_pipeline(endpoint: str, token: str, payload: dict[str, Any]) -> dict[str, Any]:
+    import urllib.error
+    import urllib.request
+
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return json.loads(response.read())
+    except urllib.error.URLError as exc:
+        raise TodoError(f"hosted pipeline request failed: {_redacted(exc, token)}") from exc
+
+
+def _pipeline_execute(
+    url: str,
+    token: str,
+    stmts: list[tuple[str, list[Any]]],
+    *,
+    baton: str | None = None,
+    close: bool = False,
+    post=None,
+) -> dict[str, Any]:
+    post = post or _post_pipeline
+    requests_payload: list[dict[str, Any]] = [
+        {"type": "execute", "stmt": {"sql": sql, "args": [_hrana_value(arg) for arg in args]}} for sql, args in stmts
+    ]
+    if close:
+        requests_payload.append({"type": "close"})
+    response = post(_hrana_endpoint(url), token, {"baton": baton, "requests": requests_payload})
+    for result in response.get("results", []):
+        if result.get("type") == "error":
+            message = result.get("error", {}).get("message", "unknown error")
+            raise TodoError(f"hosted pipeline error: {message}")
+    return response
+
+
+def hosted_item_count(url: str, token: str, post=None) -> int:
+    response = _pipeline_execute(url, token, [("SELECT count(*) FROM items", [])], close=True, post=post)
+    cell = response["results"][0]["response"]["result"]["rows"][0][0]
+    return int(cell["value"])
+
+
+def bulk_transfer(
+    staging: sqlite3.Connection,
+    url: str,
+    token: str,
+    *,
+    replace: bool = False,
+    post=None,
+    batch_size: int = 400,
+) -> dict[str, int]:
+    """Copy all tracker rows from a staged local database to the primary,
+    atomically (one baton-chained transaction; the stream closing without
+    COMMIT rolls the whole transfer back)."""
+    stmts: list[tuple[str, list[Any]]] = [("BEGIN", [])]
+    if replace:
+        for table in reversed(TRANSFER_TABLES):
+            stmts.append((f"DELETE FROM {table}", []))
+    rows_total = 0
+    for table in TRANSFER_TABLES:
+        columns = [row["name"] for row in staging.execute(f"PRAGMA table_info({table})")]
+        insert = f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})"
+        for row in staging.execute(f"SELECT {', '.join(columns)} FROM {table}"):
+            stmts.append((insert, list(row)))
+            rows_total += 1
+    stmts.append(("COMMIT", []))
+    batches = [stmts[i : i + batch_size] for i in range(0, len(stmts), batch_size)]
+    baton: str | None = None
+    for index, batch in enumerate(batches):
+        response = _pipeline_execute(url, token, batch, baton=baton, close=index == len(batches) - 1, post=post)
+        baton = response.get("baton")
+    return {"rows": rows_total, "batches": len(batches)}
+
+
+def connect_backend(backend: Path | str) -> sqlite3.Connection | _HostedConnection:
+    if isinstance(backend, Path):
+        return connect(backend)
+    return connect_hosted(backend)
+
+
+def migrate_backend(backend: Path | str) -> list[int]:
+    """Apply pending schema migrations on either backend; returns versions applied."""
+    if isinstance(backend, Path):
+        return migrate_db(backend)
+    # Hosted: a fresh sync is a hard requirement — migrating a stale replica
+    # against an already-migrated primary would corrupt the version record.
+    conn = _hosted_raw_connect(backend, sync_required=True)
+    try:
+        version = _schema_version(conn)
+        if version is None:
+            _ensure_schema(conn)  # fresh database: created at the current version
+            return []
+        applied: list[int] = []
+        for target in sorted(MIGRATIONS):
+            if version < target:
+                with _write_txn(conn):
+                    for statement in MIGRATIONS[target]:
+                        conn.execute(statement)
+                    conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(target),))
+                version = target
+                applied.append(target)
+        return applied
+    finally:
+        conn.close()
 
 
 def migrate_db(db_path: Path) -> list[int]:
@@ -1493,7 +1847,11 @@ def _print_work_order(order: dict[str, Any]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Local-SQLite TODO tracker (spike)")
-    parser.add_argument("--db", help="database path (default: <git root>/.todo-db/todo.sqlite)")
+    parser.add_argument(
+        "--db",
+        help="database path, or libsql://... / https://... URL for the hosted backend"
+        " (default: <git main root>/.todo-db/todo.sqlite, or TODO_DB_URL when set)",
+    )
     parser.add_argument("--actor", help="override actor identity for the audit log")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -1505,6 +1863,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--skip-done", action="store_true", help="import only the open TODO tree")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--verbose", action="store_true", help="print every skip/warning line")
+    p.add_argument(
+        "--replace",
+        action="store_true",
+        help="hosted backend only: clear the tracker tables before importing (same transaction)",
+    )
 
     p = sub.add_parser("create", help="create an item (flags, or --from - for a JSON payload)")
     p.add_argument("id", nargs="?")
@@ -1602,17 +1965,22 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     actor = args.actor or default_actor()
+    backend = resolve_backend(args.db)
     if args.command == "migrate":
         # Must run before connect(): connect refuses an outdated schema.
         try:
-            applied = migrate_db(resolve_db_path(args.db))
+            applied = migrate_backend(backend)
         except TodoError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
         if applied:
             print(f"applied migration(s) to v{', v'.join(str(v) for v in applied)}")
             return 0
-    conn = connect(resolve_db_path(args.db))
+    try:
+        conn = connect_backend(backend)
+    except TodoError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
     try:
         return _dispatch(conn, actor, args)
@@ -1641,18 +2009,49 @@ def _print_capped(label: str, lines: list[str], verbose: bool, cap: int = 25) ->
         print(f"  {label}: ... +{len(lines) - len(shown)} more (use --verbose)")
 
 
+def _print_import_report(report: dict[str, Any], verbose: bool) -> None:
+    print(
+        f"imported: {len(report['imported'])}  skipped: {len(report['skipped'])}  warnings: {len(report['warnings'])}"
+    )
+    print(f"  counts: {json.dumps(report['counts'], sort_keys=True)}")
+    _print_capped("skip", report["skipped"], verbose)
+    _print_capped("warn", report["warnings"], verbose)
+
+
 def _cmd_import_yaml(conn, actor, args):
     todo_dir = Path(args.todo_dir) if args.todo_dir else git_root() / "_project" / "TODO"
     done_dir = None
     if not args.skip_done:
         done_dir = Path(args.done_dir) if args.done_dir else git_root() / "_project" / "DONE"
+    backend = resolve_backend(args.db)
+    hosted = isinstance(backend, str)
+    if args.replace and not (hosted and not args.dry_run):
+        raise TodoError("--replace only applies to a live import into the hosted backend")
+    if hosted and not args.dry_run:
+        # Bulk path: stage through the exact same gated code into a temp local
+        # database, then copy rows to the primary in one batched transaction.
+        # The row-by-row path is ~2.5h over the network; this is seconds.
+        token = os.environ.get("TODO_DB_AUTH_TOKEN") or ""
+        existing = hosted_item_count(backend, token)
+        if existing and not args.replace:
+            raise TodoError(
+                f"hosted database already holds {existing} item(s);"
+                " rerun with --replace to clear the tracker tables and re-import"
+            )
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            staging = connect(Path(tmp) / "staging.sqlite")
+            try:
+                report = import_yaml_tree(staging, actor, todo_dir, done_dir=done_dir, dry_run=False)
+                summary = bulk_transfer(staging, backend, token, replace=args.replace)
+            finally:
+                staging.close()
+        _print_import_report(report, args.verbose)
+        print(f"  bulk transfer: {summary['rows']} row(s) in {summary['batches']} batch(es)")
+        return 0
     report = import_yaml_tree(conn, actor, todo_dir, done_dir=done_dir, dry_run=args.dry_run)
-    print(
-        f"imported: {len(report['imported'])}  skipped: {len(report['skipped'])}  warnings: {len(report['warnings'])}"
-    )
-    print(f"  counts: {json.dumps(report['counts'], sort_keys=True)}")
-    _print_capped("skip", report["skipped"], args.verbose)
-    _print_capped("warn", report["warnings"], args.verbose)
+    _print_import_report(report, args.verbose)
     return 0
 
 
