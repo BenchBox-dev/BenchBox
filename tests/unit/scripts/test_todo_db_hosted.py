@@ -255,6 +255,26 @@ class TestHostedConnect:
         assert rc == 2
         assert "https" in capsys.readouterr().err
 
+    def test_plaintext_refusal_is_scheme_case_insensitive(self, fake_libsql, monkeypatch):
+        # URL schemes are case-insensitive; HTTP:// must not bypass the check,
+        # via --db, TODO_DB_URL, or a response base_url.
+        for variant in ("HTTP://example-db.turso.io", "Http://example-db.turso.io", "  http://example-db.turso.io"):
+            backend = todo_db.resolve_backend(variant)
+            assert isinstance(backend, str), f"{variant!r} must be recognized as a hosted URL, not a file path"
+            with pytest.raises(todo_db.TodoError, match="https"):
+                todo_db.connect_backend(backend)
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        monkeypatch.setenv("TODO_DB_URL", "HTTP://example-db.turso.io")
+        with pytest.raises(todo_db.TodoError, match="https"):
+            todo_db.connect_backend(todo_db.resolve_backend(None))
+        assert not fake_libsql.connect_calls
+
+    def test_uppercase_scheme_normalizes_for_pipeline(self):
+        assert todo_db._hrana_endpoint("LIBSQL://x.turso.io") == "https://x.turso.io/v2/pipeline"
+        assert todo_db._hrana_endpoint(" https://x.turso.io ") == "https://x.turso.io/v2/pipeline"
+        with pytest.raises(todo_db.TodoError, match="https"):
+            todo_db._hrana_endpoint("HTTP://x.turso.io")
+
     def test_error_message_never_contains_the_token(self, monkeypatch, tmp_path):
         fake = FakeLibsql(sync_fails=True)
         monkeypatch.setitem(sys.modules, "libsql", fake)

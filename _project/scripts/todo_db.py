@@ -280,14 +280,23 @@ def resolve_db_path(explicit: str | None) -> Path:
     return git_main_root() / ".todo-db" / "todo.sqlite"
 
 
+def _normalize_url(value: str) -> str:
+    """Trim whitespace and lowercase the scheme (schemes are case-insensitive
+    per RFC 3986, so HTTP:// must not bypass scheme checks)."""
+    value = value.strip()
+    scheme, sep, rest = value.partition("://")
+    return scheme.lower() + sep + rest if sep else value
+
+
 def _is_hosted_url(value: str) -> bool:
     # http:// is recognized so it can be REJECTED with a clear error at
     # connect time (a Bearer token must never travel over plaintext), rather
     # than silently treated as a local file path.
-    return value.startswith(("libsql://", "https://", "http://"))
+    return _normalize_url(value).startswith(("libsql://", "https://", "http://"))
 
 
 def _require_secure_url(url: str) -> str:
+    url = _normalize_url(url)
     if url.startswith("http://"):
         raise TodoError(
             "refusing plaintext http:// for the hosted backend (the auth token would"
@@ -304,13 +313,13 @@ def resolve_backend(explicit: str | None) -> Path | str:
     a local file must never be silently redirected at the shared database.
     """
     if explicit:
-        return explicit if _is_hosted_url(explicit) else Path(explicit)
+        return _normalize_url(explicit) if _is_hosted_url(explicit) else Path(explicit)
     env_path = os.environ.get("TODO_DB_PATH")
     if env_path:
         return Path(env_path)
     env_url = os.environ.get("TODO_DB_URL")
     if env_url:
-        return env_url
+        return _normalize_url(env_url)
     return git_main_root() / ".todo-db" / "todo.sqlite"
 
 
@@ -576,7 +585,7 @@ TRANSFER_TABLES = (
 
 
 def _hrana_endpoint(url: str) -> str:
-    _require_secure_url(url)
+    url = _require_secure_url(url)
     if url.startswith("libsql://"):
         url = "https://" + url[len("libsql://") :]
     return url.rstrip("/") + "/v2/pipeline"
