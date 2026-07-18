@@ -61,7 +61,7 @@ work:
       (bare-column projection, G-11 rule), and add funding to the matching
       EXPECTED_VIEWS set in test_duckdb_browser_contract.py. No new base-table
       column, so no read_model_version bump.
-    notes: >-
+
       DONE in PR #1080: r.funding added to result_detail_metrics in
       duckdb_builder.py + browser-duckdb-schema.sql; EXPECTED_VIEWS guards it.
     needs: [w1]

@@ -97,6 +97,18 @@ def run_official(ctx, benchmark, platform, scale, phases, streams, seed, output_
         console.print(f"[red]Error: --streams must be a non-negative integer, got: {streams}[/red]")
         sys.exit(1)
 
+    # Reject an explicit --streams 1 outright rather than letting it silently
+    # become 2: _resolve_requested_stream_count() (benchbox/platforms/base/
+    # execution.py) floors any resolved value to the TPC throughput minimum
+    # of 2 because there is no wire-level way to distinguish "explicitly
+    # requested 1" from the schema's own default of 1 at that boundary. A
+    # user who explicitly typed --streams 1 here would otherwise see their
+    # own value silently overridden with no error, so catch it at the one
+    # place we still know it was explicit.
+    if streams == 1:
+        console.print("[red]Error: --streams must be >= 2 (TPC throughput minimum); got: 1[/red]")
+        sys.exit(1)
+
     console.print("[bold blue]TPC-Compliant Official Benchmark Run[/bold blue]")
     for label, value in [
         ("Benchmark", f"TPC-{benchmark.upper()}"),

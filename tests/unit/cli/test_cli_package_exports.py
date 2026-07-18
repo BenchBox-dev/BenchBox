@@ -39,7 +39,7 @@ def test_public_reexports_accessible_from_benchbox(symbol: str, expected_type: s
     assert symbol in benchbox.__all__
 
 
-_EXPERIMENTAL_SUBSYSTEMS = {"nl2sql", "aiml_functions", "multiregion", "gpu", "concurrency"}
+_EXPERIMENTAL_SUBSYSTEMS = {"nl2sql", "aiml_functions", "multiregion", "gpu", "load_testing"}
 
 
 def test_experimental_modules_not_in_benchmark_registry() -> None:

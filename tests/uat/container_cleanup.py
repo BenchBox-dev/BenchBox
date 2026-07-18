@@ -369,10 +369,16 @@ def _list_images(run: ContainerRunner, project_prefix: str) -> list[ContainerRes
     rows = _run_json_array(run, [CONTAINER_BIN, "image", "ls", "--format", "json"])
     out: list[ContainerResource] = []
     for row in rows:
+        row = row if isinstance(row, dict) else {}
         config = row.get("configuration") if isinstance(row, dict) else None
         config = config if isinstance(config, dict) else {}
-        name = str(config.get("name") or "")
-        identifier = str(row.get("id") or "")
+        # Current `container image ls --format json` renders ImageResource rows
+        # with the reference at the top-level `displayReference` field (see
+        # upstream ImageList.swift); `configuration.name` is empty on those
+        # rows. Fall back to `configuration.name` for older/other CLI versions
+        # that still populate it there.
+        name = str(row.get("displayReference") or config.get("name") or "")
+        identifier = str(row.get("id") or row.get("digest") or "")
         created_at = str(config.get("creationDate") or "")
         category: ContainerCategory
         if _BUILDER_IMAGE_MARKER in name:

@@ -61,15 +61,22 @@ pytestmark = [
 # Extension-availability probes
 # =============================================================================
 # Mirrors tests/integration/test_open_table_formats.py's TestDuckLakeFormatSmoke
-# guard (and tests/unit/platforms/test_ducklake_adapter.py's DUCKLAKE_AVAILABLE
-# probe): INSTALL/LOAD an extension so the tests below can skip cleanly - never
+# guard: INSTALL/LOAD an extension so the tests below can skip cleanly - never
 # fail - when the environment cannot reach the DuckDB extension repository or
 # lacks a given extension.
 #
-# Only the extensions the default lane actually needs (ducklake, sqlite) are
-# probed at import time. The postgres/httpfs probes are deferred into their
-# live_integration classes, which are deselected by default - probing them
-# eagerly would spend a network INSTALL attempt on every collection.
+# The probe must stay LAZY (called from setup_method, never at module level):
+# pytest imports every collected module to discover markers/tests regardless
+# of which markers are later deselected (module-level pytestmark = [slow] only
+# excludes these tests from EXECUTION, not from collection/import). A
+# module-level probe call, or a `@pytest.mark.skipif(not <eager flag>, ...)`
+# class decorator whose condition captures that eager flag, would therefore
+# still spend a real, potentially-networked INSTALL/LOAD attempt on every test
+# collection - including a fast/offline lane that will never run any test in
+# this file (#1082 review: this is exactly what test_ducklake_adapter.py's own
+# hermetic unit module avoids by never touching a live DuckDB connection).
+# setup_method only runs for a test pytest has already decided to execute, so
+# deferring the probe there means an excluded/deselected run never pays for it.
 
 
 @cache
@@ -94,24 +101,24 @@ def _skip_unless_extensions(*names: str) -> None:
         pytest.skip(f"DuckDB extension(s) not available: {', '.join(missing)}")
 
 
-DUCKLAKE_AVAILABLE = _probe_extension("ducklake")
-SQLITE_EXTENSION_AVAILABLE = _probe_extension("sqlite")
-
-
 # =============================================================================
 # 1. Live connection - in-process DuckDB-file catalog ATTACH
 # =============================================================================
 
 
 @pytest.mark.live_integration
-@pytest.mark.skipif(not DUCKLAKE_AVAILABLE, reason="DuckLake extension not available (needs DuckDB>=1.3 + network)")
 class TestDuckLakeLiveConnection:
     """End-to-end tests exercising a real INSTALL/LOAD/ATTACH of the ducklake extension.
 
     Marked live_integration (deselected from the default/fast lane) because
     they perform a real, potentially-networked INSTALL ducklake; they also skip
-    entirely when the extension cannot be installed/loaded.
+    entirely when the extension cannot be installed/loaded (checked in
+    setup_method, not a collection-time skipif - see the probe docstring
+    above for why).
     """
+
+    def setup_method(self) -> None:
+        _skip_unless_extensions("ducklake")
 
     def test_cursor_defaults_to_lake_catalog(self, tmp_path):
         # Regression for the w8 validation bug: framework seams (e.g.
@@ -291,12 +298,11 @@ class TestDuckLakeLiveConnection:
 # =============================================================================
 
 
-@pytest.mark.skipif(
-    not (DUCKLAKE_AVAILABLE and SQLITE_EXTENSION_AVAILABLE),
-    reason="ducklake/sqlite DuckDB extensions not available",
-)
 class TestDuckLakeSqliteCatalogLive:
     """Real end-to-end TPC-H run through the DuckLake adapter with catalog=sqlite."""
+
+    def setup_method(self) -> None:
+        _skip_unless_extensions("ducklake", "sqlite")
 
     def test_tpch_sf001_sqlite_catalog_end_to_end(self, tmp_path: Path) -> None:
         """Run TPC-H SF 0.01 via `benchbox run` with --platform-option catalog=sqlite.
