@@ -14,6 +14,7 @@ import pytest
 
 from benchbox.utils.dependencies import (
     DEPENDENCY_GROUPS,
+    PLATFORM_TO_EXTRA,
     DependencyInfo,
     InstallationScenario,
     check_platform_dependencies,
@@ -55,6 +56,49 @@ class TestDependencyInfo:
         assert info.install_command == 'uv pip install "benchbox[test]"'
         assert info.use_cases == ["Testing"]
         assert info.platforms == ["Test Platform"]
+
+    def test_extra_name_defaults_to_name_when_command_has_no_extra_flag(self):
+        """No --extra flag (e.g. the bare 'all' core-install shape) falls back to name."""
+        info = DependencyInfo(
+            name="test",
+            description="Test platform",
+            packages=["test-package"],
+            install_command="uv add benchbox",
+            use_cases=["Testing"],
+            platforms=["Test Platform"],
+        )
+
+        assert info.extra_name == "test"
+
+    def test_extra_name_follows_install_command_for_retained_aliases(self):
+        """A retained-alias group (name != real extra) must report the real extra,
+        not its own group name -- the #1194 bug: get_install_message() derived
+        'benchbox[databricks-connect]' from .name after that extra was removed,
+        even though install_command already pointed at the real replacement.
+        """
+        info = DependencyInfo(
+            name="databricks-connect",
+            description="Legacy alias",
+            packages=["databricks-sql-connector"],
+            install_command="uv add benchbox --extra cloud-spark-databricks",
+            use_cases=["Testing"],
+            platforms=["Databricks"],
+        )
+
+        assert info.extra_name == "cloud-spark-databricks"
+        message = info.get_install_message()
+        assert "cloud-spark-databricks" in message
+        assert "databricks-connect" not in message
+
+    def test_databricks_connect_group_installs_the_real_extra(self):
+        """Live catalog regression: the retained databricks-connect group must
+        recommend cloud-spark-databricks (the extra that still exists), not
+        databricks-connect (removed in #1194).
+        """
+        info = DEPENDENCY_GROUPS["databricks-connect"]
+
+        assert info.extra_name == "cloud-spark-databricks"
+        assert "databricks-connect" not in info.get_install_message()
 
 
 class TestInstallationScenario:
@@ -549,3 +593,16 @@ class TestInstallCommandDetection:
             for extra in extras:
                 cmd = get_install_command(extra)
                 assert f"benchbox[{extra}]" in cmd
+
+    def test_get_install_command_databricks_connect_uses_replacement_extra(self):
+        """Regression for #1194: databricks-connect's own extra was removed;
+        platform_to_extra must map the retained platform-name lookup to the
+        real replacement (cloud-spark-databricks), not the deleted extra --
+        otherwise the MCP discovery tool recommends an install that fails.
+        """
+        assert PLATFORM_TO_EXTRA["databricks-connect"] == "cloud-spark-databricks"
+
+        with patch("benchbox.utils.dependencies.is_development_install", return_value=False):
+            cmd = get_install_command("databricks-connect")
+
+        assert cmd == 'uv pip install "benchbox[cloud-spark-databricks]"'

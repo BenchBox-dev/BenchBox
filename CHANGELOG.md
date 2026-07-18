@@ -100,6 +100,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Passing bare `clickhouse` now raises a `ValueError` naming these replacements
   instead of silently defaulting to a deployment mode. The `ch` CLI shorthand
   now resolves to `clickhouse-local`.
+- **BREAKING: `databricks-connect` install extra removed** - The deprecated
+  `benchbox[databricks-connect]` extra was a legacy alias of
+  `benchbox[cloud-spark-databricks]`. Install Databricks Connect / DataFrame
+  mode via `benchbox[cloud-spark-databricks]` instead. The `databricks-connect`
+  PyPI package itself is unchanged — it remains a dependency of the
+  `cloud-spark-databricks` extra. (The renamed dataframe extras — `pandas`,
+  `polars`, etc. — are unaffected; they are the preferred install names, with
+  `dataframe-*` retained as their aliases.)
 
 ## [0.3.0] - 2026-05-16
 

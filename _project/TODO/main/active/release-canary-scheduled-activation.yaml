@@ -15,9 +15,11 @@ description: |
        canary added by pypi-installability-canary-and-rollback (PR #952),
        whose DONE notes claim it "would have caught broken 0.3.0 in a day";
     2. `ruleset-drift` — the daily check that pins the develop ruleset's
-       required-check wiring and (since PR #952) reports the
-       require_code_owner_review gap via
-       _project/scripts/ruleset_review_enforcement.py;
+       required-check wiring and the v* tag-creation ruleset via
+       _project/scripts/ruleset_review_enforcement.py (it formerly also
+       warned on the require_code_owner_review gap, but that target was
+       retired 2026-07-18 and the warning removed — see
+       docs/operations/repo-admin-settings.md);
     3. `credential-free-non-fast` — the scheduled non-fast test sweep.
 
   None of them has ever executed. GitHub runs `on.schedule` workflows ONLY
