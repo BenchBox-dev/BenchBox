@@ -39,8 +39,11 @@ decision_gates:
       exact threat surface, robust for fork PRs (GitHub runs the base-branch copy
       of the workflow), and decoupled from the develop soundness machinery. A/B
       govern the wrong branch and overload the soundness set. CODEOWNERS on develop
-      is at most optional defense-in-depth and is gated on the still-pending
-      require_code_owner_review admin action (see auto-merge-review-gate-admin-enforcement).
+      is at most optional defense-in-depth and was gated on the
+      require_code_owner_review admin action — RETIRED 2026-07-18 without being
+      applied (self-approval deadlock; see docs/operations/repo-admin-settings.md
+      "Soundness-path review enforcement (RETIRED 2026-07-18)"), which makes
+      Option A permanently unavailable unless a retirement revisit trigger fires.
   - id: G-CODEOWNERS-BRANCH
     gate: >-
       Which branch(es) must carry the gate?
@@ -56,7 +59,7 @@ prior_art:
   - "benchbox/validation/bundle.py::_validate_manifest_provenance — reference (the advisory result_source=vendor guard this workflow rule is the real teeth for)"
   - "scripts/generate_corpus_inventory.py::_is_vendor_subtree + _project/scripts/explorer_pipeline/pipeline.py::_is_vendor_subtree — reference (the path -> vendor-supplied label derivation being gated; keep the vendor/ prefix definition consistent)"
   - ".github/workflows/submission-validator-drift-check.yml + sync-results-data-to-published.yml — reference (how the workflow reaches published-results; the change must survive the drift check)"
-  - "_project/TODO/main/planning/auto-merge-review-gate-admin-enforcement.yaml — reference (the pending require_code_owner_review admin action that would make a CODEOWNERS DiD live)"
+  - "_project/DONE/main/planning/auto-merge-review-gate-admin-enforcement.yaml — reference (the require_code_owner_review admin action, RETIRED 2026-07-18 without being applied; a CODEOWNERS DiD on develop cannot go live unless that decision's revisit triggers fire)"
 
 work:
   - id: w1
@@ -87,9 +90,16 @@ work:
   - id: w4
     summary: >-
       OPTIONAL defense-in-depth: add CODEOWNERS /results-data/bundles/vendor/ on
-      develop (Option A) once require_code_owner_review is enabled. Deferred.
+      develop (Option A) IF require_code_owner_review is ever enabled.
     needs: [w1]
     status: pending
+    notes: |
+      Deferred indefinitely: the require_code_owner_review target was retired
+      2026-07-18 (self-approval deadlock) without being applied. Only
+      actionable if a retirement revisit trigger fires (extra write-access
+      collaborators, or agent PRs under a separate bot identity) — see
+      docs/operations/repo-admin-settings.md, "Soundness-path review
+      enforcement (RETIRED 2026-07-18)".
   - id: w5
     summary: >-
       REQUIRED to go live: mirror the vendor-gate step to published-results via a

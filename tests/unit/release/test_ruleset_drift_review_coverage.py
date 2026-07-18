@@ -1,31 +1,22 @@
-"""compare_ruleset must surface the develop review-enforcement gap.
+"""Ruleset drift coverage: tag-creation protection + retired review rule.
 
-Follow-up to ``auto-merge-review-gate-admin-enforcement``:
-``scripts/ruleset_drift_check.py``'s ``compare_ruleset`` already compares
-required status checks, strict-check policy, linear history,
-non-fast-forward, deletion, and bypass actors for both rulesets, but never
-inspected the ``pull_request`` rule's review-enforcement settings. This
-pins the merged behaviour: ``compare_ruleset`` now imports
-``review_enforcement_findings`` from
-``_project/scripts/ruleset_review_enforcement.py`` (the single source of
-truth for that predicate - not reimplemented here) and applies it only to
-``develop-squash-only`` (``main-release-only`` has no equivalent
-documented requirement).
+The develop review-rule check (``require_code_owner_review``,
+``DEVELOP_REVIEW_RULE_ENFORCED``) that used to be pinned here was RETIRED on
+2026-07-18 without the admin PUT ever landing: every PR is authored by the
+sole code owner, GitHub forbids self-approval, and the develop ruleset has no
+bypass actors, so enforcing the rule would have deadlocked soundness-path PRs
+rather than gating them (see docs/operations/repo-admin-settings.md,
+"Soundness-path review enforcement (RETIRED 2026-07-18)").
+``test_develop_review_rule_is_not_checked_after_retirement`` pins the
+retirement so the warning does not silently return.
 
-Decision (ruleset-drift-check-review-rule-coverage, w1): WARN-until-enforced.
-The live develop ruleset does not yet require a code-owner review, so a
-missing review-enforcement rule is surfaced as a ``WARNING_PREFIX``-prefixed
-finding - visible in the same findings list / JSON output as any other
-drift finding - without flipping the exit code, until
-``DEVELOP_REVIEW_RULE_ENFORCED`` is switched to ``True`` (a one-line change,
-gated on the admin PUT from ``auto-merge-review-gate-admin-enforcement``
-actually landing).
+The rest of this file pins the v* tag-creation ruleset coverage
+(tag-and-pypi-environment-admin-hardening w3), which IS live and enforced.
 """
 
 from __future__ import annotations
 
 import importlib.util
-import sys
 from pathlib import Path
 
 import pytest
@@ -44,14 +35,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _load_review_enforcement():
-    """Load _project/scripts/ruleset_review_enforcement.py out of tree.
-
-    The v* tag-creation predicate lives beside the review-rule predicate in
-    the same single-source-of-truth module (this TODO's scope_limit); load it
-    the same way tests/unit/release/test_ruleset_review_enforcement.py does.
-    """
+    """Load _project/scripts/ruleset_review_enforcement.py out of tree."""
     scripts_dir = REPO_ROOT / "_project" / "scripts"
-    sys.path.insert(0, str(scripts_dir))
     spec = importlib.util.spec_from_file_location(
         "ruleset_review_enforcement", scripts_dir / "ruleset_review_enforcement.py"
     )
@@ -80,7 +65,10 @@ def _develop_expected():
     ]
 
 
-def _live_develop_ruleset(*, review_count: int, code_owner_review: bool) -> dict:
+def _live_develop_ruleset() -> dict:
+    # The pull_request rule deliberately carries no code-owner-review
+    # requirement: that is the live (and intended) state after the 2026-07-18
+    # retirement.
     return {
         "name": "develop-squash-only",
         "enforcement": "active",
@@ -90,8 +78,8 @@ def _live_develop_ruleset(*, review_count: int, code_owner_review: bool) -> dict
             {
                 "type": "pull_request",
                 "parameters": {
-                    "required_approving_review_count": review_count,
-                    "require_code_owner_review": code_owner_review,
+                    "required_approving_review_count": 0,
+                    "require_code_owner_review": False,
                 },
             },
             {
@@ -108,41 +96,20 @@ def _live_develop_ruleset(*, review_count: int, code_owner_review: bool) -> dict
     }
 
 
-def test_missing_review_enforcement_is_a_non_blocking_warning_by_default():
-    live = _live_develop_ruleset(review_count=0, code_owner_review=False)
-
-    findings = compare_ruleset(_develop_expected(), live)
-
-    assert any(f.startswith(WARNING_PREFIX) for f in findings), findings
-    assert any("require_code_owner_review" in f for f in findings)
-    # WARN-until-enforced: the missing rule must not be a blocking finding.
-    assert blocking_findings(findings) == []
-
-
-def test_review_enforcement_produces_no_findings_once_ruleset_enforces_it():
-    live = _live_develop_ruleset(review_count=0, code_owner_review=True)
+def test_develop_review_rule_is_not_checked_after_retirement():
+    """The require_code_owner_review target was retired 2026-07-18: a develop
+    ruleset with no code-owner-review rule is the intended state, so it must
+    produce NO findings -- not even a non-blocking warning."""
+    live = _live_develop_ruleset()
 
     findings = compare_ruleset(_develop_expected(), live)
 
     assert findings == []
 
 
-def test_review_enforcement_can_be_switched_to_blocking_explicitly():
-    """The one-line enforce switch: passing enforce_review_rule=True (what
-    DEVELOP_REVIEW_RULE_ENFORCED=True will do once flipped) makes the same
-    gap a blocking finding instead of a warning."""
-    live = _live_develop_ruleset(review_count=0, code_owner_review=False)
-
-    findings = compare_ruleset(_develop_expected(), live, enforce_review_rule=True)
-
-    assert findings, "expected a blocking finding once enforcement is on"
-    assert not any(f.startswith(WARNING_PREFIX) for f in findings)
-    assert blocking_findings(findings) == findings
-
-
-def test_main_release_only_is_not_subject_to_the_review_rule_check():
-    """main-release-only has no documented review-enforcement requirement;
-    compare_ruleset must not apply the develop-only check to it."""
+def test_main_release_only_matches_runbook_expectations():
+    """main-release-only sanity: a live ruleset matching the runbook produces
+    no findings."""
     expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
         "main-release-only"
     ]
@@ -378,7 +345,7 @@ def test_tag_creation_findings_blocks_by_default_when_no_tag_ruleset_exists():
     # TAG_RULESET_ENFORCED is True, so a missing target='tag' ruleset is a
     # BLOCKING drift finding by default (no longer WARN-until-applied).
     all_live = [
-        _live_develop_ruleset(review_count=0, code_owner_review=False),
+        _live_develop_ruleset(),
     ]
     findings = tag_creation_findings(all_live)
     assert findings and blocking_findings(findings) == findings
@@ -390,7 +357,7 @@ def test_tag_creation_findings_warns_when_enforcement_forced_off():
     # Preserve the pre-2026-07-10 WARN-until-applied coverage via an explicit
     # enforce_tag_rule=False override.
     all_live = [
-        _live_develop_ruleset(review_count=0, code_owner_review=False),
+        _live_develop_ruleset(),
     ]
     findings = tag_creation_findings(all_live, enforce_tag_rule=False)
     assert findings and all(f.startswith(WARNING_PREFIX) for f in findings)
