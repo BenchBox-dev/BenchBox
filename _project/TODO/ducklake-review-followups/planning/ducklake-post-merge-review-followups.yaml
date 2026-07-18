@@ -72,10 +72,12 @@ work:
   summary: "Make _probe_extension's cached-False outcome loud instead of a silent session-wide skip"
   status: pending
   notes: |
-    tests/integration/test_ducklake_integration.py: DUCKLAKE_AVAILABLE =
-    @cache _probe_extension('ducklake') runs at import/collection; a transient
-    extension-repo blip caches False and silently skips even the SQLite class that
-    gates release-canary. Emit a warning/xfail (not a silent skip) at the release gate.
+    tests/integration/test_ducklake_integration.py: the cached
+    _probe_extension('ducklake') call runs lazily from setup_method, so
+    deselected tests do not pay the install/load cost. A transient
+    extension-repository failure can still cache False for later tests in the
+    process and silently skip the SQLite class that gates release-canary. Emit a
+    warning/xfail (not a silent skip) at the release gate.
 
 # --- Correctness / operational ---
 - id: w6
