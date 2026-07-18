@@ -71,11 +71,12 @@ work:
           "TIMESTAMP" fell through as str -> driver 'str' has no 'tzinfo'.
         - Bucket C (array/vector): PARTIAL. "Array(...)" parsed, but DuckDB
           "FLOAT[128]" matched the FLOAT branch -> float("[...]") raised.
-        - Bucket D (Table-valued schema introspection): NOT re-reproduced here;
-          needs the live DataVault schema object. `_get_column_type_names`
-          returns [] for non-dict schemas (silent no-conversion) rather than the
-          observed `'Table' is not iterable`, so the crash site is elsewhere in
-          the DataVault load path. Deferred (see deferred + w2 notes).
+        - Bucket D (Table-valued schema introspection): crash site FOUND
+          statically (no live repro needed) — SchemaInspector.get_column_count
+          did `"columns" in table_schema`, which raises `'Table' is not
+          iterable` when get_schema returns {name: BaseSchemaTable} (DataVault).
+          `_get_column_type_names` separately no-op'd (returned []) for object
+          schemas. Both fixed in w2.
   - id: w1
     summary: "Add focused unit coverage for ClickHouse-server value conversion"
     needs: [w0]
@@ -86,16 +87,16 @@ work:
       as `Array(Float32)` from bracketed literals, and schemas represented by
       benchmark `Table` objects instead of simple dicts.
 
-      DONE for Buckets A/B/C in tests/unit/platforms/test_clickhouse_adapter.py:
+      DONE for Buckets A/B/C/D in tests/unit/platforms/test_clickhouse_adapter.py:
       test_empty_numeric_date_fields_become_null_not_default (A),
       test_datetime_and_timestamp_conversion (B),
-      test_vector_bracket_type_parsed_to_list_not_float (C). The Table-object
-      schema case (Bucket D) is NOT covered yet — it depends on the Bucket D fix
-      site, which is deferred.
+      test_vector_bracket_type_parsed_to_list_not_float (C),
+      test_object_schema_table_column_count_and_types (D — uses the real
+      DataVault BaseSchemaTable schema).
   - id: w2
     summary: "Fix the client-batch conversion path without regressing clickhouse-local"
     needs: [w1]
-    status: in_progress
+    status: done
     notes: |
       Keep server mode on client-side INSERT batches for Docker-host files;
       do not revert to server-side `file()` loading. Preserve shared ClickHouse
@@ -114,9 +115,16 @@ work:
       already correct (nullable-empty -> NULL, ratified policy) and is unchanged.
       All at the helper boundary per anti_patterns; clickhouse-local path
       untouched (server-mode-only helper).
-      REMAINING (Bucket D): Table-valued schema introspection for DataVault is
-      NOT fixed — its crash site needs live repro (see deferred). w2 stays
-      in_progress until D lands or is split into its own item.
+      DONE (Bucket D): the crash was static, not needing live repro — SchemaInspector.
+      get_column_count did `"columns" in table_schema`, which raised
+      `argument of type 'Table' is not iterable` for object schemas (DataVault's
+      get_schema returns {name: BaseSchemaTable}). Added _schema_table_columns /
+      _resolve_table_schema helpers that read `.columns` from a BaseSchemaTable
+      OR ["columns"] from a dict, used by both get_column_count and
+      _get_column_type_names — so object-schema loads no longer crash AND get
+      real per-column types (DataVault TIMESTAMP now flows through the Bucket B
+      fix). All four buckets now handled at code level; only w3 live-cell
+      verification remains.
   - id: w3
     summary: "Verify representative failing cells live against ClickHouse server"
     needs: [w2]
@@ -146,8 +154,6 @@ work:
           deferred).
 
 deferred:
-  - summary: "Bucket D: harden Table-valued schema introspection for DataVault"
-    reason: "The observed `'Table' is not iterable` crash is outside _convert_field_for_clickhouse (which safely no-ops on non-dict schemas); pinning the real crash site needs a live DataVault load, unavailable this session. Split candidate if it grows."
   - summary: "Bucket B follow-up: non-ISO / epoch-integer DateTime source formats"
     reason: "datetime.fromisoformat covers the observed ISO forms; epoch-seconds or locale formats, if any benchmark emits them, would raise (loud, per guardrails) and can be handled when a real case appears."
 
