@@ -57,3 +57,4 @@ would have pointed at #1093, not #1096.
 ## Triage log
 
 - 2026-07-18: actionable — Re-verified at origin/develop 542590b66 on 2026-07-18: signature-aware comparison suppresses persistent-red duplicates, but a latent environment-dependent first failure can still open a revert for the current SHA; retain as a residual attribution gap.
+- 2026-07-18: actionable — Rechecked against origin/develop 8a7ee88e0 on 2026-07-18: signature comparison suppresses persistent-red duplicates, but the workflow still attributes a latent environment-dependent first failure to the current failing SHA without code-under-test ownership; retain as an actionable attribution gap.
