@@ -519,16 +519,18 @@ invariants, demonstrated rather than argued.
 
 ## Hosted backend (2026-07-18, fifth round — Turso/libsql, TDD)
 
-With G1 closed, `connect()` grew a second mode (PR: see below). Backend
+With G1 closed, `connect()` grew a second mode (PR #1219; hardened in
+PR #1222). Backend
 selection, first match wins: `--db` (a `libsql://`/`https://` value selects
 hosted) → `TODO_DB_PATH` (local file) → `TODO_DB_URL` (hosted; requires
 `TODO_DB_AUTH_TOKEN`) → default local path. `TODO_DB_PATH` deliberately
 outranks `TODO_DB_URL` so a test or tool that pins a local file can never be
 silently redirected at the shared database.
 
-Hosted mode uses the `libsql` Python client (0.1.11) with an **embedded
-replica** at `<git main root>/.todo-db/replica.db` (override:
-`TODO_DB_REPLICA`): reads serve from the local replica after one freshness
+Hosted mode uses the `libsql` Python client (0.1.11) with a **per-worktree
+embedded replica** at `<git root>/.todo-db/replica.db` (override:
+`TODO_DB_REPLICA`; originally the main-root path, moved per-worktree in the
+hardening round below): reads serve from the local replica after one freshness
 `sync()` at connect; writes — including every `BEGIN IMMEDIATE` interactive
 transaction — are delegated statement-by-statement to the primary, so the
 check-then-act gates serialize against all other writers exactly as they do
@@ -544,12 +546,17 @@ mapping — so every gate, query, and transaction above it runs unchanged on
 either backend. FK enforcement was verified live through write delegation
 (dangling insert refused by the primary). `todo migrate` is backend-aware;
 the hosted path hard-requires a fresh sync before touching the version
-record. TDD: 22 new tests (`tests/unit/scripts/test_todo_db_hosted.py`,
-medium-marked, written red first) pin backend resolution, wiring, adapter
-semantics, `BEGIN IMMEDIATE` discipline, rollback-on-failed-gate, the full
-gated lifecycle, and hosted migration against a fake libsql module that
-reproduces the real client's quirks; the pre-existing tracker suite (93
-tests across `test_todo_db*.py` + `test_todo_wrapper.py`) passes unchanged.
+record. TDD: `tests/unit/scripts/test_todo_db_hosted.py` (medium-marked,
+written red first; count deliberately unpinned — the file is the record)
+pins backend
+resolution, wiring, adapter semantics, `BEGIN IMMEDIATE` discipline,
+rollback-on-failed-gate, the full gated lifecycle, hosted migration, and
+the bulk-transfer failure paths against a fake libsql module and a fake
+Hrana primary that reproduce the real client's quirks; the pre-existing
+tracker suite (93 tests: `test_todo_db.py`, `test_todo_db_v2.py`,
+`test_todo_wrapper.py`)
+passes unchanged. Replayable acceptance protocol:
+`_project/audits/todo-db-hosted-acceptance-2026-07-18.md`.
 
 **Shared-visibility proof (live, two processes × two replicas × two
 actors).** The one property the local spike could not demonstrate, run
@@ -593,9 +600,10 @@ between staging and target).
 
 **G3 CLOSED (2026-07-18, live).** `todo import-yaml --replace` against
 the hosted primary: **imported 1,364 / skipped 0 / warnings 18; 539 deps
-resolved, 1 dangling; 629 open deferrals; 32,595 rows in 82 batches,
-44s wall** — report-identical to a same-tree local-SQLite control run
-(4s wall). Counts drifted from the recorded 1,362/538 of the earlier
+resolved, 1 dangling; 629 open deferrals; 32,595 rows in 82 data
+batches, 44s wall** — report-identical to a same-tree local-SQLite
+control run (4s wall); recorded from the PR #1219 head tree (the
+hardened CLI reports pipeline requests: data batches + guard + commit). Counts drifted from the recorded 1,362/538 of the earlier
 rounds because five PRs (#1114, #1142, #1194, #1215, #1217) added/moved
 TODO/DONE files on `develop` in between; warnings (18), skipped (0),
 dangling (1), and open deferrals (629) are unchanged. Post-import hosted
@@ -617,6 +625,84 @@ identically to local mode. Final stats coherent: open deferrals 629
 (unchanged), promoted 1, done 1,248. Cleanup: the promoted follow-up
 (`uat-hosted-item-followup`) was dropped with reason "UAT artifact";
 the UAT parent remains as `done` audit trail.
+
+**Hardening round (2026-07-18, post-merge review follow-up).** Confirmed
+findings from the PR #1219 review, fixed TDD (red first, fake-primary
+failure injection):
+
+- **Plaintext refusal:** `http://` hosted URLs are rejected at connect and
+  at the pipeline layer — the Bearer token never travels unencrypted.
+  Extended post-review: schemes are normalized (strip + lowercase scheme)
+  first, so `HTTP://`/whitespace variants cannot bypass the check via
+  `--db`, `TODO_DB_URL`, or a response `base_url`.
+- **Commit discipline:** Hrana keeps executing later requests in a
+  pipeline after a statement error, so `COMMIT` no longer rides with data
+  batches; it is sent alone, only after every batch's results came back
+  clean, and any failure explicitly closes the stream (server-side
+  rollback). Regression-tested with injected statement errors in final and
+  non-final batches.
+- **Atomic import guard:** the target-must-be-empty check (without
+  `--replace`) moved inside the transfer's `BEGIN IMMEDIATE` transaction —
+  no writer can populate the database between check and transfer.
+- **Protocol correctness:** the response `base_url` is carried alongside
+  the baton across batched requests, per the Hrana HTTP v2 spec.
+- **Replica concurrency:** the embedded replica moved from the shared
+  main-root path to per-worktree (`<git root>/.todo-db/replica.db`), and
+  replica open+sync is serialized by an advisory flock — concurrent
+  processes no longer sync one shared replica file. Cost: one cold sync
+  per worktree (~3.4s at 12.8MB), warm reads unchanged.
+- **Error surfaces:** pipeline network failures (timeouts, resets) and
+  non-JSON responses map to the CLI's normal exit-2 error path.
+
+**Hardening round, second wave (2026-07-18, full adversarial review).** A
+deeper review (three independent adversarial passes + live Hrana probes
+that confirmed rollback-on-close and error-continues-pipeline semantics on
+the real primary) surfaced and fixed, TDD:
+
+- **Redirect refusal (security):** urllib preserves the `Authorization`
+  header across redirects — including an https→http downgrade — so the
+  pipeline now uses an opener that refuses all redirects; a redirecting
+  endpoint fails loudly instead of replaying the token.
+- **Transactional `promote` (pre-existing spike defect):** the gate read,
+  item creation, and resolution update now run in ONE `BEGIN IMMEDIATE`
+  transaction with a conditional resolution update — two actors can no
+  longer double-promote one deferral, and a promote can no longer
+  overwrite a concurrent dismiss (pinned by a concurrent-connection test
+  that probes the write lock at the gate read).
+- **Degraded-mode fresh replica:** a never-synced replica with the primary
+  unreachable now fails with a clean exit-2 error instead of attempting a
+  delegated schema write and tracebacking.
+- **Atomic schema bootstrap:** per-statement DDL inside one write
+  transaction (with an under-lock re-check) replaces `executescript` — a
+  mid-bootstrap failure rolls back completely instead of wedging the
+  shared database with partial tables; also removes the client's
+  documented-unimplemented `executescript` from the hosted path entirely.
+- **Broadened error mapping:** non-constraint libsql failures
+  (`SQLITE_BUSY`, network drops mid-statement) map to
+  `sqlite3.OperationalError` and a redacted `database failure` exit 2 at
+  the CLI boundary — previously an unredacted traceback; `_write_txn`'s
+  rollback can no longer mask the original error.
+- **Whole-tracker import guard:** the emptiness check counts every
+  transfer table, so an itemless `events` row (e.g. from `todo config`)
+  trips the friendly `--replace` refusal instead of a cryptic mid-transfer
+  `events.seq` collision.
+- **Conditional `sweep-stale`:** lease release now carries the same
+  observed-lease predicate as `claim` — a renewal the sweeping process had
+  not seen can no longer be clobbered.
+- **Concurrent-migrate safety:** the hosted migrator re-checks the schema
+  version under the write lock; a racing migrator no-ops cleanly.
+- **Lock hardening:** the replica setup lock opens with `O_NOFOLLOW`
+  (0600) — a planted symlink fails loudly instead of truncating its
+  target.
+- **Live coverage:** `tests/integration/test_todo_db_hosted_live.py`
+  (env-gated on `TODO_TEST_DB_URL`, `live_integration`-marked) executes
+  the two-actor lifecycle against a real primary through the shim, so the
+  claim/lastrowid/contention semantics are no longer session testimony.
+
+Threat-model note (recorded, accepted): `todo verify --run` executes
+repo-authored verification commands via the shell — the repository is the
+trust root, the same boundary as `make` or pre-commit hooks. Importing a
+TODO tree from an untrusted source would plant shell commands; do not.
 
 ## Cutover plan
 
