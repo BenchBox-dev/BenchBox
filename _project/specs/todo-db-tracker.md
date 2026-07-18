@@ -413,6 +413,10 @@ requires the hosted step after G1.
 
 ## Head-to-head evaluation: legacy YAML vs DB tracker (2026-07-18)
 
+**Durable evidence:** `_project/audits/todo-db-eval-2026-07-18.md` — the
+exact prompts, verbatim harness counters, key audit output lines, and
+replay instructions. The numbers below are bound to that artifact.
+
 **Protocol.** Two isolated Opus subagents, each in its own git worktree,
 received byte-identical work-item specs (a small `word_count.py` utility +
 unit test, work units w1/w2, and two planted out-of-scope improvements
