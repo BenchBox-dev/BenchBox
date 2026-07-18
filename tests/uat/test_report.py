@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.uat.phases import report
+from tests.uat.phases import execute, report
 from tests.uat.runner import CellResult
 
 pytestmark = pytest.mark.fast
@@ -296,10 +296,12 @@ def test_release_gate_ordering_flags_docker_up_before_native_completion():
 
 def test_release_gate_ordering_does_not_raise_against_offset_aware_boundary():
     """orchestrator.py's completed_at is offset-aware (datetime.now().astimezone(),
-    #1162), but append_lifecycle_log() still writes naive uat_lifecycle.log
-    timestamps. Comparing the two used to raise TypeError; parse_docker_up_events
-    must normalize the naive side so the comparison (and any real violation)
-    still works.
+    #1162). ``_DOCKER_LOG_OK``/``_DOCKER_LOG_EARLY`` above use naive timestamps
+    to exercise the legacy-log fallback path (pre-#1202-follow-up
+    append_lifecycle_log() output, or any hand-written fixture); comparing a
+    naive timestamp against an aware boundary used to raise TypeError, so
+    parse_docker_up_events must normalize the naive side and the comparison
+    (and any real violation) must still work.
     """
     aware_boundary = _dt.datetime(2026, 5, 30, 1, 0, 0).astimezone()
 
@@ -311,3 +313,60 @@ def test_release_gate_ordering_does_not_raise_against_offset_aware_boundary():
     )
     assert len(violations) == 1
     assert "cedardb" in violations[0]
+
+
+def test_release_gate_ordering_uses_boundary_offset_for_naive_docker_timestamps():
+    """Regression for #1179: a valid PDT run must not be flagged as a violation
+    just because the checker process runs under a different timezone (e.g.
+    UTC). astimezone() previously attached the *checker process's* current
+    local offset to the naive Docker timestamp instead of the producer's --
+    for a boundary completed at 2026-05-30T01:00:00-07:00 (PDT) and a Docker
+    naive timestamp of 2026-05-30T02:00:00 (also PDT wall-clock, i.e.
+    genuinely after the boundary), a checker running under UTC would wrongly
+    attach +00:00 to the naive timestamp instead of -07:00, making it appear
+    to be hours *before* the boundary instant and firing a false violation.
+    """
+    pdt = _dt.timezone(_dt.timedelta(hours=-7))
+    boundary = _dt.datetime(2026, 5, 30, 1, 0, 0, tzinfo=pdt)
+
+    violations = report.release_gate_ordering_violations([_DOCKER_LOG_OK], native_stage_completed_at=boundary)
+
+    assert violations == []
+
+
+def test_release_gate_ordering_respects_each_events_own_offset_across_dst():
+    """A boundary and a later Docker event can carry genuinely different UTC
+    offsets when a sweep straddles a DST transition (fall-back: PDT -07:00 ->
+    PST -08:00). Once each event carries its own real offset (#1202
+    follow-up: append_lifecycle_log() now writes datetime.now().astimezone()
+    instead of naive datetime.now()), the comparison must use that offset
+    directly rather than reusing the boundary's -- the boundary's fixed
+    offset would misread the later, different-offset event's wall-clock time
+    (2026-11-01T01:15:00-08:00, genuinely after the boundary) as 45 minutes
+    *before* a boundary of 2026-11-01T01:30:00-07:00, a false violation.
+    """
+    pdt = _dt.timezone(_dt.timedelta(hours=-7))
+    boundary = _dt.datetime(2026, 11, 1, 1, 30, 0, tzinfo=pdt)
+    docker_log = (
+        "2026-11-01T01:15:00-08:00 [docker] platform=lakesail action=up status=ok "
+        "project=benchbox-uat-gate-lakesail command=['docker'] message=started\n"
+    )
+
+    violations = report.release_gate_ordering_violations([docker_log], native_stage_completed_at=boundary)
+
+    assert violations == []
+
+
+def test_append_lifecycle_log_writes_offset_aware_timestamp(tmp_path: Path):
+    """Regression for the #1202 follow-up: append_lifecycle_log() must write
+    an offset-aware timestamp (parseable straight through by
+    parse_docker_up_events with no naive-timestamp fallback needed), not
+    plain datetime.now().
+    """
+    execute.append_lifecycle_log(tmp_path, "[docker] platform=duckdb action=up status=ok")
+
+    line = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8").strip()
+    timestamp_token = line.split(" ", 1)[0]
+    parsed = _dt.datetime.fromisoformat(timestamp_token)
+
+    assert parsed.tzinfo is not None

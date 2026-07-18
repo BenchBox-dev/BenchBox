@@ -611,6 +611,17 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
             "PgDuckDBAdapter never runs any post_create_statements via the inherited no-op "
             "apply_table_tunings/generate_tuning_clause path.",
         ),
+        _T.SORTING: _none(
+            "pg_duckdb_inherited_postgresql_noop",
+            "PostgreSQLDDLGenerator treats SORTING as CLUSTERING -- a shared code path (postgresql.py:"
+            "141-159) appends both a CREATE INDEX and a CLUSTER post_create_statement for either tuning "
+            "type. PgDuckDBDDLGenerator's inherited generate_tuning_clauses runs that same path before its "
+            "filter (pg_duckdb.py:83-88) strips only the CLUSTER statement by prefix match, so a tuned "
+            "SORTING config's CREATE INDEX still surfaces in dry-run preview, same as CLUSTERING. Same "
+            "execution-time no-op as CLUSTERING/PARTITIONING regardless: PgDuckDBAdapter never runs "
+            "post_create_statements via the inherited no-op apply_table_tunings/generate_tuning_clause "
+            "path.",
+        ),
     },
     "pg-mooncake": {
         _T.PARTITIONING: _none(

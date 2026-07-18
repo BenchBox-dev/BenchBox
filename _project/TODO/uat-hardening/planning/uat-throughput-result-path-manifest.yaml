@@ -53,6 +53,16 @@ work:
       must_preserve), and delete the mtime-window logic. Keep a loud failure if
       the path is absent rather than silently falling back to glob.
 
+      Handoff: tests/uat/runner.py's `official` branch (currently ~line 241-251)
+      calls resolve_official_result_path directly and does not pass or parse
+      `stdout_text` at all -- only the non-official `else` branch does
+      (last_nonempty_output_line(stdout_text)). If w1 picks the quiet-stdout-line
+      contract, runner.py's official branch must be updated to read that line the
+      same way the non-official branch already does; if w1 picks a manifest file,
+      runner.py must locate/pass it instead. Either way runner.py's official
+      branch changes, so it (and test_runner.py) must be in scope, not just the
+      resolver + CLI.
+
 deferred:
   - summary: "Backfill emitted-path contract to other non-quiet producers if any remain"
     reason: "Scope here is the official/throughput path; a broader producer audit is separate."
@@ -88,6 +98,8 @@ scope_limit:
   only_modify:
     - "tests/uat/throughput.py"
     - "tests/uat/test_throughput.py"
+    - "tests/uat/runner.py"
+    - "tests/uat/test_runner.py"
     - "benchbox/cli/ (run-official output contract)"
     - "docs/reference/public-contracts.md"
 

@@ -870,12 +870,19 @@ def _docker_result_message(result: docker_assets.DockerCommandResult) -> str:
 
 
 def append_lifecycle_log(log_dir: Path | None, line: str) -> None:
-    """Append a timestamped line to uat_lifecycle.log. Public: also called from orchestrator.py (sweep-start engine identity, uat-container-engine-routing w2)."""
+    """Append a timestamped line to uat_lifecycle.log. Public: also called from orchestrator.py (sweep-start engine identity, uat-container-engine-routing w2).
+
+    The timestamp is offset-aware (``datetime.now().astimezone()``, not plain
+    ``datetime.now()``) so a release-gate boundary comparison spanning a DST
+    transition (see report.py's ``release_gate_ordering_violations``) can use
+    each event's own recorded offset instead of having to assume one (#1179,
+    #1202 follow-up).
+    """
     if log_dir is None:
         return
     log_dir.mkdir(parents=True, exist_ok=True)
     with (log_dir / "uat_lifecycle.log").open("a", encoding="utf-8") as fh:
-        fh.write(f"{_dt.datetime.now().isoformat(timespec='seconds')} {line}\n")
+        fh.write(f"{_dt.datetime.now().astimezone().isoformat(timespec='seconds')} {line}\n")
 
 
 def default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
