@@ -2,7 +2,7 @@ id: auto-merge-review-gate-admin-enforcement
 title: "Make the soundness-path review gate enforceable at the repo layer, not just code"
 worktree: main
 priority: High
-status: In Progress
+status: Completed
 category: Release Tooling
 
 description: |
@@ -75,13 +75,12 @@ work:
 
   - id: w3
     summary: "Verify enforcement end-to-end once the admin applies the ruleset change"
-    status: pending
+    status: done
     needs: [w1, w2]
     notes: |
-      After the deferred admin action lands: open a throwaway soundness-path PR with
-      0 approvals and confirm it cannot be squash-merged (ruleset blocks it), and
-      that the meta-check (w1) is green. Record evidence. This work unit stays
-      pending until the admin action (deferred) completes.
+      CANCELLED by the 2026-07-18 retirement decision (see resolution_notes):
+      the admin action this waited on was retired without being applied, so
+      there is no enforcement to verify. Closed as retired, not as verified.
 
 must_preserve:
   - "The code-side withholding behavior (pr-open + auto-merge-on-open.yml shared predicate, --no-renames) is unchanged."
@@ -118,4 +117,39 @@ metadata:
   tags: [release, auto-merge, soundness, ci, governance, holistic-review-followup]
   estimated_effort: "Small"
   created_date: "2026-06-30"
-  last_updated: "2026-06-30T00:00:00"
+  last_updated: "2026-07-18T00:00:00"
+
+resolution_notes: |
+  Closed 2026-07-18 as RETIRED, not as achieved. The anti-pattern above says
+  "DO NOT mark this Completed while the ruleset still shows review_count 0 /
+  code-owner review false" -- to be explicit: the ruleset STILL shows
+  require_code_owner_review: false, and the success metric "develop ruleset
+  shows require_code_owner_review true" was NOT met. It was retired by an
+  explicit maintainer decision instead of implemented, because the target is
+  unachievable in this repo's operating model: every PR (agent-authored
+  included) is opened under the sole code owner's account, GitHub forbids a
+  PR author approving their own PR, and the develop ruleset has no bypass
+  actors -- so applying the PUT would have deadlocked every soundness-path PR
+  rather than gating it.
+
+  Disposition of the work units:
+  - w0-w2 (live-state capture, CI meta-check/predicate, runbook
+    documentation) shipped earlier and their history stands.
+  - w3 and the deferred admin PUT are cancelled by the retirement decision.
+  - The warn-until-enforced machinery w1 introduced was REMOVED with the
+    retirement (a perpetual warning for an intentional state is noise):
+    scripts/ruleset_drift_check.py no longer checks the develop ruleset's
+    pull_request review settings, ruleset_review_enforcement.py retains only
+    the tag-creation predicates, and
+    tests/unit/release/test_ruleset_drift_review_coverage.py now pins that a
+    develop ruleset without a code-owner-review rule produces no findings.
+
+  The operative soundness control remains auto-merge withholding
+  (make pr-open + auto-merge-on-open.yml via SOUNDNESS_PREFIXES/CODEOWNERS)
+  plus a manual owner review-and-merge. The residual same-repo
+  workflow-tamper risk is recorded and accepted in
+  docs/operations/repo-admin-settings.md, "Soundness-path review enforcement
+  (RETIRED 2026-07-18)" -- that section also lists the revisit triggers
+  (additional write-access collaborators, or agent PRs moving to a separate
+  bot identity, which would remove the self-approval deadlock and make the
+  rule enforceable).

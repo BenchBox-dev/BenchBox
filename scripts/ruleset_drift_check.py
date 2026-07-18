@@ -22,29 +22,22 @@ sys.path.insert(0, str(REPO_ROOT / "_project" / "scripts"))
 
 from ruleset_review_enforcement import (  # noqa: E402
     TAG_RULESET_ENFORCED,
-    extract_rules,
-    review_enforcement_findings,
     tag_bypass_advisory,
     tag_protection_findings,
 )
 
 # Findings with this prefix are surfaced (rendered, included in the JSON
 # `findings` list) exactly like any other drift finding, but do NOT flip the
-# exit code / `status` field to failed. Used for the develop review-rule gap
-# below while it is still a pending admin action.
+# exit code / `status` field to failed. Used for warn-until-applied checks
+# and human-confirmation advisories (see tag_creation_findings).
+#
+# Note: until 2026-07-18 a develop review-rule check (require_code_owner_review,
+# DEVELOP_REVIEW_RULE_ENFORCED) also used this prefix. That target was retired
+# without being applied -- the sole code owner authors every PR and GitHub
+# forbids self-approval, so the rule would have deadlocked soundness-path PRs.
+# See docs/operations/repo-admin-settings.md, "Soundness-path review
+# enforcement (RETIRED 2026-07-18)".
 WARNING_PREFIX = "WARNING (non-blocking): "
-
-# Decision (ruleset-drift-check-review-rule-coverage, w1): WARN-until-enforced.
-# The live develop ruleset does not yet require a code-owner review
-# (docs/operations/repo-admin-settings.md's "Soundness-path review
-# enforcement" section - deferred admin action tracked by
-# auto-merge-review-gate-admin-enforcement). Flipping this straight to a
-# blocking check would make the daily release-canary.yml run (and the
-# validate-main-pr.yml bootstrap invocation) permanently red until that
-# admin PUT lands. Flip this constant to True once that TODO's w3 confirms
-# the PUT has landed - this is the one-line change referenced by that
-# decision; no other code here needs to change.
-DEVELOP_REVIEW_RULE_ENFORCED = False
 
 
 @dataclass(frozen=True)
@@ -167,21 +160,15 @@ def compare_ruleset(
     live: dict[str, Any],
     *,
     require_bypass_actor_visibility: bool = False,
-    enforce_review_rule: bool = DEVELOP_REVIEW_RULE_ENFORCED,
 ) -> list[str]:
     """Return human-readable drift findings for one ruleset.
 
-    For ``develop-squash-only`` only (``main-release-only`` has no equivalent
-    documented requirement), also runs the shared
-    ``ruleset_review_enforcement.review_enforcement_findings`` predicate
-    against the already-fetched live payload (via ``extract_rules`` - no
-    second API fetch) so a missing code-owner-review rule surfaces here too.
-    While ``enforce_review_rule`` is ``False`` (the default, driven by
-    ``DEVELOP_REVIEW_RULE_ENFORCED``), those findings are prefixed with
-    ``WARNING_PREFIX``: they render in the same findings list / JSON output
-    as any other drift finding, but the caller (``main``) excludes
-    ``WARNING_PREFIX``-prefixed entries when deciding the exit code, so the
-    canary does not go red for a gap that is still a pending admin action.
+    Deliberately does NOT inspect the ``pull_request`` rule's review settings:
+    the ``require_code_owner_review`` target for ``develop-squash-only`` was
+    retired on 2026-07-18 (self-approval deadlock -- see the runbook's
+    "Soundness-path review enforcement (RETIRED 2026-07-18)" section), so a
+    develop ruleset without a code-owner-review rule is the intended state,
+    not drift.
     """
     findings: list[str] = []
     if live.get("enforcement") != "active":
@@ -222,14 +209,6 @@ def compare_ruleset(
                 actor_types = [actor.get("actor_type", "(unknown)") for actor in bypass_actors]
                 findings.append(f"{expected.name}: bypass actors {actor_types!r}, expected none")
 
-    if expected.name == "develop-squash-only":
-        review_findings = review_enforcement_findings(extract_rules(live))
-        if review_findings:
-            if enforce_review_rule:
-                findings.extend(review_findings)
-            else:
-                findings.extend(f"{WARNING_PREFIX}{finding}" for finding in review_findings)
-
     return findings
 
 
@@ -248,11 +227,10 @@ def tag_creation_findings(
     fixed expected name — any ruleset with ``target: "tag"`` that covers
     ``refs/tags/v*`` with a ``creation`` rule counts.
 
-    Mirrors the ``DEVELOP_REVIEW_RULE_ENFORCED`` WARN-until-applied pattern:
-    while ``enforce_tag_rule`` is ``False`` (the default, driven by
-    ``TAG_RULESET_ENFORCED``), a missing/incomplete tag ruleset is a
-    ``WARNING_PREFIX``-prefixed finding — visible, non-blocking — until the
-    admin POST lands and the flag is flipped.
+    WARN-until-applied pattern: while ``enforce_tag_rule`` is ``False`` (the
+    default, driven by ``TAG_RULESET_ENFORCED``), a missing/incomplete tag
+    ruleset is a ``WARNING_PREFIX``-prefixed finding — visible, non-blocking —
+    until the admin POST lands and the flag is flipped.
     """
     findings: list[str] = []
     protection_findings = tag_protection_findings(all_live_rulesets)

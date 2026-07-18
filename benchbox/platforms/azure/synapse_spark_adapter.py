@@ -753,15 +753,28 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
         Returns:
             SynapseSparkAdapter instance.
         """
-        return cls(
-            workspace_name=config.get("workspace_name"),
-            spark_pool_name=config.get("spark_pool_name"),
-            storage_account=config.get("storage_account"),
-            storage_container=config.get("storage_container"),
-            storage_path=config.get("storage_path"),
-            tenant_id=config.get("tenant_id"),
-            livy_endpoint=config.get("livy_endpoint"),
-            timeout_minutes=config.get("timeout_minutes", 60),
-            spark_config=config.get("spark_config"),
-            table_format=config.get("table_format"),
-        )
+        params: dict[str, Any] = {
+            "workspace_name": config.get("workspace_name"),
+            "spark_pool_name": config.get("spark_pool_name"),
+            "storage_account": config.get("storage_account"),
+            "storage_container": config.get("storage_container"),
+            "storage_path": config.get("storage_path"),
+            "tenant_id": config.get("tenant_id"),
+            "livy_endpoint": config.get("livy_endpoint"),
+            "timeout_minutes": config.get("timeout_minutes", 60),
+            "spark_config": config.get("spark_config"),
+            "table_format": config.get("table_format"),
+        }
+
+        # Pass through tuning provenance/config
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+        ]:
+            if key in config:
+                params[key] = config[key]
+
+        return cls(**params)

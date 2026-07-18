@@ -719,6 +719,17 @@ spark.stop()
             scale = config.get("scale_factor", 1)
             params["cluster_name"] = f"benchbox-{benchmark}-sf{scale}-{uuid.uuid4().hex[:6]}"
 
+        # Pass through tuning provenance/config
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+        ]:
+            if key in config:
+                params[key] = config[key]
+
         return cls(**params)
 
     # configure_for_benchmark is inherited from CloudSparkConfigMixin

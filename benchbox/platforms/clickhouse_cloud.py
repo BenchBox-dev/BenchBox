@@ -298,6 +298,17 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         if "benchmark" in config:
             adapter_config["benchmark"] = config["benchmark"]
 
+        # Pass through tuning provenance/config
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+        ]:
+            if key in config:
+                adapter_config[key] = config[key]
+
         return cls(**adapter_config)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:

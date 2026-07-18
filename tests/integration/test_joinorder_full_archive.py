@@ -70,10 +70,16 @@ CANONICAL_NULL_COUNTS: dict[tuple[str, str], int] = {
 # (count of rows containing a non-ASCII byte, sha256 over the ordered
 # id\x1fvalue\x1e stream of those rows). A latin1 misread, truncation, or
 # re-encode would change the count or the hash.
+#
+# #1128 review: these were originally pinned against a buggy WHERE clause
+# (`column ~ '[^\x00-\x7F]'` - DuckDB's `~` is regexp_full_match, so it only
+# matched rows consisting ENTIRELY of one non-ASCII character), which
+# selected a near-empty set. Recomputed against the corrected
+# regexp_matches() contains-match query below.
 UTF8_FIDELITY: dict[tuple[str, str], tuple[int, str]] = {
-    ("title", "title"): (5, "99cc1eb7d57881fbf7966886718c359570ce85045ab759912e9fa278de582bc9"),
-    ("char_name", "name"): (4, "73f997632839dcd98adff8b5fe89785c255cb6a450e63589eb8d5b2e9f0a6389"),
-    ("aka_title", "title"): (2, "7f140d945dc9b7e0a759bf9131e628f23467decdcf82750060a616d1b2afe28f"),
+    ("title", "title"): (155075, "b615f169051a3c855d0f3209134f9c70eff2e789e4c58efd7da3aa86d554e8e9"),
+    ("char_name", "name"): (191219, "49c688de8cf3a7069a8d29d17af1ee55c814bd4f7c3f726d4795b42cfd674d94"),
+    ("aka_title", "title"): (41318, "19a3c9634ba4c99ae6480122feb5256965bdc19d95a64fcb38bae5b7f92a0d6a"),
 }
 
 
@@ -114,13 +120,50 @@ def archive_dir() -> Path:
     Reuses a locally present/cached archive (no re-download); skips when the
     archive cannot be materialized (offline, missing optional deps, etc.).
     """
+    from benchbox.core.data_fetch.errors import DownloadError
     from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
 
     try:
         paths = JoinOrderBenchmark().generate_data()
-    except Exception as exc:  # noqa: BLE001 - any fetch/verify failure => skip
+    except (DownloadError, ImportError, OSError) as exc:
+        # True availability failures only (offline, missing the optional
+        # zstandard extraction dependency, local filesystem issues) - skip.
+        # A ChecksumMismatchError/ManifestValidationError means the archive
+        # WAS materialized but is corrupt or stale, which is exactly the
+        # class of defect this suite exists to catch; letting it propagate
+        # as a real failure (not caught here) is intentional.
         pytest.skip(f"canonical joinorder archive unavailable: {exc}")
     return paths[0].parent
+
+
+def test_archive_dir_fixture_skips_only_on_availability_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    """#1128 review: a corrupt/stale archive (ChecksumMismatchError) must FAIL
+    this suite, not silently pytest.skip it away - that is exactly the class
+    of defect the full-archive assurance tests exist to catch. Only true
+    availability failures (offline, missing the zstandard extraction
+    dependency, local filesystem issues) should skip."""
+    from benchbox.core.data_fetch.errors import ChecksumMismatchError, DownloadError
+    from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
+
+    fixture_fn = archive_dir.__wrapped__
+
+    monkeypatch.setattr(
+        JoinOrderBenchmark,
+        "generate_data",
+        lambda self: (_ for _ in ()).throw(DownloadError("offline")),
+    )
+    with pytest.raises(pytest.skip.Exception):
+        fixture_fn()
+
+    monkeypatch.setattr(
+        JoinOrderBenchmark,
+        "generate_data",
+        lambda self: (_ for _ in ()).throw(
+            ChecksumMismatchError(path="title.parquet", expected_sha256="a" * 64, actual_sha256="b" * 64)
+        ),
+    )
+    with pytest.raises(ChecksumMismatchError):
+        fixture_fn()
 
 
 @pytest.fixture(scope="module")
@@ -210,7 +253,8 @@ def test_full_archive_utf8_multibyte_fidelity(archive_conn: Any) -> None:
     for (table, column), (expected_count, expected_sha256) in UTF8_FIDELITY.items():
         rows = archive_conn.execute(
             f"SELECT id, {_quote_ident(column)} FROM {_quote_ident(table)} "
-            f"WHERE {_quote_ident(column)} ~ '[^\\x00-\\x7F]' ORDER BY id, {_quote_ident(column)}"
+            f"WHERE regexp_matches({_quote_ident(column)}, '[^\\x00-\\x7F]') "
+            f"ORDER BY id, {_quote_ident(column)}"
         ).fetchall()
         assert len(rows) == expected_count
         digest = hashlib.sha256()
