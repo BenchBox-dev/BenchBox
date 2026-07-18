@@ -41,12 +41,21 @@ class ClickHouseWorkloadMixin:
                 tuning_config=effective_config,
             )
 
+            # Physical table_tunings (partitioning/sorting/clustering columns)
+            # render only when tuning is actually enabled -- matching the same
+            # `self.tuning_enabled` gate DataLoader/apply_ctas_sort use
+            # elsewhere, and per ADR-3 baseline policy (notuning = platform
+            # defaults + engine-mandatory only, no tuned rendering).
+            table_tunings = None
+            if self.tuning_enabled and effective_config is not None:
+                table_tunings = effective_config.table_tunings
+
             # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
             for statement in statements:
                 # Optimize table definitions for ClickHouse
-                statement = self._optimize_table_definition(statement)
+                statement = self._optimize_table_definition(statement, table_tunings)
                 connection.execute(statement)
                 self.logger.debug(f"Executed schema statement: {statement[:100]}...")
 
@@ -58,8 +67,21 @@ class ClickHouseWorkloadMixin:
 
         return elapsed_seconds(start_time)
 
-    def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize table definition for ClickHouse."""
+    def _optimize_table_definition(self, statement: str, table_tunings: dict[str, Any] | None = None) -> str:
+        """Optimize table definition for ClickHouse.
+
+        Args:
+            statement: A single CREATE TABLE statement.
+            table_tunings: Optional mapping of table_name -> TableTuning, from
+                the effective tuning configuration, present only when tuning
+                is enabled (see create_schema). When a matching, non-empty
+                TableTuning exists for this statement's table, tuned
+                PARTITION BY/ORDER BY clauses are rendered via
+                core.tuning.generators.clickhouse.ClickHouseDDLGenerator --
+                the same generator dry-run preview uses (ADR-3 single
+                renderer) -- instead of the engine-mandatory PK/tuple()
+                fallback below.
+        """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
@@ -95,17 +117,34 @@ class ClickHouseWorkloadMixin:
             else:
                 statement = statement + " ENGINE = MergeTree()"
 
+        tuning_clauses = self._resolve_tuned_ddl_clauses(statement, table_tunings)
+
+        # Include PARTITION BY if not present and the tuned generator produced one.
+        statement_upper = statement.upper()
+        if "PARTITION BY" not in statement_upper and tuning_clauses is not None and tuning_clauses.partition_by:
+            partition_clause = f" PARTITION BY ({tuning_clauses.partition_by})"
+            if statement.endswith(";"):
+                statement = statement[:-1] + partition_clause + ";"
+            else:
+                statement = statement + partition_clause
+
         # Include ORDER BY if not present
         statement_upper = statement.upper()
         if "ORDER BY" not in statement_upper:
-            # Extract primary key columns if any exist in the statement
-            pk_columns = self._extract_primary_key_columns(statement)
-            if pk_columns:
-                # Use primary key columns for ORDER BY to satisfy ClickHouse requirement
-                order_by_clause = f" ORDER BY ({', '.join(pk_columns)})"
+            if tuning_clauses is not None and tuning_clauses.sort_by:
+                # Tuned rendering: ORDER BY (sort + clustering columns), via
+                # the shared ClickHouseDDLGenerator.
+                order_by_clause = f" ORDER BY ({tuning_clauses.sort_by})"
             else:
-                # Use tuple() for tables without primary keys
-                order_by_clause = " ORDER BY tuple()"
+                # Engine-mandatory baseline: MergeTree requires ORDER BY.
+                # Extract primary key columns if any exist in the statement.
+                pk_columns = self._extract_primary_key_columns(statement)
+                if pk_columns:
+                    # Use primary key columns for ORDER BY to satisfy ClickHouse requirement
+                    order_by_clause = f" ORDER BY ({', '.join(pk_columns)})"
+                else:
+                    # Use tuple() for tables without primary keys
+                    order_by_clause = " ORDER BY tuple()"
 
             if statement.endswith(";"):
                 statement = statement[:-1] + order_by_clause + ";"
@@ -113,6 +152,42 @@ class ClickHouseWorkloadMixin:
                 statement = statement + order_by_clause
 
         return statement
+
+    def _resolve_tuned_ddl_clauses(self, statement: str, table_tunings: dict[str, Any] | None):
+        """Resolve tuned PARTITION BY/ORDER BY clauses for this statement's table, if any.
+
+        Returns None when tuning is not enabled, no table_tuning is
+        configured for this table, or the configured table_tuning has no
+        partitioning/sorting/clustering columns -- callers fall back to the
+        engine-mandatory baseline in that case.
+        """
+        if not table_tunings:
+            return None
+
+        import re
+
+        match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)", statement, re.IGNORECASE)
+        if not match:
+            return None
+        table_name = match.group(1)
+
+        # Benchmark table names are lowercase while shipped tuning templates
+        # key tables uppercase (e.g. "LINEITEM") -- same case-insensitive
+        # lookup pattern as core/dryrun.py's _extract_ddl_preview.
+        table_tuning = None
+        for configured_name, configured_tuning in table_tunings.items():
+            if str(configured_name).upper() == table_name.upper():
+                table_tuning = configured_tuning
+                break
+
+        if table_tuning is None or not table_tuning.has_any_tuning():
+            return None
+
+        from benchbox.core.tuning.ddl_generator import get_ddl_generator
+
+        generator = get_ddl_generator("clickhouse")
+        clauses = generator.generate_tuning_clauses(table_tuning)
+        return None if clauses.is_empty() else clauses
 
     def _extract_primary_key_columns(self, statement: str) -> list[str]:
         """Extract primary key column names from a CREATE TABLE statement.

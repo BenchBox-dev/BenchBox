@@ -294,6 +294,7 @@ def reconstruct_benchmark_results(
         tunings_applied=tuning["tunings_applied"],
         tuning_source_file=tuning["tuning_source_file"],
         tuning_config_hash=tuning["tuning_config_hash"],
+        tuning_source=tuning["tuning_source"],
         tuning_validation_status=tuning["tuning_validation_status"],
         query_plans_captured=plans_captured,
         plan_capture_failures=plan_failures,
@@ -365,27 +366,56 @@ def _extract_platform_info(platform_section: dict[str, Any]) -> dict[str, Any]:
 
 
 def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str, Any] | None) -> dict[str, Any]:
-    """Extract tuning configuration from platform section and companion data."""
+    """Extract tuning configuration from platform section and companion data.
+
+    Prefers the new ADR-1 fields (``requested_config_hash``, ``tuning_source``)
+    and falls back to the legacy ``hash``/``source`` bridge keys for older
+    bundles that predate this extraction (see schema.py's
+    ``_legacy_tuning_source_bridge``).
+    """
     tunings_applied = None
     tuning_source_file = None
     tuning_config_hash = None
+    tuning_source = None
     tuning_validation_status = None
 
     tuning_summary = platform_section.get("tuning", {})
     if tuning_summary:
+        tuning_config_hash = tuning_summary.get("requested_config_hash") or tuning_summary.get("hash")
+        tuning_source = tuning_summary.get("tuning_source")
+        # Legacy fidelity: pre-ADR-1 bundles only ever recorded a "yaml"/"auto"
+        # source in the summary block, with no companion .tuning.json carrying
+        # a real source_file. Reconstruct the old "yaml" sentinel here so those
+        # summary-only bundles keep round-tripping a truthy tuning_source_file,
+        # matching this function's pre-existing behavior.
         tuning_source_file = "yaml" if tuning_summary.get("source") == "yaml" else None
-        tuning_config_hash = tuning_summary.get("hash")
 
     if tuning_data:
-        tunings_applied = tuning_data.get("clauses", {})
+        requested = tuning_data.get("requested")
+        if requested:
+            # schema.py's _requested_tuning_sections groups
+            # primary_keys/foreign_keys/unique_constraints/check_constraints
+            # under requested["constraints"] for export. tunings_applied must
+            # carry the flat UnifiedTuningConfiguration.to_dict() shape
+            # (builder.py's documented contract) so a load -> re-export round
+            # trip through build_tuning_payload doesn't drop every constraint
+            # and its platform.tuning.counts entry.
+            tunings_applied = dict(requested.get("constraints") or {})
+            for key in ("platform_optimizations", "table_tunings"):
+                if key in requested:
+                    tunings_applied[key] = requested[key]
+        else:
+            tunings_applied = tuning_data.get("clauses", {})
         tuning_source_file = tuning_data.get("source_file")
-        tuning_config_hash = tuning_data.get("hash")
+        tuning_config_hash = tuning_data.get("requested_config_hash") or tuning_data.get("hash") or tuning_config_hash
+        tuning_source = tuning_data.get("tuning_source") or tuning_source
         tuning_validation_status = tuning_data.get("validation_status")
 
     return {
         "tunings_applied": tunings_applied,
         "tuning_source_file": tuning_source_file,
         "tuning_config_hash": tuning_config_hash,
+        "tuning_source": tuning_source,
         "tuning_validation_status": tuning_validation_status,
     }
 

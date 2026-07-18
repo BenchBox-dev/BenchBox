@@ -50,7 +50,7 @@ work:
 
 deferred:
   - summary: "Throughput performance-regression thresholds (Throughput@Size floor per platform/scale)"
-    reason: "Needs baseline data from several green nightly runs before a floor is defensible; premature thresholds create flake."
+    reason: "Needs baseline data from several green nightly runs before a floor is defensible; premature thresholds create flake. Promoted to [[uat-throughput-regression-threshold-policy]] (2026-07-16), which needs this item."
   - summary: "Widening nightly throughput coverage beyond DuckDB TPC-H SF1"
     reason: "Runtime budget: the job has a 20-minute timeout; adding platforms belongs to a capacity decision, not this gate fix."
 

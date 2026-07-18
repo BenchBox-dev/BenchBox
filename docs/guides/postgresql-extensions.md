@@ -120,7 +120,7 @@ Compare on real-world analytical query patterns:
 ```bash
 benchbox run --platform pg-mooncake --benchmark clickbench
 benchbox run --platform duckdb --benchmark clickbench
-benchbox run --platform clickhouse --benchmark clickbench
+benchbox run --platform clickhouse-local --benchmark clickbench
 ```
 
 ### Time-Series (TSBS)

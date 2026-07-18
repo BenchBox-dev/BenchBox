@@ -150,6 +150,30 @@ facets and raw platform metadata, `phases.<stage>` for lifecycle-stage
 summaries, and `comparisons.*` for cross-engine comparison data. New top-level
 keys require a public-contract update and consumer tests.
 
+##### `platform.tuning` (optional)
+
+Present only when a run resolved a tuning configuration (`--tuning` other than
+`notuning` producing an empty baseline). All values are **self-attested** -
+they describe what was *requested*, not an independently verified record of
+what physically applied (see `docs/development/tuning-adr-001-trust-and-hash-semantics.md`).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tuning_source` | string | Raw `TuningSource` enum value: `explicit_file`, `auto_discovered`, `smart_defaults`, `baseline`, `wizard`, or `fallback`. |
+| `requested_config_hash` | string | Full 64-hex-char SHA-256 over the requested `UnifiedTuningConfiguration.to_dict()` (canonical JSON, sorted keys). Identifies the requested template regardless of platform or dict ordering. |
+| `counts.tables_tuned` | number | Number of tables with at least one table-level tuning (partitioning/clustering/distribution/sorting). |
+| `counts.tuning_types` | array | Sorted list of tuning categories actually active (constraint names, platform optimization flags, table-tuning clause types). |
+| `logical_profile` | object | Optional workload-profile coverage metadata (unrelated to the requested-config hash). |
+| `source`, `hash` | string | **Legacy bridge keys**, kept for one schema generation so any external consumer of these documented keys keeps working (this is not the explorer ingest pipeline, which reads tuning facets from `data["config"]`, never from `platform.tuning`). `source` is `"yaml"` when `tuning_source` is `explicit_file`/`auto_discovered`, else `"auto"`. `hash` mirrors `requested_config_hash`. Do not add new readers of these two keys - read `tuning_source`/`requested_config_hash` instead. |
+
+The `.tuning.json` companion file (same base filename, `.tuning.json` suffix)
+carries the full detail: `requested.constraints` (primary/foreign key, unique,
+and check constraint settings), `requested.platform_optimizations`
+(non-default values only), `requested.table_tunings` (complete per-table
+tuning structure), plus `requested_config_hash`, `tuning_source`, and
+`source_file` (a repo-relative path or `"<basename>:<content-hash>"` -
+never a raw local filesystem path).
+
 #### Run Block
 | Field | Type | Description |
 |-------|------|-------------|

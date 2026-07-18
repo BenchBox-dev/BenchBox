@@ -179,6 +179,7 @@ def test_subcommands_table_covers_all_make_targets():
         "cell",
         "docker-cleanup",
         "execute",
+        "gate-check",
         "validate",
         "package",
         "explorer-smoke",
@@ -214,6 +215,38 @@ def test_sweep_main_forwards_dry_run_override(monkeypatch, capsys):
     assert rc == 0
     assert calls == [(Path("tests/uat/configs/uat-2026-05-02.yaml"), True)]
     assert '"phase_exit_codes"' in capsys.readouterr().out
+
+
+def test_stress_main_forwards_platform_benchmark_scale_as_stress_overrides(monkeypatch, capsys):
+    """w3: _handle_stress routes through run_sweep_from_path(stress_overrides=...)
+    instead of hand-duplicating the platform/benchmark/scale override logic.
+    """
+    calls: list[tuple[Path, dict]] = []
+
+    class StubResult:
+        name = "stub"
+        log_dir = Path("logs")
+        aborted_phase = None
+        abort_reason = None
+        phase_exit_codes = {"execute": 0}
+
+        def exit_code(self):
+            return 0
+
+    def fake_run_sweep_from_path(config_path, *, dry_run_override=None, stress_overrides=None):
+        assert dry_run_override is None
+        calls.append((config_path, stress_overrides))
+        return StubResult()
+
+    monkeypatch.setattr("tests.uat.orchestrator.run_sweep_from_path", fake_run_sweep_from_path)
+    rc = _cli.main(["stress", "--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.5"])
+
+    assert rc == 0
+    default_config_path = Path("tests/uat/_cli.py").resolve().parent / "configs" / "stress-default.yaml"
+    assert calls == [(default_config_path, {"platform": "duckdb", "benchmark": "tpch", "scale": 0.5})]
+    out = capsys.readouterr().out
+    assert '"phase_exit_codes"' in out
+    assert "abort_reason" not in out
 
 
 def test_make_uat_sweep_forwards_dry_run_variable():
@@ -335,10 +368,301 @@ def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeyp
     rc = _cli.main(["execute", "--config", str(config_path)])
 
     assert rc == 0
+    # free_space_checks_enabled is True even though "preflight" is absent from
+    # `phases:` -- the disk gate is always-on for execute-bearing runs,
+    # decoupled from phase-list membership (uat-disk-gate-always-on w1).
     assert captured == {
         "docker_manage_platforms": True,
         "docker_platform_switch": "volumes",
         "cleanup_enabled": True,
-        "free_space_checks_enabled": False,
+        "free_space_checks_enabled": True,
     }
     assert '"name": "managed-cli"' in capsys.readouterr().out
+
+
+def test_uat_execute_and_execute_only_sweep_produce_identical_cells_jsonl(tmp_path, monkeypatch, capsys):
+    """uat-execute-path-unification w2 parity requirement.
+
+    Post-unification, both `make uat-execute` and `make uat-sweep` share
+    `orchestrator.run_sweep`, so byte-identical cells.jsonl is largely a
+    given. What this test actually pins is that `_handle_execute`'s
+    config-scoping (phases narrowed to `[preflight?, execute]`, cleanup
+    override applied) is cell-output-neutral, and it guards against a
+    future change quietly re-diverging the two entry points.
+    """
+    from tests.uat.config import load_config
+    from tests.uat.orchestrator import run_sweep
+    from tests.uat.runner import CellResult
+
+    def fake_run_cell(platform, benchmark, scale, **kwargs):
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.23,
+            log_path=Path("/nonexistent/cell.log"),
+            result_path=Path("/nonexistent/result.json"),
+        )
+
+    monkeypatch.setattr("tests.uat.phases.execute.run_cell", fake_run_cell)
+
+    config_path = tmp_path / "uat.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                'name: "parity-smoke"',
+                "phases: [execute]",
+                "platforms:",
+                '  include: ["duckdb"]',
+                "benchmarks:",
+                '  include: ["tpch"]',
+                "scales:",
+                "  rungs: [0.01]",
+                "preflight:",
+                "  free_space_min_gib: 0",
+                "output:",
+                f'  logs_dir_template: "{tmp_path / "execute-run"}"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rc = _cli.main(["execute", "--config", str(config_path)])
+    assert rc == 0
+    execute_summary = json.loads(capsys.readouterr().out)
+    execute_log_dir = Path(execute_summary["log_dir"])
+
+    sweep_config = load_config(config_path)
+    sweep_log_dir = tmp_path / "sweep-run"
+    run_sweep(sweep_config, log_dir_override=sweep_log_dir)
+
+    execute_cells = (execute_log_dir / "cells.jsonl").read_text(encoding="utf-8")
+    sweep_cells = (sweep_log_dir / "cells.jsonl").read_text(encoding="utf-8")
+    assert execute_cells == sweep_cells
+
+    execute_sidecar = (execute_log_dir / "cells.jsonl.accounting.json").read_text(encoding="utf-8")
+    sweep_sidecar = (sweep_log_dir / "cells.jsonl.accounting.json").read_text(encoding="utf-8")
+    assert execute_sidecar == sweep_sidecar
+
+
+def test_execute_main_reports_success_for_dry_run_config(tmp_path, monkeypatch, capsys):
+    """#1146 review: a `dry_run: true` config never invokes run_execute, so
+    `result.execute_outcome` stays None -- but that's not an abort. Before
+    this fix, `_handle_execute` treated a None outcome as *always* an abort
+    and hardcoded exit 2, so `make uat-execute` on a dry-run config failed
+    even though the (no-op) phase loop succeeded.
+    """
+    config_path = tmp_path / "uat.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                'name: "dry-run-smoke"',
+                "dry_run: true",
+                "phases: [execute]",
+                "platforms:",
+                '  include: ["duckdb"]',
+                "benchmarks:",
+                '  include: ["tpch"]',
+                "scales:",
+                "  rungs: [0.01]",
+                "output:",
+                f'  logs_dir_template: "{tmp_path / "dry-run-execute"}"',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    def fail_run_execute(config, **kwargs):
+        raise AssertionError("dry_run: true must not invoke run_execute")
+
+    monkeypatch.setattr("tests.uat.phases.execute.run_execute", fail_run_execute)
+
+    rc = _cli.main(["execute", "--config", str(config_path)])
+
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["aborted"] is False
+    assert summary["abort_reason"] is None
+    assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# uat-release-gate-enforcement w3: gate-check subcommand.
+# ---------------------------------------------------------------------------
+
+
+def _write_stage(tmp_path: Path, index: int, name: str, completed_at: str, **overrides) -> Path:
+    from tests.uat import gate_summary
+
+    kwargs = {
+        "config_name": name,
+        "source_commit_sha": "abc123",
+        "source_dirty": False,
+        "container_engine": "docker",
+        "completed_at": completed_at,
+        "dry_run": False,
+        "aborted": False,
+        "abort_phase": None,
+        "abort_reason": None,
+        "phase_exit_codes": {"execute": 0, "validate": 0, "explorer_smoke": 0, "report": 0},
+        "accounting": gate_summary.PhaseAccounting(attempted=5, passed=5, total_defined=5),
+        "unreachable_is_estimated": False,
+        "validator_clean_rate": 1.0,
+        "validator_clean_rate_floor": 1.0,
+        "validator_floor_breached": False,
+        "cross_scale_clean_pairs": 10,
+        "cross_scale_floor": 8,
+        "cross_scale_floor_breached": False,
+        "explorer_smoke_status": "ran",
+        "verdict": "green",
+    }
+    kwargs.update(overrides)
+    stage_dir = tmp_path / f"stage{index}"
+    stage_dir.mkdir(exist_ok=True)
+    gate_summary.write_gate_summary(stage_dir, gate_summary.GateSummary(**kwargs))
+    return stage_dir
+
+
+def test_gate_check_green_writes_combined_evidence(tmp_path: Path, capsys):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    (s2 / "uat_lifecycle.log").write_text(
+        "2026-07-10T11:00:00 [docker] platform=starrocks action=up status=ok\n", encoding="utf-8"
+    )
+    (s3 / "uat_lifecycle.log").write_text(
+        "2026-07-10T13:00:00 [docker] platform=postgresql action=up status=ok\n", encoding="utf-8"
+    )
+    output = tmp_path / "evidence" / "uat-gate-summary.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "green"
+    assert payload["source_commit_sha"] == "abc123"
+    assert payload["ordering_violations"] == []
+    stdout = capsys.readouterr().out
+    assert "APPROVE" in stdout
+
+
+def test_gate_check_flags_docker_up_before_stage1_completion(tmp_path: Path, capsys):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    # Stage-2 Docker stack came up BEFORE stage 1 completed: the contamination
+    # the 2026-05-28/29 evidence had.
+    (s2 / "uat_lifecycle.log").write_text(
+        "2026-07-10T09:00:00 [docker] platform=starrocks action=up status=ok\n", encoding="utf-8"
+    )
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+    assert any("stage1 boundary" in violation for violation in payload["ordering_violations"])
+
+
+def test_gate_check_flags_stage3_docker_up_before_stage2_completion(tmp_path: Path):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    # After stage 1, but stage 3's stack overlapped stage 2's window.
+    (s3 / "uat_lifecycle.log").write_text(
+        "2026-07-10T11:00:00 [docker] platform=postgresql action=up status=ok\n", encoding="utf-8"
+    )
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert any("stage2 boundary" in violation for violation in payload["ordering_violations"])
+
+
+def test_gate_check_red_stage_blocks_and_reports_reason(tmp_path: Path, capsys):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(
+        tmp_path,
+        2,
+        "release-gate-02-docker-nonoltp",
+        "2026-07-10T12:00:00",
+        verdict="red",
+        phase_exit_codes={"execute": 1, "report": 1},
+    )
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 1
+    assert "HOLD" in capsys.readouterr().err
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+
+
+def test_gate_check_missing_stage_summary_is_a_hard_error(tmp_path: Path, capsys):
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    missing = tmp_path / "stage3-not-run"
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(missing), "--output", str(output)]
+    )
+
+    assert rc == 2
+    assert not output.exists()
+    assert "not found" in capsys.readouterr().err
+
+
+def test_gate_check_same_run_dir_passed_thrice_is_red(tmp_path: Path):
+    """R1(a) at the CLI: pointing all three STAGEn args at one run dir must HOLD."""
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+
+    output = tmp_path / "evidence.json"
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s1), "--stage3", str(s1), "--output", str(output)]
+    )
+
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+    assert any("do not match the expected" in reason for reason in payload["reasons"])
+
+
+def test_gate_check_docker_stage_without_lifecycle_log_is_red(tmp_path: Path):
+    """C1: a Docker stage (2/3) with no uat_lifecycle.log cannot verify ordering -- HOLD, not silent pass."""
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    # Stage 3 has a log; stage 2 does not. Stage 1 never needs one.
+    (s3 / "uat_lifecycle.log").write_text(
+        "2026-07-10T13:00:00 [docker] platform=postgresql action=up status=ok\n", encoding="utf-8"
+    )
+    output = tmp_path / "evidence.json"
+
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+    assert any(
+        "missing lifecycle log" in violation and "stage2" in violation for violation in payload["ordering_violations"]
+    )
+    assert not any(
+        "stage3" in violation and "missing lifecycle log" in violation for violation in payload["ordering_violations"]
+    )

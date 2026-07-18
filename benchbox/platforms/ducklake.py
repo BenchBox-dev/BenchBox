@@ -281,7 +281,15 @@ class DuckLakeAdapter(DuckDBAdapter):
         # settings for the "shell" connection the DuckLake catalog attaches to).
         adapter_config["memory_limit"] = config.get("memory_limit", "4GB")
         adapter_config["force_recreate"] = config.get("force", False)
-        for key in ["tuning_config", "verbose_enabled", "very_verbose"]:
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+            "verbose_enabled",
+            "very_verbose",
+        ]:
             if key in config:
                 adapter_config[key] = config[key]
         for key in [

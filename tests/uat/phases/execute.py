@@ -20,7 +20,7 @@ from __future__ import annotations
 import datetime as _dt
 from collections import defaultdict
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 from tests.uat import docker_assets
@@ -34,8 +34,8 @@ from tests.uat.phases.enumerate import (
     CompatibilityPrunedCell,
     enumerate_cells_with_pruning,
 )
-from tests.uat.phases.preflight import free_space_gib as default_free_space_reader
-from tests.uat.runner import CellResult, classify_for_submit, run_cell, submit_state_is_cell_failure
+from tests.uat.preflight_budget import free_space_gib as default_free_space_reader
+from tests.uat.runner import CellResult, run_cell
 
 
 @dataclass(frozen=True)
@@ -58,12 +58,35 @@ class ExecuteOutcome(PhaseResult):
     results: tuple[CellResult, ...]
     pruned: tuple[Cell, ...]
     skipped_unreachable: tuple[Cell, ...]
+    # Cells for a platform whose managed Docker stack never started
+    # (compose-up failure) -- distinct from `skipped_unreachable` (a
+    # reachability probe that found nothing listening). Kept as its own
+    # collection rather than folded into `skipped_unreachable` so accounting
+    # can tell "stack failed to start" from "TCP probe found nothing
+    # listening" -- see uat-fail-advance-consistency w3.
+    startup_failed: tuple[Cell, ...] = ()
     compatibility_pruned: tuple[CompatibilityPrunedCell, ...] = ()
     docker_events: tuple[DockerLifecycleEvent, ...] = ()
+    # Typed cause for `aborted` -- e.g. "disk_floor", "docker_startup",
+    # "docker_teardown". None when not aborted. Consumers must branch on this
+    # field, never on substrings of `abort_reason` (a human-facing message
+    # that can be reworded without notice) -- see
+    # uat-execute-path-unification w5. Not part of the cells.jsonl schema;
+    # do not thread it into cells_io.write_cells_jsonl.
+    abort_kind: str | None = None
 
     def exit_code(self) -> int:
         if self.aborted:
             return 2
+        # `all(... for result in self.results)` is vacuously True when
+        # `self.results` is empty (e.g. every platform was unreachable, or
+        # every managed Docker compose-up failed) -- that must not read as a
+        # clean sweep. Zero results = nonzero exit is deliberate: a
+        # degenerate config whose whole matrix is compatibility-pruned exits
+        # 1 here even though the report phase would exit 0 for it (pruned
+        # cells count as "skipped", not failures, in ReportSummary.exit_code()).
+        if not self.results:
+            return 1
         return 0 if all(result.status == "passed" for result in self.results) else 1
 
 
@@ -100,6 +123,13 @@ def run_execute(
     without spawning subprocesses or requiring a live Docker daemon. Resolves
     the module-level `run_cell` lazily so monkeypatching
     `tests.uat.phases.execute.run_cell` from a test takes effect.
+
+    Submit classification is the runner's contract, not this phase's: the
+    real `run_cell` (runner.py:256-260) classifies the exported result JSON
+    and downgrades a passed cell before returning, so `run_execute` treats
+    every `CellResult` it receives as already classified. Injected test
+    runners must do the same (see
+    test_execute_downgrades_passed_cell_with_query_failure_result).
     """
     if runner is None:
         runner = run_cell
@@ -137,12 +167,14 @@ def run_execute(
     results: list[CellResult] = []
     pruned: list[Cell] = []
     skipped_unreachable: list[Cell] = []
+    startup_failed: list[Cell] = []
     docker_events: list[DockerLifecycleEvent] = []
     completed_pairs: set[tuple[str, str]] = set()
     already_pruned: set[tuple[str, str, float]] = set()
     last_completed_platform: str | None = None
     last_docker_cleanup_status = "not-run"
     abort_reason: str | None = None
+    abort_kind: str | None = None
 
     for platform, platform_pairs in by_platform:
         platform_abort_reason = _free_space_abort_reason(
@@ -155,6 +187,7 @@ def run_execute(
             context=f"before starting platform {platform}",
             log_dir=log_dir,
         )
+        platform_abort_kind: str | None = "disk_floor" if platform_abort_reason is not None else None
         docker_state = _DockerPlatformState(cleanup_status=last_docker_cleanup_status)
 
         docker_startup_failed = False
@@ -179,11 +212,17 @@ def run_execute(
                     # stack so one stack's startup failure cannot truncate the
                     # whole sweep. Genuine global aborts (free space, fixed
                     # container-name policy, teardown failure) still abort below.
+                    # These cells are recorded in `startup_failed`, not
+                    # `skipped_unreachable` -- a stack that never started is
+                    # accounted separately from a reachability probe that
+                    # found nothing listening (uat-fail-advance-consistency
+                    # w3).
                     if docker_state.cleanup_status == "startup-failed":
-                        skipped_unreachable.extend(cell for _, pb_cells in platform_pairs for cell in pb_cells)
+                        startup_failed.extend(cell for _, pb_cells in platform_pairs for cell in pb_cells)
                         docker_startup_failed = True
                     else:
                         platform_abort_reason = startup_reason
+                        platform_abort_kind = "docker_startup"
             if platform_abort_reason is None and not docker_startup_failed:
                 try:
                     _run_or_skip_platform(
@@ -204,22 +243,22 @@ def run_execute(
                     )
                 except Exception as exc:  # noqa: BLE001 - re-raised after annotation
                     # A mid-sweep DiskFloorAbort propagates out of the runner
-                    # here, bypassing the normal ExecuteOutcome return. The
-                    # skipped-unreachable cells accumulated for earlier
-                    # platforms would otherwise be lost (run_execute never
-                    # returns), causing the abort report to under-count
-                    # `total_defined`. Annotate the exception with the count
-                    # so the orchestrator can thread it into the abort
-                    # artifact. The platform teardown still runs via the
-                    # enclosing `finally` before the exception propagates.
-                    if not hasattr(exc, "skipped_unreachable_count"):
-                        try:
-                            exc.skipped_unreachable_count = len(skipped_unreachable)  # type: ignore[attr-defined]
-                        except (AttributeError, TypeError):
-                            pass
+                    # here, bypassing the normal ExecuteOutcome return.
+                    # Annotate it with what the orchestrator needs to thread
+                    # into the abort artifact instead of losing it (or, for
+                    # compatibility_pruned, re-deriving it via a second,
+                    # possibly-diverging enumeration). The platform teardown
+                    # still runs via the enclosing `finally` before the
+                    # exception propagates.
+                    _annotate_disk_floor_abort(
+                        exc,
+                        skipped_unreachable=skipped_unreachable,
+                        startup_failed=startup_failed,
+                        compatibility_pruned=enumeration.compatibility_pruned,
+                    )
                     raise
         finally:
-            docker_state, teardown_abort_reason = _teardown_docker_platform_if_needed(
+            docker_state, teardown_abort_reason, teardown_abort_kind = _teardown_docker_platform_if_needed(
                 config,
                 platform=platform,
                 docker_state=docker_state,
@@ -235,9 +274,11 @@ def run_execute(
             last_docker_cleanup_status = docker_state.cleanup_status
             if platform_abort_reason is None:
                 platform_abort_reason = teardown_abort_reason
+                platform_abort_kind = teardown_abort_kind
 
         if platform_abort_reason is not None:
             abort_reason = platform_abort_reason
+            abort_kind = platform_abort_kind
             break
         last_completed_platform = platform
 
@@ -246,10 +287,12 @@ def run_execute(
         results=tuple(results),
         pruned=tuple(pruned),
         skipped_unreachable=tuple(skipped_unreachable),
+        startup_failed=tuple(startup_failed),
         compatibility_pruned=enumeration.compatibility_pruned,
         docker_events=tuple(docker_events),
         aborted=abort_reason is not None,
         abort_reason=abort_reason,
+        abort_kind=abort_kind,
     )
 
 
@@ -340,9 +383,21 @@ def _teardown_docker_platform_if_needed(
     free_space_min_gib: float,
     free_space_reader: FreeSpaceReader,
     log_dir: Path | None,
-) -> tuple[_DockerPlatformState, str | None]:
+) -> tuple[_DockerPlatformState, str | None, str | None]:
     if not docker_state.started or docker_state.spec is None or docker_state.project_name is None:
-        return docker_state, None
+        return docker_state, None, None
+
+    # A stack whose OWN startup already failed already advanced the sweep at
+    # the #700 FAIL-and-advance decision point above (`run_execute`,
+    # docker_startup_failed). `started=True` is still set unconditionally so
+    # this teardown runs -- a partially-started compose stack can still leak
+    # containers/volumes -- but if teardown on that SAME broken stack also
+    # fails, that must not defeat the advance-past-broken-stack intent by
+    # turning into a GLOBAL abort. Only a stack that started successfully
+    # makes an undoable teardown failure a genuine resource-leak emergency
+    # worth aborting the whole sweep for -- see
+    # uat-fail-advance-consistency w4.
+    stack_started_successfully = docker_state.cleanup_status == "started"
 
     cleanup_status, cleanup_abort_reason = _run_docker_teardown(
         config,
@@ -359,7 +414,22 @@ def _teardown_docker_platform_if_needed(
         started=docker_state.started,
         cleanup_status=cleanup_status,
     )
-    abort_reason = _free_space_abort_reason(
+    if cleanup_abort_reason is not None:
+        if stack_started_successfully:
+            return state, cleanup_abort_reason, "docker_teardown"
+        _record_docker_event(
+            docker_events,
+            log_dir=log_dir,
+            platform=platform,
+            action="down-policy",
+            status="advance-after-startup-failed",
+            project_name=docker_state.project_name,
+            message=(
+                "Teardown also failed for a stack whose own startup already failed; "
+                f"advancing per FAIL-and-advance policy instead of a global abort: {cleanup_abort_reason}"
+            ),
+        )
+    free_space_abort_reason = _free_space_abort_reason(
         enabled=free_space_checks_enabled,
         path=free_space_path,
         min_gib=free_space_min_gib,
@@ -369,7 +439,9 @@ def _teardown_docker_platform_if_needed(
         context=f"after Docker teardown for platform {platform}",
         log_dir=log_dir,
     )
-    return state, cleanup_abort_reason or abort_reason
+    if free_space_abort_reason is not None:
+        return state, free_space_abort_reason, "disk_floor"
+    return state, None, None
 
 
 def _run_docker_teardown(
@@ -418,6 +490,38 @@ def _run_docker_teardown(
         message=_docker_result_message(down_result),
         result=down_result,
     )
+    # mocker 0.5.4's `compose down -v` leaks named volumes (live-validated in
+    # uat-container-engine-routing w0); sweep them project-scoped, mirroring
+    # the Makefile's compose_down_fresh macro (Makefile:452-463). Only when
+    # `-v` was actually requested (cleanup_mode volumes/images) -- a
+    # `containers`-mode teardown intentionally keeps volumes for reuse, and
+    # sweeping them here would defeat that. Best-effort regardless of
+    # `down_result` (matches the Makefile's `;` sequencing, not `&&`): a
+    # stack whose `down` itself failed can still have created volumes worth
+    # sweeping.
+    if (
+        config.cleanup.docker_platform_switch in {"volumes", "images"}
+        and docker_assets.resolve_container_cli() == "mocker"
+    ):
+        removed_volumes = docker_assets.sweep_leaked_mocker_volumes(
+            docker_state.project_name,
+            docker_state.spec,
+            runner=docker_runner,
+            dry_run=config.dry_run,
+        )
+        _record_docker_event(
+            docker_events,
+            log_dir=log_dir,
+            platform=platform,
+            action="volume-sweep",
+            status="ok",
+            project_name=docker_state.project_name,
+            message=(
+                f"removed {len(removed_volumes)} leaked mocker named volume(s): {', '.join(removed_volumes)}"
+                if removed_volumes
+                else "no leaked mocker named volumes found"
+            ),
+        )
     if down_result.succeeded:
         return cleanup_status, None
     return (
@@ -512,7 +616,6 @@ def _run_platform_benchmark(
             streams=config.execute.streams,
             seed=config.execute.seed,
         )
-        cell_result = _apply_submit_classification(cell_result)
         results.append(cell_result)
         observed.append(
             LadderRung(
@@ -539,21 +642,6 @@ def _run_platform_benchmark(
             databases_root=databases_root,
             dry_run=config.dry_run,
         )
-
-
-def _apply_submit_classification(cell_result: CellResult) -> CellResult:
-    """Mirror submit refusals for any runner that returned a result JSON."""
-    if cell_result.status != "passed" or cell_result.result_path is None or not cell_result.result_path.exists():
-        return cell_result
-    submit_state = classify_for_submit(cell_result.result_path)
-    if submit_state.value == cell_result.submit_terminal_state and not submit_state_is_cell_failure(submit_state):
-        return cell_result
-    return replace(
-        cell_result,
-        status="failed" if submit_state_is_cell_failure(submit_state) else cell_result.status,
-        exit_code=(cell_result.exit_code or 1) if submit_state_is_cell_failure(submit_state) else cell_result.exit_code,
-        submit_terminal_state=submit_state.value,
-    )
 
 
 def _reorder_for_topology(
@@ -677,6 +765,40 @@ def _maybe_prune_completed(
                 already_pruned.add(key)
 
 
+def _annotate_disk_floor_abort(
+    exc: BaseException,
+    *,
+    skipped_unreachable: list[Cell],
+    startup_failed: list[Cell],
+    compatibility_pruned: tuple[CompatibilityPrunedCell, ...],
+) -> None:
+    """Attach accounting the orchestrator needs to thread into abort artifacts.
+
+    A mid-sweep DiskFloorAbort propagates out of `run_execute`, bypassing the
+    normal `ExecuteOutcome` return. The skipped-unreachable and
+    startup-failed counts, plus this run's actual compatibility-pruned
+    enumeration, would otherwise be lost, forcing the orchestrator to either
+    under-count `total_defined` or fall back to a second, possibly-diverging
+    re-enumeration -- see uat-execute-path-unification w5 and
+    uat-fail-advance-consistency w3.
+    """
+    if not hasattr(exc, "skipped_unreachable_count"):
+        try:
+            exc.skipped_unreachable_count = len(skipped_unreachable)  # type: ignore[attr-defined]
+        except (AttributeError, TypeError):
+            pass
+    if not hasattr(exc, "startup_failed_count"):
+        try:
+            exc.startup_failed_count = len(startup_failed)  # type: ignore[attr-defined]
+        except (AttributeError, TypeError):
+            pass
+    if not hasattr(exc, "compatibility_pruned"):
+        try:
+            exc.compatibility_pruned = compatibility_pruned  # type: ignore[attr-defined]
+        except (AttributeError, TypeError):
+            pass
+
+
 def _free_space_abort_reason(
     *,
     enabled: bool,
@@ -691,7 +813,7 @@ def _free_space_abort_reason(
     if not enabled or min_gib <= 0:
         return None
     free_gib = reader(path)
-    _append_lifecycle_log(
+    append_lifecycle_log(
         log_dir,
         f"[free-space] {context}: {free_gib:.2f} GiB free at {path} "
         f"(threshold {min_gib:.2f} GiB, docker_cleanup_status={docker_cleanup_status})",
@@ -729,7 +851,7 @@ def _record_docker_event(
     )
     events.append(event)
     command = f" command={result.command}" if result is not None else ""
-    _append_lifecycle_log(
+    append_lifecycle_log(
         log_dir,
         f"[docker] platform={platform} action={action} status={status} project={project_name}"
         f"{command} message={message}",
@@ -747,7 +869,8 @@ def _docker_result_message(result: docker_assets.DockerCommandResult) -> str:
     return detail
 
 
-def _append_lifecycle_log(log_dir: Path | None, line: str) -> None:
+def append_lifecycle_log(log_dir: Path | None, line: str) -> None:
+    """Append a timestamped line to uat_lifecycle.log. Public: also called from orchestrator.py (sweep-start engine identity, uat-container-engine-routing w2)."""
     if log_dir is None:
         return
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -756,11 +879,36 @@ def _append_lifecycle_log(log_dir: Path | None, line: str) -> None:
 
 
 def default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
-    """Resolve the YAML log_dir_template against {date} and {name}."""
+    """Resolve the YAML log_dir_template against {date}, {time}, and {name}.
+
+    {time} (HHMMSS, expanded at sweep start alongside {date}) is what makes
+    the DEFAULT template collision-free across same-day sweeps -- see
+    uat-resume-retirement-artifact-durability. Templates that never mention
+    {time} (every checked-in config predates this and only uses {date})
+    render unchanged: `str.replace` is a no-op when the placeholder is
+    absent, so existing explicit `logs_dir_template` values keep working
+    verbatim.
+
+    HHMMSS alone still collides when two sweeps using a {time} template
+    start in the same second (e.g. automation kicking off multiple configs
+    at once); since the log dir is now the durable record (no resume
+    machinery to merge into it), a resolved path that already exists gets a
+    numeric suffix appended until it names a fresh directory.
+    """
     now = now or _dt.datetime.now()
     template = config.output.logs_dir_template
-    rendered = template.replace("{date}", now.strftime("%Y%m%d")).replace("{name}", config.name)
-    return Path(rendered).expanduser()
+    rendered = (
+        template.replace("{date}", now.strftime("%Y%m%d"))
+        .replace("{time}", now.strftime("%H%M%S"))
+        .replace("{name}", config.name)
+    )
+    path = Path(rendered).expanduser()
+    if "{time}" in template:
+        suffix = 2
+        while path.exists():
+            path = path.with_name(f"{path.name}-{suffix}")
+            suffix += 1
+    return path
 
 
 def default_benchmark_runs_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:

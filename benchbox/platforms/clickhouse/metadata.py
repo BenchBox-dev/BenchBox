@@ -74,6 +74,10 @@ class ClickHouseMetadataMixin:
             "secure",
             "compression",
             "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
             "verbose_enabled",
             "very_verbose",
         ]:

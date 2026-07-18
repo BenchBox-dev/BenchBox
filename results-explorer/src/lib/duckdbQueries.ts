@@ -67,6 +67,13 @@ export interface ResultRow extends CostDeploymentFields {
   plans_published: boolean;
   has_tuning: boolean;
   bundle_download_url: string;
+  // ADR-2 §3 secondary facet: the physical rendering strategy id for
+  // platforms that expose one (currently TPC benchmarks on Databricks).
+  // Never invented; null/undefined when the bundle never recorded a logical
+  // tuning profile. Optional (like plans_published above) so fixtures and
+  // SQL paths predating this field default to undefined rather than needing
+  // updates everywhere a ResultRow is constructed.
+  physical_rendering_id?: string | null;
 }
 
 export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_eligible" | "visibility"> {
@@ -79,6 +86,13 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   cpu_count: number | null;
   memory_gb: number | null;
   python: string | null;
+  // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
+  // physical_mechanisms in DetailResult). Tri-state, preserved from the
+  // pipeline: SQL NULL (-> null here) means no logical tuning profile was
+  // recorded at all (unknown); "" means a profile WAS recorded and it
+  // genuinely has zero mechanisms (recorded-empty, a real comparable
+  // value); a non-empty string is the comma-joined mechanism list.
+  physical_mechanisms?: string | null;
 }
 
 export interface QueryDisplayTimingRow {
@@ -304,6 +318,7 @@ const RESULT_COLUMNS = [
   "plans_published",
   "has_tuning",
   "bundle_download_url",
+  "physical_rendering_id",
 ].join(", ");
 
 const RESULT_DETAIL_METRICS_COLUMNS = [
@@ -359,6 +374,8 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "plans_published",
   "has_tuning",
   "bundle_download_url",
+  "physical_mechanisms",
+  "physical_rendering_id",
   "os",
   "arch",
   "cpu_count",
@@ -635,6 +652,17 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     storage_format: wide.storage_format,
     storage_tier: wide.storage_tier,
     compliance_class: wide.compliance_class,
+    // Preserve the unknown (null/undefined -> undefined) vs recorded-empty
+    // ("" -> []) distinction from the DB row -- do not collapse both to [],
+    // or a legacy/unrecorded row would look identical to a genuine
+    // zero-mechanism row to ComparabilityReceipt's undefined-guard.
+    physical_mechanisms:
+      wide.physical_mechanisms === null || wide.physical_mechanisms === undefined
+        ? undefined
+        : wide.physical_mechanisms === ""
+          ? []
+          : wide.physical_mechanisms.split(","),
+    physical_rendering_id: wide.physical_rendering_id,
   };
 }
 

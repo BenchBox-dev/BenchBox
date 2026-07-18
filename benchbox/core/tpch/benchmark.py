@@ -370,6 +370,32 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             schema[table.name.lower()] = table_schema
         return schema
 
+    def get_table_loading_order(self, available_tables: list[str]) -> list[str]:
+        """Get the correct order for loading TPC-H tables to respect foreign key dependencies.
+
+        Derived from schema FK metadata (see
+        ``benchbox.core.tpch.schema.get_table_loading_order``), not a
+        hand-maintained constant. Without this, callers fall back to
+        alphabetical table order, which loads e.g. ``lineitem`` before
+        ``orders`` and violates FK references when constraints are enforced.
+
+        Args:
+            available_tables: List of table names that are actually available
+
+        Returns:
+            List of table names in the correct loading order
+        """
+        from benchbox.core.tpch.schema import get_table_loading_order as _schema_table_loading_order
+
+        full_order = _schema_table_loading_order()
+        available_set = set(available_tables)
+
+        ordered_tables = [t for t in full_order if t in available_set]
+        remaining_tables = [t for t in available_tables if t not in ordered_tables]
+        ordered_tables.extend(remaining_tables)
+
+        return ordered_tables
+
     def get_create_tables_sql(
         self,
         dialect: str = "standard",

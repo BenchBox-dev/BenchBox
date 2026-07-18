@@ -32,21 +32,24 @@ def _make_tuning_config(table_tunings: dict):
 
 
 def _make_table_tuning_with_sort(sort_columns: list[str]):
-    """Build a mock TableTuning with SORTING columns."""
-    from benchbox.core.tuning.interface import TuningType
+    """Build a mock TableTuning with SORTING columns.
+
+    Sort columns are real TuningColumn instances (not Mocks): apply_ctas_sort
+    forwards them to DuckDBDDLGenerator via a TableTuning, whose constructor
+    validates that sorting columns are genuine TuningColumn instances -- see
+    the renderer-consolidation TODO's w2 duckdb migration.
+    """
+    from benchbox.core.tuning.interface import TuningColumn, TuningType
 
     table_tuning = Mock()
 
-    mock_cols = []
-    for i, col_name in enumerate(sort_columns, start=1):
-        col = Mock()
-        col.name = col_name
-        col.order = i
-        mock_cols.append(col)
+    real_cols = [
+        TuningColumn(name=col_name, type="VARCHAR", order=i) for i, col_name in enumerate(sort_columns, start=1)
+    ]
 
     def get_columns_by_type(tuning_type):
         if tuning_type == TuningType.SORTING:
-            return mock_cols
+            return real_cols
         return []
 
     table_tuning.get_columns_by_type.side_effect = get_columns_by_type
@@ -59,13 +62,10 @@ class TestDuckdbBuildCtasSortSql:
             self.adapter = DuckDBAdapter()
 
     def test_builds_or_replace_ctas_with_ordered_columns(self):
-        col_b = Mock()
-        col_b.name = "l_orderkey"
-        col_b.order = 2
+        from benchbox.core.tuning.interface import TuningColumn
 
-        col_a = Mock()
-        col_a.name = "l_shipdate"
-        col_a.order = 1
+        col_b = TuningColumn(name="l_orderkey", type="INTEGER", order=2)
+        col_a = TuningColumn(name="l_shipdate", type="DATE", order=1)
 
         sql = self.adapter._build_ctas_sort_sql("lineitem", [col_a, col_b])
 

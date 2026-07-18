@@ -1,0 +1,88 @@
+id: todo-schema-require-id-field
+title: "Add id to TODO_SCHEMA.yaml required fields so missing IDs are caught at validation time"
+worktree: main
+priority: Medium
+status: Not Started
+category: Developer Tooling
+
+description: |
+  The `id` field is the stable cross-reference key used in `deps.needs`,
+  `todo_cli.py show`, and index generation. It must match the filename slug
+  exactly. Yet `id` is NOT in the `required:` list in `TODO_SCHEMA.yaml` —
+  it is only defined under `properties:` with a regex pattern.
+
+  Consequence: `validate_todo.py` silently accepts a TODO file with no `id`
+  field. Any `deps.needs` reference to that item then silently fails at
+  dep-graph resolution time rather than at validation time, making the graph
+  check unreliable as a quality gate.
+
+  Add `id` to the `required:` list. This is a one-line schema change but
+  requires confirming all existing TODO/DONE files already carry the field
+  before the gate goes live.
+
+work:
+  - id: w0
+    summary: "Audit all TODO and DONE files for missing id field"
+    status: pending
+    notes: |
+      Run: uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all
+      Then also: grep -rL "^id:" _project/TODO _project/DONE --include="*.yaml"
+      Expected: 0 files missing id (but must confirm before making id required).
+
+  - id: w1
+    summary: "Add id to required: list in TODO_SCHEMA.yaml"
+    needs: [w0]
+    status: pending
+    notes: |
+      In _project/TODO_SCHEMA.yaml, add "- id" to the required: list alongside
+      title, worktree, priority, status, description.
+      The id property definition and pattern already exist under properties: —
+      no changes needed there.
+
+  - id: w2
+    summary: "Run validate_todo.py --all and confirm 0 new failures"
+    needs: [w1]
+    status: pending
+    notes: |
+      uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all
+      Any newly-failing file has a missing id and must be fixed before this
+      change lands.
+
+  - id: w3
+    summary: "Update TODO_ENTRY_TEMPLATE.yaml comment to note id is required"
+    needs: [w1]
+    status: pending
+    notes: |
+      The template already has id: "<filename-slug>" at the top. Add a comment
+      noting it is required and must match the filename without .yaml extension.
+
+prior_art:
+  - "_project/TODO_SCHEMA.yaml: required: list at line ~15 — add id here"
+  - "_project/TODO_ENTRY_TEMPLATE.yaml: id field already at top — add required annotation"
+  - "_project/scripts/validate_todo.py: --all flag to sweep all files"
+
+must_preserve:
+  - "All currently-valid TODO/DONE files must still pass validate_todo.py after the change"
+  - "The id pattern regex (^[a-z0-9][a-z0-9-]*[a-z0-9]$) is unchanged"
+
+verification:
+  - description: "validate_todo.py rejects a file with no id field"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py /tmp/test-no-id.yaml"
+    expected_output: "root: 'id' is a required property"
+  - description: "All existing files still pass after adding id to required"
+    command: "uv run --project _project/scripts -- python _project/scripts/validate_todo.py --all"
+    expected_output: "0 errors"
+
+metadata:
+  created_date: "2026-06-08"
+  estimated_effort: "Small"
+  tags:
+    - schema
+    - tooling
+    - todo-system
+
+impact:
+  technical_debt: |
+    Without id in required, the dep-graph check (todo_cli.py check-graph) can
+    reference items that have no queryable ID, making cross-item dependencies
+    silently unresolvable. One-line schema fix closes the gap permanently.

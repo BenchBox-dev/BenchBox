@@ -251,7 +251,7 @@ class ClickHouseDDLGenerator(BaseDDLGenerator):
         # Tuning clauses
         if tuning:
             if tuning.partition_by:
-                statement = f"{statement}\nPARTITION BY {tuning.partition_by}"
+                statement = f"{statement}\nPARTITION BY ({tuning.partition_by})"
 
             if tuning.sort_by:
                 statement = f"{statement}\nORDER BY ({tuning.sort_by})"

@@ -422,7 +422,13 @@ class DuckDBSnapshotBuilder:
                 has_plans            BOOLEAN  NOT NULL,
                 plans_published      BOOLEAN  NOT NULL,
                 has_tuning           BOOLEAN  NOT NULL,
-                bundle_download_url  VARCHAR  NOT NULL
+                bundle_download_url  VARCHAR  NOT NULL,
+                -- ADR-2 §3: platform-rendered physical tuning mechanisms
+                -- (comma-joined, sorted) and, for platforms that expose one,
+                -- the physical rendering strategy id. NULL when the bundle
+                -- never recorded a logical tuning profile.
+                physical_mechanisms   VARCHAR,
+                physical_rendering_id VARCHAR
             )
         """)
         con.execute("""
@@ -480,6 +486,8 @@ class DuckDBSnapshotBuilder:
                 r.plans_published,
                 r.has_tuning,
                 r.bundle_download_url,
+                r.physical_mechanisms,
+                r.physical_rendering_id,
                 e.os,
                 e.arch,
                 e.cpu_count,
@@ -735,6 +743,19 @@ class DuckDBSnapshotBuilder:
             plans_published = detail.plans_published if detail is not None else False
             has_tuning = detail.has_tuning if detail is not None else False
             bundle_download_url = f"{bundle_url_prefix}/{entry.result_id}.json"
+            # Preserve the None (unknown/no logical profile recorded) vs []
+            # (a logical profile WAS recorded and genuinely has zero
+            # mechanisms) distinction from DetailResult.physical_mechanisms:
+            # SQL NULL means unknown; "" (join of an empty list) means
+            # recorded-empty. `if ... else None` would collapse both to
+            # NULL, making a legacy/unrecorded row indistinguishable from a
+            # genuinely zero-mechanism row downstream.
+            physical_mechanisms = (
+                None
+                if detail is None or detail.physical_mechanisms is None
+                else ",".join(sorted(detail.physical_mechanisms))
+            )
+            physical_rendering_id = detail.physical_rendering_id if detail is not None else None
             rows.append(
                 (
                     entry.result_id,
@@ -776,6 +797,8 @@ class DuckDBSnapshotBuilder:
                     plans_published,
                     has_tuning,
                     bundle_download_url,
+                    physical_mechanisms,
+                    physical_rendering_id,
                 )
             )
         if rows:

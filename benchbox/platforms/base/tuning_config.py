@@ -33,12 +33,13 @@ def apply_standard_unified_tuning(adapter: Any, unified_config: UnifiedTuningCon
 class TuningConfigMixin:
     """Mixin providing unified-tuning configuration handling for `PlatformAdapter`.
 
-    Expects host class to expose `platform_name`, `logger`, `tuning_enabled`,
-    `create_connection`, `close_connection`, plus `log_verbose` /
-    `log_very_verbose` from `VerbosityMixin`.
+    Expects host class to expose `platform_name`, `canonical_platform_type`,
+    `logger`, `tuning_enabled`, `create_connection`, `close_connection`, plus
+    `log_verbose` / `log_very_verbose` from `VerbosityMixin`.
     """
 
     platform_name: str
+    canonical_platform_type: str
     logger: logging.Logger
     tuning_enabled: bool
 
@@ -83,7 +84,7 @@ class TuningConfigMixin:
         if not effective_config:
             return []
 
-        return effective_config.validate_for_platform(self.platform_name)
+        return effective_config.validate_for_platform(self.canonical_platform_type)
 
     def validate_tuning_configuration(self, unified_config: UnifiedTuningConfiguration) -> list[str]:
         """Validate a unified tuning configuration against platform capabilities.
@@ -97,7 +98,7 @@ class TuningConfigMixin:
         if not unified_config:
             return []
 
-        return unified_config.validate_for_platform(self.platform_name)
+        return unified_config.validate_for_platform(self.canonical_platform_type)
 
     def _validate_database_tunings(self, **connection_config):
         """Validate that database tunings match expected configuration.

@@ -1,0 +1,101 @@
+id: tuning-drift-detection-persistence-widening-20260716
+title: "Widen tuning drift-detection persistence: unique/check constraints and platform optimizations"
+worktree: main
+priority: Medium-High
+status: Completed
+completed_date: "2026-07-16"
+completed_note: |
+  Widened persistence via section-hash marker rows rather than a DDL change:
+  TuningMetadataManager now writes 3 sentinel rows (table_name
+  "__benchbox_tuning_sections__") into the existing benchbox_tuning_metadata
+  table shape (table_name, tuning_type, column_name, column_order,
+  configuration_hash, created_at, platform) after save_tunings commits the
+  column-based table tunings - schema_version marker, constraints_hash
+  (SHA-256 of unique_constraints.to_dict() + check_constraints.to_dict()),
+  and platform_optimizations_hash (SHA-256 of platform_optimizations.to_dict()).
+  No DDL/migration needed since the row schema is unchanged.
+
+  validate_unified_tunings now calls _compare_section_hashes after the
+  existing table-tunings check: loads persisted markers via
+  _load_section_markers(), computes expected hashes from the given
+  UnifiedTuningConfiguration, and reports mismatches as errors plus
+  MetadataValidationResult.drifted_sections (new additive field: a set of
+  {"constraints", "platform_optimizations"}) for a future drift_check
+  consumer to read without re-parsing error strings.
+
+  must_preserve satisfied without any migration: _rebuild_tunings_from_records
+  now skips sentinel rows via a new _COLUMN_TUNING_TYPE_VALUES filter (a
+  prior version would have KeyError'd on the sentinel tuning_type values,
+  since the per-table dict is only seeded with the four column-tuning keys).
+  Old-format tables (no sentinel rows at all) load without error;
+  _load_section_markers returning {} is reported as a warning ("no
+  section-hash metadata found ... drift cannot be detected for this
+  database"), never an error. save_unified_tunings persists section markers
+  best-effort after save_tunings succeeds - a marker-save failure is logged
+  and swallowed, never turning an otherwise-successful save into a failure.
+
+  Tests added to tests/unit/core/tuning/test_tuning_metadata.py (11 new,
+  49 total in the metadata/drift filter, 500 total in tests/unit/core/tuning):
+  hash determinism, marker-record shape, sentinel-row skipping in
+  _rebuild_tunings_from_records, _compare_section_hashes unit tests (warns
+  with no markers, detects platform-optimization drift, detects constraint
+  drift, no false positive when matching), and two full round-trip tests
+  against a new stateful fake adapter (_FakeAdapter/_FakeConn/_FakeCursor)
+  proving (a) toggling z_ordering off after a save is detected as
+  platform_optimizations drift on validate_unified_tunings, and (b) an
+  old-format table (no marker rows) loads and validates without error,
+  surfacing only a warning.
+
+  ruff check/format and ty check clean on benchbox/core/tuning/metadata.py
+  and the test file.
+category: Core Functionality
+
+description: |
+  Residual from review finding R6, verified still present post-batch:
+  TuningMetadataManager._as_benchmark_tunings (benchbox/core/tuning/metadata.py)
+  persists only pk/fk flags + table tunings, dropping unique/check constraints
+  and ALL platform optimizations. Reused-database drift detection is therefore
+  blind to z-order/liquid/session-relevant drift. Widen the persisted record
+  (schema-compatible: add typed rows or a config-hash-per-section) and the
+  validate_unified_tunings comparison to cover the full UnifiedTuningConfiguration,
+  feeding the richer result into the drift_check companion field added by the
+  applied-ledger work.
+
+work:
+  - id: w1
+    summary: "Extend the metadata persistence to cover unique/check constraints and platform optimizations"
+    status: done
+    needs: []
+  - id: w2
+    summary: "Extend validate_unified_tunings comparison + drift_check payload; migration handling for old metadata tables"
+    status: done
+    needs: [w1]
+  - id: w3
+    summary: "Tests: drift in a platform optimization (e.g. z_ordering toggled) is detected on reuse; old-format tables load without error"
+    status: done
+    needs: [w2]
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Existing benchbox_tuning_metadata tables written by older versions must still load (versioned or additive schema)"
+  - "save failure remains non-fatal to the run"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/tuning/metadata.py"
+    - "benchbox/platforms/base/**"
+    - "tests/**"
+
+verification:
+  - description: "Drift tests green incl. platform-optimization drift"
+    command: "uv run -- python -m pytest tests/unit/core/tuning -q -k 'metadata or drift'"
+    expected_output: "All passing"
+
+metadata:
+  owners: ["benchbox-team"]
+  tags: [tuning, drift-detection, metadata]
+  estimated_effort: Medium
+  created_date: "2026-07-16"
+  source_review: "tuning remediation batch close-out 2026-07-16 (R6 residual)"
