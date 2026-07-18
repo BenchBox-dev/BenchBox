@@ -17,7 +17,9 @@ lifecycle rule; when it refuses (exit 2), fix the cause, don't work around it.
 2. `todo claim <id>` — claims it and prints the work order: scope globs,
    must-preserves, anti-patterns, verification ladder, ready units, and open
    deferrals. Follow the work order; it is the whole briefing.
-3. Per unit: `todo start <id> <wid>`, implement, then
+3. Per unit: `todo start <id> <wid>` (optional — records your worktree and
+   branch so another agent can resume partial work; `todo done` stamps them
+   too), implement, then
    `todo done <id> <wid> --evidence "<command run / commit / PR>"`.
 4. The moment you decide to skip something: `todo defer <id> --summary "..."
    --reason "..."` — deferring is cheap; losing work is not.

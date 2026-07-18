@@ -36,7 +36,16 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Applied in order by `todo migrate`; each version's statements are additive.
+MIGRATIONS: dict[int, list[str]] = {
+    2: [
+        "ALTER TABLE work_units ADD COLUMN started_at TEXT",
+        "ALTER TABLE work_units ADD COLUMN started_worktree TEXT",
+        "ALTER TABLE work_units ADD COLUMN started_branch TEXT",
+    ],
+}
 
 PRIORITIES = ("critical", "high", "medium-high", "medium", "low")
 STATES = ("planning", "active", "done", "dropped")
@@ -82,6 +91,9 @@ CREATE TABLE work_units (
              ('pending','in_progress','done')),
   evidence TEXT,
   notes    TEXT,
+  started_at TEXT,
+  started_worktree TEXT,
+  started_branch TEXT,
   PRIMARY KEY (item_id, wid)
 );
 
@@ -199,13 +211,42 @@ def git_root() -> Path:
     return Path(result.stdout.strip())
 
 
+def git_main_root() -> Path:
+    """Root of the MAIN repository, even when run from a linked worktree.
+
+    All worktrees of a clone must share one tracker database (eval finding:
+    per-worktree DBs fragment state into invisible islands), so the default
+    DB path resolves through the common git dir, not the worktree root.
+    """
+    result = subprocess.run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return git_root()
+    common = Path(result.stdout.strip())
+    return common.parent if common.name == ".git" else git_root()
+
+
 def resolve_db_path(explicit: str | None) -> Path:
     if explicit:
         return Path(explicit)
     env = os.environ.get("TODO_DB_PATH")
     if env:
         return Path(env)
-    return git_root() / ".todo-db" / "todo.sqlite"
+    return git_main_root() / ".todo-db" / "todo.sqlite"
+
+
+def _git_location() -> tuple[str | None, str | None]:
+    """(worktree toplevel, branch) of the CWD, for resume/recovery stamps."""
+
+    def _out(*args: str) -> str | None:
+        result = subprocess.run(["git", *args], capture_output=True, text=True, check=False)
+        return result.stdout.strip() or None if result.returncode == 0 else None
+
+    return _out("rev-parse", "--show-toplevel"), _out("rev-parse", "--abbrev-ref", "HEAD")
 
 
 def connect(db_path: Path) -> sqlite3.Connection:
@@ -225,12 +266,39 @@ def connect(db_path: Path) -> sqlite3.Connection:
             "INSERT INTO meta (key, value) VALUES ('schema_version', ?)",
             (str(SCHEMA_VERSION),),
         )
-    elif version != SCHEMA_VERSION:
+    elif version < SCHEMA_VERSION:
         raise TodoError(
-            f"database schema_version={version}, CLI expects {SCHEMA_VERSION}; "
-            "run a newer CLI or re-create the spike database"
+            f"database schema_version={version}, CLI expects {SCHEMA_VERSION}; run `todo migrate` to upgrade it"
         )
+    elif version > SCHEMA_VERSION:
+        raise TodoError(f"database schema_version={version} is newer than this CLI ({SCHEMA_VERSION}); use a newer CLI")
     return conn
+
+
+def migrate_db(db_path: Path) -> list[int]:
+    """Apply pending schema migrations; returns the versions applied."""
+    if not db_path.exists():
+        # Nothing to migrate — a fresh connect() creates the current schema.
+        connect(db_path).close()
+        return []
+    raw = sqlite3.connect(db_path)
+    raw.row_factory = sqlite3.Row
+    try:
+        version = _schema_version(raw)
+        if version is None:
+            raise TodoError(f"{db_path} exists but has no tracker schema")
+        applied: list[int] = []
+        for target in sorted(MIGRATIONS):
+            if version < target:
+                for statement in MIGRATIONS[target]:
+                    raw.execute(statement)
+                raw.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(target),))
+                raw.commit()
+                version = target
+                applied.append(target)
+        return applied
+    finally:
+        raw.close()
 
 
 @contextmanager
@@ -527,11 +595,14 @@ def start_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str) -> 
         if unit["status"] == "done":
             raise TodoError(f"{item_id}:{wid} is already done")
         _require_unit_needs_done(conn, item_id, wid)
+        worktree, branch = _git_location()
         conn.execute(
-            "UPDATE work_units SET status = 'in_progress' WHERE item_id = ? AND wid = ?",
-            (item_id, wid),
+            "UPDATE work_units SET status = 'in_progress',"
+            " started_at = ?, started_worktree = ?, started_branch = ?"
+            " WHERE item_id = ? AND wid = ?",
+            (utc_now(), worktree, branch, item_id, wid),
         )
-        log_event(conn, actor, item_id, "start", {"wid": wid})
+        log_event(conn, actor, item_id, "start", {"wid": wid, "worktree": worktree, "branch": branch})
 
 
 def done_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str, evidence: str) -> None:
@@ -541,9 +612,16 @@ def done_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str, evid
         _require_item(conn, item_id)
         _require_unit(conn, item_id, wid)
         _require_unit_needs_done(conn, item_id, wid)
+        # Implicit start: stamp the location if `start` was skipped, so the
+        # record of where the work happened survives either path.
+        worktree, branch = _git_location()
         conn.execute(
-            "UPDATE work_units SET status = 'done', evidence = ? WHERE item_id = ? AND wid = ?",
-            (evidence, item_id, wid),
+            "UPDATE work_units SET status = 'done', evidence = ?,"
+            " started_at = COALESCE(started_at, ?),"
+            " started_worktree = COALESCE(started_worktree, ?),"
+            " started_branch = COALESCE(started_branch, ?)"
+            " WHERE item_id = ? AND wid = ?",
+            (evidence, utc_now(), worktree, branch, item_id, wid),
         )
         log_event(conn, actor, item_id, "done", {"wid": wid, "evidence": evidence})
 
@@ -898,6 +976,10 @@ def check_paths(files: list[str], rules: list[dict[str, str]]) -> list[str]:
     deny = [r["path_glob"] for r in rules if r["kind"] == "do_not_modify"]
     violations = []
     for path in files:
+        # The tracker's own state directory is never scope-relevant
+        # (eval finding: it false-positived on worktrees with stale gitignores).
+        if path == ".todo-db" or path.startswith(".todo-db/"):
+            continue
         if any(fnmatch.fnmatch(path, glob) for glob in deny):
             violations.append(f"{path}: matches do_not_modify")
         elif only and not any(fnmatch.fnmatch(path, glob) for glob in only):
@@ -1330,7 +1412,13 @@ def _print_work_order(order: dict[str, Any]) -> None:
     blocked = order.get("blocked_units", [])
     print("-- ready units" if ready else "-- no ready units")
     for unit in ready:
-        print(f"   {unit['wid']} [{unit['status']}] {unit['summary']}")
+        resume = ""
+        if unit["status"] == "in_progress" and unit.get("started_branch"):
+            resume = (
+                f" (resumable: branch {unit['started_branch']}"
+                f" @ {unit.get('started_worktree') or '?'}, since {unit.get('started_at')})"
+            )
+        print(f"   {unit['wid']} [{unit['status']}] {unit['summary']}{resume}")
     for unit in blocked:
         print(f"   {unit['wid']} BLOCKED on {','.join(unit['unmet'])}: {unit['summary']}")
     open_defs = [d for d in order["deferrals"] if d["resolution"] == "open"]
@@ -1355,12 +1443,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--verbose", action="store_true", help="print every skip/warning line")
 
-    p = sub.add_parser("create", help="create an item")
-    p.add_argument("id")
-    p.add_argument("--title", required=True)
-    p.add_argument("--worktree", required=True)
-    p.add_argument("--priority", required=True, choices=PRIORITIES)
-    p.add_argument("--description", required=True)
+    p = sub.add_parser("create", help="create an item (flags, or --from - for a JSON payload)")
+    p.add_argument("id", nargs="?")
+    p.add_argument(
+        "--from", dest="from_source", metavar="-|FILE", help="read a JSON item payload from stdin (-) or a file"
+    )
+    p.add_argument("--title")
+    p.add_argument("--worktree")
+    p.add_argument("--priority", choices=PRIORITIES)
+    p.add_argument("--description")
     p.add_argument("--category")
     p.add_argument("--approach")
     p.add_argument("--work", action="append", default=[], metavar="WID:SUMMARY[:needs=w1,w2]")
@@ -1437,11 +1528,23 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("sweep-stale", help="release expired claims")
     p.add_argument("--ttl-hours", type=float, default=DEFAULT_LEASE_TTL_HOURS)
 
+    sub.add_parser("migrate", help="apply pending schema migrations to the database")
+
     p = sub.add_parser("export", help="deterministic JSONL + markdown index")
     p.add_argument("--out", default=None)
 
     args = parser.parse_args(argv)
     actor = args.actor or default_actor()
+    if args.command == "migrate":
+        # Must run before connect(): connect refuses an outdated schema.
+        try:
+            applied = migrate_db(resolve_db_path(args.db))
+        except TodoError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        if applied:
+            print(f"applied migration(s) to v{', v'.join(str(v) for v in applied)}")
+            return 0
     conn = connect(resolve_db_path(args.db))
 
     try:
@@ -1512,7 +1615,61 @@ def _parse_verify_flag(specs: list[str]) -> list[dict[str, str]]:
     return verifications
 
 
+def create_from_payload(conn: sqlite3.Connection, actor: str, payload: dict[str, Any]) -> str:
+    """Create an item from a structured JSON payload (the `create --from` path)."""
+    for required in ("id", "title", "worktree", "priority", "description"):
+        if not payload.get(required):
+            raise TodoError(f"payload missing required field: {required!r}")
+
+    def _triple(entry: Any, keys: tuple[str, str, str]) -> tuple[str, str, str]:
+        if isinstance(entry, dict):
+            try:
+                return tuple(str(entry[k]) for k in keys)  # type: ignore[return-value]
+            except KeyError as exc:
+                raise TodoError(f"payload entry {entry!r} missing key {exc}") from exc
+        return tuple(str(v) for v in entry)  # type: ignore[return-value]
+
+    scope_map = payload.get("scope") or {}
+    scope = [(kind, str(glob)) for kind in ("only_modify", "do_not_modify") for glob in scope_map.get(kind) or []]
+    create_item(
+        conn,
+        actor,
+        item_id=str(payload["id"]),
+        title=str(payload["title"]),
+        worktree=str(payload["worktree"]),
+        priority=str(payload["priority"]),
+        description=str(payload["description"]),
+        category=payload.get("category"),
+        approach=payload.get("approach"),
+        work=payload.get("work") or [],
+        deps=[str(d) for d in payload.get("deps") or []],
+        scope=scope,
+        verifications=payload.get("verifications") or [],
+        preserves=[str(p) for p in payload.get("preserves") or []],
+        anti_patterns=[_triple(e, ("dont", "why", "instead")) for e in payload.get("anti_patterns") or []],
+        prior_art=[_triple(e, ("path", "concept", "decision")) for e in payload.get("prior_art") or []],
+    )
+    return str(payload["id"])
+
+
 def _cmd_create(conn, actor, args):
+    if args.from_source:
+        if args.from_source == "-":
+            raw = sys.stdin.read()
+        else:
+            raw = Path(args.from_source).read_text(encoding="utf-8")
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise TodoError(f"--from payload is not valid JSON: {exc}") from exc
+        if args.id and not payload.get("id"):
+            payload["id"] = args.id
+        item_id = create_from_payload(conn, actor, payload)
+        print(f"created {item_id}")
+        return 0
+    missing = [flag for flag in ("id", "title", "worktree", "priority", "description") if not getattr(args, flag)]
+    if missing:
+        raise TodoError(f"create requires {', '.join(missing)} (or use --from - with a JSON payload)")
     scope = [("only_modify", g) for g in args.only_modify]
     scope += [("do_not_modify", g) for g in args.do_not_modify]
     create_item(
@@ -1705,9 +1862,16 @@ def _cmd_sweep_stale(conn, actor, args):
 
 
 def _cmd_export(conn, actor, args):
-    out_dir = Path(args.out) if args.out else git_root() / ".todo-db" / "export"
+    out_dir = Path(args.out) if args.out else git_main_root() / ".todo-db" / "export"
     jsonl_path, index_path = write_export(conn, out_dir)
     print(f"wrote {jsonl_path} and {index_path}")
+    return 0
+
+
+def _cmd_migrate(conn, actor, args):
+    # Reached only when the DB is already current (main() migrates before
+    # connecting for this command); report the no-op for clarity.
+    print(f"schema v{SCHEMA_VERSION}: up to date")
     return 0
 
 
@@ -1736,6 +1900,7 @@ _HANDLERS = {
     "lint": _cmd_lint,
     "sweep-stale": _cmd_sweep_stale,
     "export": _cmd_export,
+    "migrate": _cmd_migrate,
 }
 
 

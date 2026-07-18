@@ -411,6 +411,95 @@ piped output. The spike is single-clone by construction — it validates the
 enforcement design (G2), not the shared-visibility goal, which still
 requires the hosted step after G1.
 
+**Post-eval improvements (2026-07-18, fourth round — schema v2).** The
+eval's tool findings were implemented TDD-first
+(`tests/unit/scripts/test_todo_db_v2.py`, 15 tests written red):
+
+- **Shared database across worktrees**: the default DB path now resolves
+  through `git rev-parse --git-common-dir`, so every worktree of a clone
+  shares the main repository's tracker (the eval exposed that per-worktree
+  DBs fragment state into invisible islands).
+- **Resume/recovery metadata**: `start` records `started_at`,
+  `started_worktree`, and `started_branch` on the work unit (`done` stamps
+  them implicitly if `start` was skipped, and never overwrites an earlier
+  stamp). The work order renders in-progress units as
+  `(resumable: branch X @ <worktree>, since T)`, so another agent can
+  locate and recover partial work after a dead session — verified live
+  across a real worktree pair. `start` is now explicitly optional for
+  single-sitting units.
+- **`check-scope` exempts `.todo-db/`** unconditionally (eval false
+  positive on stale-gitignore worktrees).
+- **`create --from -`** accepts a structured JSON payload on stdin as an
+  alternative to flag-soup item creation.
+- Schema v2 migration path: `connect` refuses an outdated DB with a
+  `todo migrate` hint; migrations are additive and idempotent.
+
+## Head-to-head evaluation: legacy YAML vs DB tracker (2026-07-18)
+
+**Durable evidence:** `_project/audits/todo-db-eval-2026-07-18.md` — the
+exact prompts, verbatim harness counters, key audit output lines, and
+replay instructions. The numbers below are bound to that artifact.
+
+**Protocol.** Two isolated Opus subagents, each in its own git worktree,
+received byte-identical work-item specs (a small `word_count.py` utility +
+unit test, work units w1/w2, and two planted out-of-scope improvements
+that "must be tracked as deferred follow-up work per the system's
+conventions"). The only difference between the prompts was the assigned
+tracking system: the legacy YAML stack (skill + `todo_cli.py` + schema +
+validator) vs the DB tracker (thin `todo-db` skill + `todo` shim). Token
+usage came from the harness's per-subagent counters; end states were
+audited independently in each worktree (tests re-run, script behavior
+probed, tracked-item state and queue visibility inspected) before the
+worktrees were discarded. Caveats: n=1, so magnitudes are indicative; both
+arms paid a similar environmental tax (the worktree base predated both
+systems' tooling, so each provisioned its tracker first).
+
+**Token burn.**
+
+| Metric | Legacy YAML | DB tracker | Delta |
+|---|---|---|---|
+| Subagent tokens | 85,703 | 61,091 | −29% |
+| Tool calls | 50 | 36 | −28% |
+| Wall time | 8.4 min | 7.6 min | −9% |
+
+The YAML arm's overhead went to reading the governing prose stack
+(skill + references + 350-line schema + template) before acting,
+hand-authoring the YAML entry, and the completion ceremony (status edits,
+`sections` block, `git mv` to DONE, validate, check-graph, reindex). The
+DB arm created the item with flags on one command and completed with one
+gated command.
+
+**Effectiveness.** Both agents produced correct, identical-behavior
+implementations (2/2 tests passing, exact output format, independently
+verified) and both executed their assigned lifecycle faithfully — the
+YAML agent's execution was near-flawless by the legacy system's own
+rules. The separation was structural:
+
+| Dimension | YAML | DB |
+|---|---|---|
+| Code + test correct | pass | pass |
+| Lifecycle executed per system rules | pass | pass (with per-unit evidence, which YAML has no field for) |
+| Verification recorded in the tracker | fail (run but not captured) | pass (`verify --run` stamped) |
+| Deferred follow-ups survivable | **fail (buried)** | **pass (promoted)** |
+
+The decisive row reproduces the motivating failure class under
+controlled conditions: the YAML agent recorded both follow-ups in
+`deferred[]` — the system's official convention — and that block now
+lives inside a DONE file, invisible to `ready` and `list` (audited: both
+grep empty). The follow-ups reached the exact state that previously
+required forensic sweeps #1181/#1195/#1210, *despite perfect agent
+compliance*. The DB agent structurally could not lose them: `complete`
+refused until each deferral was resolved, so both became standalone
+planning items (`uat-word-count-multi-file`, `uat-word-count-json-output`)
+visible in the ready queue with provenance links to the parent.
+
+**Conclusion.** Same task, same model: the DB tracker was ~29% cheaper in
+tokens and ~28% fewer tool calls while producing a strictly better end
+state — evidence-stamped units, a recorded verification result, and zero
+silently-lost deferred work versus two follow-ups already buried. The gap
+is not agent skill; it is prose-enforced invariants vs code-enforced
+invariants, demonstrated rather than argued.
+
 ## Cutover plan
 
 - **G1 — host verification (before any build):** from a live remote session,
