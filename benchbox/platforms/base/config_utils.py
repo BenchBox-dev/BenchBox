@@ -192,6 +192,19 @@ def make_registered_platform_config_builder(
     return builder
 
 
+# Tuning provenance/config keys established by the direct-CLI-path tuning fix
+# (see w0 of the tuning-from-config-forwarding-sweep TODO). Every from_config
+# implementation must forward these verbatim when present in the input config
+# -- no per-platform bespoke channel names.
+TUNING_FORWARD_KEYS: tuple[str, ...] = (
+    "tuning_config",
+    "tuning_enabled",
+    "unified_tuning_configuration",
+    "tuning_source",
+    "tuning_source_file",
+)
+
+
 def build_adapter_config(
     config: dict[str, Any],
     *,
@@ -218,4 +231,11 @@ def build_adapter_config(
     for key in fields:
         if key in config and (include_none or config[key] is not None):
             adapter_config[key] = config[key]
+
+    # Always forward tuning provenance/config keys when present, regardless of
+    # whether the caller listed them in `fields`. See TUNING_FORWARD_KEYS.
+    for key in TUNING_FORWARD_KEYS:
+        if key in config:
+            adapter_config[key] = config[key]
+
     return adapter_config

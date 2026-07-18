@@ -102,109 +102,74 @@ gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '
   }'
 ```
 
-### Soundness-path review enforcement (pending admin action)
+### Soundness-path review enforcement (RETIRED 2026-07-18)
 
-The `develop-squash-only` ruleset's `pull_request` rule must require a code-owner
-review so a PR touching the CODEOWNERS-owned soundness paths cannot be
-squash-merged with zero approvals. The authoritative path list is
-`SOUNDNESS_PREFIXES` in `_project/scripts/auto_merge_soundness_paths.py`
-(mirrored 1:1 into `.github/CODEOWNERS`); as of `soundness-surface-widening`
-it covers the comparators/parsers (`benchbox/core/equivalence/**`,
-`benchbox/core/query_plans/parsers/**`, `benchbox/core/**/validation.py`),
-the oracle-adjacent surface (`benchbox/core/expected_results/**`,
-`benchbox/platforms/base/result_capture.py`, the `benchbox/sql_compat/`
-rule-dispatch core), and the review-gate machinery itself
-(`_project/scripts/auto_merge_soundness_paths.py`,
-`.github/workflows/auto-merge-on-open.yml`, `.github/workflows/release.yml`).
-The self-protection entries matter because in-workflow checks are
-attacker-controlled for same-repo PRs (GitHub runs the PR's own copy of a
-`pull_request`-triggered workflow); this CODEOWNERS + ruleset layer is the
-durable control. The auto-merge code side already withholds auto-merge
-enablement for those paths, but withholding is only a precondition — without
-this ruleset requirement a soundness-path PR can still be squash-merged
-manually. Tracked by the `auto-merge-review-gate-admin-enforcement` TODO.
+**Decision (2026-07-18): the former target state here —
+`require_code_owner_review: true` on the `develop-squash-only` ruleset — is
+RETIRED without ever having been applied.** It cannot work in this
+repository's operating model: every PR (agent-authored included) is opened
+under the sole code owner's account (@joeharris76), GitHub does not allow a
+PR author to approve their own PR, and the ruleset has `bypass_actors:
+(none)` — so enabling the rule would have made every soundness-path PR
+permanently unmergeable rather than reviewed. The gate this section used to
+describe as "pending admin action" was therefore a target that could never
+land; this section now records what the soundness gate actually is.
 
-Target state:
+The soundness gate, as operated:
 
-```text
-require_code_owner_review: true
-```
+- `SOUNDNESS_PREFIXES` in `_project/scripts/auto_merge_soundness_paths.py`
+  (mirrored 1:1 into `.github/CODEOWNERS`, lockstep pinned by
+  `tests/unit/test_auto_merge_soundness_paths.py`) classifies the
+  soundness-critical surface: comparators/parsers
+  (`benchbox/core/equivalence/**`, `benchbox/core/query_plans/parsers/**`,
+  `benchbox/core/**/validation.py`), the oracle-adjacent surface
+  (`benchbox/core/expected_results/**`,
+  `benchbox/platforms/base/result_capture.py`, the `benchbox/sql_compat/`
+  rule-dispatch core), and the gate machinery itself (the predicate,
+  `.github/workflows/auto-merge-on-open.yml`, and the PyPI-publishing
+  `.github/workflows/release.yml`).
+- `make pr-open` and `auto-merge-on-open.yml` WITHHOLD squash auto-merge for
+  PRs touching those paths (and revoke it on a later push that newly touches
+  them). CI cannot catch a change that redefines the oracle it validates
+  against, so these PRs must not merge hands-free.
+- The owner reviews the diff and merges manually. That manual step IS the
+  control; no repo-layer rule forces an approval.
 
-`required_approving_review_count` is deliberately NOT part of the target state:
-GitHub's `pull_request` rule applies that count to EVERY PR against the branch, not
-just CODEOWNERS-matched paths, so requiring `>= 1` would gate every develop PR
-instead of just soundness-path ones — defeating the fast squash-auto-merge default.
-`require_code_owner_review: true` is independently sufficient: GitHub still requires
-an owner's approval on a PR that touches a CODEOWNERS-matched soundness path
-regardless of the count setting.
+**Accepted residual risk** (recorded deliberately, not overlooked):
+in-workflow checks are attacker-controlled for same-repo PRs — GitHub runs
+the PR's own copy of a `pull_request`-triggered workflow, so a
+malicious/errant PR that edits `auto-merge-on-open.yml` could delete the
+soundness check and re-enable its own auto-merge in the same commit, then
+land on green CI with no human involved. Accepted because write access is
+limited to the owner and the owner's own agent sessions. **Revisit this
+decision if either changes:**
 
-Live state at this writing: `require_code_owner_review: false` — not yet enforced.
-Applying it is a deferred repo-admin action: the develop-PR `GITHUB_TOKEN` has no
-`administration` scope, so it can neither read nor write the ruleset; only an admin
-PAT can.
+- collaborators beyond the owner gain write access; or
+- agent sessions start opening PRs under a separate bot/App identity. That
+  removes the self-approval deadlock, at which point
+  `require_code_owner_review: true` becomes both applicable and the right
+  durable control — the retired machinery (the review-rule predicate, the
+  `DEVELOP_REVIEW_RULE_ENFORCED` warn-until-enforced canary wiring, and this
+  section's former target-state/apply/order-of-operations text) is
+  recoverable from git history prior to 2026-07-18.
 
-As of `ruleset-drift-check-review-rule-coverage`, this predicate is now wired into
-`scripts/ruleset_drift_check.py`'s `compare_ruleset` (see "Ruleset drift is checked
-by `scripts/ruleset_drift_check.py`" below) — the daily `release-canary.yml` run and
-`validate-main-pr.yml`'s bootstrap invocation both surface a missing
-`require_code_owner_review` as a finding automatically, using the
-`RULESET_DRIFT_TOKEN` those workflows already fetch rulesets with. **Decision:
-WARN-until-enforced** — while the live state above says `false`, that finding is
-prefixed `WARNING (non-blocking):` in the canary's findings/JSON output and does
-**not** fail the canary or the exit code (`scripts/ruleset_drift_check.py`'s
-`DEVELOP_REVIEW_RULE_ENFORCED = False`). This avoids the canary going permanently
-red before the admin PUT below lands. Once this section's "Live state" is updated
-to `require_code_owner_review: true`, flip `DEVELOP_REVIEW_RULE_ENFORCED` to `True`
-(a one-line change) so the same gap starts failing the canary if it ever regresses.
+Consequences of the retirement, applied 2026-07-18:
 
-The manual, one-off verify command below still works standalone (e.g. to check
-current live state without waiting for the next canary run):
-
-```bash
-gh api repos/joeharris76/BenchBox/rules/branches/develop \
-  | uv run --project _project/scripts -- python _project/scripts/ruleset_review_enforcement.py --rules-file -
-```
-
-The predicate exits non-zero and names the offending field while review enforcement
-is missing, and exits zero once the ruleset requires a code-owner review. Its pinned
-logic is guarded by `tests/unit/release/test_ruleset_review_enforcement.py`, and the
-merged drift-checker behaviour (WARN-until-enforced, develop-only scoping) is
-guarded by `tests/unit/release/test_ruleset_drift_review_coverage.py`, both in the
-required fast lane.
-
-Apply (admin only — the deferred action that closes the gap):
-
-```bash
-# Fetch the current ruleset, set the pull_request rule parameter
-#   require_code_owner_review: true
-# then PUT it back.
-gh api repos/joeharris76/BenchBox/rulesets/15611785 > /tmp/develop-ruleset.json
-# edit /tmp/develop-ruleset.json (pull_request rule parameters), then:
-gh api -X PUT repos/joeharris76/BenchBox/rulesets/15611785 --input /tmp/develop-ruleset.json
-```
-
-After applying, re-run the Verify command (expect exit 0) and confirm a zero-approval
-soundness-path PR can no longer be squash-merged.
-
-**Order of operations (the flag flip is coupled to this PUT — do it second, never first):**
-
-1. Apply the PUT above so the live `develop-squash-only` ruleset actually carries
-   `require_code_owner_review: true`, and update this section's "Live state" line to `true`.
-2. Only then flip the one-line constant in `scripts/ruleset_drift_check.py:47`:
-
-   ```diff
-   -DEVELOP_REVIEW_RULE_ENFORCED = False
-   +DEVELOP_REVIEW_RULE_ENFORCED = True
-   ```
-
-Flipping the constant **before** step 1 turns the (still-live) missing-review gap from a
-`WARNING (non-blocking):` finding into a blocking one, which reddens **both** the daily
-`release-canary.yml` run **and** `validate-main-pr.yml`'s drift-check on every real develop
-PR until the PUT lands. Done in the correct order, the flip's own CI is green (the live
-ruleset already satisfies the rule). No test changes are required: `compare_ruleset`'s
-`enforce_review_rule` parameter is exercised in both `False`/`True` modes by
-`tests/unit/release/test_ruleset_drift_review_coverage.py`, so the constant's value does
-not itself make any unit test pass or fail.
+- `scripts/ruleset_drift_check.py` no longer inspects the develop ruleset's
+  `pull_request` review settings (the `DEVELOP_REVIEW_RULE_ENFORCED`
+  constant and the perpetual `WARNING (non-blocking):` canary finding were
+  removed — a warning for a state that is intentional is noise, not signal).
+  `tests/unit/release/test_ruleset_drift_review_coverage.py` pins that a
+  develop ruleset without a code-owner-review rule produces no findings.
+- `_project/scripts/ruleset_review_enforcement.py` retains only the
+  tag-creation protection predicates (next section); its develop review-rule
+  predicate and `--rules-file` CLI were removed.
+- `.github/CODEOWNERS` is retained: it is the mirrored soundness-path list
+  the auto-merge withholding is documented against, and it routes review
+  requests — it just does not (and never did) block a merge by itself.
+- Historical tracking TODO `auto-merge-review-gate-admin-enforcement` is
+  closed as retired (its w3 "verify enforcement end-to-end" and the deferred
+  admin PUT are cancelled by this decision).
 
 History:
 
@@ -291,8 +256,8 @@ run, and the real-PyPI `Publish to PyPI` step additionally requires
 controls. The two sections below are the remaining repo-admin-layer half of
 the fix — "who can create a `v*` tag at all" and "does the `pypi`
 environment require a human approval" — neither of which the develop-PR
-`GITHUB_TOKEN` can read or write (no `administration` scope), same
-constraint as the soundness-path review enforcement gap above.
+`GITHUB_TOKEN` can read or write (no `administration` scope) — only an
+admin PAT can.
 
 ### Tag creation restricted to release flow (pending admin action)
 
@@ -340,10 +305,9 @@ soundness-path section above — the develop-PR `GITHUB_TOKEN` has no
 `administration` scope to read or write repository rulesets.
 
 Drift detection (landed 2026-07-05, tag-and-pypi-environment-admin-hardening
-w3): `_project/scripts/ruleset_review_enforcement.py` now carries a
+w3): `_project/scripts/ruleset_review_enforcement.py` carries a
 `tag_protection_findings()` predicate and a `TAG_RULESET_ENFORCED`
-warn-until-applied flag, mirroring `ruleset_drift_check.py`'s
-`DEVELOP_REVIEW_RULE_ENFORCED`. Feed it the live tag rulesets to check:
+warn-until-applied flag. Feed it the live tag rulesets to check:
 
 ```bash
 # Fetch each ruleset in full (the list endpoint omits conditions/rules,
@@ -473,13 +437,11 @@ Ruleset drift is checked by `scripts/ruleset_drift_check.py` inside
 `develop-squash-only` and `main-release-only`, then compares live GitHub
 rulesets for required status check contexts, strict-base settings, bypass
 actors, linear history, non-fast-forward protection, deletion protection, and
-target refs. For `develop-squash-only` only, it also imports
-`review_enforcement_findings` from
-`_project/scripts/ruleset_review_enforcement.py` (see "Soundness-path review
-enforcement" above) and surfaces a missing code-owner-review rule as a
-`WARNING (non-blocking):`-prefixed finding — visible in the job summary and
-JSON output, but not yet failing the canary (WARN-until-enforced; flips to
-blocking via `DEVELOP_REVIEW_RULE_ENFORCED` once the admin PUT lands). The
+target refs. It deliberately does NOT inspect the develop ruleset's
+`pull_request` review settings — the `require_code_owner_review` target was
+retired 2026-07-18 (see "Soundness-path review enforcement (RETIRED
+2026-07-18)" above), so a develop ruleset without a code-owner-review rule
+is the intended state, not drift. The
 workflow must use the repository secret `RULESET_DRIFT_TOKEN`
 with enough ruleset write/admin visibility for the API to expose
 `bypass_actors`; the default `GITHUB_TOKEN` is intentionally not used for this

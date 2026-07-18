@@ -39,10 +39,14 @@ SOUNDNESS_PREFIXES = (
     # base-ref execution + self-touch override in auto-merge-on-open.yml is
     # best-effort only for same-repo PRs (GitHub runs the PR's OWN copy of a
     # pull_request-triggered workflow file, so a PR editing that workflow can
-    # delete those checks in the same commit). The durable control is this
-    # prefix list mirrored into .github/CODEOWNERS plus the develop ruleset's
-    # require_code_owner_review (pending admin action; see
-    # docs/operations/repo-admin-settings.md). release.yml is included
+    # delete those checks in the same commit). There is no repo-layer
+    # backstop: the develop ruleset's require_code_owner_review target was
+    # retired 2026-07-18 (self-approval deadlock -- the sole code owner
+    # authors every PR; see docs/operations/repo-admin-settings.md,
+    # "Soundness-path review enforcement (RETIRED 2026-07-18)"). Listing
+    # these files here still matters: it stops auto-merge so the owner
+    # personally reviews and merges any change to the gate machinery.
+    # release.yml is included
     # because it publishes to PyPI. .github/workflows/pr.yml is deliberately
     # NOT included: it is high-churn (routine CI-lane edits), and the
     # required-check contract it feeds (ci-required-result) is pinned by the

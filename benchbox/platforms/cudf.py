@@ -260,7 +260,16 @@ class CuDFAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         adapter_config["collect_metrics"] = config.get("collect_gpu_metrics", False)
 
         # Pass through other relevant config
-        for key in ["verbose_enabled", "very_verbose", "force_recreate"]:
+        for key in [
+            "verbose_enabled",
+            "very_verbose",
+            "force_recreate",
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+        ]:
             if key in config:
                 adapter_config[key] = config[key]
 

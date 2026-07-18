@@ -212,6 +212,10 @@ class BigQueryAdapter(PlatformAdapter):
             "disable_result_cache",
             "maximum_bytes_billed",
             "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
             "verbose_enabled",
             "very_verbose",
         ]:
