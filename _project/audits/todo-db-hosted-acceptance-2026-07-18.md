@@ -64,11 +64,15 @@ imported/skipped/warnings counts without writing. Full replay
 non-empty target without `--replace`, atomically (the emptiness guard runs
 inside the transfer's `BEGIN IMMEDIATE` transaction).
 
-Recorded result at this SHA's tree (drifts as TODO/DONE files land):
+Recorded result (drifts as TODO/DONE files land):
 `imported: 1364  skipped: 0  warnings: 18`,
-`deps_resolved 539, deps_dangling 1`, stats `open` deferrals 629;
-32,595 rows, 44s wall via the Hrana bulk path (vs 4s local-SQLite control,
-vs ~2.5h projected for row-by-row delegation). Verify hosted == local by
+`deps_resolved 539, deps_dangling 1`, stats `open` deferrals 629 — these
+reproduce exactly at this file's pinned SHA. The live run's row total,
+32,595 in 82 data batches / 44s wall via the Hrana bulk path (vs 4s
+local-SQLite control, vs ~2.5h projected for row-by-row delegation), came
+from the PR #1219 head tree; a replay at the pinned SHA yields 32,621
+rows (intervening TODO/DONE edits), and the hardened CLI reports pipeline
+requests (data batches + guard + commit), so a replay prints 84. Verify hosted == local by
 running the same import into a scratch local file
 (`TODO_DB_PATH=/tmp/ctl.sqlite`) and diffing the report lines and `stats`.
 
@@ -87,7 +91,8 @@ promoted 1). Command latency observed: reads 0.7–0.8s warm; writes
 ## E. Hardening regressions (post-merge review)
 
 Failure paths are pinned by `tests/unit/scripts/test_todo_db_hosted.py`
-(fake libsql client + fake Hrana primary): plaintext `http://` refusal,
+(fake libsql client + fake Hrana primary): plaintext `http://` refusal
+(scheme-normalized: `HTTP://`/whitespace variants are caught too),
 COMMIT isolated from data batches and withheld on any statement error,
 stream close (rollback) on mid-transfer failure, `base_url` carried across
 baton-chained requests, atomic emptiness guard, network/JSON error mapping

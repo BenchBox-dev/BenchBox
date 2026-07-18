@@ -519,7 +519,8 @@ invariants, demonstrated rather than argued.
 
 ## Hosted backend (2026-07-18, fifth round — Turso/libsql, TDD)
 
-With G1 closed, `connect()` grew a second mode (PR: see below). Backend
+With G1 closed, `connect()` grew a second mode (PR #1219; hardened in
+PR #1222). Backend
 selection, first match wins: `--db` (a `libsql://`/`https://` value selects
 hosted) → `TODO_DB_PATH` (local file) → `TODO_DB_URL` (hosted; requires
 `TODO_DB_AUTH_TOKEN`) → default local path. `TODO_DB_PATH` deliberately
@@ -546,12 +547,13 @@ either backend. FK enforcement was verified live through write delegation
 (dangling insert refused by the primary). `todo migrate` is backend-aware;
 the hosted path hard-requires a fresh sync before touching the version
 record. TDD: `tests/unit/scripts/test_todo_db_hosted.py` (medium-marked,
-written red first; 38 tests after the hardening round below) pins backend
+written red first; 40 tests as of PR #1222) pins backend
 resolution, wiring, adapter semantics, `BEGIN IMMEDIATE` discipline,
 rollback-on-failed-gate, the full gated lifecycle, hosted migration, and
 the bulk-transfer failure paths against a fake libsql module and a fake
 Hrana primary that reproduce the real client's quirks; the pre-existing
-tracker suite (93 tests across `test_todo_db*.py` + `test_todo_wrapper.py`)
+tracker suite (93 tests: `test_todo_db.py`, `test_todo_db_v2.py`,
+`test_todo_wrapper.py`)
 passes unchanged. Replayable acceptance protocol:
 `_project/audits/todo-db-hosted-acceptance-2026-07-18.md`.
 
@@ -597,9 +599,10 @@ between staging and target).
 
 **G3 CLOSED (2026-07-18, live).** `todo import-yaml --replace` against
 the hosted primary: **imported 1,364 / skipped 0 / warnings 18; 539 deps
-resolved, 1 dangling; 629 open deferrals; 32,595 rows in 82 batches,
-44s wall** — report-identical to a same-tree local-SQLite control run
-(4s wall). Counts drifted from the recorded 1,362/538 of the earlier
+resolved, 1 dangling; 629 open deferrals; 32,595 rows in 82 data
+batches, 44s wall** — report-identical to a same-tree local-SQLite
+control run (4s wall); recorded from the PR #1219 head tree (the
+hardened CLI reports pipeline requests: data batches + guard + commit). Counts drifted from the recorded 1,362/538 of the earlier
 rounds because five PRs (#1114, #1142, #1194, #1215, #1217) added/moved
 TODO/DONE files on `develop` in between; warnings (18), skipped (0),
 dangling (1), and open deferrals (629) are unchanged. Post-import hosted
@@ -628,6 +631,9 @@ failure injection):
 
 - **Plaintext refusal:** `http://` hosted URLs are rejected at connect and
   at the pipeline layer — the Bearer token never travels unencrypted.
+  Extended post-review: schemes are normalized (strip + lowercase scheme)
+  first, so `HTTP://`/whitespace variants cannot bypass the check via
+  `--db`, `TODO_DB_URL`, or a response `base_url`.
 - **Commit discipline:** Hrana keeps executing later requests in a
   pipeline after a statement error, so `COMMIT` no longer rides with data
   batches; it is sent alone, only after every batch's results came back
