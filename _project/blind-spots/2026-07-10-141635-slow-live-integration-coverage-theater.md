@@ -1,7 +1,7 @@
 ---
 id: 2026-07-10-141635-slow-live-integration-coverage-theater
 date: 2026-07-10
-status: open
+status: actionable
 finding_kind: missed-axis
 review_context: "ducklake deep review / CI-lane coverage audit (origin/develop 7b6d1eef4)"
 related_paths:
@@ -13,27 +13,26 @@ suggested_sweep: "for each large integration test module, resolve its module+cla
 todo_id: null
 ---
 
-# A `slow` + `live_integration` marked module can run in ZERO CI lanes while looking covered
+# DuckLake live integration classes can run in ZERO CI lanes while looking covered
 
 ## Finding
-`tests/integration/test_ducklake_integration.py` is ~700 lines across 4 classes,
-presenting as the adapter's live coverage. Resolving markers against every lane:
-- Module marker: `slow`. Class `TestDuckLakeLiveConnection` (core in-process
-  ATTACH: cursor scoping, force-recreate, platform_info) adds `live_integration`;
-  `TestDuckLakePostgresCatalogLive` and `TestDuckLakeS3DataPathLive` add
-  `live_integration` too. Only `TestDuckLakeSqliteCatalogLive` lacks it.
-- Every default lane selects `not (slow or ... or live_integration)` (pr.yml
-  fast, test.yml integration, nightly, develop-post-merge `make test-medium`).
-  The `-m "slow"` jobs in pr.yml are FILE-SCOPED to other files (mutation,
-  tpchavoc), never naming this module. release-canary/validate-main-pr run
-  `-m "(slow or resource_heavy) and not (... live_integration)"`.
-- Net: classes 1/3/4 (in-process ATTACH, Postgres, S3) run in NO lane at all.
-  Class 2 (SQLite CLI e2e) runs ONLY at the main-release gate — never on the
-  develop PR that merged it, nor nightly, nor post-merge. The adapter's core
-  ATTACH/cursor/force-recreate behavior has zero live CI coverage; only the
-  hermetic mock unit test (`tests/unit/platforms/test_ducklake_adapter.py`,
-  `fast`) runs on the PR. #1082 and #1096 both merged via squash auto-merge
-  with no human review and effectively no live-behavior gate.
+`tests/integration/test_ducklake_integration.py` is a large four-class module,
+presenting as the adapter's live coverage. Resolving its current markers against
+the configured lanes:
+- The module is marked `integration` and `slow`. `TestDuckLakeLiveConnection`
+  (core in-process ATTACH: cursor scoping, force-recreate, platform_info),
+  `TestDuckLakePostgresCatalogLive`, and `TestDuckLakeS3DataPathLive` add
+  `live_integration`; only `TestDuckLakeSqliteCatalogLive` lacks it.
+- The develop PR fast/medium lanes, credential-free integration lane, nightly
+  integration lane, and develop-post-merge `make test-medium` all exclude
+  `slow` and/or `live_integration`. The named `-m "slow"` PR steps are
+  file-scoped to other modules and never select this file.
+- Net: 8 of the module's 9 tests (the in-process ATTACH, Postgres, and S3
+  classes) still run in no configured CI lane. The SQLite CLI test is selected
+  only by the release non-fast canary because it lacks `live_integration`; it
+  is not covered by the develop PR, nightly, or post-merge lanes. The
+  adapter's core live ATTACH behavior therefore still has zero live CI
+  coverage; the PR only runs the hermetic mock unit test.
 - Amplifier: `_probe_extension(...)` is cached for the test process. A transient
   extension-repository failure can cache `False` for later tests in that process.
   The probe is deliberately lazy and runs from `setup_method`, so deselected
@@ -53,5 +52,10 @@ evades the "where are the tests?" prompt.
       integration test module is selected by zero configured lanes.
 - [ ] Give the extension-only in-process ATTACH class a marker that a real lane
       runs (it needs no external service), so core adapter behavior is gated.
-- [ ] Make `_probe_extension` failures loud (warn/xfail) rather than a cached
-      silent skip at the release gate.
+- [ ] Make `_probe_extension` failures visible as an explicit skip/health
+      result rather than a cached silent skip in a gate that is meant to prove
+      live coverage.
+
+## Triage log
+
+- 2026-07-18: actionable — Rechecked against origin/develop 8a7ee88e0 on 2026-07-18: current marker collection selects 8 of 9 DuckLake tests in no configured CI lane; only the non-live SQLite test reaches the release non-fast canary; revised the record to match current lane behavior.

@@ -1,7 +1,7 @@
 ---
 id: 2026-05-23-223538-todo-review-misses-spec-the-todo-edits
 date: 2026-05-23
-status: open
+status: actionable
 finding_kind: framework-gap
 review_context: "/todo review — chore/shrink-review-followup-todos (shrink-campaign follow-ups)"
 related_paths:
@@ -11,20 +11,23 @@ suggested_sweep: "grep active TODO descriptions for 'goal line N' / spec line-nu
 todo_id: null
 ---
 
-# TODO-review freshness axis misses spec/goal docs the TODO itself edits
+# TODO-review freshness does not bind citations to files the TODO itself edits
 
 ## Finding
-A TODO that proposes to edit a living policy/spec document (here
-`_project/goal-shrink-core-code.md`) cited that document's current state as
+The original shrink TODO proposed to edit a living policy/spec document
+(`_project/goal-shrink-core-code.md`) while citing that document's state as
 fixed evidence ("goal line 12", "goal line 19", "still driven by a single
-naive `cloc` metric"). The goal file had since been rewritten to encode the
-very objective function the TODO's w1 was going to author, and the cited line
-numbers no longer held. The TODO scored 3 on clarity, guardrails, prior_art,
-and work breakdown and would have passed a mechanical review; only manually
-reading the goal file revealed w1 was already done and the premise falsified.
-The review rubric's evidence-durability sub-axis enumerates dependency
-versions, harness PASS, and observed external behavior — but not "the
-spec/goal file this TODO proposes to modify may have already moved."
+naive `cloc` metric"). The goal had already been rewritten to encode the
+objective function the TODO's w1 was supposed to author, so the cited lines
+and the premise were stale. Its w0 re-read caught the drift, and the TODO was
+completed and moved to `DONE/` on 2026-05-24.
+
+The current `/todo review` rubric now checks cited upstream evidence such as
+dependency versions, harness PASS, and observed external behavior, but it
+still does not require a fresh read when a TODO's own
+`scope_limit.only_modify` includes a policy/spec/goal file quoted by its
+description. The historical instance is resolved; the review-framework gap
+remains.
 
 ## Why this matters
 TODOs authored from a campaign review often target the campaign's governing
@@ -41,3 +44,7 @@ external dependencies.
       and diffs against the quoted text (score 0 if absent).
 - [ ] Spot-check other active TODOs for spec line-number citations that can
       drift (sql-catalog already corrected to a stable phrase reference here).
+
+## Triage log
+
+- 2026-07-18: actionable — The original shrink TODO is completed in DONE/ as of 2026-05-24, but recheck of the current /todo review rubric shows the own-edit-target freshness gap remains; revised the record to separate the resolved example from the live framework gap.
