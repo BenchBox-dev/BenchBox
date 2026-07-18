@@ -308,6 +308,22 @@ Retained LLM actions: `ideate`, `spec`, `from-spec`, judgment half of
 - **G1 — host verification (before any build):** from a live remote session,
   create the candidate DB (Turso first), verify connect/query/write through
   the HTTPS proxy, verify from local env, record results in this spec.
+
+  **G1 partial results (2026-07-18, live remote session):**
+  - All three candidate control planes are **denied by the environment's
+    network policy**: CONNECT to `api.turso.tech:443`,
+    `console.neon.tech:443`, and `api.supabase.com:443` each returned a 403
+    policy denial at the gateway (confirmed in agent-proxy relay logs).
+  - Raw TCP egress on 5432 is blocked, confirming the spec's assumption
+    that the Postgres wire protocol is not viable from remote sessions;
+    HTTPS through the proxy is the sanctioned transport.
+  - **New prerequisite for G1 completion (maintainer actions):**
+    (a) add the chosen host's domains to the remote environment's network
+    allowlist (for Turso: `api.turso.tech` and the org's `*.turso.io`
+    database endpoint); (b) create the account/DB and provision the auth
+    token into the environment config — both are account-holder actions an
+    agent session cannot perform. Re-run the reachability probe afterwards
+    to close G1.
 - **G2 — CLI MVP:** schema DDL + `create/show/claim/start/done/defer/
   promote/dismiss/complete/ready/list/stats/export` + tests. No repo changes
   to the YAML system yet.
