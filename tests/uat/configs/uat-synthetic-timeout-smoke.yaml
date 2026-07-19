@@ -1,3 +1,5 @@
+# TEMPLATE — reusable synthetic fixture exercising per-cell timeout handling.
+# See _project/specs/uat-framework.md Section 9.
 name: "uat-synthetic-timeout-smoke"
 description: "Tiny UAT sweep that should time out one local DuckDB TPC-H cell"
 

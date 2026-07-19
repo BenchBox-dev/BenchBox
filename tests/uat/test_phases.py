@@ -355,12 +355,26 @@ def test_enumerate_honours_scale_options():
 
 
 def test_enumerate_override_replaces_rungs():
+    """`scales.override` wins over `scales.rungs` at enumerate time.
+
+    YAML configs can no longer express both fields at once (w1:
+    `scales.rungs`/`scales.override` are validated mutually exclusive at
+    load time, uat-config-schema-spec-realignment) -- but the stress-override
+    runtime path (`tests/uat/orchestrator.py`'s `SCALE=` handling) legitimately
+    builds a config with both set via `dataclasses.replace`, bypassing YAML
+    validation entirely. This exercises that same precedence at the enumerate
+    layer without going through `validate_config`.
+    """
+    from dataclasses import replace
+
     raw = {
         "platforms": {"include": ["duckdb"]},
         "benchmarks": {"include": ["tpch"]},
-        "scales": {"rungs": [0.01, 0.1, 1.0], "override": 0.1},
+        "scales": {"rungs": [0.01, 0.1, 1.0]},
     }
-    cells = enum_phase.enumerate_cells(_cfg(raw))
+    cfg = _cfg(raw)
+    cfg = replace(cfg, scales=replace(cfg.scales, override=0.1))
+    cells = enum_phase.enumerate_cells(cfg)
     assert {c.scale for c in cells} == {0.1}
 
 

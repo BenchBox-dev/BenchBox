@@ -375,3 +375,214 @@ def test_release_gate_cross_scale_floors_are_tuned_and_achievable():
             f"{config_name}: floor {floor_value} exceeds 0.8 * eligible ({eligible}); re-run the w4 derivation"
         )
         assert floor_value < eligible, f"{config_name}: floor must never equal the eligible count"
+
+
+# ---------------------------------------------------------------------------
+# w1 load-time enforcement (uat-config-schema-spec-realignment): rules that
+# were previously either unvalidated or only enforced at runtime.
+# ---------------------------------------------------------------------------
+
+
+def test_validate_config_rejects_duplicate_phases():
+    with pytest.raises(config.ConfigError, match="duplicate"):
+        config.validate_config({"name": "smoke", "phases": ["preflight", "execute", "execute"]})
+
+
+def test_validate_config_rejects_out_of_order_phases():
+    """`report` before `execute` used to load fine and silently produce an
+    empty report (the orchestrator walks `phases:` literally)."""
+    with pytest.raises(config.ConfigError, match="canonical order"):
+        config.validate_config({"name": "smoke", "phases": ["report", "execute"]})
+
+
+def test_validate_config_accepts_canonical_phase_subsequence():
+    cfg = config.validate_config({"name": "smoke", "phases": ["preflight", "execute", "validate", "report"]})
+    assert cfg.phases == ("preflight", "execute", "validate", "report")
+
+
+def test_validate_config_rejects_rungs_and_override_together():
+    with pytest.raises(config.ConfigError, match="mutually exclusive"):
+        config.validate_config({"name": "smoke", "phases": ["execute"], "scales": {"rungs": [0.1], "override": 1.0}})
+
+
+def test_validate_config_rejects_bool_rung():
+    with pytest.raises(config.ConfigError, match="scales.rungs"):
+        config.validate_config({"name": "smoke", "scales": {"rungs": [True]}})
+
+
+def test_validate_config_rejects_bool_override():
+    with pytest.raises(config.ConfigError, match="scales.override"):
+        config.validate_config({"name": "smoke", "scales": {"override": True}})
+
+
+def test_validate_config_rejects_validator_clean_rate_floor_above_one():
+    with pytest.raises(config.ConfigError, match=r"\[0\.0, 1\.0\]"):
+        config.validate_config(
+            {"name": "smoke", "phases": ["execute", "validate"], "validate": {"validator_clean_rate_floor": 1.5}}
+        )
+
+
+def test_validate_config_accepts_validator_clean_rate_floor_boundaries():
+    lo = config.validate_config({"name": "smoke", "validate": {"validator_clean_rate_floor": 0.0}})
+    hi = config.validate_config({"name": "smoke", "validate": {"validator_clean_rate_floor": 1.0}})
+    assert lo.validate.validator_clean_rate_floor == 0.0
+    assert hi.validate.validator_clean_rate_floor == 1.0
+
+
+def test_validate_config_rejects_non_string_phases_arg():
+    with pytest.raises(config.ConfigError, match="phases_arg"):
+        config.validate_config({"name": "smoke", "execute": {"phases_arg": ["load"]}})
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["benchmark_runs_dir_template", "logs_dir_template", "submissions_dir_template"],
+)
+def test_validate_config_rejects_non_string_output_template(field: str):
+    with pytest.raises(config.ConfigError, match=rf"output\.{field}` must be a string"):
+        config.validate_config({"name": "smoke", "output": {field: {"nested": "mapping"}}})
+
+
+def test_validate_config_rejects_package_phase_without_terminal_state():
+    with pytest.raises(config.ConfigError, match="submit_terminal_state.*required"):
+        config.validate_config({"name": "smoke", "phases": ["preflight", "execute", "package", "report"]})
+
+
+def test_validate_config_rejects_package_phase_with_invalid_vocab():
+    with pytest.raises(config.ConfigError, match="not in"):
+        config.validate_config(
+            {
+                "name": "smoke",
+                "phases": ["execute", "package"],
+                "package": {"submit_terminal_state": "merged-mainline"},
+            }
+        )
+
+
+def test_validate_config_rejects_package_phase_cloud_uploaded_without_service():
+    with pytest.raises(config.ConfigError, match="package.service"):
+        config.validate_config(
+            {
+                "name": "smoke",
+                "phases": ["execute", "package"],
+                "package": {"submit_terminal_state": "cloud-uploaded"},
+            }
+        )
+
+
+def test_validate_config_accepts_package_phase_cloud_uploaded_with_service():
+    cfg = config.validate_config(
+        {
+            "name": "smoke",
+            "phases": ["execute", "package"],
+            "package": {"submit_terminal_state": "cloud-uploaded", "service": "https://results.example.com"},
+        }
+    )
+    assert cfg.package.service == "https://results.example.com"
+
+
+def test_validate_config_package_checks_are_inert_when_package_phase_not_enabled():
+    """A stale/invalid `package:` section is only enforced once `package` is
+    actually in `phases:` -- mirrors the framework's existing leniency for
+    unused-phase config (e.g. `preflight.free_space_min_gib` when
+    `preflight` is absent from `phases:`). This keeps
+    `tests/uat/phases/package.py`'s own runtime guard (package.py:55-68)
+    independently testable via `validate_config` payloads that never enable
+    the package phase."""
+    cfg = config.validate_config(
+        {
+            "name": "smoke",
+            "phases": ["preflight", "execute", "report"],
+            "package": {"submit_terminal_state": "merged-mainline"},
+        }
+    )
+    assert cfg.package.submit_terminal_state == "merged-mainline"
+
+
+# ---------------------------------------------------------------------------
+# w3 corpus runnability guard (uat-config-schema-spec-realignment): every
+# checked-in YAML under tests/uat/configs/ -- including
+# generated-rerun-shards/, which no test referenced before this guard --
+# must load, resolve with zero unknown platform/benchmark includes, and
+# enumerate to a non-empty cell set. Parametrized by discovered path so a
+# failing config is named in the test id; each assertion also names the
+# specific field that broke.
+# ---------------------------------------------------------------------------
+
+_CORPUS_CONFIGS_ROOT = Path(__file__).parent / "configs"
+
+
+def _corpus_config_paths() -> tuple[Path, ...]:
+    return tuple(sorted(_CORPUS_CONFIGS_ROOT.rglob("*.yaml")))
+
+
+@pytest.mark.parametrize(
+    "config_path",
+    _corpus_config_paths(),
+    ids=lambda p: str(p.relative_to(_CORPUS_CONFIGS_ROOT)),
+)
+def test_every_corpus_config_loads_and_enumerates_nonempty(config_path: Path):
+    from tests.uat.matrix import load_benchmarks, missing_benchmarks_from_include, missing_platforms_from_include
+    from tests.uat.phases.enumerate import enumerate_cells_with_pruning
+
+    try:
+        cfg = config.load_config(config_path)
+    except config.ConfigError as exc:
+        pytest.fail(f"{config_path}: `load_config` raised: {exc}")
+
+    benchmarks = load_benchmarks()
+
+    missing_platforms = missing_platforms_from_include(cfg.platforms.include)
+    assert not missing_platforms, f"{config_path}: `platforms.include` has unknown platform id(s): {missing_platforms}"
+
+    missing_benchmarks = missing_benchmarks_from_include(cfg.benchmarks.include, benchmarks)
+    assert not missing_benchmarks, (
+        f"{config_path}: `benchmarks.include` has unknown benchmark id(s): {missing_benchmarks}"
+    )
+
+    result = enumerate_cells_with_pruning(cfg, benchmarks=benchmarks)
+    assert result.cells, f"{config_path}: `enumerate_cells_with_pruning` produced zero cells (empty matrix)"
+
+
+def test_corpus_config_paths_cover_generated_rerun_shards():
+    """Guard the guard: fail loudly if the corpus discovery glob stops
+    reaching `generated-rerun-shards/` (e.g. a rename), rather than silently
+    shrinking the parametrized set above."""
+    shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
+    discovered = set(_corpus_config_paths())
+    shards = {p for p in discovered if shard_dir in p.parents}
+    assert shards, "corpus discovery found zero generated-rerun-shards/*.yaml files"
+    assert shards == set(shard_dir.glob("*.yaml"))
+
+
+# ---------------------------------------------------------------------------
+# w4 lifecycle headers (uat-config-schema-spec-realignment): every top-level
+# config under tests/uat/configs/ (excluding generated-rerun-shards/, which
+# carries its own generated/frozen-header convention per Section 9.3) must
+# declare its lifecycle class as the first line -- `# TEMPLATE` or
+# `# HISTORICAL` -- per _project/specs/uat-framework.md Section 9.
+# ---------------------------------------------------------------------------
+
+_RECOGNIZED_CONFIG_HEADERS = ("# TEMPLATE", "# HISTORICAL")
+
+
+def _top_level_config_paths() -> tuple[Path, ...]:
+    return tuple(sorted(_CORPUS_CONFIGS_ROOT.glob("*.yaml")))
+
+
+@pytest.mark.parametrize("config_path", _top_level_config_paths(), ids=lambda p: p.name)
+def test_top_level_config_carries_recognized_lifecycle_header(config_path: Path):
+    first_line = config_path.read_text(encoding="utf-8").splitlines()[0]
+    assert first_line.startswith(_RECOGNIZED_CONFIG_HEADERS), (
+        f"{config_path.name}: first line {first_line!r} does not start with one of "
+        f"{_RECOGNIZED_CONFIG_HEADERS} (see _project/specs/uat-framework.md Section 9)"
+    )
+
+
+def test_top_level_config_paths_exclude_generated_rerun_shards():
+    """Guard the guard: the top-level glob must stay non-recursive so
+    generated-rerun-shards/ (a different header convention) never enters
+    this parametrized set."""
+    shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
+    assert all(shard_dir not in p.parents for p in _top_level_config_paths())
+    assert len(_top_level_config_paths()) == 15

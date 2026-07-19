@@ -220,6 +220,29 @@ def _validate_phases(phases: list[str]) -> tuple[str, ...]:
         if entry not in VALID_PHASES:
             raise ConfigError(f"Unknown phase {entry!r}; valid: {sorted(VALID_PHASES)}")
         out.append(entry)
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for entry in out:
+        if entry in seen:
+            duplicates.append(entry)
+        else:
+            seen.add(entry)
+    if duplicates:
+        raise ConfigError(f"`phases:` contains duplicate entries: {sorted(set(duplicates))}")
+    # The orchestrator (tests/uat/orchestrator.py) walks `phases:` literally
+    # in the order given -- it does not reorder to the canonical pipeline
+    # order. A config like `phases: [report, execute]` used to load
+    # successfully and silently produce an empty report (report ran before
+    # any cell existed). Reject any ordering that is not a subsequence of
+    # VALID_PHASES's canonical order.
+    canonical_index = {phase: idx for idx, phase in enumerate(VALID_PHASES)}
+    indices = [canonical_index[phase] for phase in out]
+    if indices != sorted(indices):
+        raise ConfigError(
+            f"`phases:` entries must follow canonical order {list(VALID_PHASES)}; got {out} "
+            "-- the orchestrator walks `phases:` literally, so an out-of-order list "
+            "(e.g. `report` before `execute`) silently produces an empty report"
+        )
     return tuple(out)
 
 
@@ -293,6 +316,10 @@ def _validate_scales(payload: dict[str, Any] | None) -> ScalesConfig:
     rungs_raw = payload.get("rungs", [0.01])
     if isinstance(rungs_raw, (str, bytes)) or not isinstance(rungs_raw, (list, tuple)):
         raise ConfigError("`scales.rungs` must be a list of numbers")
+    if any(isinstance(value, bool) for value in rungs_raw):
+        # bool is an int subclass, so `float(True) == 1.0` would otherwise
+        # silently accept `rungs: [true]` as a 1.0 scale rung.
+        raise ConfigError("`scales.rungs` entries must be numbers, got bool")
     try:
         rungs = tuple(float(value) for value in rungs_raw)
     except (TypeError, ValueError) as exc:
@@ -300,10 +327,17 @@ def _validate_scales(payload: dict[str, Any] | None) -> ScalesConfig:
     if not rungs:
         raise ConfigError("`scales.rungs` must be non-empty")
     override = payload.get("override")
+    if isinstance(override, bool):
+        raise ConfigError("`scales.override` must be a number, got bool")
     try:
         override_value = float(override) if override is not None else None
     except (TypeError, ValueError) as exc:
         raise ConfigError("`scales.override` must be a number") from exc
+    if "rungs" in payload and override_value is not None:
+        raise ConfigError(
+            "`scales.rungs` and `scales.override` are mutually exclusive -- "
+            "set only one (see _project/specs/uat-framework.md Section 3)"
+        )
     return ScalesConfig(rungs=rungs, override=override_value)
 
 
@@ -346,7 +380,12 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
         extra_args = tuple(extra_args_raw)
     else:
         raise ConfigError("`execute.extra_args` must be a list of strings")
-    phases_arg = str(payload.get("phases_arg", "load,power"))
+    phases_arg_raw = payload.get("phases_arg", "load,power")
+    if not isinstance(phases_arg_raw, str):
+        raise ConfigError(
+            f"`execute.phases_arg` must be a string, got {type(phases_arg_raw).__name__}={phases_arg_raw!r}"
+        )
+    phases_arg = phases_arg_raw
     official = _require_bool(payload, "official", default=False, section="execute")
     streams = _optional_positive_int(payload, "streams", section="execute")
     seed = _optional_int(payload, "seed", section="execute")
@@ -411,34 +450,27 @@ def _validate_output(payload: dict[str, Any]) -> OutputConfig:
         payload = {}
     if not isinstance(payload, dict):
         raise ConfigError("`output:` must be a mapping")
-    _reject_unknown_fields(
-        payload,
-        frozenset({"benchmark_runs_dir_template", "logs_dir_template", "submissions_dir_template"}),
-        "output",
-    )
-    explicitly_set = frozenset(
-        key
-        for key in ("benchmark_runs_dir_template", "logs_dir_template", "submissions_dir_template")
-        if key in payload
-    )
+    template_keys = ("benchmark_runs_dir_template", "logs_dir_template", "submissions_dir_template")
+    _reject_unknown_fields(payload, frozenset(template_keys), "output")
+    for key in template_keys:
+        if key in payload and not isinstance(payload[key], str):
+            # Without this, a non-string value (e.g. a YAML mapping) would
+            # silently str()-coerce into a nonsense path fragment instead of
+            # failing at load time.
+            raise ConfigError(f"`output.{key}` must be a string, got {type(payload[key]).__name__}={payload[key]!r}")
+    explicitly_set = frozenset(key for key in template_keys if key in payload)
     return OutputConfig(
-        benchmark_runs_dir_template=str(
-            payload.get(
-                "benchmark_runs_dir_template",
-                "~/Developer/benchmark_runs",
-            )
+        benchmark_runs_dir_template=payload.get(
+            "benchmark_runs_dir_template",
+            "~/Developer/benchmark_runs",
         ),
-        logs_dir_template=str(
-            payload.get(
-                "logs_dir_template",
-                "~/Developer/benchmark_runs/logs/uat_{date}_{time}",
-            )
+        logs_dir_template=payload.get(
+            "logs_dir_template",
+            "~/Developer/benchmark_runs/logs/uat_{date}_{time}",
         ),
-        submissions_dir_template=str(
-            payload.get(
-                "submissions_dir_template",
-                "~/Developer/benchmark_runs/submissions/{name}",
-            )
+        submissions_dir_template=payload.get(
+            "submissions_dir_template",
+            "~/Developer/benchmark_runs/submissions/{name}",
         ),
         explicitly_set=explicitly_set,
     )
@@ -553,14 +585,15 @@ def _validate_validate(payload: dict[str, Any] | None) -> ValidateConfig:
     if not isinstance(payload, dict):
         raise ConfigError("`validate:` must be a mapping")
     _reject_unknown_fields(payload, frozenset({"validator_clean_rate_floor"}), "validate")
-    return ValidateConfig(
-        validator_clean_rate_floor=_require_nonnegative_float(
-            payload,
-            "validator_clean_rate_floor",
-            default=0.80,
-            section="validate",
-        )
+    floor = _require_nonnegative_float(
+        payload,
+        "validator_clean_rate_floor",
+        default=0.80,
+        section="validate",
     )
+    if floor > 1.0:
+        raise ConfigError(f"`validate.validator_clean_rate_floor` must be in [0.0, 1.0], got {floor}")
+    return ValidateConfig(validator_clean_rate_floor=floor)
 
 
 def _validate_package(payload: dict[str, Any] | None) -> PackageConfig:
@@ -666,6 +699,25 @@ def validate_config(payload: dict[str, Any]) -> UATConfig:
     cleanup = _validate_cleanup(payload.get("cleanup"))
     validate = _validate_validate(payload.get("validate"))
     package = _validate_package(payload.get("package"))
+    if "package" in phases:
+        # These three checks mirror tests/uat/phases/package.py's
+        # `_resolve_state`/`_resolve_service` runtime guard (package.py:55-68)
+        # -- moved here so a bad `package:` section is a load-time
+        # ConfigError instead of an execute-time PackagePhaseError, but only
+        # once the `package` phase is actually enabled. A `package:` section
+        # left stale while the phase is not in `phases:` is inert (matches
+        # the framework's existing "unused-field is a warning, not an
+        # error" leniency for e.g. `preflight.free_space_min_gib` when
+        # `preflight` is absent from `phases:`).
+        if package.submit_terminal_state is None:
+            raise ConfigError("`package.submit_terminal_state` is required when the `package` phase is enabled")
+        if package.submit_terminal_state not in VALID_TERMINAL_STATES:
+            raise ConfigError(
+                f"`package.submit_terminal_state` {package.submit_terminal_state!r} not in "
+                f"{sorted(VALID_TERMINAL_STATES)}"
+            )
+        if package.submit_terminal_state == "cloud-uploaded" and not package.service:
+            raise ConfigError("`package.submit_terminal_state: cloud-uploaded` requires `package.service`")
     explorer_smoke = _validate_explorer_smoke(payload.get("explorer_smoke"))
     report = _validate_report(payload.get("report"))
     compatibility = _validate_compatibility(payload.get("compatibility"))
