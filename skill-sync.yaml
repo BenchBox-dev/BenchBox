@@ -9,6 +9,7 @@ skills:
   - test
   - docs
   - todo
+  - todo-db
   - benchbox
   - SHARED/commit-framework
   - SHARED/verify-framework
@@ -25,9 +26,7 @@ targets:
   claude:
     dir: .claude/skills
     tracked: true
-    # todo-db is the DB-tracker spike wrapper (_project/specs/todo-db-tracker.md),
-    # deliberately outside skill-sync until G5 cutover adopts it into the source.
-    ignore: [blog, todo-db]
+    ignore: [blog]
   codex: .codex/skills
   gemini: .gemini/skills
   antigravity: .antigravity/skills
@@ -44,7 +43,3 @@ config:
   test:
     runner: pytest
     coverage: "uv run -- python -m pytest --cov=benchbox --cov-report=term-missing"
-  todo:
-    cli: "uv run _project/scripts/todo_cli.py"
-    validate: "uv run _project/scripts/validate_todo.py"
-    index: "uv run _project/scripts/generate_indexes.py"
