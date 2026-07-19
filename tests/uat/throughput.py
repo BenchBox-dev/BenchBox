@@ -31,6 +31,8 @@ import datetime as _dt
 from pathlib import Path
 from typing import Any
 
+from benchbox.utils.scale_factor import format_scale_factor
+
 # Mirrors benchbox/cli/commands/run_official.py::TPC_ALLOWED_SCALE_FACTORS.
 # `run-official` rejects any other scale factor outright, so a throughput UAT
 # cell must pick one of these (the verification command in the
@@ -44,8 +46,9 @@ def resolve_official_result_path(
     platform: str,
     benchmark: str,
     started_after: _dt.datetime,
+    scale: float | None = None,
 ) -> Path | None:
-    """Find the newest result JSON exported for (platform, benchmark).
+    """Find the newest result JSON exported for (platform, benchmark[, scale]).
 
     `run-official` prints its result path through Rich's non-quiet console
     output (e.g. ``JSON: [dim]/path/to/result.json[/dim]``), which is not a
@@ -54,20 +57,77 @@ def resolve_official_result_path(
     Locating the file by name + mtime instead works regardless of console
     formatting and also survives a non-clean (exit code != 0) run, which
     `run-official` still exports a full result JSON for.
+
+    Filename grammar (pinned from the exporter every result JSON funnels
+    through, ``benchbox.core.results.filenames.build_result_filename_base``,
+    as exercised by the fixtures in ``tests/uat/test_throughput.py``)::
+
+        {benchmark...}_{sf<N>}_{platform...}_{mode}_{timestamp}[_{execution_id}].json
+
+    The exporter writes the registry ``benchmark_id`` and the normalized
+    platform name verbatim, and BOTH can themselves contain underscores, so
+    each spans a *variable-length* run of ``"_"``-split tokens rather than a
+    single fixed slot:
+
+    - single-token benchmark, single-token platform --
+      ``tpch_sf1_duckdb_sql_20260709_223304_0865bb91.json`` ->
+      ``["tpch", "sf1", "duckdb", "sql", ...]``
+    - single-token benchmark, two-token platform (``pg-duckdb`` ->
+      ``pg_duckdb``) -- ``tpch_sf1_pg_duckdb_sql_20260709.json`` ->
+      ``["tpch", "sf1", "pg", "duckdb", "sql", ...]``
+    - two-token benchmark (``tpcds_obt``, ``tsbs_devops``, ``tpch_skew``,
+      ``vector_search``, ``*_primitives`` ...) --
+      ``tpcds_obt_sf1_duckdb_sql_20260709.json`` ->
+      ``["tpcds", "obt", "sf1", "duckdb", "sql", ...]``
+
+    Matching is token-exact, not substring. A candidate's ``"_"``-split stem
+    must (1) begin with the benchmark's own token sequence as a prefix, then
+    (2) carry the scale-factor token at index ``len(benchmark_tokens)`` (only
+    *checked* when `scale` is given, but always skipped over so the platform
+    slice lines up), then (3) carry the platform's own token sequence in the
+    slots immediately after. This is what stops ``platform="duckdb"`` from
+    matching a ``pg_duckdb`` result file (or the reverse), and
+    ``benchmark="tpcds_obt"`` from being shifted/rejected -- both of which
+    the old glob-based ``f"{benchmark}_*{platform}*.json"`` pattern got
+    wrong (a false-positive on the platform, a false-negative on the
+    multi-token benchmark).
+
+    `scale` is optional and keyword-only for backward compatibility with
+    existing callers that don't (yet) pass it; when omitted, the
+    scale-factor token is present in the filename but not checked.
+
+    Ties (equal ``st_mtime``, e.g. within filesystem mtime granularity) are
+    broken deterministically by filename, not left to whatever order the
+    filesystem happens to yield candidates in.
     """
     if not results_dir.is_dir():
         return None
-    platform_token = platform.lower().replace("-", "_")
-    benchmark_token = benchmark.lower()
+    benchmark_tokens = benchmark.lower().split("_")
+    platform_tokens = platform.lower().replace("-", "_").split("_")
+    scale_token = format_scale_factor(scale) if scale is not None else None
+    scale_idx = len(benchmark_tokens)
+    platform_start = scale_idx + 1
+    platform_end = platform_start + len(platform_tokens)
     started_ts = started_after.timestamp()
-    candidates = [
-        path
-        for path in results_dir.glob(f"{benchmark_token}_*{platform_token}*.json")
-        if path.is_file() and path.stat().st_mtime >= started_ts
-    ]
+
+    candidates: list[Path] = []
+    for path in results_dir.glob(f"{benchmark.lower()}_*.json"):
+        if not path.is_file() or path.stat().st_mtime < started_ts:
+            continue
+        tokens = path.stem.split("_")
+        if tokens[:scale_idx] != benchmark_tokens:
+            continue
+        # The scale-factor token always occupies ``scale_idx`` in the pinned
+        # grammar; only *check* it when the caller supplied `scale`, but the
+        # platform slice below is offset past it regardless.
+        if scale_token is not None and (len(tokens) <= scale_idx or tokens[scale_idx] != scale_token):
+            continue
+        if tokens[platform_start:platform_end] != platform_tokens:
+            continue
+        candidates.append(path)
     if not candidates:
         return None
-    return max(candidates, key=lambda path: path.stat().st_mtime)
+    return max(candidates, key=lambda path: (path.stat().st_mtime, path.name))
 
 
 def validate_stream_count(

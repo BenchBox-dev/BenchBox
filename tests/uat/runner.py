@@ -248,6 +248,7 @@ def run_cell(
             platform=platform,
             benchmark=benchmark,
             started_after=now,
+            scale=scale,
         )
     else:
         result_path_str = last_nonempty_output_line(stdout_text) if timeout_result.exit_code == 0 else None
