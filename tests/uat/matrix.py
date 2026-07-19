@@ -150,7 +150,11 @@ def known_platform_ids() -> frozenset[str]:
     """
     sql = set(PlatformRegistry.get_sql_platforms())
     dataframe = set(PlatformRegistry.get_dataframe_platforms())
-    return frozenset(sql | dataframe | {f"{platform}-df" for platform in dataframe})
+    # Guard against ids that already carry the suffix (e.g. `databricks-df`
+    # is registered under both capabilities) so we don't mint spurious
+    # `databricks-df-df` entries.
+    df_aliases = {f"{platform}-df" for platform in dataframe if not platform.endswith("-df")}
+    return frozenset(sql | dataframe | df_aliases)
 
 
 def missing_platforms_from_include(

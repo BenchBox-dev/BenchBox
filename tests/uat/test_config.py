@@ -501,7 +501,7 @@ def test_validate_config_package_checks_are_inert_when_package_phase_not_enabled
 
 # ---------------------------------------------------------------------------
 # w3 corpus runnability guard (uat-config-schema-spec-realignment): every
-# checked-in YAML under tests/uat/configs/ -- including
+# checked-in config (*.yaml or *.yml) under tests/uat/configs/ -- including
 # generated-rerun-shards/, which no test referenced before this guard --
 # must load, resolve with zero unknown platform/benchmark includes, and
 # enumerate to a non-empty cell set. Parametrized by discovered path so a
@@ -510,10 +510,18 @@ def test_validate_config_package_checks_are_inert_when_package_phase_not_enabled
 # ---------------------------------------------------------------------------
 
 _CORPUS_CONFIGS_ROOT = Path(__file__).parent / "configs"
+# Both extensions: a future `.yml` config must not silently escape the corpus
+# and lifecycle-header guards below.
+_CONFIG_GLOB_EXTS = ("*.yaml", "*.yml")
+
+
+def _glob_configs(directory: Path, *, recursive: bool) -> set[Path]:
+    glob = directory.rglob if recursive else directory.glob
+    return {path for ext in _CONFIG_GLOB_EXTS for path in glob(ext)}
 
 
 def _corpus_config_paths() -> tuple[Path, ...]:
-    return tuple(sorted(_CORPUS_CONFIGS_ROOT.rglob("*.yaml")))
+    return tuple(sorted(_glob_configs(_CORPUS_CONFIGS_ROOT, recursive=True)))
 
 
 @pytest.mark.parametrize(
@@ -551,8 +559,8 @@ def test_corpus_config_paths_cover_generated_rerun_shards():
     shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
     discovered = set(_corpus_config_paths())
     shards = {p for p in discovered if shard_dir in p.parents}
-    assert shards, "corpus discovery found zero generated-rerun-shards/*.yaml files"
-    assert shards == set(shard_dir.glob("*.yaml"))
+    assert shards, "corpus discovery found zero generated-rerun-shards/ config files"
+    assert shards == _glob_configs(shard_dir, recursive=False)
 
 
 # ---------------------------------------------------------------------------
@@ -567,7 +575,7 @@ _RECOGNIZED_CONFIG_HEADERS = ("# TEMPLATE", "# HISTORICAL")
 
 
 def _top_level_config_paths() -> tuple[Path, ...]:
-    return tuple(sorted(_CORPUS_CONFIGS_ROOT.glob("*.yaml")))
+    return tuple(sorted(_glob_configs(_CORPUS_CONFIGS_ROOT, recursive=False)))
 
 
 @pytest.mark.parametrize("config_path", _top_level_config_paths(), ids=lambda p: p.name)
