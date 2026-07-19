@@ -499,6 +499,14 @@ class TodoCLI:
             status = data.get("status", "Not Started")
             if status == "Completed":
                 continue
+            if status == "Blocked":
+                # No deps.needs entry required: an item can be gated on an
+                # external trigger condition (e.g. "activate when a second
+                # consumer exists") that isn't expressible as another TODO's
+                # id. status: Blocked alone must keep it out of the ready
+                # queue, or the gate is decorative.
+                blocked_items.append((slug, data, ["status: Blocked"]))
+                continue
 
             # Check inter-item deps
             deps = data.get("deps", {})

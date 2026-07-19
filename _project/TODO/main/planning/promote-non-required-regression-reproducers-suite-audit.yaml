@@ -62,9 +62,9 @@ anti_patterns:
   - "DO NOT add a required step without proving it goes red when the fix is reverted."
 
 verification:
-  - description: "Each promoted step is load-bearing"
-    command: "revert the underlying fix locally -> the required develop-PR check goes red -> restore (record in PR body)"
-    expected_output: "every promoted cell fails required CI when its fix is reverted"
+  - description: "Each promoted step is load-bearing (per-cell template; run once per promoted step in w3, substituting the real fix commit and pytest selector)"
+    command: "git revert --no-commit <fix-commit-sha> && uv run -- python -m pytest <promoted-test-selector> -q; git revert --abort"
+    expected_output: "the promoted step's pytest selector fails (non-zero exit) with the fix reverted, proving it is load-bearing; git revert --abort restores the working tree; record the failing output in the PR body before the final commit"
 
 scope_limit:
   only_modify:

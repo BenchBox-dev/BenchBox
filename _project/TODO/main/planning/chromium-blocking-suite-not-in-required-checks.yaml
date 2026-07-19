@@ -77,14 +77,33 @@ work:
       action, and must handle path-skip). Record the choice and why in the PR
       body.
 
+      WIRING CORRECTION for (a) (PR #1217 review follow-up, 2026-07-19):
+      `needs:` only resolves jobs defined in the SAME workflow file, so
+      ci-required-result (in pr.yml) cannot `needs:` a job that stays defined in
+      results-explorer-browser.yml — that combination cannot block. A
+      `workflow_run`-triggered job is a SEPARATE, later workflow run keyed off
+      the first workflow's completion; it does not make pr.yml's
+      ci-required-result job wait on it or fail when it fails, so a red Chromium
+      run could still let ci-required-result (and therefore the ruleset, which
+      only requires ci-required-result) go green and auto-merge. The two
+      actually-blocking shapes for (a) are: (a1) move/duplicate the Chromium
+      full-suite job definition into pr.yml itself so it is a normal same-workflow
+      `needs:` dependency, or (a2) convert results-explorer-browser.yml's Chromium
+      job into a reusable workflow (`workflow_call`) that pr.yml invokes via
+      `uses:` — a called reusable-workflow job DOES join the calling workflow's
+      own dependency graph and can be `needs:`-ed like any other job. `workflow_run`
+      is not a viable option for this and must not be chosen in w2.
+
   - id: w2
     summary: "Implement the chosen wiring so a red Chromium full suite blocks merge"
     status: pending
     needs: [w1]
     notes: |
       If (a): extend .github/workflows/pr.yml ci-required-result to consume the
-      Chromium full-suite result across workflows (workflow_run or a reusable
-      job), treating 'skipped' (path-gated off) as pass and 'failure' as fail.
+      Chromium full-suite result via (a1) an in-workflow job or (a2) a
+      `workflow_call` reusable-workflow invocation (see w1 notes — NOT
+      `workflow_run`, which cannot block), treating 'skipped' (path-gated off) as
+      pass and 'failure' as fail.
       If (b): the ruleset PUT is a deferred admin action (see deferred).
 
   - id: w3

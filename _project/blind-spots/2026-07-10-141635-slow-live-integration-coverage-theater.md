@@ -1,7 +1,7 @@
 ---
 id: 2026-07-10-141635-slow-live-integration-coverage-theater
 date: 2026-07-10
-status: actionable
+status: merged-to-todo
 finding_kind: missed-axis
 review_context: "ducklake deep review / CI-lane coverage audit (origin/develop 7b6d1eef4)"
 related_paths:
@@ -10,7 +10,7 @@ related_paths:
   - .github/workflows/develop-post-merge.yml
   - .github/workflows/release-canary.yml
 suggested_sweep: "for each large integration test module, resolve its module+class markers against every CI lane's -m expression and confirm at least one lane selects it"
-todo_id: null
+todo_id: ducklake-post-merge-review-followups
 ---
 
 # DuckLake live integration classes can run in ZERO CI lanes while looking covered
@@ -59,3 +59,4 @@ evades the "where are the tests?" prompt.
 ## Triage log
 
 - 2026-07-18: actionable — Rechecked against origin/develop 8a7ee88e0 on 2026-07-18: current marker collection selects 8 of 9 DuckLake tests in no configured CI lane; only the non-live SQLite test reaches the release non-fast canary; revised the record to match current lane behavior.
+- 2026-07-19: merged-to-todo (ducklake-post-merge-review-followups) — all three "Suggested next steps" above are already tracked 1:1 as pending work units in that TODO: w3 (re-marker TestDuckLakeLiveConnection so a real lane runs it), w4 (CI meta-check for zero-lane-selected modules), w5 (make _probe_extension's cached-False loud, not a silent skip). Left `status: actionable`/`todo_id: null` after the TODO existed, which caused a PR review to flag this as an untracked duplicate. Terminal-stating it here per the blind-spot README's `promote` outcome.

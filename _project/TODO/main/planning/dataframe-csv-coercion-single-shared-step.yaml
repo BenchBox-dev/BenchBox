@@ -19,6 +19,15 @@ description: |
   (datafusion/pyspark/pandas/polars/dask, plus the SQL<->DataFrame parity case), so
   the parity tests are the behavior-preservation net.
 
+  ADAPTER LIST CORRECTION (PR #1210 review follow-up, 2026-07-19): the enumeration
+  above is NOT exhaustive. modin_df.py and cudf_df.py also carry their own
+  empty-string/null coercion branches (grep missing_utf8_is_empty_string /
+  null_marker across benchbox/platforms/dataframe/) and are not covered by name in
+  either #904's original scope or #936's parity list referenced here. w1 must
+  enumerate the LIVE set of coercion sites by grepping the codebase, not by
+  trusting this prose list, or the refactor risks leaving Modin/cuDF's copies
+  behind as duplicate, drifting implementations after w2 "consolidates" the rest.
+
 prior_art:
   - ref: "benchbox/platforms/dataframe/polars_df.py (missing_utf8_is_empty_string) and the sibling per-adapter coercion sites"
     note: "The per-adapter coercion this item consolidates; enumerate every site before extracting."
