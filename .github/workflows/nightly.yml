@@ -640,14 +640,18 @@ jobs:
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
       - name: Assert the requested stream count reached the driver and every stream succeeded
-        # Independent, defense-in-depth gate: runs (and can fail the job)
-        # regardless of the sweep step's own exit code above, so a change
-        # that ever weakens or bypasses that step's gating still gets caught
-        # here. Now strict: both the wiring-defect check (distinct stream
-        # ids == requested, validate_stream_count) AND the per-stream
-        # success check (every counted stream had >=1 SUCCESSFUL query,
-        # validate_stream_success) must pass -- see tests/uat/throughput.py
+        # Independent, defense-in-depth gate. `if: !cancelled()` is load-bearing:
+        # without it, a FAILED sweep step above would SKIP this step under GitHub
+        # Actions' default `success()` step-condition, so the gate would silently
+        # stop running exactly when it matters most. `!cancelled()` makes it run
+        # (and gate) on both a passing AND a failing sweep -- only a workflow
+        # cancellation skips it -- so this check stays genuinely independent of
+        # the sweep step's outcome. Now strict: both the wiring-defect check
+        # (distinct stream ids == requested, validate_stream_count) AND the
+        # per-stream success check (every counted stream had >=1 SUCCESSFUL
+        # query, validate_stream_success) must pass -- see tests/uat/throughput.py
         # for why these stay two separate functions.
+        if: ${{ !cancelled() }}
         run: |
           uv run -- python -c "
           import datetime, os, sys
