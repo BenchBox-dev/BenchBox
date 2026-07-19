@@ -228,6 +228,45 @@ def test_missing_benchmarks_from_include_matches_resolve_benchmarks_drop():
 
 
 # ---------------------------------------------------------------------------
+# known_platform_ids / missing_platforms_from_include
+# (uat-config-schema-spec-realignment w2 -- mirrors missing_benchmarks_from_include).
+# ---------------------------------------------------------------------------
+
+
+def test_known_platform_ids_covers_curated_groups():
+    known = matrix.known_platform_ids()
+    assert set(matrix.SQL_PLATFORMS).issubset(known)
+    assert set(matrix.DATAFRAME_PLATFORMS).issubset(known)
+    assert "duckdb" in known
+    assert "polars-df" in known
+
+
+def test_missing_platforms_from_include_flags_unknown_ids():
+    out = matrix.missing_platforms_from_include(["duckdb", "totally_bogus_platform_xyz"])
+    assert out == ["totally_bogus_platform_xyz"]
+
+
+def test_missing_platforms_from_include_dedupes_and_preserves_order():
+    out = matrix.missing_platforms_from_include(["bogus_a", "duckdb", "bogus_b", "bogus_a"])
+    assert out == ["bogus_a", "bogus_b"]
+
+
+def test_missing_platforms_from_include_empty_when_all_known():
+    assert matrix.missing_platforms_from_include(["duckdb", "polars-df"]) == []
+
+
+def test_missing_platforms_from_include_matches_resolve_platforms_drop():
+    """`resolve_platforms` silently drops unknown `include` ids (mirrors
+    `resolve_benchmarks`); this helper must flag exactly the ids that drop
+    causes, so accounting stays honest."""
+    include = ["duckdb", "totally_bogus_platform_xyz"]
+    resolved = matrix.resolve_platforms(include=include)
+    missing = matrix.missing_platforms_from_include(include)
+    assert set(include) == set(resolved) | set(missing)
+    assert set(resolved) & set(missing) == set()
+
+
+# ---------------------------------------------------------------------------
 # enumerate_cells_with_pruning registry/ladder accounting
 # (uat-accounting-hardening w2/w3): a typo'd benchmark id or a scale outside
 # the registry's declared scale_options must produce a visible accounting
@@ -257,6 +296,29 @@ def test_enumerate_with_pruning_records_registry_missing_benchmark():
         ("duckdb", "totally_bogus_benchmark_xyz", 0.1),
         ("sqlite", "totally_bogus_benchmark_xyz", 0.01),
         ("sqlite", "totally_bogus_benchmark_xyz", 0.1),
+    }
+    assert all(c.status == enum_phase.REGISTRY_PRUNE_STATUS for c in missing_rows)
+    assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
+
+
+def test_enumerate_with_pruning_records_registry_missing_platform():
+    raw = {
+        "platforms": {"include": ["duckdb", "totally_bogus_platform_xyz"]},
+        "benchmarks": {"include": ["tpch", "tpcds"]},
+        "scales": {"rungs": [0.01, 0.1]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert {c.platform for c in result.cells} == {"duckdb"}
+    missing_rows = [c for c in result.compatibility_pruned if c.rule_id == "platform-not-in-registry"]
+    # One row per missing platform x resolved benchmark x requested scale -
+    # it must be visible in accounting output, not silently absent.
+    assert {(c.platform, c.benchmark, c.scale) for c in missing_rows} == {
+        ("totally_bogus_platform_xyz", "tpch", 0.01),
+        ("totally_bogus_platform_xyz", "tpch", 0.1),
+        ("totally_bogus_platform_xyz", "tpcds", 0.01),
+        ("totally_bogus_platform_xyz", "tpcds", 0.1),
     }
     assert all(c.status == enum_phase.REGISTRY_PRUNE_STATUS for c in missing_rows)
     assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)

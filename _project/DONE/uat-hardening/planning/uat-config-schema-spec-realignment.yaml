@@ -2,7 +2,8 @@ id: uat-config-schema-spec-realignment
 title: "Enforce the schema rules the spec claims; validate platform includes and frozen shards; realign the UAT charter spec with reality"
 worktree: uat-hardening
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-07-19"
 category: "Code Quality and Technical Debt"
 
 description: |
@@ -66,28 +67,113 @@ prior_art:
 work:
   - id: w1
     summary: "Load-time enforcement: rungs/override exclusion, floor in [0,1], terminal-state vocab + service, phases order/duplicate rejection, bool rejection for rungs, phases_arg/output type checks"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      config.py: all new rejections added inside the existing per-section
+      validators (no new validation layer). scales.rungs+override
+      coexistence rejected when both explicitly set; validator_clean_rate_floor
+      > 1.0 rejected (was only >= 0 before); bool rung/override values
+      rejected (bool is an int subclass, float(True)==1.0 previously
+      coerced silently); phases duplicate + out-of-canonical-order entries
+      rejected (an out-of-order list e.g. [report, execute] silently
+      produced an empty report); execute.phases_arg and output.*_template
+      non-string values rejected instead of str()-coerced. package
+      submit_terminal_state vocab + service-required checks moved from
+      package.py's runtime guard to load time, GATED on `"package" in
+      phases` so a stale package: block on a config that never runs the
+      phase stays inert (mirrors the existing preflight inertness
+      carve-out, and keeps package.py's own runtime guard independently
+      testable via test_package.py which is out of scope_limit). 16 new
+      test_config.py tests.
   - id: w2
     summary: "Registry-validate platforms.include at enumerate with pruned-accounting rows (mirroring benchmark includes); unknown platform in include becomes a visible pruned row, not an execute-time surprise"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      matrix.py: known_platform_ids() (SQL ∪ dataframe registry platforms
+      + the `-df` CLI alias suffix, guarded against double-suffixing ids
+      already ending in -df) and missing_platforms_from_include(),
+      mirroring missing_benchmarks_from_include. resolve_platforms now
+      drops include entries absent from the registry. enumerate.py grew a
+      loop mirroring the benchmark-missing accounting (was enumerate.py:106-117)
+      emitting platform-not-in-registry / pruned-registry rows, one per
+      (missing platform x resolved benchmark x scale). test_matrix.py:
+      6 new tests (known_platform_ids coverage, missing_platforms_from_include
+      flag/dedupe/empty/resolve-parity, enumerate registry-missing-platform
+      accounting).
   - id: w3
     summary: "Shard/config runnability guard: fast test that loads + enumerates every YAML under tests/uat/configs/ (including generated-rerun-shards/) asserting non-empty cells and zero unknown includes"
-    status: pending
+    status: done
     needs: [w1, w2]
+    notes: >
+      test_config.py: test_every_corpus_config_loads_and_enumerates_nonempty
+      parametrized over all 32 configs under tests/uat/configs/ (15
+      top-level + 17 generated-rerun-shards/, none previously referenced
+      by any test) -- loads, checks zero unknown platform/benchmark
+      includes, asserts non-empty enumeration; each failure names the
+      config + field. Companion test_corpus_config_paths_cover_generated_rerun_shards
+      guards the discovery glob. Review nit applied: discovery globs both
+      *.yaml and *.yml (shared _glob_configs helper) so a future .yml
+      config cannot silently escape.
   - id: w4
     summary: "Lifecycle headers: add class headers to the 9 unlabeled configs; fast test asserting every top-level config carries a recognized header"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      Empirically 10 (not 9) top-level configs lacked a header. All
+      classified # TEMPLATE (none met the immutable-one-shot bar
+      # HISTORICAL requires): the 3 release-gate-0N, uat-enabled-platforms-
+      {enumeration,full}, uat-explorer-external-corpus-smoke,
+      uat-lakesail-failing-benchmarks, uat-pg-extension-auth-smoke,
+      uat-synthetic-timeout-smoke, uat-throughput-duckdb-nightly. Fixing
+      the corpus to satisfy w1 surfaced a REAL defect: all three
+      release-gate-0N configs declared `package` in phases: with no
+      package: section, so every release-gate sweep silently aborted at
+      the package phase (validated by review: explorer_smoke consumes
+      package's submissions_dir; local-stage is valid vocab and does not
+      change gate semantics). Fixed by adding
+      `package: {submit_terminal_state: local-stage}` to each -- did NOT
+      weaken the rule. test_config.py:
+      test_top_level_config_carries_recognized_lifecycle_header
+      (parametrized over 15) + a discovery-exclusion guard.
   - id: w5
     summary: "Fix the operator-doc contradiction (quick-ref pointing at the HISTORICAL config) and spec Section 9 to match the enforced header policy"
-    status: pending
+    status: done
     needs: [w4]
+    notes: >
+      docs/operations/uat-framework.md: quick-ref "Full sweep" example and
+      the "clone a template" cp example now point at runnable TEMPLATE
+      configs (uat-tuned-followup-20260505.yaml / stress-default.yaml)
+      instead of the HISTORICAL uat-2026-05-02.yaml. Spec Section 9.1
+      widened to note # TEMPLATE also covers canonical repeatedly-run
+      operational configs (edited in place, not cloned per sweep), with an
+      "Enforcement" note pointing at the w3/w4 guards -- the policy is no
+      longer convention-only.
   - id: w6
     summary: "Spec realignment pass over uat-framework.md per the description list (scope, module/LOC table, schema table, make targets, CLI-guard description, TSV shape, package stubs)"
-    status: pending
+    status: done
     needs: [w1, w3, w4]
+    notes: >
+      _project/specs/uat-framework.md, enumerated stale claims only:
+      Section 1.4 throughput marked shipped (throughput.py + execute.
+      official/streams/seed + run-official routing); Section 2 module
+      table + tree re-measured TODAY at ~9,774 production LOC across 26
+      modules (added artifact_hygiene/cells_io/container_cleanup/
+      gate_summary/throughput; per-bucket reconciliation refreshed);
+      Section 3 schema table now matches the w1 validations and documents
+      the previously-omitted enforced fields (local_platforms_check,
+      benchmark_runs_dir_template, extra_args, official/streams/seed,
+      release_gate_runtime_envelopes) + a row noting include-registry
+      drops are accounting rows not ConfigErrors; Section 4 make-target
+      table corrected to real Makefile signatures + added uat-artifact-
+      hygiene/bring-up/prepull/docker-cleanup/gate-check; the
+      test_no_cli_surface_drift.py description rewritten to the real
+      loosened guarantee (29-file allowlist, submit/run signature-diff
+      skipped); Section 6 corrected to the real 13-column REPORT_HEADER
+      and the header-only (not row-count) parity assertion; draft-pr/
+      merged-to-published-results documented as stubs everywhere claimed
+      implemented. No spec section rewritten beyond the enumerated claims.
 
 deferred:
   - summary: "Auto-generating the spec's module/LOC table from the tree"
@@ -132,6 +218,44 @@ scope_limit:
     - "_project/specs/uat-framework.md"
     - "docs/operations/uat-framework.md"
     - "tests/uat/README.md"
+
+files_affected:
+  modified:
+  - _project/config/fast_test_lane_policy.json
+  - _project/specs/uat-framework.md
+  - docs/operations/uat-framework.md
+  - tests/uat/config.py
+  - tests/uat/configs/release-gate-01-native-dataframe.yaml
+  - tests/uat/configs/release-gate-02-docker-nonoltp.yaml
+  - tests/uat/configs/release-gate-03-docker-oltp.yaml
+  - tests/uat/configs/uat-enabled-platforms-enumeration.yaml
+  - tests/uat/configs/uat-enabled-platforms-full.yaml
+  - tests/uat/configs/uat-explorer-external-corpus-smoke.yaml
+  - tests/uat/configs/uat-lakesail-failing-benchmarks.yaml
+  - tests/uat/configs/uat-pg-extension-auth-smoke.yaml
+  - tests/uat/configs/uat-synthetic-timeout-smoke.yaml
+  - tests/uat/configs/uat-throughput-duckdb-nightly.yaml
+  - tests/uat/matrix.py
+  - tests/uat/phases/enumerate.py
+  - tests/uat/test_config.py
+  - tests/uat/test_matrix.py
+  - tests/uat/test_phases.py
+
+completion_notes: >
+  Adversarial review: 0 Critical, 0 Required (CLEAN). 2 Nits applied
+  (known_platform_ids -df double-suffix guard; corpus/header guards widened
+  to *.yaml + *.yml). 2 Considers kept by design: (1) phases canonical-order
+  enforces validate-before-package, stricter than the raw execute->
+  {validate,package,report} dependency graph -- intentional convention, no
+  config uses the alternative; (2) package vocab/service checks gated on
+  `"package" in phases` leaves an invalid-but-string submit_terminal_state
+  unvalidated when the phase is disabled -- mitigated by base type checks +
+  package.py's runtime guard, matches the preflight inertness carve-out,
+  explicitly tested. Cross-cutting exception: bumped
+  _project/config/fast_test_lane_policy.json max_fast_tests 25250 -> 25350
+  (fast lane collected 25317 with the new guards); dated justification
+  appended to _ceiling_note. scope_limit note: tests/uat/README.md was in
+  only_modify but needed no change.
 
 metadata:
   tags: [uat, config-schema, spec-drift, lifecycle]

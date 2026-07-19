@@ -11,6 +11,7 @@ from tests.uat.matrix import (
     filter_scales_by_registry,
     load_benchmarks,
     missing_benchmarks_from_include,
+    missing_platforms_from_include,
     resolve_benchmarks,
     resolve_platforms,
 )
@@ -23,6 +24,7 @@ from tests.uat.matrix import (
 # shaped accounting file for registry-derived drops.
 REGISTRY_PRUNE_STATUS = "pruned-registry"
 BENCHMARK_NOT_IN_REGISTRY_RULE_ID = "benchmark-not-in-registry"
+PLATFORM_NOT_IN_REGISTRY_RULE_ID = "platform-not-in-registry"
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,19 @@ def enumerate_cells_with_pruning(
                 _registry_absent_rows(platform=platform, benchmark=missing_benchmark, requested=requested)
             )
 
+    # Mirror of the missing-benchmark accounting above (w2,
+    # uat-config-schema-spec-realignment): `resolve_platforms` silently drops
+    # `platforms.include` entries absent from the registry (see
+    # `missing_platforms_from_include`'s docstring), so a typo'd/removed
+    # platform id never reaches `platform_list`. Surface it as a visible
+    # accounting row per missing platform x resolved benchmark, instead of an
+    # execute-time surprise.
+    for missing_platform in missing_platforms_from_include(config.platforms.include):
+        for benchmark in benchmark_list:
+            compatibility_pruned.extend(
+                _registry_absent_platform_rows(platform=missing_platform, benchmark=benchmark, requested=requested)
+            )
+
     for platform in platform_list:
         for benchmark in benchmark_list:
             info = benchmarks.get(benchmark)
@@ -180,6 +195,30 @@ def _registry_absent_rows(
                 "benchmark registry (typo'd or removed benchmark id)."
             ),
             evidence="tests.uat.matrix.load_benchmarks() BENCHMARK_METADATA keys",
+        )
+        for scale in requested
+    ]
+
+
+def _registry_absent_platform_rows(
+    *,
+    platform: str,
+    benchmark: str,
+    requested: list[float],
+) -> list[CompatibilityPrunedCell]:
+    """Accounting rows for a platform id absent from the registry entirely."""
+    return [
+        CompatibilityPrunedCell(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            rule_id=PLATFORM_NOT_IN_REGISTRY_RULE_ID,
+            status=REGISTRY_PRUNE_STATUS,
+            reason=(
+                f"Platform {platform!r} was requested in the config but is not present in the "
+                "platform registry (typo'd or removed platform id)."
+            ),
+            evidence="tests.uat.matrix.known_platform_ids() PlatformRegistry SQL/dataframe platforms",
         )
         for scale in requested
     ]
