@@ -626,33 +626,42 @@ jobs:
           echo "THROUGHPUT_UAT_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S)" >> "$GITHUB_ENV"
 
       - name: Run DuckDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
-        # KNOWN, TRACKED, PRE-EXISTING DEFECT (independent of this TODO):
-        # TPC-H throughput mode's per-stream/per-position seed derivation
-        # (seed + stream_id * 1000 + position, benchbox/core/tpch/throughput_test.py)
-        # means queries 11/16/18/20 (TPC-H's own "non-deterministic" query
-        # set) never land on the reference-seed exact-match validation path
-        # after the first query of stream 0, so they fail BenchBox's LOOSE
-        # (+-50%) row-count check on every stream -- reproduced with a custom
-        # seed, a different custom seed, and no seed at all. Confirmed
-        # independent of concurrency: the identical 4 queries fail the same
-        # way in single-stream POWER mode with a non-reference seed. This
-        # keeps the cell's overall clean-pass status red until that separate
-        # defect is fixed; continue-on-error here so it doesn't block the
-        # nightly workflow. The actual concurrency invariant this TODO
-        # protects (requested stream count reaches the driver) is hard-gated
-        # by the step below, independent of this known gap -- see
-        # tests/uat/throughput.py's validate_stream_count/validate_throughput_metric split.
-        continue-on-error: true
+        # Gated on the sweep's own exit code: the config's
+        # `validator_clean_rate_floor: 1.0` plus the strict report exit
+        # policy fail this step on any non-clean cell. The TPC-H
+        # queries-11/16/18/20 seed-derivation defect that used to keep this
+        # cell permanently red (and required a `continue-on-error: true`
+        # here) was fixed in #1142 -- see the HISTORICAL NOTE on
+        # `validate_throughput_metric` in tests/uat/throughput.py. Do NOT
+        # re-add `continue-on-error` here; the step below is the
+        # independent, defense-in-depth wiring check, not a substitute for
+        # gating on this step's own exit code.
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
-      - name: Assert the requested stream count reached the driver
+      - name: Assert the requested stream count reached the driver and every stream succeeded
+        # Independent, defense-in-depth gate. `if: !cancelled()` is load-bearing:
+        # without it, a FAILED sweep step above would SKIP this step under GitHub
+        # Actions' default `success()` step-condition, so the gate would silently
+        # stop running exactly when it matters most. `!cancelled()` makes it run
+        # (and gate) on both a passing AND a failing sweep -- only a workflow
+        # cancellation skips it -- so this check stays genuinely independent of
+        # the sweep step's outcome. Now strict: both the wiring-defect check
+        # (distinct stream ids == requested, validate_stream_count) AND the
+        # per-stream success check (every counted stream had >=1 SUCCESSFUL
+        # query, validate_stream_success) must pass -- see tests/uat/throughput.py
+        # for why these stay two separate functions.
+        if: ${{ !cancelled() }}
         run: |
           uv run -- python -c "
           import datetime, os, sys
           from datetime import timezone
           from pathlib import Path
-          from tests.uat.throughput import resolve_official_result_path, validate_stream_count
+          from tests.uat.throughput import (
+              resolve_official_result_path,
+              validate_stream_count,
+              validate_stream_success,
+          )
 
           # Narrow window: the timestamp captured immediately before the sweep
           # step above, not a full-hour lookback -- see that step's comment.
@@ -683,7 +692,11 @@ jobs:
           if not ok:
               print(f'::error::{reason}')
               sys.exit(1)
-          print(f'OK: {reason} ({result_path})')
+          ok, reason = validate_stream_success(result_json)
+          if not ok:
+              print(f'::error::{reason}')
+              sys.exit(1)
+          print(f'OK: stream count and per-stream success both verified ({result_path})')
           "
 
   pyspark-tests:

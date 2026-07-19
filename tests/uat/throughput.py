@@ -15,9 +15,11 @@ module supplies the two things a `run-official`-backed UAT cell needs that a
    default stdout parsing (`last_nonempty_output_line`) expects. The result
    JSON is instead located on disk by filename + mtime.
 2. `validate_throughput_result` -- checks the exported result JSON for the
-   two things a silent concurrency regression would break: every requested
-   stream actually executed at least one query, and Throughput@Size was
-   actually computed.
+   three things a silent concurrency regression would break: every requested
+   stream actually executed at least one query (`validate_stream_count`),
+   every stream that executed actually had at least one SUCCESSFUL query and
+   didn't just fail out immediately (`validate_stream_success`), and
+   Throughput@Size was actually computed (`validate_throughput_metric`).
 
 `TPC_ALLOWED_SCALE_FACTORS` mirrors `run_official.py`'s own constant (kept as
 a local copy rather than importing from a `deprecated` CLI command module)
@@ -150,6 +152,16 @@ def validate_stream_count(
     not a count) and so is off-by-one from the real stream count (see
     ``benchbox/core/results/schema.py::_build_run_section``).
 
+    Deliberately status-blind: a stream counts as "executed" the moment it
+    contributes >=1 row to ``queries[]``, regardless of whether that query
+    passed or failed. That is by design -- this check exists purely to catch
+    the concurrency-wiring regression (a requested stream never reaching the
+    driver at all), and stays a pure "did the request reach the driver"
+    signal so callers (e.g. the nightly wiring-defect assert step) can use it
+    independent of run outcome. See ``validate_stream_success`` for the
+    stricter, outcome-sensitive companion that checks each executed stream
+    actually succeeded.
+
     Returns ``(ok, reason)``; `reason` is a human-readable explanation on
     failure, or ``"ok"`` on success.
     """
@@ -166,6 +178,57 @@ def validate_stream_count(
     return True, "ok"
 
 
+def validate_stream_success(result_json: dict[str, Any]) -> tuple[bool, str]:
+    """Check that every stream that executed at least one query had at least
+    one SUCCESSFUL query.
+
+    ``validate_stream_count`` counts a stream as "executed" the moment it
+    contributes >=1 row to ``queries[]``, REGARDLESS of that row's
+    ``status`` -- so a stream whose every query failed (e.g. it errored out
+    on its first query and never got another chance) still counts as
+    "executed", silently masking a fully-dead stream behind a passing
+    stream-count check. This is the stricter companion: every distinct
+    stream id present in ``queries[]`` must carry at least one row whose
+    ``status`` is ``"SUCCESS"`` (matched case-insensitively, mirroring
+    ``benchbox/core/results/schema.py``'s own status comparison).
+
+    Deliberately independent of ``requested_streams`` (unlike
+    ``validate_stream_count``): a stream missing entirely from ``queries[]``
+    is a count mismatch -- that check's job. A stream that's present but
+    100% failed is this check's job. Both are needed for a throughput cell
+    to be trustworthy, which is why ``validate_throughput_result`` runs both
+    (plus ``validate_throughput_metric``).
+
+    Split out (rather than folded into ``validate_stream_count``) so the
+    nightly wiring-defect assert step -- which must stay a pure
+    concurrency-wiring signal, independent of run outcome, see
+    ``validate_stream_count`` -- is unaffected by this stricter,
+    outcome-sensitive check. This check instead feeds the sweep/report-facing
+    ``validate_throughput_result`` composition.
+
+    Returns ``(ok, reason)``; `reason` is a human-readable explanation on
+    failure, or ``"ok"`` on success.
+    """
+    queries = result_json.get("queries") or []
+    stream_has_success: dict[Any, bool] = {}
+    for query in queries:
+        if not isinstance(query, dict):
+            continue
+        stream_id = query.get("stream")
+        if stream_id is None:
+            continue
+        is_success = str(query.get("status", "")).upper() == "SUCCESS"
+        stream_has_success[stream_id] = stream_has_success.get(stream_id, False) or is_success
+
+    failed_streams = sorted(stream_id for stream_id, has_success in stream_has_success.items() if not has_success)
+    if failed_streams:
+        return (
+            False,
+            f"stream(s) {failed_streams} executed but had zero SUCCESSFUL queries",
+        )
+    return True, "ok"
+
+
 def validate_throughput_metric(result_json: dict[str, Any]) -> tuple[bool, str]:
     """Check that Throughput@Size was actually computed (> 0).
 
@@ -173,20 +236,22 @@ def validate_throughput_metric(result_json: dict[str, Any]) -> tuple[bool, str]:
     ``summary.tpc_metrics``) whenever the run's overall validation status is
     not clean.
 
-    NOTE: as of this TODO's implementation, TPC-H throughput mode fails this
-    check at SF=1 on DuckDB regardless of ``--seed`` choice (reproduced with
-    a custom seed, a different custom seed, and no seed at all) -- queries
-    11/16/18/20 (TPC-H's own "non-deterministic" query set) fail BenchBox's
-    LOOSE (+-50%) row-count validation on every stream, because the
-    throughput driver's per-stream/per-position seed derivation
+    HISTORICAL NOTE: prior to #1142, TPC-H throughput mode failed this check
+    at SF=1 on DuckDB regardless of ``--seed`` choice -- queries 11/16/18/20
+    (TPC-H's own "non-deterministic" query set) failed BenchBox's LOOSE
+    (+-50%) row-count validation on every stream, because the throughput
+    driver's per-stream/per-position seed derivation
     (``benchbox/core/tpch/throughput_test.py``: ``seed + stream_id * 1000 +
-    position``) means no stream after the first query of stream 0 can ever
+    position``) meant no stream after the first query of stream 0 could ever
     land on the reference-seed exact-match path that POWER mode gets when no
-    seed is given. Confirmed independent of concurrency: the identical 4
-    queries fail identically in single-stream POWER mode with a non-reference
-    seed too. This is a pre-existing, orthogonal correctness gap (tracked
-    separately), not a regression in stream-count wiring -- see
-    ``validate_stream_count`` for the check that guards against that.
+    seed is given. #1142 fixed this at the root by adding a thread-local
+    reference-seed context (``benchbox.core.validation.query_validation.
+    set_reference_seed_context``) so the four parameter-sensitive queries are
+    excluded from EXACT row-count checks only when a non-reference seed is
+    actually in effect. This was a correctness gap orthogonal to
+    stream-count wiring -- see ``validate_stream_count`` for the check that
+    guards that separate concern, and ``validate_stream_success`` for the
+    per-stream pass/fail check this metric check doesn't cover.
 
     Returns ``(ok, reason)``; `reason` is a human-readable explanation on
     failure, or ``"ok"`` on success.
@@ -205,15 +270,24 @@ def validate_throughput_result(
 ) -> tuple[bool, str]:
     """Validate a throughput cell's exported result JSON.
 
-    Combines the two checks a throughput cell needs to be acceptance-passing:
-    ``validate_stream_count`` (the concurrency-wiring signal this TODO exists
-    to protect) and ``validate_throughput_metric`` (the run produced a usable
+    Combines the three checks a throughput cell needs to be
+    acceptance-passing: ``validate_stream_count`` (the concurrency-wiring
+    signal this TODO exists to protect), ``validate_stream_success`` (every
+    executed stream actually had a SUCCESSFUL query, not just rows that all
+    failed), and ``validate_throughput_metric`` (the run produced a usable
     Throughput@Size). See each for what it checks and why they are split.
+
+    Checked in that order and short-circuits on the first failure, so a
+    stream-count mismatch is reported ahead of a same-run success or
+    throughput-metric failure.
 
     Returns ``(ok, reason)``; `reason` is a human-readable explanation on
     failure, or ``"ok"`` on success.
     """
     ok, reason = validate_stream_count(result_json, requested_streams=requested_streams)
+    if not ok:
+        return ok, reason
+    ok, reason = validate_stream_success(result_json)
     if not ok:
         return ok, reason
     return validate_throughput_metric(result_json)
