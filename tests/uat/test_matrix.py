@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -9,10 +11,20 @@ import pytest
 from benchbox.core.benchmark_registry import CATEGORY_ORDER
 from benchbox.core.platform_registry import PlatformRegistry
 from tests.uat import compatibility, matrix
-from tests.uat.config import validate_config
+from tests.uat.config import load_config, validate_config
 from tests.uat.phases import enumerate as enum_phase
 
 pytestmark = pytest.mark.fast
+
+_RELEASE_GATE_CONFIGS_DIR = Path(__file__).parent / "configs"
+
+
+def _release_gate_config_names() -> tuple[str, ...]:
+    """Discover `release-gate-*.yaml` configs by glob rather than a hardcoded
+    list, so a future `release-gate-04-*.yaml` stage is automatically probed
+    by `test_release_gate_platforms_resolve_from_dev_venv_or_have_uv_extra`
+    (uat-operator-provisioning review response, 2026-07-19)."""
+    return tuple(sorted(path.name for path in _RELEASE_GATE_CONFIGS_DIR.glob("release-gate-*.yaml")))
 
 
 # ---------------------------------------------------------------------------
@@ -359,3 +371,61 @@ def test_benchbox_run_argv_velox_iterations_one():
     iter_idx = argv.index("--iterations")
     opt_idx = argv.index("--platform-option")
     assert iter_idx < opt_idx
+
+
+# ---------------------------------------------------------------------------
+# w1 (uat-operator-provisioning): every release-gate platform must resolve
+# from the persistent dev venv (`uv sync` dev group) OR have a
+# PLATFORM_UV_EXTRA entry -- otherwise a second operator's sweep records
+# ModuleNotFoundError cells as FAILED with no doc pointing at the cause.
+# No network: probes importlib.util.find_spec on the registry-declared
+# driver module. Conservative by construction -- platforms with no
+# registry `libraries` entry (native/stdlib platforms with nothing to
+# probe) are skipped rather than guessed at.
+# ---------------------------------------------------------------------------
+
+
+def _release_gate_platforms() -> set[str]:
+    platforms: set[str] = set()
+    for name in _release_gate_config_names():
+        cfg = load_config(_RELEASE_GATE_CONFIGS_DIR / name)
+        platforms.update(matrix.resolve_platforms(groups=cfg.platforms.groups or ()))
+    return platforms
+
+
+def _registry_driver_module(platform: str) -> str | None:
+    """Conservative import-module name for `platform`'s primary required
+    driver library, sourced from PlatformRegistry metadata (the same
+    `libraries[].import_name`/`name` precedence `_detect_library` uses) --
+    not a hand-maintained platform->module table that can drift. Returns
+    None when the registry has no required library (nothing to probe)."""
+    base = platform[:-3] if platform.endswith("-df") else platform
+    meta = PlatformRegistry.get_all_platform_metadata().get(base)
+    if not meta:
+        return None
+    required = [lib for lib in meta.get("libraries", []) if lib.get("required", True)]
+    if not required:
+        return None
+    lib = required[0]
+    return lib.get("import_name", lib["name"])
+
+
+def test_release_gate_platforms_resolve_from_dev_venv_or_have_uv_extra():
+    platforms = _release_gate_platforms()
+    assert platforms, "release-gate configs resolved to zero platforms; test fixture is broken"
+
+    unresolved = []
+    for platform in sorted(platforms):
+        if platform in matrix.PLATFORM_UV_EXTRA:
+            continue  # `uv run --extra` installs it per cell; dev-venv probe not applicable.
+        module = _registry_driver_module(platform)
+        if module is None:
+            continue  # no registry-declared driver (native/stdlib platform); nothing to probe.
+        if importlib.util.find_spec(module) is None:
+            unresolved.append((platform, module))
+
+    assert not unresolved, (
+        f"platform(s) have no PLATFORM_UV_EXTRA entry and their driver module is not "
+        f"importable from the dev venv: {unresolved} -- add a PLATFORM_UV_EXTRA entry "
+        f"(tests/uat/matrix.py) or a dev dependency-group requirement (pyproject.toml)"
+    )

@@ -54,6 +54,13 @@ class OutputConfig:
     benchmark_runs_dir_template: str = "~/Developer/benchmark_runs"
     logs_dir_template: str = "~/Developer/benchmark_runs/logs/uat_{date}_{time}"
     submissions_dir_template: str = "~/Developer/benchmark_runs/submissions/{name}"
+    # Keys that were actually present in the raw YAML `output:` mapping --
+    # NOT a value-equality check. A config that explicitly sets a template to
+    # a string that happens to equal the schema default must still be
+    # treated as explicit (must_preserve "Explicit YAML output templates
+    # ALWAYS win"; see tests.uat.phases.execute._resolve_output_base and the
+    # uat-operator-provisioning review response, 2026-07-19).
+    explicitly_set: frozenset[str] = field(default_factory=frozenset)
 
 
 @dataclass(frozen=True)
@@ -409,6 +416,11 @@ def _validate_output(payload: dict[str, Any]) -> OutputConfig:
         frozenset({"benchmark_runs_dir_template", "logs_dir_template", "submissions_dir_template"}),
         "output",
     )
+    explicitly_set = frozenset(
+        key
+        for key in ("benchmark_runs_dir_template", "logs_dir_template", "submissions_dir_template")
+        if key in payload
+    )
     return OutputConfig(
         benchmark_runs_dir_template=str(
             payload.get(
@@ -428,6 +440,7 @@ def _validate_output(payload: dict[str, Any]) -> OutputConfig:
                 "~/Developer/benchmark_runs/submissions/{name}",
             )
         ),
+        explicitly_set=explicitly_set,
     )
 
 

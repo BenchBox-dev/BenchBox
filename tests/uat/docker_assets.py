@@ -459,6 +459,32 @@ def compose_up_command(
     return argv
 
 
+def compose_pull_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
+    """Build `docker compose pull --ignore-buildable` argv for a UAT-owned
+    platform project (uat-operator-provisioning w4).
+
+    `--ignore-buildable` skips services that declare only `build:` (no
+    `image:` to pull) instead of erroring on them -- pair with
+    ``compose_build_command`` to cover those.
+    """
+    argv = _compose_base_command(spec, project_name)
+    argv.extend(["pull", "--ignore-buildable"])
+    argv.extend(spec.services)
+    return argv
+
+
+def compose_build_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
+    """Build `docker compose build` argv for a UAT-owned platform project.
+
+    Covers services with a `build:` directive (e.g. LakeSail's PySail
+    image) that `compose_pull_command` deliberately skips.
+    """
+    argv = _compose_base_command(spec, project_name)
+    argv.append("build")
+    argv.extend(spec.services)
+    return argv
+
+
 def compose_down_command(spec: DockerPlatformSpec, project_name: str, cleanup_mode: str) -> list[str]:
     """Build targeted `docker compose down` argv for a UAT-owned project."""
     if cleanup_mode == "off":

@@ -2,7 +2,8 @@ id: uat-operator-provisioning
 title: "Un-strand the second operator: venv extras for all release-gate platforms, coherent output-root contract, engine/sizing/prepull docs"
 worktree: uat-hardening
 priority: Medium
-status: Not Started
+status: Completed
+completed_date: "2026-07-12"
 category: "Operations / Documentation"
 
 description: |
@@ -65,30 +66,132 @@ prior_art:
 work:
   - id: w1
     summary: "Add modin and databend to PLATFORM_UV_EXTRA; fast import-probe test that every release-gate platform resolves in the dev group or has a PLATFORM_UV_EXTRA entry"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      matrix.py: "modin-df" -> "modin" (matrix/CLI key has the -df suffix,
+      the pyproject extra does not) and "databend" -> "databend" added to
+      PLATFORM_UV_EXTRA. New test_matrix.py
+      test_release_gate_platforms_resolve_from_dev_venv_or_have_uv_extra:
+      resolves platforms from the three release-gate configs, and for any
+      platform without a PLATFORM_UV_EXTRA entry probes
+      importlib.util.find_spec on a driver module sourced from
+      PlatformRegistry.get_all_platform_metadata()[base]["libraries"][0]
+      (import_name/name precedence, mirroring _detect_library) --
+      registry-derived, not a hand-maintained platform->module table.
+      Platforms with no registry library entry are skipped (nothing to
+      probe) rather than guessed at. Verified the test fails with the
+      expected pair when the two new extras are temporarily removed.
   - id: w2
     summary: "Honor BENCHBOX_OUTPUT_DIR as base when YAML output templates are defaults (explicit templates win); tests for both directions; align uat-framework.md/AGENTS.md wording"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      execute.py: new _resolve_output_base(template, default_template)
+      splices BENCHBOX_OUTPUT_DIR in as the base ONLY when the config's
+      template string equals the OutputConfig schema default (an
+      explicit YAML template, even one that happens to match the
+      default's literal wording, evaluates equal and still honors the
+      env var -- which is what the release-gate configs rely on since
+      they set the templates verbatim). default_log_dir and
+      default_benchmark_runs_dir both route through it. 6 new
+      test_phases.py tests cover both directions (default template +
+      env var honored / no env var unchanged; explicit template always
+      wins) for both functions. uat-framework.md "Output artefacts" and
+      "Release-gate re-run" reworded to state the actual precedence;
+      AGENTS.md already read as accurate post-fix (BENCHBOX_OUTPUT_DIR
+      is a general directive, not sweep-specific) so left unchanged.
   - id: w3
     summary: "Remove BENCHBOX_SEED from docs (execute.seed is the real mechanism); sweep docs for other phantom env vars (grep os.environ/os.getenv across tests/uat vs doc claims)"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      Removed the "Record the run seed (BENCHBOX_SEED)" line from
+      uat-framework.md's release-gate run rules (the
+      release-gate-01-native-dataframe.yaml comment referencing it is out
+      of scope_limit, left as-is). Grepped os.environ/os.getenv across
+      tests/uat/*.py against every BENCHBOX_* / *_HOST_PORT token in the
+      three in-scope docs: only BENCHBOX_OUTPUT_DIR and
+      BENCHBOX_CONTAINER_CLI are both documented and read; no other
+      phantom vars found. (BENCHBOX_NON_INTERACTIVE and
+      BENCHBOX_ALLOW_MAIN_CLONE_WRITE also appear in AGENTS.md but are
+      read outside tests/uat -- confirmed real, not phantom.)
   - id: w4
     summary: "make uat-prepull PLATFORM=... (compose pull + build via the resolved engine, project-scoped); document in uat-local-provisioning.md"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      docker_assets.py: compose_pull_command (adds --ignore-buildable)
+      and compose_build_command, both sharing _compose_base_command so
+      they pick up the resolved engine and project scoping for free.
+      Mechanism chosen: extended scripts/uat-bring-up/uat_bring_up.py
+      with a --prepull-only flag (pull then build, no health probe)
+      rather than a new script or an _cli.py route -- reuses the
+      existing PLATFORM validation, project-name derivation, and
+      resolved-engine identity print verbatim. New `make uat-prepull
+      PLATFORM=<name> [PREPULL_TIMEOUT_S=900] [DRY_RUN=1]` target mirrors
+      uat-bring-up's UAT_BRING_UP_KNOWN_PLATFORMS guard. Not added to
+      _cli.py's MAKE_TARGET_SUBCOMMANDS (uat-bring-up itself isn't
+      routed through _cli either). Verified: `make uat-prepull
+      PLATFORM=postgresql DRY_RUN=1` prints the pull+build plan, exit 0,
+      no execution; unknown platform still fails clearly (exit 2).
   - id: w5
     summary: "Fresh-machine checklist in uat-local-provisioning.md: extras per stage, engine install, VM memory, doris max_map_count, node+Playwright, prepull, first-run datagen/network costs"
-    status: pending
+    status: done
     needs: [w1, w2, w3, w4]
+    notes: >
+      Added "Container engine" (finding 5, pointer to
+      uat-framework.md/AGENTS.md, no duplication) and "Fresh machine
+      checklist" sections to uat-local-provisioning.md: per-stage extras
+      (derived by running resolve_platforms per release-gate config and
+      intersecting with PLATFORM_UV_EXTRA -- stage1
+      clickhouse-local+modin, stage2 clickhouse-server+lakesail, stage3
+      databend+influxdb+singlestore), container engine, Docker/VM memory
+      >= 12 GiB (velox 11.7 GB ceiling rationale from matrix.py:29-34),
+      doris vm.max_map_count >= 2000000 (docs/platforms/doris.md
+      pointer), make uat-prepull, node+Playwright install command
+      (`cd results-explorer && npm ci && npx playwright install
+      --with-deps chromium`, matches .github/workflows/
+      results-explorer-browser.yml), and first-run datagen/network
+      costs. Each item states its skip-this-and-you-will-see-X symptom.
+      Notes Linux as untested territory per the deferred item below.
 
 deferred:
   - summary: "Linux release-gate validation run"
     reason: "Code is not Linux-blocked but evidence/budgets are all macOS; an actual Linux sweep is an operational campaign, not a code/docs change. The checklist notes Linux as untested territory."
   - summary: "make uat-bring-down counterpart to uat-bring-up"
     reason: "uat-docker-cleanup APPLY=1 already covers reclamation; a dedicated target is ergonomic sugar."
+
+review_response:
+  date: "2026-07-19"
+  summary: >
+    Adversarial review of w2's shipped implementation found a
+    must_preserve violation plus two in-scope docs/test hardening items.
+    All three applied; three additional Considers deferred as noted below.
+  required_fix: >
+    w2's _resolve_output_base decided "default vs. explicit" by STRING
+    EQUALITY (`template != default_template`), so a config that explicitly
+    set an output.*_template to a string that happened to equal the schema
+    default was indistinguishable from "unset" -- BENCHBOX_OUTPUT_DIR would
+    silently reroot it, violating must_preserve "Explicit YAML output
+    templates ALWAYS win." Fixed by provenance instead of value: added
+    OutputConfig.explicitly_set (frozenset of output.* keys actually
+    present in the raw YAML payload, populated in config._validate_output)
+    and gated _resolve_output_base's reroot on key-absence rather than
+    value-equality. New test_phases.py regression test:
+    benchmark_runs_dir_template explicitly set to the schema-default
+    string, with BENCHBOX_OUTPUT_DIR set, still resolves to the explicit
+    value (not rerooted).
+  considers_applied:
+    - "docs/operations/uat-local-provisioning.md checklist step 1 claimed cells invoke `uv run --extra <X> --no-sync`, but matrix.uv_run_argv emits `uv run --extra <X> --` for extra platforms (no --no-sync -- combined with --extra that flag would skip installing the extra). Corrected the documented command."
+    - "tests/uat/test_matrix.py _RELEASE_GATE_CONFIG_NAMES was a hardcoded 3-entry tuple, so a future release-gate-04-*.yaml would silently escape the import-coverage test. Replaced with a glob-based _release_gate_config_names() over configs/release-gate-*.yaml; test assertions unchanged."
+  considers_deferred:
+    - summary: "--prepull-only main() branch in uat_bring_up.py has no automated test"
+      reason: "Natural home is tests/uat/test_preflight.py, which is outside this TODO's scope_limit. Follow-up."
+    - summary: "submissions_dir_template is not rerooted by BENCHBOX_OUTPUT_DIR"
+      reason: "By design -- the env var override is documented as scoped to the runs dir and log dir only; submissions has its own terminal-state handling."
+    - summary: "Residual phantom BENCHBOX_SEED comment in tests/uat/configs/release-gate-01-native-dataframe.yaml:13"
+      reason: "That config file is outside this TODO's scope_limit (w3 already noted and deferred it). Follow-up sweep."
 
 deps:
   needs: [uat-resume-retirement-artifact-durability, uat-container-engine-routing]
@@ -138,3 +241,16 @@ metadata:
   estimated_effort: Medium
   created_date: "2026-07-11"
   source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), findings G1-G5"
+
+files_affected:
+  modified:
+  - Makefile
+  - docs/operations/uat-framework.md
+  - docs/operations/uat-local-provisioning.md
+  - scripts/uat-bring-up/uat_bring_up.py
+  - tests/uat/docker_assets.py
+  - tests/uat/matrix.py
+  - tests/uat/phases/execute.py
+  - tests/uat/test_docker_assets.py
+  - tests/uat/test_matrix.py
+  - tests/uat/test_phases.py

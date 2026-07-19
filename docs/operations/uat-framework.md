@@ -43,9 +43,17 @@ By default every BenchBox runtime artefact lands under the shared
 The UAT runner passes this root to every `benchbox run` subprocess as
 `BENCHBOX_OUTPUT_DIR`, so datagen, loaded databases, and result JSONs
 stay outside the worktree even when the sweep is launched from a pool
-worktree. Override the root with `output.benchmark_runs_dir_template`;
-override only logs or staged submissions with `output.logs_dir_template`
-and `output.submissions_dir_template`.
+worktree.
+
+Two ways to change the root, in precedence order: an explicit
+`output.benchmark_runs_dir_template` (and/or `output.logs_dir_template`,
+`output.submissions_dir_template`) in the config always wins. If a config
+leaves those at their schema defaults (every checked-in config does),
+setting `BENCHBOX_OUTPUT_DIR` before the sweep overrides the
+`~/Developer/benchmark_runs` base for both the runs dir and the log dir —
+this also matches bare `make uat-cell` (which has always read the env var).
+A config with an explicit template ignores `BENCHBOX_OUTPUT_DIR` entirely —
+no silent root switching for a configured sweep.
 
 ## Local-artifact hygiene (external-root invariant)
 
@@ -426,7 +434,9 @@ just wastes the timeout window each attempt.
 A release-gate sweep produces the sign-off evidence (a COMPLETED report per
 config with a commit SHA). It runs in four stages, in this order, so that all
 native and dataframe platforms finish before any Docker stack starts — the
-ordering the 2026-05-28/29 evidence violated.
+ordering the 2026-05-28/29 evidence violated. First time on a machine: work
+through `docs/operations/uat-local-provisioning.md` "Fresh machine checklist"
+before starting stage 1.
 
 Stages (run each to completion before starting the next):
 
@@ -439,9 +449,10 @@ dataframe — in a single Docker-free sweep; stages 2 and 3 are the Docker tiers
 
 Run rules:
 
-- Use a **fresh run root** under `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`;
-  never resume into the failed 2026-05-28/29 dirs (they are non-evidentiary).
-- Record the run **seed** (`BENCHBOX_SEED`) in the release-gate log.
+- Use a **fresh run root** under `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`
+  (the three configs use the default output templates, so the env var sets the
+  base — see "Output artefacts"); never resume into the failed 2026-05-28/29
+  dirs (they are non-evidentiary).
 - One platform / one Docker stack at a time (`execute.parallel_platforms` is
   hard-rejected). A single Docker stack's compose-up failure records FAIL and
   the sweep advances; it does not truncate the run.

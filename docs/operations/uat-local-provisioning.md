@@ -16,6 +16,14 @@ For automated platforms, preflight makes one explicit `make uat-bring-up
 PLATFORM=<name>` attempt before aborting. Document-only platforms must be
 started by the operator.
 
+## Container engine
+
+`resolve_container_cli()` picks the compose-compatible binary: `BENCHBOX_CONTAINER_CLI`
+env override (verbatim) > macOS: `mocker` if on `PATH`, else `docker` > every
+other platform: always `docker`. A missing resolved binary is a hard error.
+Full contract and mocker teardown interaction: `docs/operations/uat-framework.md`
+"Container engine resolution", AGENTS.md "UAT container engine resolution".
+
 ## Automated Docker-backed platforms
 
 These platforms have UAT-owned compose metadata, healthchecks, and a TCP probe.
@@ -23,6 +31,13 @@ They can be started explicitly:
 
 ```bash
 make uat-bring-up PLATFORM=<platform>
+```
+
+Before a timed sweep, pre-fetch a slow stack's images/build ahead of time so a
+first-run download doesn't eat into `cleanup.docker_start_timeout_s`:
+
+```bash
+make uat-prepull PLATFORM=<platform>   # compose pull --ignore-buildable + compose build
 ```
 
 - `cedardb` — `localhost:5435`, compose file `docker/cedardb/docker-compose.yml`.
@@ -55,3 +70,45 @@ startup instructions.
 - `docker ps` must work before any automated bring-up can succeed.
 - If a platform remains unreachable after bring-up, inspect the platform's
   compose logs and verify the endpoint in `local-platform-provisioning.tsv`.
+
+## Fresh machine checklist
+
+Provisioning order for a second operator running the release-gate sweep
+(`docs/operations/uat-framework.md` "Release-gate re-run") from scratch. Each
+item names the failure symptom if skipped. Evidenced on macOS only — Linux is
+untested territory (see the `uat-operator-provisioning` TODO).
+
+1. **`uv sync` + per-stage extras** (`tests/uat/matrix.py` `PLATFORM_UV_EXTRA`
+   is the source of truth). Stage 1 (native-sql + dataframe) needs
+   `clickhouse-local` + `modin`; stage 2 (docker-fast) needs
+   `clickhouse-server` + `lakesail`; stage 3 (docker-slow) needs `databend` +
+   `influxdb` + `singlestore`. Cells invoke `uv run --extra <X> --`
+   per platform, so nothing needs pre-installing beyond a plain `uv sync` for
+   everything else. Skip this → the first cell for that platform records
+   `ModuleNotFoundError` as FAILED, silently breaching the validator
+   clean-rate floor.
+2. **Container engine** — see "Container engine" above. Skip this →
+   `resolve_container_cli()` raises before any compose command runs.
+3. **Docker/VM memory ≥ 12 GiB.** Docker Desktop: Settings → Resources →
+   Memory. Skip this → velox's Spark/Velox container fails a 3× SF=1 TPC-H
+   pass under the default ~11.7 GB ceiling (`tests/uat/matrix.py:29-34`;
+   already mitigated to one warmup + one measurement run, but headroom still
+   matters with other stacks running concurrently in a sweep). Apple
+   container/mocker sizes each container's VM independently — confirm the
+   host has equivalent headroom free rather than raising a shared ceiling.
+4. **Doris `vm.max_map_count` ≥ 2000000** — see `docs/platforms/doris.md`.
+   Skip this → Doris fails its startup preflight check inside the container
+   unless `DORIS_PRIVILEGED=true` is also set.
+5. **`make uat-prepull PLATFORM=<name>`** for slow/first-run stacks
+   (LakeSail, Velox, Doris) ahead of a timed sweep. Skip this → a multi-GB
+   image pull or PySail build silently eats
+   `cleanup.docker_start_timeout_s` and the stack records
+   `skipped-unreachable` instead of a clear pull/build failure.
+6. **node + Playwright** for `explorer_smoke`: `cd results-explorer && npm ci
+   && npx playwright install --with-deps chromium`. Skip this → the phase
+   records `skip_reason="node not on PATH"`, or a Playwright browser-download
+   failure, instead of running.
+7. **First-run costs.** Scale-1.0 TPC-H/TPC-DS datagen is CPU/disk-bound, not
+   instant; LakeSail's first build additionally downloads a multi-GB PySail
+   package tarball over the network (covered by step 5's prepull). Budget the
+   first sweep attempt's wall-clock time accordingly.
