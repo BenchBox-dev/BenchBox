@@ -31,6 +31,8 @@ import datetime as _dt
 from pathlib import Path
 from typing import Any
 
+from benchbox.utils.scale_factor import format_scale_factor
+
 # Mirrors benchbox/cli/commands/run_official.py::TPC_ALLOWED_SCALE_FACTORS.
 # `run-official` rejects any other scale factor outright, so a throughput UAT
 # cell must pick one of these (the verification command in the
@@ -44,8 +46,9 @@ def resolve_official_result_path(
     platform: str,
     benchmark: str,
     started_after: _dt.datetime,
+    scale: float | None = None,
 ) -> Path | None:
-    """Find the newest result JSON exported for (platform, benchmark).
+    """Find the newest result JSON exported for (platform, benchmark[, scale]).
 
     `run-official` prints its result path through Rich's non-quiet console
     output (e.g. ``JSON: [dim]/path/to/result.json[/dim]``), which is not a
@@ -54,20 +57,63 @@ def resolve_official_result_path(
     Locating the file by name + mtime instead works regardless of console
     formatting and also survives a non-clean (exit code != 0) run, which
     `run-official` still exports a full result JSON for.
+
+    Filename grammar (pinned from the exporter every result JSON funnels
+    through, ``benchbox.core.results.filenames.build_result_filename_base``,
+    as exercised by the fixtures in ``tests/uat/test_throughput.py``)::
+
+        {benchmark}_{sf<N>}_{platform_token...}_{mode}_{timestamp}[_{execution_id}].json
+
+    e.g. ``tpch_sf1_duckdb_sql_20260709_223304_0865bb91.json`` splits on
+    ``"_"`` into ``["tpch", "sf1", "duckdb", "sql", "20260709", "223304",
+    "0865bb91"]``. A platform whose normalized form itself contains an
+    underscore (e.g. ``pg-duckdb`` -> ``pg_duckdb``) spans two tokens:
+    ``["tpch", "sf1", "pg", "duckdb", "sql", "20260709"]``.
+
+    Matching is token-exact, not substring: a candidate's ``"_"``-split stem
+    must start with ``benchmark_token`` at index 0, then (when `scale` is
+    given) the scale-factor token at index 1, then the platform's own
+    tokens filling the following slots in order. This is what stops
+    ``platform="duckdb"`` from matching a ``pg_duckdb`` result file (or the
+    reverse) merely because one platform name is a substring of the other --
+    the old glob-based ``f"..._*{platform_token}*.json"`` pattern had that
+    exact collision.
+
+    `scale` is optional and keyword-only for backward compatibility with
+    existing callers that don't (yet) pass it; when omitted, the
+    scale-factor token is present in the filename but not checked.
+
+    Ties (equal ``st_mtime``, e.g. within filesystem mtime granularity) are
+    broken deterministically by filename, not left to whatever order the
+    filesystem happens to yield candidates in.
     """
     if not results_dir.is_dir():
         return None
-    platform_token = platform.lower().replace("-", "_")
     benchmark_token = benchmark.lower()
+    platform_tokens = platform.lower().replace("-", "_").split("_")
+    scale_token = format_scale_factor(scale) if scale is not None else None
     started_ts = started_after.timestamp()
-    candidates = [
-        path
-        for path in results_dir.glob(f"{benchmark_token}_*{platform_token}*.json")
-        if path.is_file() and path.stat().st_mtime >= started_ts
-    ]
+
+    candidates: list[Path] = []
+    for path in results_dir.glob(f"{benchmark_token}_*.json"):
+        if not path.is_file() or path.stat().st_mtime < started_ts:
+            continue
+        tokens = path.stem.split("_")
+        if not tokens or tokens[0] != benchmark_token:
+            continue
+        # Index 1 is always the scale-factor token in the pinned grammar;
+        # only *check* it when the caller supplied `scale`, but always skip
+        # over it so the platform-token slice below lines up.
+        if scale_token is not None and (len(tokens) < 2 or tokens[1] != scale_token):
+            continue
+        platform_start = 2
+        platform_end = platform_start + len(platform_tokens)
+        if tokens[platform_start:platform_end] != platform_tokens:
+            continue
+        candidates.append(path)
     if not candidates:
         return None
-    return max(candidates, key=lambda path: path.stat().st_mtime)
+    return max(candidates, key=lambda path: (path.stat().st_mtime, path.name))
 
 
 def validate_stream_count(

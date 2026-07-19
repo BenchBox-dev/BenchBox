@@ -615,6 +615,16 @@ jobs:
         run: |
           uv run -- python -m pytest tests/integration -k "throughput and duckdb" -m integration --tb=short -v
 
+      - name: Capture throughput UAT start timestamp
+        # Captured BEFORE the sweep step so the assert step below can filter
+        # on "written after this run started" precisely, instead of the
+        # previous full-hour `now() - 1h` window -- which, over a shared,
+        # persistent results dir (multi-cell sweeps, repeated nightly runs
+        # on a non-ephemeral runner), risked resolving a stale file from an
+        # earlier run instead of this run's own export.
+        run: |
+          echo "THROUGHPUT_UAT_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S)" >> "$GITHUB_ENV"
+
       - name: Run DuckDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
         # KNOWN, TRACKED, PRE-EXISTING DEFECT (independent of this TODO):
         # TPC-H throughput mode's per-stream/per-position seed derivation
@@ -639,16 +649,25 @@ jobs:
       - name: Assert the requested stream count reached the driver
         run: |
           uv run -- python -c "
-          import datetime, sys
+          import datetime, os, sys
           from pathlib import Path
           from tests.uat.throughput import resolve_official_result_path, validate_stream_count
 
+          # Narrow window: the timestamp captured immediately before the sweep
+          # step above, not a full-hour lookback -- see that step's comment.
+          # scale=1 matches uat-throughput-duckdb-nightly.yaml's rung and
+          # tightens filename resolution alongside the exact platform-token
+          # match (both landed together; see tests/uat/throughput.py).
+          started_after = datetime.datetime.strptime(
+              os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
+          )
           results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
           result_path = resolve_official_result_path(
               results_dir,
               platform='duckdb',
               benchmark='tpch',
-              started_after=datetime.datetime.now() - datetime.timedelta(hours=1),
+              started_after=started_after,
+              scale=1,
           )
           if result_path is None:
               print('::error::No throughput UAT result JSON found for duckdb/tpch')
