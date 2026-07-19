@@ -12,7 +12,3 @@ code:
 test:
   coverage: uv run -- python -m pytest --cov=benchbox --cov-report=term-missing
   runner: pytest
-todo:
-  cli: uv run _project/scripts/todo_cli.py
-  index: uv run _project/scripts/generate_indexes.py
-  validate: uv run _project/scripts/validate_todo.py

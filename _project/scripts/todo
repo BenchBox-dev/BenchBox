@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Thin entry point for the DB-backed TODO tracker spike
+# Thin entry point for the DB-backed TODO tracker
 # (_project/specs/todo-db-tracker.md). All TODO state changes go through this
 # command; the CLI and database enforce the lifecycle rules.
 set -euo pipefail

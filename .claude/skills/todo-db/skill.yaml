@@ -1,5 +1,8 @@
 depends:
+  - SHARED/commit-framework
+  - SHARED/verify-framework
   - SHARED/research-framework
+  - SHARED/slicing-framework
   - SHARED/review-protocol
   - SHARED/plan-deepening-framework
 tags:
