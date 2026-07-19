@@ -541,6 +541,14 @@ def _replica_setup_lock(replica: Path):
         os.close(fd)
 
 
+def _import_libsql():
+    try:
+        import libsql  # deferred: only hosted mode needs it
+    except ImportError as exc:
+        raise TodoError("hosted tracker requires the `libsql` package; run `uv sync` in _project/scripts") from exc
+    return libsql
+
+
 def _hosted_raw_connect(url: str, sync_required: bool) -> _HostedConnection:
     # Use the normalized return (trimmed whitespace, lowercased scheme) for the
     # actual connect, not just the security check: direct helper callers do not
@@ -550,10 +558,7 @@ def _hosted_raw_connect(url: str, sync_required: bool) -> _HostedConnection:
     token = os.environ.get("TODO_DB_AUTH_TOKEN") or ""
     if not token:
         raise TodoError("hosted tracker: set TODO_DB_AUTH_TOKEN when TODO_DB_URL points at a remote database")
-    try:
-        import libsql  # deferred: only hosted mode needs it
-    except ImportError as exc:
-        raise TodoError("hosted tracker requires the `libsql` package; run `uv sync` in _project/scripts") from exc
+    libsql = _import_libsql()
     replica = hosted_replica_path()
     replica.parent.mkdir(parents=True, exist_ok=True)
     with _replica_setup_lock(replica):
@@ -577,7 +582,36 @@ def _hosted_raw_connect(url: str, sync_required: bool) -> _HostedConnection:
     return conn
 
 
-def connect_hosted(url: str) -> _HostedConnection:
+def _hosted_read_connect(url: str) -> _HostedConnection:
+    """Remote-only connection (no embedded replica) for read-only commands.
+
+    Queries go straight to the primary over HTTP, so a read-only auth token
+    works and no schema-bootstrap write is ever attempted (a read-only token
+    cannot drive embedded-replica sync, which would leave an empty replica and
+    trip the bootstrap write). Slower per query than the local replica, so read
+    paths that use this must be bulk — see export_all().
+    """
+    url = _require_secure_url(url)
+    token = os.environ.get("TODO_DB_AUTH_TOKEN") or ""
+    if not token:
+        raise TodoError("hosted tracker: set TODO_DB_AUTH_TOKEN when TODO_DB_URL points at a remote database")
+    libsql = _import_libsql()
+    return _HostedConnection(libsql.connect(url, auth_token=token))
+
+
+def connect_hosted(url: str, *, read_only: bool = False) -> _HostedConnection:
+    if read_only:
+        conn = _hosted_read_connect(url)
+        version = _schema_version(conn)
+        if version is None:
+            conn.close()
+            raise TodoError("hosted tracker: no schema found on the primary")
+        if version != SCHEMA_VERSION:
+            conn.close()
+            raise TodoError(
+                f"database schema_version={version}, CLI expects {SCHEMA_VERSION}; run `todo migrate` to upgrade it"
+            )
+        return conn
     conn = _hosted_raw_connect(url, sync_required=False)
     if conn.stale and _schema_version(conn) is None:
         # A never-synced replica cannot bootstrap the schema while the
@@ -787,10 +821,17 @@ def bulk_transfer(
     return {"rows": rows_total, "batches": len(batches) + 2}
 
 
-def connect_backend(backend: Path | str) -> sqlite3.Connection | _HostedConnection:
+# Commands that only read: connected remote-only (no embedded replica) so a
+# read-only hosted token works. Kept minimal — `export` is the automated
+# read-only-token consumer and its reader is bulk; interactive reads keep the
+# fast embedded replica (which needs a read-write token anyway).
+READ_ONLY_COMMANDS = frozenset({"export"})
+
+
+def connect_backend(backend: Path | str, *, read_only: bool = False) -> sqlite3.Connection | _HostedConnection:
     if isinstance(backend, Path):
         return connect(backend)
-    return connect_hosted(backend)
+    return connect_hosted(backend, read_only=read_only)
 
 
 def migrate_backend(backend: Path | str) -> list[int]:
@@ -1665,7 +1706,59 @@ def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
 
 
 def export_all(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    return [get_item(conn, row["id"]) for row in conn.execute("SELECT id FROM items ORDER BY id")]
+    # Bulk read: one SELECT per table, assembled in Python. Produces output
+    # byte-identical to per-item get_item() but with ~11 round-trips instead of
+    # thousands, so a remote (no-embedded-replica) read-only connection stays
+    # fast enough for the export job. Ordering within every child list mirrors
+    # get_item()'s per-item ORDER BY exactly.
+    items: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for row in conn.execute("SELECT * FROM items ORDER BY id"):
+        d = dict(row)
+        d["work"] = []
+        d["deps"] = []
+        d["scope"] = []
+        d["verifications"] = []
+        d["preserves"] = []
+        d["anti_patterns"] = []
+        d["prior_art"] = []
+        d["deferrals"] = []
+        items[d["id"]] = d
+        order.append(d["id"])
+
+    work_index: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in conn.execute("SELECT * FROM work_units ORDER BY item_id, wid"):
+        w = dict(row)
+        w["needs"] = []
+        items[w["item_id"]]["work"].append(w)
+        work_index[(w["item_id"], w["wid"])] = w
+    for row in conn.execute("SELECT item_id, wid, needs_wid FROM work_needs ORDER BY item_id, wid, needs_wid"):
+        work_index[(row["item_id"], row["wid"])]["needs"].append(row["needs_wid"])
+    for row in conn.execute("SELECT item_id, needs_item FROM item_deps ORDER BY item_id, needs_item"):
+        items[row["item_id"]]["deps"].append(row["needs_item"])
+    for row in conn.execute("SELECT item_id, kind, path_glob FROM scope_rules ORDER BY item_id, kind, path_glob"):
+        items[row["item_id"]]["scope"].append({"kind": row["kind"], "path_glob": row["path_glob"]})
+    for row in conn.execute("SELECT * FROM verifications ORDER BY item_id, seq"):
+        items[row["item_id"]]["verifications"].append(dict(row))
+    for row in conn.execute("SELECT item_id, behavior FROM preserves ORDER BY item_id, behavior"):
+        items[row["item_id"]]["preserves"].append(row["behavior"])
+    # Use dict(row) (as get_item does) rather than by-name access: `instead` is
+    # a SQL keyword and the backends disagree on its result-column name (local
+    # SQLite -> "instead", the libsql cursor -> "INSTEAD"); dict(row) inherits
+    # whatever the cursor reports, keeping export byte-identical with get_item()
+    # on both backends, and avoids the by-name keyword lookup that fails on the
+    # remote cursor.
+    for row in conn.execute("SELECT item_id, dont, why, instead FROM anti_patterns ORDER BY item_id, dont"):
+        anti = dict(row)
+        items[anti.pop("item_id")]["anti_patterns"].append(anti)
+    for row in conn.execute("SELECT item_id, path, concept, decision FROM prior_art ORDER BY item_id, path, concept"):
+        items[row["item_id"]]["prior_art"].append(
+            {"path": row["path"], "concept": row["concept"], "decision": row["decision"]}
+        )
+    for row in conn.execute("SELECT * FROM deferrals ORDER BY from_item, id"):
+        items[row["from_item"]]["deferrals"].append(dict(row))
+
+    return [items[i] for i in order]
 
 
 def write_export(conn: sqlite3.Connection, out_dir: Path) -> tuple[Path, Path]:
@@ -2174,7 +2267,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"applied migration(s) to v{', v'.join(str(v) for v in applied)}")
             return 0
     try:
-        conn = connect_backend(backend)
+        conn = connect_backend(backend, read_only=args.command in READ_ONLY_COMMANDS)
     except TodoError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2

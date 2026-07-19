@@ -18,6 +18,7 @@ Marked medium (not fast) deliberately: the fast lane is budget-gated.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sqlite3
 import sys
 import types
@@ -888,3 +889,71 @@ class TestHostedMigrate:
         conn = todo_db.connect_backend(HOSTED_URL)
         cols = [row[1] for row in conn.execute("PRAGMA table_info(work_units)").fetchall()]
         assert "started_at" in cols
+
+
+# ---------------------------------------------------------------------------
+# Read-only export path (bulk reader + remote-only connect)
+
+
+def test_export_all_bulk_matches_per_item(tmp_path):
+    """Bulk export_all() must be byte-identical to per-item get_item() assembly
+    across every child table (work+needs, deps, scope, verifications, preserves,
+    anti_patterns incl. the INSTEAD keyword column, prior_art, deferrals)."""
+    conn = todo_db.connect(tmp_path / "t.sqlite")
+    todo_db.create_item(
+        conn,
+        "tester",
+        item_id="item-b",
+        title="Item B target",
+        worktree="spike",
+        priority="low",
+        description="dep target item",
+    )
+    todo_db.create_item(
+        conn,
+        "tester",
+        item_id="item-a",
+        title="Item A rich",
+        worktree="spike",
+        priority="high",
+        description="rich item body",
+        work=[{"id": "w0", "summary": "first"}, {"id": "w1", "summary": "second", "needs": ["w0"]}],
+        deps=["item-b"],
+        scope=[("only_modify", "src/**"), ("do_not_modify", "gen/**")],
+        verifications=[{"description": "check", "command": "make x", "expected": "ok"}],
+        preserves=["keep the public API"],
+        anti_patterns=[("do not hack", "it breaks", "do it properly")],
+        prior_art=[("docs/x.md", "concept", "reuse")],
+    )
+    todo_db.defer_work(conn, "tester", "item-a", "later work", "out of scope")
+
+    per_item = [todo_db.get_item(conn, row["id"]) for row in conn.execute("SELECT id FROM items ORDER BY id")]
+    bulk = todo_db.export_all(conn)
+    assert bulk == per_item
+    # and the serialized form export writes is identical too
+    dump = lambda rows: [json.dumps(r, sort_keys=True) for r in rows]
+    assert dump(bulk) == dump(per_item)
+    # the keyword `instead` column round-trips (its result-column name is
+    # backend-dependent: "instead" on local SQLite, "INSTEAD" on libsql), so
+    # check the value under either key.
+    a = next(r for r in bulk if r["id"] == "item-a")
+    ap = a["anti_patterns"][0]
+    assert ap["dont"] == "do not hack" and ap["why"] == "it breaks"
+    assert ap.get("instead", ap.get("INSTEAD")) == "do it properly"
+
+
+def test_export_command_uses_read_only_connect(monkeypatch):
+    """The export command must connect read-only (remote-only, no embedded
+    replica) so a read-only hosted token works."""
+    assert "export" in todo_db.READ_ONLY_COMMANDS
+    seen = {}
+
+    def spy(url, *, read_only=False):
+        seen["read_only"] = read_only
+        raise todo_db.TodoError("stop after connect")  # short-circuit; we only assert the flag
+
+    monkeypatch.setattr(todo_db, "connect_hosted", spy)
+    monkeypatch.setenv("TODO_DB_URL", HOSTED_URL)
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    todo_db.main(["export", "--out", "/tmp/does-not-matter"])
+    assert seen == {"read_only": True}
