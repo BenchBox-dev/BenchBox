@@ -2,7 +2,8 @@ id: uat-throughput-result-resolution-hardening
 title: "Harden the throughput result-path resolver: exact platform token, scale token, deterministic tie-break, narrower nightly window"
 worktree: uat-hardening
 priority: Medium-High
-status: Not Started
+status: Completed
+completed_date: "2026-07-19"
 category: "Bug Fix / Data Pipeline"
 
 description: |
@@ -40,24 +41,89 @@ prior_art:
 work:
   - id: w1
     summary: "Pin the filename grammar: locate the exporter that writes result filenames, document the token order (benchmark, sf, platform, mode, date) in the resolver docstring"
-    status: pending
+    status: done
     needs: []
+    notes: >
+      Pinned the exporter's filename grammar
+      (benchbox.core.results.filenames.build_result_filename_base) in the
+      resolver docstring:
+      {benchmark...}_{sf<N>}_{platform...}_{mode}_{timestamp}[_{execution_id}].json,
+      with benchmark and platform each documented as variable-length
+      underscore-token runs (not fixed indices).
   - id: w2
     summary: "Exact-token platform matching: split filename on underscores and require the platform token sequence to match exactly (pg_duckdb no longer matches duckdb); add the collision-direction regression test"
-    status: pending
+    status: done
     needs: [w1]
+    notes: >
+      Split filename on underscores and require the platform token
+      SEQUENCE to match exactly, so platform="duckdb" no longer
+      substring-matches a pg_duckdb result file (old glob was
+      f"{benchmark}_*{platform}*.json"). Added both-direction collision
+      regression tests. Review (Opus) found and fixed a Critical here: the
+      first-pass matcher hardcoded fixed token indices
+      (benchmark=token[0], scale=token[1], platform_start=2), which
+      regressed the ~10 registered benchmark ids containing underscores
+      (tpcds_obt, tsbs_devops, tpch_skew, *_primitives, ...) to
+      false-negative None -- a real tpcds_obt_sf1_duckdb_sql_*.json would
+      have downgraded a passing official cell to FAILED. Fixed by matching
+      the benchmark as a token PREFIX SEQUENCE and deriving scale_idx =
+      len(benchmark_tokens) / platform_start = scale_idx + 1; added
+      tpcds_obt + tsbs_devops regression tests (incl. the pg_duckdb
+      non-collision) and confirmed the reverted single-token code returns
+      None on the new fixture. See review_response below.
   - id: w3
     summary: "Add a scale token to the filter (scale param threaded from run_cell, which knows it); tie-break by (mtime, filename) so equal-mtime resolution is deterministic"
-    status: pending
+    status: done
     needs: [w2]
+    notes: >
+      Added an optional keyword-only scale filter threaded from run_cell
+      (which already knows the scale) and a deterministic (mtime,
+      filename) tie-break for equal-mtime candidates. Backward-compatible:
+      resolve_official_result_path's signature keeps scale
+      optional/keyword-only. Review found the run_cell -> resolver scale
+      forwarding was untested (every other official test mocked the
+      resolver without checking kwargs, so deleting the wiring would have
+      passed silently); added a forwarding-assert test.
   - id: w4
     summary: "Narrow the nightly assert window: capture a start timestamp before the sweep step and pass it through instead of now()-1h (nightly.yml)"
-    status: pending
+    status: done
     needs: [w3]
+    notes: >
+      Narrowed the nightly assert window: capture a UTC start timestamp
+      (via $GITHUB_ENV, written with `date -u`) before the sweep step
+      instead of a now()-1h lookback over a shared results dir. Review
+      found the captured timestamp was parsed as a naive/local datetime
+      rather than UTC; fixed by anchoring the parsed value with
+      .replace(tzinfo=timezone.utc) so resolution is runner-timezone
+      independent.
 
 deferred:
   - summary: "Replace glob resolution entirely with a result-path manifest emitted by run-official"
     reason: "Requires a benchbox CLI surface change (run-official output contract) which the no-CLI-surface-drift constraint makes a bigger conversation; the hardened glob is sufficient for sequential UAT. Promoted to [[uat-throughput-result-path-manifest]] (2026-07-16), which needs this item."
+
+review_response:
+  date: "2026-07-19"
+  summary: >
+    Merged as PR #1228. Adversarial review of the shipped implementation
+    found one merge-blocking Critical (multi-token benchmark ids
+    regressed to false-negatives) plus two Considers; all three fixed
+    before merge.
+  required_fix: >
+    The first-pass exact-token matcher (w2) hardcoded
+    benchmark=token[0], scale=token[1], platform_start=2, which shifts
+    every index for the ~10 registered benchmark ids that contain
+    underscores (tpcds_obt, tsbs_devops, tpch_skew, *_primitives, ...). A
+    real tpcds_obt_sf1_duckdb_sql_*.json then resolved to None ->
+    run_cell downgrades a passing official cell to FAILED -- a
+    false-negative worse than the substring false-positive it replaced.
+    Fixed by matching the benchmark as a token PREFIX SEQUENCE and
+    deriving scale_idx = len(benchmark_tokens) / platform_start =
+    scale_idx + 1. Added tpcds_obt + tsbs_devops regression tests (incl.
+    the pg_duckdb non-collision), and confirmed the reverted
+    single-token code returns None on the new fixture.
+  considers_applied:
+    - "run_cell forwarding scale= into resolve_official_result_path was untested (every other official test mocked the resolver without checking kwargs, so deleting the wiring would have passed silently) -- added a forwarding-assert test."
+    - "The nightly assert step wrote the start timestamp with `date -u` (UTC) but consumed it as a naive datetime whose .timestamp() reads as local -- anchored the parsed value to UTC (.replace(tzinfo=timezone.utc)) so resolution is runner-timezone independent."
 
 deps:
   needs: [uat-status-taxonomy-exit-code-fixes, tpch-throughput-seed-validation-fix]
@@ -94,3 +160,12 @@ metadata:
   estimated_effort: Small
   created_date: "2026-07-11"
   source: "UAT infrastructure review 2026-07-10 (develop @ fc31f3604), finding R4"
+
+files_affected:
+  modified:
+  - .github/workflows/nightly.yml
+  - _project/config/fast_test_lane_policy.json
+  - tests/uat/runner.py
+  - tests/uat/test_runner.py
+  - tests/uat/test_throughput.py
+  - tests/uat/throughput.py
