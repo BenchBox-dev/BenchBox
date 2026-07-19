@@ -99,6 +99,10 @@ _project/*
 !_project/LAUNCH_*.md
 !_project/CONTENT_*.md
 !_project/SOCIAL_*.md
+# Committed TODO-tracker export snapshot (written weekly by
+# .github/workflows/todo-db-export.yml) -- provenance trail, must be tracked.
+!_project/todo-db-export/
+!_project/todo-db-export/**
 
 # Include pre-compiled TPC binaries for distribution
 !_binaries/

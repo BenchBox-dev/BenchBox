@@ -542,7 +542,11 @@ def _replica_setup_lock(replica: Path):
 
 
 def _hosted_raw_connect(url: str, sync_required: bool) -> _HostedConnection:
-    _require_secure_url(url)
+    # Use the normalized return (trimmed whitespace, lowercased scheme) for the
+    # actual connect, not just the security check: direct helper callers do not
+    # pass through resolve_backend(), so without this a whitespace-padded or
+    # uppercase-scheme URL would reach libsql.connect() un-normalized.
+    url = _require_secure_url(url)
     token = os.environ.get("TODO_DB_AUTH_TOKEN") or ""
     if not token:
         raise TodoError("hosted tracker: set TODO_DB_AUTH_TOKEN when TODO_DB_URL points at a remote database")
