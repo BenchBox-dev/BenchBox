@@ -7,8 +7,6 @@
 # prose with executable code (Sphinx config, extension modules, helper
 # scripts) — those code paths must run lint/type/test like any other code.
 safe-content:
-  - "_project/TODO/**"
-  - "_project/DONE/**"
   - "_project/blind-spots/**"
   - "_project/decisions/**"
   - "_project/handoffs/**"
@@ -41,8 +39,6 @@ safe-content:
 # that touches both prose and Sphinx code still triggers docs-validate
 # alongside the full PR tier.
 content-guard:
-  - "_project/TODO/**"
-  - "_project/DONE/**"
   - "_project/blind-spots/**"
   - "_project/decisions/**"
   - "_project/handoffs/**"

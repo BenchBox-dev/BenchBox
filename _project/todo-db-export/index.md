@@ -729,6 +729,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | logging-standardization | done | medium | observability-quality | Logging Standardization |
 | loud-loader-failures-for-contaminated-data | done | high | main | Raise DataLoadingError instead of silent zero-row loads in SQL/file loader |
 | lxml-cve-pysec-2026-87-blocked-by-redshift-connector | active | medium | main | Unblock lxml PYSEC-2026-87 fix once redshift-connector relaxes its lxml pin |
+| maintainer-review-g4-uncertain-deferrals | planning | medium | main | Maintainer review of 27 G4 UNCERTAIN deferrals |
 | make-benchmark-query-tests-hermetic | done | medium | unknown | ✅ Make Benchmark Query Tests Hermetic |
 | make-parquet-default-for-tpcds-obt | done | high | main | Make Parquet the default output format for TPC-DS OBT |
 | make-platform-capabilities-entirely-test-derived | planning | medium | main | Make platform capabilities entirely test-derived |
@@ -1313,6 +1314,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | timing-runtime-wide-monotonic-migration | done | medium-high | main | Migrate runtime elapsed and timeout timing to centralized monotonic clock |
 | todo-add-todo-validation-to-pr-preflight | planning | medium | main | Add a pre-commit hook for validate_todo.py to catch invalid TODO YAML at commit time |
 | todo-backcompat-removal-matrix-formalize | planning | low | main | Decide fate of remove-alpha-backward-compatibility-surface-removal-matrix.md in main/active/ |
+| todo-db-cutover-g5 | planning | medium-high | main | G5: cut over to the DB-backed TODO tracker (freeze & delete legacy) |
 | todo-dep-graph-unblocking-sweep | planning | medium-high | main | Sweep TODO dep graph after each release batch to surface items whose blockers are now in DONE |
 | todo-done-tree-location-convention | planning | low | main | Document and enforce a consistent location convention for items moved to the DONE tree |
 | todo-post-748-capture-status-audit | done | medium-high | main | Audit and update TODO statuses staled by PRs #748-#759 (capture wiring, tpchavoc, output-root) |
