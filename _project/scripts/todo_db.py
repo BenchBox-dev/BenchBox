@@ -24,7 +24,7 @@ the primary, so check-then-act gates serialize against every other writer.
 On sync failure, reads degrade to the stale replica with a banner; writes
 fail loudly (no offline queue, by design).
 
-Spike deviations from the spec DDL (recorded in the spec's spike section):
+Deviations from the spec DDL (recorded in the spec):
 - `items.category` column added (nullable) so the importer is lossless.
 - scope-rule matching uses fnmatch semantics ('*' crosses '/'), which is
   slightly more permissive than the final glob contract.
@@ -2133,7 +2133,7 @@ def _print_work_order(order: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Local-SQLite TODO tracker (spike)")
+    parser = argparse.ArgumentParser(description="Database-backed TODO tracker")
     parser.add_argument(
         "--db",
         help="database path, or libsql://... / https://... URL for the hosted backend"

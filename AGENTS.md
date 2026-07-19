@@ -295,19 +295,24 @@ an unpinned-gate window until the wiring lands separately.
 
 ## Planning & TODOs
 
-TODOs live in `_project/TODO/{worktree}/{phase}/{item}.yaml`; completed items
-move to `_project/DONE/`. Stable `id` is filename slug. Use flat `work[]` with
-`needs` edges; inter-item deps go in `deps.needs`; deferred work goes in
-`deferred[]`.
+TODO state lives in the shared tracker database — there is no `_project/TODO`
+tree. `_project/scripts/todo` is the only write path; the CLI and DB enforce
+every lifecycle rule (exit 2 = fix the cause, don't work around it). Global
+flags `--db`/`--actor` go before the subcommand.
 
-CLI:
+CLI (`_project/scripts/todo`, spec `_project/specs/todo-db-tracker.md`):
 
 ```bash
-uv run --project _project/scripts -- python _project/scripts/todo_cli.py list|show|stats|ready|next|done|check-graph|validate|reindex|cleanup
+# read
+_project/scripts/todo ready|list|show|stats|deps|lint|export|check-scope
+# lifecycle (write; feature/pool worktrees per write policy)
+_project/scripts/todo create|claim|start|done|defer|promote|dismiss|complete|drop|block|unblock|verify
 ```
 
-Indexes under `_project/{TODO|DONE}/_indexes/` are generated. Guardrails:
-`must_preserve`, `approach`, `anti_patterns`, `verification`, `scope_limit`.
+`todo claim <id>` prints the work order — scope globs, `must_preserve`,
+`anti_patterns`, `verification` ladder, ready units, deferrals — follow it;
+`todo lint <id>` runs the mechanical quality checks. The database is the only
+record; never write tracker state to files.
 
 ## Reuse anchors
 
@@ -325,8 +330,10 @@ Add anchors as patterns are extracted.
 
 ## Skills & Workflow
 
-High-level wrappers remain stable: `code`, `test`, `todo`, `blog`, `docs`,
-`benchbox-workflow`, `skill-sync`, `tidy-perms`. Preserve action names and
+High-level wrappers remain stable: `code`, `test`, `todo`, `todo-db`, `blog`,
+`docs`, `benchbox-workflow`, `skill-sync`, `tidy-perms`. `todo` now does
+idea->spec authoring only; `todo-db` owns all tracker actions. Preserve action
+names and
 triggers. Review-shaped actions are read-only except local capture;
 write-shaped actions require research, verification, explicit-path commit, and
 push when authorized.
