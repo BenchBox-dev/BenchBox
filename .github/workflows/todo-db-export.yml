@@ -21,6 +21,19 @@ name: TODO DB weekly export
 # Until both secrets exist the scheduled run fails loudly and opens the incident
 # issue -- intentional: a silently non-exporting provenance job is worse than a
 # noisy one.
+#
+# Auto-merge requires a THIRD secret (optional but needed for hands-free weekly
+# landings):
+#   3. TODO_EXPORT_PR_TOKEN = a fine-grained PAT (this repo; contents +
+#      pull-requests: write) or a GitHub App installation token.
+# Rationale: GitHub deliberately does NOT trigger workflows for events raised by
+# the built-in GITHUB_TOKEN, so a PR opened/pushed with it never runs pr.yml and
+# its required `ci-required-result` check never reports -- auto-merge would wait
+# forever. A non-GITHUB_TOKEN identity makes pr.yml run so the check reports and
+# auto-merge completes. Without this secret the workflow still runs and opens the
+# snapshot PR, but leaves it for MANUAL merge (and says so) instead of enabling a
+# stuck auto-merge. This mirrors why sync-results-data-to-published uses a
+# human-merged PR rather than GITHUB_TOKEN auto-merge.
 
 on:
   schedule:
@@ -45,7 +58,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      # Issue/label/incident steps use the built-in token (it has issues:write
+      # via `permissions` below; a fine-grained PR token may not). PR creation +
+      # branch push use TODO_EXPORT_PR_TOKEN when set (checkout `token:` and a
+      # step-level GH_TOKEN override) so pr.yml fires and ci-required-result
+      # reports -- see header.
       GH_TOKEN: ${{ github.token }}
+      PR_TOKEN_SET: ${{ secrets.TODO_EXPORT_PR_TOKEN != '' }}
       EXPORT_DIR: _project/todo-db-export
       SNAPSHOT_BRANCH: chore/todo-db-export-snapshot
       INCIDENT_LABEL: incident:todo-export-failed
@@ -56,6 +75,10 @@ jobs:
         with:
           ref: develop
           fetch-depth: 0
+          # Persist this token for the branch push: a push authored by the
+          # built-in token would not trigger pr.yml on the PR's synchronize
+          # event either, so the reuse path needs the same identity as creation.
+          token: ${{ secrets.TODO_EXPORT_PR_TOKEN || github.token }}
 
       - name: Require DB secrets
         env:
@@ -152,6 +175,9 @@ jobs:
 
       - name: Open or reuse auto-merging PR
         if: steps.diff.outputs.changed == 'true'
+        env:
+          # Author the PR as the PR token (when set) so pr.yml runs for it.
+          GH_TOKEN: ${{ secrets.TODO_EXPORT_PR_TOKEN || github.token }}
         run: |
           set -euo pipefail
           existing="$(gh pr list --base develop --head "${SNAPSHOT_BRANCH}" --state open --json number --jq '.[0].number // empty')"
@@ -175,9 +201,16 @@ jobs:
             gh pr edit "${existing}" --body-file "${body_file}"
             echo "Reusing PR #${existing} (${url})"
           fi
-          # Backstop for auto-merge-on-open.yml (this path is not soundness-critical).
-          gh pr merge --auto --squash "${url}" \
-            || echo "auto-merge enablement deferred to auto-merge-on-open.yml"
+          # Only enable auto-merge when the PR was authored by a token that
+          # triggers pr.yml. With the built-in GITHUB_TOKEN, ci-required-result
+          # never runs, so enabling auto-merge would leave the PR stuck
+          # "waiting for status" forever; leave it for manual merge and say so.
+          if [ "${PR_TOKEN_SET}" = "true" ]; then
+            gh pr merge --auto --squash "${url}" \
+              || echo "::warning::auto-merge enable failed; merge ${url} manually"
+          else
+            echo "::warning::TODO_EXPORT_PR_TOKEN not set — ${url} was authored by GITHUB_TOKEN, so pr.yml/ci-required-result will not run and auto-merge cannot complete. Merge it manually, or provision TODO_EXPORT_PR_TOKEN (see workflow header) for hands-free weekly landings."
+          fi
 
       - name: Alert on failure
         if: failure()

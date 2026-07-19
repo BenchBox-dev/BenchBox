@@ -15,6 +15,12 @@ safe-content:
   - "_project/notes/**"
   - "_project/research/**"
   - "_project/planning/**"
+  # Deterministic machine-generated tracker export snapshot (written weekly by
+  # .github/workflows/todo-db-export.yml). Data, not authored prose, so it is
+  # deliberately safe-content but NOT content-guard: routing generated files
+  # through markdownlint --fix would let a future generated table stick the
+  # weekly auto-merge PR with no author to fix it.
+  - "_project/todo-db-export/**"
   - "_blog/**.md"
   - "_blog/**.rst"
   - "_blog/**.png"
