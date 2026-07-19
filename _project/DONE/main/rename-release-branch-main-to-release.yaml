@@ -2,7 +2,8 @@ id: rename-release-branch-main-to-release
 title: "Rename the release branch main->release (Decision B of the branching-strategy review)"
 worktree: main
 priority: Medium
-status: "In Progress"
+status: "Completed"
+completed_date: "2026-07-19"
 category: "Release Tooling"
 
 description: |
@@ -100,7 +101,24 @@ work:
   - id: w6
     summary: "ADMIN: rename branch + recreate ruleset"
     needs: [w1, w2, w3]
-    status: pending
+    status: done
+    completion: |
+      DONE 2026-07-19. In-repo work (w1-w5) merged via PR #1114. Admin flip
+      executed by the maintainer:
+      - `branches/main/rename -f new_name=release` — refs/heads/release now
+        exists at the former main HEAD (7550c423); main is gone (GitHub
+        redirect covers old URLs / retargets PRs).
+      - Recreated the ruleset as `release-only` (id 19149459) on
+        refs/heads/release, then deleted the stale `main-release-only`
+        (id 15611783). Verified live-vs-target match: target=branch,
+        ref=[refs/heads/release], enforcement=active, checks=[validate-base,
+        release-required-result], rules=[pull_request, required_status_checks,
+        required_linear_history, non_fast_forward, deletion], bypass_actors=[].
+      - repo-admin-settings.md needed no id edit: the `release-only` section
+        uses a `<release-ruleset-id>` placeholder ("ruleset id varies; list and
+        inspect"), and nothing in Makefile/scripts hard-codes the old id.
+      - Verified-safe unchanged: PyPI trusted publishing (repo + release.yml
+        filename + pypi env), GitHub Pages (deploy-pages).
     notes: |
       `gh api -X POST repos/joeharris76/BenchBox/branches/main/rename
       -f new_name=release` (GitHub redirects old URLs, retargets open PRs).
