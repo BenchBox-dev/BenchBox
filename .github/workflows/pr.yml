@@ -135,31 +135,6 @@ jobs:
           fi
           uv run -- pre-commit run markdownlint --files "${existing_markdown_paths[@]}"
 
-      - name: Validate TODO graph
-        shell: bash
-        run: |
-          if [ ! -s .ci-paths/todo.txt ]; then
-            echo "No TODO/DONE YAML paths changed."
-            exit 0
-          fi
-          while IFS= read -r todo_path; do
-            if [ ! -e "$todo_path" ]; then
-              echo "Skipping deleted TODO/DONE path: $todo_path"
-              continue
-            fi
-            uv run --project _project/scripts -- python _project/scripts/validate_todo.py "$todo_path"
-          done < .ci-paths/todo.txt
-          uv run --project _project/scripts -- python _project/scripts/todo_cli.py check-graph
-
-      - name: Validate executable TODO docs
-        shell: bash
-        run: |
-          if [ ! -s .ci-paths/todo.txt ]; then
-            echo "No TODO/DONE YAML paths changed."
-            exit 0
-          fi
-          uv run -- python -m pytest tests/unit/test_todo_executable_docs.py -q
-
       - name: Validate docs references
         shell: bash
         run: |

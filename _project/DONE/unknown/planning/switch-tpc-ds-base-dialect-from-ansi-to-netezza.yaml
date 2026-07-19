@@ -1,9 +1,0 @@
-id: switch-tpc-ds-base-dialect-from-ansi-to-netezza
-title: Switch TPC-DS Base Dialect from ANSI to Netezza ✅ │
-category: '"Technical Debt & Refactoring"'
-sections:
-  Notes: │        with production code
-worktree: unknown
-priority: Medium
-status: Completed
-description: │        with production code

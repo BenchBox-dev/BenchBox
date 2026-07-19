@@ -38,7 +38,7 @@ def test_pattern_matches_directory_recursive() -> None:
 
 
 def test_safe_content_only_for_todo(rules: dict[str, list[str]]) -> None:
-    decision = classify_paths(["_project/TODO/main/foo.yaml"], rules)
+    decision = classify_paths(["_project/blind-spots/foo.md"], rules)
     assert decision["safe_content_only"] is True
     assert decision["needs_code_ci"] is False
     assert decision["content_guard_needed"] is True
@@ -136,7 +136,7 @@ def test_classify_does_not_treat_deleted_code_as_safe(
 
 def test_safe_content_only_when_truly_content(rules: dict[str, list[str]]) -> None:
     decision = classify_paths(
-        ["_project/TODO/main/foo.yaml", "docs/development/foo.md", "README.md"],
+        ["_project/blind-spots/foo.md", "docs/development/foo.md", "README.md"],
         rules,
     )
     assert decision["safe_content_only"] is True
