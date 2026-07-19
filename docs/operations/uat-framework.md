@@ -18,7 +18,7 @@ developer guide for hacking on the framework itself is
 | Smoke a single cell | `make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01` |
 | Stress preset (one scale, no validate/package/explorer) | `make uat-stress` |
 | Stress, single platform / benchmark | `make uat-stress PLATFORM=duckdb BENCHMARK=tpch` |
-| Full sweep from a config | `make uat-sweep CONFIG=tests/uat/configs/uat-2026-05-02.yaml` |
+| Full sweep from a config | `make uat-sweep CONFIG=tests/uat/configs/uat-tuned-followup-20260505.yaml` |
 | Validate a directory of bundles | `make uat-validate RESULTS_DIR=<dir> OUTPUT_TSV=<path>` |
 | Package staged bundles via terminal-state YAML | `make uat-package CONFIG=<path> SUBMISSIONS_DIR=<path> RESULTS="r1.json r2.json"` |
 | Explorer build + Playwright smoke | `make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path>` |
@@ -384,7 +384,7 @@ location:
 New sweeps clone a template:
 
 ```bash
-cp tests/uat/configs/uat-2026-05-02.yaml tests/uat/configs/uat-<new>.yaml
+cp tests/uat/configs/stress-default.yaml tests/uat/configs/uat-<new>.yaml
 # edit `name:`, then run `make uat-sweep CONFIG=tests/uat/configs/uat-<new>.yaml`
 ```
 

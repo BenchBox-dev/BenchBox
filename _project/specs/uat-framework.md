@@ -72,8 +72,14 @@ group, no validate/package/explorer phases).
   Databricks, ClickHouse Cloud) — deferred to a separate
   `uat-framework-cloud-platforms` TODO if/when the explorer's cloud
   facets are ready.
-- Throughput-phase coverage — the 2026-05-02 sweep ran load,power
-  only; throughput multiplies wall-clock cost.
+- ~~Throughput-phase coverage~~ — **shipped** (`throughput-uat-and-ci-coverage`):
+  `tests/uat/throughput.py`, `execute.official`/`execute.streams`/
+  `execute.seed`, and a `throughput` segment in `execute.phases_arg` route
+  to `benchbox run-official --streams N` (the only CLI surface that honors
+  N>1 concurrent streams; see `tests.uat.matrix.benchbox_run_official_argv`).
+  Nightly-only in practice — `tests/uat/configs/uat-throughput-duckdb-nightly.yaml`
+  run from `.github/workflows/nightly.yml` — because multi-stream cells
+  multiply wall-clock cost; not part of the default fast-lane matrix.
 - A `benchbox uat` CLI subcommand — UAT is a project-developer
   concern, `benchbox` is a project-user concern. `make` targets are
   the developer entrypoint for `worktree-*`, `blind-spots-*`,
@@ -91,6 +97,12 @@ tests/uat/
 ├── timeouts.py                    # signal-based timeout wrapper
 ├── cleanup.py                     # reuse-aware datagen/databases cleanup
 ├── docker_assets.py               # UAT-owned Docker compose lifecycle helpers
+├── docker_cleanup.py              # Docker-engine teardown/recovery (make uat-docker-cleanup)
+├── container_cleanup.py           # Apple `container`-engine teardown/recovery sibling
+├── artifact_hygiene.py            # local-artifact hygiene guard (make uat-artifact-hygiene)
+├── cells_io.py                    # cells.jsonl + accounting-sidecar codec
+├── gate_summary.py                # uat_gate_summary.json evidence artifact (make uat-gate-check)
+├── throughput.py                  # multi-stream throughput/concurrent cell support
 ├── ladder.py                      # scale-ladder + early-stop logic
 ├── phases/
 │   ├── __init__.py
@@ -103,59 +115,67 @@ tests/uat/
 │   └── report.py                  # TSV roll-up + cross-scale coverage assertion
 ├── orchestrator.py                # composes phases per YAML phases: list (uat-sweep entry point)
 ├── configs/                       # tracked YAML configs
-│   ├── README.md                  # content policy (historical vs editable)
+│   ├── README.md                  # content policy (template vs historical vs generated-shard)
 │   ├── uat-2026-05-02.yaml        # historical replay (W10 deliverable)
-│   └── stress-default.yaml        # canned preset for `make uat-stress` (W9 deliverable)
+│   ├── stress-default.yaml        # canned preset for `make uat-stress` (W9 deliverable)
+│   └── generated-rerun-shards/    # generated/frozen operator rerun evidence, not templates
 └── test_*.py                      # fast-test coverage (port maps, ladder pruning, schema, etc.)
 ```
 
 **Responsibility split.**
 
-| Module | Responsibility | Lines (est.) | Actual (2026-06-01) |
+| Module | Responsibility | Lines (est.) | Actual (2026-07-19) |
 |---|---|---|---|
 | `__init__.py` | UAT package marker and documentation string | — | 6 |
-| `matrix.py` | Registry-driven benchmark enumeration, platform grouping, compose-derived TCP reachability probe (connection facts now owned by `docker_assets`) | 250 | 384 |
-| `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path; submit classification via shared `benchbox.core.results.submit_classification` | 120 | 265 |
-| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 578 |
-| `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 556 |
-| `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 | 130 |
+| `matrix.py` | Registry-driven benchmark enumeration, platform grouping, compose-derived TCP reachability probe (connection facts now owned by `docker_assets`) | 250 | 511 |
+| `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path; submit classification via shared `benchbox.core.results.submit_classification` | 120 | 353 |
+| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 741 |
+| `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 756 |
+| `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 | 123 |
 | `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 | 121 |
 | `compatibility.py` | Platform/benchmark compatibility rules; record compatibility-pruned cells with rule metadata | — | 198 |
-| `docker_assets.py` | Single connection registry: compose-file map, compose-derived host ports + platform options, safe project-scoped compose commands | 180 | 504 |
-| `docker_cleanup.py` | Docker stack teardown at platform boundaries; project-scoped down/volume handling | — | 372 |
+| `docker_assets.py` | Single connection registry: compose-file map, compose-derived host ports + platform options, safe project-scoped compose commands | 180 | 751 |
+| `docker_cleanup.py` | Docker stack teardown at platform boundaries; project-scoped down/volume handling | — | 426 |
+| `container_cleanup.py` | Apple `container`-engine sibling of `docker_cleanup.py`; backs `make uat-docker-cleanup ENGINE=container` | — | 557 |
+| `artifact_hygiene.py` | Local-artifact hygiene guard: flags worktree-local `benchmark_runs/` growth when an external output root is configured; report-only (`make uat-artifact-hygiene`) | — | 282 |
+| `cells_io.py` | `cells.jsonl` + accounting-sidecar read/write codec; single schema shared by `orchestrator.py` and `_cli.py` | — | 279 |
+| `gate_summary.py` | Writes/reads the versioned `uat_gate_summary.json` per-sweep evidence artifact; powers `make uat-gate-check` cross-stage aggregation | — | 274 |
+| `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — | 293 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 | 83 |
-| `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 216 |
+| `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 236 |
 | `phases/__init__.py` | UAT phase package marker and phase contract documentation string | — | 17 |
-| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 407 |
-| `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 | 137 |
-| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 | 751 |
-| `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 | 303 |
-| `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; for `draft-pr`/`merged-to-published-results`, open PR vs `published-results` (auto-merge per state) | 130 | 170 |
-| `phases/explorer_smoke.py` | Branch-presence-guarded explorer smoke: always-on corpus contract, delegates build+Playwright to the Results Explorer | 60 | 356 |
-| `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 | 273 |
-| `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 | 649 |
+| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 451 |
+| `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 | 269 |
+| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 | 985 |
+| `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 | 304 |
+| `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; `draft-pr`/`merged-to-published-results` are **stubs** (dispatcher only, per `PR_STUB_TERMINAL_STATES`) that emit the same argv as `local-stage` plus an operator warning -- PR-opening to `published-results` is not implemented | 130 | 170 |
+| `phases/explorer_smoke.py` | Branch-presence-guarded explorer smoke: always-on corpus contract, delegates build+Playwright to the Results Explorer | 60 | 387 |
+| `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 | 450 |
+| `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 | 751 |
 
-**Budget reconciliation (revised 2026-06-01, `uat-loc-budget-reconciliation`).**
-Original estimate: ~1,500 LOC across 13 modules. Measured actual: **~6,476
-production LOC across 21 modules** (+ ~5,730 test LOC, ~1,729 YAML). The ~4.3×
-gap is undercounting of chartered surface, not bloat — it has two causes:
+**Budget reconciliation (revised 2026-06-01, `uat-loc-budget-reconciliation`; re-measured
+2026-07-19, `uat-config-schema-spec-realignment`).**
+Original estimate: ~1,500 LOC across 13 modules. 2026-06-01 measured actual: ~6,476
+production LOC across 21 modules (+ ~5,730 test LOC, ~1,729 YAML) — see that
+reconciliation's own causes (four unlisted modules, under-estimated phases/plumbing).
 
-- **Unlisted modules (~1,342 LOC).** The original table omitted four real
-  modules entirely: `_cli.py` (556), `docker_cleanup.py` (372),
-  `preflight_budget.py` (216), `compatibility.py` (198).
-- **Under-estimated phases/plumbing.** The six-phase pipeline plus the
-  orchestration/config/CLI layer ran larger than the per-module guesses
-  (e.g. `execute.py` 220→751, `orchestrator.py` 100→649, `config.py` 180→578).
+**2026-07-19 re-measurement.** Five modules landed since 2026-06-01 —
+`artifact_hygiene.py` (282), `cells_io.py` (279), `container_cleanup.py` (557),
+`gate_summary.py` (274), `throughput.py` (293), all in-charter (artifact
+hygiene, gate evidence, and throughput are release-gate-orchestration
+deliverables; `cells_io.py`/`container_cleanup.py` are refactors that gave
+existing inline logic its own module). Measured actual: **~9,774 production
+LOC across 26 modules** (+ ~10,806 test LOC, ~1,880 YAML). Per-bucket actuals:
+plumbing (orchestrator/config/`_cli`) 2,248; core exercise
+(execute/matrix/runner/enumerate/cleanup/ladder) 2,322; preflight/compat/timeouts
+1,008; Docker lifecycle (default-OFF, incl. `container_cleanup.py`) 1,734;
+chartered evidence artifacts (validate/report/package/cells_io/gate_summary)
+1,477; explorer-prep 387; throughput 293; artifact hygiene 282; package init
+markers 23. The chartered scope is "release-gate orchestration" (§10) —
+evidence artifacts, the six phases, Docker lifecycle, and throughput are all
+in-charter, so the load-bearing buckets remain non-discretionary.
 
-Per-bucket actuals: plumbing (orchestrator/config/`_cli`) 1,783; core exercise
-(execute/matrix/runner/enumerate/cleanup/ladder) 1,741; preflight/compat/timeouts
-951; Docker lifecycle (default-OFF) 876; chartered evidence artifacts
-(validate/report/package) 746; explorer-prep 356; package init markers 23.
-The chartered scope is "release-gate orchestration" (§10) — evidence artifacts,
-the six phases, and the Docker lifecycle are all in-charter, so the
-load-bearing buckets are not discretionary cuts.
-
-Revised budget: **~6,500 production LOC across ~21 modules + tests**, reviewed
+Revised budget: **~9,800 production LOC across ~26 modules + tests**, reviewed
 per-bucket above rather than against a single aggregate number.
 
 ## 3. YAML config schema
@@ -179,7 +199,10 @@ phases:                          # required, list[str]. Order matters.
   - explorer_smoke
   - report
 # Allowed: preflight, execute, validate, package, explorer_smoke, report.
-# Stress preset omits validate/package/explorer_smoke.
+# Stress preset omits validate/package/explorer_smoke. Entries must be a
+# subsequence of that canonical order (the orchestrator walks `phases:`
+# literally, not reordered) and must not repeat -- both rejected at load
+# time (see "Schema enforcement" below).
 
 dry_run: false                   # optional, bool, default false. When
                                  # true, every phase prints what it
@@ -211,7 +234,10 @@ scales:
   override: null                 # optional, float|null. When set, uses
                                  # this single scale per cell (matches
                                  # bash --scale override). Mutually
-                                 # exclusive with rungs.
+                                 # exclusive with rungs -- explicitly
+                                 # setting both is rejected at load time.
+                                 # Rung/override entries must be numbers;
+                                 # a bool (e.g. `rungs: [true]`) is rejected.
 
 # Execution -------------------------------------------------------------
 execute:
@@ -224,9 +250,15 @@ execute:
   early_stop_on_failure: true    # optional, bool, default true. Prune
                                  # higher rungs on any non-zero exit.
   phases_arg: "load,power"       # optional, str, default "load,power".
-                                 # Passed as --phases to benchbox run.
+                                 # Passed as --phases to benchbox run (or
+                                 # run-official when official: true). Must
+                                 # be a string -- a list (e.g. `[load]`) is
+                                 # rejected rather than str()-coerced.
   compression: null              # optional, str|null. Passed as
                                  # --compression when set.
+  extra_args: []                 # optional, list[str], default []. Extra
+                                 # argv appended verbatim after every other
+                                 # flag (e.g. `["--tuning", "tuned"]`).
   skip_unreachable: true         # optional, bool, default true. TCP
                                  # probe failures are skipped, not
                                  # counted as failures.
@@ -234,6 +266,19 @@ execute:
                                  # rejected at validation time. UAT W3
                                  # line 222: parallel platforms
                                  # contaminate timings.
+  official: false                # optional, bool, default false. When
+                                 # true, cells run via `benchbox
+                                 # run-official --streams N` instead of
+                                 # `benchbox run` -- see tests.uat.throughput.
+                                 # Requires scales.rungs to be TPC-compliant
+                                 # scale factors.
+  streams: null                  # optional, int|null. Concurrent stream
+                                 # count for run-official. Requires
+                                 # official: true; required (non-null) when
+                                 # official: true and phases_arg includes
+                                 # "throughput".
+  seed: null                     # optional, int|null. Passed as --seed to
+                                 # run-official when set.
 
 cleanup:
   preserve_datagen: true         # optional, bool, default true. Reserved
@@ -284,6 +329,17 @@ preflight:
   noisy_neighbor_warn_load: 8.0  # optional, float, default 8.0. Host
                                  # 1-min load average above this prints
                                  # a warning but does not abort.
+  local_platforms_check: false   # optional, bool, default false. When
+                                 # true, preflight probes every requested
+                                 # platform before the sweep starts instead
+                                 # of deferring to per-cell reachability
+                                 # skips: automated platforms get one
+                                 # `make uat-bring-up` attempt, non-automated
+                                 # ones abort preflight with an
+                                 # operator-facing message. Default false
+                                 # preserves the historical behaviour
+                                 # (unreachable platforms become
+                                 # execute-phase skipped_unreachable cells).
 
 # Disk-budget estimate --------------------------------------------------
 # `tests/uat/data/disk_budget_table.tsv` is an advisory, checked-in
@@ -314,11 +370,17 @@ package:
                                          # enabled. One of:
                                          #   local-stage,
                                          #   cloud-uploaded,
-                                         #   draft-pr,
-                                         #   merged-to-published-results.
+                                         #   draft-pr,          (STUB -- see below)
+                                         #   merged-to-published-results. (STUB)
   service: null                          # optional, str|null. Required
                                          # when state=cloud-uploaded;
                                          # passed as --service.
+# draft-pr/merged-to-published-results are accepted vocabulary (the
+# submit_terminal_state validation treats them as valid states) but the
+# package phase's PR-opening behavior for them is UNIMPLEMENTED --
+# `tests/uat/phases/package.py` dispatches both to the same argv as
+# local-stage and prints an operator warning naming the config that any
+# result submitted this way is a local stage, not a published-results PR.
 
 # Explorer smoke phase --------------------------------------------------
 explorer_smoke:
@@ -341,8 +403,27 @@ report:
                                                 # methodology spec
                                                 # Finding 1 scoping.
 
+# Compatibility phase ----------------------------------------------------
+compatibility:
+  release_gate_runtime_envelopes: false  # optional, bool, default false.
+                                         # When true, includes cells that
+                                         # `tests/uat/compatibility.py`
+                                         # would otherwise prune purely for
+                                         # runtime-envelope reasons (e.g. a
+                                         # slow-but-correct PostgreSQL-family
+                                         # cell) -- used by the diagnostic
+                                         # `uat-enabled-platforms-full`-style
+                                         # sweeps, not the default matrix.
+
 # Output paths ----------------------------------------------------------
 output:
+  benchmark_runs_dir_template: "~/Developer/benchmark_runs"
+                                       # optional, str, default
+                                       # "~/Developer/benchmark_runs". Root
+                                       # for datagen/, databases/, results/
+                                       # (BENCHBOX_OUTPUT_DIR for every
+                                       # `benchbox run` subprocess); distinct
+                                       # from logs_dir_template below.
   logs_dir_template: "~/Developer/benchmark_runs/logs/uat_{date}_{time}"
                                        # optional, str. {date} expands
                                        # to YYYYMMDD, {time} to HHMMSS,
@@ -365,16 +446,34 @@ output:
 
 | Rule | Effect |
 |---|---|
+| Unknown field in any section (root or nested) | Validation error at load time |
 | `phases:` references unknown phase | Validation error at load time |
+| `phases:` contains a duplicate entry | Validation error at load time |
+| `phases:` entries out of canonical order (e.g. `report` before `execute`) | Validation error at load time |
 | `parallel_platforms: true` | Validation error (UAT W3 line 222) |
-| `package` in `phases:` without `package.submit_terminal_state` | Validation error |
-| `package.submit_terminal_state` not in 4-word vocab | Validation error |
-| `submit_terminal_state: cloud-uploaded` without `service:` | Validation error |
-| `scales.rungs` and `scales.override` both set | Validation error |
-| `cross_scale_coverage_min_pairs` set but `report` not in phases | Validation error |
+| `package` in `phases:` without `package.submit_terminal_state` | Validation error, **only when `package` is in `phases:`** |
+| `package.submit_terminal_state` not in 4-word vocab | Validation error, **only when `package` is in `phases:`** |
+| `submit_terminal_state: cloud-uploaded` without `service:` | Validation error, **only when `package` is in `phases:`** |
+| `scales.rungs` explicitly set together with `scales.override` | Validation error |
+| `scales.rungs`/`scales.override` entries are bool | Validation error (bool is an int subclass; would otherwise silently coerce, e.g. `rungs: [true]` -> `1.0`) |
+| `execute.phases_arg` not a string (e.g. a list) | Validation error (would otherwise `str()`-coerce to a nonsense value) |
+| `output.*_template` not a string (e.g. a mapping) | Validation error (same str()-coercion hazard) |
 | `validator_clean_rate_floor` outside `[0.0, 1.0]` | Validation error |
 | `preflight.free_space_min_gib` <= 0 | Validation error |
 | `preflight` not in `phases:` but `preflight.free_space_min_gib` set | Validation warning (telemetry-only run) |
+| `platforms.include` / `benchmarks.include` entry absent from the registry | **Not** a `ConfigError` — `resolve_platforms`/`resolve_benchmarks` silently drop the id, and `enumerate_cells_with_pruning` records a visible `pruned-registry` accounting row per dropped platform/benchmark (see Section 10's compatibility-pruning note and `tests.uat.matrix.missing_platforms_from_include`/`missing_benchmarks_from_include`) |
+
+Three of the `package:` rules above are conditioned on phase membership
+(not on the section merely being present) so that a stale `package:`
+block on a config that never runs the `package` phase does not block
+loading — mirroring the existing `preflight` leniency in the last row.
+
+**Not currently enforced.** `report.cross_scale_coverage_min_pairs` set
+while `report` is absent from `phases:` is inert (the floor is simply
+never evaluated, since the report phase that would check it never runs)
+rather than a `ConfigError`. This differs from earlier drafts of this
+spec, which claimed it as a validation error; no code path ever
+implemented that check.
 
 **Default-off teeth.** Per the methodology spec's Finding 1 scoping,
 `cross_scale_coverage_min_pairs` defaults `null` (no enforcement).
@@ -382,17 +481,25 @@ Sweep authors opt in explicitly.
 
 ## 4. Make targets
 
+Args below are the real Makefile signatures (`Makefile` targets `uat-*`);
+`[...]` marks an optional make-var.
+
 | Target | Args | Purpose |
 |---|---|---|
-| `make uat-cell` | `PLATFORM=`, `BENCHMARK=`, `SCALE=` | Single-cell execution. Smallest debugging unit. (W3) |
-| `make uat-execute` | `CONFIG=` | Full execute phase: enumerate + ladder + cleanup. Stops after report. (W4) |
-| `make uat-validate` | `RESULTS_DIR=` | Standalone validate phase against an existing results dir. (W5) |
-| `make uat-package` | `CONFIG=` | Standalone package phase. Reads `submit_terminal_state` from YAML. (W6) |
-| `make uat-explorer-smoke` | `RESULTS_DIR=` | Standalone explorer build + Playwright. (W7) |
-| `make uat-report` | `LOGS_DIR=` | Standalone TSV roll-up. (W8) |
-| `make uat-sweep` | `CONFIG=` (and optional `DRY_RUN=1`) | Full sweep: walks `phases:` list. (W9) |
+| `make uat-cell` | `PLATFORM= BENCHMARK= SCALE=` `[PHASES=] [COMPRESSION=] [TIMEOUT_S=] [LOG_DIR=]` | Single-cell execution. Smallest debugging unit. (W3) |
+| `make uat-execute` | `CONFIG=` `[DATABASES_ROOT=] [NO_CLEANUP=1]` | Full execute phase: enumerate + ladder + cleanup. Stops after report. (W4) |
+| `make uat-validate` | `RESULTS_DIR= OUTPUT_TSV=` `[FLOOR=0.80]` | Standalone validate phase against an existing results dir. (W5) |
+| `make uat-package` | `CONFIG= SUBMISSIONS_DIR= RESULTS="r1.json r2.json ..."` | Standalone package phase. Reads `submit_terminal_state` from YAML. (W6) |
+| `make uat-explorer-smoke` | `BUNDLES_DIR= OUTPUT_DIR= LOG_DIR=` `[BROWSERS=chromium]` | Standalone explorer build + Playwright. (W7) |
+| `make uat-report` | `CELLS_JSONL= OUTPUT_TSV=` `[RUNGS=0.01,0.1,1.0] [CROSS_SCALE_FLOOR=N]` | Standalone TSV roll-up. (W8) |
+| `make uat-sweep` | `CONFIG=` `[DRY_RUN=1]` | Full sweep: walks `phases:` list. (W9) |
 | `python -m tests.uat._cli preflight` | `--config <path>` | Advisory disk-budget estimate plus current preflight status. |
-| `make uat-stress` | `PLATFORM=`, `BENCHMARK=`, `SCALE=` (all optional) | Canned preset for framework-owned stress-test use. (W9) |
+| `make uat-stress` | `[PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]` | Canned preset for framework-owned stress-test use. (W9) |
+| `make uat-artifact-hygiene` | `[OUTPUT=<root>] [THRESHOLD_BYTES=N]` | Local-artifact hygiene guard: no-op unless an external output root is configured; report-only. Wired into `make pr-preflight`. |
+| `make uat-bring-up` | `PLATFORM=` `[TIMEOUT_S=300] [DRY_RUN=1] [BENCHMARK_RUNS_DIR=]` | Bring up one Docker-managed platform in isolation and probe health (measure-then-set `docker_start_timeout_s`). |
+| `make uat-prepull` | `PLATFORM=` `[PREPULL_TIMEOUT_S=900] [DRY_RUN=1]` | Pull/build a platform's compose images ahead of a sweep (no health probe); shares `uat-bring-up`'s platform validation. |
+| `make uat-docker-cleanup` | `[ENGINE=docker\|container] [MODE=owned\|images\|max] [APPLY=1] [PREFIX=benchbox-uat]` | Interrupted-run recovery: inventories (default) or removes (`APPLY=1`) UAT-owned compose resources. |
+| `make uat-gate-check` | `STAGE1= STAGE2= STAGE3=` `[OUTPUT=<path>]` | Aggregates the three release-gate stage `uat_gate_summary.json` files into the combined APPROVE/HOLD evidence file (landed PR #1162). |
 
 **Invocation contract.**
 
@@ -428,12 +535,26 @@ uat-sweep`, etc.) do not honour these env vars; they read the
 YAML config verbatim. The override mechanism is specific to the
 canned stress preset.
 
-**No `benchbox` CLI surface change.** UAT follow-up work must not change
-user-visible `benchbox` commands, options, or the `benchbox submit`
-command signature. This is enforced by
-`tests/uat/test_no_cli_surface_drift.py`, which permits only the
-internal `benchbox/cli/commands/submit.py` validator refactor and fails
-on click command/option or submit signature drift.
+**No `benchbox` CLI surface change (weaker than originally chartered).**
+UAT follow-up work must not change user-visible `benchbox` commands or
+options. This was originally enforced by
+`tests/uat/test_no_cli_surface_drift.py` failing on any click
+command/option/argument/group decorator change plus a `submit()`/`run()`
+signature diff, with only the internal `submit.py` validator refactor
+allowlisted. That guard has since been loosened by intervening,
+individually-chartered CLI changes: `ALLOWED_INTERNAL_CLI_FILES` now
+allowlists 29 `benchbox/cli/` files (module-level, not decorator-level --
+any change to those files' CLI surface is unchecked), and
+`ALLOWED_HIDDEN_COMPAT_CLI_FILES` (a subset of the above, currently 8
+files including `submit.py` and `run.py`) skips the click-surface AST
+diff entirely for files whose signature was intentionally changed by a
+landed PR (`--funding`/`--notes` on `submit`, `--analyze-plans` on `run`).
+The guard's real, current guarantee: click surface drift is caught only
+for `benchbox/cli/` files **not** in `ALLOWED_INTERNAL_CLI_FILES`, and the
+`submit`/`run`/`convert`/`visualize` signature-diff check
+(`FORBIDDEN_CLI_SURFACE_FUNCTIONS`) only fires for files not in
+`ALLOWED_HIDDEN_COMPAT_CLI_FILES`. It is a drift *tripwire* for
+un-reviewed changes, not a hard freeze on the whole CLI surface.
 
 ## 5. Stress Workflow Retirement
 
@@ -487,33 +608,40 @@ output:
   logs_dir_template: "~/Developer/benchmark_runs/logs/uat_20260502_replay"
 ```
 
-**Structural parity assertion (W10).** The slow-marked test
-`tests/uat/test_replay_2026_05_02.py` runs:
+**Structural parity assertion (W10) — header-only, not a row-count
+replay.** The slow-marked test `tests/uat/test_replay_2026_05_02.py`
+runs the orchestrator in dry-run mode against this config and asserts
+only that `tests.uat.phases.report.REPORT_HEADER` (the live code's
+column list) matches the checked-in fixture
+`tests/uat/fixtures/uat-2026-05-02-matrix-summary-header.tsv` byte-for-byte
+(both currently 13 tab-separated columns, below). The test's own
+docstring is explicit: "This is not a row-count replay." No candidate/
+attempted/pruned cell count from the 2026-05-02 retrospective (1,530
+candidate, 527 attempted, 133 ladder-pruned, 870 reachability-skipped) is
+asserted anywhere in this test — `run_sweep`'s dry-run mode records 0 for
+every phase and never writes the TSV body, so there is nothing to compare
+row counts against. A second fast test,
+`test_replay_config_has_expected_shape`, separately smoke-checks a
+handful of the YAML's own keys (`name`, `scales.rungs`,
+`execute.per_cell_timeout_s`, `execute.early_stop_after_s`,
+`package.submit_terminal_state`, `report.cross_scale_coverage_min_pairs`).
 
-```python
-make uat-sweep CONFIG=tests/uat/configs/uat-2026-05-02.yaml DRY_RUN=1
+```
+platform | benchmark | scale | status | terminal_state | elapsed_s | log_path | result_path | submit_terminal_state | validator_status | source_commit_sha | source_dirty | throughput_check
 ```
 
-and asserts that the dry-run TSV columns and row count match
-`~/Developer/benchmark_runs/logs/uat_20260502/matrix_summary.tsv`
-(within scale-ladder pruning tolerance — the historical retrospective
-reports 1,530 candidate cells, 527 real attempted terminal cells,
-133 ladder-pruned, 870 reachability-skipped). The columns must match
-exactly:
-
-```
-platform | benchmark | scale | status | elapsed_s | log_path | result_path | submit_terminal_state | validator_status
-```
-
-The `submit_terminal_state` column was inserted in PR #247 between
-`result_path` and `validator_status`; the historical fixture
-(`tests/uat/fixtures/uat-2026-05-02-matrix-summary-header.tsv`)
-was bumped at the same time. External consumers parsing the TSV by
-positional index (`awk '{print $8}'`) must move `validator_status`
-from column 8 to column 9 to stay correct.
+The header has grown twice since the original 9-column TSV this section
+once documented: `submit_terminal_state` was inserted in PR #247 between
+`result_path` and `validator_status`, and `terminal_state`,
+`source_commit_sha`, `source_dirty`, `throughput_check` were added later
+(source-provenance and throughput-check plumbing) without a corresponding
+spec update until now. External consumers parsing the TSV by positional
+index must re-derive the column offset from `REPORT_HEADER`
+(`tests/uat/phases/report.py`) rather than trust this document's prior
+9- or 10-column count.
 
 Wall-clock match is impossible (dry-run prints intent without
-invoking benchbox); structural parity is the bar.
+invoking benchbox); structural (header) parity is the bar.
 
 **Historical status.** This config is historical evidence. The file's
 first line includes `# HISTORICAL — record of the 2026-05-02 sweep. Do
@@ -699,6 +827,11 @@ name: "stress-default"
 - The canned `stress-default.yaml` is the canonical example; future
   templates (e.g. a `tpch-only-fast-platforms.yaml`) follow the same
   header convention.
+- `# TEMPLATE` also covers canonical, repeatedly-run operational configs
+  that are edited in place across releases rather than cloned per sweep
+  (e.g. `release-gate-0{1,2,3}-*.yaml`, `uat-enabled-platforms-*.yaml`,
+  `uat-throughput-duckdb-nightly.yaml`) -- the distinguishing trait is
+  "mutable, not a one-shot historical snapshot", not "always cloned".
 
 ### 9.2 Historical replay configs
 
@@ -735,6 +868,15 @@ Section 3): these shards are ordinary sweep configs, not runtime state.
 
 The conceptual policy is "templates are starting points; historical configs and
 generated rerun shards are evidence."
+
+**Enforcement.** `tests/uat/test_config.py::test_top_level_config_carries_recognized_lifecycle_header`
+(uat-config-schema-spec-realignment w4) fails the fast lane if any top-level
+config under `tests/uat/configs/` is missing a recognized `# TEMPLATE` /
+`# HISTORICAL` first line -- this policy is no longer convention-only.
+A companion corpus guard (`test_every_corpus_config_loads_and_enumerates_nonempty`,
+w3) loads and enumerates every checked-in config, including
+`generated-rerun-shards/`, asserting a non-empty cell set and zero unknown
+`platforms.include`/`benchmarks.include` entries.
 
 ## 10. What UAT does NOT assert
 

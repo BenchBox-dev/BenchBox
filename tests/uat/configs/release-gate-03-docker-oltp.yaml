@@ -1,3 +1,7 @@
+# TEMPLATE — canonical, repeatedly-run release-gate stage config; edited in
+# place across releases (e.g. cross_scale_coverage_min_pairs re-derivation),
+# not cloned per sweep. See _project/specs/uat-framework.md Section 9.
+#
 # Release-gate re-run — STAGE 3 of 3: Docker OLTP stacks.
 #
 # Start ONLY after stages 1 and 2 have fully completed. OLTP stacks run at
@@ -47,6 +51,15 @@ cleanup:
 
 validate:
   validator_clean_rate_floor: 1.0
+
+# `package` was in `phases:` above with no `package:` section -- every
+# release-gate sweep aborted at the package phase with
+# PackagePhaseError("package.submit_terminal_state is required..."),
+# invisible until w1's load-time enforcement caught it
+# (uat-config-schema-spec-realignment). local-stage matches every other
+# checked-in config; PR-opening states are stubs (tests/uat/phases/package.py).
+package:
+  submit_terminal_state: "local-stage"
 
 report:
   matrix_summary_tsv: "matrix_summary.tsv"

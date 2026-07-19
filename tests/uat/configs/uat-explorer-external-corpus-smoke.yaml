@@ -1,3 +1,5 @@
+# TEMPLATE — reusable small smoke sweep for Explorer external-corpus route
+# derivation. See _project/specs/uat-framework.md Section 9.
 name: "uat-explorer-external-corpus-smoke"
 description: "Small UAT run proving Explorer smoke derives routes from packaged result bundles"
 

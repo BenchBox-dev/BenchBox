@@ -135,16 +135,68 @@ PLATFORM_GROUPS: dict[str, tuple[str, ...]] = {
 }
 
 
+def known_platform_ids() -> frozenset[str]:
+    """Full registry-known platform ids UAT's `platforms.include` may name.
+
+    Union of `PlatformRegistry.get_sql_platforms()` and
+    `get_dataframe_platforms()`, plus the `-df` CLI alias suffix for every
+    dataframe-capable platform (`benchbox.cli.platform.PLATFORM_ALIASES`
+    maps e.g. `polars-df` -> `polars`; mirrored here by suffix rather than
+    importing CLI code into the UAT framework). This is the same "true
+    registry" boundary `missing_benchmarks_from_include` uses via
+    `load_benchmarks()` -- broader than any single curated `PLATFORM_GROUPS`
+    bucket, so a real (if UAT-out-of-scope, e.g. a cloud platform) registry
+    id is never flagged, only a genuine typo/removed id.
+    """
+    sql = set(PlatformRegistry.get_sql_platforms())
+    dataframe = set(PlatformRegistry.get_dataframe_platforms())
+    # Guard against ids that already carry the suffix (e.g. `databricks-df`
+    # is registered under both capabilities) so we don't mint spurious
+    # `databricks-df-df` entries.
+    df_aliases = {f"{platform}-df" for platform in dataframe if not platform.endswith("-df")}
+    return frozenset(sql | dataframe | df_aliases)
+
+
+def missing_platforms_from_include(
+    include: Iterable[str],
+    known: Iterable[str] | None = None,
+) -> list[str]:
+    """Return `include` entries naming a platform absent from the registry.
+
+    `resolve_platforms` silently drops `include` entries not in
+    `known_platform_ids()` (mirrors `missing_benchmarks_from_include` /
+    `resolve_benchmarks` for benchmarks) - so a typo'd or removed platform id
+    in a sweep config's `platforms.include` list would otherwise vanish with
+    zero signal before `enumerate_cells_with_pruning` ever sees it. This
+    exposes exactly which requested ids were dropped for that reason,
+    preserving request order and de-duplicating, so callers can turn them
+    into accounting rows instead of a silent drop.
+    """
+    known_set = set(known_platform_ids()) if known is None else set(known)
+    seen: set[str] = set()
+    missing: list[str] = []
+    for platform in include:
+        if platform not in known_set and platform not in seen:
+            seen.add(platform)
+            missing.append(platform)
+    return missing
+
+
 def resolve_platforms(
     groups: Iterable[str] = (),
     include: Iterable[str] = (),
     exclude: Iterable[str] = (),
+    known: Iterable[str] | None = None,
 ) -> list[str]:
     """Resolve a final platform list given group, include, and exclude filters.
 
     Order: groups expanded first (in the order given, deduplicated by first
-    occurrence), then `include` appended, then `exclude` removed.
+    occurrence), then `include` appended, then `exclude` removed. `include`
+    entries absent from `known` (default `known_platform_ids()`) are silently
+    dropped, mirroring `resolve_benchmarks`; use `missing_platforms_from_include`
+    to surface those drops as accounting rows.
     """
+    known_set = set(known_platform_ids()) if known is None else set(known)
     seen: set[str] = set()
     resolved: list[str] = []
     for group in groups:
@@ -155,7 +207,7 @@ def resolve_platforms(
                 seen.add(platform)
                 resolved.append(platform)
     for platform in include:
-        if platform not in seen:
+        if platform in known_set and platform not in seen:
             seen.add(platform)
             resolved.append(platform)
     excluded = set(exclude)

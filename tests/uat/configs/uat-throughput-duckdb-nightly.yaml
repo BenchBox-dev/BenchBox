@@ -1,3 +1,7 @@
+# TEMPLATE — canonical nightly-CI throughput config (.github/workflows/nightly.yml);
+# edited in place, not cloned per sweep. See _project/specs/uat-framework.md
+# Section 9.
+#
 # Nightly-only real acceptance coverage for the throughput/concurrent phase
 # (throughput-uat-and-ci-coverage). Concurrency previously had zero UAT/CI
 # coverage: no config ran a real `throughput` phase, so a regression that
