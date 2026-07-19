@@ -140,6 +140,38 @@ def test_resolve_official_result_path_pg_duckdb_does_not_match_plain_duckdb_file
     assert out is None
 
 
+def test_resolve_official_result_path_matches_multi_token_benchmark(tmp_path: Path):
+    """Regression (C1): registry ids like `tpcds_obt`/`tsbs_devops` split into MULTIPLE
+    `_`-tokens, so a matcher that hardcoded benchmark=token[0]/scale=token[1] shifted every
+    index and returned None for a real `tpcds_obt_sf1_duckdb_sql_*.json` file -- a NEW
+    false-negative worse than the substring false-positive it replaced (a None result
+    downgrades a passing official cell to FAILED). The benchmark must match as a token
+    *prefix sequence*, with scale/platform offsets derived from its length.
+    """
+    results_dir = tmp_path / "results"
+    results_dir.mkdir()
+    started = _dt.datetime.now() - _MTIME_SLACK
+    match = results_dir / "tpcds_obt_sf1_duckdb_sql_20260709_223304_abcdabcd.json"
+    match.write_text("{}", encoding="utf-8")
+    # A pg_duckdb file for the same multi-token benchmark must NOT collide with plain duckdb.
+    (results_dir / "tpcds_obt_sf1_pg_duckdb_sql_20260709_223304_deadbeef.json").write_text("{}", encoding="utf-8")
+    out = resolve_official_result_path(
+        results_dir, platform="duckdb", benchmark="tpcds_obt", started_after=started, scale=1
+    )
+    assert out == match
+
+
+def test_resolve_official_result_path_multi_token_benchmark_without_scale(tmp_path: Path):
+    """The multi-token benchmark prefix + platform-token match holds even when `scale` is omitted."""
+    results_dir = tmp_path / "results"
+    results_dir.mkdir()
+    started = _dt.datetime.now() - _MTIME_SLACK
+    match = results_dir / "tsbs_devops_sf1_duckdb_sql_20260709_223304_abcdabcd.json"
+    match.write_text("{}", encoding="utf-8")
+    out = resolve_official_result_path(results_dir, platform="duckdb", benchmark="tsbs_devops", started_after=started)
+    assert out == match
+
+
 def test_resolve_official_result_path_filters_by_scale_when_given(tmp_path: Path):
     """`scale` (optional, keyword) narrows candidates to the matching sf<N> token."""
     results_dir = tmp_path / "results"

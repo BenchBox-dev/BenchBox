@@ -650,6 +650,7 @@ jobs:
         run: |
           uv run -- python -c "
           import datetime, os, sys
+          from datetime import timezone
           from pathlib import Path
           from tests.uat.throughput import resolve_official_result_path, validate_stream_count
 
@@ -658,9 +659,13 @@ jobs:
           # scale=1 matches uat-throughput-duckdb-nightly.yaml's rung and
           # tightens filename resolution alongside the exact platform-token
           # match (both landed together; see tests/uat/throughput.py).
+          # The capture step writes UTC (date -u); strptime yields a naive
+          # datetime whose .timestamp() would otherwise be read as LOCAL, so
+          # anchor it to UTC explicitly -- correct on any runner TZ, not just
+          # ubuntu-latest's UTC.
           started_after = datetime.datetime.strptime(
               os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
-          )
+          ).replace(tzinfo=timezone.utc)
           results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
           result_path = resolve_official_result_path(
               results_dir,

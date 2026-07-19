@@ -62,22 +62,35 @@ def resolve_official_result_path(
     through, ``benchbox.core.results.filenames.build_result_filename_base``,
     as exercised by the fixtures in ``tests/uat/test_throughput.py``)::
 
-        {benchmark}_{sf<N>}_{platform_token...}_{mode}_{timestamp}[_{execution_id}].json
+        {benchmark...}_{sf<N>}_{platform...}_{mode}_{timestamp}[_{execution_id}].json
 
-    e.g. ``tpch_sf1_duckdb_sql_20260709_223304_0865bb91.json`` splits on
-    ``"_"`` into ``["tpch", "sf1", "duckdb", "sql", "20260709", "223304",
-    "0865bb91"]``. A platform whose normalized form itself contains an
-    underscore (e.g. ``pg-duckdb`` -> ``pg_duckdb``) spans two tokens:
-    ``["tpch", "sf1", "pg", "duckdb", "sql", "20260709"]``.
+    The exporter writes the registry ``benchmark_id`` and the normalized
+    platform name verbatim, and BOTH can themselves contain underscores, so
+    each spans a *variable-length* run of ``"_"``-split tokens rather than a
+    single fixed slot:
 
-    Matching is token-exact, not substring: a candidate's ``"_"``-split stem
-    must start with ``benchmark_token`` at index 0, then (when `scale` is
-    given) the scale-factor token at index 1, then the platform's own
-    tokens filling the following slots in order. This is what stops
-    ``platform="duckdb"`` from matching a ``pg_duckdb`` result file (or the
-    reverse) merely because one platform name is a substring of the other --
-    the old glob-based ``f"..._*{platform_token}*.json"`` pattern had that
-    exact collision.
+    - single-token benchmark, single-token platform --
+      ``tpch_sf1_duckdb_sql_20260709_223304_0865bb91.json`` ->
+      ``["tpch", "sf1", "duckdb", "sql", ...]``
+    - single-token benchmark, two-token platform (``pg-duckdb`` ->
+      ``pg_duckdb``) -- ``tpch_sf1_pg_duckdb_sql_20260709.json`` ->
+      ``["tpch", "sf1", "pg", "duckdb", "sql", ...]``
+    - two-token benchmark (``tpcds_obt``, ``tsbs_devops``, ``tpch_skew``,
+      ``vector_search``, ``*_primitives`` ...) --
+      ``tpcds_obt_sf1_duckdb_sql_20260709.json`` ->
+      ``["tpcds", "obt", "sf1", "duckdb", "sql", ...]``
+
+    Matching is token-exact, not substring. A candidate's ``"_"``-split stem
+    must (1) begin with the benchmark's own token sequence as a prefix, then
+    (2) carry the scale-factor token at index ``len(benchmark_tokens)`` (only
+    *checked* when `scale` is given, but always skipped over so the platform
+    slice lines up), then (3) carry the platform's own token sequence in the
+    slots immediately after. This is what stops ``platform="duckdb"`` from
+    matching a ``pg_duckdb`` result file (or the reverse), and
+    ``benchmark="tpcds_obt"`` from being shifted/rejected -- both of which
+    the old glob-based ``f"{benchmark}_*{platform}*.json"`` pattern got
+    wrong (a false-positive on the platform, a false-negative on the
+    multi-token benchmark).
 
     `scale` is optional and keyword-only for backward compatibility with
     existing callers that don't (yet) pass it; when omitted, the
@@ -89,25 +102,26 @@ def resolve_official_result_path(
     """
     if not results_dir.is_dir():
         return None
-    benchmark_token = benchmark.lower()
+    benchmark_tokens = benchmark.lower().split("_")
     platform_tokens = platform.lower().replace("-", "_").split("_")
     scale_token = format_scale_factor(scale) if scale is not None else None
+    scale_idx = len(benchmark_tokens)
+    platform_start = scale_idx + 1
+    platform_end = platform_start + len(platform_tokens)
     started_ts = started_after.timestamp()
 
     candidates: list[Path] = []
-    for path in results_dir.glob(f"{benchmark_token}_*.json"):
+    for path in results_dir.glob(f"{benchmark.lower()}_*.json"):
         if not path.is_file() or path.stat().st_mtime < started_ts:
             continue
         tokens = path.stem.split("_")
-        if not tokens or tokens[0] != benchmark_token:
+        if tokens[:scale_idx] != benchmark_tokens:
             continue
-        # Index 1 is always the scale-factor token in the pinned grammar;
-        # only *check* it when the caller supplied `scale`, but always skip
-        # over it so the platform-token slice below lines up.
-        if scale_token is not None and (len(tokens) < 2 or tokens[1] != scale_token):
+        # The scale-factor token always occupies ``scale_idx`` in the pinned
+        # grammar; only *check* it when the caller supplied `scale`, but the
+        # platform slice below is offset past it regardless.
+        if scale_token is not None and (len(tokens) <= scale_idx or tokens[scale_idx] != scale_token):
             continue
-        platform_start = 2
-        platform_end = platform_start + len(platform_tokens)
         if tokens[platform_start:platform_end] != platform_tokens:
             continue
         candidates.append(path)
