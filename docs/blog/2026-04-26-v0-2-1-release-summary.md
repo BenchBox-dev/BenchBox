@@ -138,7 +138,7 @@ Apache Doris and StarRocks carried the expected new-adapter shake-out cycle: bul
 
 One ClickHouse fix deserves to be called out: TPC-DS power tests now report `FAILED` when no queries execute, where they previously passed silently. Query error messages are now surfaced in result output (also extended to Redshift and Firebolt), and dialect overrides landed for `tpcdi`, `coffeeshop`, `h2odb` Q9, `nyctaxi` EXTRACT, `tpchavoc` Q6, and `read_primitives`.
 
-Other quality-of-life work this cycle: QuestDB query rewrites and `/imp` loader improvements; CedarDB, LakeSail, Firebolt, and Databend reliability fixes; `psycopg3` migration for pg-family adapters; DataVault SHA-256 hash keys; and benchmark-timeout enforcement on macOS. Full inventory in the [changelog](https://github.com/joeharris76/BenchBox/blob/main/CHANGELOG.md).
+Other quality-of-life work this cycle: QuestDB query rewrites and `/imp` loader improvements; CedarDB, LakeSail, Firebolt, and Databend reliability fixes; `psycopg3` migration for pg-family adapters; DataVault SHA-256 hash keys; and benchmark-timeout enforcement on macOS. Full inventory in the [changelog](https://github.com/joeharris76/BenchBox/blob/v0.2.1/CHANGELOG.md).
 
 ## Changed behavior to be aware of
 

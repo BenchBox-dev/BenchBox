@@ -231,7 +231,7 @@ Use `--platform` to run on different databases:
 --platform sqlite       # SQLite database
 
 # Self-hosted
---platform clickhouse   # ClickHouse server
+--platform clickhouse-server   # ClickHouse server
 
 # Cloud platforms (requires credentials)
 --platform databricks   # Databricks SQL Warehouse
@@ -395,7 +395,7 @@ python unified_runner.py --platform duckdb --benchmark primitives --scale 0.01 \
 ### Multi-Platform Comparison
 ```bash
 # Run same benchmark on 3 platforms
-for platform in duckdb clickhouse databricks; do
+for platform in duckdb clickhouse-local databricks; do
   python unified_runner.py --platform $platform --benchmark tpch --scale 1.0 \
     --phases power --output-dir ./comparison/$platform
 done

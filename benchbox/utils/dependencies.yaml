@@ -21,7 +21,7 @@ platform_to_extra:
   bigquery: bigquery
   snowflake: snowflake
   databricks: databricks
-  databricks-connect: databricks-connect
+  databricks-connect: cloud-spark-databricks
   redshift: redshift
   synapse: synapse
   fabric: fabric
@@ -238,7 +238,7 @@ dependency_groups:
     - databricks-sql-connector
     - databricks-connect
     - cloudpathlib
-    install_command: uv add benchbox --extra databricks-connect
+    install_command: uv add benchbox --extra cloud-spark-databricks
     use_cases:
     - PySpark DataFrame API
     - Interactive development
@@ -252,7 +252,7 @@ dependency_groups:
     - databricks-sql-connector
     - databricks-connect
     - cloudpathlib
-    install_command: uv add benchbox --extra databricks-connect
+    install_command: uv add benchbox --extra cloud-spark-databricks
     use_cases:
     - Remote Spark execution
     - Local IDE development

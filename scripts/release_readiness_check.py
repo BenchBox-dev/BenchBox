@@ -278,8 +278,17 @@ def evaluate_uat_gate_evidence(
             False, f"UAT gate evidence completed_at {completed_raw!r} is unparseable; release is blocked.", summary
         )
     if completed_at.tzinfo is None:
-        # Sweep summaries record operator-local wall-clock time.
-        completed_at = completed_at.astimezone()
+        # A naive timestamp has no recoverable offset here: `.astimezone()`
+        # would reinterpret it against *this process's* local timezone (the
+        # CI runner's, not the operator's who produced the evidence), so
+        # evidence near the max-age cutoff could read stale or fresh purely
+        # based on where the check happens to run (#1162 review). New
+        # evidence is written with an explicit offset (see
+        # orchestrator._write_gate_summary_artifact); a naive timestamp here
+        # means older/hand-authored evidence, so assume UTC -- deterministic
+        # regardless of the evaluating environment, even if not necessarily
+        # the exact original operator offset.
+        completed_at = completed_at.replace(tzinfo=UTC)
     age_days = (now - completed_at).total_seconds() / 86400
     summary.append(f"- uat_age: {age_days:.1f}d")
     if age_days > max_age_days:
@@ -333,8 +342,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workflow", default=os.environ.get("RELEASE_CANARY_WORKFLOW", "release-canary.yml"))
     parser.add_argument(
         "--branch",
-        default=os.environ.get("RELEASE_CANARY_BRANCH", "main"),
-        help="Trusted branch/ref that owns the release-canary workflow runs.",
+        default=os.environ.get("RELEASE_CANARY_BRANCH", "develop"),
+        help="Trusted branch/ref that owns the release-canary workflow runs (the default branch, develop as of the 2026-07-08 switch).",
     )
     parser.add_argument(
         "--max-age-hours", type=float, default=float(os.environ.get("RELEASE_CANARY_MAX_AGE_HOURS", "48"))

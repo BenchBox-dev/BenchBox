@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from importlib import metadata as importlib_metadata
 from pathlib import Path
@@ -818,6 +818,29 @@ class NoCompressionHandler(CompressionHandler):
             yield f
 
 
+def _resolve_table_schema(schema: Any, table_name: str) -> Any:
+    """Look up one table's schema, tolerant of case and non-dict schemas."""
+    if not isinstance(schema, dict):
+        return {}
+    return schema.get(table_name, schema.get(table_name.lower(), {}))
+
+
+def _schema_table_columns(table_schema: Any) -> list[Any] | None:
+    """Return a table schema's column list, or None if it has no column list.
+
+    Accepts either a dict shape (``{"columns": [...]}``) or a
+    ``BaseSchemaTable``-like object exposing a ``.columns`` attribute (e.g. the
+    Data Vault / TPC-H / TPC-DS ``Table`` classes). A plain ``"columns" in
+    table_schema`` test raises ``argument of type 'Table' is not iterable`` for
+    the object form, which previously aborted DataVault server-mode loads.
+    """
+    if isinstance(table_schema, dict):
+        columns = table_schema.get("columns")
+    else:
+        columns = getattr(table_schema, "columns", None)
+    return columns if isinstance(columns, list) else None
+
+
 class SchemaInspector:
     """Inspector for determining table schema information."""
 
@@ -836,10 +859,11 @@ class SchemaInspector:
         """
         # Try to get from schema first
         schema = benchmark.get_schema() if hasattr(benchmark, "get_schema") else {}
-        table_schema = schema.get(table_name, schema.get(table_name, {}))
+        table_schema = _resolve_table_schema(schema, table_name)
 
-        if "columns" in table_schema:
-            return len(table_schema["columns"])
+        columns = _schema_table_columns(table_schema)
+        if columns is not None:
+            return len(columns)
 
         # Fallback: read first line to determine column count
         first_line = file_handle.readline().strip()
@@ -1908,6 +1932,17 @@ class DuckDBVortexHandler(FileFormatHandler):
             return row_count
 
 
+# Matches DuckDB bracketed vector/list type suffixes, e.g. "FLOAT[128]",
+# "DOUBLE[3]", or "INTEGER[]" — used to route these to array parsing rather
+# than scalar numeric conversion during ClickHouse client-side inserts.
+# NOTE: the DDL side rewrites the same fixed-size forms to ClickHouse arrays
+# (workload.py: FLOAT[N] -> Array(Float32), DOUBLE[N] -> Array(Float64)); this
+# value-level detector is the insert-time counterpart and additionally covers
+# bracketless-size lists like "INTEGER[]". Keep the two in sync if a new
+# bracketed vector form is added to either surface.
+_CLICKHOUSE_VECTOR_TYPE_RE = re.compile(r"\[\s*\d*\s*\]")
+
+
 class ClickHouseNativeHandler(FileFormatHandler):
     """Handler for ClickHouse's native file() function.
 
@@ -2075,8 +2110,11 @@ class ClickHouseNativeHandler(FileFormatHandler):
     def _get_column_type_names(self, benchmark: Any, table_name: str) -> list[str | None]:
         """Return schema type strings for a benchmark table when available."""
         schema = benchmark.get_schema() if hasattr(benchmark, "get_schema") else {}
-        table_schema = schema.get(table_name, schema.get(table_name.lower(), {}))
-        columns = table_schema.get("columns", []) if isinstance(table_schema, dict) else []
+        table_schema = _resolve_table_schema(schema, table_name)
+        # Handles both dict schemas and BaseSchemaTable objects (e.g. DataVault),
+        # so object-schema benchmarks get real column types instead of an empty
+        # list (which silently skipped type conversion for those loads).
+        columns = _schema_table_columns(table_schema) or []
 
         type_names: list[str | None] = []
         for column in columns:
@@ -2113,9 +2151,12 @@ class ClickHouseNativeHandler(FileFormatHandler):
 
         type_upper = type_name.upper()
 
-        # Array types: parse the CSV string representation into a Python list so
-        # clickhouse-driver receives a sequence rather than a raw string.
-        if "ARRAY" in type_upper:
+        # Array/vector types: "Array(...)" or DuckDB bracketed vector/list syntax
+        # such as "FLOAT[128]" (fixed-size vector) or "INTEGER[]" (list). Parse
+        # the bracketed CSV string into a Python list so clickhouse-driver
+        # receives a sequence; otherwise "FLOAT[128]" matches the FLOAT branch
+        # below and float("[0.02,...]") raises (Bucket C).
+        if "ARRAY" in type_upper or _CLICKHOUSE_VECTOR_TYPE_RE.search(type_upper):
             if not value or value.upper() in ("\\N", "NULL"):
                 return None
             try:
@@ -2126,10 +2167,19 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 pass
             return value
 
+        # DateTime/DateTime64/TIMESTAMP must be classified BEFORE the DATE prefix:
+        # "DATETIME".startswith("DATE") is True, so a bare DATE check misroutes
+        # timestamps into date.fromisoformat() (raises on the time component),
+        # and plain "TIMESTAMP" otherwise falls through as a str, which the
+        # driver rejects with "'str' object has no attribute 'tzinfo'" (Bucket B).
+        is_datetime = "DATETIME" in type_upper or "TIMESTAMP" in type_upper
+        is_date = not is_datetime and type_upper.startswith("DATE")
+
         needs_non_string_value = (
             "INT" in type_upper
             or any(token in type_upper for token in ("DECIMAL", "NUMERIC", "DOUBLE", "FLOAT", "REAL"))
-            or type_upper.startswith("DATE")
+            or is_date
+            or is_datetime
         )
         if value == "":
             return None if needs_non_string_value else value
@@ -2140,7 +2190,15 @@ class ClickHouseNativeHandler(FileFormatHandler):
             return Decimal(value)
         if any(token in type_upper for token in ("DOUBLE", "FLOAT", "REAL")):
             return float(value)
-        if type_upper.startswith("DATE"):
+        if is_datetime:
+            # datetime.fromisoformat() only accepts a trailing "Z" (RFC 3339
+            # UTC shorthand) starting in Python 3.11; on the supported 3.10
+            # runtime (requires-python >=3.10) it raises ValueError.
+            # Normalize to the explicit "+00:00" offset fromisoformat has
+            # always accepted, matching the pattern used elsewhere in this
+            # codebase (e.g. core/tpc_validation.py, mcp/tools/analytics.py).
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if is_date:
             return date.fromisoformat(value)
         return value
 

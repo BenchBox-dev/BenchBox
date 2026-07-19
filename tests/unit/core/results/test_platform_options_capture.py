@@ -191,6 +191,113 @@ def test_lifecycle_run_config_persists_sanitized_platform_options_with_provenanc
     }
 
 
+def test_sanitize_excludes_internal_keys_when_requested() -> None:
+    """w1: exported paths must drop internal bookkeeping keys, matching
+    ``_iter_public_options`` semantics, instead of publishing them."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options(
+        {
+            "warehouse": "WH",
+            "tuning_config": object(),
+            "unified_tuning_configuration": object(),
+            "df_tuning_config": object(),
+            "tuning_enabled": True,
+            "_explicit_platform_options": {"warehouse": "WH"},
+        },
+        exclude_internal=True,
+    )
+
+    assert sanitized == {"warehouse": "WH"}
+    assert "tuning_config" not in sanitized
+    assert "unified_tuning_configuration" not in sanitized
+    assert "df_tuning_config" not in sanitized
+    assert "tuning_enabled" not in sanitized
+
+
+def test_sanitize_without_exclude_internal_preserves_existing_behavior() -> None:
+    """Non-export call sites keep receiving internal keys unless they opt in,
+    so this is an additive/opt-in change rather than a behavior break."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options({"warehouse": "WH", "tuning_enabled": True})
+
+    assert sanitized["warehouse"] == "WH"
+    assert sanitized["tuning_enabled"] is True
+
+
+def test_sanitize_uses_to_dict_for_objects_that_support_it() -> None:
+    """w2: an object with ``to_dict`` must serialize as that dict (recursively
+    sanitized), never as a repr string."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    class _Config:
+        def to_dict(self) -> dict[str, object]:
+            return {"driver": "postgres", "password": "super-secret"}
+
+    sanitized = sanitize_platform_options({"tuning_config": _Config()})
+
+    assert sanitized["tuning_config"] == {"driver": "postgres", "password": REDACTED_VALUE}
+
+
+def test_sanitize_marks_unserializable_values_instead_of_using_repr() -> None:
+    """w2/w3: objects without ``to_dict`` become an explicit marker string,
+    never a Python repr(), so capture gaps stay visible rather than opaque."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    class _Opaque:
+        def __repr__(self) -> str:  # pragma: no cover - guards against leakage
+            return "<Opaque object at 0x1234 with lots of internal repr text>"
+
+    sanitized = sanitize_platform_options({"weird": _Opaque()})
+
+    assert sanitized["weird"] == "<unserializable:_Opaque>"
+    assert "0x" not in sanitized["weird"]
+    assert "repr" not in sanitized["weird"]
+
+
+def test_sanitize_never_raises_when_to_dict_itself_fails() -> None:
+    """Bundle emission must never raise because an option value is unserializable."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    class _Broken:
+        def to_dict(self) -> dict[str, object]:
+            raise RuntimeError("boom")
+
+    sanitized = sanitize_platform_options({"broken": _Broken()})
+
+    assert sanitized["broken"] == "<unserializable:_Broken>"
+
+
+def test_sanitize_never_raises_when_to_dict_lookup_itself_fails() -> None:
+    """A ``to_dict`` descriptor that raises on attribute access (not just on
+    call) must be caught too -- the ``getattr(value, "to_dict", None)`` lookup
+    happens outside the call's try/except, so a raising property previously
+    escaped uncaught."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    class _BrokenDescriptor:
+        @property
+        def to_dict(self):
+            raise RuntimeError("boom during attribute access")
+
+    sanitized = sanitize_platform_options({"broken": _BrokenDescriptor()})
+
+    assert sanitized["broken"] == "<unserializable:_BrokenDescriptor>"
+
+
+def test_secret_redaction_unaffected_by_internal_key_filtering() -> None:
+    """Secret redaction must remain exact regardless of exclude_internal."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options(
+        {"password": "super-secret", "tuning_config": "x"},
+        exclude_internal=True,
+    )
+
+    assert sanitized == {"password": REDACTED_VALUE}
+
+
 def test_result_payload_exports_platform_option_sources_from_run_config() -> None:
     builder = ResultBuilder(
         benchmark=BenchmarkInfoInput(name="TPC-H", scale_factor=0.01, benchmark_id="tpch"),

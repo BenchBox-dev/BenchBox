@@ -16,6 +16,7 @@ from benchbox.core.dryrun import (
     _build_table_ddl_entry,
     _extract_df_write_tuning,
 )
+from benchbox.core.tuning.ddl_generator import TuningClauses
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -95,51 +96,56 @@ class TestExtractDfWriteTuning:
 
 
 class TestBuildTableDdlEntry:
-    def _make_tuning_clauses(self, **kwargs):
-        tc = MagicMock()
-        tc.sort_by = kwargs.get("sort_by")
-        tc.partition_by = kwargs.get("partition_by")
-        tc.cluster_by = kwargs.get("cluster_by")
-        tc.distribution_key = kwargs.get("distribution_key")
-        tc.distribution_style = kwargs.get("distribution_style")
-        return tc
+    """Uses the real TuningClauses dataclass (not a MagicMock double).
+
+    Each DDL generator formats its own clause text into these fields (e.g.
+    DuckDB's sort_by already reads "ORDER BY ..."; Redshift's distribute_by
+    already reads "DISTSTYLE ... DISTKEY (...)"), so _build_table_ddl_entry
+    must pass them through via TuningClauses.get_inline_clauses() rather than
+    re-wrapping bare values with its own labels.
+    """
 
     def test_empty_clauses(self):
-        tc = self._make_tuning_clauses()
+        tc = TuningClauses()
         result = _build_table_ddl_entry(tc)
         assert result["ddl_clauses"] is None
         assert result["tuning_summary"] == {}
 
     def test_sort_by_clause(self):
-        tc = self._make_tuning_clauses(sort_by="l_shipdate")
+        tc = TuningClauses(sort_by="ORDER BY l_shipdate")
         result = _build_table_ddl_entry(tc)
-        assert "ORDER BY (l_shipdate)" in result["ddl_clauses"]
-        assert result["tuning_summary"]["sort_by"] == "l_shipdate"
+        assert result["ddl_clauses"] == "ORDER BY l_shipdate"
+        assert result["tuning_summary"]["sort_by"] == "ORDER BY l_shipdate"
 
     def test_partition_by_clause(self):
-        tc = self._make_tuning_clauses(partition_by="region")
+        tc = TuningClauses(partition_by="PARTITION BY (region)")
         result = _build_table_ddl_entry(tc)
-        assert "PARTITION BY (region)" in result["ddl_clauses"]
-        assert result["tuning_summary"]["partition_by"] == "region"
+        assert result["ddl_clauses"] == "PARTITION BY (region)"
+        assert result["tuning_summary"]["partition_by"] == "PARTITION BY (region)"
 
     def test_cluster_by_clause(self):
-        tc = self._make_tuning_clauses(cluster_by="customer_id")
+        tc = TuningClauses(cluster_by="CLUSTER BY (customer_id)")
         result = _build_table_ddl_entry(tc)
-        assert "CLUSTER BY (customer_id)" in result["ddl_clauses"]
-        assert result["tuning_summary"]["cluster_by"] == "customer_id"
+        assert result["ddl_clauses"] == "CLUSTER BY (customer_id)"
+        assert result["tuning_summary"]["cluster_by"] == "CLUSTER BY (customer_id)"
 
-    def test_distribution_style_and_key(self):
-        tc = self._make_tuning_clauses(distribution_style="KEY", distribution_key="order_id")
+    def test_distribute_by_clause(self):
+        tc = TuningClauses(distribute_by="DISTSTYLE KEY\nDISTKEY (order_id)")
         result = _build_table_ddl_entry(tc)
         assert "DISTSTYLE KEY" in result["ddl_clauses"]
         assert "DISTKEY (order_id)" in result["ddl_clauses"]
-        assert result["tuning_summary"]["distribution_style"] == "KEY"
-        assert result["tuning_summary"]["distribution_key"] == "order_id"
+        assert result["tuning_summary"]["distribute_by"] == "DISTSTYLE KEY\nDISTKEY (order_id)"
+
+    def test_order_by_clause(self):
+        tc = TuningClauses(order_by="ORDER BY (ts)")
+        result = _build_table_ddl_entry(tc)
+        assert result["ddl_clauses"] == "ORDER BY (ts)"
+        assert result["tuning_summary"]["order_by"] == "ORDER BY (ts)"
 
     def test_multiple_clauses_joined(self):
-        tc = self._make_tuning_clauses(sort_by="ts", partition_by="region")
+        tc = TuningClauses(sort_by="ORDER BY ts", partition_by="PARTITION BY (region)")
         result = _build_table_ddl_entry(tc)
-        assert "ORDER BY (ts)" in result["ddl_clauses"]
+        assert "ORDER BY ts" in result["ddl_clauses"]
         assert "PARTITION BY (region)" in result["ddl_clauses"]
 
 

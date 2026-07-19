@@ -1,41 +1,22 @@
 #!/usr/bin/env python3
-"""Predicate: does the ``develop`` ruleset enforce a review before squash-auto-merge?
+"""Predicates for the ``v*`` tag-creation ruleset (release-flow hardening).
 
-Follow-up guard for ``auto-merge-review-gate-soundness-paths`` (#912). The auto-merge
-*code* side is correct: ``make pr-open`` and ``auto-merge-on-open.yml`` share
-``auto_merge_soundness_paths.py`` (``--no-renames``) and WITHHOLD auto-merge
-enablement for PRs touching the soundness paths in
-``auto_merge_soundness_paths.SOUNDNESS_PREFIXES``. But withholding auto-merge is only
-a precondition: a soundness-path PR can still be squash-merged with zero approvals
-(manually, or by re-enabling auto-merge) unless the ``develop`` branch ruleset itself
-requires a review. This module pins that repo-layer rule -- the ``develop`` ruleset's
-``pull_request`` rule must require a code-owner review -- so the soundness exception
-is enforceable at the repo layer, not just in code.
+History note: until 2026-07-18 this module also carried the ``develop``
+review-rule predicate (``review_enforcement_findings``), which pinned the
+then-pending admin target ``require_code_owner_review: true`` on the
+``develop-squash-only`` ruleset. That target was RETIRED without being
+applied: every PR in this repository is authored by the sole code owner
+(agent sessions open PRs under the owner's account), GitHub does not let a
+PR author approve their own PR, and the ruleset has no bypass actors -- so
+enabling the rule would have deadlocked every soundness-path PR instead of
+gating it. The operative soundness control is auto-merge withholding plus a
+manual owner merge; see docs/operations/repo-admin-settings.md,
+"Soundness-path review enforcement (RETIRED 2026-07-18)".
 
-Checks ONLY ``require_code_owner_review``, never ``required_approving_review_count``:
-per GitHub's ``pull_request`` rule, ``required_approving_review_count`` applies to
-EVERY PR against the branch -- it is not scoped to CODEOWNERS-matched paths -- so
-asserting ``count >= 1`` here would push an admin toward requiring an approval on
-every develop PR, including non-soundness ones the fast squash-auto-merge default is
-meant to cover, defeating the point of a soundness-path-ONLY review gate.
-``require_code_owner_review=True`` is independently sufficient: GitHub still requires
-an owner's approval on a PR that touches a CODEOWNERS-matched soundness path
-regardless of ``required_approving_review_count``, while a PR that touches no
-CODEOWNERS-matched path is unaffected either way.
-
-The soundness path set is read from ``auto_merge_soundness_paths`` (single source of
-truth), so the narration here and the auto-merge withholding cannot drift apart.
-
-Token note: the develop-PR CI cannot read the live ruleset -- the default Actions
-``GITHUB_TOKEN`` has no ``administration`` scope, and the ruleset-read
-``RULESET_DRIFT_TOKEN`` is wired only into ``release-canary.yml``. So this module is
-exercised two ways:
-
-  * as a pinned-logic guard in ``tests/unit/release/`` (runs in the required fast
-    lane); and
-  * as the predicate behind the manual / canary live-ruleset check documented in
-    ``docs/operations/repo-admin-settings.md`` -- an operator pipes
-    ``gh api repos/<owner>/<repo>/rules/branches/develop`` into ``--rules-file -``.
+What remains here is the tag-creation protection predicate
+(tag-and-pypi-environment-admin-hardening w3), shared between the standalone
+``--rulesets-file`` CLI documented in ``docs/operations/repo-admin-settings.md``
+and ``scripts/ruleset_drift_check.py``'s canary wiring.
 """
 
 from __future__ import annotations
@@ -47,79 +28,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Make the sibling source-of-truth importable whether this file is run as a script
-# (sys.path[0] is already this dir) or loaded via importlib from a test.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from auto_merge_soundness_paths import SOUNDNESS_PREFIXES  # noqa: E402
-
-# Human-readable globs for the CODEOWNERS-owned soundness surface, derived from the
-# shared predicate so this narration tracks the auto-merge withholding set exactly.
-# Directory prefixes (ending in "/") get a "**" suffix; exact-file prefixes
-# (e.g. benchbox/platforms/base/result_capture.py) are rendered as-is, since
-# appending "**" to a filename would misleadingly read as a directory glob.
-SOUNDNESS_PATH_GLOBS: tuple[str, ...] = tuple(
-    f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES
-) + ("benchbox/core/**/validation.py",)
-
-
-def extract_rules(payload: Any) -> list[dict[str, Any]]:
-    """Normalize either a ``rules/branches`` list or a ``rulesets/<id>`` object.
-
-    ``gh api repos/<owner>/<repo>/rules/branches/develop`` returns the flat list of
-    effective rules; ``gh api repos/<owner>/<repo>/rulesets/<id>`` returns a ruleset
-    object carrying ``rules``. Accept both so the operator can pipe either.
-    """
-    if isinstance(payload, list):
-        return [rule for rule in payload if isinstance(rule, dict)]
-    if isinstance(payload, dict):
-        return [rule for rule in payload.get("rules", []) if isinstance(rule, dict)]
-    return []
-
-
-def _pull_request_parameters(rules: list[dict[str, Any]]) -> dict[str, Any] | None:
-    for rule in rules:
-        if rule.get("type") == "pull_request":
-            params = rule.get("parameters")
-            return params if isinstance(params, dict) else {}
-    return None
-
-
-def review_enforcement_findings(rules: list[dict[str, Any]]) -> list[str]:
-    """Return human-readable reasons the ruleset fails to enforce a review.
-
-    Empty list == the ruleset requires a code-owner review, so a soundness-path PR
-    (CODEOWNERS-owned) cannot be squash-merged with zero approvals.
-
-    Checks ONLY ``require_code_owner_review`` -- see the module docstring for why
-    ``required_approving_review_count`` is deliberately NOT part of this check (it
-    is a branch-wide setting, not CODEOWNERS-scoped, so requiring it here would gate
-    every develop PR rather than just soundness-path ones).
-    """
-    params = _pull_request_parameters(rules)
-    if params is None:
-        return [
-            "develop ruleset has no pull_request rule: a soundness-path PR "
-            f"({', '.join(SOUNDNESS_PATH_GLOBS)}) can squash-auto-merge with zero reviews"
-        ]
-    if not params.get("require_code_owner_review", False):
-        return [
-            f"require_code_owner_review={params.get('require_code_owner_review', False)} (need true) "
-            f"for CODEOWNERS-owned soundness paths: {', '.join(SOUNDNESS_PATH_GLOBS)}"
-        ]
-    return []
-
-
-def is_review_enforced(rules: list[dict[str, Any]]) -> bool:
-    """True when the ruleset requires an approving + code-owner review."""
-    return not review_enforcement_findings(rules)
-
-
 # ---------------------------------------------------------------------------
 # v* tag-creation protection (tag-and-pypi-environment-admin-hardening w3)
 # ---------------------------------------------------------------------------
 
-# Enforcement flag, mirroring ruleset_drift_check.DEVELOP_REVIEW_RULE_ENFORCED.
+# Enforcement flag (WARN-until-applied pattern).
 # The v* tag-creation ruleset was applied by admin on 2026-07-10 (ruleset id
 # 18774756 ``v-tag-restricted``; see docs/operations/repo-admin-settings.md,
 # "Tag creation restricted to release flow"), so this is flipped to True:
@@ -153,10 +66,10 @@ def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
     Empty list == at least one ACTIVE ruleset with ``target == "tag"`` whose
     ref conditions cover ``refs/tags/v*`` (or ``~ALL``) AND that carries a
     ``creation`` rule. That is the repo-admin layer closing the last
-    zero-human path to publish: ``release.yml``'s ``verify-tag-on-main`` only
-    stops a tag that does not point at a main-ancestor commit; it does nothing
+    zero-human path to publish: ``release.yml``'s ``verify-tag-on-release`` only
+    stops a tag that does not point at a release-ancestor commit; it does nothing
     to stop a collaborator with push access from creating a ``v*`` tag ON an
-    existing main commit out of band. A tag-creation ruleset restricts who may
+    existing release commit out of band. A tag-creation ruleset restricts who may
     mint the tag in the first place.
 
     Accepts FULL ruleset objects (``GET /repos/{o}/{r}/rulesets/{id}``). The
@@ -285,87 +198,40 @@ def _load_rulesets(raw_source: str) -> list[dict[str, Any]]:
     return []
 
 
-def _fetch_branch_rules(repo: str, branch: str, token: str) -> list[dict[str, Any]]:
-    import urllib.request
-
-    url = f"https://api.github.com/repos/{repo}/rules/branches/{branch}"
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-    )
-    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 (fixed api.github.com host)
-        return extract_rules(json.loads(response.read().decode("utf-8")))
-
-
-def _load_rules(args: argparse.Namespace) -> list[dict[str, Any]]:
-    if args.rules_file:
-        raw = sys.stdin.read() if args.rules_file == "-" else Path(args.rules_file).read_text(encoding="utf-8")
-        return extract_rules(json.loads(raw))
-    if args.token:
-        return _fetch_branch_rules(args.repo, args.branch, args.token)
-    raise SystemExit(
-        "Provide --rules-file (e.g. `gh api repos/<owner>/<repo>/rules/branches/develop | "
-        "ruleset_review_enforcement.py --rules-file -`) or --token to fetch live."
-    )
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--rules-file",
-        help="Path to a JSON rules/ruleset payload, or '-' to read it from stdin.",
-    )
-    parser.add_argument("--repo", default="joeharris76/BenchBox", help="owner/repo for live fetch.")
-    parser.add_argument("--branch", default="develop", help="Branch whose ruleset to check.")
-    parser.add_argument("--token", default="", help="Ruleset-read token for live fetch (e.g. RULESET_DRIFT_TOKEN).")
-    parser.add_argument(
         "--rulesets-file",
+        required=True,
         help=(
             "Path to a JSON array of FULL ruleset objects (or '-' for stdin) to check "
             "v* tag-creation protection; e.g. "
             "`gh api repos/<owner>/<repo>/rulesets --jq '[.[] | .id] | map(...)'` -- see "
-            "docs/operations/repo-admin-settings.md for the exact fetch. When set, ONLY the "
-            "tag-protection check runs (the review-rule check needs branch rules, not tag rulesets)."
+            "docs/operations/repo-admin-settings.md for the exact fetch."
         ),
     )
     args = parser.parse_args(argv)
 
-    if args.rulesets_file:
-        rulesets = _load_rulesets(args.rulesets_file)
-        tag_findings = tag_protection_findings(rulesets)
-        if not tag_findings:
-            print("# Tag-creation ruleset - OK")
-            print(f"- {TAG_REF_PATTERN} creation restricted by an active tag ruleset")
-            for advisory in tag_bypass_advisory(rulesets):
-                # Not a failure (must_preserve requires a bypass path), but the
-                # operator must confirm the actor list before enforcing.
-                print(f"- CONFIRM before enforcing: {advisory}")
-            return 0
-        if TAG_RULESET_ENFORCED:
-            print("# Tag-creation ruleset - FAILED")
-            for finding in tag_findings:
-                print(f"- {finding}")
-            return 1
-        # WARN-until-applied: surface the gap without failing while the admin
-        # POST is still pending (mirrors DEVELOP_REVIEW_RULE_ENFORCED).
-        print("# Tag-creation ruleset - WARNING (non-blocking, pending admin action)")
-        for finding in tag_findings:
-            print(f"- WARNING (non-blocking): {finding}")
+    rulesets = _load_rulesets(args.rulesets_file)
+    tag_findings = tag_protection_findings(rulesets)
+    if not tag_findings:
+        print("# Tag-creation ruleset - OK")
+        print(f"- {TAG_REF_PATTERN} creation restricted by an active tag ruleset")
+        for advisory in tag_bypass_advisory(rulesets):
+            # Not a failure (must_preserve requires a bypass path), but the
+            # operator must confirm the actor list before enforcing.
+            print(f"- CONFIRM before enforcing: {advisory}")
         return 0
-
-    rules = _load_rules(args)
-    findings = review_enforcement_findings(rules)
-    if findings:
-        print(f"# Ruleset review enforcement ({args.branch}) - FAILED")
-        for finding in findings:
+    if TAG_RULESET_ENFORCED:
+        print("# Tag-creation ruleset - FAILED")
+        for finding in tag_findings:
             print(f"- {finding}")
         return 1
-    print(f"# Ruleset review enforcement ({args.branch}) - OK")
-    print(f"- code-owner review required for {', '.join(SOUNDNESS_PATH_GLOBS)}")
+    # WARN-until-applied: surface the gap without failing while the admin
+    # POST is still pending.
+    print("# Tag-creation ruleset - WARNING (non-blocking, pending admin action)")
+    for finding in tag_findings:
+        print(f"- WARNING (non-blocking): {finding}")
     return 0
 
 

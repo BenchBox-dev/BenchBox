@@ -1,0 +1,101 @@
+id: tuning-template-packaging-20260716
+title: "Ship discoverable tuning templates with the installed package"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-07-16"
+category: Core Functionality
+
+description: |
+  Deferred from tuning-docs-env-contract-fixes-20260712 (review finding N8):
+  template auto-discovery is cwd-relative, so installed-package users silently
+  hit the tuned-fallback path unless BENCHBOX_TUNING_PATH is set. Ship the
+  examples/tunings templates as package resources and add a discovery tier
+  (env path > cwd examples > packaged resources) so `--tuning tuned` works
+  outside a repo checkout. Update the precedence doc written by #1178.
+
+work:
+  - id: w1
+    summary: "Package templates as resources (pyproject data files or importlib.resources layout)"
+    status: done
+    needs: []
+    resolution: |
+      Copied the duckdb/databricks `<benchmark>_tuned.yaml` auto-discovery
+      templates (the naming pattern get_tuning_template_paths searches for)
+      into benchbox/core/tuning/templates/<platform>/<benchmark>_tuned.yaml
+      (14 files), reusing the plain-path pattern from
+      workload_profiles.py:PROFILE_ROOT (no importlib.resources needed).
+      examples/tunings/ stays the dev-time source of truth; a new
+      TestPackagedTemplatesParity test class enforces byte-for-byte parity.
+      No pyproject.toml/MANIFEST.in change was needed - verified with
+      `uv build --wheel` that the existing `include-package-data = true` +
+      MANIFEST.in `recursive-include benchbox *.yaml` already ships the new
+      directory in the wheel, same as profiles/tpc.yaml.
+  - id: w2
+    summary: "Add packaged-resource tier to get_tuning_template_paths + tuning list; update docs/reference/cli/tuning.md precedence table"
+    status: done
+    needs: [w1]
+    resolution: |
+      Added benchbox/core/tuning/packaged_templates.py
+      (packaged_template_path/list_packaged_templates). Appended the packaged
+      candidate as tier 4 (LAST) in get_tuning_template_paths, and made
+      list_available_tuning_templates fall back to list_packaged_templates
+      only when the default examples/tunings base_path is absent (explicit
+      base_path callers keep prior behavior). Added
+      TuningSource.PACKAGED_RESOURCE (distinct from AUTO_DISCOVERED) so
+      provenance records the packaged tier distinctly, per must_preserve.
+      resolve_template_reference() (the canonical "<ref>:<hash>" helper)
+      does not exist on develop yet (owned by unmerged #1176/PR
+      fix/tuning-bundle-provenance) - recorded a "packaged:<platform>/
+      <benchmark>_tuned.yaml" ref string ad hoc in the info message with a
+      code comment marking the composition point for that merge. Updated
+      docs/reference/cli/tuning.md precedence table and tuning-list section.
+  - id: w3
+    summary: "Tests: discovery works from a temp cwd with no repo checkout (simulated installed env)"
+    status: done
+    needs: [w2]
+    resolution: |
+      Added TestSimulatedInstalledEnvironmentDiscovery (monkeypatch.chdir to
+      a tmp_path with no examples/tunings/) covering get_tuning_template_paths,
+      resolve_tuning("tuned", ...) resolving via PACKAGED_RESOURCE,
+      list_available_tuning_templates() falling back to packaged templates,
+      the explicit-base_path non-fallback case, the still-falls-back-when-
+      no-packaged-template-either case, and display_tuning_list not
+      crashing. Added TestPackagedTemplatesParity. Full file:
+      `uv run -- python -m pytest tests/unit/cli/test_tuning_resolution.py -q`
+      -> 58 passed. Also ran tests/unit -k tuning (1269 passed, 2 skipped,
+      unrelated Java skips), ruff check/format, lint-imports (3 contracts
+      kept), ty check (no new diagnostics vs baseline), complexity-check
+      (no failures), and interrogate on touched files (100% docstring
+      coverage).
+
+deps:
+  needs: []
+
+must_preserve:
+  - "Existing precedence for env path and cwd discovery (packaged tier is LAST)"
+  - "Provenance records the packaged-template ref distinctly"
+
+scope_limit:
+  only_modify:
+    - "benchbox/cli/tuning_resolver.py"
+    - "pyproject.toml"
+    - "benchbox/**"
+    - "docs/reference/cli/tuning.md"
+    - "tests/**"
+
+verification:
+  - description: "Simulated installed-env discovery test green"
+    command: "uv run -- python -m pytest tests/unit/cli/test_tuning_resolution.py -q"
+    expected_output: "All passing incl. packaged-tier tests"
+
+prior_art:
+  - "pyproject.toml existing package-data/include configuration - extend"
+  - "benchbox/core/tuning/profiles/tpc.yaml: existing in-package YAML resource loaded at runtime - reuse loading pattern"
+
+metadata:
+  owners: ["benchbox-team"]
+  tags: [tuning, packaging, discovery]
+  estimated_effort: Medium
+  created_date: "2026-07-16"
+  source_review: "tuning remediation batch close-out 2026-07-16 (N8)"

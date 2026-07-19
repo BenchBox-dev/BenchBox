@@ -1,0 +1,83 @@
+id: promote-non-required-regression-reproducers-suite-audit
+title: "Audit the whole suite for regression reproducers parked outside required develop CI"
+worktree: main
+priority: Medium
+status: Not Started
+category: Testing and Quality Assurance
+
+description: |
+  Systemic follow-up to required-ci-coverage-deepest-reproducers (#932), which
+  promoted three specific holistic-review reproducers (#900 plan-capture planted
+  defect, #901 mutation catch, #909 plan-capture-phase) into the required
+  develop-PR gate. That item deliberately scoped itself to those three instances
+  and deferred the suite-wide sweep.
+
+  The systemic gap: a regression reproducer that proves a fix but is parked in a
+  non-required lane (an env-var gate, a `slow`/`integration`/`medium` marker, or a
+  test.yml-only job) does NOT run in the develop required gate `ci-required-result`,
+  so the PR that introduced the fix can self-merge without ever running its own
+  deepest guard — the reproducer only fires one ring out, at the main-release
+  boundary. Audit the whole test suite for this pattern and promote the
+  load-bearing cells into the required gate via bounded explicit-node steps, the
+  same mechanism #932 used.
+
+prior_art:
+  - ref: "_project/DONE/main/planning/required-ci-coverage-deepest-reproducers.yaml"
+    note: "The pattern this generalizes: explicit-node `-m <marker> -n 0 -k <cell>` steps added to a job already in ci-required-result.needs, each proven load-bearing by reverting its fix."
+  - ref: ".github/workflows/pr.yml"
+    note: "ci-required-result.needs and the existing explicit-node drift-guard steps in code-test; reuse the mechanism, do not add continue-on-error jobs."
+
+work:
+  - id: w1
+    summary: "Enumerate regression reproducers excluded from the required develop gate"
+    status: pending
+    needs: []
+    notes: |
+      Grep for env-var-gated tests, module/function slow|integration|medium marks,
+      and tests that run only in test.yml, and cross-reference which prove a
+      specific merged fix. Produce the candidate list (test id, marker/gate, which
+      fix it protects, current lane).
+  - id: w2
+    summary: "Classify each candidate as load-bearing vs redundant and select the cells to promote"
+    status: pending
+    needs: [w1]
+    notes: |
+      A reproducer is load-bearing if reverting its fix would turn it red. Select
+      only those; keep wall-clock bounded (specific cells, never whole slow matrices).
+  - id: w3
+    summary: "Promote the selected cells via explicit-node steps in a required job and prove each load-bearing"
+    status: pending
+    needs: [w2]
+    notes: |
+      Add explicit-node steps to a job already in ci-required-result.needs. For each,
+      revert its underlying fix locally, confirm the required step goes red, restore;
+      record the break/restore evidence in the PR body. No continue-on-error.
+
+must_preserve:
+  - "No new always-on slow/integration matrix in required CI — promote only the load-bearing cells; keep wall-clock bounded."
+  - "Every added step lives in a job already in ci-required-result.needs and is not continue-on-error."
+
+anti_patterns:
+  - "DO NOT promote entire slow/integration suites — promote the specific cells that prove the fixes."
+  - "DO NOT add a required step without proving it goes red when the fix is reverted."
+
+verification:
+  - description: "Each promoted step is load-bearing (per-cell template; run once per promoted step in w3, substituting the real fix commit and pytest selector)"
+    command: "git revert --no-commit <fix-commit-sha> && uv run -- python -m pytest <promoted-test-selector> -q; git revert --abort"
+    expected_output: "the promoted step's pytest selector fails (non-zero exit) with the fix reverted, proving it is load-bearing; git revert --abort restores the working tree; record the failing output in the PR body before the final commit"
+
+scope_limit:
+  only_modify:
+    - ".github/workflows/pr.yml"
+    - "Makefile"
+    - "tests/"
+
+success_metrics:
+  - "No regression reproducer that proves a merged fix runs ONLY outside the required develop-PR gate."
+  - "Promoted steps add bounded wall-clock (selected cells), not full slow/integration matrices."
+
+metadata:
+  tags: [ci, testing, regression-guard, holistic-review-followup]
+  estimated_effort: "Medium"
+  created_date: "2026-07-17"
+  last_updated: "2026-07-17T00:00:00"

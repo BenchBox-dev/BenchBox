@@ -166,3 +166,159 @@ class TestPowerTestExecution:
         assert parts[0] == "Position"
         assert parts[2] == "Query"
         assert sample_sql == f"SELECT {parts[3]}"
+
+
+class TestPowerTestReferenceSeedContext:
+    """tpch-throughput-seed-validation-fix w2/w3: TPCHPowerTest.run() must tell
+    QueryValidator, per query, whether the CURRENT stream's seed matches the
+    pinned reference seed for its scale factor -- see
+    benchbox.core.validation.query_validation.set_reference_seed_context()."""
+
+    def test_reference_seed_context_true_for_qgen_defaults(self) -> None:
+        """No seed given -> qgen defaults mode, treated as reference-equivalent
+        (matches the pre-existing __init__ seed-selection assumption)."""
+        power_test = _make_power_test(scale_factor=1.0, seed=None)
+
+        calls: list[bool] = []
+        with patch(
+            "benchbox.core.tpch.power_test.set_reference_seed_context",
+            side_effect=lambda v: calls.append(v),
+        ):
+            power_test.run()
+
+        assert len(calls) == 22
+        assert all(v is True for v in calls)
+
+    def test_reference_seed_context_true_when_seed_matches_reference(self) -> None:
+        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
+
+        power_test = _make_power_test(scale_factor=1.0, seed=TPCH_SF1_REFERENCE_SEED)
+
+        calls: list[bool] = []
+        with patch(
+            "benchbox.core.tpch.power_test.set_reference_seed_context",
+            side_effect=lambda v: calls.append(v),
+        ):
+            power_test.run()
+
+        assert len(calls) == 22
+        assert all(v is True for v in calls)
+
+    def test_reference_seed_context_false_for_custom_seed(self) -> None:
+        """A custom seed that does not match the reference seed -> every query
+        in this stream is tagged non-reference (the exact w0 repro scenario:
+        seed=12345, SF=1.0)."""
+        power_test = _make_power_test(scale_factor=1.0, seed=12345)
+
+        calls: list[bool] = []
+        with patch(
+            "benchbox.core.tpch.power_test.set_reference_seed_context",
+            side_effect=lambda v: calls.append(v),
+        ):
+            power_test.run()
+
+        assert len(calls) == 22
+        assert all(v is False for v in calls)
+
+    def test_reference_seed_context_cleared_after_every_query(self) -> None:
+        power_test = _make_power_test(scale_factor=1.0, seed=12345)
+
+        with patch("benchbox.core.tpch.power_test.clear_reference_seed_context") as mock_clear:
+            power_test.run()
+
+        assert mock_clear.call_count == 22
+
+    def test_boundary_query_not_failed_with_custom_seed_at_sf1(self) -> None:
+        """End-to-end regression for the w0 defect: at SF=1.0 with a custom
+        (non-reference) seed, Q11/16/18/20 must not come back FAILED anymore.
+
+        Routes through the REAL PlatformAdapterConnection + DuckDBAdapter +
+        QueryValidator stack (not a bare Mock connection, which would bypass
+        row-count validation entirely and silently not exercise the defect --
+        see w1 notes on why the raw-Mock pattern elsewhere in this file never
+        caught this bug). Only the innermost raw DB cursor is mocked, forced
+        to return a row count that would fail an EXACT comparison against the
+        real SF=1 answer set.
+        """
+        from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        bench = Mock()
+        bench.get_query = Mock(return_value="SELECT 1")
+
+        raw_connection = Mock()
+
+        def raw_execute(query_text):
+            raw_result = Mock()
+            # A row count guaranteed to mismatch any real TPC-H SF=1 answer.
+            raw_result.fetchall = Mock(return_value=[(1,)] * 999)
+            return raw_result
+
+        raw_connection.execute = Mock(side_effect=raw_execute)
+
+        adapter = DuckDBAdapter()
+        connection = PlatformAdapterConnection(raw_connection, adapter)
+        connection.benchmark_type = "tpch"
+        connection.scale_factor = 1.0
+
+        power_test = TPCHPowerTest(
+            benchmark=bench,
+            connection=connection,
+            scale_factor=1.0,
+            seed=12345,
+            stream_id=0,
+            validation=True,
+            warm_up=False,
+            query_subset=["11", "16", "18", "20"],
+        )
+
+        result = power_test.run()
+
+        assert result.success is True
+        assert result.queries_successful == 4
+        assert all(qr["success"] for qr in result.query_results)
+        for qr in result.query_results:
+            assert qr.get("error") is None
+
+    def test_boundary_query_still_fails_with_reference_seed_at_sf1(self) -> None:
+        """must_preserve: a REFERENCE-seed run keeps EXACT-match validation
+        for Q11/16/18/20 -- the same wrong-row-count cursor as above must
+        still fail the query when the seed matches the pinned reference."""
+        from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
+        from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        bench = Mock()
+        bench.get_query = Mock(return_value="SELECT 1")
+
+        raw_connection = Mock()
+
+        def raw_execute(query_text):
+            raw_result = Mock()
+            raw_result.fetchall = Mock(return_value=[(1,)] * 999)
+            return raw_result
+
+        raw_connection.execute = Mock(side_effect=raw_execute)
+
+        adapter = DuckDBAdapter()
+        connection = PlatformAdapterConnection(raw_connection, adapter)
+        connection.benchmark_type = "tpch"
+        connection.scale_factor = 1.0
+
+        power_test = TPCHPowerTest(
+            benchmark=bench,
+            connection=connection,
+            scale_factor=1.0,
+            seed=TPCH_SF1_REFERENCE_SEED,
+            stream_id=0,
+            validation=True,
+            validation_mode="exact",
+            warm_up=False,
+            query_subset=["11"],
+        )
+
+        result = power_test.run()
+
+        assert result.success is False
+        assert result.queries_successful == 0
+        assert not result.query_results[0]["success"]

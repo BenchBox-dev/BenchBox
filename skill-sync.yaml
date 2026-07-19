@@ -25,7 +25,9 @@ targets:
   claude:
     dir: .claude/skills
     tracked: true
-    ignore: [blog]
+    # todo-db is the DB-tracker spike wrapper (_project/specs/todo-db-tracker.md),
+    # deliberately outside skill-sync until G5 cutover adopts it into the source.
+    ignore: [blog, todo-db]
   codex: .codex/skills
   gemini: .gemini/skills
   antigravity: .antigravity/skills

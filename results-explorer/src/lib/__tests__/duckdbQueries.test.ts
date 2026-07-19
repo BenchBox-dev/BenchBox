@@ -11,6 +11,7 @@ import {
   getResultDetailMetrics,
   getQueryDisplayTimings,
   getQueryExecutions,
+  getDetailResult,
   getBenchmarkMatrixCells,
   getBenchmarkRanking,
   getBenchmarkSummaryFromDuckDB,
@@ -21,7 +22,9 @@ import {
   memoizedSnapshotQueryRows,
   resolveShortId,
   toShortIds,
+  type ResultDetailMetricsRow,
 } from "@/lib/duckdbQueries";
+import { buildComparabilityFields } from "@/components/ComparabilityReceipt";
 
 const mockedQueryRows = vi.mocked(queryRows);
 
@@ -120,6 +123,109 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toMatch(/CASE WHEN iter IS NULL THEN 0 ELSE iter END/);
     expect(sql).not.toMatch(/COALESCE/);
     expect(params).toEqual(["r1"]);
+  });
+
+  describe("getDetailResult - physical_mechanisms unknown vs recorded-empty (ADR-2 §3)", () => {
+    // A "wide row" shaped exactly as the real result_detail_metrics view
+    // would hand back to getResultDetailMetrics: NULL becomes `null` here,
+    // and a recorded-but-empty mechanism list becomes duckdb_builder.py's
+    // "" (comma-join of []), not NULL.
+    function makeWideRow(overrides: Partial<ResultDetailMetricsRow>): ResultDetailMetricsRow {
+      return {
+        result_id: "r1",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        driver_version: null,
+        run_date: "2026-04-01",
+        power_score: null,
+        total_duration_s: 60,
+        geomean_ms: 10,
+        display_geomean_ms: 10,
+        query_count: 2,
+        has_display_timing: true,
+        valid_query_count: 2,
+        missing_query_count: 0,
+        zero_timing_count: 0,
+        display_exclusion_reason: null,
+        comparison_exclusion_reason: null,
+        ranking_exclusion_reason: null,
+        trust_label: "maintainer-run",
+        funding: "unspecified",
+        visibility: "public-curated",
+        platform_version: null,
+        execution_mode: "sql",
+        tuning_mode: "tuned",
+        tuning_hash: null,
+        test_type: "power",
+        validation_status: "exact",
+        cost_usd: null,
+        compliance_class: null,
+        has_plans: false,
+        plans_published: false,
+        has_tuning: true,
+        bundle_download_url: "",
+        os: null,
+        arch: null,
+        cpu_count: null,
+        memory_gb: null,
+        python: null,
+        physical_mechanisms: null,
+        ...overrides,
+      };
+    }
+
+    async function fetchDetail(resultId: string, wideRow: ResultDetailMetricsRow) {
+      // getDetailResult() Promise.all()s getResultDetailMetrics,
+      // getQueryDisplayTimings, and getQueryExecutions, in that order.
+      mockedQueryRows.mockResolvedValueOnce([wideRow]);
+      mockedQueryRows.mockResolvedValueOnce([]);
+      mockedQueryRows.mockResolvedValueOnce([]);
+      return getDetailResult(resultId);
+    }
+
+    it("a legacy row (no logical_profile recorded -> NULL) yields undefined, not []", async () => {
+      const legacy = await fetchDetail("legacy", makeWideRow({ result_id: "legacy", physical_mechanisms: null }));
+      expect(legacy?.physical_mechanisms).toBeUndefined();
+    });
+
+    it("a modern row with a recorded-but-empty mechanism list ('') yields [], not undefined", async () => {
+      const modernEmpty = await fetchDetail(
+        "modern-empty",
+        makeWideRow({ result_id: "modern-empty", physical_mechanisms: "" }),
+      );
+      expect(modernEmpty?.physical_mechanisms).toEqual([]);
+    });
+
+    it("production path: a legacy result paired with a modern tuned result skips the mechanism-warning field (unknown, not a false mismatch)", async () => {
+      const legacy = await fetchDetail("legacy", makeWideRow({ result_id: "legacy", physical_mechanisms: null }));
+      const modern = await fetchDetail(
+        "modern",
+        makeWideRow({ result_id: "modern", physical_mechanisms: "indexes,clustering" }),
+      );
+      expect(legacy).not.toBeNull();
+      expect(modern).not.toBeNull();
+
+      const fields = buildComparabilityFields([legacy!, modern!]);
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+    });
+
+    it("production path: two modern tuned results with recorded-empty mechanisms participate in comparison as a match", async () => {
+      const a = await fetchDetail("a", makeWideRow({ result_id: "a", physical_mechanisms: "" }));
+      const b = await fetchDetail(
+        "b",
+        makeWideRow({ result_id: "b", platform: "SQLite", physical_mechanisms: "" }),
+      );
+      expect(a).not.toBeNull();
+      expect(b).not.toBeNull();
+
+      const fields = buildComparabilityFields([a!, b!]);
+      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toMatchObject({
+        status: "match",
+        summary: "None rendered",
+      });
+    });
   });
 
   it("getBenchmarkMatrixCells scopes by (benchmark, scale_factor, phase)", async () => {

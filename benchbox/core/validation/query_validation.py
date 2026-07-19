@@ -12,14 +12,87 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import threading
 
 # Import expected_results to trigger provider registration
 # This ensures TPC-H and TPC-DS providers are available when QueryValidator is instantiated
 import benchbox.core.expected_results  # noqa: F401
 from benchbox.core.expected_results.models import ValidationMode, ValidationResult
 from benchbox.core.expected_results.registry import get_registry
+from benchbox.core.expected_results.tpch_results import (
+    PARAMETER_SENSITIVE_QUERY_IDS as _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
+)
 
 logger = logging.getLogger(__name__)
+
+# Per-benchmark parameter-sensitive query-id sets consulted by the exclusion
+# check in QueryValidator.validate_query_result(). Only TPC-H has one today
+# (see tpch_results.PARAMETER_SENSITIVE_QUERY_IDS); benchmarks with no entry
+# here get an empty set, so the exclusion never fires for them regardless of
+# reference-seed context.
+_PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK: dict[str, frozenset[str]] = {
+    "tpch": _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
+    "tpc-h": _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
+}
+
+
+def get_parameter_sensitive_query_ids(benchmark_type: str) -> frozenset[str]:
+    """Return the parameter-sensitive query-id set for a benchmark, if any.
+
+    Empty frozenset for benchmarks with no known parameter-sensitive queries
+    (e.g. TPC-DS today) -- the exclusion check in validate_query_result()
+    never fires for them.
+    """
+    return _PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK.get(benchmark_type.lower(), frozenset())
+
+
+# Thread-local reference-seed determination. Set by the TPC-H power/throughput
+# drivers (benchbox.core.tpch.power_test, benchbox.core.tpch.throughput_test)
+# immediately before executing a query, and read here to decide whether a
+# parameter-sensitive query's EXACT-mode mismatch should be excluded instead
+# of failed. Thread-local (not a plain module global) because throughput
+# streams execute concurrently, one thread per stream (see
+# benchbox.core.throughput.runner.StreamRunner) -- a single shared global
+# would let one stream's context leak into a concurrently-running stream's
+# validation call.
+_reference_seed_state = threading.local()
+
+
+def set_reference_seed_context(is_reference_seed: bool | None) -> None:
+    """Record, for the CURRENT THREAD, whether the query about to run through
+    QueryValidator is using the pinned TPC reference seed's substitution
+    parameters.
+
+    This module never derives or compares seeds itself -- callers (the TPC-H
+    power/throughput drivers) compute the comparison against
+    benchbox.core.tpch.benchmark.get_reference_seed() and pass the result in.
+
+    Values:
+        True: this query's actual seed matches the reference seed for its
+            scale factor (or the run used qgen defaults, which the TPC-H
+            drivers treat as reference-equivalent) -- exact validation
+            applies normally, with no exclusion.
+        False: this query is running under different substitution parameters
+            than the reference answer set -- get_parameter_sensitive_query_ids
+            entries are excluded from EXACT-mode failure rather than
+            compared.
+        None (the default/unset value): unknown -- preserves the pre-existing
+            behavior of always attempting EXACT validation. Benchmarks that
+            never call this function (TPC-DS, DataFrame validation, any other
+            QueryValidator caller) are therefore completely unaffected by the
+            exclusion below.
+    """
+    _reference_seed_state.is_reference_seed = is_reference_seed
+
+
+def get_reference_seed_context() -> bool | None:
+    """Return the current thread's reference-seed determination, if set."""
+    return getattr(_reference_seed_state, "is_reference_seed", None)
+
+
+def clear_reference_seed_context() -> None:
+    """Reset the current thread's reference-seed context to unset (None)."""
+    _reference_seed_state.is_reference_seed = None
 
 
 class QueryValidator:
@@ -131,6 +204,31 @@ class QueryValidator:
         # Normalize query_id for lookups in expected results
         # Benchmarks may use int keys but expected results use string keys
         query_id_normalized = self._normalize_query_id(benchmark_type, query_id)
+
+        # Parameter-sensitive exclusion (non-reference-seed runs only). TPC-H's
+        # answer-set-boundary queries (Q11/16/18/20 -- see
+        # get_parameter_sensitive_query_ids) only have a validated cardinality
+        # under the pinned reference seed's substitution parameters. When the
+        # caller has told us (via set_reference_seed_context) that the CURRENT
+        # query is running under different parameters, cardinality validation
+        # is inapplicable rather than a false failure -- mirrors the bounded
+        # correctness gate's existing exclusion policy (see
+        # docs/operations/release-guide.md: "Q11/Q16/Q18/Q20 ... excluded for
+        # answer-set boundary sensitivity"). Checked BEFORE the registry
+        # lookup so it applies regardless of what stream_id the caller passed.
+        # Reference-seed runs (context is True) and callers that never set the
+        # context (None, e.g. TPC-DS, DataFrame validation) are unaffected.
+        if get_reference_seed_context() is False and query_id_normalized in get_parameter_sensitive_query_ids(
+            benchmark_type
+        ):
+            return ValidationResult(
+                is_valid=True,
+                query_id=query_id_str,
+                expected_row_count=None,
+                actual_row_count=actual_row_count,
+                validation_mode=ValidationMode.SKIP,
+                warning_message=(f"Query '{query_id}' not validated (parameter-sensitive, non-reference params)."),
+            )
 
         # Get expected result from registry
         expected_result = self.registry.get_expected_result(

@@ -1,7 +1,7 @@
 ---
 id: 2026-07-12-164408-hand-maintained-capability-matrices-drift
 date: 2026-07-12
-status: open
+status: actioned
 finding_kind: bug-class
 review_context: "tuning-system deep review / claude/tuning-system-review-7mzapy"
 related_paths:
@@ -31,3 +31,7 @@ per-platform feature matrices by hand.
 ## Suggested next steps
 - [ ] Add a cross-consistency unit test over the existing sources as a stopgap (fails on new drift).
 - [ ] Evaluate a single capability registry that the other five artifacts derive from.
+
+## Triage log
+
+- 2026-07-16: actioned — remediated by tuning batch PRs 1164-1183

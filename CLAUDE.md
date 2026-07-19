@@ -22,8 +22,10 @@ Default write-task close-out: implement → `code review` (fix every finding,
 incl. nits) → `make pr-open` (see AGENTS.md).
 **Dev PRs land via squash auto-merge once CI passes** — `make pr-open`
 enables it automatically except for soundness-critical comparator and
-plan-parser paths covered by `.github/CODEOWNERS`; those PRs wait for
-Code Owner review before merge. In remote/cloud sessions (no `make`/`gh`,
+plan-parser paths covered by `.github/CODEOWNERS`; those PRs get no
+auto-merge — the maintainer reviews the diff and merges manually (no
+ruleset forces an approval; that target was retired 2026-07-18, see
+docs/operations/repo-admin-settings.md). In remote/cloud sessions (no `make`/`gh`,
 PRs created via GitHub MCP), enable squash auto-merge right after
 opening the PR instead of waiting for a manual merge instruction unless
 that soundness-path exception applies.
@@ -87,7 +89,7 @@ command is the explicit-recording entrypoint.
 - **PR/Worktree (read-only)**: `make pr-preflight`, `make pr-preflight-fast-tests`, `make pr-content-guard *`, `make pr-status`, `make dev-loop-metrics`, `make worktree-pool-status`, `make worktree-pool-check`, `make worktree-list`, `git worktree list*`, `gh pr list*`, `gh pr view*`, `gh pr checks*`
 - **PR/Worktree (write — feature/pool worktrees only)**: `make pr-open`, `make pr-fanout`, `make pr-refresh`, `make worktree-claim BRANCH=*`, `make worktree-release`, `make worktree-pool-sweep-stale`, `git push -u origin chore/*`, `git push -u origin fix/*`, `git push -u origin feat/*`, `git push -u origin docs/*`, `gh pr create --fill*`, `gh pr merge --auto --squash*`
 - **Manual/admin escape hatches** (not broad auto-allow): `make worktree-pool-init`, `make worktree-pool-reset POOL=NN`, `make worktree-prune`
-- **Never auto-allowed**: `git push * develop`, `git push * main`, `git push --force*`, `gh pr create --base main*` — prompt-on-use
+- **Never auto-allowed**: `git push * develop`, `git push * release`, `git push --force*`, `gh pr create --base release*` — prompt-on-use
 - **Files**: `ls*`, `find*`, `cat*`, `head*`, `tail*`, `wc*`, `file*`, `stat*`, `du*`, `tree*`, `which*`
 - **Git**: `git status`, `git diff*`, `git log*`, `git show*`, `git branch*`, `git remote*`, `git config --list`, `git worktree list*`
 - **Python**: `uv tree`, `uv pip list`, `uv pip show*`, `uv export`, `uv run -- python -c*`, `uv run -- python -m*`

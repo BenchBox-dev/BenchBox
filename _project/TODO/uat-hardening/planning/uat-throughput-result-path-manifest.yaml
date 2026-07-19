@@ -1,0 +1,110 @@
+id: uat-throughput-result-path-manifest
+title: "Replace throughput glob resolution with a result-path manifest emitted by run-official"
+worktree: uat-hardening
+priority: Medium
+status: Not Started
+category: "Bug Fix / Data Pipeline"
+
+description: |
+  Promoted from the deferred item in
+  [[uat-throughput-result-resolution-hardening]] (surfaced by the UAT-effort
+  assessment, 2026-07-16). That item hardens the filename-glob + mtime resolver
+  (exact platform token, scale token, deterministic tie-break, narrower nightly
+  window) but keeps glob resolution in principle: the official/throughput cell
+  still discovers its result JSON by matching filenames rather than reading a
+  path the producer told it. Any glob is inference; the sound fix is for
+  `run-official` to emit the exact result path it wrote (a small manifest or a
+  quiet path line) and for UAT to consume that.
+
+  Gated on the hardening item (which stabilises the glob as the interim) AND on
+  a `benchbox` CLI surface decision: `run-official` has no `--quiet` today, and
+  the parent explicitly deferred this because it "requires a benchbox CLI
+  surface change (run-official output contract) which the no-CLI-surface-drift
+  constraint makes a bigger conversation." That contract decision is the real
+  precondition, not just the parent's code.
+
+work:
+  - id: w0
+    summary: "Re-validate the hardened glob is in place and scope the run-official output contract"
+    status: pending
+    needs: []
+    notes: |
+      Confirm the parent's hardened resolver landed. Inventory run-official's
+      current stdout/exit contract and how every other cell already uses the
+      quiet result-path line (tests/uat/runner.py) so the manifest mirrors an
+      existing convention rather than inventing one.
+  - id: w1
+    summary: "Design the result-path contract (reuse the quiet-path convention or a per-run manifest)"
+    status: pending
+    needs: [w0]
+    notes: |
+      Decide between (a) giving run-official the same --quiet result-path line
+      the other cells consume, or (b) a per-run manifest file. Prefer (a) for
+      surface consistency unless run-official emits multiple result paths.
+      This is a public-contract change — must go through the contract-map /
+      CODEOWNERS review, not slipped in.
+  - id: w2
+    summary: "Emit the path from run-official and switch UAT to consume it; retire the glob"
+    status: pending
+    needs: [w1]
+    notes: |
+      Implement the chosen contract, replace resolve_official_result_path's glob
+      body with a read of the emitted path (keep the signature per the parent's
+      must_preserve), and delete the mtime-window logic. Keep a loud failure if
+      the path is absent rather than silently falling back to glob.
+
+      Handoff: tests/uat/runner.py's `official` branch (currently ~line 241-251)
+      calls resolve_official_result_path directly and does not pass or parse
+      `stdout_text` at all -- only the non-official `else` branch does
+      (last_nonempty_output_line(stdout_text)). If w1 picks the quiet-stdout-line
+      contract, runner.py's official branch must be updated to read that line the
+      same way the non-official branch already does; if w1 picks a manifest file,
+      runner.py must locate/pass it instead. Either way runner.py's official
+      branch changes, so it (and test_runner.py) must be in scope, not just the
+      resolver + CLI.
+
+deferred:
+  - summary: "Backfill emitted-path contract to other non-quiet producers if any remain"
+    reason: "Scope here is the official/throughput path; a broader producer audit is separate."
+
+deps:
+  needs: [uat-throughput-result-resolution-hardening]
+
+prior_art:
+  - "tests/uat/throughput.py:resolve_official_result_path — the glob resolver this retires; preserve its signature so runner.py/nightly consumers do not churn."
+  - "tests/uat/runner.py quiet result-path consumption — the existing convention every other cell uses; mirror it rather than inventing a new manifest format if possible."
+  - "docs/reference/public-contracts.md — run-official output is a public contract surface; a new emitted-path line must be recorded here."
+
+must_preserve:
+  - "resolve_official_result_path signature stays backward-compatible (per the parent item's must_preserve)."
+  - "No silent fallback to glob — a missing emitted path must fail loudly, or the drift this fixes returns."
+
+approach: |
+  Contract-first: the CLI output decision (w1) gates the code. Once run-official
+  emits its result path, the UAT resolver becomes a read, not a search, and the
+  whole class of substring/scale/tie-break bugs the parent hardened against
+  disappears at the source.
+
+anti_patterns:
+  - "DO NOT keep the glob as a 'just in case' fallback — dual resolution reintroduces the ambiguity."
+  - "DO NOT change run-official output without updating docs/reference/public-contracts.md and passing contract review."
+
+verification:
+  - description: "Resolver reads an emitted path; glob body removed; contract documented"
+    command: "grep -n 'glob\\|iglob\\|mtime' tests/uat/throughput.py; grep -rn 'run-official' docs/reference/public-contracts.md"
+    expected_output: "no glob/mtime resolution remains; run-official emitted-path contract documented"
+
+scope_limit:
+  only_modify:
+    - "tests/uat/throughput.py"
+    - "tests/uat/test_throughput.py"
+    - "tests/uat/runner.py"
+    - "tests/uat/test_runner.py"
+    - "benchbox/cli/ (run-official output contract)"
+    - "docs/reference/public-contracts.md"
+
+metadata:
+  tags: [uat, throughput, result-resolution, cli-contract, deeper-question]
+  estimated_effort: Medium
+  created_date: "2026-07-16"
+  source: "UAT-effort assessment 2026-07-16 (deeper-questions promotion); parent uat-throughput-result-resolution-hardening deferred item"

@@ -167,6 +167,19 @@ class MotherDuckAdapter(PlatformAdapter):
         if config.get("memory_limit"):
             adapter_config["memory_limit"] = config["memory_limit"]
 
+        # Pass through tuning provenance/config
+        for key in [
+            "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
+            "verbose_enabled",
+            "very_verbose",
+        ]:
+            if key in config:
+                adapter_config[key] = config[key]
+
         return cls(**adapter_config)
 
     def get_target_dialect(self) -> str:

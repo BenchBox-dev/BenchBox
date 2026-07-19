@@ -1227,6 +1227,23 @@ def test_dry_run_sweep_writes_gate_summary_with_dry_run_verdict(tmp_path: Path):
     assert payload["source_commit_sha"]
 
 
+def test_gate_summary_completed_at_is_offset_aware(tmp_path: Path):
+    """#1162 review: completed_at must carry an explicit UTC offset, not a
+    naive local timestamp -- release_readiness_check.py evaluates the
+    committed evidence in a different process (CI), possibly in a different
+    timezone than the operator who ran the sweep. A naive timestamp there
+    gets reinterpreted against the *evaluating* process's local timezone,
+    which can misjudge freshness near the max-age cutoff.
+    """
+    cfg = validate_config({"name": "gate-tz", "dry_run": True, "phases": ["preflight", "execute", "report"]})
+
+    orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    payload = _read_gate_summary(tmp_path)
+    completed_at = _dt.datetime.fromisoformat(payload["completed_at"])
+    assert completed_at.tzinfo is not None
+
+
 def test_green_sweep_writes_green_gate_summary_with_accounting(tmp_path: Path):
     cfg = validate_config(
         {

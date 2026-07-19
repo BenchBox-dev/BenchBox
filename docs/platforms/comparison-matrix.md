@@ -121,7 +121,7 @@ Zero-infrastructure platforms that run in-process. Ideal for development, testin
 | **SQL Support**    | Full              | Full               | Full               | **DataFrame only** | Full                     |
 
 ```{note}
-**ClickHouse Platforms**: ClickHouse is available as three first-class platforms: `clickhouse-local` (chDB, zero-config), `clickhouse-server` (self-hosted), and `clickhouse-cloud` (managed). The legacy bare `clickhouse` selector still works but is deprecated. See [Migration Guide](clickhouse-migration.md).
+**ClickHouse Platforms**: ClickHouse is available as three first-class platforms: `clickhouse-local` (chDB, zero-config), `clickhouse-server` (self-hosted), and `clickhouse-cloud` (managed). The legacy bare `clickhouse` selector has been removed and now raises an error naming these replacements. See [Migration Guide](clickhouse-migration.md).
 ```
 
 ### Relative Performance Characteristics

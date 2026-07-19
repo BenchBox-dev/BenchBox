@@ -2,7 +2,7 @@ id: uat-resume-shard-config-sprawl
 title: "UAT boundary reset: prune resume-shard config sprawl; define config lifecycle policy"
 worktree: main
 priority: Medium
-status: "Not Started"
+status: Completed
 category: Testing and Quality Assurance
 
 description: |
@@ -25,40 +25,72 @@ description: |
 work:
   - id: w0
     summary: "Re-validate the shard count and classify every file in tests/uat/configs/"
-    status: pending
+    status: done
     notes: |
       Confirm exactly 17 uat-tuned-followup-resume-*-20260505.yaml shards out of
       31 configs. Classify each of the 31 into: reusable template / historical
       evidence / generated rerun shard / ephemeral resume state. Record a compact
       summary.
 
+      RE-VALIDATION (2026-07-16): the cleanup has already landed. This item was
+      misfiled in DONE with a stale `status: Not Started` field and restored to
+      planning on that basis (PR #1181); the work was executed. Evidence:
+        - Zero shards remain at the configs root:
+          `find tests/uat/configs -maxdepth 1 -name '*resume-*20260505*.yaml'`
+          -> 0. Root config count is now 15 (down from 31).
+        - All 17 shards were RELOCATED (not deleted) to
+          tests/uat/configs/generated-rerun-shards/, each carrying a lifecycle
+          header ("# GENERATED rerun shard (frozen historical) ... NOT an
+          editable template; see README.md") plus a directory README.md.
+        - The four-way classification collapsed to three live classes because
+          the resume mechanism itself was RETIRED (see w3): reusable template /
+          historical evidence / generated rerun shard.
+
   - id: w1
     summary: "Define the config-lifecycle policy"
     needs: [w0]
-    status: pending
+    status: done
     notes: |
       Write the policy distinguishing the four categories and where each lives
       (tracked reusable dir vs evidence/archive path vs gitignored scratch vs
       runtime-only resume.json). Align with spec lines 268-277.
 
+      DONE: docs/operations/uat-framework.md has a "Config lifecycle (three
+      classes)" section (reusable template / historical evidence / generated
+      rerun shard); "Historical configs are evidence" is stated. Three classes
+      not four because resume state ceased to be a config class when resume was
+      retired (w3).
+
   - id: w2
     summary: "Relocate or mark the 17 resume shards per the policy"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Move them out of the tracked reusable-config directory (gitignore or an
       evidence/archive path), OR mark them generated/frozen-historical with an
       explicit lifecycle header. Do not leave them masquerading as reusable
       templates.
 
+      DONE: all 17 relocated to tests/uat/configs/generated-rerun-shards/ (both
+      approaches applied) — moved out of the reusable-config root AND each file
+      stamped with a frozen-historical lifecycle header, alongside a README.md.
+      Relocated, not deleted, preserving evidence retrievability.
+
   - id: w3
     summary: "Document resume.json as ephemeral resume state and remove any 'resume config' ambiguity"
     needs: [w1]
-    status: pending
+    status: done
     notes: |
       Make clear in docs/operations and/or the spec that resume.json is the
       ephemeral resume mechanism; resume *configs* are not a reusable artifact
       class.
+
+      DONE (superseded upstream): the resume mechanism was RETIRED entirely
+      (_project/specs/uat-framework.md:295 "Resume (retired)"; the
+      `--resume <manifest>`/resume.json path was removed under
+      [[uat-resume-retirement-artifact-durability]]). This eliminates the
+      "resume config" ambiguity at the root rather than merely documenting it,
+      so no reusable "resume config" artifact class can exist.
 
 deferred:
   - summary: "Auto-expire or auto-archive generated rerun shards"
@@ -71,7 +103,15 @@ metadata:
     - tech-debt
   estimated_effort: "Small"
   created_date: "2026-05-31"
-  last_updated: "2026-05-31T00:00:00Z"
+  last_updated: "2026-07-16T00:00:00-04:00"
+  completed_date: "2026-07-16"
+  completion_note: |
+    Closed as already-implemented. The 17 shards were relocated to
+    generated-rerun-shards/ with lifecycle headers + README, the config-lifecycle
+    policy was documented, and the resume mechanism was retired upstream — all
+    before this item's erroneous DONE-filing; PR #1181 restored it to planning on
+    the stale "Not Started" field. Tree re-validation on 2026-07-16 confirms the
+    verification block green. No new work.
 
 impact:
   technical_debt: |

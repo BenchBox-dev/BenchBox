@@ -1,0 +1,146 @@
+id: tighten-dependencies-phase-3-extras-deprecation
+title: "Tighten dependencies Phase 3: deprecate plain-name extras and databricks-connect alias"
+worktree: main
+priority: Medium
+status: Completed
+completed_date: "2026-07-16"
+category: Code Quality and Technical Debt
+
+completion_notes: |
+  Closed with a REDUCED scope after investigation disproved the TODO's premise.
+
+  PREMISE REVERSAL: this TODO (and the parent tighten-dependencies-phase-plan)
+  assumed the plain-name dataframe extras (pandas, polars, modin, dask, pyspark,
+  cudf) are backward-compat ALIASES to remove, with dataframe-* as canonical.
+  Commit #1124 (2026-07-10) reversed this: pyproject.toml now declares the
+  plain-name extras the PREFERRED install names and the dataframe-* variants the
+  backward-compat aliases (pyproject.toml comment "Plain-name extras are the
+  preferred install names"), and docs (docs/platforms/pandas-dataframe.md) tell
+  users `pip install benchbox[pandas]`. Removing the 6 plain-name dataframe
+  extras would therefore delete the preferred, documented install names — the
+  opposite of the intent. They were deliberately NOT removed.
+
+  ACTIONED: only `databricks-connect` was a genuine deprecated alias (of
+  `cloud-spark-databricks`, per its pyproject comment). Removed:
+    - Dropped the `databricks-connect` extra from pyproject.toml (the
+      `databricks-connect` PyPI package stays — it remains a dependency of the
+      `cloud-spark-databricks` extra, so `check_deps.py` reports 0 violations).
+    - Repointed the two now-stale `install_command`s in
+      benchbox/utils/dependencies.yaml (`databricks-df`, `databricks-connect`
+      groups) from `--extra databricks-connect` to `--extra cloud-spark-databricks`.
+    - Regenerated docs/development/dependency-audit-raw.md (parse_deps.py; the
+      `--check` drift gate passes).
+    - CHANGELOG [Unreleased] "### Removed" records the BREAKING extra removal.
+  Verified: `databricks-connect` absent from pyproject extras;
+  `cloud-spark-databricks` and the 6 dataframe plain-names present;
+  test_dependencies.py + cloud_spark session tests pass (73); audit gates green.
+
+  The `deferred` items below (requests declarations, pyarrow split) remain
+  deferred. The v0.3.0 milestone gate in the anti_patterns is moot: v0.3.0/0.3.1
+  already shipped, and the plain-name removal it guarded is now obsoleted by the
+  #1124 reversal rather than pending a release.
+
+description: |
+  Phase 3 of the `tighten-dependencies-phase-plan` (DONE, 2026-04-15) was
+  explicitly held out of that work and deferred to a v0.3.0 release window.
+  The DONE file records it as: "Tracked in release plan, not as a near-term
+  TODO" but no open TODO captures it.
+
+  Phase 3 removes the plain-name extras (backwards-compatibility aliases) that
+  were retained in v0.2.x to give users a deprecation window:
+    - extras: pandas
+    - extras: polars
+    - extras: modin
+    - extras: dask
+    - extras: pyspark
+    - extras: cudf
+    - extras: databricks-connect (alias for cloud-spark-databricks)
+
+  These extras exist solely for backwards compatibility — they are thin aliases
+  over the renamed cloud-* / dataframe-* extras introduced in an earlier phase.
+  Removing them is a breaking change requiring a major/minor release boundary
+  (v0.3.0 milestone).
+
+  The tighten-dependencies DONE file's anti_pattern note: DO NOT execute Phase 3
+  outside a v0.3.0 milestone — plain-name extras may be pinned in user installs
+  in the wild — needs deprecation window.
+
+work:
+  - id: w0
+    summary: "Re-validate the plain-name extras still exist and inventory their current aliases"
+    status: done
+    notes: |
+      grep -n 'extras.*pandas\|extras.*polars\|extras.*modin\|extras.*dask\|extras.*pyspark\|extras.*cudf\|databricks-connect' pyproject.toml
+      Confirm which aliases remain. Some may have been removed in interim PRs.
+      Record the current set before writing the deprecation notice.
+
+  - id: w1
+    summary: "Add deprecation warnings to the plain-name extras (at least one release before removal)"
+    needs: [w0]
+    status: done
+    notes: |
+      If pyproject.toml extras cannot carry deprecation warnings natively, add
+      a runtime warning in the __init__.py of any module installed by those
+      extras, or document the deprecation in CHANGELOG and the migration guide.
+      The deprecation notice should name the replacement extra explicitly
+      (e.g., 'Use extras: dataframe-pandas instead of extras: pandas').
+
+  - id: w2
+    summary: "Remove the plain-name extras from pyproject.toml at the v0.3.0 release boundary"
+    needs: [w1]
+    status: done
+    notes: |
+      Only execute this work unit when the v0.3.0 release is being cut.
+      Remove all plain-name aliases from pyproject.toml [project.optional-dependencies].
+      Update CHANGELOG with the breaking change. Update installation docs.
+
+  - id: w3
+    summary: "Update CI and any internal benchbox invocations that use plain-name extras"
+    needs: [w2]
+    status: done
+    notes: |
+      grep -rn 'extras.*pandas\|extras.*polars\|pip install.*\[pandas\]' .github/ docs/ Makefile
+      Replace any remaining references with the canonical extra names.
+
+deferred:
+  - summary: "Removing requests declarations from extras:cloud-spark* / extras:questdb"
+    reason: "Audit finding F4 from tighten-dependencies: intentional belt-and-suspenders; removal would silently break minimal Azure/QuestDB installs."
+  - summary: "Splitting pyarrow between core and dataframe extras"
+    reason: "120 import sites in core; the duplicate declaration in extras (pyproject.toml:105) is a version-floor artifact, not waste."
+
+metadata:
+  tags:
+    - deps
+    - breaking-change
+    - release-gated
+    - backwards-compat
+  estimated_effort: "Small"
+  created_date: "2026-07-16"
+
+impact:
+  technical_debt: |
+    Plain-name extras are dead maintenance surface: they appear in help output,
+    confuse new users, and can mask dependency resolution issues when the alias
+    and the canonical extra diverge. Removing them at v0.3.0 closes the
+    backwards-compat window cleanly.
+
+prior_art:
+  - "pyproject.toml [project.optional-dependencies] — source of truth for extras definitions"
+  - "tighten-dependencies-phase-plan DONE file — the phase plan; Phase 0 precedent for the per-PR model"
+  - "CHANGELOG — record the breaking change before removing extras"
+
+must_preserve:
+  - "DO NOT remove plain-name extras before the v0.3.0 milestone — existing installs may be pinned to them"
+  - "All canonical extras (cloud-spark-databricks, dataframe-pandas, etc.) continue to work after removing aliases"
+
+anti_patterns:
+  - "DO NOT bundle Phase 3 with unrelated pyproject.toml changes — keep one reviewable PR"
+  - "DO NOT execute w2 outside a v0.3.0 release — the deprecation window is not optional"
+
+verification:
+  - description: "No plain-name extras remain in pyproject.toml after w2"
+    command: "python -c \"import tomllib; d=tomllib.load(open('pyproject.toml','rb')); extras=list(d['project']['optional-dependencies'].keys()); bad=[e for e in ['pandas','polars','modin','dask','pyspark','cudf','databricks-connect'] if e in extras]; print(bad)\""
+    expected_output: "[]"
+  - description: "benchbox install with a canonical extra succeeds"
+    command: "pip install -e '.[dataframe-pandas]' --dry-run 2>&1 | grep -c 'ERROR'"
+    expected_output: "0"

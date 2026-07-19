@@ -499,6 +499,14 @@ class TodoCLI:
             status = data.get("status", "Not Started")
             if status == "Completed":
                 continue
+            if status == "Blocked":
+                # No deps.needs entry required: an item can be gated on an
+                # external trigger condition (e.g. "activate when a second
+                # consumer exists") that isn't expressible as another TODO's
+                # id. status: Blocked alone must keep it out of the ready
+                # queue, or the gate is decorative.
+                blocked_items.append((slug, data, ["status: Blocked"]))
+                continue
 
             # Check inter-item deps
             deps = data.get("deps", {})
@@ -888,7 +896,7 @@ class TodoCLI:
             )
             if branch_result.returncode == 0:
                 current_branch = branch_result.stdout.strip()
-                if current_branch in ("develop", "main"):
+                if current_branch in ("develop", "release"):
                     print(
                         f"❌ Error: Direct commits to '{current_branch}' are prohibited by BenchBox durable commit guidelines.\n"
                         f"Please claim a worktree first (e.g., 'make worktree-claim BRANCH=chore/...') and run cleanup from a feature branch.\n",

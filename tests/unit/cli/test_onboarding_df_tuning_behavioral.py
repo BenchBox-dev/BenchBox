@@ -1,17 +1,15 @@
-"""Behavioral tests for onboarding and deprecated df-tuning CLI flows."""
+"""Behavioral tests for onboarding and the DataFrame tuning profile helper."""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
-from click.testing import CliRunner
 from rich.panel import Panel
 
-from benchbox.cli.app import cli
-from benchbox.cli.commands.df_tuning import _create_profile_config
+from benchbox.cli.commands.tuning_group import _create_profile_config
 from benchbox.cli.onboarding import (
     _create_benchmark_help,
     _create_concurrency_help,
@@ -228,8 +226,13 @@ class TestFirstRunOnboarding:
         assert panels[0].title == "Help: Tuning Mode"
 
 
-class TestDfTuningHelpers:
-    """Tests for df-tuning helper behavior."""
+class TestCreateProfileConfigHelper:
+    """Tests for tuning_group._create_profile_config, used by `tuning init --mode dataframe`.
+
+    The deprecated `df-tuning` command group (which used to re-export this
+    helper) was retired by the tuning-renderer-consolidation-and-baseline-policy
+    TODO's w5; this helper itself is not deprecated and stays covered here.
+    """
 
     def test_create_profile_config_for_polars_optimized(self):
         """Optimized Polars profile should enable lazy in-memory execution."""
@@ -254,106 +257,3 @@ class TestDfTuningHelpers:
 
         assert config.gpu.enabled is True
         assert any("GPU profile is only applicable to cuDF" in str(call) for call in mock_print.call_args_list)
-
-
-class TestDfTuningCli:
-    """Tests for deprecated df-tuning command flows."""
-
-    def test_create_sample_command_writes_output(self, tmp_path: Path):
-        """create-sample should write a tuning file and report the chosen profile."""
-        runner = CliRunner()
-        output_path = tmp_path / "polars_optimized.yaml"
-
-        result = runner.invoke(
-            cli,
-            [
-                "df-tuning",
-                "create-sample",
-                "--platform",
-                "polars",
-                "--profile",
-                "optimized",
-                "--output",
-                str(output_path),
-            ],
-        )
-
-        assert result.exit_code == 0
-        assert output_path.exists()
-        assert "Tuning configuration created" in result.output
-        assert "optimized" in result.output.lower()
-
-    def test_validate_command_reports_success(self, tmp_path: Path):
-        """validate should report a valid configuration when no issues are returned."""
-        runner = CliRunner()
-        config_path = tmp_path / "config.yaml"
-        config_path.write_text("placeholder: true\n", encoding="utf-8")
-        config = MagicMock()
-        config.get_summary.return_value = {
-            "setting_count": 1,
-            "has_streaming": True,
-            "has_gpu": False,
-        }
-
-        with (
-            patch.object(_tuning_group_module, "load_dataframe_tuning", return_value=config),
-            patch.object(_tuning_group_module, "validate_dataframe_tuning", return_value=[]),
-        ):
-            result = runner.invoke(cli, ["df-tuning", "validate", str(config_path), "--platform", "polars"])
-
-        assert result.exit_code == 0
-        assert "Configuration is valid for polars" in result.output
-
-    def test_validate_command_aborts_on_errors(self, tmp_path: Path):
-        """validate should fail when the validator reports errors."""
-        runner = CliRunner()
-        config_path = tmp_path / "config.yaml"
-        config_path.write_text("placeholder: true\n", encoding="utf-8")
-        issues = [{"severity": "error", "message": "bad config"}]
-
-        with (
-            patch.object(_tuning_group_module, "load_dataframe_tuning", return_value=MagicMock()),
-            patch.object(_tuning_group_module, "validate_dataframe_tuning", return_value=issues),
-            patch.object(_tuning_group_module, "format_issues", return_value="formatted issues"),
-            patch.object(_tuning_group_module, "has_errors", return_value=True),
-        ):
-            result = runner.invoke(cli, ["df-tuning", "validate", str(config_path), "--platform", "polars"])
-
-        assert result.exit_code != 0
-        assert "Configuration has errors that must be fixed" in result.output
-
-    def test_show_defaults_command_displays_detected_profile(self):
-        """show-defaults should render system profile and recommended settings."""
-        runner = CliRunner()
-        config = DataFrameTuningConfiguration()
-        config.execution.streaming_mode = True
-
-        with (
-            patch.object(_tuning_group_module, "detect_system_profile", return_value=MagicMock()),
-            patch.object(
-                _tuning_group_module,
-                "get_profile_summary",
-                return_value={
-                    "cpu_cores": 8,
-                    "available_memory_gb": 16.0,
-                    "memory_category": "medium",
-                    "has_gpu": False,
-                },
-            ),
-            patch.object(_tuning_group_module, "get_smart_defaults", return_value=config),
-        ):
-            result = runner.invoke(cli, ["df-tuning", "show-defaults", "--platform", "polars"])
-
-        assert result.exit_code == 0
-        assert "Detected System Profile" in result.output
-        assert "Recommended Settings for Polars" in result.output
-
-    def test_list_platforms_command_displays_platform_table(self):
-        """list-platforms should print the supported DataFrame platforms."""
-        runner = CliRunner()
-        result = runner.invoke(cli, ["df-tuning", "list-platforms"])
-
-        assert result.exit_code == 0
-        assert "DataFrame Platforms" in result.output
-        assert "polars" in result.output.lower()
-        assert "cudf" in result.output.lower()

@@ -103,7 +103,7 @@ This means MotherDuck automatically uses DuckDB's query translator and Starburst
 ClickHouse has three first-class platform names, plus a legacy `clickhouse` selector for backwards compatibility.
 
 ```{note}
-The bare `clickhouse` selector and colon syntax (`clickhouse:local`, `clickhouse:server`) are deprecated. Use the first-class names below. See [Migration Guide](clickhouse-migration.md).
+The bare `clickhouse` selector has been removed (it now raises an error). The colon syntax (`clickhouse:local`, `clickhouse:server`) is deprecated but still works. Use the first-class names below. See [Migration Guide](clickhouse-migration.md).
 ```
 
 ### clickhouse-local (chDB)

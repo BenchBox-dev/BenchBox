@@ -2,7 +2,7 @@ name: Documentation
 
 on:
   push:
-    branches: [main]
+    branches: [release]
     paths:
       - "benchbox/**"
       - "docs/**"
@@ -19,7 +19,7 @@ on:
       - "README.md"
       - "pyproject.toml"
   pull_request:
-    branches: [main, develop]
+    branches: [release, develop]
     paths:
       - "benchbox/**"
       - "docs/**"
@@ -203,7 +203,7 @@ jobs:
   # Isolated as its own job so the github-pages environment protection
   # rules don't gate the build job on PRs.
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
     needs: build
     runs-on: ubuntu-latest
     environment:

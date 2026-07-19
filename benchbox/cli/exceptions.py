@@ -9,6 +9,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Union
 
+import click
 from rich.console import Console
 from rich.markup import escape
 
@@ -493,3 +494,19 @@ class ValidationRules:
                     f"Cannot create output directory: {output_dir}",
                     details={"path": output_dir, "error": str(e)},
                 ) from e
+
+    @staticmethod
+    def validate_dry_run_output_dir(ctx: click.Context, param: click.Parameter, value: Optional[str]) -> Optional[str]:
+        """Click callback: reject option-like values for --dry-run OUTPUT_DIR.
+
+        --dry-run takes a required directory argument, so a following flag
+        (e.g. `--dry-run --non-interactive`) is silently consumed as the
+        directory name, creating a directory literally named
+        "--non-interactive". Fail fast with a clear message instead.
+        """
+        if value is not None and value.startswith("-"):
+            raise click.BadParameter(
+                f"'{value}' looks like a command-line flag, not a directory. "
+                "Pass a directory for --dry-run, e.g. --dry-run ./preview --non-interactive."
+            )
+        return value

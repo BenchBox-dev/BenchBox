@@ -1,7 +1,7 @@
 ---
 id: 2026-05-23-223538-todo-review-misses-spec-the-todo-edits
 date: 2026-05-23
-status: open
+status: actionable
 finding_kind: framework-gap
 review_context: "/todo review — chore/shrink-review-followup-todos (shrink-campaign follow-ups)"
 related_paths:
@@ -41,3 +41,8 @@ external dependencies.
       and diffs against the quoted text (score 0 if absent).
 - [ ] Spot-check other active TODOs for spec line-number citations that can
       drift (sql-catalog already corrected to a stable phrase reference here).
+
+## Triage log
+
+- 2026-07-18: actionable — The original shrink TODO is completed in DONE/ as of 2026-05-24, but recheck of the current /todo review rubric shows the own-edit-target freshness gap remains; revised the record to separate the resolved example from the live framework gap.
+- 2026-07-19: actionable — The 2026-07-18 pass rewrote the title and `## Finding` body in place instead of confining its update to this Triage log, losing the original verbatim finding (per this directory's README: `## Finding` is verbatim audit text, triage may only touch frontmatter `status`/`todo_id` plus append here). Restored the original 2026-05-23 title and Finding text verbatim from git history (commit 9833fedc); the 2026-07-18 entry's substance (shrink TODO completed in DONE/, review-framework gap still live) stands as the triage-log record of that recheck.

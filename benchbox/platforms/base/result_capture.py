@@ -1441,6 +1441,7 @@ class ResultCaptureMixin:
         tunings_applied_dict,
         tuning_validation_status,
         tuning_metadata_saved,
+        requested_config_hash=None,
     ):
         """Create a benchmark result indicating validation failure."""
         from datetime import datetime as _datetime
@@ -1501,6 +1502,9 @@ class ResultCaptureMixin:
             tunings_applied=tunings_applied_dict,
             tuning_validation_status=tuning_validation_status,
             tuning_metadata_saved=tuning_metadata_saved,
+            tuning_config_hash=requested_config_hash,
+            tuning_source_file=getattr(self, "tuning_source_file", None),
+            tuning_source=getattr(self, "tuning_source", None),
             platform_info=platform_info,
             **normalized_metadata,
             validation_status="FAILED",  # This is the key fix

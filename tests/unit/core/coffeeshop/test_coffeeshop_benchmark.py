@@ -126,3 +126,24 @@ class TestCoffeeShopBenchmarkLoadAndRun:
     def test_run_benchmark_avg_time_positive(self, coffeeshop, loaded_conn):
         result = coffeeshop.run_benchmark(loaded_conn, queries=["SA1"])
         assert result["query_results"][0]["avg_time"] > 0
+
+
+class TestCoffeeShopBenchmarkTableLoadingOrder:
+    """Regression coverage for tuning-fk-load-ordering-fix-20260716: before
+    this fix, CoffeeShopBenchmark had no get_table_loading_order, so
+    benchbox/platforms/base/data_loading.py::DataLoader fell back to
+    alphabetical order for whatever table set was actually discovered.
+    """
+
+    def test_orders_a_shuffled_available_subset_fk_safely(self, coffeeshop):
+        available = ["order_lines", "dim_products", "dim_locations"]
+        order = coffeeshop.get_table_loading_order(available)
+
+        assert set(order) == set(available)
+        position = {name: i for i, name in enumerate(order)}
+        assert position["dim_locations"] < position["order_lines"]
+        assert position["dim_products"] < position["order_lines"]
+
+    def test_unknown_table_is_preserved_not_dropped(self, coffeeshop):
+        order = coffeeshop.get_table_loading_order(["dim_locations", "some_extra_table"])
+        assert "some_extra_table" in order

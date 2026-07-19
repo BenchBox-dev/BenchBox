@@ -335,6 +335,10 @@ class DatabricksAdapter(PlatformAdapter):
         # Pass through other relevant config
         for key in [
             "tuning_config",
+            "tuning_enabled",
+            "unified_tuning_configuration",
+            "tuning_source",
+            "tuning_source_file",
             "verbose_enabled",
             "very_verbose",
             "uc_catalog",

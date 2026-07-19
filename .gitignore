@@ -99,6 +99,10 @@ _project/*
 !_project/LAUNCH_*.md
 !_project/CONTENT_*.md
 !_project/SOCIAL_*.md
+# Committed TODO-tracker export snapshot (written weekly by
+# .github/workflows/todo-db-export.yml) -- provenance trail, must be tracked.
+!_project/todo-db-export/
+!_project/todo-db-export/**
 
 # Include pre-compiled TPC binaries for distribution
 !_binaries/
@@ -182,6 +186,10 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 # pure functions of the per-item _project/{TODO,DONE}/**/*.yaml files.
 _project/TODO/_indexes/
 _project/DONE/_indexes/
+
+# Local-SQLite TODO tracker spike (see _project/specs/todo-db-tracker.md):
+# per-clone operational state, never committed.
+.todo-db/
 _project/blind-spots/_indexes/
 
 # Ephemeral review/audit evidence. Commit durable markdown summaries instead.

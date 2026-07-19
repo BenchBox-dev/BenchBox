@@ -1,0 +1,256 @@
+name: TODO DB weekly export
+
+# Sanctioned exception to the DB-free-CI rule (_project/specs/todo-db-tracker.md,
+# "CI stays DB-free"): this is the ONLY workflow that connects to the hosted
+# TODO tracker database. It runs `todo export` weekly with a READ-ONLY Turso
+# token and lands the deterministic JSONL + markdown snapshot on develop through
+# an auto-merging, path-scoped PR, so the repo carries a reviewable provenance
+# trail and a vendor-lock escape hatch that contains full tracker state. The job
+# is load-bearing for provenance, so it ALERTS ON FAILURE (upserts an
+# incident:todo-export-failed issue) and clears that incident on the next
+# success.
+#
+# Provisioning (maintainer, one-time -- an agent session cannot do either step;
+# minting needs the logged-in `turso` CLI and secrets need repo admin):
+#   1. Mint a READ-ONLY token -- never the read-write session token:
+#        turso db tokens create benchbox-todo --read-only --expiration none
+#      (or a long expiry you commit to rotating; --read-only is mandatory).
+#   2. Add two repository secrets:
+#        TODO_DB_URL           = libsql://benchbox-todo-<...>.turso.io
+#        TODO_DB_RO_AUTH_TOKEN = <the read-only token from step 1>
+# Until both secrets exist the scheduled run fails loudly and opens the incident
+# issue -- intentional: a silently non-exporting provenance job is worse than a
+# noisy one.
+#
+# Auto-merge requires a THIRD secret (optional but needed for hands-free weekly
+# landings):
+#   3. TODO_EXPORT_PR_TOKEN = a fine-grained PAT (this repo; contents +
+#      pull-requests: write) or a GitHub App installation token.
+# Rationale: GitHub deliberately does NOT trigger workflows for events raised by
+# the built-in GITHUB_TOKEN, so a PR opened/pushed with it never runs pr.yml and
+# its required `ci-required-result` check never reports -- auto-merge would wait
+# forever. A non-GITHUB_TOKEN identity makes pr.yml run so the check reports and
+# auto-merge completes. Without this secret the workflow still runs and opens the
+# snapshot PR, but leaves it for MANUAL merge (and says so) instead of enabling a
+# stuck auto-merge. This mirrors why sync-results-data-to-published uses a
+# human-merged PR rather than GITHUB_TOKEN auto-merge.
+
+on:
+  schedule:
+    # Weekly, Sunday 09:00 UTC. Isolated from the daily 03/06/08 jobs and the
+    # Monday 06:00/07:00 cluster to avoid runner contention. Weekly (not nightly)
+    # per the maintainer: the snapshot is a provenance trail, not a live mirror.
+    - cron: '0 9 * * 0'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: todo-db-export
+  cancel-in-progress: false
+
+jobs:
+  export:
+    name: Export tracker DB and land snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Issue/label/incident steps use the built-in token (it has issues:write
+      # via `permissions` below; a fine-grained PR token may not). PR creation +
+      # branch push use TODO_EXPORT_PR_TOKEN when set (checkout `token:` and a
+      # step-level GH_TOKEN override) so pr.yml fires and ci-required-result
+      # reports -- see header.
+      GH_TOKEN: ${{ github.token }}
+      PR_TOKEN_SET: ${{ secrets.TODO_EXPORT_PR_TOKEN != '' }}
+      EXPORT_DIR: _project/todo-db-export
+      SNAPSHOT_BRANCH: chore/todo-db-export-snapshot
+      INCIDENT_LABEL: incident:todo-export-failed
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+          # Persist this token for the branch push: a push authored by the
+          # built-in token would not trigger pr.yml on the PR's synchronize
+          # event either, so the reuse path needs the same identity as creation.
+          token: ${{ secrets.TODO_EXPORT_PR_TOKEN || github.token }}
+
+      - name: Require DB secrets
+        env:
+          SECRET_TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
+          SECRET_TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "${SECRET_TODO_DB_URL:-}" ] || missing+=("TODO_DB_URL")
+          [ -n "${SECRET_TODO_DB_RO_AUTH_TOKEN:-}" ] || missing+=("TODO_DB_RO_AUTH_TOKEN")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required repository secret(s): ${missing[*]}. See this workflow's header comment for provisioning steps." >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Run todo export (read-only token)
+        env:
+          # The CLI reads TODO_DB_AUTH_TOKEN; feed it the READ-ONLY token so the
+          # export path can never mutate the shared tracker DB.
+          TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
+          TODO_DB_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          uv run --project _project/scripts -- \
+            python _project/scripts/todo_db.py export --out "${EXPORT_DIR}"
+
+      - name: Write directory README
+        run: |
+          set -euo pipefail
+          # Self-document the generated directory. Written here (not committed in
+          # the workflow-adding PR) so the .gitignore negation that makes this
+          # tree trackable never lands in the same PR as a tracked file under it
+          # -- gitignore-lint flags a negation pattern that matches a tracked
+          # path, even though a negation un-ignores rather than ignores.
+          cat > "${EXPORT_DIR}/README.md" <<'MD'
+          # TODO tracker export snapshot
+
+          **Auto-generated — do not hand-edit.**
+
+          Deterministic weekly snapshot of the hosted TODO tracker database
+          (`_project/specs/todo-db-tracker.md`), written by
+          `.github/workflows/todo-db-export.yml` with a read-only token.
+
+          - `items.jsonl` — one JSON object per item, keys sorted, ordered by
+            `id`, timestamps from row data (not wall-clock). Full-state
+            vendor-lock escape hatch: the tracker reconstructs from it.
+          - `index.md` — rendered `id / state / priority / worktree / title`.
+
+          This directory's git history is the tracker's provenance trail — the
+          single sanctioned exception to the repo's DB-free-CI rule.
+          MD
+
+      - name: Detect snapshot changes
+        id: diff
+        run: |
+          set -euo pipefail
+          git add "${EXPORT_DIR}"
+          if git diff --staged --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No tracker changes since the last snapshot -- nothing to commit."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push snapshot branch
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Fetch the snapshot branch's current remote state (if any) so
+          # --force-with-lease below has a real remote-tracking ref to lease
+          # against. The checkout only fetched develop, and the branch name is
+          # fixed (reused every week), so without this the second-and-later push
+          # would be rejected as stale. Harmless on the first run (no branch yet).
+          git fetch --no-tags origin "${SNAPSHOT_BRANCH}:refs/remotes/origin/${SNAPSHOT_BRANCH}" 2>/dev/null || true
+          # Reset the workflow-owned snapshot branch to the develop tip, then
+          # carry the staged export onto it, so the PR diff is exactly this
+          # week's tracker delta against develop. The branch is only ever
+          # managed here, so --force-with-lease is safe (matches the
+          # sync-results-data-to-published convention).
+          git checkout -B "${SNAPSHOT_BRANCH}"
+          git commit -m "chore(todo-db): weekly tracker export snapshot" \
+            -m "Auto-generated by .github/workflows/todo-db-export.yml. Deterministic ${EXPORT_DIR}/ snapshot (stable ordering + row-data timestamps => clean diffs). Provenance trail and vendor-lock escape hatch; do not hand-edit."
+          git push --force-with-lease origin "${SNAPSHOT_BRANCH}"
+
+      - name: Open or reuse auto-merging PR
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          # Author the PR as the PR token (when set) so pr.yml runs for it.
+          GH_TOKEN: ${{ secrets.TODO_EXPORT_PR_TOKEN || github.token }}
+        run: |
+          set -euo pipefail
+          existing="$(gh pr list --base develop --head "${SNAPSHOT_BRANCH}" --state open --json number --jq '.[0].number // empty')"
+          body_file="$(mktemp)"
+          {
+            echo "Auto-generated weekly snapshot of the hosted TODO tracker DB (\`${EXPORT_DIR}/\`)."
+            echo ""
+            echo "The export is deterministic, so this diff is the week's tracker delta."
+            echo "It is the provenance trail (residual-risk mitigation in the todo-db spec)"
+            echo "and the vendor-lock escape hatch -- it contains full tracker state."
+            echo ""
+            echo "Run: ${RUN_URL}"
+          } > "${body_file}"
+          if [ -z "${existing}" ]; then
+            url="$(gh pr create --base develop --head "${SNAPSHOT_BRANCH}" \
+              --title "chore(todo-db): weekly tracker export snapshot" \
+              --body-file "${body_file}")"
+            echo "Opened ${url}"
+          else
+            url="$(gh pr view "${existing}" --json url --jq .url)"
+            gh pr edit "${existing}" --body-file "${body_file}"
+            echo "Reusing PR #${existing} (${url})"
+          fi
+          # Only enable auto-merge when the PR was authored by a token that
+          # triggers pr.yml. With the built-in GITHUB_TOKEN, ci-required-result
+          # never runs, so enabling auto-merge would leave the PR stuck
+          # "waiting for status" forever; leave it for manual merge and say so.
+          if [ "${PR_TOKEN_SET}" = "true" ]; then
+            gh pr merge --auto --squash "${url}" \
+              || echo "::warning::auto-merge enable failed; merge ${url} manually"
+          else
+            echo "::warning::TODO_EXPORT_PR_TOKEN not set — ${url} was authored by GITHUB_TOKEN, so pr.yml/ci-required-result will not run and auto-merge cannot complete. Merge it manually, or provision TODO_EXPORT_PR_TOKEN (see workflow header) for hands-free weekly landings."
+          fi
+
+      - name: Alert on failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          gh label create "${INCIDENT_LABEL}" \
+            --description "Weekly TODO tracker export workflow failed" \
+            --color B60205 >/dev/null 2>&1 || true
+          # One open incident per outage: reuse the existing issue instead of
+          # opening a fresh one every failed run.
+          existing="$(gh issue list --state open --label "${INCIDENT_LABEL}" --json url --jq '.[0].url // empty')"
+          body_file="$(mktemp)"
+          {
+            echo "The weekly TODO tracker export workflow failed."
+            echo ""
+            echo "Run: ${RUN_URL}"
+            echo ""
+            echo "This job is load-bearing for tracker provenance (the export is the"
+            echo "vendor-lock escape hatch). Likely causes: a missing or rotated"
+            echo "TODO_DB_URL / TODO_DB_RO_AUTH_TOKEN secret, the hosted DB being"
+            echo "unreachable, or a schema-version mismatch. See the header of"
+            echo ".github/workflows/todo-db-export.yml for provisioning and rotation."
+          } > "${body_file}"
+          if [ -n "${existing}" ]; then
+            gh issue comment "${existing}" --body-file "${body_file}"
+            echo "Commented on existing incident: ${existing}"
+          else
+            url="$(gh issue create --title "TODO tracker weekly export failed" \
+              --body-file "${body_file}" --label "${INCIDENT_LABEL}")"
+            echo "Opened incident: ${url}"
+          fi
+
+      - name: Clear stale incident on success
+        if: success()
+        run: |
+          set -euo pipefail
+          mapfile -t nums < <(gh issue list --state open --label "${INCIDENT_LABEL}" --json number --jq '.[].number')
+          for n in "${nums[@]:-}"; do
+            [ -n "${n}" ] || continue
+            gh issue close "${n}" \
+              --comment "Weekly export succeeded again at ${RUN_URL}; closing stale incident." \
+              || echo "Failed to close incident #${n}; leaving open." >&2
+          done

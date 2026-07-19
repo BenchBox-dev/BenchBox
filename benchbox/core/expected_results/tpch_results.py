@@ -77,6 +77,26 @@ from benchbox.core.expected_results.models import (
 
 logger = logging.getLogger(__name__)
 
+# Queries whose result cardinality is sensitive to the specific substitution
+# parameters used (not just the scale factor) -- TPC-H's "answer-set boundary"
+# queries. Only the pinned reference-seed answer set is guaranteed to match;
+# a different seed produces valid-but-different query parameters that
+# legitimately shift these queries' row counts, so an EXACT-mode mismatch on
+# a non-reference-seed run is not a correctness regression.
+#
+# The bounded correctness gate (Makefile CORRECTNESS_GATE_QUERY_IDS, see
+# docs/operations/release-guide.md "Q11/Q16/Q18/Q20 ... excluded for
+# answer-set boundary sensitivity") already excludes this same set for the
+# same reason. This constant is the production-code mirror that
+# benchbox.core.validation.query_validation.QueryValidator consults so
+# non-reference-seed runs (custom --seed, throughput streams whose derived
+# seed is base_seed + stream_id*1000 + position) report an exclusion instead
+# of a false EXACT-mode row-count failure. Not the same list object as the
+# Makefile's (that one is test-only env-var plumbing feeding a single
+# integration test, not importable production code) -- kept in sync by
+# convention; a change to either should be reviewed against the other.
+PARAMETER_SENSITIVE_QUERY_IDS: frozenset[str] = frozenset({"11", "16", "18", "20"})
+
 
 def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedResults | None:
     """Get expected results for TPC-H queries at a given scale factor.

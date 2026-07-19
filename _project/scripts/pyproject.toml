@@ -20,6 +20,7 @@ dependencies = [
     # regardless of writer version (kept in sync with the root manifest).
     "duckdb>=1.0.0,<2.0.0",
     "jsonschema>=4.25.1", # validate_todo.py: Draft7Validator
+    "libsql>=0.1.11", # todo_db.py: hosted backend (Turso embedded replica)
     "pyyaml>=6.0.0", # todo_cli.py + validate_todo.py: yaml.safe_load
     "ruamel-yaml>=0.19.1", # todo_cli.py: YAML() for structure-preserving edits (done command)
     "sqlglot>=25.6.0,<31.0.0",

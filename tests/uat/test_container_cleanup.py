@@ -208,6 +208,78 @@ def test_report_renders_mode_and_store_path():
     assert "Retained (widen --mode to reclaim):" in rendered
 
 
+def test_custom_project_prefix_reaches_classification():
+    """#1065 review: --prefix must actually classify resources, not just be
+    echoed in the report. _inventory_resources/_list_images/_list_containers/
+    _list_volumes previously ignored the caller's project_prefix and always
+    classified against the hard-coded DEFAULT_UAT_PROJECT_PREFIX."""
+    custom_images = [
+        {"id": "img-custom", "configuration": {"name": "foo-tpc-h:latest", "creationDate": "2026-07-08T00:00:00Z"}},
+    ]
+    custom_containers = [
+        {
+            "id": "custom-leftover",
+            "configuration": {
+                "id": "custom-leftover",
+                "image": {"reference": "postgres:18"},
+                "labels": {"com.docker.compose.project": "foo-smoke-postgresql"},
+            },
+            "status": {"state": "stopped"},
+        },
+    ]
+
+    def fake(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        if argv_tuple[:4] == ("container", "image", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(custom_images), "")
+        if argv_tuple[:3] == ("container", "ls", "-a"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(custom_containers), "")
+        if argv_tuple[:4] == ("container", "volume", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, "[]", "")
+        if argv_tuple == ("container", "system", "df"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, _SYSTEM_DF, "")
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    report = container_cleanup.reclaim_container_usage(mode="owned", apply=False, project_prefix="foo", runner=fake)
+    assert _targets_by_kind(report) == {
+        "image": {"foo-tpc-h:latest"},
+        "container": {"custom-leftover"},
+    }
+
+
+def test_image_reference_read_from_display_reference_field():
+    """#1065 review: current `container image ls --format json` renders
+    ImageResource rows with the reference at the top-level `displayReference`
+    field, not `configuration.name` (which is empty on those rows)."""
+    images = [
+        {
+            "id": "sha256:abc123",
+            "displayReference": "benchbox/tpc-h-linux-arm64:latest",
+            "configuration": {"descriptor": {"digest": "sha256:abc123"}},
+        },
+        {
+            "id": "sha256:def456",
+            "displayReference": "postgres:18",
+            "configuration": {"descriptor": {"digest": "sha256:def456"}},
+        },
+    ]
+
+    def fake(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        if argv_tuple[:4] == ("container", "image", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(images), "")
+        if argv_tuple[:3] == ("container", "ls", "-a"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, "[]", "")
+        if argv_tuple[:4] == ("container", "volume", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, "[]", "")
+        if argv_tuple == ("container", "system", "df"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, _SYSTEM_DF, "")
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    report = container_cleanup.reclaim_container_usage(mode="owned", apply=False, runner=fake)
+    assert _targets_by_kind(report) == {"image": {"benchbox/tpc-h-linux-arm64:latest"}}
+
+
 # --------------------------------------------------------------------------
 # uat-container-engine-routing w4/w5/w6 regression coverage
 # --------------------------------------------------------------------------
@@ -317,6 +389,39 @@ def test_network_inventory_owned_vs_shared_vs_system():
     max_networks = {r.display_name for r in max_mode.targets if r.kind == "network"}
     assert "developer-bridge" in max_networks
     assert "default" not in max_networks  # system network is never a target, even at max
+
+
+def test_network_name_extending_prefix_without_separator_is_not_owned():
+    """#1158 review: a network without a compose project label whose name
+    merely extends project_prefix (no `-`/`_` boundary) must be classified
+    `shared`, not `owned` -- otherwise `MODE=owned APPLY=1` deletes an
+    unrelated network. The name fallback must use the same separator-aware
+    matching as the project-label check (_is_owned), not a bare startswith.
+    """
+    networks = [
+        *_NETWORKS,
+        {"id": "lookalike-net", "configuration": {"name": "benchbox-uatfoo_default", "labels": {}}},
+    ]
+
+    def fake(argv, **kwargs):
+        argv_tuple = tuple(argv)
+        if argv_tuple[:4] == ("container", "image", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(_IMAGES), "")
+        if argv_tuple[:3] == ("container", "ls", "-a"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(_CONTAINERS), "")
+        if argv_tuple[:4] == ("container", "volume", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(_VOLUMES), "")
+        if argv_tuple[:4] == ("container", "network", "ls", "--format"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, json.dumps(networks), "")
+        if argv_tuple == ("container", "system", "df"):
+            return docker_assets.DockerCommandResult(argv_tuple, 0, _SYSTEM_DF, "")
+        return docker_assets.DockerCommandResult(argv_tuple, 0, "", "")
+
+    owned = container_cleanup.reclaim_container_usage(mode="owned", apply=False, runner=fake)
+    owned_networks = {r.display_name for r in owned.targets if r.kind == "network"}
+    assert "benchbox-uatfoo_default" not in owned_networks
+    retained_networks = {r.display_name for r in owned.retained if r.kind == "network"}
+    assert "benchbox-uatfoo_default" in retained_networks
 
 
 def test_mocker_compose_project_label_is_recognized(monkeypatch):

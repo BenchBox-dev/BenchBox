@@ -65,28 +65,25 @@ def _build_table_ddl_entry(tuning_clauses: Any) -> dict[str, Any]:
         ("sort_by", "sort_by"),
         ("partition_by", "partition_by"),
         ("cluster_by", "cluster_by"),
-        ("distribution_key", "distribution_key"),
-        ("distribution_style", "distribution_style"),
+        ("distribute_by", "distribute_by"),
+        ("order_by", "order_by"),
     ]
     for attr, key in _clause_fields:
         value = getattr(tuning_clauses, attr, None)
         if value:
             tuning_summary[key] = value
 
-    ddl_parts = []
-    if tuning_clauses.sort_by:
-        ddl_parts.append(f"ORDER BY ({tuning_clauses.sort_by})")
-    if tuning_clauses.partition_by:
-        ddl_parts.append(f"PARTITION BY ({tuning_clauses.partition_by})")
-    if tuning_clauses.cluster_by:
-        ddl_parts.append(f"CLUSTER BY ({tuning_clauses.cluster_by})")
-    if tuning_clauses.distribution_style:
-        ddl_parts.append(f"DISTSTYLE {tuning_clauses.distribution_style}")
-    if tuning_clauses.distribution_key:
-        ddl_parts.append(f"DISTKEY ({tuning_clauses.distribution_key})")
+    # Delegate clause assembly to TuningClauses.get_inline_clauses() (already used by
+    # generate_create_table_ddl) rather than re-deriving it here: each DDL generator
+    # formats its own clause text (e.g. DuckDB's sort_by already reads "ORDER BY ...",
+    # Redshift's distribute_by already reads "DISTSTYLE ... DISTKEY (...)"), so
+    # reconstructing labels from bare field values here duplicated - and, for fields
+    # like distribution_key/distribution_style that TuningClauses doesn't define,
+    # mismatched - that logic.
+    inline_clauses = tuning_clauses.get_inline_clauses() if hasattr(tuning_clauses, "get_inline_clauses") else []
 
     return {
-        "ddl_clauses": "\n".join(ddl_parts) if ddl_parts else None,
+        "ddl_clauses": "\n".join(inline_clauses) if inline_clauses else None,
         "tuning_summary": tuning_summary,
     }
 
@@ -173,7 +170,7 @@ class DryRunExecutor:
                 result.warnings.append(f"Schema generation failed: {e}")
 
             if benchmark_config.options.get("tuning_enabled", False):
-                result.tuning_config = self._extract_tuning_config(benchmark, benchmark_config)
+                result.tuning_config = self._extract_tuning_config(benchmark, benchmark_config, platform_type)
 
             # Extract DDL with tuning clauses for dry-run preview
             if execution_mode == "sql" and database_config:
@@ -895,14 +892,16 @@ class DryRunExecutor:
 
         return "\n".join(lines)
 
-    def _extract_tuning_config(self, benchmark, config: BenchmarkConfig) -> Optional[dict[str, Any]]:
+    def _extract_tuning_config(
+        self, benchmark, config: BenchmarkConfig, platform: Optional[str] = None
+    ) -> Optional[dict[str, Any]]:
         try:
             tuning_dict: dict[str, Any] = {}
 
             # Extract unified SQL tuning configuration
             unified_config = config.options.get("unified_tuning_configuration")
             if unified_config:
-                tuning_dict = self._extract_unified_tuning(unified_config)
+                tuning_dict = self._extract_unified_tuning(unified_config, platform)
 
             # Extract DataFrame tuning configuration (runtime + write)
             df_tuning_config = config.options.get("df_tuning_config")
@@ -922,9 +921,21 @@ class DryRunExecutor:
         except Exception:
             return None
 
+    # Platform-specific fields to include in platform_optimizations, keyed by the
+    # platform (lowercased database_config.type) that they are relevant to. These
+    # fields carry a non-empty default (e.g. databricks_clustering_strategy defaults
+    # to "z_order") so they must be gated on platform rather than on truthiness alone,
+    # or they show up as "enabled" for every platform.
+    _PLATFORM_SPECIFIC_OPTIMIZATION_FIELDS: dict[str, str] = {
+        "databricks_clustering_strategy": "databricks",
+        "physical_rendering_id": "databricks",
+    }
+
     @staticmethod
-    def _extract_unified_tuning(unified_config: Any) -> dict[str, Any]:
+    def _extract_unified_tuning(unified_config: Any, platform: Optional[str] = None) -> dict[str, Any]:
         """Extract constraints, platform optimizations, and table tunings from unified config."""
+        platform_key = (platform or "").lower()
+
         tuning_dict: dict[str, Any] = {
             "constraints": {
                 "primary_keys": {
@@ -941,7 +952,6 @@ class DryRunExecutor:
             },
             "platform_optimizations": {
                 "z_ordering": unified_config.platform_optimizations.z_ordering_enabled,
-                "databricks_clustering_strategy": unified_config.platform_optimizations.databricks_clustering_strategy,
                 "physical_rendering_id": unified_config.platform_optimizations.physical_rendering_id,
                 "liquid_clustering": unified_config.platform_optimizations.liquid_clustering_enabled,
                 "auto_optimize": unified_config.platform_optimizations.auto_optimize_enabled,
@@ -949,6 +959,12 @@ class DryRunExecutor:
                 "materialized_views": unified_config.platform_optimizations.materialized_views_enabled,
             },
         }
+
+        for field_name, owning_platform in DryRunExecutor._PLATFORM_SPECIFIC_OPTIMIZATION_FIELDS.items():
+            if platform_key == owning_platform:
+                tuning_dict["platform_optimizations"][field_name] = getattr(
+                    unified_config.platform_optimizations, field_name
+                )
 
         if unified_config.table_tunings:
             tuning_dict["table_tunings"] = {}
@@ -1078,13 +1094,31 @@ class DryRunExecutor:
         if not unified_config:
             return ddl_preview, post_load_statements
 
-        if not hasattr(benchmark, "get_tables"):
+        # Benchmark classes expose table names via get_schema() (see
+        # _generate_external_schema_sql below for the same pattern); no benchmark
+        # implements a get_tables() method, so that check always short-circuited
+        # this preview to empty.
+        if not hasattr(benchmark, "get_schema"):
             return ddl_preview, post_load_statements
 
-        tables = benchmark.get_tables()
+        # get_schema() is a dict on core benchmark classes but some public wrapper
+        # classes (e.g. JoinOrder) return a DDL string instead - normalize the same
+        # way _generate_external_schema_sql() does rather than assuming a mapping.
+        raw_schema = benchmark.get_schema()
+        if isinstance(raw_schema, dict):
+            tables = list(raw_schema.keys())
+        elif isinstance(raw_schema, list):
+            tables = [t["name"] for t in raw_schema if isinstance(t, dict) and "name" in t]
+        else:
+            return ddl_preview, post_load_statements
+
+        # Benchmark table names are lowercase (e.g. "lineitem") while shipped tuning
+        # templates key tables uppercase (e.g. "LINEITEM"); look up case-insensitively
+        # like profile_validation.extract_template_columns does.
+        table_tunings_by_upper = {str(key).upper(): value for key, value in unified_config.table_tunings.items()}
 
         for table_name in tables:
-            table_tuning = unified_config.table_tunings.get(table_name)
+            table_tuning = table_tunings_by_upper.get(str(table_name).upper())
             if not table_tuning:
                 continue
 

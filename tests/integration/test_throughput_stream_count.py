@@ -290,4 +290,25 @@ def test_run_official_forward_requested_streams_noop_when_not_requested():
     original = BenchmarkOrchestrator.execute_benchmark
     with _forward_requested_streams(None):
         assert BenchmarkOrchestrator.execute_benchmark is original
-    assert BenchmarkOrchestrator.execute_benchmark is original
+
+
+def test_run_official_rejects_explicit_streams_one():
+    """#1077 review: an explicit --streams 1 must error, not be silently
+    floored to 2. _resolve_requested_stream_count() floors any resolved
+    value to the TPC throughput minimum because it cannot distinguish an
+    explicit user request of 1 from the schema's own default of 1 at that
+    deep boundary -- so run-official (the one place the request is still
+    known to be explicit) must reject it up front instead of accepting it
+    and silently running a different stream count than requested."""
+    from click.testing import CliRunner
+
+    from benchbox.cli.commands.run_official import run_official
+
+    runner = CliRunner()
+    result = runner.invoke(
+        run_official,
+        ["tpch", "--platform", "duckdb", "--scale", "1", "--phases", "throughput", "--streams", "1", "--seed", "42"],
+    )
+
+    assert result.exit_code != 0
+    assert "streams must be >= 2" in result.output

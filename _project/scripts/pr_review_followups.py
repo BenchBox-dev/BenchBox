@@ -1012,7 +1012,7 @@ def ensure_clean_start(runner: CommandRunner, *, allow_dirty: bool, base_ref: st
 def ensure_action_branch(branch: str, *, no_submit: bool) -> None:
     if no_submit:
         return
-    if branch in {"", "develop", "main"}:
+    if branch in {"", "develop", "release"}:
         raise RuntimeError(
             f"Refusing to action comments from branch {branch or '(detached)'} because the routine submits a PR. "
             "Claim a feature worktree first or rerun with --no-submit."

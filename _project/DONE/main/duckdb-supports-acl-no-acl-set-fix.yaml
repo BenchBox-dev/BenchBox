@@ -1,0 +1,108 @@
+id: duckdb-supports-acl-no-acl-set-fix
+title: "Add 'duckdb' to the no_acl set in ddl.py so supports_acl('duckdb') returns False"
+worktree: main
+priority: Low
+status: Completed
+completed_date: "2026-07-16"
+category: Core Functionality
+
+completion_notes: |
+  Already satisfied in code — no new change required. PR #1124 added
+  'duckdb' to the `no_acl` set in
+  `benchbox/core/metadata_primitives/ddl.py:563`
+  ({"sqlite", "datafusion", "spark", "polars", "duckdb"}), so
+  `supports_acl('duckdb')` now returns False. Verified:
+  `supports_acl('duckdb') is False` (target of w1), and the ACL-focused
+  metadata_primitives tests pass (14 passed) with no test still asserting
+  the old True return value (w2 needed no update). Closing the TODO to
+  retire the tracking of already-landed work.
+
+description: |
+  `supports_acl('duckdb')` currently returns `True` (or a non-False value)
+  because 'duckdb' is missing from the `no_acl` frozenset in
+  `benchbox/core/metadata_primitives/ddl.py:583`. DuckDB is a Tier 4
+  platform that does not support ACL / GRANT/REVOKE semantics, consistent
+  with its classification in `catalog/queries.yaml:1435-1438`.
+
+  Surfaced as a pending work item (w2) in the DONE file for
+  `reconcile-docs-review-code-followups` (completed 2026-04-16). Items w1
+  (HashAlgorithm Literal narrowing) and w3 (stream cursor call sites) were
+  completed; w2 was never executed.
+
+  The fix is a one-line change. The anti_pattern note from the DONE file
+  specifies: do NOT change supports_acl_introspection / role_hierarchy /
+  column_grants for DuckDB — those already correctly return False — only the
+  `no_acl` set needs 'duckdb' added.
+
+work:
+  - id: w0
+    summary: "Confirm supports_acl('duckdb') still returns a non-False value at the cited line"
+    status: done
+    notes: |
+      grep -n 'no_acl' benchbox/core/metadata_primitives/ddl.py
+      Confirm 'duckdb' is absent from the set. Also verify:
+        python -c "from benchbox.core.metadata_primitives.ddl import supports_acl; print(supports_acl('duckdb'))"
+      Should print True or raise; target is False after the fix.
+
+  - id: w1
+    summary: "Add 'duckdb' to the no_acl set in ddl.py:583"
+    needs: [w0]
+    status: done
+    notes: |
+      One-line change: add 'duckdb' to the no_acl frozenset.
+      Do NOT touch supports_acl_introspection, role_hierarchy, or column_grants
+      — those already return False for DuckDB and are correct.
+
+  - id: w2
+    summary: "Run metadata_primitives tests; update any test that encodes the old True return value"
+    needs: [w1]
+    status: done
+    notes: |
+      uv run -- python -m pytest tests/ -k metadata_primitives -m fast -q
+      If any test asserts supports_acl('duckdb') is True, that test was
+      encoding the bug — update it to assert False.
+
+files_affected:
+  modified:
+    - "benchbox/core/metadata_primitives/ddl.py"
+
+metadata:
+  tags:
+    - correctness
+    - duckdb
+    - acl
+    - one-liner
+  estimated_effort: "Small"
+  created_date: "2026-07-16"
+
+impact:
+  technical_debt: |
+    Any code path that gates ACL operations on supports_acl() will incorrectly
+    attempt GRANT/REVOKE on DuckDB connections, producing runtime errors or
+    silently skipping intended safety checks depending on the caller's error
+    handling.
+
+prior_art:
+  - "benchbox/core/metadata_primitives/ddl.py:583 — add 'duckdb' to the no_acl set here"
+  - "catalog/queries.yaml:1435-1438 — DuckDB Tier 4 classification; no ACL support"
+  - "reconcile-docs-review-code-followups DONE file — w2 was the missed work item"
+
+must_preserve:
+  - "supports_acl_introspection('duckdb'), role_hierarchy('duckdb'), and column_grants('duckdb') remain unchanged (already return False correctly)"
+  - "All other platform ACL classifications are unaffected"
+
+anti_patterns:
+  - "DO NOT change supports_acl_introspection/role_hierarchy/column_grants for DuckDB — those already return False — only the no_acl set needs updating"
+
+scope_limit:
+  only_modify:
+    - "benchbox/core/metadata_primitives/ddl.py"
+    - "tests/ (only if a test encodes the buggy True return value)"
+
+verification:
+  - description: "supports_acl('duckdb') returns False after the fix"
+    command: "python -c \"from benchbox.core.metadata_primitives.ddl import supports_acl; assert supports_acl('duckdb') is False, f'got {supports_acl(\\\"duckdb\\\")}'\" && echo OK"
+    expected_output: "OK"
+  - description: "metadata_primitives tests pass"
+    command: "uv run -- python -m pytest tests/ -k metadata_primitives -m fast -q"
+    expected_output: "all tests pass"

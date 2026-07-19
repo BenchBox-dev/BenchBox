@@ -243,6 +243,79 @@ def test_cli_build_from_junit_writes_signature_file(tmp_path: Path) -> None:
     assert len(written["failure_ids"]) == 2
 
 
+def test_cli_build_job_failed_with_clean_junit_falls_back_to_job_failure(tmp_path: Path) -> None:
+    # #1136 review: a gate can fail for a reason junit never records (e.g.
+    # pytest-cov's --cov-fail-under gate - every testcase passes, the step
+    # still fails). Trusting the empty junit-derived signature here would
+    # make the diff see no new failures and silently suppress a real revert.
+    junit_path = tmp_path / "junit.xml"
+    junit_path.write_text(JUNIT_ALL_PASS, encoding="utf-8")
+    out_path = tmp_path / "signature.json"
+
+    exit_code = main(
+        [
+            "build",
+            "--job",
+            "fast-test",
+            "--junit",
+            str(junit_path),
+            "--failed-step",
+            "coverage threshold not met",
+            "--job-failed",
+            "--out",
+            str(out_path),
+        ]
+    )
+
+    assert exit_code == 0
+    written = json.loads(out_path.read_text(encoding="utf-8"))
+    assert written["kind"] == "job-failure"
+    assert written["failure_ids"] == ["fast-test:coverage threshold not met"]
+
+
+def test_cli_build_job_failed_with_real_junit_failures_keeps_junit_signature(tmp_path: Path) -> None:
+    # A job that failed WITH real testcase failures keeps the more precise
+    # junit-derived signature - --job-failed only overrides an EMPTY one.
+    junit_path = tmp_path / "junit.xml"
+    junit_path.write_text(JUNIT_WITH_FAILURES, encoding="utf-8")
+    out_path = tmp_path / "signature.json"
+
+    exit_code = main(
+        [
+            "build",
+            "--job",
+            "fast-test",
+            "--junit",
+            str(junit_path),
+            "--failed-step",
+            "should not be used",
+            "--job-failed",
+            "--out",
+            str(out_path),
+        ]
+    )
+
+    assert exit_code == 0
+    written = json.loads(out_path.read_text(encoding="utf-8"))
+    assert written["kind"] == "junit"
+    assert len(written["failure_ids"]) == 2
+
+
+def test_cli_build_without_job_failed_keeps_clean_junit_signature(tmp_path: Path) -> None:
+    # The default (no --job-failed, i.e. the job actually succeeded) must
+    # keep behaving exactly as before: a clean junit stays a clean signature.
+    junit_path = tmp_path / "junit.xml"
+    junit_path.write_text(JUNIT_ALL_PASS, encoding="utf-8")
+    out_path = tmp_path / "signature.json"
+
+    exit_code = main(["build", "--job", "fast-test", "--junit", str(junit_path), "--out", str(out_path)])
+
+    assert exit_code == 0
+    written = json.loads(out_path.read_text(encoding="utf-8"))
+    assert written["kind"] == "junit"
+    assert written["failure_ids"] == []
+
+
 def test_cli_build_from_job_failure_writes_signature_file(tmp_path: Path) -> None:
     out_path = tmp_path / "signature.json"
 

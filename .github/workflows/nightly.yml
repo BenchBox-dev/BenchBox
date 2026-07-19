@@ -409,12 +409,12 @@ jobs:
     # exactly how release-canary.yml sat dead while the repo's safety story
     # leaned on it). This job scans the DEVELOP tree (where scheduled
     # workflows are authored) and fails when any of them has no SCHEDULED
-    # run within its cadence-derived window. It executes from main's copy of
-    # nightly.yml, so it takes effect once this file reaches main.
-    # DELIBERATE: a scheduled workflow newly authored on develop goes red
-    # here until it lands on main — that lag is exactly the silent gap this
-    # guard converts to a loud one; land the file (admin/release flow) or
-    # remove the schedule.
+    # run within its cadence-derived window. Scheduled workflows execute from
+    # the DEFAULT branch (develop, as of the 2026-07-08 default-branch switch),
+    # which is where they are authored, so this guard is effective as soon as a
+    # scheduled workflow merges to develop — there is no "until it lands on the
+    # release branch" lag anymore. (Before the switch the default was main, so
+    # a workflow stayed dark until a release carried it there; that gap is gone.)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -510,6 +510,32 @@ jobs:
               print(f"::error::GitHub API unreachable after retries for {url}: {last_err}")
               sys.exit(1)
 
+          def workflow_registered_at(workflow_file: str):
+              """When Actions first registered this workflow (~when its file
+              first landed on the default branch), or None if unknown. Used to
+              grace a freshly-added scheduled workflow whose first cron fire is
+              still pending -- it has zero scheduled runs not because it is dead
+              but because it has not had a chance to fire yet."""
+              url = f"{api}/repos/{repo}/actions/workflows/{workflow_file}"
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "User-Agent": "benchbox-scheduled-workflow-liveness",
+              }
+              if token:
+                  headers["Authorization"] = f"Bearer {token}"
+              # Any failure here (HTTP error, unreachable, non-JSON body, or an
+              # unparseable timestamp) returns None so the caller falls through
+              # to the normal dead-path: this grace must never crash the liveness
+              # job, only relax it.
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as resp:
+                      created = json.load(resp).get("created_at")
+                  if not created:
+                      return None
+                  return datetime.fromisoformat(created.replace("Z", "+00:00"))
+              except (urllib.error.HTTPError, urllib.error.URLError, ValueError):
+                  return None
+
           dead: list[str] = []
           checked = 0
           for path in sorted(wf_dir.glob("*.yml")) + sorted(wf_dir.glob("*.yaml")):
@@ -521,6 +547,19 @@ jobs:
               window_days = cadence_window_days(cron_re.findall(on_block.group(1)))
               runs = latest_scheduled_run(path.name)
               if not runs:
+                  # Activation grace: a workflow added within its own cadence
+                  # window has not had a scheduled fire yet, so "no runs" is
+                  # expected, not dead. This grace only RELAXES the check (it can
+                  # never turn a live schedule red); worst case it tolerates a
+                  # genuinely-dead brand-new workflow for one cadence window,
+                  # after which the missing run trips the check normally.
+                  registered = workflow_registered_at(path.name)
+                  if registered is not None and datetime.now(timezone.utc) - registered <= timedelta(days=window_days):
+                      print(
+                          f"{path.name}: registered {registered.date()}, no scheduled "
+                          f"run yet -- within its {window_days}-day activation grace."
+                      )
+                      continue
                   dead.append(
                       f"{path.name}: no scheduled runs at all -- absent from the "
                       "default branch, or its cron is disabled/never fires"

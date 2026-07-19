@@ -369,10 +369,16 @@ def _list_images(run: ContainerRunner, project_prefix: str) -> list[ContainerRes
     rows = _run_json_array(run, [CONTAINER_BIN, "image", "ls", "--format", "json"])
     out: list[ContainerResource] = []
     for row in rows:
+        row = row if isinstance(row, dict) else {}
         config = row.get("configuration") if isinstance(row, dict) else None
         config = config if isinstance(config, dict) else {}
-        name = str(config.get("name") or "")
-        identifier = str(row.get("id") or "")
+        # Current `container image ls --format json` renders ImageResource rows
+        # with the reference at the top-level `displayReference` field (see
+        # upstream ImageList.swift); `configuration.name` is empty on those
+        # rows. Fall back to `configuration.name` for older/other CLI versions
+        # that still populate it there.
+        name = str(row.get("displayReference") or config.get("name") or "")
+        identifier = str(row.get("id") or row.get("digest") or "")
         created_at = str(config.get("creationDate") or "")
         category: ContainerCategory
         if _BUILDER_IMAGE_MARKER in name:
@@ -473,7 +479,14 @@ def _list_networks(run: ContainerRunner, project_prefix: str) -> list[ContainerR
 
         if labels.get(_BUILDER_ROLE_LABEL) == "builtin" or name == "default":
             category: ContainerCategory = "system"
-        elif _is_owned(project, project_prefix) or _is_owned_image_name(name, project_prefix):
+        elif _is_owned(project, project_prefix) or _is_owned(name, project_prefix):
+            # Name fallback uses _is_owned (separator-aware: exact match or
+            # `<prefix>-`/`<prefix>_` boundary), not _is_owned_image_name
+            # (bare startswith, meant for image repo names like
+            # "benchbox/foo"). A network without a compose project label
+            # named e.g. "benchbox-uatfoo" must NOT match prefix
+            # "benchbox-uat" -- that's a different, unrelated network, and
+            # `MODE=owned APPLY=1` would otherwise delete it (#1158 review).
             category = "owned"
         else:
             category = "shared"
