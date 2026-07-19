@@ -82,7 +82,7 @@ untested territory (see the `uat-operator-provisioning` TODO).
    is the source of truth). Stage 1 (native-sql + dataframe) needs
    `clickhouse-local` + `modin`; stage 2 (docker-fast) needs
    `clickhouse-server` + `lakesail`; stage 3 (docker-slow) needs `databend` +
-   `influxdb` + `singlestore`. Cells invoke `uv run --extra <X> --no-sync`
+   `influxdb` + `singlestore`. Cells invoke `uv run --extra <X> --`
    per platform, so nothing needs pre-installing beyond a plain `uv sync` for
    everything else. Skip this → the first cell for that platform records
    `ModuleNotFoundError` as FAILED, silently breaching the validator

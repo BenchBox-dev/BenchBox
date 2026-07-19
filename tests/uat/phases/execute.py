@@ -38,9 +38,12 @@ from tests.uat.phases.enumerate import (
 from tests.uat.preflight_budget import free_space_gib as default_free_space_reader
 from tests.uat.runner import CellResult, run_cell
 
-# Frozen-dataclass default instance, used to detect whether a config's
-# output.*_template was left at the schema default (vs. explicitly set in
-# YAML) -- see _resolve_output_base.
+# Frozen-dataclass default instance, used to render the schema-default
+# templates for BENCHBOX_OUTPUT_DIR suffix splicing -- see
+# _resolve_output_base. Whether a config's output.*_template was explicitly
+# set in YAML is tracked by provenance on OutputConfig.explicitly_set, NOT by
+# comparing against these defaults (a config that explicitly sets a template
+# to a string equal to the default must still count as explicit).
 _DEFAULT_OUTPUT = OutputConfig()
 
 # BENCHBOX_OUTPUT_DIR (uat-operator-provisioning w2): bare `uat-cell` runs
@@ -49,17 +52,21 @@ _DEFAULT_OUTPUT = OutputConfig()
 # only from the YAML output.* templates, so docs telling operators to "set
 # BENCHBOX_OUTPUT_DIR for sweeps" (uat-framework.md, AGENTS.md) were false for
 # every checked-in config, which all use the DEFAULT templates. Honor the env
-# var as the base ONLY when the template is still the untouched default --
-# an explicit YAML template always wins (no silent root switching for a
-# configured sweep).
+# var as the base ONLY when the template key was left unset in YAML -- an
+# explicit YAML template always wins (no silent root switching for a
+# configured sweep), even when its value happens to match the schema default
+# string (see uat-operator-provisioning review response, 2026-07-19).
 BENCHBOX_OUTPUT_DIR_ENV_VAR = "BENCHBOX_OUTPUT_DIR"
 
 
-def _resolve_output_base(template: str, default_template: str) -> str:
+def _resolve_output_base(template: str, default_template: str, *, explicit: bool) -> str:
     """Splice `BENCHBOX_OUTPUT_DIR` in as the base directory when `template`
-    is exactly the schema default and the env var is set; otherwise return
-    `template` unchanged (explicit YAML templates always win)."""
-    if template != default_template:
+    was left unset in YAML (`explicit=False`) and the env var is set;
+    otherwise return `template` unchanged (explicit YAML templates always
+    win -- gated on provenance, not on `template == default_template`, so a
+    config that explicitly sets a template to the default string is still
+    honored as explicit)."""
+    if explicit:
         return template
     override = os.environ.get(BENCHBOX_OUTPUT_DIR_ENV_VAR)
     if not override:
@@ -929,12 +936,16 @@ def default_log_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
     numeric suffix appended until it names a fresh directory.
 
     `BENCHBOX_OUTPUT_DIR` overrides the base directory ONLY when
-    `logs_dir_template` is still the schema default -- an explicit YAML
-    template always wins (uat-operator-provisioning w2; see
-    _resolve_output_base).
+    `logs_dir_template` was left unset in YAML -- an explicit YAML template
+    always wins, by provenance, even if its value equals the schema default
+    (uat-operator-provisioning w2; see _resolve_output_base).
     """
     now = now or _dt.datetime.now()
-    template = _resolve_output_base(config.output.logs_dir_template, _DEFAULT_OUTPUT.logs_dir_template)
+    template = _resolve_output_base(
+        config.output.logs_dir_template,
+        _DEFAULT_OUTPUT.logs_dir_template,
+        explicit="logs_dir_template" in config.output.explicitly_set,
+    )
     rendered = (
         template.replace("{date}", now.strftime("%Y%m%d"))
         .replace("{time}", now.strftime("%H%M%S"))
@@ -953,13 +964,15 @@ def default_benchmark_runs_dir(config: UATConfig, now: _dt.datetime | None = Non
     """Resolve the YAML benchmark_runs root against {date} and {name}.
 
     `BENCHBOX_OUTPUT_DIR` overrides the base directory ONLY when
-    `benchmark_runs_dir_template` is still the schema default -- an explicit
-    YAML template always wins (uat-operator-provisioning w2; see
-    _resolve_output_base).
+    `benchmark_runs_dir_template` was left unset in YAML -- an explicit YAML
+    template always wins, by provenance, even if its value equals the schema
+    default (uat-operator-provisioning w2; see _resolve_output_base).
     """
     now = now or _dt.datetime.now()
     template = _resolve_output_base(
-        config.output.benchmark_runs_dir_template, _DEFAULT_OUTPUT.benchmark_runs_dir_template
+        config.output.benchmark_runs_dir_template,
+        _DEFAULT_OUTPUT.benchmark_runs_dir_template,
+        explicit="benchmark_runs_dir_template" in config.output.explicitly_set,
     )
     rendered = template.replace("{date}", now.strftime("%Y%m%d")).replace("{name}", config.name)
     return Path(rendered).expanduser()

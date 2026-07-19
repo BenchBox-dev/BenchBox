@@ -1442,6 +1442,29 @@ def test_default_benchmark_runs_dir_default_template_without_env_var_unchanged(m
     assert out == Path("~/Developer/benchmark_runs").expanduser()
 
 
+def test_default_benchmark_runs_dir_explicit_template_equal_to_default_wins_over_env_var(monkeypatch, tmp_path):
+    """Provenance, not value equality (uat-operator-provisioning review response).
+
+    A config that explicitly sets `benchmark_runs_dir_template` to the SAME
+    string as the schema default must still be treated as explicit -- the
+    prior string-equality check in `_resolve_output_base` could not tell
+    this apart from "unset", so BENCHBOX_OUTPUT_DIR would silently reroot an
+    explicit template that happened to match the default value.
+    """
+    monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(tmp_path / "external-root"))
+    default_template = "~/Developer/benchmark_runs"
+    cfg = validate_config(
+        {
+            "name": "uat-smoke",
+            "output": {"benchmark_runs_dir_template": default_template},
+        }
+    )
+    assert "benchmark_runs_dir_template" in cfg.output.explicitly_set
+    out = exec_phase.default_benchmark_runs_dir(cfg, now=_dt.datetime(2026, 5, 5))
+    # Explicit value wins -- NOT rerooted under tmp_path / "external-root".
+    assert out == Path(default_template).expanduser()
+
+
 def test_topological_sort_moves_source_before_consumer():
     consumer_to_sources = {
         "read_primitives": ["tpch"],

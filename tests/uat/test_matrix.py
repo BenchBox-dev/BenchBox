@@ -17,11 +17,14 @@ from tests.uat.phases import enumerate as enum_phase
 pytestmark = pytest.mark.fast
 
 _RELEASE_GATE_CONFIGS_DIR = Path(__file__).parent / "configs"
-_RELEASE_GATE_CONFIG_NAMES = (
-    "release-gate-01-native-dataframe.yaml",
-    "release-gate-02-docker-nonoltp.yaml",
-    "release-gate-03-docker-oltp.yaml",
-)
+
+
+def _release_gate_config_names() -> tuple[str, ...]:
+    """Discover `release-gate-*.yaml` configs by glob rather than a hardcoded
+    list, so a future `release-gate-04-*.yaml` stage is automatically probed
+    by `test_release_gate_platforms_resolve_from_dev_venv_or_have_uv_extra`
+    (uat-operator-provisioning review response, 2026-07-19)."""
+    return tuple(sorted(path.name for path in _RELEASE_GATE_CONFIGS_DIR.glob("release-gate-*.yaml")))
 
 
 # ---------------------------------------------------------------------------
@@ -384,7 +387,7 @@ def test_benchbox_run_argv_velox_iterations_one():
 
 def _release_gate_platforms() -> set[str]:
     platforms: set[str] = set()
-    for name in _RELEASE_GATE_CONFIG_NAMES:
+    for name in _release_gate_config_names():
         cfg = load_config(_RELEASE_GATE_CONFIGS_DIR / name)
         platforms.update(matrix.resolve_platforms(groups=cfg.platforms.groups or ()))
     return platforms
