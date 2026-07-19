@@ -558,6 +558,41 @@ tracker suite (93 tests: `test_todo_db.py`, `test_todo_db_v2.py`,
 passes unchanged. Replayable acceptance protocol:
 `_project/audits/todo-db-hosted-acceptance-2026-07-18.md`.
 
+### Pilot status & readiness (2026-07-19, PR #1222 review follow-up)
+
+Current readiness: **ready for controlled agent use via the explicit
+`todo-db` skill, one process per worktree, with hosted credentials
+configured** — NOT the default project-wide TODO process.
+
+- **Cutover contract (opt-in pilot, not migrated).** Generic TODO routing
+  still points at the YAML tree: `AGENTS.md` "Planning & TODOs" and the
+  skill-synced `todo` skill direct agents to `_project/TODO/**` +
+  `todo_cli.py`; `todo-db` is an unmanaged, opt-in sibling. The routing/docs
+  cutover is **G5** (deferred, maintainer-gated). Until G5, describe this as
+  an opt-in DB-backend pilot — do not claim the project-wide TODO process has
+  migrated.
+- **Same-worktree replica concurrency (one process per worktree).** The
+  `_replica_setup_lock()` advisory flock serializes replica open+sync across
+  processes but is released while the connection stays open, so it does not
+  make two processes *sharing one replica file* provably safe. The supported
+  operating model is therefore **one active process per worktree** — already
+  enforced by the `worktree-claim` workflow (one agent per worktree). The
+  design also already supports **per-process replica isolation** via
+  `TODO_DB_REPLICA` (the live acceptance test drives two concurrent actors
+  with distinct replica paths); any concurrent-same-worktree use should give
+  each process its own `TODO_DB_REPLICA`. Full-connection-lifetime
+  serialization is deliberately not taken on now (tracker commands are
+  single-round-trip; it would risk self-deadlock for a command opening two
+  same-worktree connections).
+- **Hosted acceptance boundary (manual, not in PR CI).** Ordinary PR CI runs
+  the hosted suite against fakes only; the live Turso test
+  (`tests/integration/test_todo_db_hosted_live.py`) is gated on a **dedicated**
+  `TODO_TEST_DB_URL` (never the production tracker) and is skipped otherwise.
+  Hosted **write-path** production readiness is thus a manual acceptance step
+  (run the acceptance protocol above against a dedicated test DB). The hosted
+  **read path** is verified live: the G6 export ran against the production
+  primary on 2026-07-19 (deterministic across two runs, 1366 items).
+
 **Shared-visibility proof (live, two processes × two replicas × two
 actors).** The one property the local spike could not demonstrate, run
 against the real Turso primary through the shim only:

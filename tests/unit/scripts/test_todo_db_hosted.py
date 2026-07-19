@@ -243,6 +243,16 @@ class TestHostedConnect:
             todo_db.SCHEMA_VERSION
         )
 
+    def test_direct_helper_normalizes_url_before_connect(self, fake_libsql):
+        # _hosted_raw_connect is reachable without resolve_backend()'s
+        # normalization (direct helper callers). A whitespace-padded,
+        # uppercase-scheme URL must still reach libsql.connect() normalized.
+        conn = todo_db._hosted_raw_connect(f"  LIBSQL://{HOSTED_URL.split('://', 1)[1]}  ", sync_required=True)
+        try:
+            assert fake_libsql.connect_calls[0]["sync_url"] == HOSTED_URL
+        finally:
+            conn.close()
+
     def test_default_replica_path_is_per_worktree(self, monkeypatch, tmp_path):
         # Per-worktree deliberately (NOT git_main_root): every process syncing
         # one shared replica file is a cross-process corruption hazard; the
