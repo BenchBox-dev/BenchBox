@@ -29,36 +29,31 @@ description: |
 work:
 - id: w1
   summary: "Code-Owner review + merge PR #1027 (in-repo main->release rename)"
-  status: pending
+  status: done
   notes: |
     Source: rename-release-branch-main-to-release (w1-w4, in-repo half).
-    PR #1027 renames the release branch main->release across workflows/Makefile/
-    docs and adds docs/operations/branch-rename-runbook.md. It touches
-    release.yml, so it is CODEOWNERS-gated (@joeharris76) and auto-merge is
-    intentionally OFF — it needs your review. An Opus 4.8 review already
-    verified the PyPI publish gate (tag-shaped-ref condition) is untouched and
-    all six test.yml base_ref conditionals renamed consistently; re-confirm the
-    two flagged maintainer notes in the PR body (pyproject blob/main URL;
-    seed-corpus.yml --base main) are acceptable, then squash-merge.
-    Do NOT merge until you are ready to run w2 right after (ordering matters).
+    STALE REFERENCE (PR #1225 review follow-up, 2026-07-19): PR #1027 was
+    superseded and closed unmerged — the in-repo rename actually landed via
+    PR #1114 (strict superset of #1027's file set, folded in its two correct
+    findings), which the archived
+    _project/DONE/main/rename-release-branch-main-to-release.yaml confirms
+    merged and Code-Owner-reviewed. Marking done here to match; do not attempt
+    to review/merge #1027, it no longer exists as an open PR.
 
 - id: w2
   summary: "GitHub admin: rename branch main->release + recreate the ruleset (rename w5/w6)"
   needs: [w1]
-  status: pending
+  status: done
   notes: |
     Source: rename-release-branch-main-to-release (w5/w6, ADMIN half).
-    w3 below (branch-default-switch-to-develop) is DONE, so this is now only
-    blocked on w1. Run RIGHT AFTER w1 merges, per
-    docs/operations/branch-rename-runbook.md:
-      gh api -X POST repos/joeharris76/BenchBox/branches/main/rename -f new_name=release
-    Then recreate the `main-release-only` ruleset as `release-only` targeting
-    refs/heads/release (same required checks/protections), and update the
-    ruleset-id reference in docs/operations/repo-admin-settings.md.
-    No real coverage gap exists because the release branch only receives pushes
-    via release-cut/release-finalize (both maintainer-controlled); if
-    `make release-cut` is run before the rename it fails fast (base does not
-    exist) rather than mis-cutting.
+    DONE 2026-07-19 (PR #1225 review follow-up correction): the archived
+    rename-release-branch-main-to-release.yaml's w6 records the maintainer
+    already executed this admin flip on 2026-07-19 — `main` renamed to
+    `release` (former HEAD 7550c423), the `main-release-only` ruleset (id
+    15611783) recreated as `release-only` (id 19149459) on refs/heads/release
+    with the same required checks/protections, repo-admin-settings.md needed
+    no id edit (placeholder-based). Re-running the rename command would now
+    fail (branches/main no longer exists) — do not attempt it again.
 
 - id: w3
   summary: "GitHub admin: set default_branch=develop + verify scheduled workflows fire"
@@ -108,12 +103,12 @@ prior_art:
 - "_project/analysis/known-stranded-commits.txt — the allowlist referenced by w5; the branches are safe to delete because their content is on develop."
 
 verification:
-- description: "w1: PR #1027 is merged"
-  command: "gh pr view 1027 --repo joeharris76/BenchBox --json state,mergedAt --jq '.state + \" \" + (.mergedAt // \"unmerged\")'"
-  expected_output: "MERGED <timestamp> (once you review + merge it)"
+- description: "w1: the in-repo rename merged (via #1114, not the superseded #1027)"
+  command: "gh pr view 1114 --repo joeharris76/BenchBox --json state,mergedAt --jq '.state + \" \" + (.mergedAt // \"unmerged\")'"
+  expected_output: "MERGED <timestamp> (w1 is done)"
 - description: "w2: the release branch is renamed"
   command: "gh api repos/joeharris76/BenchBox/branches/release --jq .name 2>/dev/null || echo 'not renamed yet'"
-  expected_output: "release (once w2 is done)"
+  expected_output: "release (w2 is done)"
 - description: "w3: default branch is develop"
   command: "gh api repos/joeharris76/BenchBox --jq .default_branch"
   expected_output: "develop (w3 is done)"

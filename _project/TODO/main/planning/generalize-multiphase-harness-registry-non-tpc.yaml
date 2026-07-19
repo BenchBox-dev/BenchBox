@@ -2,7 +2,7 @@ id: generalize-multiphase-harness-registry-non-tpc
 title: "Generalize the multi-phase harness registry so a non-TPC family can register its harnesses"
 worktree: main
 priority: Low
-status: Not Started
+status: Blocked
 category: Code Quality and Technical Debt
 
 description: |
@@ -23,6 +23,15 @@ description: |
   designing the abstraction against a single consumer risks the wrong shape. Do the
   generalization together with (or immediately before) that second family, using it
   as the second consumer that proves the API.
+
+  GATING FIX (PR #1210 review follow-up, 2026-07-19): `status: Not Started` with no
+  `deps.needs` entry was decorative -- `todo_cli.py ready()` only excludes
+  `status: Completed` items, so this showed up in the project-wide ready queue
+  despite the prose above. There is no second-family TODO id to depend on yet (that
+  is the whole point of the gate), so `status: Blocked` is the only available
+  encoding; `ready()` was fixed in this same followup to also exclude
+  `status: Blocked` items from the ready queue. Flip this back to `Not Started`
+  when a second multi-phase family TODO exists and can be added to `deps.needs`.
 
 prior_art:
   - ref: "benchbox/core/power_harnesses.py (#937 registry: resolve_power/throughput/maintenance/combined_harness)"

@@ -62,9 +62,9 @@ anti_patterns:
   - "DO NOT reimplement the pruning logic; invoke the #935 writer/target."
 
 verification:
-  - description: "Dry-run detects a seeded resolved entry and produces the expected prune diff"
-    command: "seed a resolved entry, run the detection step -> it identifies exactly that entry and the writer's diff drops only it"
-    expected_output: "resolved entry surfaced and pruned; no live entry touched; no-op when none resolved"
+  - description: "Detection logic identifies a synthetic resolved entry and computes the correct prune diff, unit-level (no live scheduled run needed)"
+    command: "uv run -- python -m pytest tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py -q"
+    expected_output: "given a synthetic gate report with one resolved entry and one still-live entry, the detector returns exactly the resolved key; update_baseline_file's diff (per #935) drops only that key and leaves the live entry untouched; a report with zero resolved entries yields no diff and no PR is opened"
 
 scope_limit:
   only_modify:

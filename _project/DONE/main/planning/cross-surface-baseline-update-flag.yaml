@@ -24,6 +24,23 @@ description: |
   The writer lives under core/equivalence/, not benchbox/cli/ as scope_limit listed,
   to satisfy the utils<core<platforms<cli import layering enforced by #952's lint-imports.
 
+  KNOWN LIMITATION (by design, PR #1202-followup review, 2026-07-19): the "no
+  manual file editing" success metric covers YAML-backed entries only. A
+  resolved entry backed by a `ClassifiedDivergence` (executable Python in
+  cross_surface.py, not YAML data) cannot be surgically pruned by this writer
+  -- `_apply_baseline_update` (cross_surface.py) still exits 1 and tells the
+  operator to edit cross_surface.py in a reviewed change. This is intentional,
+  not a residual gap: an AST rewrite of Python source was the original design
+  and was explicitly rejected in review as unsafe (see the description above).
+  Silently reporting success would leave a stale, no-longer-reproducing
+  predicate in place. Also: the writer fully re-serializes the YAML file on
+  every prune (`yaml.safe_dump(sort_keys=True)`) rather than doing a
+  byte-level in-place edit -- safe because the format carries no per-entry
+  comments to lose and the hand-maintained file header is independently kept
+  in sync by test_checked_in_baseline_file_is_a_fixed_point_of_the_writer and
+  test_update_baseline_file_regenerates_header
+  (tests/unit/core/equivalence/test_cross_surface_baseline_update.py).
+
 prior_art:
   - ref: "benchbox/core/equivalence/cross_surface.py:1421"
     note: "The known-divergence baseline read/emit path from #903; the --update-baseline writer goes here, reusing the existing baseline file format and loader."
