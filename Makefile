@@ -683,7 +683,7 @@ lint-site-theme-tokens:
 # unsuperseded analysis files revive the retired mixed-theme contract phrases.
 # Allowlist: inline `allow-stale-theme: <reason>` marker, or a supersession
 # header (Superseded / supersedes / supersession) in `_project/analysis/*`
-# files. `_project/DONE/*` is excluded by design.
+# historical archive files are excluded by design.
 lint-explorer-stale-theme:
 	python3 _project/scripts/scan_explorer_stale_theme.py
 

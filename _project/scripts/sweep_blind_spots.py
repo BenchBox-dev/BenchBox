@@ -15,7 +15,7 @@ Subcommands::
 Triage edits only the frontmatter and appends one line under a
 ``## Triage log`` section. Triage does NOT author TODO files —
 ``promote`` records the link to a TODO id you authored separately
-(see ``_project/TODO_ENTRY_TEMPLATE.yaml``).
+(see the DB tracker spec in ``_project/specs/todo-db-tracker.md``).
 """
 
 from __future__ import annotations
