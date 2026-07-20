@@ -170,7 +170,7 @@ jobs:
     # no CI consumer before this job - it only ran when a developer invoked it
     # locally. Measured locally at ~18 minutes (2 xdist workers), too slow for
     # the develop-PR-blocking lane, so it lands here for visibility/metrics.
-    # See _project/TODO/main/planning/medium-tier-ci-home.yaml.
+    # See tracker item `medium-tier-ci-home`.
     #
     # PROMOTED 2026-07-06 (medium-tier-red-disposition-and-promotion): the
     # tier ran clean (green) on the real runner - develop-post-merge run

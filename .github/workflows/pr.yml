@@ -817,7 +817,7 @@ jobs:
       # Keep empty unless triage is documented in the TODO item.
       # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
       # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
-      # bound. See _project/TODO/main/planning/lxml-cve-pysec-2026-87-blocked-by-redshift-connector.yaml
+      # bound. See tracker item `lxml-cve-pysec-2026-87-blocked-by-redshift-connector`.
       PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87"
     steps:
       - name: Checkout code
@@ -853,7 +853,7 @@ jobs:
     name: parity-check
     needs: ci-paths
     # Path-filtered on results-explorer/viz source changes (see
-    # _project/DONE/main/parity-check-develop-ring.yaml). `make parity-check`
+    # tracker item `parity-check-develop-ring`). `make parity-check`
     # is Python-only (no npm/vitest install), measured at well under a second
     # locally, so it is cheap enough to block develop PRs.
     #

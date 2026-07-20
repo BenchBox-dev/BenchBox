@@ -77,10 +77,9 @@ Antigravity can run these without permission:
 - `timeout 60s _binaries/tpc-{h,ds}/<platform>/dsqgen*`
 
 ### TODO Management
-- `uv run _project/scripts/todo_cli.py list|show|stats|ready|next|done|check-graph`
-- `uv run _project/scripts/validate_todo.py*`
-- `uv run _project/scripts/generate_indexes.py` (or `make todo-reindex`)
-- `uv run _project/scripts/migrate_todo_format.py*`
+- `_project/scripts/todo` is the DB-backed tracker entry point; global `--db`/`--actor` flags come before the subcommand.
+- Read: `_project/scripts/todo ready|list|show|stats|deps|lint|export|check-scope`
+- Lifecycle writes: `_project/scripts/todo create|claim|start|done|defer|promote|dismiss|complete|drop|block|unblock|verify`
 
 ### Timing & Audit
 - `uv run _project/scripts/timing_audit.py --report`
@@ -90,13 +89,10 @@ Antigravity can run these without permission:
 - `ps*`, `uname*`, `whoami`, `pwd`, `env | grep*`
 
 ## TODO Workflow
-- Layout: `_project/TODO/{worktree}/{phase}/{item}.yaml`; completed -> `_project/DONE/`.
-- Stable `id` = filename slug.
-- Flat `work[]` with `needs` edges. Inter-item deps: `deps.needs: [slug-ids]`.
-- CLI: `uv run _project/scripts/todo_cli.py list|show|stats|ready|next|done|check-graph`.
-- Indexes are gitignored; `make todo-reindex` to rebuild (also auto-runs on first read).
-- Refer to `TODO_ENTRY_TEMPLATE.yaml` and `TODO_SCHEMA.yaml` for format.
-- Standard format in files: Priority/Status/Description/Files/Solution/Impact.
+- State lives in the shared DB; there is no `_project/TODO` tree. `_project/scripts/todo` is the only write path.
+- `todo claim <id>` prints scope, preserves, anti-patterns, the verification ladder, ready units, and deferrals.
+- Per unit: `todo start ...` (optional) then `todo done ... --evidence ...`; use `todo defer` when skipping; `todo complete ... --pr ...` is gated.
+- `todo export` is the deterministic JSONL/Markdown snapshot; never hand-edit tracker state.
 
 ## CLI Options & Phases
 - **Basic Run**: `benchbox run --platform {plat} --benchmark {bm} --scale {sf}`

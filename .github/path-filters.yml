@@ -100,7 +100,7 @@ code-ci:
 
 # Packaging-metadata changes: build/install/audit signal (package-smoke,
 # dependency-audit jobs in pr.yml) only needs to run when one of these
-# changed. See _project/TODO/main/planning/pr-gate-package-and-audit-promotion.yaml.
+# changed. See tracker item `pr-gate-package-and-audit-promotion`.
 packaging:
   - "pyproject.toml"
   - "MANIFEST.in"
@@ -111,7 +111,7 @@ packaging:
 
 # Results-explorer visualization / CLI<->explorer parity source changes:
 # gates the parity-check job in pr.yml. See
-# _project/TODO/main/planning/parity-check-develop-ring.yaml.
+# tracker item `parity-check-develop-ring`.
 viz:
   - "results-explorer/**"
   - "tests/parity/**"
