@@ -1715,7 +1715,23 @@ def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
 # Export
 
 
-def export_all(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+@contextmanager
+def _read_txn(conn: Any):
+    """Hold one consistent read snapshot across the complete export bundle."""
+    conn.execute("BEGIN")
+    try:
+        yield
+    except BaseException:
+        try:
+            conn.rollback()
+        except Exception:  # noqa: S110 - never mask the original failure
+            pass
+        raise
+    else:
+        conn.commit()
+
+
+def _export_all_unlocked(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     # Bulk read: one SELECT per table, assembled in Python. Produces output
     # byte-identical to per-item get_item() but with ~11 round-trips instead of
     # thousands, so a remote (no-embedded-replica) read-only connection stays
@@ -1771,18 +1787,26 @@ def export_all(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     return [items[i] for i in order]
 
 
+def export_all(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    with _read_txn(conn):
+        return _export_all_unlocked(conn)
+
+
 def write_export(conn: sqlite3.Connection, out_dir: Path) -> tuple[Path, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
+    items = export_all(conn)
     jsonl_path = out_dir / "items.jsonl"
     with open(jsonl_path, "w", encoding="utf-8") as handle:
-        for item in export_all(conn):
+        for item in items:
             handle.write(json.dumps(item, sort_keys=True) + "\n")
     index_path = out_dir / "index.md"
     with open(index_path, "w", encoding="utf-8") as handle:
         handle.write("# TODO export\n\n| id | state | priority | worktree | title |\n")
         handle.write("|---|---|---|---|---|\n")
-        for row in conn.execute("SELECT id, state, priority, worktree, title FROM items ORDER BY id"):
-            handle.write(f"| {row['id']} | {row['state']} | {row['priority']} | {row['worktree']} | {row['title']} |\n")
+        for item in items:
+            handle.write(
+                f"| {item['id']} | {item['state']} | {item['priority']} | {item['worktree']} | {item['title']} |\n"
+            )
     return jsonl_path, index_path
 
 

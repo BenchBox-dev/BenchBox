@@ -1423,6 +1423,15 @@ def test_default_log_dir_honors_env_var_when_template_is_default(monkeypatch, tm
     assert out == tmp_path / "external-root" / "logs" / "uat_20260505_090000"
 
 
+def test_default_submissions_dir_honors_env_var_when_template_is_default(monkeypatch, tmp_path):
+    monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(tmp_path / "external-root"))
+    cfg = validate_config({"name": "uat-smoke"})
+
+    out = exec_phase.default_submissions_dir(cfg, now=_dt.datetime(2026, 5, 5))
+
+    assert out == tmp_path / "external-root" / "submissions" / "uat-smoke"
+
+
 def test_default_benchmark_runs_dir_explicit_template_wins_over_env_var(monkeypatch, tmp_path):
     """An explicit YAML template must never be silently overridden by the env var."""
     monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(tmp_path / "external-root"))

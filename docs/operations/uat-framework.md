@@ -47,13 +47,13 @@ worktree.
 
 Two ways to change the root, in precedence order: an explicit
 `output.benchmark_runs_dir_template` (and/or `output.logs_dir_template`,
-`output.submissions_dir_template`) in the config always wins. If a config
-leaves those at their schema defaults (every checked-in config does),
-setting `BENCHBOX_OUTPUT_DIR` before the sweep overrides the
-`~/Developer/benchmark_runs` base for both the runs dir and the log dir —
+`output.submissions_dir_template`) in the config always wins. The three
+release-gate configs intentionally leave those keys unset, so setting
+`BENCHBOX_OUTPUT_DIR` before a stage overrides the
+`~/Developer/benchmark_runs` base for runs, logs, and local-stage submissions;
 this also matches bare `make uat-cell` (which has always read the env var).
-A config with an explicit template ignores `BENCHBOX_OUTPUT_DIR` entirely —
-no silent root switching for a configured sweep.
+A config with an explicit template ignores `BENCHBOX_OUTPUT_DIR` for that
+path — no silent root switching for a configured sweep.
 
 ## Local-artifact hygiene (external-root invariant)
 
@@ -450,8 +450,8 @@ dataframe — in a single Docker-free sweep; stages 2 and 3 are the Docker tiers
 Run rules:
 
 - Use a **fresh run root** under `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`
-  (the three configs use the default output templates, so the env var sets the
-  base — see "Output artefacts"); never resume into the failed 2026-05-28/29
+  (the three configs leave their output templates unset, so the env var sets
+  the base — see "Output artefacts"); never resume into the failed 2026-05-28/29
   dirs (they are non-evidentiary).
 - One platform / one Docker stack at a time (`execute.parallel_platforms` is
   hard-rejected). A single Docker stack's compose-up failure records FAIL and

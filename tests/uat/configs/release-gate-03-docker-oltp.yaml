@@ -37,7 +37,6 @@ execute:
 
 preflight:
   free_space_min_gib: 5
-  free_space_path: "~/Developer/benchmark_runs"
   docker_required: true
 
 cleanup:
@@ -71,8 +70,3 @@ report:
   # docker stack without letting a mass regression sign off; never set this
   # to the eligible count exactly.
   cross_scale_coverage_min_pairs: 162
-
-output:
-  benchmark_runs_dir_template: "~/Developer/benchmark_runs"
-  logs_dir_template: "~/Developer/benchmark_runs/logs/release_gate_03_docker_oltp_{date}"
-  submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"

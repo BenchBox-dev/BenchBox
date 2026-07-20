@@ -78,7 +78,7 @@ Gemini can run these without permission:
 
 ### TODO Management
 - `_project/scripts/todo` is the DB-backed tracker entry point; global `--db`/`--actor` flags come before the subcommand.
-- Read: `_project/scripts/todo ready|list|show|stats|deps|lint|export|check-scope`
+- Read-only: `_project/scripts/todo ready|list|show|stats|deps|lint|export|check-scope`
 - Lifecycle writes: `_project/scripts/todo create|claim|start|done|defer|promote|dismiss|complete|drop|block|unblock|verify`
 
 ### Timing & Audit
@@ -90,9 +90,10 @@ Gemini can run these without permission:
 
 ## TODO Workflow
 - State lives in the shared DB; there is no `_project/TODO` tree. `_project/scripts/todo` is the only write path.
-- `todo claim <id>` prints scope, preserves, anti-patterns, the verification ladder, ready units, and deferrals.
+- `todo claim <id>` prints scope, preserves, anti-patterns, the verification ladder, dependencies, ready units, and deferrals; follow that work order.
 - Per unit: `todo start ...` (optional) then `todo done ... --evidence ...`; use `todo defer` when skipping; `todo complete ... --pr ...` is gated.
 - `todo export` is the deterministic JSONL/Markdown snapshot; never hand-edit tracker state.
+- `todo lint <id>` runs the mechanical quality checks. Never hand-write tracker state into repository files.
 
 ## CLI Options & Phases
 - **Basic Run**: `benchbox run --platform {plat} --benchmark {bm} --scale {sf}`

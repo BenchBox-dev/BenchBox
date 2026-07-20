@@ -983,3 +983,15 @@ def default_benchmark_runs_dir(config: UATConfig, now: _dt.datetime | None = Non
     )
     rendered = template.replace("{date}", now.strftime("%Y%m%d")).replace("{name}", config.name)
     return Path(rendered).expanduser()
+
+
+def default_submissions_dir(config: UATConfig, now: _dt.datetime | None = None) -> Path:
+    """Resolve the package submissions directory using the same output root."""
+    now = now or _dt.datetime.now()
+    template = _resolve_output_base(
+        config.output.submissions_dir_template,
+        _DEFAULT_OUTPUT.submissions_dir_template,
+        explicit="submissions_dir_template" in config.output.explicitly_set,
+    )
+    rendered = template.replace("{date}", now.strftime("%Y%m%d")).replace("{name}", config.name)
+    return Path(rendered).expanduser()

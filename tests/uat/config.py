@@ -101,6 +101,11 @@ class ScalesConfig:
     rungs: tuple[float, ...] = (0.01,)
     override: float | None = None
 
+    @property
+    def requested_rungs(self) -> tuple[float, ...]:
+        """Return the effective ladder after any one-scale override."""
+        return (self.override,) if self.override is not None else self.rungs
+
 
 @dataclass(frozen=True)
 class ValidateConfig:
@@ -313,7 +318,19 @@ def _validate_scales(payload: dict[str, Any] | None) -> ScalesConfig:
     if not isinstance(payload, dict):
         raise ConfigError("`scales:` must be a mapping")
     _reject_unknown_fields(payload, frozenset({"rungs", "override"}), "scales")
-    rungs_raw = payload.get("rungs", [0.01])
+    override = payload.get("override")
+    if isinstance(override, bool):
+        raise ConfigError("`scales.override` must be a number, got bool")
+    try:
+        override_value = float(override) if override is not None else None
+    except (TypeError, ValueError) as exc:
+        raise ConfigError("`scales.override` must be a number") from exc
+
+    # Keep the report-facing rung list aligned with the single-scale override.
+    # Enumeration already prefers `override`, but report/aggregation consumers
+    # read `rungs`; leaving the schema default here makes an override run report
+    # against the wrong scale ladder.
+    rungs_raw = payload.get("rungs", [override_value] if override_value is not None else [0.01])
     if isinstance(rungs_raw, (str, bytes)) or not isinstance(rungs_raw, (list, tuple)):
         raise ConfigError("`scales.rungs` must be a list of numbers")
     if any(isinstance(value, bool) for value in rungs_raw):
@@ -326,13 +343,6 @@ def _validate_scales(payload: dict[str, Any] | None) -> ScalesConfig:
         raise ConfigError("`scales.rungs` must be a list of numbers") from exc
     if not rungs:
         raise ConfigError("`scales.rungs` must be non-empty")
-    override = payload.get("override")
-    if isinstance(override, bool):
-        raise ConfigError("`scales.override` must be a number, got bool")
-    try:
-        override_value = float(override) if override is not None else None
-    except (TypeError, ValueError) as exc:
-        raise ConfigError("`scales.override` must be a number") from exc
     if "rungs" in payload and override_value is not None:
         raise ConfigError(
             "`scales.rungs` and `scales.override` are mutually exclusive -- "
