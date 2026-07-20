@@ -342,6 +342,61 @@ class TestExport:
         assert "second-item" in (first_dir / "index.md").read_text()
 
 
+class TestHostedRow:
+    """_HostedRow is the libsql/Turso stand-in for sqlite3.Row (see its
+    docstring in todo_db.py). libsql's cursor.description has been observed
+    to report a keyword column name ("instead", via INSTEAD OF triggers)
+    back in uppercase, while local sqlite3 preserves the lowercase SELECT
+    casing. sqlite3.Row is case-insensitive on name access, so _HostedRow
+    must be too, or hosted-only KeyErrors sneak past local-only test runs."""
+
+    def test_case_insensitive_access_and_dict_roundtrip(self):
+        r = todo_db._HostedRow(["dont", "why", "INSTEAD"], ("a", "b", "c"))
+        assert r["instead"] == "c"
+        assert r["INSTEAD"] == "c"
+        assert dict(r) == {"dont": "a", "why": "b", "instead": "c"}
+        assert r[2] == "c"
+        assert list(r.keys()) == ["dont", "why", "instead"]
+
+    def test_missing_column_raises_index_error(self):
+        r = todo_db._HostedRow(["dont", "why", "instead"], ("a", "b", "c"))
+        with pytest.raises(IndexError, match="no such column: nope"):
+            r["nope"]
+
+
+class TestPrintWorkOrderHostedRegression:
+    """Regression coverage for the `todo claim` crash on the hosted backend:
+    get_item() builds anti_patterns entries via dict(row); on hosted, an
+    unfixed _HostedRow yielded the key "INSTEAD" (uppercase) instead of
+    "instead", and _print_work_order's `anti['instead']` lookup raised
+    KeyError. The state transition itself succeeded — only the banner print
+    crashed — so this must exercise the print path directly, not just the
+    lifecycle functions (which are backend-agnostic and were never broken)."""
+
+    def test_anti_pattern_from_hosted_row_does_not_raise(self, capsys):
+        hosted_row = todo_db._HostedRow(
+            ["dont", "why", "INSTEAD"],
+            ("skip the fast tests", "flakiness hides real regressions", "run make test-fast locally first"),
+        )
+        order = {
+            "id": "sample-item",
+            "priority": "medium",
+            "title": "A sample tracked item",
+            "state": "active",
+            "worktree": "spike",
+            "claimed_by": "tester",
+            "blocked_reason": None,
+            "scope": [],
+            "preserves": [],
+            "anti_patterns": [dict(hosted_row)],
+            "verifications": [],
+            "deferrals": [],
+        }
+        todo_db._print_work_order(order)  # must not raise KeyError
+        out = capsys.readouterr().out
+        assert "instead: run make test-fast locally first" in out
+
+
 class TestAntiPatternParse:
     def test_full_form(self):
         dont, why, instead = todo_db._parse_anti_pattern(

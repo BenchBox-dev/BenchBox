@@ -402,18 +402,28 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 
 class _HostedRow:
-    """sqlite3.Row stand-in: index + name access, dict(row) via keys()."""
+    """sqlite3.Row stand-in: index + name access, dict(row) via keys().
+
+    libsql's cursor.description reports column names verbatim from the SQL
+    keyword casing that produced them rather than the SELECT-list casing (observed
+    live against Turso: the `anti_patterns.instead` column - "instead" being
+    a keyword via INSTEAD OF triggers - comes back as "INSTEAD"). sqlite3.Row
+    has no such quirk and is case-insensitive on name access besides. Names
+    are lowercased at construction so keys()/dict(row) match local sqlite3.Row
+    output exactly, and __getitem__ additionally lowercases the lookup key as
+    a second line of defense for any future case mismatch.
+    """
 
     __slots__ = ("_names", "_values")
 
     def __init__(self, names: list[str], values: tuple):
-        self._names = names
+        self._names = [name.lower() for name in names]
         self._values = values
 
     def __getitem__(self, key):
         if isinstance(key, str):
             try:
-                return self._values[self._names.index(key)]
+                return self._values[self._names.index(key.lower())]
             except ValueError:
                 raise IndexError(f"no such column: {key}") from None
         return self._values[key]
@@ -1742,12 +1752,12 @@ def export_all(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         items[row["item_id"]]["verifications"].append(dict(row))
     for row in conn.execute("SELECT item_id, behavior FROM preserves ORDER BY item_id, behavior"):
         items[row["item_id"]]["preserves"].append(row["behavior"])
-    # Use dict(row) (as get_item does) rather than by-name access: `instead` is
-    # a SQL keyword and the backends disagree on its result-column name (local
-    # SQLite -> "instead", the libsql cursor -> "INSTEAD"); dict(row) inherits
-    # whatever the cursor reports, keeping export byte-identical with get_item()
-    # on both backends, and avoids the by-name keyword lookup that fails on the
-    # remote cursor.
+    # Use dict(row) (as get_item does), consistent with every other table
+    # here: `instead` is a SQL keyword and the hosted libsql cursor once
+    # reported it back as "INSTEAD" while local sqlite3 preserved the SELECT
+    # casing "instead" - _HostedRow now lowercases column names at
+    # construction (see its docstring) so both backends agree, but dict(row)
+    # remains the right idiom regardless of casing.
     for row in conn.execute("SELECT item_id, dont, why, instead FROM anti_patterns ORDER BY item_id, dont"):
         anti = dict(row)
         items[anti.pop("item_id")]["anti_patterns"].append(anti)
