@@ -58,8 +58,9 @@ todo_db = _load_script()
 class FakeRawCursor:
     """Mimics libsql's cursor: tuple rows, NOT iterable, has description."""
 
-    def __init__(self, cur: sqlite3.Cursor):
+    def __init__(self, cur: sqlite3.Cursor, uppercase_keyword_columns: bool = False):
         self._cur = cur
+        self._uppercase_keyword_columns = uppercase_keyword_columns
 
     def fetchone(self):
         return self._cur.fetchone()
@@ -69,7 +70,10 @@ class FakeRawCursor:
 
     @property
     def description(self):
-        return self._cur.description
+        description = self._cur.description or []
+        if not self._uppercase_keyword_columns:
+            return description
+        return [("INSTEAD" if column[0] == "instead" else column[0], *column[1:]) for column in description]
 
     @property
     def lastrowid(self):
@@ -87,7 +91,13 @@ def _hrana_wrap(exc: sqlite3.Error) -> ValueError:
 class FakeRawConnection:
     """Mimics libsql.Connection over a real local SQLite file."""
 
-    def __init__(self, database: str, sync_fails: bool = False, execute_error: str | None = None):
+    def __init__(
+        self,
+        database: str,
+        sync_fails: bool = False,
+        execute_error: str | None = None,
+        uppercase_keyword_columns: bool = False,
+    ):
         self._conn = sqlite3.connect(database)
         self._conn.isolation_level = None  # autocommit, like isolation_level=None
         self.statements: list[str] = []
@@ -95,6 +105,7 @@ class FakeRawConnection:
         self.commit_calls = 0
         self._sync_fails = sync_fails
         self.execute_error = execute_error  # substring: matching statements raise like a busy/network error
+        self._uppercase_keyword_columns = uppercase_keyword_columns
 
     def execute(self, sql, params=()):
         self.statements.append(sql if isinstance(sql, str) else str(sql))
@@ -103,7 +114,10 @@ class FakeRawConnection:
                 'Hrana: `stream error: `Error { message: "SQLite error: database is locked", code: "SQLITE_BUSY" }``'
             )
         try:
-            return FakeRawCursor(self._conn.execute(sql, tuple(params)))
+            return FakeRawCursor(
+                self._conn.execute(sql, tuple(params)),
+                uppercase_keyword_columns=self._uppercase_keyword_columns,
+            )
         except sqlite3.IntegrityError as exc:
             raise _hrana_wrap(exc) from None
 
@@ -128,16 +142,27 @@ class FakeRawConnection:
 
 
 class FakeLibsql(types.ModuleType):
-    def __init__(self, sync_fails: bool = False, execute_error: str | None = None):
+    def __init__(
+        self,
+        sync_fails: bool = False,
+        execute_error: str | None = None,
+        uppercase_keyword_columns: bool = False,
+    ):
         super().__init__("libsql")
         self.connect_calls: list[dict] = []
         self.connections: list[FakeRawConnection] = []
         self._sync_fails = sync_fails
         self._execute_error = execute_error
+        self._uppercase_keyword_columns = uppercase_keyword_columns
 
     def connect(self, database, **kwargs):
         self.connect_calls.append({"database": database, **kwargs})
-        conn = FakeRawConnection(str(database), sync_fails=self._sync_fails, execute_error=self._execute_error)
+        conn = FakeRawConnection(
+            str(database),
+            sync_fails=self._sync_fails,
+            execute_error=self._execute_error,
+            uppercase_keyword_columns=self._uppercase_keyword_columns,
+        )
         self.connections.append(conn)
         return conn
 
@@ -425,6 +450,39 @@ class TestHostedAdapter:
         assert row[1] == "planning"
         as_dict = dict(conn.execute("SELECT id, state FROM items").fetchone())
         assert as_dict == {"id": "hosted-item", "state": "planning"}
+
+    def test_uppercase_keyword_column_is_normalized_through_claim_render(self, monkeypatch, tmp_path, capsys):
+        """A Turso-style uppercase description must not crash `todo claim`."""
+        fake = FakeLibsql(uppercase_keyword_columns=True)
+        monkeypatch.setitem(sys.modules, "libsql", fake)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "test-token-value")
+        monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica" / "replica.db"))
+        conn = _hosted_conn(fake)
+        _make_item(conn)
+        conn.execute(
+            "INSERT INTO anti_patterns (item_id, dont, why, instead) VALUES (?, ?, ?, ?)",
+            (
+                "hosted-item",
+                "skip the hosted path",
+                "local-only tests miss protocol differences",
+                "exercise the cursor",
+            ),
+        )
+        conn.commit()
+
+        order = todo_db.claim_item(conn, "tester", "hosted-item")
+        todo_db._print_work_order(order)
+        output = capsys.readouterr().out
+        assert "instead: exercise the cursor" in output
+        assert order["anti_patterns"] == [
+            {
+                "dont": "skip the hosted path",
+                "why": "local-only tests miss protocol differences",
+                "instead": "exercise the cursor",
+            }
+        ]
+        exported = todo_db.export_all(conn)
+        assert exported[0]["anti_patterns"] == order["anti_patterns"]
 
     def test_cursor_is_iterable(self, fake_libsql):
         conn = _hosted_conn(fake_libsql)
