@@ -324,6 +324,22 @@ def test_enumerate_with_pruning_records_registry_missing_platform():
     assert result.candidate_count == len(result.cells) + len(result.compatibility_pruned)
 
 
+def test_enumerate_with_pruning_records_both_unknown_include_dimensions():
+    raw = {
+        "platforms": {"include": ["totally_bogus_platform_xyz"]},
+        "benchmarks": {"include": ["totally_bogus_benchmark_xyz"]},
+        "scales": {"rungs": [0.01]},
+    }
+
+    result = enum_phase.enumerate_cells_with_pruning(_registry_cfg(raw))
+
+    assert result.cells == ()
+    assert {(row.rule_id, row.platform, row.benchmark, row.scale) for row in result.compatibility_pruned} == {
+        ("platform-not-in-registry", "totally_bogus_platform_xyz", "totally_bogus_benchmark_xyz", 0.01),
+        ("benchmark-not-in-registry", "totally_bogus_platform_xyz", "totally_bogus_benchmark_xyz", 0.01),
+    }
+
+
 def test_enumerate_with_pruning_records_ladder_pruned_scales():
     raw = {
         "platforms": {"include": ["duckdb"]},

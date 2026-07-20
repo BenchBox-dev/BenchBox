@@ -97,23 +97,29 @@ def enumerate_cells_with_pruning(
         benchmarks=benchmarks,
     )
 
-    if config.scales.override is not None:
-        requested = [config.scales.override]
-    else:
-        requested = list(config.scales.rungs)
+    # `requested_rungs` centralizes the effective values from
+    # `config.scales.rungs` and `config.scales.override` for every consumer.
+    requested = list(config.scales.requested_rungs)
 
     cells: list[Cell] = []
     compatibility_pruned: list[CompatibilityPrunedCell] = []
     include_release_gate_runtime_envelopes = config.compatibility.release_gate_runtime_envelopes
 
+    missing_benchmarks = missing_benchmarks_from_include(config.benchmarks.include, benchmarks)
+    missing_platforms = missing_platforms_from_include(config.platforms.include)
     # `resolve_benchmarks` silently drops `benchmarks.include` entries absent
     # from the registry (see `missing_benchmarks_from_include`'s docstring) -
     # so a typo'd/removed benchmark id never reaches `benchmark_list` below.
     # Surface it here as a visible accounting row instead of a zero-signal
     # drop, one row per platform x requested scale (mirrors the shape
     # `_pruned_rows_for_rule` already uses for compatibility-rule prunes).
-    for missing_benchmark in missing_benchmarks_from_include(config.benchmarks.include, benchmarks):
-        for platform in platform_list:
+    # Include missing ids as accounting dimensions too. This preserves a
+    # diagnostic row when both explicit include lists contain only unknown
+    # ids, rather than letting each side's empty resolved list hide the other.
+    accounting_platforms = [*platform_list, *missing_platforms]
+    accounting_benchmarks = [*benchmark_list, *missing_benchmarks]
+    for missing_benchmark in missing_benchmarks:
+        for platform in accounting_platforms:
             compatibility_pruned.extend(
                 _registry_absent_rows(platform=platform, benchmark=missing_benchmark, requested=requested)
             )
@@ -125,8 +131,8 @@ def enumerate_cells_with_pruning(
     # platform id never reaches `platform_list`. Surface it as a visible
     # accounting row per missing platform x resolved benchmark, instead of an
     # execute-time surprise.
-    for missing_platform in missing_platforms_from_include(config.platforms.include):
-        for benchmark in benchmark_list:
+    for missing_platform in missing_platforms:
+        for benchmark in accounting_benchmarks:
             compatibility_pruned.extend(
                 _registry_absent_platform_rows(platform=missing_platform, benchmark=benchmark, requested=requested)
             )

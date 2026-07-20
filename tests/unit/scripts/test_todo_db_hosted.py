@@ -1000,6 +1000,26 @@ def test_export_all_bulk_matches_per_item(tmp_path):
     assert ap.get("instead", ap.get("INSTEAD")) == "do it properly"
 
 
+def test_export_all_uses_one_read_transaction(tmp_path):
+    conn = todo_db.connect(tmp_path / "t.sqlite")
+    todo_db.create_item(
+        conn,
+        "tester",
+        item_id="snapshot-item",
+        title="Snapshot item",
+        worktree="spike",
+        priority="low",
+        description="transaction test",
+    )
+    statements: list[str] = []
+    conn.set_trace_callback(statements.append)
+
+    todo_db.write_export(conn, tmp_path / "export")
+
+    assert statements[0] == "BEGIN"
+    assert statements[-1] == "COMMIT"
+
+
 def test_export_command_uses_read_only_connect(monkeypatch):
     """The export command must connect read-only (remote-only, no embedded
     replica) so a read-only hosted token works."""

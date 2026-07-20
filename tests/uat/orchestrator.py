@@ -363,11 +363,7 @@ def run_sweep(  # noqa: C901
             # regardless of exit code), but packaging/submitting it would
             # present a known-bad run as a candidate submission.
             result_paths = [r.result_path for r in execute_outcome.results if r.result_path and r.status == "passed"]
-            submissions_dir = Path(
-                config.output.submissions_dir_template.replace("{date}", now.strftime("%Y%m%d")).replace(
-                    "{name}", config.name
-                )
-            ).expanduser()
+            submissions_dir = exec_phase.default_submissions_dir(config, now=now)
             pr = run_package(
                 config,
                 result_paths=result_paths,
@@ -483,7 +479,7 @@ def run_sweep(  # noqa: C901
             summary = report_phase.write_report(
                 cells,
                 output_path=tsv_path,
-                rungs=list(config.scales.rungs),
+                rungs=list(config.scales.requested_rungs),
                 cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
                 validator_status_by_path=validator_status_by_path,
                 compatibility_pruned_count=len(getattr(execute_outcome, "compatibility_pruned", ())),
@@ -586,7 +582,7 @@ def _emit_abort_artifacts(
     return report_phase.write_report(
         cells,
         output_path=_partial_report_path(log_dir / config.report.matrix_summary_tsv),
-        rungs=list(config.scales.rungs),
+        rungs=list(config.scales.requested_rungs),
         cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
         compatibility_pruned_count=len(compatibility_pruned),
         early_stop_pruned_count=early_stop_pruned_count,

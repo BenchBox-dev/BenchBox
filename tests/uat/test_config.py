@@ -263,7 +263,7 @@ def test_stress_default_fields_have_reader_or_reserved_contract():
         "report.matrix_summary_tsv": ("tests/uat/orchestrator.py", "config.report.matrix_summary_tsv"),
         "output.logs_dir_template": ("tests/uat/phases/execute.py", "config.output.logs_dir_template"),
         "output.submissions_dir_template": (
-            "tests/uat/orchestrator.py",
+            "tests/uat/phases/execute.py",
             "config.output.submissions_dir_template",
         ),
     }
@@ -300,6 +300,7 @@ def test_stress_override_scale_sets_override_without_mutating_rungs():
     overridden = replace(cfg, scales=replace(cfg.scales, override=0.1))
     assert overridden.scales.rungs == (0.01, 0.1, 1.0)
     assert overridden.scales.override == 0.1
+    assert overridden.scales.requested_rungs == (0.1,)
 
 
 # ---------------------------------------------------------------------------
@@ -403,6 +404,13 @@ def test_validate_config_accepts_canonical_phase_subsequence():
 def test_validate_config_rejects_rungs_and_override_together():
     with pytest.raises(config.ConfigError, match="mutually exclusive"):
         config.validate_config({"name": "smoke", "phases": ["execute"], "scales": {"rungs": [0.1], "override": 1.0}})
+
+
+def test_validate_config_uses_override_as_report_rung():
+    cfg = config.validate_config({"name": "official", "scales": {"override": 1.0}})
+
+    assert cfg.scales.override == 1.0
+    assert cfg.scales.rungs == (1.0,)
 
 
 def test_validate_config_rejects_bool_rung():
