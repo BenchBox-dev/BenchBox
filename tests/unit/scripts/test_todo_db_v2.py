@@ -20,6 +20,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -105,6 +106,20 @@ class TestSharedDbAcrossWorktrees:
 
 
 class TestScopeSelfExemption:
+    def test_trailing_slash_scope_is_recursive_without_matching_siblings(self):
+        rules = [{"kind": "only_modify", "path_glob": "tests/"}]
+        violations = todo_db.check_paths(
+            ["tests/unit/scripts/test_todo_db.py", "tests-other/not_allowed.py"],
+            rules,
+        )
+        assert violations == ["tests-other/not_allowed.py: outside only_modify allowlist"]
+
+    def test_trailing_slash_deny_scope_is_recursive(self):
+        rules = [{"kind": "do_not_modify", "path_glob": "_project/scripts/"}]
+        assert todo_db.check_paths(["_project/scripts/todo_db.py"], rules) == [
+            "_project/scripts/todo_db.py: matches do_not_modify"
+        ]
+
     def test_tracker_state_never_violates_scope(self):
         rules = [{"kind": "only_modify", "path_glob": "src/*"}]
         violations = todo_db.check_paths(
@@ -116,6 +131,25 @@ class TestScopeSelfExemption:
     def test_tracker_state_ignored_even_under_do_not_modify(self):
         rules = [{"kind": "do_not_modify", "path_glob": ".todo-db/*"}]
         assert todo_db.check_paths([".todo-db/todo.sqlite"], rules) == []
+
+
+@pytest.mark.parametrize(
+    ("args", "expected"),
+    [
+        (SimpleNamespace(command="init"), False),
+        (SimpleNamespace(command="stats"), False),
+        (SimpleNamespace(command="claim"), True),
+        (SimpleNamespace(command="future-write-command"), True),
+        (SimpleNamespace(command="import-yaml", dry_run=True), False),
+        (SimpleNamespace(command="import-yaml", dry_run=False), True),
+        (SimpleNamespace(command="verify", run=None), False),
+        (SimpleNamespace(command="verify", run=1), True),
+        (SimpleNamespace(command="config", value=None), False),
+        (SimpleNamespace(command="config", value="on"), True),
+    ],
+)
+def test_implicit_fallback_write_classification(args, expected):
+    assert todo_db._command_mutates_tracker(args) is expected
 
 
 class TestResumeLocation:
