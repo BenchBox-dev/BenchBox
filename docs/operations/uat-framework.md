@@ -280,6 +280,35 @@ write) in place instead of a torn file. `cells.jsonl` is written before its
 accounting sidecar, so a crash between the two writes cannot leave a fresh
 sidecar next to a stale (or absent) cell stream.
 
+### Incremental durability and killed-run detection
+
+During the execute phase each cell's `cells.jsonl` row is appended and
+`fsync`'d the moment that cell completes, so a sweep that dies mid-run keeps
+every row it had already earned instead of losing the whole batch. Two
+sentinel files beside `cells.jsonl` record the run's lifecycle:
+
+- `cells.jsonl.inprogress` — written when streaming begins.
+- `cells.jsonl.finalized` — written last, at an orderly sweep end (normal
+  completion *or* a controlled abort), which also clears `.inprogress`.
+
+A run interrupted by a signal (see below) or a hard crash leaves `.inprogress`
+without `.finalized`. `make uat-report` treats such a run as `INCOMPLETE` and
+exits nonzero — a partial stream of all-passed rows never reads as a clean
+sweep. A legacy artifact that carries *neither* sentinel (it predates this
+machinery) still regenerates exactly as before.
+
+### Signal teardown (SIGTERM behaves like Ctrl-C)
+
+For the duration of a sweep the process installs a SIGTERM handler that raises
+a cancellation, so an operator `kill` (or a CI cancellation) unwinds through
+the same path Ctrl-C already took: the per-platform `finally` tears the
+managed Docker stack down, no finalize marker is written (the run stays
+`INCOMPLETE`), and the process exits nonzero. The cancellation — signal name,
+phase in flight, and timestamp — is recorded to `uat_lifecycle.log` as a
+`[cancel]` line. The shim is scoped to the sweep process only; cell
+subprocesses keep their own timeout/process-group kill semantics, and the
+previous SIGTERM handler is always restored when the sweep returns.
+
 ## Disk-budget estimate
 
 Preflight prints a disk-budget line and a per-root free-space report before

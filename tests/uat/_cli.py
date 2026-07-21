@@ -147,10 +147,22 @@ def _handle_preflight(args: argparse.Namespace) -> int:
 
 def _handle_report(args: argparse.Namespace) -> int:
     """Implements `make uat-report`. Reads cells from a JSON-lines stream."""
-    from tests.uat.cells_io import coerce_accounting_count, read_accounting_sidecar, read_cells_jsonl
+    from tests.uat.cells_io import (
+        cells_run_incomplete,
+        coerce_accounting_count,
+        read_accounting_sidecar,
+        read_cells_jsonl,
+    )
     from tests.uat.phases.report import write_report
 
     cells = read_cells_jsonl(Path(args.cells_jsonl))
+    # A cells.jsonl whose durable sweep began but never finalized (its
+    # `.inprogress` marker still lingers with no `.finalized`) came from a
+    # sweep killed mid-run (uat-sweep-durability-and-signal-teardown w1): the
+    # rows present are durable but partial, so the report must not read green.
+    # A legacy artifact with neither marker is unaffected -- it still
+    # regenerates exactly as before.
+    finalized = not cells_run_incomplete(Path(args.cells_jsonl))
     # Skipped-unreachable and startup-failed cells are not JSONL rows; the
     # durable sweep writes their counts to a sidecar next to cells.jsonl.
     # Read the sidecar ONCE and take both counts from the same payload so a
@@ -175,6 +187,7 @@ def _handle_report(args: argparse.Namespace) -> int:
         skipped_unreachable_count=skipped_unreachable_count,
         startup_failed_count=startup_failed_count,
         unreachable_count_is_estimated=not sidecar_present,
+        finalized=finalized,
     )
     print(
         json.dumps(
@@ -192,6 +205,7 @@ def _handle_report(args: argparse.Namespace) -> int:
                 "passed": summary.pass_count,
                 "failed": summary.fail_count,
                 "timed_out": summary.timeout_count,
+                "finalized": finalized,
                 "cross_scale_clean_pairs": summary.cross_scale_clean_pairs,
                 "cross_scale_floor": summary.cross_scale_floor,
                 "cross_scale_floor_breached": summary.cross_scale_floor_breached,

@@ -968,12 +968,14 @@ def test_write_cells_jsonl_persists_skipped_unreachable_sidecar(tmp_path: Path):
 
 
 def test_write_cells_jsonl_writes_cell_stream_before_accounting_sidecar(tmp_path: Path):
-    """cells.jsonl must land before its accounting sidecar (w4).
+    """cells.jsonl, then its accounting sidecar, then the finalize marker (w1/w4).
 
-    A crash between the two writes must never leave a fresh sidecar beside a
-    stale (or absent) cell stream -- see
-    uat-resume-retirement-artifact-durability w4. Record the path order
-    `atomic_write_text` is called in and assert cells.jsonl comes first.
+    A crash between the row and sidecar writes must never leave a fresh sidecar
+    beside a stale (or absent) cell stream -- see
+    uat-resume-retirement-artifact-durability w4. The finalize marker is
+    written strictly last (uat-sweep-durability-and-signal-teardown w1) so its
+    presence guarantees both the rows and the sidecar preceded it. Record the
+    path order `atomic_write_text` is called in and assert that ordering.
     """
     cells_jsonl = tmp_path / "cells.jsonl"
     written_paths: list[Path] = []
@@ -992,7 +994,8 @@ def test_write_cells_jsonl_writes_cell_stream_before_accounting_sidecar(tmp_path
         )
 
     sidecar = cells_jsonl.with_name("cells.jsonl.accounting.json")
-    assert written_paths == [cells_jsonl, sidecar]
+    finalized = cells_jsonl.with_name("cells.jsonl.finalized")
+    assert written_paths == [cells_jsonl, sidecar, finalized]
 
 
 def test_abort_artifacts_thread_skipped_unreachable_when_outcome_missing(tmp_path: Path):
