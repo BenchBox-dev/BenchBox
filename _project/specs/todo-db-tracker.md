@@ -237,6 +237,11 @@ todo export   [--out DIR]                   # deterministic JSONL + markdown ren
 todo admin migrate                          # only schema-migration path; CLI pins schema_version
 ```
 
+`verify --run` uses the recorded command's exit status as the machine verdict.
+The `expected` field is human-readable acceptance guidance shown in the work
+order; commands that need output assertions must encode them directly (for
+example with a test assertion or `grep`).
+
 `todo lint` mechanical checks (replaces the rubric's mechanical axes):
 verification rows exist and ≥1 has a `command`; scope rules present for code
 items; `prior_art` rows present when the item is tagged new-module/env-var/
@@ -314,7 +319,12 @@ scope was built as a spike against a **local SQLite file**:
 `_project/scripts/todo_db.py` (schema v1 + complete CLI) with
 `tests/unit/scripts/test_todo_db.py` (41 tests covering every enforced
 invariant). Database path: `<git root>/.todo-db/todo.sqlite` (gitignored);
-override with `--db` / `TODO_DB_PATH`.
+override with `--db` / `TODO_DB_PATH`. The implicit path is visibly a local
+fallback: reads emit an unmistakable stderr warning, while writes exit 2 until
+the operator explicitly selects `--db`, `TODO_DB_PATH`, or `TODO_DB_URL`.
+`init` remains available for fresh-clone bootstrap. Every invocation reports
+`local (<path>)` or `hosted` on stderr; hosted URLs and tokens are never
+printed.
 
 ```bash
 uv run --project _project/scripts -- python _project/scripts/todo_db.py import-yaml
@@ -404,8 +414,10 @@ skill-synced `todo` skill during the spike; at G5 it is adopted into the
 skill-sync source and replaces the legacy skill's tracker actions.
 
 **Spike deviations from the DDL above** (fold back into the final design):
-`items.category` column added so the import is lossless; scope matching
-uses `fnmatch` semantics (`*` crosses `/`) pending the final glob contract;
+`items.category` column added so the import is lossless; scope matching uses
+`fnmatch` semantics (`*` crosses `/`), while a trailing slash denotes the
+named directory recursively (`tests/` matches `tests/unit/test_x.py` but not
+`tests-other/test_x.py`);
 no network/degraded-mode layer (local file); `BrokenPipeError` handled for
 piped output. The spike is single-clone by construction — it validates the
 enforcement design (G2), not the shared-visibility goal, which still
@@ -526,6 +538,13 @@ hosted) → `TODO_DB_PATH` (local file) → `TODO_DB_URL` (hosted; requires
 `TODO_DB_AUTH_TOKEN`) → default local path. `TODO_DB_PATH` deliberately
 outranks `TODO_DB_URL` so a test or tool that pins a local file can never be
 silently redirected at the shared database.
+
+The default-local final branch is a diagnostic/bootstrap seam, not a silent
+production substitute. Implicit reads remain available with a loud
+`LOCAL FALLBACK DB - NOT the production tracker` stderr banner; implicit
+writes fail before opening the database. Explicit local pins are warning-free,
+and hosted invocations identify only the backend kind so the DSN remains
+secret. `init` and non-mutating dry-runs are the deliberate exceptions.
 
 Hosted mode uses the `libsql` Python client (0.1.11) with a **per-worktree
 embedded replica** at `<git root>/.todo-db/replica.db` (override:

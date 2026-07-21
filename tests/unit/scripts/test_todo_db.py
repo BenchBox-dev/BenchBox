@@ -324,27 +324,16 @@ class TestVerifyRun:
         ).fetchall()
         assert [(r["seq"], r["last_result"]) for r in rows] == [(1, "pass"), (2, "fail")]
 
-    def test_verify_expected_substring(self, conn):
+    def test_verify_expected_is_human_acceptance_text(self, conn):
         _mk(
             conn,
             verifications=[
-                {"description": "greps output", "command": "echo hello", "expected": "hello"},
-                {"description": "wrong output", "command": "echo hello", "expected": "goodbye"},
+                {"description": "passes", "command": "true", "expected": "human-readable criterion"},
+                {"description": "fails", "command": "false", "expected": "human-readable criterion"},
             ],
         )
         assert todo_db.run_verification(conn, "tester", "sample-item", 1)[0] == "pass"
         assert todo_db.run_verification(conn, "tester", "sample-item", 2)[0] == "fail"
-
-    def test_verify_expected_exit_status(self, conn):
-        _mk(
-            conn,
-            verifications=[
-                {"description": "successful command", "command": "true", "expected": "exit 0"},
-                {"description": "expected failure", "command": "false", "expected": "exit 1"},
-            ],
-        )
-        assert todo_db.run_verification(conn, "tester", "sample-item", 1)[0] == "pass"
-        assert todo_db.run_verification(conn, "tester", "sample-item", 2)[0] == "pass"
 
 
 class TestExport:
