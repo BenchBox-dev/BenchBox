@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
 
@@ -151,6 +152,94 @@ def test_comparison_includes_meta_and_normalizes_event_order() -> None:
     assert result["events"]["equal_provenance"] is True
 
 
+def test_comparison_normalizes_generated_import_provenance() -> None:
+    legacy = _legacy_snapshot()
+    legacy["items"][0]["created_at"] = "2026-07-21T13:19:48Z"
+    legacy["items"][0]["deps"] = ["dependency"]
+    legacy["items"][0]["deferrals"][0].update({"created_at": "2026-07-21T13:19:48Z", "resolution": "open"})
+    legacy["events"] = [
+        {"action": "create", "item_id": "sample-item", "detail": {"title": "A sample tracked item"}},
+        {"action": "defer", "item_id": "sample-item", "detail": {"deferral_id": 4, "summary": "follow up"}},
+    ]
+    legacy["meta"] = [{"key": "schema_version", "value": "2"}]
+    standalone = _standalone_envelope()
+    standalone["tables"]["items"] = [
+        {
+            key: value
+            for key, value in legacy["items"][0].items()
+            if key
+            not in {"work", "deps", "scope", "verifications", "preserves", "anti_patterns", "prior_art", "deferrals"}
+        }
+    ]
+    standalone["tables"]["items"][0]["created_at"] = "2026-07-21T13:19:54Z"
+    standalone["tables"]["deferrals"] = [
+        {
+            **legacy["items"][0]["deferrals"][0],
+            "id": 9,
+            "created_at": "2026-07-21T13:19:54Z",
+        }
+    ]
+    standalone["tables"]["anti_patterns"] = [{"item_id": "sample-item", **legacy["items"][0]["anti_patterns"][0]}]
+    standalone["tables"]["prior_art"] = [{"item_id": "sample-item", **legacy["items"][0]["prior_art"][0]}]
+    standalone["tables"]["item_deps"] = [{"item_id": "sample-item", "needs_item": "dependency"}]
+    standalone["events"] = [
+        {
+            "action": "create",
+            "detail": {"item_id": "sample-item", "title": "A sample tracked item"},
+        },
+        {
+            "action": "defer",
+            "detail": {"item_id": "sample-item", "deferral_id": 9, "summary": "follow up"},
+        },
+        {"action": "dependency", "detail": {"item_id": "sample-item", "needs_item": "dependency"}},
+    ]
+    for table in shadow.TABLE_NAMES:
+        if table != "items":
+            legacy[table] = list(standalone["tables"][table])
+
+    result = shadow.compare_snapshots(
+        legacy,
+        standalone,
+        import_window=(
+            datetime(2026, 7, 21, 13, 19, 40, tzinfo=timezone.utc),
+            datetime(2026, 7, 21, 13, 20, 0, tzinfo=timezone.utc),
+        ),
+    )
+
+    assert result["items"]["field_diffs"] == {}
+    assert result["events"]["equal_provenance"] is True
+    assert result["events"]["standalone_supplemental_actions"] == {"dependency": 1}
+    assert result["events"]["supplemental_provenance_equal"] is True
+    assert result["meta"]["equal"] is True
+    assert result["passed"] is True
+
+
+def test_comparison_rejects_dependency_event_detail_drift() -> None:
+    legacy = {"items": [], "events": [], "meta": [], "item_deps": [{"item_id": "a", "needs_item": "b"}]}
+    standalone = _standalone_envelope()
+    standalone["tables"]["item_deps"] = [{"item_id": "a", "needs_item": "b"}]
+    standalone["events"] = [{"action": "dependency", "detail": {"item_id": "a", "needs_item": "wrong-target"}}]
+    result = shadow.compare_snapshots(legacy, standalone)
+    assert result["events"]["supplemental_provenance_equal"] is False
+    assert result["passed"] is False
+
+
+def test_comparison_does_not_hide_durable_timestamp_drift() -> None:
+    legacy = _legacy_snapshot()
+    standalone = _standalone_envelope()
+    standalone["tables"]["items"] = [
+        {
+            key: value
+            for key, value in legacy["items"][0].items()
+            if key
+            not in {"work", "deps", "scope", "verifications", "preserves", "anti_patterns", "prior_art", "deferrals"}
+        }
+    ]
+    standalone["tables"]["items"][0]["created_at"] = "2025-01-01T00:00:00Z"
+    result = shadow.compare_snapshots(legacy, standalone)
+    assert "sample-item" in result["items"]["field_diffs"]
+
+
 def test_malformed_envelope_has_actionable_error() -> None:
     with pytest.raises(shadow.ShadowMigrationError, match="items table"):
         shadow.compare_snapshots({"items": [], "events": [], "meta": []}, {"tables": []})
@@ -161,6 +250,17 @@ def test_validate_target_rejects_export_sidecar(tmp_path: Path) -> None:
     target.with_suffix(".export.json").write_text("keep", encoding="utf-8")
     with pytest.raises(shadow.ShadowMigrationError, match="export path"):
         shadow.validate_target(target, benchbox_db=tmp_path / "benchbox.sqlite", standalone_db=tmp_path / "plan.sqlite")
+
+
+@pytest.mark.parametrize("protected_name", ["benchbox.sqlite", "plan.sqlite"])
+def test_validate_target_rejects_protected_databases(tmp_path: Path, protected_name: str) -> None:
+    protected = tmp_path / protected_name
+    with pytest.raises(shadow.ShadowMigrationError, match="protected tracker database"):
+        shadow.validate_target(
+            protected,
+            benchbox_db=tmp_path / "benchbox.sqlite",
+            standalone_db=tmp_path / "plan.sqlite",
+        )
 
 
 def test_run_captures_success_output() -> None:
@@ -175,6 +275,27 @@ def test_run_redacts_success_output() -> None:
         env={"TODO_DB_RO_AUTH_TOKEN": "secret"},
     )
     assert result == {"stdout": "[REDACTED]", "stderr": "[REDACTED]", "returncode": 0}
+
+
+def test_hosted_snapshot_is_bulk_complete_private_and_no_clobber(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    queried: list[str] = []
+
+    def fake_rows(connection: object, table: str) -> list[dict]:
+        queried.append(table)
+        return [{"table": table}]
+
+    monkeypatch.setattr(shadow, "_rows", fake_rows)
+    output = tmp_path / "snapshot.json"
+    counts = shadow.write_hosted_legacy_snapshot(object(), output)
+    expected_tables = ["items", *[name for name in shadow.TABLE_NAMES if name != "items"], "events", "meta"]
+    assert queried == expected_tables
+    assert counts == dict.fromkeys(expected_tables, 1)
+    assert output.stat().st_mode & 0o777 == 0o600
+    assert set(json.loads(output.read_text())) == set(expected_tables)
+    with pytest.raises(shadow.ShadowMigrationError, match="must not already exist"):
+        shadow.write_hosted_legacy_snapshot(object(), output)
 
 
 def test_empty_source_is_rejected_before_any_target_creation(tmp_path: Path) -> None:

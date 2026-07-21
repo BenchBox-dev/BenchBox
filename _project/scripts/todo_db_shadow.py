@@ -10,12 +10,14 @@ be reported as a successful zero-item migration.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import sqlite3
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +79,51 @@ def _rows(connection: sqlite3.Connection, table: str) -> list[dict[str, Any]]:
         "deferrals": "from_item, id",
     }.get(table, "rowid")
     return [dict(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY {order_by}")]
+
+
+def write_hosted_legacy_snapshot(connection: Any, output: Path) -> dict[str, int]:
+    """Write one bulk-query-per-table legacy snapshot without exposing credentials."""
+
+    if output.exists() or output.is_symlink():
+        raise ShadowMigrationError(f"hosted snapshot target must not already exist: {output}")
+    table_names = ("items", *(name for name in TABLE_NAMES if name != "items"), "events", "meta")
+    snapshot = {table: _rows(connection, table) for table in table_names}
+    output.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(output, os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(_json(snapshot) + "\n")
+    return {table: len(rows) for table, rows in snapshot.items()}
+
+
+def capture_hosted_legacy_snapshot(*, repo_root: Path, url: str, output: Path) -> dict[str, int]:
+    """Connect to the legacy hosted primary in read-only mode and capture it."""
+
+    if not os.environ.get("TODO_DB_AUTH_TOKEN"):
+        raise ShadowMigrationError("hosted snapshot requires TODO_DB_AUTH_TOKEN carrying read-only authority")
+    module_path = repo_root / "_project" / "scripts" / "todo_db.py"
+    spec = importlib.util.spec_from_file_location("benchbox_legacy_todo_db_for_snapshot", module_path)
+    if spec is None or spec.loader is None:
+        raise ShadowMigrationError(f"cannot load legacy tracker module: {module_path}")
+    legacy = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(legacy)
+    token = os.environ.get("TODO_DB_AUTH_TOKEN", "")
+    try:
+        connection = legacy.connect_backend(url, read_only=True)
+    except Exception as exc:
+        message = str(exc).replace(url, "[REDACTED]")
+        if token:
+            message = message.replace(token, "[REDACTED]")
+        raise ShadowMigrationError(f"hosted snapshot connection failed: {message}") from exc
+    try:
+        with legacy._read_txn(connection):
+            return write_hosted_legacy_snapshot(connection, output)
+    except Exception as exc:
+        message = str(exc).replace(url, "[REDACTED]")
+        if token:
+            message = message.replace(token, "[REDACTED]")
+        raise ShadowMigrationError(f"hosted snapshot failed: {message}") from exc
+    finally:
+        connection.close()
 
 
 def legacy_snapshot(connection: sqlite3.Connection) -> dict[str, Any]:
@@ -204,10 +251,46 @@ def _event_signature(event: dict[str, Any], *, legacy: bool) -> tuple[Any, ...]:
     item_id = event.get("item_id")
     if not legacy:
         item_id = detail.pop("item_id", None)
+    if event.get("action") == "defer":
+        detail.pop("deferral_id", None)
     return (event.get("action"), item_id, detail)
 
 
-def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dict[str, Any]:
+def _timestamp_in_window(value: Any, import_window: tuple[datetime, datetime] | None) -> bool:
+    if not isinstance(value, str) or import_window is None:
+        return False
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    if timestamp.tzinfo is None:
+        return False
+    return import_window[0] <= timestamp <= import_window[1]
+
+
+def _semantic_item(
+    item: dict[str, Any], *, peer: dict[str, Any], import_window: tuple[datetime, datetime] | None
+) -> dict[str, Any]:
+    """Remove only database-generated identities while retaining durable source values."""
+
+    normalized = dict(item)
+    if _timestamp_in_window(normalized.get("created_at"), import_window) and _timestamp_in_window(
+        peer.get("created_at"), import_window
+    ):
+        normalized.pop("created_at", None)
+    normalized["deferrals"] = [
+        {key: value for key, value in deferral.items() if key not in {"id", "created_at"}}
+        for deferral in normalized.get("deferrals", [])
+    ]
+    return normalized
+
+
+def compare_snapshots(
+    legacy: dict[str, Any],
+    standalone: dict[str, Any],
+    *,
+    import_window: tuple[datetime, datetime] | None = None,
+) -> dict[str, Any]:
     legacy_items = {item["id"]: item for item in legacy.get("items", [])}
     standalone_items = {item["id"]: item for item in _standalone_items(standalone)}
     missing = sorted(set(legacy_items) - set(standalone_items))
@@ -215,17 +298,32 @@ def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dic
     item_diffs = {
         item_id: {"legacy": legacy_items[item_id], "standalone": standalone_items[item_id]}
         for item_id in sorted(set(legacy_items) & set(standalone_items))
-        if _json(legacy_items[item_id]) != _json(standalone_items[item_id])
+        if _json(_semantic_item(legacy_items[item_id], peer=standalone_items[item_id], import_window=import_window))
+        != _json(_semantic_item(standalone_items[item_id], peer=legacy_items[item_id], import_window=import_window))
     }
     legacy_events = sorted((_event_signature(event, legacy=True) for event in legacy.get("events", [])), key=_json)
-    standalone_events = sorted(
+    all_standalone_events = sorted(
         (_event_signature(event, legacy=False) for event in (standalone.get("events") or [])), key=_json
     )
+    standalone_events = [event for event in all_standalone_events if event[0] != "dependency"]
+    dependency_events = [event for event in all_standalone_events if event[0] == "dependency"]
+    expected_dependency_events = sorted(
+        [
+            ("dependency", row["item_id"], {"needs_item": row["needs_item"]})
+            for row in (standalone.get("tables") or {}).get("item_deps") or []
+        ],
+        key=_json,
+    )
+    supplemental_actions = {
+        "dependency": len(dependency_events),
+    }
     event_result = {
         "legacy_count": len(legacy_events),
-        "standalone_count": len(standalone_events),
+        "standalone_count": len(all_standalone_events),
         "legacy_actions": [list(event) for event in legacy_events],
-        "standalone_actions": [list(event) for event in standalone_events],
+        "standalone_actions": [list(event) for event in all_standalone_events],
+        "standalone_supplemental_actions": supplemental_actions,
+        "supplemental_provenance_equal": dependency_events == expected_dependency_events,
         "equal_provenance": legacy_events == standalone_events,
     }
     table_counts = {
@@ -235,7 +333,7 @@ def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dic
         }
         for table in TABLE_NAMES
     }
-    legacy_meta = {row["key"]: row["value"] for row in legacy.get("meta", [])}
+    legacy_meta = {row["key"]: row["value"] for row in legacy.get("meta", []) if row["key"] != "schema_version"}
     standalone_meta = standalone.get("metadata") or {}
     meta_result = {"legacy": legacy_meta, "standalone": standalone_meta, "equal": legacy_meta == standalone_meta}
     result = {
@@ -256,6 +354,7 @@ def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dic
         and not unexpected
         and not item_diffs
         and event_result["equal_provenance"]
+        and event_result["supplemental_provenance_equal"]
         and meta_result["equal"]
         and all(counts["legacy"] == counts["standalone"] for counts in table_counts.values())
     )
@@ -317,6 +416,7 @@ def run_shadow(
     export_path: Path | None = None
     legacy_temporary = tempfile.TemporaryDirectory(prefix="benchbox-legacy-shadow-")
     command_reports: list[dict[str, Any]] = []
+    import_started_at = datetime.now(timezone.utc)
     try:
         legacy_db = Path(legacy_temporary.name) / "legacy.sqlite"
         command_reports.append(
@@ -438,10 +538,15 @@ def run_shadow(
         )
         standalone = json.loads(export_path.read_text(encoding="utf-8"))
         _require_imported_items(standalone, source_count=len(sources), importer="standalone")
+        import_finished_at = datetime.now(timezone.utc)
         result = {
             "source": {"todo_dir": str(todo_dir), "done_dir": str(done_dir), "yaml_records": len(sources)},
             "commands": command_reports,
-            "comparison": compare_snapshots(legacy, standalone),
+            "comparison": compare_snapshots(
+                legacy,
+                standalone,
+                import_window=(import_started_at, import_finished_at),
+            ),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(_json(result) + "\n", encoding="utf-8")
@@ -458,14 +563,28 @@ def run_shadow(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--todo-dir", type=Path, required=True)
-    parser.add_argument("--done-dir", type=Path, required=True)
-    parser.add_argument("--db", type=Path, required=True, help="new dedicated shadow target; must not exist")
-    parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--todo-dir", type=Path)
+    parser.add_argument("--done-dir", type=Path)
+    parser.add_argument("--db", type=Path, help="new dedicated shadow target; must not exist")
+    parser.add_argument("--report", type=Path)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--standalone-project", type=Path, default=Path("/Users/joe/Developer/todo-db"))
+    parser.add_argument("--hosted-url", help="legacy hosted source URL; never written to output")
+    parser.add_argument("--hosted-snapshot-output", type=Path)
     args = parser.parse_args(argv)
     try:
+        if args.hosted_snapshot_output:
+            if not args.hosted_url:
+                raise ShadowMigrationError("--hosted-snapshot-output requires --hosted-url")
+            counts = capture_hosted_legacy_snapshot(
+                repo_root=args.repo_root.resolve(),
+                url=args.hosted_url,
+                output=args.hosted_snapshot_output,
+            )
+            print(_json({"snapshot": str(args.hosted_snapshot_output), "counts": counts}))
+            return 0
+        if not all((args.todo_dir, args.done_dir, args.db, args.report)):
+            raise ShadowMigrationError("shadow mode requires --todo-dir, --done-dir, --db, and --report")
         result = run_shadow(
             repo_root=args.repo_root.resolve(),
             todo_dir=args.todo_dir.resolve(),
