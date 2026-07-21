@@ -102,7 +102,7 @@ class TestStreamRunnerExecute:
         assert result.errors == []
         assert stream_fn.call_count == 3
 
-    def test_failed_stream_recorded_as_error(self) -> None:
+    def test_partial_stream_is_forced_failed_and_recorded_as_error(self) -> None:
         config = _FakeConfig(num_streams=1)
         result = _make_result()
         logger = logging.getLogger("test-throughput-runner")
@@ -112,8 +112,7 @@ class TestStreamRunnerExecute:
                 0,
                 queries_successful=20,
                 queries_failed=2,
-                success=False,
-                error="boom",
+                success=True,
             )
         )
 
@@ -123,7 +122,8 @@ class TestStreamRunnerExecute:
         assert result.streams_successful == 0
         assert len(result.errors) == 1
         assert "Stream 0 failed" in result.errors[0]
-        assert "boom" in result.errors[0]
+        assert "20/22 queries succeeded" in result.errors[0]
+        assert result.stream_results[0].success is False
 
     def test_exception_from_stream_fn_is_captured_as_error(self) -> None:
         config = _FakeConfig(num_streams=1)
@@ -141,8 +141,8 @@ class TestStreamRunnerExecute:
         assert "execution failed" in result.errors[0]
         assert "stream blew up" in result.errors[0]
 
-    def test_zero_queries_stream_is_aggregated_without_error(self) -> None:
-        """A stream that legitimately executes zero queries should still count as successful."""
+    def test_zero_queries_stream_is_failed_and_visible(self) -> None:
+        """A stream with no executions is dead, not a successful measurement."""
         config = _FakeConfig(num_streams=1)
         result = _make_result()
         logger = logging.getLogger("test-throughput-runner")
@@ -160,9 +160,10 @@ class TestStreamRunnerExecute:
         StreamRunner.execute(stream_fn, config, result, logger)
 
         assert result.streams_executed == 1
-        assert result.streams_successful == 1
-        assert result.errors == []
+        assert result.streams_successful == 0
+        assert result.errors == ["Stream 0 failed: 0/0 queries succeeded"]
         assert result.stream_results[0].queries_executed == 0
+        assert result.stream_results[0].success is False
 
     def test_single_stream_fallback_when_max_workers_unset(self) -> None:
         """config.max_workers=None falls back to config.num_streams (single-thread case)."""
@@ -201,6 +202,8 @@ class TestStreamRunnerComputeMetrics:
             _make_stream_result(1, start_time=1.0, end_time=3599.0, queries_executed=22),
             _make_stream_result(2, start_time=2.0, end_time=3600.0, queries_executed=22),
         ]
+        result.streams_executed = 3
+        result.streams_successful = 3
 
         StreamRunner.compute_metrics(result, config, start_time=0.0)
 
@@ -221,6 +224,8 @@ class TestStreamRunnerComputeMetrics:
         config = _FakeConfig(num_streams=1, scale_factor=0.1)
         result = _make_result()
         result.stream_results = [_make_stream_result(0, start_time=0.0, end_time=5.0, queries_executed=0)]
+        result.streams_executed = 1
+        result.streams_successful = 1
 
         StreamRunner.compute_metrics(result, config, start_time=0.0)
 
@@ -237,24 +242,32 @@ class TestStreamRunnerComputeMetrics:
         config = _FakeConfig(num_streams=1)
         result = _make_result()
         assert result.stream_results == []
+        result.streams_executed = 1
+        result.errors = ["Stream 0 execution failed: worker died"]
 
         StreamRunner.compute_metrics(result, config, start_time=0.0)
 
         assert result.total_time == pytest.approx(7.5)
+        assert result.success is False
+        assert result.throughput_at_size == 0.0
+        assert result.errors == ["Stream 0 execution failed: worker died"]
 
-    def test_zero_total_time_leaves_throughput_fields_untouched(self) -> None:
-        """When total_time is 0 (degenerate identical start/end), division is skipped entirely."""
+    def test_zero_total_time_suppresses_throughput_metric(self) -> None:
+        """A degenerate timing window cannot produce a scored metric."""
         config = _FakeConfig(num_streams=1)
         result = _make_result()
         result.throughput_at_size = -1.0
         result.query_throughput = -1.0
         result.stream_results = [_make_stream_result(0, start_time=5.0, end_time=5.0)]
+        result.streams_executed = 1
+        result.streams_successful = 1
 
         StreamRunner.compute_metrics(result, config, start_time=0.0)
 
         assert result.total_time == 0.0
-        assert result.throughput_at_size == -1.0
-        assert result.query_throughput == -1.0
+        assert result.throughput_at_size == 0.0
+        assert result.query_throughput == 0.0
+        assert result.success is False
 
 
 class TestThroughputResultAggregation:

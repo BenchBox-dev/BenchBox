@@ -8,12 +8,12 @@
 * ``compute_metrics()`` - TTT calculation, Throughput@Size, query throughput;
   also mutates ``ThroughputResult`` in-place.
 
-Success-rate gating is intentionally left to each spec's ``run()`` so that
-TPC-H's and TPC-DS's independently configurable ``min_success_rate`` gates
-remain independently testable and auditable (see each module's config
-dataclass for its spec-derived default).  Verbose summary logging
-(Throughput@Size, query throughput, success rate) is also left spec-local
-because the two specs format the gate threshold differently.
+Per-stream success is enforced here at the shared metric boundary: every
+requested stream must complete successfully before Throughput@Size is valid.
+Spec-local harnesses may still report their historical configurable success
+rate, but the product/export path cannot turn partial success into a score.
+Verbose summary logging remains spec-local because the two specs format their
+details differently.
 
 Timed-out streams
 ------------------
@@ -102,7 +102,12 @@ from typing import Any, Callable, Protocol
 from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.utils.clock import elapsed_seconds
 
-from .result import ThroughputResult, ThroughputStreamResult
+from .result import (
+    ThroughputResult,
+    ThroughputStreamResult,
+    throughput_result_succeeded,
+    throughput_stream_succeeded,
+)
 
 
 class _RunnerConfig(Protocol):
@@ -233,9 +238,19 @@ class StreamRunner:
                     result.stream_results.append(stream_result)
                     result.streams_executed += 1
 
-                    if stream_result.success:
+                    if throughput_stream_succeeded(stream_result):
                         result.streams_successful += 1
                     else:
+                        stream_result.success = False
+                        if not stream_result.error:
+                            query_errors = [
+                                str(query.get("error"))
+                                for query in stream_result.query_results
+                                if not query.get("success", True) and query.get("error")
+                            ]
+                            stream_result.error = "; ".join(query_errors) or (
+                                f"{stream_result.queries_successful}/{stream_result.queries_executed} queries succeeded"
+                            )
                         result.errors.append(f"Stream {stream_result.stream_id} failed: {stream_result.error}")
 
                     if config.verbose:
@@ -339,13 +354,14 @@ class StreamRunner:
         result: ThroughputResult,
         config: _RunnerConfig,
         start_time: float,
-    ) -> None:
+    ) -> bool:
         """Compute TTT, Throughput@Size, and query throughput; mutates *result*.
 
         Sets ``result.end_time``, ``result.total_time``,
         ``result.throughput_at_size``, and ``result.query_throughput``.
-        The success-rate gate and verbose summary logging are left to the
-        calling spec's ``run()`` method.
+        A metric is emitted only when every requested stream completed and
+        reported success. Returning ``False`` lets both TPC drivers use this
+        product-level validity gate without duplicating it.
 
         Args:
             result: Mutable ``ThroughputResult`` populated by ``execute()``.
@@ -369,12 +385,21 @@ class StreamRunner:
 
         result.total_time = total_time
 
-        if total_time > 0:
-            total_queries = sum(sr.queries_executed for sr in result.stream_results)
-            result.throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
-                total_queries=total_queries,
-                total_time_seconds=total_time,
-                scale_factor=config.scale_factor,
-                num_streams=config.num_streams,
-            )
-            result.query_throughput = total_queries / total_time
+        if not throughput_result_succeeded(result, config.num_streams) or total_time <= 0:
+            # Keep the internal numeric sentinel compatible with spec-local
+            # log formatting. The adapter/export seam omits this invalid metric.
+            result.throughput_at_size = 0.0
+            result.query_throughput = 0.0
+            result.success = False
+            return False
+
+        total_queries = sum(sr.queries_executed for sr in result.stream_results)
+        result.throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
+            total_queries=total_queries,
+            total_time_seconds=total_time,
+            scale_factor=config.scale_factor,
+            num_streams=config.num_streams,
+        )
+        result.query_throughput = total_queries / total_time
+        result.success = result.throughput_at_size > 0
+        return result.success

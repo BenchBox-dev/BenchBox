@@ -1516,6 +1516,8 @@ class ResultCaptureMixin:
         if throughput_result is None:
             return None
 
+        from benchbox.core.throughput.result import throughput_result_succeeded, throughput_stream_succeeded
+
         streams: list[ThroughputStream] = []
         total_queries_executed = 0
 
@@ -1550,6 +1552,14 @@ class ResultCaptureMixin:
                     )
                 )
 
+            stream_success = throughput_stream_succeeded(stream_result)
+            stream_error = getattr(stream_result, "error", None)
+            if not stream_success and not stream_error:
+                stream_error = (
+                    f"{getattr(stream_result, 'queries_successful', 0)}/"
+                    f"{getattr(stream_result, 'queries_executed', 0)} queries succeeded"
+                )
+
             streams.append(
                 ThroughputStream(
                     stream_id=stream_result.stream_id,
@@ -1557,12 +1567,15 @@ class ResultCaptureMixin:
                     end_time=end_iso,
                     duration_ms=duration_ms,
                     query_executions=query_executions,
+                    success=stream_success,
+                    error_message=stream_error,
                 )
             )
             total_queries_executed += getattr(stream_result, "queries_executed", len(stream_result.query_results))
 
         duration_ms = int(float(getattr(throughput_result, "total_time", 0.0)) * 1000)
         end_time_iso = throughput_result.end_time or datetime.now().isoformat()
+        phase_success = throughput_result_succeeded(throughput_result)
 
         return ThroughputTestPhase(
             start_time=throughput_result.start_time,
@@ -1571,7 +1584,9 @@ class ResultCaptureMixin:
             num_streams=getattr(getattr(throughput_result, "config", None), "num_streams", len(streams)),
             streams=streams,
             total_queries_executed=total_queries_executed,
-            throughput_at_size=getattr(throughput_result, "throughput_at_size", 0.0),
+            throughput_at_size=(getattr(throughput_result, "throughput_at_size", None) if phase_success else None),
+            success=phase_success,
+            errors=list(getattr(throughput_result, "errors", []) or []),
         )
 
     @staticmethod

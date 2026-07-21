@@ -136,15 +136,16 @@ class TestTPCHCompliance:
         assert power_test.config.validation is True
         assert power_test.config.validation_mode == "loose"
 
-    def test_tpch_throughput_test_uses_stream_specific_permutations(self):
-        """Test that TPC-H throughput test uses different permutations for different streams."""
+    def test_tpch_throughput_stream_permutations_keep_stream_zero_validation_context(self):
+        """Streams vary query order while validation stays on the canonical context."""
         from benchbox.core.tpch.streams import TPCHStreams
         from benchbox.core.tpch.throughput_test import TPCHThroughputTest
 
         # Mock benchmark
         mock_benchmark = MagicMock()
         mock_benchmark.get_query.return_value = "SELECT 1"
-        mock_connection_factory = MagicMock(return_value=MagicMock())
+        mock_connection = MagicMock()
+        mock_connection_factory = MagicMock(return_value=mock_connection)
 
         # Create throughput test
         throughput_test = TPCHThroughputTest(
@@ -185,6 +186,9 @@ class TestTPCHCompliance:
         assert stream_0_queries == expected_stream_0
         assert stream_1_queries == expected_stream_1
         assert stream_0_queries != stream_1_queries
+        assert len(mock_connection.set_query_context.call_args_list) == 44
+        assert all(not call.kwargs for call in mock_connection.set_query_context.call_args_list)
+        assert all(len(call.args) == 1 for call in mock_connection.set_query_context.call_args_list)
 
 
 class TestTPCDSCompliance:

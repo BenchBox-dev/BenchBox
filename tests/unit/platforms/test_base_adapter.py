@@ -1447,6 +1447,8 @@ class TestThroughputPhaseCreation:
             {"query_id": "Q2", "execution_time_seconds": 2.0, "success": True},
         ]
         stream1.queries_executed = 2
+        stream1.success = False
+        stream1.error = "stream stopped"
 
         throughput_result = Mock()
         throughput_result.stream_results = [stream1]
@@ -1455,6 +1457,9 @@ class TestThroughputPhaseCreation:
         throughput_result.end_time = "2025-01-01T10:01:00"
         throughput_result.config = Mock(num_streams=1)
         throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 0
+        throughput_result.errors = ["Stream 0 failed: stream stopped"]
 
         result = adapter._create_throughput_phase(throughput_result)
 
@@ -1463,6 +1468,10 @@ class TestThroughputPhaseCreation:
         assert result.streams[0].stream_id == 0
         assert len(result.streams[0].query_executions) == 2
         assert result.total_queries_executed == 2
+        assert result.success is False
+        assert result.errors == ["Stream 0 failed: stream stopped"]
+        assert result.streams[0].success is False
+        assert result.streams[0].error_message == "stream stopped"
         assert result.streams[0].query_executions[0].run_type == "measurement"
         assert result.streams[0].query_executions[1].run_type == "measurement"
 
@@ -1477,6 +1486,8 @@ class TestThroughputPhaseCreation:
         stream1.duration = 60.0
         stream1.query_results = [{"query_id": "Q1", "execution_time_seconds": 1.0, "success": True, "iteration": 0}]
         stream1.queries_executed = 1
+        stream1.success = True
+        stream1.error = None
 
         throughput_result = Mock()
         throughput_result.stream_results = [stream1]
@@ -1485,6 +1496,9 @@ class TestThroughputPhaseCreation:
         throughput_result.end_time = "2025-01-01T10:01:00"
         throughput_result.config = Mock(num_streams=1)
         throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 1
+        throughput_result.errors = []
 
         result = adapter._create_throughput_phase(throughput_result)
 
@@ -2706,6 +2720,8 @@ class TestTPCHAndTPCDSExecutionHelpers:
             },
         ]
         assert adapter._last_throughput_test_result is throughput_result
+        assert throughput_result.success is False
+        assert throughput_result.throughput_at_size is None
         assert any("Target dialect" in str(call) for call in mock_console.print.call_args_list)
 
     @patch("benchbox.platforms.base.execution.quiet_console")
@@ -2866,6 +2882,8 @@ class TestTPCHAndTPCDSExecutionHelpers:
         assert connection.cursor.call_count == 1
         assert results[-1]["error"] == "tpch timeout"
         assert adapter._last_throughput_test_result is throughput_result
+        assert throughput_result.success is False
+        assert throughput_result.throughput_at_size is None
 
     @patch("benchbox.platforms.base.execution.quiet_console")
     def test_execute_tpch_maintenance_test_passes_rf_intervals_and_integrity_flag(self, _mock_console, tmp_path):

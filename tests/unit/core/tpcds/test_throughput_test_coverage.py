@@ -82,9 +82,11 @@ def test_validate_results_branches():
     assert throughput.validate_results(good) is False
 
     good.success = True
+    good.streams_executed = 1
     good.streams_successful = 1
     good.config.num_streams = 1
     good.throughput_at_size = 10.0
+    good.errors = []
     assert throughput.validate_results(good) is True
 
 

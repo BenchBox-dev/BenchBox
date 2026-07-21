@@ -369,7 +369,7 @@ class TestPlatformAdapterEnhancedMethods:
             TPCHThroughputTestResult,
         )
 
-        config = TPCHThroughputTestConfig(scale_factor=0.01, num_streams=2)
+        config = TPCHThroughputTestConfig(scale_factor=0.01, num_streams=1)
         stream_result = TPCHThroughputStreamResult(
             stream_id=0,
             start_time=1_700_000_000.0,
@@ -403,8 +403,8 @@ class TestPlatformAdapterEnhancedMethods:
             end_time="2024-01-01T00:00:01Z",
             total_time=1.0,
             throughput_at_size=123.45,
-            streams_executed=2,
-            streams_successful=2,
+            streams_executed=1,
+            streams_successful=1,
             stream_results=[stream_result],
             query_throughput=44.0,
         )
@@ -413,7 +413,7 @@ class TestPlatformAdapterEnhancedMethods:
 
         assert phase is not None
         assert phase.throughput_at_size == 123.45
-        assert phase.num_streams == 2
+        assert phase.num_streams == 1
         assert phase.total_queries_executed == 2
         assert len(phase.streams) == 1
 

@@ -129,8 +129,7 @@ class TestThroughputTestConfig:
         assert config.max_workers is None
         assert config.queries_per_stream is None  # Default: execute all queries
         assert config.enable_preflight is True
-        # Configurable success gate (mirrors TPC-H's min_success_rate); spec-
-        # derived default of 70% must be preserved.
+        # Legacy per-stream reporting threshold remains configurable.
         assert config.min_success_rate == 0.70
         # Opt-in cooperative cancellation must default OFF (behavior-preserving).
         assert config.cancel_on_timeout is False
@@ -328,11 +327,8 @@ class TestThroughputTest:
         validation = test.validate_results(result)
         assert validation is False
 
-    def test_validate_results_gate_is_configurable(self, tpcds_benchmark):
-        """Same 1/2 streams-successful pattern as test_result_validation_failures
-        but with a lowered min_success_rate, proving validate_results() reads
-        config.min_success_rate instead of a hardcoded 0.7 (the third of the
-        three previously-independent hard-coded 70% literals)."""
+    def test_validate_results_rejects_partial_run_despite_legacy_threshold(self, tpcds_benchmark):
+        """A lowered reporting threshold cannot make a partial result valid."""
         config = TPCDSThroughputTestConfig(num_streams=2, min_success_rate=0.5)
         test = TPCDSThroughputTest(benchmark=tpcds_benchmark)
 
@@ -348,9 +344,7 @@ class TestThroughputTest:
             success=True,
         )
 
-        # 1/2 = 50% >= min_success_rate=0.5 -> validation passes even though
-        # it would fail against the (still-default-elsewhere) 70% threshold.
-        assert test.validate_results(result) is True
+        assert test.validate_results(result) is False
 
     def test_result_structure(self, throughput_test_config, temp_output_dir):
         """Test TPCDSThroughputTestResult structure and properties."""
@@ -406,10 +400,7 @@ class TestThroughputTest:
 
 
 class TestSuccessGateConfigurable:
-    """Cover the configurable min_success_rate gate (w3): run(),
-    _finalize_stream_success() (per-stream), and validate_results() must all
-    read the SAME config.min_success_rate -- single source of truth, no more
-    independently hard-coded 0.7 literals."""
+    """Cover the legacy per-stream threshold and strict run-level gate."""
 
     def test_finalize_stream_success_uses_configurable_gate(self, tpcds_benchmark):
         """3/5 = 60% queries successful: fails against the default 70% gate,
@@ -434,9 +425,8 @@ class TestSuccessGateConfigurable:
         assert _make_result(0.70).success is False
         assert _make_result(0.50).success is True
 
-    def test_run_success_gate_is_configurable(self, tpcds_benchmark):
-        """Same 1/2-streams-successful pattern used for the run()-level gate
-        elsewhere in this file, but with a lowered min_success_rate."""
+    def test_run_partial_stream_is_fatal_despite_legacy_success_threshold(self, tpcds_benchmark):
+        """A lowered reporting threshold cannot make a partial run scoreable."""
         connections: list[Mock] = []
 
         def factory() -> Mock:
@@ -472,9 +462,9 @@ class TestSuccessGateConfigurable:
         with patch.object(test, "_execute_stream", side_effect=[successful_stream, failing_stream]):
             result = test.run(config)
 
-        # 1/2 = 50% successful streams >= min_success_rate=0.5 -> overall success
-        assert result.success is True
+        assert result.success is False
         assert result.streams_successful == 1
+        assert result.throughput_at_size == 0.0
 
 
 class TestCooperativeCancellation:

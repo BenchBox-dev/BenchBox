@@ -455,7 +455,7 @@ def _build_run_section(
         "query_time_ms": round(sum(query_times_ms)),
     }
     run["iterations"] = max(iterations_set) if iterations_set else 1
-    run["streams"] = max(streams_set) if streams_set else 1
+    run["streams"] = len(streams_set) if streams_set else 1
     if result.query_subset:
         run["query_subset"] = result.query_subset
     return run
@@ -968,10 +968,7 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
             "duration_ms": power_test.duration_ms,
         }
     if result.execution_phases and result.execution_phases.throughput_test:
-        phases["throughput_test"] = {
-            "status": "COMPLETED",
-            "duration_ms": result.execution_phases.throughput_test.duration_ms,
-        }
+        phases["throughput_test"] = _throughput_phase_payload(result.execution_phases.throughput_test)
 
     # pg_mooncake heap-to-columnstore migration phase (omit when not run).
     # per_table_stats intentionally excluded - summary-level only per schema v2 design.
@@ -998,6 +995,25 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
             phases[phase] = {"status": "NOT_RUN"}
 
     return phases
+
+
+def _throughput_phase_payload(throughput: Any) -> dict[str, Any]:
+    """Serialize additive throughput stream outcomes into schema v2."""
+    payload: dict[str, Any] = {
+        "status": "COMPLETED" if throughput.success else "FAILED",
+        "duration_ms": throughput.duration_ms,
+        "stream_results": [
+            {
+                "stream_id": stream.stream_id,
+                "success": stream.success,
+                **({"error": stream.error_message} if stream.error_message else {}),
+            }
+            for stream in throughput.streams
+        ],
+    }
+    if throughput.errors:
+        payload["errors"] = list(throughput.errors)
+    return payload
 
 
 def compute_plan_capture_stats(

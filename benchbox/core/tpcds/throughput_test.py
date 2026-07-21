@@ -49,11 +49,9 @@ class TPCDSThroughputTestConfig:
     queries_per_stream: Optional[int] = None  # Default: execute all queries
     # Enable preflight validation (validates query generation before execution)
     enable_preflight: bool = True
-    # Minimum fraction of streams (0.0-1.0) that must succeed to declare the
-    # Throughput Test successful, and (per-stream) the minimum fraction of a
-    # single stream's queries that must succeed for that stream to count as
-    # successful. Default 0.70 = 70%. Mirrors TPC-H's configurable
-    # min_success_rate (see TPCHThroughputTestConfig).
+    # Legacy per-stream reporting threshold retained for configuration
+    # compatibility. Product scoring is stricter: StreamRunner emits
+    # Throughput@Size only when every requested stream and query succeeds.
     #
     # Spec citation: NOT derived from a TPC-DS "acceptable failure rate"
     # clause -- no such partial-success allowance exists in the TPC-DS
@@ -66,16 +64,9 @@ class TPCDSThroughputTestConfig:
     # compliance gate, and results below 100% success are not eligible for
     # TPC-DS-compliant/audited reporting regardless of this setting.
     #
-    # COUPLING: this single field now drives BOTH gates -- the run-level
-    # stream-success gate in run() (result.success = streams_successful /
-    # num_streams >= min_success_rate) AND the per-stream query-success gate
-    # in _finalize_stream_success() (stream_result.success = queries_successful
-    # / queries_executed >= min_success_rate). Before this change they were
-    # two independent hardcoded 0.7 literals that happened to share a value;
-    # they are now the same configurable knob, so lowering (or raising) it
-    # to relax/tighten one gate relaxes/tightens the other identically. There
-    # is currently no way to configure the run-level and per-stream
-    # thresholds independently.
+    # The threshold still drives _finalize_stream_success() so historical
+    # per-stream status remains visible, but it cannot make a partial run
+    # scoreable at the shared metric boundary.
     min_success_rate: float = 0.70
 
 
@@ -255,14 +246,12 @@ class TPCDSThroughputTest:
             # Execute concurrent streams
             StreamRunner.execute(self._execute_stream, config, result, self.logger)
 
-            # Calculate metrics
-            StreamRunner.compute_metrics(result, config, start_time)
+            # A throughput metric is valid only when every requested stream
+            # completed successfully. Partial success remains visible in the
+            # result details but is never published as a scored measurement.
+            result.success = StreamRunner.compute_metrics(result, config, start_time)
 
-            # TPC-DS success criteria: configurable stream success rate (see
-            # TPCDSThroughputTestConfig.min_success_rate for the spec citation
-            # -- default is 70%, mirroring TPC-H's configurable gate).
             success_rate = result.streams_successful / max(config.num_streams, 1)
-            result.success = success_rate >= config.min_success_rate
 
             if config.verbose:
                 self.logger.info(f"Throughput Test completed in {result.total_time:.3f}s")
@@ -628,10 +617,9 @@ class TPCDSThroughputTest:
                 self.logger.info(f"Stream {stream_id} completed: no queries executed")
             return
 
-        # Per-stream success rate: same configurable gate as the overall
-        # run-level gate in run() (see TPCDSThroughputTestConfig.
-        # min_success_rate for the spec citation -- single source of truth,
-        # no separate hardcoded threshold here).
+        # Preserve the configurable per-stream reporting threshold. The shared
+        # metric boundary independently requires every query and stream to
+        # succeed before the run can produce a score.
         success_rate = stream_result.queries_successful / stream_result.queries_executed
         stream_result.success = success_rate >= config.min_success_rate
         if config.verbose:
@@ -750,11 +738,10 @@ class TPCDSThroughputTest:
         if not result.success:
             return False
 
-        # Same configurable gate as run() -- see
-        # TPCDSThroughputTestConfig.min_success_rate for the spec citation.
-        if result.config.num_streams > 0:
-            stream_success_rate = result.streams_successful / result.config.num_streams
-            if stream_success_rate < result.config.min_success_rate:
-                return False
+        if result.streams_executed != result.config.num_streams:
+            return False
 
-        return not result.throughput_at_size <= 0
+        if result.streams_successful != result.config.num_streams:
+            return False
+
+        return not result.errors and result.throughput_at_size is not None and result.throughput_at_size > 0

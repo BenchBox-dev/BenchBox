@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from benchbox.core.results.models import ExecutionPhases, SetupPhase, ThroughputStream, ThroughputTestPhase
 from benchbox.core.results.schema import build_result_payload
 
 pytestmark = [
@@ -62,14 +63,41 @@ def test_build_result_payload_prefers_execution_time_seconds() -> None:
                 "execution_time_ms": None,
                 "rows_returned": 10,
                 "iteration": 1,
-                "stream_id": 0,
+                "stream_id": 5,
                 "run_type": "measurement",
             }
         ]
     )
+    result.execution_phases = ExecutionPhases(
+        setup=SetupPhase(),
+        throughput_test=ThroughputTestPhase(
+            start_time="2026-02-12T00:00:00",
+            end_time="2026-02-12T00:00:01",
+            duration_ms=1000,
+            num_streams=1,
+            streams=[
+                ThroughputStream(5, "start", "end", 1000, [], success=False, error_message="worker died"),
+            ],
+            total_queries_executed=1,
+            throughput_at_size=None,
+            success=False,
+            errors=["Stream 5 failed: worker died"],
+        ),
+    )
 
     payload = build_result_payload(result)
+
     assert payload["queries"][0]["ms"] == 1250.0
+    assert payload["run"]["streams"] == 1
+    assert payload["phases"]["throughput_test"] == {
+        "status": "FAILED",
+        "duration_ms": 1000,
+        "stream_results": [
+            {"stream_id": 5, "success": False, "error": "worker died"},
+        ],
+        "errors": ["Stream 5 failed: worker died"],
+    }
+    assert "throughput_at_size" not in payload["summary"].get("tpc_metrics", {})
 
 
 def test_build_result_payload_preserves_positive_sub_ms_measurements() -> None:

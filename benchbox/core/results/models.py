@@ -222,6 +222,8 @@ class ThroughputStream:
     end_time: str
     duration_ms: int
     query_executions: list[QueryExecution]
+    success: bool = True
+    error_message: str | None = None
 
 
 @dataclass
@@ -232,7 +234,9 @@ class ThroughputTestPhase:
     num_streams: int
     streams: list[ThroughputStream]
     total_queries_executed: int
-    throughput_at_size: float
+    throughput_at_size: float | None
+    success: bool = True
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
