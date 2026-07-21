@@ -87,6 +87,10 @@ def _has_option(argv: Iterable[str], name: str) -> bool:
     return any(value == name or value.startswith(f"{name}=") for value in argv)
 
 
+def _has_database_environment() -> bool:
+    return any(os.environ.get(name) for name in ("TODO_DB_PATH", "TODO_DB_URL"))
+
+
 def _with_identity(argv: list[str], command_index: int) -> list[str]:
     before = argv[:command_index]
     after = argv[command_index:]
@@ -287,7 +291,7 @@ def _main(argv: list[str] | None = None) -> int:
         return result.returncode
     command_index, command = located
     root = _repo_root()
-    if not _has_option(args, "--db"):
+    if not _has_option(args, "--db") and not _has_database_environment():
         args[command_index:command_index] = ["--db", str(root / ".todo-db" / "todo.sqlite")]
         command_index += 2
     if command == "export":

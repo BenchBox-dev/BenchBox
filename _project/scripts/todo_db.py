@@ -2181,7 +2181,8 @@ def _print_work_order(order: dict[str, Any]) -> None:
         print("-- verification ladder (narrowest first)")
         for ver in order["verifications"]:
             cmd = f" :: {ver['command']}" if ver["command"] else ""
-            print(f"   {ver['seq']}. {ver['description']}{cmd}")
+            expected = f" — expected: {ver['expected']}" if ver.get("expected") else ""
+            print(f"   {ver['seq']}. {ver['description']}{cmd}{expected}")
     ready = order.get("ready_units", [])
     blocked = order.get("blocked_units", [])
     print("-- ready units" if ready else "-- no ready units")
@@ -2686,7 +2687,9 @@ def _cmd_verify(conn, actor, args):
     item = get_item(conn, args.id)
     for ver in item["verifications"]:
         status = f" [{ver['last_result']} @ {ver['last_run']}]" if ver["last_result"] else ""
-        print(f"{ver['seq']}. {ver['description']}" + (f" :: {ver['command']}" if ver["command"] else "") + status)
+        cmd = f" :: {ver['command']}" if ver["command"] else ""
+        expected = f" — expected: {ver['expected']}" if ver.get("expected") else ""
+        print(f"{ver['seq']}. {ver['description']}{cmd}{expected}{status}")
     return 0
 
 

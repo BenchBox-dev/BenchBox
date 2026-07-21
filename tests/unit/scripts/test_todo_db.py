@@ -6,6 +6,7 @@ import importlib.util
 import sys
 import textwrap
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -334,6 +335,18 @@ class TestVerifyRun:
         )
         assert todo_db.run_verification(conn, "tester", "sample-item", 1)[0] == "pass"
         assert todo_db.run_verification(conn, "tester", "sample-item", 2)[0] == "fail"
+
+    def test_verify_expected_is_rendered_in_work_order_and_listing(self, conn, capsys):
+        _mk(
+            conn,
+            verifications=[{"description": "passes", "command": "true", "expected": "human-readable criterion"}],
+        )
+
+        todo_db._print_work_order(todo_db.work_order(conn, "sample-item"))
+        assert "expected: human-readable criterion" in capsys.readouterr().out
+
+        todo_db._cmd_verify(conn, "tester", SimpleNamespace(id="sample-item", run=None))
+        assert "expected: human-readable criterion" in capsys.readouterr().out
 
 
 class TestExport:

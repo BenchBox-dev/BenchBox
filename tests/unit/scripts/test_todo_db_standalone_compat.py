@@ -164,8 +164,31 @@ def test_missing_db_is_pinned_to_benchbox_database(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    monkeypatch.delenv("TODO_DB_URL", raising=False)
     assert compat.main(["show", "item"]) == 0
     assert calls[0][:2] == ["--db", str(tmp_path / ".todo-db" / "todo.sqlite")]
+
+
+@pytest.mark.parametrize(
+    ("variable", "value"),
+    [("TODO_DB_PATH", "/tmp/pinned.sqlite"), ("TODO_DB_URL", "libsql://tracker.example")],
+)
+def test_database_environment_is_left_for_standalone_cli(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, variable: str, value: str
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        calls.append(argv)
+        return CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv(variable, value)
+
+    assert compat.main(["show", "item"]) == 0
+    assert "--db" not in calls[0]
 
 
 def test_missing_binary_fails_cleanly(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys) -> None:
