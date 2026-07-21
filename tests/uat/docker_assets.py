@@ -295,12 +295,21 @@ _PLATFORM_INJECT_SPARK_CONNECT_ENDPOINT_OPT: frozenset[str] = frozenset({"lakesa
 # Local managed-Docker credentials, appended only when UAT manages the stack
 # (kept separate because PLATFORM options apply even for externally managed
 # local platforms).
+#
+# postgresql's compose stack (docker/postgresql/docker-compose.yml) sets
+# POSTGRES_USER=benchbox, which makes `benchbox` the ONLY superuser role the
+# official postgres image creates (POSTGRES_USER replaces the default
+# `postgres` role rather than adding alongside it) -- the adapter's own
+# `username` default ("postgres") does not exist in this container and
+# authentication fails outright. `username=benchbox` must be injected here
+# alongside `password=benchbox` for any docker-managed postgresql cell (e.g.
+# the throughput UAT cell) to connect at all.
 _PLATFORM_LOCAL_MANAGED_OPTS: dict[str, list[str]] = {
     "clickhouse-server": ["--platform-option", "password=benchbox"],
     "pg-duckdb": ["--platform-option", "password=benchbox"],
     "pg-mooncake": ["--platform-option", "password=benchbox"],
     "timescaledb": ["--platform-option", "password=benchbox"],
-    "postgresql": ["--platform-option", "password=benchbox"],
+    "postgresql": ["--platform-option", "username=benchbox", "--platform-option", "password=benchbox"],
 }
 
 # A compose `ports:` entry: "[ip:]host:container", host may be ${VAR:-default}.

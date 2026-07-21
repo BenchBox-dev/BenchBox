@@ -540,12 +540,17 @@ class TestDriversMixin:
 
             console.print(f"[green]Running TPC-DS Maintenance Test (Scale Factor: {scale_factor})[/green]")
 
-            # Create connection factory that wraps the platform adapter connection
+            # Create connection factory that wraps the platform adapter connection.
+            # Routed through new_stream_connection() (see the throughput
+            # connection_factory above): SHARED_CURSOR (default) returns a
+            # thread-safe cursor of this one shared connection - unchanged for
+            # embedded engines like DuckDB. INDEPENDENT_CONNECTION opens a
+            # fresh connection/session per RF1/RF2 maintenance stream, so a
+            # server engine's refresh stream no longer shares the query
+            # stream's session.
             def connection_factory():
-                # Create thread-safe cursor for concurrent stream execution
-                # See: https://duckdb.org/docs/stable/guides/python/multiple_threads
-                stream_cursor = _make_stream_cursor(connection)
-                conn_wrapper = PlatformAdapterConnection(stream_cursor, self)
+                stream_connection = self.new_stream_connection(connection)
+                conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpcds"
                 conn_wrapper.scale_factor = scale_factor
@@ -635,13 +640,18 @@ class TestDriversMixin:
 
             console.print(f"[green]Running TPC-H Maintenance Test (Scale Factor: {scale_factor})[/green]")
 
+            # Routed through new_stream_connection() (see the throughput
+            # connection_factory in _execute_tpch_throughput_test): SHARED_CURSOR
+            # (default) returns a thread-safe cursor of this one shared
+            # connection - unchanged for embedded engines like DuckDB.
+            # INDEPENDENT_CONNECTION opens a fresh connection/session per
+            # RF1/RF2 maintenance stream, so a server engine's refresh stream
+            # no longer shares the query stream's session.
             def connection_factory():
-                # Create thread-safe cursor for maintenance operations
-                # See: https://duckdb.org/docs/stable/guides/python/multiple_threads
-                stream_cursor = _make_stream_cursor(connection)
+                stream_connection = self.new_stream_connection(connection)
                 # Use maintenance_mode=True to execute all queries directly on the connection
                 # (RF1/RF2 operations need real data, not validation-wrapped results)
-                conn_wrapper = PlatformAdapterConnection(stream_cursor, self, maintenance_mode=True)
+                conn_wrapper = PlatformAdapterConnection(stream_connection, self, maintenance_mode=True)
                 conn_wrapper.benchmark_type = "tpch"
                 conn_wrapper.scale_factor = scale_factor
                 return conn_wrapper

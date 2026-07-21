@@ -102,6 +102,37 @@ class TestPostgreSQLAdapter:
 
         assert params["dbname"] == "override_db"
 
+    def test_new_stream_connection_opens_independent_session(self, postgres_stubs):
+        """Each stream gets a fresh psycopg session with adapter GUCs applied."""
+        stream_connection = Mock()
+        stream_cursor = Mock()
+        stream_connection.cursor.return_value = stream_cursor
+        postgres_stubs.connect.return_value = stream_connection
+        adapter = PostgreSQLAdapter(
+            host="pg.example.com",
+            port=5433,
+            database="testdb",
+            username="testuser",
+            password="testpass",
+            schema="analytics",
+        )
+        shared_connection = Mock()
+
+        result = adapter.new_stream_connection(shared_connection)
+
+        assert result is stream_connection
+        postgres_stubs.connect.assert_called_once_with(**adapter._get_connection_params())
+        assert stream_cursor.execute.call_args_list == [
+            (("SET work_mem = '256MB'",), {}),
+            (("SET maintenance_work_mem = '512MB'",), {}),
+            (("SET effective_cache_size = '1GB'",), {}),
+            (("SET max_parallel_workers_per_gather = 2",), {}),
+            (('SET search_path TO "analytics", public',), {}),
+        ]
+        stream_connection.commit.assert_called_once_with()
+        stream_cursor.close.assert_called_once_with()
+        shared_connection.cursor.assert_not_called()
+
     def test_add_cli_arguments_registers_postgres_compatible_flags(self, postgres_stubs):
         """CLI parser should expose shared PostgreSQL-compatible arguments."""
         parser = argparse.ArgumentParser()
