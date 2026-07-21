@@ -262,6 +262,11 @@ class TestLifecycle:
 
 
 class TestScopeAndLint:
+    def test_scope_matches_absolute_cross_repository_globs(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        rules = [{"kind": "only_modify", "path_glob": f"{tmp_path}/**"}]
+        assert todo_db.check_paths(["src/todo_db/cli.py"], rules) == []
+
     def test_check_paths_only_modify(self):
         rules = [{"kind": "only_modify", "path_glob": "benchbox/core/*"}]
         violations = todo_db.check_paths(["benchbox/core/foo.py", "docs/guide.md"], rules)

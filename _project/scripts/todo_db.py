@@ -1638,9 +1638,10 @@ def check_paths(files: list[str], rules: list[dict[str, str]]) -> list[str]:
         # (eval finding: it false-positived on worktrees with stale gitignores).
         if path == ".todo-db" or path.startswith(".todo-db/"):
             continue
-        if any(fnmatch.fnmatch(path, glob) for glob in deny):
+        candidates = (path, str((Path.cwd() / path).resolve())) if not Path(path).is_absolute() else (path,)
+        if any(fnmatch.fnmatch(candidate, glob) for candidate in candidates for glob in deny):
             violations.append(f"{path}: matches do_not_modify")
-        elif only and not any(fnmatch.fnmatch(path, glob) for glob in only):
+        elif only and not any(fnmatch.fnmatch(candidate, glob) for candidate in candidates for glob in only):
             violations.append(f"{path}: outside only_modify allowlist")
     return violations
 
