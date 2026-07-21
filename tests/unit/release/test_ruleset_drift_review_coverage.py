@@ -1,17 +1,10 @@
-"""Ruleset drift coverage: tag-creation protection + retired review rule.
+"""Ruleset drift coverage: live develop review + v* tag protection.
 
-The develop review-rule check (``require_code_owner_review``,
-``DEVELOP_REVIEW_RULE_ENFORCED``) that used to be pinned here was RETIRED on
-2026-07-18 without the admin PUT ever landing: every PR is authored by the
-sole code owner, GitHub forbids self-approval, and the develop ruleset has no
-bypass actors, so enforcing the rule would have deadlocked soundness-path PRs
-rather than gating them (see docs/operations/repo-admin-settings.md,
-"Soundness-path review enforcement (RETIRED 2026-07-18)").
-``test_develop_review_rule_is_not_checked_after_retirement`` pins the
-retirement so the warning does not silently return.
-
-The rest of this file pins the v* tag-creation ruleset coverage
-(tag-and-pypi-environment-admin-hardening w3), which IS live and enforced.
+The develop ``require_code_owner_review`` rule is currently active in GitHub
+(ruleset id 15611785), so a missing rule must be a blocking finding by
+default. The explicit warning-only override remains covered for migration
+fixtures. The v* tag-creation ruleset (id 18774756) is likewise live and
+enforced.
 """
 
 from __future__ import annotations
@@ -65,10 +58,7 @@ def _develop_expected():
     ]
 
 
-def _live_develop_ruleset() -> dict:
-    # The pull_request rule deliberately carries no code-owner-review
-    # requirement: that is the live (and intended) state after the 2026-07-18
-    # retirement.
+def _live_develop_ruleset(*, review_count: int = 0, code_owner_review: bool = True) -> dict:
     return {
         "name": "develop-squash-only",
         "enforcement": "active",
@@ -78,8 +68,8 @@ def _live_develop_ruleset() -> dict:
             {
                 "type": "pull_request",
                 "parameters": {
-                    "required_approving_review_count": 0,
-                    "require_code_owner_review": False,
+                    "required_approving_review_count": review_count,
+                    "require_code_owner_review": code_owner_review,
                 },
             },
             {
@@ -96,15 +86,27 @@ def _live_develop_ruleset() -> dict:
     }
 
 
-def test_develop_review_rule_is_not_checked_after_retirement():
-    """The require_code_owner_review target was retired 2026-07-18: a develop
-    ruleset with no code-owner-review rule is the intended state, so it must
-    produce NO findings -- not even a non-blocking warning."""
-    live = _live_develop_ruleset()
+def test_missing_develop_review_rule_is_blocking_by_default():
+    live = _live_develop_ruleset(code_owner_review=False)
 
     findings = compare_ruleset(_develop_expected(), live)
 
-    assert findings == []
+    assert findings and blocking_findings(findings) == findings
+    assert not any(f.startswith(WARNING_PREFIX) for f in findings)
+    assert any("require_code_owner_review" in finding for finding in findings)
+
+
+def test_develop_review_rule_passes_when_live_rule_is_present():
+    assert compare_ruleset(_develop_expected(), _live_develop_ruleset()) == []
+
+
+def test_develop_review_rule_can_be_warn_only_for_explicit_migration_override():
+    findings = compare_ruleset(
+        _develop_expected(), _live_develop_ruleset(code_owner_review=False), enforce_review_rule=False
+    )
+
+    assert findings and all(f.startswith(WARNING_PREFIX) for f in findings)
+    assert blocking_findings(findings) == []
 
 
 def test_release_only_matches_runbook_expectations():

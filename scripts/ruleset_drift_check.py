@@ -22,22 +22,23 @@ sys.path.insert(0, str(REPO_ROOT / "_project" / "scripts"))
 
 from ruleset_review_enforcement import (  # noqa: E402
     TAG_RULESET_ENFORCED,
+    extract_rules,
+    review_enforcement_findings,
     tag_bypass_advisory,
     tag_protection_findings,
 )
 
 # Findings with this prefix are surfaced (rendered, included in the JSON
 # `findings` list) exactly like any other drift finding, but do NOT flip the
-# exit code / `status` field to failed. Used for warn-until-applied checks
-# and human-confirmation advisories (see tag_creation_findings).
-#
-# Note: until 2026-07-18 a develop review-rule check (require_code_owner_review,
-# DEVELOP_REVIEW_RULE_ENFORCED) also used this prefix. That target was retired
-# without being applied -- the sole code owner authors every PR and GitHub
-# forbids self-approval, so the rule would have deadlocked soundness-path PRs.
-# See docs/operations/repo-admin-settings.md, "Soundness-path review
-# enforcement (RETIRED 2026-07-18)".
+# exit code / `status` field to failed. They are reserved for explicit
+# migration overrides and human-confirmation advisories (see
+# `tag_creation_findings`).
 WARNING_PREFIX = "WARNING (non-blocking): "
+
+# The live develop-squash-only ruleset (id 15611785) carries
+# require_code_owner_review: true. A regression is blocking; the explicit
+# parameter override remains available for migration fixtures.
+DEVELOP_REVIEW_RULE_ENFORCED = True
 
 
 @dataclass(frozen=True)
@@ -160,15 +161,14 @@ def compare_ruleset(
     live: dict[str, Any],
     *,
     require_bypass_actor_visibility: bool = False,
+    enforce_review_rule: bool = DEVELOP_REVIEW_RULE_ENFORCED,
 ) -> list[str]:
     """Return human-readable drift findings for one ruleset.
 
-    Deliberately does NOT inspect the ``pull_request`` rule's review settings:
-    the ``require_code_owner_review`` target for ``develop-squash-only`` was
-    retired on 2026-07-18 (self-approval deadlock -- see the runbook's
-    "Soundness-path review enforcement (RETIRED 2026-07-18)" section), so a
-    develop ruleset without a code-owner-review rule is the intended state,
-    not drift.
+    For ``develop-squash-only`` only, applies the shared
+    ``review_enforcement_findings`` predicate to the already-fetched live
+    payload. The live default is blocking; callers may explicitly pass
+    ``enforce_review_rule=False`` for migration fixtures.
     """
     findings: list[str] = []
     if live.get("enforcement") != "active":
@@ -209,6 +209,14 @@ def compare_ruleset(
                 actor_types = [actor.get("actor_type", "(unknown)") for actor in bypass_actors]
                 findings.append(f"{expected.name}: bypass actors {actor_types!r}, expected none")
 
+    if expected.name == "develop-squash-only":
+        review_findings = review_enforcement_findings(extract_rules(live))
+        if review_findings:
+            if enforce_review_rule:
+                findings.extend(review_findings)
+            else:
+                findings.extend(f"{WARNING_PREFIX}{finding}" for finding in review_findings)
+
     return findings
 
 
@@ -227,10 +235,10 @@ def tag_creation_findings(
     fixed expected name — any ruleset with ``target: "tag"`` that covers
     ``refs/tags/v*`` with a ``creation`` rule counts.
 
-    WARN-until-applied pattern: while ``enforce_tag_rule`` is ``False`` (the
-    default, driven by ``TAG_RULESET_ENFORCED``), a missing/incomplete tag
-    ruleset is a ``WARNING_PREFIX``-prefixed finding — visible, non-blocking —
-    until the admin POST lands and the flag is flipped.
+    ``enforce_tag_rule`` defaults to the live-enforced ``TAG_RULESET_ENFORCED``
+    setting, so a missing or incomplete tag ruleset is blocking in normal
+    canary execution. Callers may explicitly pass ``False`` for a migration
+    fixture that must retain the former warning-only behavior.
     """
     findings: list[str] = []
     protection_findings = tag_protection_findings(all_live_rulesets)

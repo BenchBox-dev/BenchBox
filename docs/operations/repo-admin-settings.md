@@ -102,18 +102,13 @@ gh api repos/joeharris76/BenchBox/rulesets/15611785 --jq '
   }'
 ```
 
-### Soundness-path review enforcement (RETIRED 2026-07-18)
+### Soundness-path review enforcement (enforced; operational caution)
 
-**Decision (2026-07-18): the former target state here —
-`require_code_owner_review: true` on the `develop-squash-only` ruleset — is
-RETIRED without ever having been applied.** It cannot work in this
-repository's operating model: every PR (agent-authored included) is opened
-under the sole code owner's account (@joeharris76), GitHub does not allow a
-PR author to approve their own PR, and the ruleset has `bypass_actors:
-(none)` — so enabling the rule would have made every soundness-path PR
-permanently unmergeable rather than reviewed. The gate this section used to
-describe as "pending admin action" was therefore a target that could never
-land; this section now records what the soundness gate actually is.
+Live verification on 2026-07-21 shows that `develop-squash-only` (ruleset id
+`15611785`) is `active` and its `pull_request` rule has
+`require_code_owner_review: true`, with `required_approving_review_count: 0`
+and no bypass actors. This current live state supersedes the 2026-07-18
+retirement note, which was based on the rule not yet being applied.
 
 The soundness gate, as operated:
 
@@ -132,44 +127,33 @@ The soundness gate, as operated:
   PRs touching those paths (and revoke it on a later push that newly touches
   them). CI cannot catch a change that redefines the oracle it validates
   against, so these PRs must not merge hands-free.
-- The owner reviews the diff and merges manually. That manual step IS the
-  control; no repo-layer rule forces an approval.
+- The active ruleset now supplies the repo-layer control; the owner must still
+  review and merge manually because the current single-owner account cannot
+  approve its own PR. Adding a second code-owner or changing the PR identity
+  model would remove that operational deadlock; alternatively, an admin must
+  remove the live rule before it blocks a soundness-path release.
 
-**Accepted residual risk** (recorded deliberately, not overlooked):
-in-workflow checks are attacker-controlled for same-repo PRs — GitHub runs
-the PR's own copy of a `pull_request`-triggered workflow, so a
-malicious/errant PR that edits `auto-merge-on-open.yml` could delete the
-soundness check and re-enable its own auto-merge in the same commit, then
-land on green CI with no human involved. Accepted because write access is
-limited to the owner and the owner's own agent sessions. **Revisit this
-decision if either changes:**
+`scripts/ruleset_drift_check.py` now imports the shared
+`review_enforcement_findings` predicate and treats a missing or false
+`require_code_owner_review` as a **blocking** finding through
+`DEVELOP_REVIEW_RULE_ENFORCED = True`. The daily `release-canary.yml` run and
+`validate-release-pr.yml` bootstrap use the same path. The standalone check is
+available for an immediate live verification:
 
-- collaborators beyond the owner gain write access; or
-- agent sessions start opening PRs under a separate bot/App identity. That
-  removes the self-approval deadlock, at which point
-  `require_code_owner_review: true` becomes both applicable and the right
-  durable control — the retired machinery (the review-rule predicate, the
-  `DEVELOP_REVIEW_RULE_ENFORCED` warn-until-enforced canary wiring, and this
-  section's former target-state/apply/order-of-operations text) is
-  recoverable from git history prior to 2026-07-18.
+```bash
+gh api repos/joeharris76/BenchBox/rules/branches/develop \
+  | uv run --project _project/scripts -- python _project/scripts/ruleset_review_enforcement.py --rules-file -
+```
 
-Consequences of the retirement, applied 2026-07-18:
+The predicate deliberately does not assert `required_approving_review_count`:
+that setting is branch-wide and would gate every develop PR. The checker
+reports drift; it does not make the current single-owner self-approval rule
+operable. Treat a green drift check as evidence of configuration, not proof
+that a soundness-path PR is mergeable under the current identity model.
 
-- `scripts/ruleset_drift_check.py` no longer inspects the develop ruleset's
-  `pull_request` review settings (the `DEVELOP_REVIEW_RULE_ENFORCED`
-  constant and the perpetual `WARNING (non-blocking):` canary finding were
-  removed — a warning for a state that is intentional is noise, not signal).
-  `tests/unit/release/test_ruleset_drift_review_coverage.py` pins that a
-  develop ruleset without a code-owner-review rule produces no findings.
-- `_project/scripts/ruleset_review_enforcement.py` retains only the
-  tag-creation protection predicates (next section); its develop review-rule
-  predicate and `--rules-file` CLI were removed.
-- `.github/CODEOWNERS` is retained: it is the mirrored soundness-path list
-  the auto-merge withholding is documented against, and it routes review
-  requests — it just does not (and never did) block a merge by itself.
-- Historical tracking TODO `auto-merge-review-gate-admin-enforcement` is
-  closed as retired (its w3 "verify enforcement end-to-end" and the deferred
-  admin PUT are cancelled by this decision).
+The review predicate and its blocking/default-plus-explicit-override behavior
+are covered by `tests/unit/release/test_ruleset_review_enforcement.py` and
+`tests/unit/release/test_ruleset_drift_review_coverage.py`.
 
 History:
 
@@ -259,9 +243,9 @@ environment require a human approval" — neither of which the develop-PR
 `GITHUB_TOKEN` can read or write (no `administration` scope) — only an
 admin PAT can.
 
-### Tag creation restricted to release flow (pending admin action)
+### Tag creation restricted to release flow (enforced)
 
-Target state: a GitHub tag-protection ruleset targeting `refs/tags/v*` that
+Current control: a GitHub tag-protection ruleset targeting `refs/tags/v*` that
 restricts tag *creation* to the release automation identity / specific
 maintainer actors, mirroring how `develop-squash-only` restricts pushes to
 `refs/heads/develop`. Today, `verify-tag-on-release` stops a stray tag from
@@ -278,13 +262,15 @@ targets `refs/tags/v*` with `target: "tag"`):
 gh api repos/joeharris76/BenchBox/rulesets --jq '.[] | {id, name, target, conditions}'
 ```
 
-Live state at time of writing (2026-07-03): no ruleset with `target: "tag"`
-exists. The only ruleset whose name resembles this (`v-release-branches-minimal`,
-id `15611787`) targets *branches* matching `refs/heads/v*`, not tags — it is
-unrelated to tag creation. Any collaborator with push access can create a
-`v*` tag today.
+Live verification on 2026-07-21 shows `v-tag-restricted` (ruleset id
+`18774756`) is `active`, targets `refs/tags/v*`, carries a `creation` rule,
+and has the release-finalize bypass actor `User:57046` with `bypass_mode:
+always`. The bypass is required for `make release-finalize` to push its tag;
+confirm it remains scoped to that identity.
 
-Apply (admin only):
+The ruleset was applied by an admin on 2026-07-10. No PR-side admin mutation is
+required; the commands below remain as historical context for the original
+application:
 
 ```bash
 gh api -X POST repos/joeharris76/BenchBox/rulesets \
@@ -306,8 +292,8 @@ soundness-path section above — the develop-PR `GITHUB_TOKEN` has no
 
 Drift detection (landed 2026-07-05, tag-and-pypi-environment-admin-hardening
 w3): `_project/scripts/ruleset_review_enforcement.py` carries a
-`tag_protection_findings()` predicate and a `TAG_RULESET_ENFORCED`
-warn-until-applied flag. Feed it the live tag rulesets to check:
+`tag_protection_findings()` predicate and an enforced `TAG_RULESET_ENFORCED`
+flag. Feed it the live tag rulesets to check:
 
 ```bash
 # Fetch each ruleset in full (the list endpoint omits conditions/rules,
@@ -331,11 +317,9 @@ structurally-valid ruleset with zero bypass actors would itself block
 that is a finding, not just an advisory). A NON-empty `bypass_actors` list is
 not a structural failure (a bypass path is REQUIRED so `make release-finalize`
 can still tag) — instead it prints a `CONFIRM before enforcing:` line listing
-the bypass actors; verify that list is the release identity only (not a
-broad Write/Admin role) before flipping the flag. After applying the
-ruleset and confirming the bypass list, flip `TAG_RULESET_ENFORCED = True`
-(a one-line change, tested by `test_ruleset_drift_review_coverage.py`) so
-the gap becomes blocking.
+the bypass actors; verify that list is the release identity only (not a broad
+Write/Admin role). An explicit `enforce_tag_rule=False` call remains available
+for migration fixtures, but the live default is blocking.
 
 Wired into CI (landed alongside the fnmatch/bypass-empty hardening above):
 `scripts/ruleset_drift_check.py`'s `tag_creation_findings()` calls
@@ -343,15 +327,15 @@ Wired into CI (landed alongside the fnmatch/bypass-empty hardening above):
 `release-canary.yml`'s `ruleset-drift` job already fetches (the same
 `RULESET_DRIFT_TOKEN`-authenticated full-ruleset listing used for the
 `develop-squash-only`/`release-only` checks — no second API call), so
-the daily canary run itself surfaces tag-ruleset drift under the same
-WARN-until-applied gating as the develop review rule, with no dependency on
+the daily canary run itself surfaces tag-ruleset drift as a blocking finding,
+with no dependency on
 `release-canary-scheduled-activation` beyond the canary running at all.
 
-Live-state note (fill in after applying — do not leave blank):
+Live-state note:
 
 ```text
 # Tag-creation ruleset live state
-# checked: 2026-07-10  by: joeharris76 (admin)
+# checked: 2026-07-21  by: joeharris76 (admin)
 # ruleset id: 18774756  enforcement: active  conditions.ref_name.include: [refs/tags/v*]
 # rules: [creation]  bypass_actors: [User:57046 (always)]
 ```
@@ -437,11 +421,10 @@ Ruleset drift is checked by `scripts/ruleset_drift_check.py` inside
 `develop-squash-only` and `release-only`, then compares live GitHub
 rulesets for required status check contexts, strict-base settings, bypass
 actors, linear history, non-fast-forward protection, deletion protection, and
-target refs. It deliberately does NOT inspect the develop ruleset's
-`pull_request` review settings — the `require_code_owner_review` target was
-retired 2026-07-18 (see "Soundness-path review enforcement (RETIRED
-2026-07-18)" above), so a develop ruleset without a code-owner-review rule
-is the intended state, not drift. The
+target refs. For `develop-squash-only`, it also applies the shared
+`review_enforcement_findings` predicate and treats a missing or false
+`require_code_owner_review` as a blocking finding through
+`DEVELOP_REVIEW_RULE_ENFORCED = True`. The
 workflow must use the repository secret `RULESET_DRIFT_TOKEN`
 with enough ruleset write/admin visibility for the API to expose
 `bypass_actors`; the default `GITHUB_TOKEN` is intentionally not used for this
