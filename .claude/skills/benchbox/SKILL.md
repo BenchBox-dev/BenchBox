@@ -7,7 +7,8 @@ tools: Bash, Read, Write, Edit, Glob, Grep, Task
 
 # BenchBox Workflow
 
-Route benchmark, platform, quality, and architecture work to one action. Auto-
+Route benchmark, platform, quality, and architecture work to one action.
+Before acting, read the file in the Read column for the selected action. Auto-
 detect the runner, honor non-interactive mode, and produce human plus JSON/file
 artifacts when supported.
 
@@ -33,8 +34,9 @@ Aliases remain accepted: `benchmark-test`, `quality-check`, `qa`,
 ## Hard rules
 
 - Use `uv run --` for Python; Makefile wrappers are fine.
-- Propagate phases: `generate`, `load`, `power`, `throughput`, and
-  `maintenance`. Default smoke scale is `0.01`; scale >=1 is a whole integer.
+- Propagate phases via `--phases`: `generate`, `load`, `power`, `throughput`,
+  and `maintenance`. Default smoke scale is `0.01`; scale >=1 is a whole
+  integer.
 - Do not run live cloud tests without explicit approval and credentials.
 - Use `benchbox.utils.clock.mono_time()` / `elapsed_seconds()` for durations.
 - Register adapter DDL rewrites under

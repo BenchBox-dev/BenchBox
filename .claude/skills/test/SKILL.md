@@ -8,7 +8,8 @@ tools: Bash, Read, Write, Edit, Task
 # Test Workflow
 
 Route the request to the matching action and use project-defined commands
-first.
+first. Before acting, read the file in the Read column for the selected
+action.
 
 ## Resolve
 

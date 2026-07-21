@@ -7,7 +7,8 @@ tools: Bash, Read, Edit, Write, Task
 
 # TODO Tracker
 
-Route the requested CLI subcommand to its guide. The database is the record:
+Route the requested CLI subcommand to its guide and read that guide before
+acting. The database is the record:
 `_project/scripts/todo` is the ONLY write path, and exit 2 means fix the cause.
 Global `--db` / `--actor` flags go before the subcommand.
 
