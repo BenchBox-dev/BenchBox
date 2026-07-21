@@ -298,7 +298,12 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 table,
                 path,
                 row_count=row_counts.get(table, 0),
-                metadata={"csv_has_header": True, "csv_null_marker": None},
+                metadata={
+                    "csv_delimiter": ",",
+                    "csv_has_header": True,
+                    "csv_null_marker": None,
+                    "csv_normalize_booleans": False,
+                },
             )
 
         manifest.write()

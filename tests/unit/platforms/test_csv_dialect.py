@@ -56,9 +56,14 @@ class _EmptyBenchmark:
 
 
 def test_manifest_metadata_wins_over_benchmark_attribute(caplog: pytest.LogCaptureFixture) -> None:
-    """Manifest metadata takes precedence over benchmark attributes."""
+    """Manifest fields win while omitted fields fall through to benchmark attributes."""
     ds = _make_data_source({"customer": {"csv_has_header": True, "csv_delimiter": "\t"}})
-    benchmark = _Benchmark(csv_delimiter=",", csv_has_header=False)
+    benchmark = _Benchmark(
+        csv_delimiter=",",
+        csv_has_header=False,
+        csv_normalize_booleans=True,
+        csv_null_marker="",
+    )
     file_path = Path("customer.csv")
 
     with caplog.at_level(logging.WARNING):
@@ -66,6 +71,8 @@ def test_manifest_metadata_wins_over_benchmark_attribute(caplog: pytest.LogCaptu
 
     assert dialect.delimiter == "\t"
     assert dialect.has_header is True
+    assert dialect.normalize_booleans is True
+    assert dialect.null_marker == ""
     # No warning when manifest wins
     assert not caplog.records
 

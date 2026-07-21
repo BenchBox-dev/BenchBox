@@ -394,5 +394,10 @@ class ClickBenchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             "clickbench",
             table_paths,
             self._table_row_counts,
-            metadata={"csv_delimiter": "|", "csv_null_marker": None},
+            metadata={
+                "csv_delimiter": "|",
+                "csv_has_header": False,
+                "csv_null_marker": None,
+                "csv_normalize_booleans": False,
+            },
         )
