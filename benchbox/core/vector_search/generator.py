@@ -203,5 +203,14 @@ class VectorSearchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
         write_generator_manifest(
-            self, "vector_search", table_paths, self._manifest_row_counts, metadata={"csv_has_header": True}
+            self,
+            "vector_search",
+            table_paths,
+            self._manifest_row_counts,
+            metadata={
+                "csv_delimiter": "|",
+                "csv_has_header": True,
+                "csv_null_marker": None,
+                "csv_normalize_booleans": False,
+            },
         )

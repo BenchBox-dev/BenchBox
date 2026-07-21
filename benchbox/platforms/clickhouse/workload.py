@@ -9,6 +9,7 @@ from typing import Any
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.printing import emit
+from benchbox.utils.sql_parsing import find_matching_parenthesis
 
 from .query_transformer import ClickHouseQueryTransformer
 
@@ -40,6 +41,7 @@ class ClickHouseWorkloadMixin:
                 dialect="duckdb",
                 tuning_config=effective_config,
             )
+            nullable_columns_by_table = self._get_nullable_columns_by_table(benchmark)
 
             # Physical table_tunings (partitioning/sorting/clustering columns)
             # render only when tuning is actually enabled -- matching the same
@@ -55,7 +57,13 @@ class ClickHouseWorkloadMixin:
 
             for statement in statements:
                 # Optimize table definitions for ClickHouse
-                statement = self._optimize_table_definition(statement, table_tunings)
+                table_name = self._extract_table_name(statement)
+                nullable_columns = nullable_columns_by_table.get(table_name.lower(), set()) if table_name else set()
+                statement = self._optimize_table_definition(
+                    statement,
+                    table_tunings,
+                    nullable_columns=nullable_columns,
+                )
                 connection.execute(statement)
                 self.logger.debug(f"Executed schema statement: {statement[:100]}...")
 
@@ -67,7 +75,13 @@ class ClickHouseWorkloadMixin:
 
         return elapsed_seconds(start_time)
 
-    def _optimize_table_definition(self, statement: str, table_tunings: dict[str, Any] | None = None) -> str:
+    def _optimize_table_definition(
+        self,
+        statement: str,
+        table_tunings: dict[str, Any] | None = None,
+        *,
+        nullable_columns: set[str] | None = None,
+    ) -> str:
         """Optimize table definition for ClickHouse.
 
         Args:
@@ -81,6 +95,9 @@ class ClickHouseWorkloadMixin:
                 the same generator dry-run preview uses (ADR-3 single
                 renderer) -- instead of the engine-mandatory PK/tuple()
                 fallback below.
+            nullable_columns: Lowercase source-schema column names whose values
+                may be NULL. Columns used by resolved MergeTree keys are
+                intentionally excluded before wrapping.
         """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
@@ -107,6 +124,11 @@ class ClickHouseWorkloadMixin:
         statement = re.sub(r"\bFLOAT\s*\[\s*\d+\s*\]", "Array(Float32)", statement, flags=re.IGNORECASE)
         statement = re.sub(r"\bDOUBLE\s*\[\s*\d+\s*\]", "Array(Float64)", statement, flags=re.IGNORECASE)
 
+        tuning_clauses = self._resolve_tuned_ddl_clauses(statement, table_tunings)
+        if nullable_columns:
+            key_columns = self._resolve_key_columns(statement, tuning_clauses, nullable_columns)
+            statement = self._apply_nullable_column_types(statement, nullable_columns - key_columns)
+
         # Include ClickHouse MergeTree engine and ORDER BY clause if not present
         statement_upper = statement.upper()
 
@@ -116,8 +138,6 @@ class ClickHouseWorkloadMixin:
                 statement = statement[:-1] + " ENGINE = MergeTree();"
             else:
                 statement = statement + " ENGINE = MergeTree()"
-
-        tuning_clauses = self._resolve_tuned_ddl_clauses(statement, table_tunings)
 
         # Include PARTITION BY if not present and the tuned generator produced one.
         statement_upper = statement.upper()
@@ -153,6 +173,203 @@ class ClickHouseWorkloadMixin:
 
         return statement
 
+    @staticmethod
+    def _extract_table_name(statement: str) -> str | None:
+        """Extract an unquoted table name from a CREATE TABLE statement."""
+        import re
+
+        match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+([A-Za-z_]\w*)", statement, re.IGNORECASE)
+        return match.group(1) if match else None
+
+    @staticmethod
+    def _get_nullable_columns_by_table(benchmark: Any) -> dict[str, set[str]]:
+        """Return source-nullable, non-primary-key columns by table.
+
+        BenchBox schemas use several shapes: dict/list columns (TPC-DS and
+        vector search), dict-of-column-specs (NYC Taxi and TSBS), and table
+        objects (Data Vault). Schema metadata treats an omitted ``nullable``
+        flag as nullable; explicit ``False`` is the non-null contract.
+        """
+        schema_getter = getattr(benchmark, "get_schema", None)
+        if not callable(schema_getter):
+            return {}
+        schema = schema_getter()
+        if not isinstance(schema, dict):
+            return {}
+
+        nullable_by_table: dict[str, set[str]] = {}
+        for table_name, table_schema in schema.items():
+            if isinstance(table_schema, dict):
+                columns = table_schema.get("columns")
+                table_primary_keys = {str(name).lower() for name in table_schema.get("primary_key", [])}
+            else:
+                columns = getattr(table_schema, "columns", None)
+                table_primary_keys = set()
+
+            if isinstance(columns, dict):
+                column_items = [(name, spec) for name, spec in columns.items()]
+            elif isinstance(columns, (list, tuple)):
+                column_items = []
+                for column in columns:
+                    name = column.get("name") if isinstance(column, dict) else getattr(column, "name", None)
+                    column_items.append((name, column))
+            else:
+                continue
+
+            nullable_columns: set[str] = set()
+            for raw_name, column in column_items:
+                if not isinstance(raw_name, str):
+                    continue
+                if isinstance(column, dict):
+                    is_nullable = column.get("nullable", True)
+                    is_primary_key = column.get("primary_key", False)
+                else:
+                    is_nullable = getattr(column, "nullable", True)
+                    is_primary_key = getattr(column, "primary_key", False)
+                column_name = raw_name.lower()
+                if bool(is_nullable) and not bool(is_primary_key) and column_name not in table_primary_keys:
+                    nullable_columns.add(column_name)
+
+            if nullable_columns:
+                nullable_by_table[str(table_name).lower()] = nullable_columns
+
+        return nullable_by_table
+
+    def _resolve_key_columns(self, statement: str, tuning_clauses: Any, nullable_columns: set[str]) -> set[str]:
+        """Return nullable candidates referenced by PK/partition/order keys."""
+        import re
+
+        key_columns = {name.lower() for name in self._extract_primary_key_columns(statement)}
+        if tuning_clauses is None:
+            return key_columns
+
+        key_expressions = [
+            value
+            for value in (
+                tuning_clauses.partition_by,
+                tuning_clauses.sort_by,
+                tuning_clauses.order_by,
+                tuning_clauses.cluster_by,
+                tuning_clauses.primary_key,
+            )
+            if value
+        ]
+        for column_name in nullable_columns:
+            identifier = re.compile(
+                rf"(?<![A-Za-z0-9_]){re.escape(column_name)}(?![A-Za-z0-9_])",
+                re.IGNORECASE,
+            )
+            if any(identifier.search(expression) for expression in key_expressions):
+                key_columns.add(column_name)
+        return key_columns
+
+    @classmethod
+    def _apply_nullable_column_types(cls, statement: str, nullable_columns: set[str]) -> str:
+        """Wrap selected CREATE TABLE column types with ``Nullable(...)``.
+
+        The scanner splits only on top-level commas, so nested type commas
+        such as ``DECIMAL(10,2)`` cannot consume the next column. Edits are
+        confined to selected type spans; every other byte remains unchanged.
+        """
+        import re
+
+        if not nullable_columns:
+            return statement
+
+        create_match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+[A-Za-z_]\w*\s*\(", statement, re.IGNORECASE)
+        if create_match is None:
+            return statement
+        open_index = statement.find("(", create_match.start())
+        close_index = find_matching_parenthesis(statement, open_index)
+        body = statement[open_index + 1 : close_index]
+        edits: list[tuple[int, int, str]] = []
+
+        for start, end in cls._top_level_column_spans(body):
+            segment = body[start:end]
+            name_match = re.match(r'^\s*(?:"(?P<quoted>[^"]+)"|(?P<plain>[A-Za-z_]\w*))\s+', segment)
+            if name_match is None:
+                continue
+            column_name = (name_match.group("quoted") or name_match.group("plain")).lower()
+            if column_name not in nullable_columns:
+                continue
+
+            type_start = name_match.end()
+            type_end = cls._column_type_end(segment, type_start)
+            data_type = segment[type_start:type_end].rstrip()
+            if not data_type or data_type.upper().startswith("NULLABLE("):
+                continue
+            suffix = segment[type_end:]
+            if re.search(r"\bNOT\s+NULL\b", suffix, re.IGNORECASE):
+                raise ValueError(f"source-nullable column {column_name!r} is declared NOT NULL")
+            replacement_end = type_start + len(data_type)
+            edits.append((start + type_start, start + replacement_end, f"Nullable({data_type})"))
+
+        for start, end, replacement in reversed(edits):
+            body = body[:start] + replacement + body[end:]
+        return statement[: open_index + 1] + body + statement[close_index:]
+
+    @staticmethod
+    def _top_level_column_spans(body: str) -> list[tuple[int, int]]:
+        """Return comma-delimited spans while respecting nested SQL syntax."""
+        spans: list[tuple[int, int]] = []
+        start = 0
+        depth = 0
+        quote: str | None = None
+        index = 0
+        while index < len(body):
+            char = body[index]
+            if quote is not None:
+                if char == quote:
+                    if index + 1 < len(body) and body[index + 1] == quote:
+                        index += 2
+                        continue
+                    quote = None
+            elif char in {"'", '"'}:
+                quote = char
+            elif char in "([":
+                depth += 1
+            elif char in ")]":
+                depth -= 1
+            elif char == "," and depth == 0:
+                spans.append((start, index))
+                start = index + 1
+            index += 1
+        spans.append((start, len(body)))
+        return spans
+
+    @staticmethod
+    def _column_type_end(segment: str, type_start: int) -> int:
+        """Locate the end of a type expression before column constraints."""
+        import re
+
+        constraint = re.compile(
+            r"(?:NOT\s+NULL|NULL|PRIMARY\s+KEY|REFERENCES|DEFAULT|UNIQUE|CHECK|COLLATE|GENERATED|CONSTRAINT)\b",
+            re.IGNORECASE,
+        )
+        depth = 0
+        quote: str | None = None
+        index = type_start
+        while index < len(segment):
+            char = segment[index]
+            if quote is not None:
+                if char == quote:
+                    if index + 1 < len(segment) and segment[index + 1] == quote:
+                        index += 2
+                        continue
+                    quote = None
+            elif char in {"'", '"'}:
+                quote = char
+            elif char in "([":
+                depth += 1
+            elif char in ")]":
+                depth -= 1
+            elif char.isspace() and depth == 0:
+                next_token = segment[index:].lstrip()
+                if constraint.match(next_token):
+                    return index
+            index += 1
+        return len(segment.rstrip())
+
     def _resolve_tuned_ddl_clauses(self, statement: str, table_tunings: dict[str, Any] | None):
         """Resolve tuned PARTITION BY/ORDER BY clauses for this statement's table, if any.
 
@@ -187,7 +404,51 @@ class ClickHouseWorkloadMixin:
 
         generator = get_ddl_generator("clickhouse")
         clauses = generator.generate_tuning_clauses(table_tuning)
-        return None if clauses.is_empty() else clauses
+        if clauses.is_empty():
+            return None
+        self._normalize_tuning_clause_identifiers(statement, clauses)
+        return clauses
+
+    @classmethod
+    def _normalize_tuning_clause_identifiers(cls, statement: str, tuning_clauses: Any) -> None:
+        """Match tuning-template identifier case to the emitted DDL columns."""
+        import re
+
+        column_names = cls._ddl_column_name_map(statement)
+        if not column_names:
+            return
+
+        identifier = re.compile(r"[A-Za-z_]\w*")
+        for attribute in ("partition_by", "sort_by", "order_by", "cluster_by", "primary_key"):
+            expression = getattr(tuning_clauses, attribute, None)
+            if expression:
+                setattr(
+                    tuning_clauses,
+                    attribute,
+                    identifier.sub(lambda match: column_names.get(match.group(0).lower(), match.group(0)), expression),
+                )
+
+    @classmethod
+    def _ddl_column_name_map(cls, statement: str) -> dict[str, str]:
+        """Return lowercase-to-emitted names for CREATE TABLE columns."""
+        import re
+
+        create_match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+[A-Za-z_]\w*\s*\(", statement, re.IGNORECASE)
+        if create_match is None:
+            return {}
+        open_index = statement.find("(", create_match.start())
+        close_index = find_matching_parenthesis(statement, open_index)
+        body = statement[open_index + 1 : close_index]
+        names: dict[str, str] = {}
+        for start, end in cls._top_level_column_spans(body):
+            segment = body[start:end]
+            match = re.match(r'^\s*(?:"(?P<quoted>[^"]+)"|(?P<plain>[A-Za-z_]\w*))\s+', segment)
+            if match is None:
+                continue
+            name = match.group("quoted") or match.group("plain")
+            if name.upper() not in {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT"}:
+                names[name.lower()] = name
+        return names
 
     def _extract_primary_key_columns(self, statement: str) -> list[str]:
         """Extract primary key column names from a CREATE TABLE statement.

@@ -185,34 +185,50 @@ def resolve_csv_dialect(
     """
     name_lower = table_name.lower()
 
-    # (a) Manifest metadata wins — keys are always stored lowercase by the resolver
-    meta = data_source.table_metadata.get(name_lower)
-    if meta:
-        return CsvDialect(
-            delimiter=meta.get("csv_delimiter", get_delimiter_for_file(file_path)),
-            has_header=bool(meta.get("csv_has_header", False)),
-            null_marker=meta.get("csv_null_marker", None),
-            normalize_booleans=bool(meta.get("csv_normalize_booleans", False)),
-            quote=meta.get("csv_quote", None),
-        )
-
-    # (b) Benchmark instance attributes
     benchmark_delimiter = _get_optional_str_attr(benchmark, "csv_delimiter")
     benchmark_header = _get_optional_bool_attr(benchmark, "csv_has_header")
     benchmark_booleans = _get_optional_bool_attr(benchmark, "csv_normalize_booleans")
     benchmark_null_marker = _get_optional_str_attr(benchmark, "csv_null_marker")
+    ext = get_data_extension(file_path)
+    is_tpc = ext in (".tbl", ".dat")
+    format_delimiter = "|" if is_tpc else get_delimiter_for_file(file_path)
+    format_null_marker = "" if is_tpc else None
+
+    # (a) Manifest metadata wins per field. A partial manifest falls through
+    # to (b) and (c) only for fields it does not define. Explicit None remains
+    # meaningful for csv_null_marker, so use key membership for that field.
+    meta = data_source.table_metadata.get(name_lower)
+    if meta is not None:
+        return CsvDialect(
+            delimiter=meta.get("csv_delimiter", benchmark_delimiter or format_delimiter),
+            has_header=bool(meta.get("csv_has_header", benchmark_header if benchmark_header is not None else False)),
+            null_marker=(
+                meta["csv_null_marker"]
+                if "csv_null_marker" in meta
+                else benchmark_null_marker
+                if benchmark_null_marker is not None
+                else format_null_marker
+            ),
+            normalize_booleans=bool(
+                meta.get(
+                    "csv_normalize_booleans",
+                    benchmark_booleans if benchmark_booleans is not None else False,
+                )
+            ),
+            quote=meta.get("csv_quote", None),
+        )
+
+    # (b) Benchmark instance attributes
     if any(v is not None for v in (benchmark_delimiter, benchmark_header, benchmark_booleans, benchmark_null_marker)):
         logger.warning(
             "table '%s': CSV dialect from benchmark attributes (no manifest metadata). "
             "Annotate the generator with manifest metadata to suppress this warning.",
             table_name,
         )
-        ext = get_data_extension(file_path)
-        is_tpc = ext in (".tbl", ".dat")
         return CsvDialect(
-            delimiter=benchmark_delimiter if benchmark_delimiter is not None else ("|" if is_tpc else ","),
+            delimiter=benchmark_delimiter if benchmark_delimiter is not None else format_delimiter,
             has_header=bool(benchmark_header) if benchmark_header is not None else False,
-            null_marker=benchmark_null_marker if benchmark_null_marker is not None else ("" if is_tpc else None),
+            null_marker=benchmark_null_marker if benchmark_null_marker is not None else format_null_marker,
             normalize_booleans=bool(benchmark_booleans) if benchmark_booleans is not None else False,
             quote=None,
         )
@@ -223,7 +239,6 @@ def resolve_csv_dialect(
         "Annotate the generator with manifest metadata to suppress this warning.",
         table_name,
     )
-    ext = get_data_extension(file_path)
     if ext in (".tbl", ".dat"):
         return CsvDialect(
             delimiter="|",

@@ -162,8 +162,17 @@ class TestClickHouseAdapter:
 
         mock_benchmark = Mock()
         mock_benchmark.get_create_tables_sql.return_value = (
-            "CREATE TABLE test (id INT); CREATE TABLE test2 (name STRING);"
+            "CREATE TABLE test (id INT NOT NULL, optional DECIMAL(10,2)); CREATE TABLE test2 (name STRING);"
         )
+        mock_benchmark.get_schema.return_value = {
+            "test": {
+                "columns": [
+                    {"name": "id", "type": "INT", "nullable": False},
+                    {"name": "optional", "type": "DECIMAL(10,2)", "nullable": True},
+                ]
+            },
+            "test2": {"columns": {"name": {"type": "STRING", "nullable": False}}},
+        }
 
         adapter = ClickHouseAdapter(deployment_mode="server")
         connection = adapter.create_connection()
@@ -174,6 +183,10 @@ class TestClickHouseAdapter:
         assert schema_time >= 0
         # Should execute multiple statements
         assert mock_client.execute.call_count >= 2
+        executed_ddl = "\n".join(str(call.args[0]) for call in mock_client.execute.call_args_list)
+        assert "id INT NOT NULL" in executed_ddl
+        assert "optional Nullable(DECIMAL(10,2))" in executed_ddl
+        assert "name STRING" in executed_ddl
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_load_data_with_tables(self, mock_client_class):
@@ -408,6 +421,8 @@ class TestClickHouseAdapter:
         partition/order clauses -- i.e. it is real, engine-accepted DDL, not
         just a string BenchBox believes is valid.
         """
+        from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
+        from benchbox.core.tpcds.schema.registry import get_tunings
         from benchbox.core.tuning.interface import TableTuning, TuningColumn
 
         adapter = ClickHouseAdapter(deployment_mode="local", strict_validation=False, data_path=str(tmp_path))
@@ -448,6 +463,36 @@ class TestClickHouseAdapter:
         connection.execute("INSERT INTO lineitem VALUES (1, '2026-01-15'), (2, '2026-02-01')")
         count_rows = connection.execute("SELECT count(*) FROM lineitem").fetchall()
         assert count_rows[0][0] == 2
+
+        # Execute the complete tuned TPC-DS schema. This catches both key
+        # nullability and case drift: tuning templates use uppercase names,
+        # while the benchmark emits lowercase, case-sensitive ClickHouse DDL.
+        benchmark = TPCDSBenchmark(scale_factor=0.01, output_dir=tmp_path / "tpcds")
+        nullable_by_table = adapter._get_nullable_columns_by_table(benchmark)
+        tpcds_tunings = get_tunings().table_tunings
+        created_tables: list[str] = []
+        statements = [
+            statement.strip()
+            for statement in benchmark.get_create_tables_sql(dialect="duckdb").split(";")
+            if statement.strip()
+        ]
+        for statement in statements:
+            table_name = adapter._extract_table_name(statement)
+            assert table_name is not None
+            nullable_columns = nullable_by_table.get(table_name.lower(), set())
+            tuning_clauses = adapter._resolve_tuned_ddl_clauses(statement, tpcds_tunings)
+            key_columns = adapter._resolve_key_columns(statement, tuning_clauses, nullable_columns)
+            rendered = adapter._optimize_table_definition(
+                statement,
+                tpcds_tunings,
+                nullable_columns=nullable_columns,
+            )
+            for key_column in key_columns:
+                assert f"{key_column} Nullable(" not in rendered
+            connection.execute(rendered)
+            created_tables.append(table_name)
+
+        assert len([table for table in created_tables if table != "dbgen_version"]) == 24
 
     def test_get_database_path_server_mode(self):
         """Test database path generation in server mode returns None."""
@@ -547,6 +592,43 @@ class TestClickHouseAdapter:
             assert "vec Array(Float32)" in mixed_out
             assert "my_float_col INT" in mixed_out
             assert "FLOAT[" not in mixed_out
+
+            # Nullable wrapping is confined to selected type spans. A nested
+            # comma in DECIMAL must not consume the following compact column.
+            compact = "CREATE TABLE t (amount DECIMAL(10,2), next_col INTEGER, tail VARCHAR(5))"
+            compact_out = adapter._optimize_table_definition(
+                compact,
+                nullable_columns={"amount", "next_col"},
+            )
+            assert "amount Nullable(DECIMAL(10,2)), next_col Nullable(INTEGER), tail VARCHAR(5)" in compact_out
+
+            # Source-nullable metadata and an explicit NOT NULL declaration
+            # are contradictory; fail loudly instead of emitting invalid DDL.
+            with pytest.raises(ValueError, match="source-nullable column 'amount'"):
+                adapter._optimize_table_definition(
+                    "CREATE TABLE t (amount DECIMAL(10,2) NOT NULL)",
+                    nullable_columns={"amount"},
+                )
+
+            from benchbox.core.tuning.interface import TableTuning, TuningColumn
+
+            tuned = {
+                "events": TableTuning(
+                    table_name="events",
+                    partitioning=[TuningColumn(name="event_date", type="DATE", order=1)],
+                    sorting=[TuningColumn(name="event_id", type="INTEGER", order=1)],
+                )
+            }
+            keyed = adapter._optimize_table_definition(
+                "CREATE TABLE events (event_id INTEGER, event_date DATE, payload VARCHAR(50))",
+                tuned,
+                nullable_columns={"event_id", "event_date", "payload"},
+            )
+            assert "event_id INTEGER" in keyed
+            assert "event_date DATE" in keyed
+            assert "payload Nullable(VARCHAR(50))" in keyed
+            assert "event_id Nullable" not in keyed
+            assert "event_date Nullable" not in keyed
 
     def test_array_field_parsed_to_list_not_float(self):
         """An Array column value like ``[0.1,0.2]`` is parsed to a Python list.

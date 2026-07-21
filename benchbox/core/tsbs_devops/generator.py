@@ -178,7 +178,16 @@ class TSBSDevOpsDataGenerator(CompressionMixin, VerbosityMixin):
 
         if self._table_row_counts:
             write_generator_manifest(
-                self, "tsbs_devops", table_files, self._table_row_counts, metadata={"csv_has_header": True}
+                self,
+                "tsbs_devops",
+                table_files,
+                self._table_row_counts,
+                metadata={
+                    "csv_delimiter": ",",
+                    "csv_has_header": True,
+                    "csv_null_marker": None,
+                    "csv_normalize_booleans": False,
+                },
             )
         self.log_verbose("TSBS DevOps data generation complete")
         return table_files
