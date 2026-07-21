@@ -9,7 +9,7 @@ tools: Bash, Read, Write, Edit
 
 Read `skill-sync.yaml` (or `.claude/skills/skill-sync.yaml`) first. It defines
 sources, destination, excludes, pins, and validation. Route to the operation
-guide below.
+guide below and read the file in the Read column before acting.
 
 ## Actions
 

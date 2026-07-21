@@ -7,8 +7,9 @@ tools: Bash, Read, Edit, Write, Task
 
 # Idea → Spec Authoring
 
-This is the pre-tracker thinking workflow. Route to `ideate` or `spec`; all
-tracker state belongs to `todo-db`, never this skill.
+This is the pre-tracker thinking workflow. Route to `ideate` or `spec` and
+read the file in the Read column before acting; all tracker state belongs to
+`todo-db`, never this skill.
 
 ## Actions
 

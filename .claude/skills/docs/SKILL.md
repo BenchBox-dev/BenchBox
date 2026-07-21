@@ -7,7 +7,8 @@ tools: Bash, Read, Write, Edit, Task
 
 # Docs Workflow
 
-Route the request to one action below. Preserve local markup, navigation, and
+Route the request to one action below. Before acting, read the file in the
+Read column for the selected action. Preserve local markup, navigation, and
 build conventions.
 
 ## Resolve

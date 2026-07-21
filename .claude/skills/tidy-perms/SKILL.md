@@ -7,8 +7,8 @@ tools: Bash, Read, Write, Edit
 
 # Permissions Consolidation
 
-Route to `consolidate` or `audit`. Keep unclear entries PERSONAL and never
-weaken safety.
+Route to `consolidate` or `audit`; read the file in the Read column before
+acting. Keep unclear entries PERSONAL and ask; never weaken safety.
 
 ## Actions
 
