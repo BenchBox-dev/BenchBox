@@ -28,7 +28,9 @@ uat-resume-retirement-artifact-durability w4.
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
+import os
 from collections import deque
 from collections.abc import Iterable
 from pathlib import Path
@@ -39,6 +41,27 @@ from tests.uat.runner import CellResult
 
 FAILURE_TAIL_LINES = 50
 FAILURE_TAIL_CHARS = 12_000
+
+# Sweep lifecycle markers (uat-sweep-durability-and-signal-teardown w1).
+#
+# Both are *separate* sentinel artifacts beside cells.jsonl -- deliberately not
+# trailing rows inside cells.jsonl, so the row schema report/gate consumers
+# parse stays byte-for-byte unchanged.
+#
+# The durable sweep writes the ``.inprogress`` marker the moment it starts
+# streaming rows, and a complete ``write_cells_jsonl`` clears it and writes the
+# ``.finalized`` marker at orderly end. The two together let a reader tell
+# three cases apart WITHOUT changing how a marker-less legacy artifact reads:
+#   * finalized present            -> sweep completed (positive signal).
+#   * inprogress present, no final -> sweep was KILLED mid-run: its streamed
+#                                     rows are durable but partial, so report
+#                                     must reject it as green.
+#   * neither marker               -> a legacy/hand-written artifact predating
+#                                     the markers -- treated exactly as before
+#                                     (the pinned "regenerate old artifacts"
+#                                     contract, test_report_cli_without_sidecar_*).
+CELLS_FINALIZED_SUFFIX = ".finalized"
+CELLS_INPROGRESS_SUFFIX = ".inprogress"
 
 
 class SourceInfo(Protocol):
@@ -52,6 +75,153 @@ def cells_accounting_path(cells_jsonl: Path) -> Path:
     return cells_jsonl.with_name(cells_jsonl.name + ".accounting.json")
 
 
+def cells_finalized_path(cells_jsonl: Path) -> Path:
+    """Path of the finalize-marker sentinel beside a given cells.jsonl (w1)."""
+    return cells_jsonl.with_name(cells_jsonl.name + CELLS_FINALIZED_SUFFIX)
+
+
+def cells_inprogress_path(cells_jsonl: Path) -> Path:
+    """Path of the in-progress marker sentinel beside a given cells.jsonl (w1)."""
+    return cells_jsonl.with_name(cells_jsonl.name + CELLS_INPROGRESS_SUFFIX)
+
+
+def _render_cell_row(cell: CellResult, *, source_info: SourceInfo) -> str:
+    """Render one cells.jsonl row (with trailing newline) and persist its log failure context.
+
+    The single owner of the cells.jsonl row schema, shared by the complete
+    `write_cells_jsonl` writer and the incremental `CellStreamWriter` so a
+    streamed row and a batch-written row are byte-for-byte identical -- the
+    final atomic `write_cells_jsonl` at orderly sweep end can then replace the
+    incrementally-appended file without changing a single row's bytes.
+    `_persist_cell_failure_context` is idempotent per cell log (guarded by
+    `_cell_log_has_marker`), so calling it once while streaming and again at
+    the batch write does not double-append the failure tail.
+    """
+    cell_terminal_state = terminal_state(cell)
+    failure_tail = _persist_cell_failure_context(cell, terminal_state=cell_terminal_state)
+    return (
+        json.dumps(
+            {
+                "platform": cell.platform,
+                "benchmark": cell.benchmark,
+                "scale": cell.scale,
+                "status": cell.status,
+                "terminal_state": cell_terminal_state,
+                "submit_terminal_state": cell.submit_terminal_state,
+                "timed_out": cell.status == "timed-out",
+                "exit_code": cell.exit_code,
+                "elapsed_s": cell.elapsed_s,
+                "log_path": str(cell.log_path),
+                "result_path": (str(cell.result_path) if cell.result_path else None),
+                "throughput_check": cell.throughput_check,
+                "failure_tail": failure_tail,
+                "source_commit_sha": source_info.commit_sha,
+                "source_commit_short_sha": source_info.commit_short_sha,
+                "source_dirty": source_info.dirty,
+            }
+        )
+        + "\n"
+    )
+
+
+class CellStreamWriter:
+    """Incrementally append cells.jsonl rows, flushing + fsync'ing each row.
+
+    Durability contract (uat-sweep-durability-and-signal-teardown w1): a sweep
+    killed mid-run keeps every *completed* cell's row on disk, because each row
+    is flushed and fsync'd at cell completion instead of being buffered in
+    memory until the sweep's end (the pre-existing failure mode -- the whole
+    result set was written in one batch after the last cell, so a mid-sweep
+    process death lost every row). It reopens the file per append rather than
+    holding a handle across the sweep: cells complete seconds-to-minutes apart
+    in a serial sweep, so the open cost is negligible, and no open handle has
+    to be reasoned about across the SIGTERM teardown path (w2).
+
+    It deliberately does NOT write the finalize marker -- only a complete
+    `write_cells_jsonl` does. On construction it drops the ``.inprogress``
+    marker, the positive signal that a durable stream began; if the sweep is
+    killed before `write_cells_jsonl` clears it, that lingering marker is how
+    report tells this partial run apart from a marker-less legacy artifact.
+    """
+
+    def __init__(self, path: Path, *, source_info: SourceInfo) -> None:
+        self._path = path
+        self._source_info = source_info
+        self.count = 0
+        write_cells_inprogress_marker(path)
+
+    def append(self, cell: CellResult) -> None:
+        line = _render_cell_row(cell, source_info=self._source_info)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        with self._path.open("a", encoding="utf-8") as fh:
+            fh.write(line)
+            fh.flush()
+            os.fsync(fh.fileno())
+        self.count += 1
+
+
+def write_cells_inprogress_marker(cells_jsonl: Path) -> Path:
+    """Write the atomic in-progress marker when a durable stream begins (w1)."""
+    marker = cells_inprogress_path(cells_jsonl)
+    atomic_write_text(
+        marker,
+        json.dumps({"started_at": _dt.datetime.now().astimezone().isoformat(timespec="seconds")}) + "\n",
+    )
+    return marker
+
+
+def write_cells_finalized_marker(cells_jsonl: Path, *, row_count: int) -> Path:
+    """Write the atomic finalize marker for a completed cells.jsonl and clear the in-progress one (w1).
+
+    Called from a complete `write_cells_jsonl` (and directly by tests modeling
+    a finished sweep). Records the row count and an offset-aware completion
+    timestamp, then removes any `.inprogress` marker so an orderly-completed run
+    is never mistaken for a killed one.
+    """
+    marker = cells_finalized_path(cells_jsonl)
+    atomic_write_text(
+        marker,
+        json.dumps(
+            {
+                "finalized_at": _dt.datetime.now().astimezone().isoformat(timespec="seconds"),
+                "row_count": int(row_count),
+            }
+        )
+        + "\n",
+    )
+    cells_inprogress_path(cells_jsonl).unlink(missing_ok=True)
+    return marker
+
+
+def cells_are_finalized(cells_jsonl: Path) -> bool:
+    """True when the finalize marker beside `cells_jsonl` exists (positive completion signal)."""
+    return cells_finalized_path(cells_jsonl).exists()
+
+
+def cells_run_incomplete(cells_jsonl: Path) -> bool:
+    """True when a durable sweep began (`.inprogress`) but never finalized -- i.e. it was killed mid-run.
+
+    False for a legacy/hand-written artifact that carries neither marker, so
+    `make uat-report` keeps regenerating old artifacts exactly as before
+    (test_report_cli_without_sidecar_defaults_unreachable_zero) -- only a
+    genuinely interrupted durable run is flagged.
+    """
+    return cells_inprogress_path(cells_jsonl).exists() and not cells_finalized_path(cells_jsonl).exists()
+
+
+def read_cells_finalized_marker(cells_jsonl: Path) -> dict[str, object] | None:
+    """Return the finalize marker payload, or None when absent/unreadable."""
+    marker = cells_finalized_path(cells_jsonl)
+    if not marker.exists():
+        return None
+    try:
+        with marker.open(encoding="utf-8") as fh:
+            payload = json.load(fh)
+    except (OSError, ValueError, TypeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
 def write_cells_jsonl(
     path: Path,
     cells: Iterable[CellResult],
@@ -61,35 +231,20 @@ def write_cells_jsonl(
     startup_failed_count: int = 0,
     disk_gate_disabled: bool = False,
     container_engine: str | None = None,
+    finalize: bool = True,
 ) -> None:
-    """Write the durable per-cell result stream plus its accounting sidecar."""
-    lines: list[str] = []
-    for cell in cells:
-        cell_terminal_state = terminal_state(cell)
-        failure_tail = _persist_cell_failure_context(cell, terminal_state=cell_terminal_state)
-        lines.append(
-            json.dumps(
-                {
-                    "platform": cell.platform,
-                    "benchmark": cell.benchmark,
-                    "scale": cell.scale,
-                    "status": cell.status,
-                    "terminal_state": cell_terminal_state,
-                    "submit_terminal_state": cell.submit_terminal_state,
-                    "timed_out": cell.status == "timed-out",
-                    "exit_code": cell.exit_code,
-                    "elapsed_s": cell.elapsed_s,
-                    "log_path": str(cell.log_path),
-                    "result_path": (str(cell.result_path) if cell.result_path else None),
-                    "throughput_check": cell.throughput_check,
-                    "failure_tail": failure_tail,
-                    "source_commit_sha": source_info.commit_sha,
-                    "source_commit_short_sha": source_info.commit_short_sha,
-                    "source_dirty": source_info.dirty,
-                }
-            )
-            + "\n"
-        )
+    """Write the durable per-cell result stream plus its accounting sidecar.
+
+    This is the *complete* writer: it is called with the full result set at an
+    orderly sweep end (or by a test modeling a finished sweep), so by default
+    it also writes the finalize marker (`finalize=True`) that report/gate use
+    to tell a finished sweep from a killed one. During a live sweep the
+    orchestrator streams rows via `CellStreamWriter` first, then calls this to
+    atomically replace the incrementally-written file with the identical
+    authoritative content and drop the marker. Pass `finalize=False` only to
+    model an unfinalized/partial run in a test.
+    """
+    lines = [_render_cell_row(cell, source_info=source_info) for cell in cells]
     # cells.jsonl before its sidecar -- see module docstring "Write ordering".
     atomic_write_text(path, "".join(lines))
 
@@ -114,6 +269,12 @@ def write_cells_jsonl(
         + "\n"
     )
     atomic_write_text(accounting_path, accounting_text)
+
+    # Finalize marker last: rows and sidecar are on disk before the sweep is
+    # declared complete, so a reader that sees the marker is guaranteed the
+    # full stream + sidecar preceded it (uat-sweep-durability-and-signal-teardown w1).
+    if finalize:
+        write_cells_finalized_marker(path, row_count=len(lines))
 
 
 def read_cells_jsonl(path: Path) -> list[CellResult]:

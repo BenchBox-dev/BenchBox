@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import signal
 import subprocess
 import sys
 from collections.abc import Callable, Iterable
@@ -69,6 +70,74 @@ class DiskFloorAbort(RuntimeError):
         self.reason = reason
 
 
+class SweepCancelled(KeyboardInterrupt):
+    """A sweep-process SIGTERM upgraded to a Ctrl-C-equivalent cancellation.
+
+    Subclasses `KeyboardInterrupt` so it rides the exact same unwinding path a
+    real Ctrl-C already took: the per-platform `finally` in `run_execute` tears
+    the Docker stack down, no finalize marker is written (so report/gate treat
+    the run as unfinished, not green), and the process exits nonzero
+    (uat-sweep-durability-and-signal-teardown w2).
+    """
+
+    def __init__(self, signal_name: str) -> None:
+        super().__init__(signal_name)
+        self.signal_name = signal_name
+
+
+# Sentinel distinct from a real previous handler of None (SIG_DFL is not None,
+# but signal.getsignal can legitimately return None for a handler set outside
+# Python); used to mean "shim was never installed, do not restore".
+_SHIM_NOT_INSTALLED = object()
+
+
+def _install_sweep_sigterm_shim(log_dir: Path, phase_holder: list[str | None]) -> object | None:
+    """Convert SIGTERM to `SweepCancelled` for the sweep process only (w2/w3).
+
+    Returns the previous SIGTERM handler to restore, or the not-installed
+    sentinel when the shim could not be installed (not running in the main
+    thread -- `signal.signal` raises there). Installing in the sweep's own
+    process does not touch cell subprocesses: `timeouts.py` owns their
+    process-group kill semantics, and those subprocesses never import this
+    shim. Returning the sentinel (rather than raising) keeps a sweep driven
+    from a worker thread working with default SIGTERM behavior; row durability
+    does not depend on the shim, only the orderly-teardown upgrade does.
+
+    The handler records the cancellation (signal name, phase in flight,
+    timestamp) to uat_lifecycle.log before raising (w3), so a killed sweep
+    leaves a durable breadcrumb of when and where it was cancelled -- written
+    from the handler because the phase loop never returns to do it.
+    """
+
+    def _raise_cancelled(signum: int, _frame: object) -> None:
+        signal_name = signal.Signals(signum).name
+        exec_phase.append_lifecycle_log(
+            log_dir,
+            f"[cancel] signal={signal_name} phase={phase_holder[0]} "
+            "status=tearing-down unfinalized (no finalize marker will be written)",
+        )
+        raise SweepCancelled(signal_name)
+
+    try:
+        return signal.signal(signal.SIGTERM, _raise_cancelled)
+    except (ValueError, OSError):
+        return _SHIM_NOT_INSTALLED
+
+
+def _restore_sweep_sigterm_shim(previous: object | None) -> None:
+    if previous is _SHIM_NOT_INSTALLED:
+        return
+    # A previous handler of None means SIGTERM was last set outside Python;
+    # `signal.signal(sig, None)` rejects that, so fall back to SIG_DFL rather
+    # than silently leaving our SweepCancelled-raising shim installed past the
+    # sweep. Restoring the default is the honest "no Python handler" state.
+    restore_to = signal.SIG_DFL if previous is None else previous
+    try:
+        signal.signal(signal.SIGTERM, restore_to)  # type: ignore[arg-type]
+    except (ValueError, OSError, TypeError):
+        pass
+
+
 def capture_run_source_info(repo_root: Path | None = None) -> RunSourceInfo:
     """Capture source provenance once per sweep."""
     root = repo_root or Path(__file__).resolve().parents[2]
@@ -105,12 +174,23 @@ def _build_disk_floor_runner(
     watch_disk_floor: bool,
     free_space_path: str | Path,
     free_space_min_gib: float,
+    cell_stream: Callable[[CellResult], None] | None = None,
 ) -> CellRunner:
-    """Wrap a cell runner with attempted-cell capture and mid-sweep disk checks."""
+    """Wrap a cell runner with attempted-cell capture, incremental durability, and mid-sweep disk checks.
+
+    `cell_stream`, when provided, is called with each cell's result the moment
+    it completes -- the hook the durable sweep uses to append + fsync that row
+    to cells.jsonl immediately (uat-sweep-durability-and-signal-teardown w1),
+    so a mid-sweep process death keeps every completed cell's row instead of
+    losing the whole batch. It fires before the disk-floor check so a row is
+    on disk even when the very next check aborts the sweep.
+    """
 
     def runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
         result = base_runner(platform, benchmark, scale, **kwargs)
         attempted_cells.append(result)
+        if cell_stream is not None:
+            cell_stream(result)
         if watch_disk_floor:
             free_gib = preflight_budget.free_space_gib(free_space_path)
             if free_gib < free_space_min_gib:
@@ -141,13 +221,21 @@ def _record_container_engine_identity(log_dir: Path) -> str | None:
     return binary
 
 
-def run_sweep(  # noqa: C901
+def run_sweep(
     config: UATConfig,
     *,
     log_dir_override: Path | None = None,
     databases_root: Path | None = None,
 ) -> SweepResult:
-    """Orchestrate the YAML's `phases:` list. Returns SweepResult."""
+    """Orchestrate the YAML's `phases:` list. Returns SweepResult.
+
+    Installs a sweep-process SIGTERM shim (uat-sweep-durability-and-signal-teardown
+    w2) so an operator `kill` (or a CI cancellation) tears the Docker stack
+    down, records the cancellation (w3), and exits nonzero exactly like Ctrl-C,
+    then always restores the previous handler. The phase loop itself lives in
+    `_run_sweep_phases`; the split keeps that restore in a single, obvious
+    try/finally instead of threading it through every `break`.
+    """
     now = _dt.datetime.now()
     log_dir = log_dir_override or exec_phase.default_log_dir(config, now=now)
     benchmark_runs_dir = exec_phase.default_benchmark_runs_dir(config, now=now)
@@ -157,10 +245,41 @@ def run_sweep(  # noqa: C901
     if databases_root is None:
         databases_root = benchmark_runs_dir / "databases"
 
+    source_info = capture_run_source_info()
+    phase_holder: list[str | None] = [None]
+    sigterm_prev = _install_sweep_sigterm_shim(log_dir, phase_holder)
+    try:
+        return _run_sweep_phases(
+            config,
+            now=now,
+            log_dir=log_dir,
+            benchmark_runs_dir=benchmark_runs_dir,
+            databases_root=databases_root,
+            container_engine=container_engine,
+            source_info=source_info,
+            phase_holder=phase_holder,
+        )
+    finally:
+        _restore_sweep_sigterm_shim(sigterm_prev)
+
+
+def _run_sweep_phases(  # noqa: C901
+    config: UATConfig,
+    *,
+    now: _dt.datetime,
+    log_dir: Path,
+    benchmark_runs_dir: Path,
+    databases_root: Path,
+    container_engine: str | None,
+    source_info: RunSourceInfo,
+    phase_holder: list[str | None],
+) -> SweepResult:
+    """Walk the YAML `phases:` list. Split out of `run_sweep` so the SIGTERM
+    shim's restore lives in one try/finally there; this body is unchanged from
+    the pre-split loop except for recording the in-flight phase for w3."""
     phase_exit_codes: dict[str, int] = {}
     aborted_phase: str | None = None
     abort_reason: str | None = None
-    source_info = capture_run_source_info()
 
     cells_jsonl = log_dir / "cells.jsonl"
     compatibility_pruned_jsonl = log_dir / "compatibility_pruned.jsonl"
@@ -178,6 +297,7 @@ def run_sweep(  # noqa: C901
             print(gate_warning, file=sys.stderr)
 
     for phase in config.phases:
+        phase_holder[0] = phase
         if config.dry_run:
             phase_exit_codes[phase] = 0
             continue
@@ -210,6 +330,12 @@ def run_sweep(  # noqa: C901
                 break
         elif phase == "execute":
             attempted_cells: list[CellResult] = []
+            # Stream each cell's row to cells.jsonl as it completes so a
+            # mid-sweep kill keeps the rows already earned (w1). The final
+            # atomic write_cells_jsonl below replaces this incrementally-grown
+            # file with identical authoritative content and adds the finalize
+            # marker; a kill before that leaves the streamed rows unfinalized.
+            cell_stream_writer = cells_io.CellStreamWriter(cells_jsonl, source_info=source_info)
             execute_kwargs: dict[str, Any] = {
                 "log_dir": log_dir,
                 "benchmark_runs_dir": benchmark_runs_dir,
@@ -222,6 +348,7 @@ def run_sweep(  # noqa: C901
                     watch_disk_floor=config.disk_gate_enabled,
                     free_space_path=config.preflight.free_space_path or str(benchmark_runs_dir),
                     free_space_min_gib=config.preflight.free_space_min_gib,
+                    cell_stream=cell_stream_writer.append,
                 ),
             }
             try:

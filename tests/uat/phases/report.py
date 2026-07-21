@@ -117,9 +117,14 @@ class ReportSummary(PhaseResult):
     # fail_count or unreachable_count would misrepresent an environment
     # condition as a cell failure.
     startup_failed_count: int = 0
+    # The sweep that produced these cells never wrote its finalize marker --
+    # it was killed mid-run (uat-sweep-durability-and-signal-teardown w1). A
+    # partial cells.jsonl must never read as a clean sweep, so this forces a
+    # nonzero exit regardless of what the rows-so-far happen to say.
+    unfinalized: bool = False
 
     def exit_code(self) -> int:
-        if self.aborted:
+        if self.aborted or self.unfinalized:
             return 2
         has_uncleared_cells = (
             self.fail_count > 0 or self.timeout_count > 0 or self.unreachable_count > 0 or self.startup_failed_count > 0
@@ -228,6 +233,7 @@ def write_report(
     run_status: str = "COMPLETED",
     abort_phase: str | None = None,
     abort_reason: str | None = None,
+    finalized: bool = True,
 ) -> ReportSummary:
     """Write the matrix summary TSV; optionally enforce a cross-scale floor.
 
@@ -254,6 +260,11 @@ def write_report(
     `unreachable_count` does, but is reported under its own counter -- see
     uat-fail-advance-consistency w3.
     """
+    # A run whose sweep never finalized (killed mid-stream) is INCOMPLETE and
+    # must not read as a clean COMPLETED run, whatever the rows-so-far say. An
+    # already-ABORTED run stays ABORTED (it reached an orderly, finalized end).
+    if not finalized and run_status == "COMPLETED":
+        run_status = "INCOMPLETE"
     rows = list(cells)
     executed_count = len(rows)
 
@@ -349,6 +360,7 @@ def write_report(
         startup_failed_count=startup_failed_count,
         aborted=run_status in {"ABORTED", "BLOCKED"},
         abort_reason=abort_reason,
+        unfinalized=not finalized,
     )
 
 
