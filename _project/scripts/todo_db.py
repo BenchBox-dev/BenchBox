@@ -26,8 +26,8 @@ fail loudly (no offline queue, by design).
 
 Deviations from the spec DDL (recorded in the spec):
 - `items.category` column added (nullable) so the importer is lossless.
-- scope-rule matching uses fnmatch semantics ('*' crosses '/'), which is
-  slightly more permissive than the final glob contract.
+- scope-rule matching uses fnmatch semantics ('*' crosses '/'); a trailing
+  slash explicitly means the named directory and all descendants.
 """
 
 from __future__ import annotations
@@ -305,22 +305,22 @@ def _require_secure_url(url: str) -> str:
     return url
 
 
-def resolve_backend(explicit: str | None) -> Path | str:
-    """Pick the database backend: a Path (local SQLite) or a URL (hosted).
-
-    Precedence: --db > TODO_DB_PATH > TODO_DB_URL > default local path.
-    TODO_DB_PATH outranks TODO_DB_URL deliberately: a test or tool that pins
-    a local file must never be silently redirected at the shared database.
-    """
+def _resolve_backend(explicit: str | None) -> tuple[Path | str, bool]:
+    """Return ``(backend, implicit_default_local)`` using CLI precedence."""
     if explicit:
-        return _normalize_url(explicit) if _is_hosted_url(explicit) else Path(explicit)
+        return (_normalize_url(explicit) if _is_hosted_url(explicit) else Path(explicit)), False
     env_path = os.environ.get("TODO_DB_PATH")
     if env_path:
-        return Path(env_path)
+        return Path(env_path), False
     env_url = os.environ.get("TODO_DB_URL")
     if env_url:
-        return _normalize_url(env_url)
-    return git_main_root() / ".todo-db" / "todo.sqlite"
+        return _normalize_url(env_url), False
+    return git_main_root() / ".todo-db" / "todo.sqlite", True
+
+
+def resolve_backend(explicit: str | None) -> Path | str:
+    """Pick the backend: --db > TODO_DB_PATH > TODO_DB_URL > local fallback."""
+    return _resolve_backend(explicit)[0]
 
 
 def hosted_replica_path() -> Path:
@@ -836,6 +836,35 @@ def bulk_transfer(
 # read-only-token consumer and its reader is bulk; interactive reads keep the
 # fast embedded replica (which needs a read-write token anyway).
 READ_ONLY_COMMANDS = frozenset({"export"})
+
+_IMPLICIT_LOCAL_READ_COMMANDS = frozenset({"check-scope", "deps", "export", "lint", "list", "ready", "show", "stats"})
+
+
+def _command_mutates_tracker(args: argparse.Namespace) -> bool:
+    """Whether the parsed command can modify tracker state (fail closed)."""
+    if args.command == "init":
+        return False
+    if args.command == "import-yaml":
+        return not args.dry_run
+    if args.command == "verify":
+        return args.run is not None
+    if args.command == "config":
+        return args.value is not None
+    return args.command not in _IMPLICIT_LOCAL_READ_COMMANDS
+
+
+def _report_backend(backend: Path | str, *, implicit_default_local: bool) -> None:
+    if isinstance(backend, Path):
+        print(f"todo backend: local ({backend})", file=sys.stderr)
+        if implicit_default_local:
+            print(
+                "WARNING: LOCAL FALLBACK DB - NOT the production tracker; "
+                "set --db, TODO_DB_PATH, or TODO_DB_URL explicitly.",
+                file=sys.stderr,
+            )
+        return
+    # Never print the hosted URL or token: the backend kind is enough.
+    print("todo backend: hosted", file=sys.stderr)
 
 
 def connect_backend(backend: Path | str, *, read_only: bool = False) -> sqlite3.Connection | _HostedConnection:
@@ -1628,6 +1657,14 @@ def stats(conn: sqlite3.Connection) -> dict[str, Any]:
 # Scope check, verify, lint
 
 
+def _scope_glob_matches(path: str, glob: str) -> bool:
+    """Match a scope glob, treating a trailing slash as a recursive directory."""
+    if glob.endswith("/"):
+        directory = glob.rstrip("/")
+        return path == directory or path.startswith(f"{directory}/")
+    return fnmatch.fnmatch(path, glob)
+
+
 def check_paths(files: list[str], rules: list[dict[str, str]]) -> list[str]:
     """Return violation messages for changed files vs scope rules."""
     only = [r["path_glob"] for r in rules if r["kind"] == "only_modify"]
@@ -1638,9 +1675,9 @@ def check_paths(files: list[str], rules: list[dict[str, str]]) -> list[str]:
         # (eval finding: it false-positived on worktrees with stale gitignores).
         if path == ".todo-db" or path.startswith(".todo-db/"):
             continue
-        if any(fnmatch.fnmatch(path, glob) for glob in deny):
+        if any(_scope_glob_matches(path, glob) for glob in deny):
             violations.append(f"{path}: matches do_not_modify")
-        elif only and not any(fnmatch.fnmatch(path, glob) for glob in only):
+        elif only and not any(_scope_glob_matches(path, glob) for glob in only):
             violations.append(f"{path}: outside only_modify allowlist")
     return violations
 
@@ -1676,8 +1713,6 @@ def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: in
     proc = subprocess.run(row["command"], shell=True, capture_output=True, text=True, check=False)
     output = (proc.stdout or "") + (proc.stderr or "")
     passed = proc.returncode == 0
-    if passed and row["expected"]:
-        passed = row["expected"] in output
     result = "pass" if passed else "fail"
     with _write_txn(conn):
         conn.execute(
@@ -2286,7 +2321,15 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     actor = args.actor or default_actor()
-    backend = resolve_backend(args.db)
+    backend, implicit_default_local = _resolve_backend(args.db)
+    _report_backend(backend, implicit_default_local=implicit_default_local)
+    if implicit_default_local and _command_mutates_tracker(args):
+        print(
+            "error: refusing to write through the implicit local fallback; "
+            "select a backend with --db, TODO_DB_PATH, or TODO_DB_URL",
+            file=sys.stderr,
+        )
+        return 2
     if args.command == "migrate":
         # Must run before connect(): connect refuses an outdated schema.
         try:

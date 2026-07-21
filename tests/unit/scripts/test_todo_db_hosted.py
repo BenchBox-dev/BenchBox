@@ -238,6 +238,55 @@ class TestBackendResolution:
         monkeypatch.delenv("TODO_DB_PATH", raising=False)
         assert isinstance(todo_db.resolve_backend(None), Path)
 
+    def test_implicit_local_read_is_loud_but_allowed(self, monkeypatch, tmp_path, capsys):
+        monkeypatch.delenv("TODO_DB_URL", raising=False)
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+
+        assert todo_db.main(["stats"]) == 0
+
+        captured = capsys.readouterr()
+        fallback_path = tmp_path / ".todo-db" / "todo.sqlite"
+        assert "items_by_state" in captured.out
+        assert f"todo backend: local ({fallback_path})" in captured.err
+        assert "LOCAL FALLBACK DB - NOT the production tracker" in captured.err
+
+    def test_implicit_local_write_is_refused_before_database_creation(self, monkeypatch, tmp_path, capsys):
+        monkeypatch.delenv("TODO_DB_URL", raising=False)
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+
+        assert todo_db.main(["claim", "missing-item"]) == 2
+
+        assert not (tmp_path / ".todo-db" / "todo.sqlite").exists()
+        assert "refusing to write through the implicit local fallback" in capsys.readouterr().err
+
+    def test_implicit_local_init_remains_available_for_bootstrap(self, monkeypatch, tmp_path, capsys):
+        monkeypatch.delenv("TODO_DB_URL", raising=False)
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+
+        assert todo_db.main(["init"]) == 0
+
+        assert (tmp_path / ".todo-db" / "todo.sqlite").exists()
+        assert "LOCAL FALLBACK DB - NOT the production tracker" in capsys.readouterr().err
+
+    @pytest.mark.parametrize("source", ["flag", "env"])
+    def test_explicit_local_backend_has_identity_without_fallback_warning(self, source, monkeypatch, tmp_path, capsys):
+        monkeypatch.delenv("TODO_DB_URL", raising=False)
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        db_path = tmp_path / "explicit.sqlite"
+        argv = ["--db", str(db_path), "stats"]
+        if source == "env":
+            monkeypatch.setenv("TODO_DB_PATH", str(db_path))
+            argv = ["stats"]
+
+        assert todo_db.main(argv) == 0
+
+        captured = capsys.readouterr()
+        assert f"todo backend: local ({db_path})" in captured.err
+        assert "LOCAL FALLBACK" not in captured.err
+
 
 # ---------------------------------------------------------------------------
 # Hosted connection wiring
@@ -588,7 +637,10 @@ class TestHostedLifecycleGates:
         rc = todo_db.main(["--actor", "tester", "stats"])
         assert rc == 0
         assert fake_libsql.connect_calls, "main() did not open the hosted backend"
-        assert "items_by_state" in capsys.readouterr().out
+        captured = capsys.readouterr()
+        assert "items_by_state" in captured.out
+        assert "todo backend: hosted" in captured.err
+        assert HOSTED_URL not in captured.err
 
 
 # ---------------------------------------------------------------------------
