@@ -99,6 +99,7 @@ import threading
 from datetime import datetime
 from typing import Any, Callable, Protocol
 
+from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.utils.clock import elapsed_seconds
 
 from .result import ThroughputResult, ThroughputStreamResult
@@ -369,10 +370,11 @@ class StreamRunner:
         result.total_time = total_time
 
         if total_time > 0:
-            # Throughput@Size = S × 3600 × SF / TTT
-            # where S = num_streams, SF = scale_factor, TTT = total_test_time
-            result.throughput_at_size = (config.num_streams * 3600.0 * config.scale_factor) / total_time
-
-            # Calculate query throughput
             total_queries = sum(sr.queries_executed for sr in result.stream_results)
+            result.throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
+                total_queries=total_queries,
+                total_time_seconds=total_time,
+                scale_factor=config.scale_factor,
+                num_streams=config.num_streams,
+            )
             result.query_throughput = total_queries / total_time

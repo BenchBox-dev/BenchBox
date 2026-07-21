@@ -237,6 +237,8 @@ def _result_json(
     streams: dict[int, int],
     throughput_at_size: float | None,
     failed_stream_ids: frozenset[int] = frozenset(),
+    duration_ms: int = 1_000_000,
+    scale_factor: float = 1.0,
 ) -> dict:
     """Build a minimal result JSON with `queries[]` covering the given streams.
 
@@ -251,17 +253,27 @@ def _result_json(
         status = "FAILED" if stream_id in failed_stream_ids else "SUCCESS"
         for i in range(count):
             queries.append({"id": str(i + 1), "stream": stream_id, "status": status})
-    payload: dict = {"queries": queries, "summary": {}}
+    payload: dict = {
+        "benchmark": {"scale_factor": scale_factor},
+        "phases": {"throughput_test": {"duration_ms": duration_ms}},
+        "queries": queries,
+        "summary": {},
+    }
     if throughput_at_size is not None:
         payload["summary"]["tpc_metrics"] = {"throughput_at_size": throughput_at_size}
     return payload
 
 
-def test_validate_throughput_result_ok_on_clean_pass():
+def test_validate_throughput_result_accepts_correct_metric_and_rejects_old_formula():
     result = _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=123.4)
     ok, reason = validate_throughput_result(result, requested_streams=3)
     assert ok is True
     assert reason == "ok"
+
+    result["summary"]["tpc_metrics"]["throughput_at_size"] = 10.8
+    ok, reason = validate_throughput_result(result, requested_streams=3)
+    assert ok is False
+    assert "plausibility band" in reason
 
 
 def test_validate_throughput_result_fails_on_stream_count_mismatch():

@@ -33,6 +33,7 @@ import datetime as _dt
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.utils.scale_factor import format_scale_factor
 
 # Mirrors benchbox/cli/commands/run_official.py::TPC_ALLOWED_SCALE_FACTORS.
@@ -230,7 +231,7 @@ def validate_stream_success(result_json: dict[str, Any]) -> tuple[bool, str]:
 
 
 def validate_throughput_metric(result_json: dict[str, Any]) -> tuple[bool, str]:
-    """Check that Throughput@Size was actually computed (> 0).
+    """Check that Throughput@Size is positive and plausibly spec-scaled.
 
     It is ``None`` (and therefore absent from the exported JSON's
     ``summary.tpc_metrics``) whenever the run's overall validation status is
@@ -260,6 +261,30 @@ def validate_throughput_metric(result_json: dict[str, Any]) -> tuple[bool, str]:
     throughput_at_size = tpc_metrics.get("throughput_at_size")
     if not isinstance(throughput_at_size, (int, float)) or throughput_at_size <= 0:
         return False, f"Throughput@Size not positive (got {throughput_at_size!r})"
+
+    queries = result_json.get("queries") or []
+    total_queries = sum(1 for query in queries if isinstance(query, dict) and "stream" in query)
+    scale_factor = (result_json.get("benchmark") or {}).get("scale_factor")
+    duration_ms = ((result_json.get("phases") or {}).get("throughput_test") or {}).get("duration_ms")
+    if not isinstance(scale_factor, (int, float)) or scale_factor <= 0:
+        return False, f"Throughput@Size plausibility unavailable: invalid scale factor {scale_factor!r}"
+    if not isinstance(duration_ms, (int, float)) or duration_ms <= 0:
+        return False, f"Throughput@Size plausibility unavailable: invalid throughput duration {duration_ms!r}"
+
+    stream_ids = {query.get("stream") for query in queries if isinstance(query, dict) and "stream" in query}
+    expected = TPCMetricsCalculator.calculate_throughput_at_size(
+        total_queries=total_queries,
+        total_time_seconds=duration_ms / 1000.0,
+        scale_factor=float(scale_factor),
+        num_streams=len(stream_ids),
+    )
+    lower_bound = expected / 2.0
+    upper_bound = expected * 2.0
+    if not lower_bound <= throughput_at_size <= upper_bound:
+        return False, (
+            f"Throughput@Size outside plausibility band: got {throughput_at_size:.2f}, "
+            f"expected {expected:.2f} ({lower_bound:.2f}..{upper_bound:.2f})"
+        )
     return True, "ok"
 
 
