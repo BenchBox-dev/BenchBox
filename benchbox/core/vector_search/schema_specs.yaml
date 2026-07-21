@@ -6,13 +6,17 @@ tables:
     columns:
     - name: id
       type: BIGINT
+      nullable: false
       primary_key: true
     - name: embedding
       type: FLOAT_ARRAY
+      nullable: false
     - name: category
       type: VARCHAR(50)
+      nullable: false
     - name: doc_id
       type: VARCHAR(100)
+      nullable: false
 - id: VECTOR_QUERIES
   key: vector_queries
   schema:
@@ -20,9 +24,11 @@ tables:
     columns:
     - name: query_id
       type: INTEGER
+      nullable: false
       primary_key: true
     - name: query_vector
       type: FLOAT_ARRAY
+      nullable: false
 table_order:
 - vectors
 - vector_queries
