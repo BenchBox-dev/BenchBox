@@ -178,12 +178,22 @@ def _handle_report(args: argparse.Namespace) -> int:
     accounting, sidecar_present = read_accounting_sidecar(Path(args.cells_jsonl))
     skipped_unreachable_count = coerce_accounting_count(accounting.get("skipped_unreachable_count", 0))
     startup_failed_count = coerce_accounting_count(accounting.get("startup_failed_count", 0))
+    # Prune counts are not cells.jsonl rows either; read them back from the
+    # sidecar so a regenerated report reconstructs the same total_defined the
+    # live report had, and registry drops stay in their own bucket instead of
+    # collapsing to compatibility_pruned=0 (uat-report-regen-prune-accounting w1/w2).
+    compatibility_pruned_count = coerce_accounting_count(accounting.get("compatibility_pruned_count", 0))
+    early_stop_pruned_count = coerce_accounting_count(accounting.get("early_stop_pruned_count", 0))
+    registry_pruned_count = coerce_accounting_count(accounting.get("registry_pruned_count", 0))
     rungs = _split_csv(args.rungs)
     summary = write_report(
         cells,
         output_path=Path(args.output_tsv),
         rungs=rungs,
         cross_scale_floor=args.cross_scale_floor,
+        compatibility_pruned_count=compatibility_pruned_count,
+        early_stop_pruned_count=early_stop_pruned_count,
+        registry_pruned_count=registry_pruned_count,
         skipped_unreachable_count=skipped_unreachable_count,
         startup_failed_count=startup_failed_count,
         unreachable_count_is_estimated=not sidecar_present,
