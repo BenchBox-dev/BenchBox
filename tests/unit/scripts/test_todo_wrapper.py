@@ -5,8 +5,8 @@ skill carried as prose must live in the CLI or the DB, so the skill shrinks to
 a command contract. These tests pin that contract:
 
 - the `todo` shim is the single entry point and works from any cwd;
-- the skill is genuinely thin (line budget) and mentions only real commands;
-- the skill covers the mandatory workflow verbs and carries no schema prose.
+- the root skill is genuinely thin (line budget) and carries no schema prose;
+- the skill package covers the mandatory workflow verbs and mentions only real commands.
 
 Marked medium (not fast) deliberately: subprocess-driven and the fast lane is
 budget-gated.
@@ -32,6 +32,12 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SHIM_PATH = REPO_ROOT / "_project" / "scripts" / "todo"
 SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "todo-db" / "SKILL.md"
+
+
+def _read_skill_package() -> str:
+    """Read the routed skill contract: the thin wrapper plus its references."""
+    reference_paths = sorted((SKILL_PATH.parent / "references").glob("*.md"))
+    return "\n".join(path.read_text(encoding="utf-8") for path in (SKILL_PATH, *reference_paths))
 
 
 def _load_script():
@@ -122,14 +128,14 @@ class TestSkillThinness:
         )
 
     def test_skill_references_only_real_commands(self):
-        text = SKILL_PATH.read_text(encoding="utf-8")
+        text = _read_skill_package()
         referenced = set(re.findall(r"`todo ([a-z][a-z-]*)", text))
-        assert referenced, "skill must reference `todo <command>` forms"
+        assert referenced, "skill package must reference `todo <command>` forms"
         unknown = referenced - set(todo_db._HANDLERS)
-        assert not unknown, f"skill references commands the CLI does not have: {sorted(unknown)}"
+        assert not unknown, f"skill package references commands the CLI does not have: {sorted(unknown)}"
 
     def test_skill_covers_required_workflow(self):
-        text = SKILL_PATH.read_text(encoding="utf-8")
+        text = _read_skill_package()
         for required in (
             "`todo ready`",
             "`todo claim",
@@ -142,7 +148,7 @@ class TestSkillThinness:
             "`todo verify",
             "`todo check-scope",
         ):
-            assert required in text, f"skill workflow is missing {required}"
+            assert required in text, f"skill package workflow is missing {required}"
 
     def test_skill_carries_no_schema_prose(self):
         body = SKILL_PATH.read_text(encoding="utf-8").split("---", 2)[2].lower()

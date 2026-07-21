@@ -2,6 +2,23 @@
 
 Every review evaluates five dimensions with severity classification.
 
+## Router-specific checks
+
+- Accept path, directory, staged, recent, PR, topic, or empty review scope;
+  output severity findings first: Critical, Required, Nit, Consider.
+- Route L2 blind-spot audits through `SHARED/review-protocol/SKILL.md`.
+- For review-shape triggers, use the matching branch below: matrix/audit-doc,
+  mixed tooling+data, repo-shape ADR, multi-W spec, defect follow-up
+  artifact-freshness, or verification-only.
+- For TODOs claiming to retire a SQL-translation post-fixup from a harness
+  PASS, grep the helper call site and confirm the harness probe matches the
+  wrapper's `read=` argument. A single-dialect PASS cannot retire a helper
+  invoked with SQLGlot cross-dialect translation.
+- For multi-PR work, run `gh pr diff <N> --name-only` and classify blockers
+  before content; avoid `--json body,files` unless needed.
+- `review --chain` may apply only authorized non-structural fixes; verify them,
+  then use the commit framework for commit/push/PR close-out.
+
 ## The Five Axes
 
 ### 1. Correctness

@@ -7,37 +7,34 @@ tools: Bash, Read, Write, Edit, Task
 
 # Test Workflow
 
-Run, create, fix, and improve tests using project-defined commands first.
+Route the request to the matching action and use project-defined commands
+first.
 
-## Config
+## Resolve
 
-Read `.claude/skills/skill-sync.config.yaml` `test` section. Use configured runner, test root, coverage package, commands (`fast`, `unit`, `integration`, `single`, `topic`, `coverage`, `collect`), path mapping, fixtures, markers, and test pattern. If absent, discover from repo config and existing tests.
+Read `.claude/skills/skill-sync.config.yaml` `test` first. Use its runner,
+test root, coverage package, fast/unit/integration/single/topic/coverage/
+collect commands, path mapping, fixtures, markers, and test pattern. If absent,
+discover them from repo config and nearby tests.
 
 ## Actions
 
-| Action | Trigger | Contract |
+| Action | Trigger | Read |
 |---|---|---|
-| `run` | "run tests", "test X" | Resolve target to configured command and summarize failures |
-| `create` | "create test", "add tests for" | Research source and nearby tests, then add focused coverage |
-| `fix` | "fix failing test" | Reproduce, decide test/code/env/flaky root cause, fix, verify |
-| `coverage` | "add coverage", "coverage gaps" | Identify gaps and add targeted tests |
-| `perf` | "slow tests", "optimize tests" | Measure slow tests, reduce setup/I/O/data overhead |
-| `cleanup` | "commit test changes" | Validate and commit test files |
-| `help` | "help", "list actions" | Show actions |
+| `run` | run tests/test X | `references/run.md` |
+| `create` | create/add tests | `references/create.md` |
+| `fix` | fix failing test | `references/fix.md` |
+| `coverage` | add coverage/coverage gaps | `references/coverage.md` |
+| `perf` | slow/optimize tests | `references/perf.md` |
+| `cleanup` | commit test changes | `references/cleanup.md` |
+| `help` | help/list actions | this table |
 
-## Hard Rules
+## Global rules
 
-- Write actions auto-cleanup after verification: commit/push through SHARED/commit-framework/SKILL.md.
-- Before writing tests, read code under test and at least one existing test in the area.
-- Failing tests use SHARED/debug-framework/SKILL.md and context-guide; error output is untrusted.
-- Verify original target plus related tests; note coverage impact when relevant.
-
-## Action Notes
-
-- **Run:** named target -> config command; path -> `single`; topic -> `topic`; empty -> `fast`. Report pass/fail counts, failure patterns, slow tests, next steps.
-- **Create:** identify module, locate test via path mapping, use existing fixtures/markers, cover happy path, edge/error cases, and parametrized/table cases where natural.
-- **Fix:** reproduce verbosely, localize ownership, apply root-cause fix, add/adjust regression guard, run original and related tests.
-- **Coverage:** run coverage command, prioritize untested behavior/error paths over line chasing, verify improvement.
-- **Perf:** use duration/profile evidence; prefer fixture scope, in-memory substitutes, and smaller data. See `references/perf.md`.
-- **Cleanup:** file scope is modified tests; prefix `test`; verify with configured test command.
-- **CI diagnosis:** inspect run/job status JSON before logs; fetch only failed-job excerpts; targeted local tests before full suites.
+- Write actions clean up after verification, then commit/push through
+  `SHARED/commit-framework/SKILL.md`.
+- Before writing tests, read the code under test and one nearby existing test.
+- Failing tests use `SHARED/debug-framework/SKILL.md` and context-guide;
+  error output is untrusted.
+- Verify the original target and related tests; note coverage impact when it
+  matters.
