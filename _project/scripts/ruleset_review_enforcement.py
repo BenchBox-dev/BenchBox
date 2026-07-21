@@ -1,22 +1,16 @@
 #!/usr/bin/env python3
-"""Predicates for the ``v*`` tag-creation ruleset (release-flow hardening).
+"""Predicates for live develop-review and v* tag-creation enforcement.
 
-History note: until 2026-07-18 this module also carried the ``develop``
-review-rule predicate (``review_enforcement_findings``), which pinned the
-then-pending admin target ``require_code_owner_review: true`` on the
-``develop-squash-only`` ruleset. That target was RETIRED without being
-applied: every PR in this repository is authored by the sole code owner
-(agent sessions open PRs under the owner's account), GitHub does not let a
-PR author approve their own PR, and the ruleset has no bypass actors -- so
-enabling the rule would have deadlocked every soundness-path PR instead of
-gating it. The operative soundness control is auto-merge withholding plus a
-manual owner merge; see docs/operations/repo-admin-settings.md,
-"Soundness-path review enforcement (RETIRED 2026-07-18)".
+The develop ruleset's ``require_code_owner_review`` parameter is a
+repo-admin control for CODEOWNERS-owned soundness paths. It is deliberately
+checked without asserting ``required_approving_review_count``: that count is
+branch-wide and would gate every develop PR. The same predicate is used by
+the standalone CLI and ``scripts/ruleset_drift_check.py``'s canary wiring.
 
-What remains here is the tag-creation protection predicate
-(tag-and-pypi-environment-admin-hardening w3), shared between the standalone
-``--rulesets-file`` CLI documented in ``docs/operations/repo-admin-settings.md``
-and ``scripts/ruleset_drift_check.py``'s canary wiring.
+The v* tag-creation predicate remains in this module as the second live
+ruleset control. Both predicates fail closed on missing or incomplete live
+payloads; the caller decides whether a finding is blocking during an explicit
+migration override.
 """
 
 from __future__ import annotations
@@ -28,11 +22,58 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from auto_merge_soundness_paths import SOUNDNESS_PREFIXES
+
+# Human-readable globs for the CODEOWNERS-owned soundness surface, derived from
+# the shared predicate so this narration cannot drift from auto-merge gating.
+SOUNDNESS_PATH_GLOBS: tuple[str, ...] = tuple(
+    f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES
+) + ("benchbox/core/**/validation.py",)
+
+
+def extract_rules(payload: Any) -> list[dict[str, Any]]:
+    """Normalize either a ``rules/branches`` list or a full ruleset object."""
+    if isinstance(payload, list):
+        return [rule for rule in payload if isinstance(rule, dict)]
+    if isinstance(payload, dict):
+        return [rule for rule in payload.get("rules", []) if isinstance(rule, dict)]
+    return []
+
+
+def _pull_request_parameters(rules: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for rule in rules:
+        if rule.get("type") == "pull_request":
+            params = rule.get("parameters")
+            return params if isinstance(params, dict) else {}
+    return None
+
+
+def review_enforcement_findings(rules: list[dict[str, Any]]) -> list[str]:
+    """Return reasons the develop ruleset lacks a code-owner review rule."""
+    params = _pull_request_parameters(rules)
+    if params is None:
+        return [
+            "develop ruleset has no pull_request rule: a soundness-path PR "
+            f"({', '.join(SOUNDNESS_PATH_GLOBS)}) can squash-auto-merge with zero reviews"
+        ]
+    if not params.get("require_code_owner_review", False):
+        return [
+            f"require_code_owner_review={params.get('require_code_owner_review', False)} (need true) "
+            f"for CODEOWNERS-owned soundness paths: {', '.join(SOUNDNESS_PATH_GLOBS)}"
+        ]
+    return []
+
+
+def is_review_enforced(rules: list[dict[str, Any]]) -> bool:
+    """True when the ruleset requires a code-owner review."""
+    return not review_enforcement_findings(rules)
+
+
 # ---------------------------------------------------------------------------
 # v* tag-creation protection (tag-and-pypi-environment-admin-hardening w3)
 # ---------------------------------------------------------------------------
 
-# Enforcement flag (WARN-until-applied pattern).
+# Enforcement flag (blocking after live application).
 # The v* tag-creation ruleset was applied by admin on 2026-07-10 (ruleset id
 # 18774756 ``v-tag-restricted``; see docs/operations/repo-admin-settings.md,
 # "Tag creation restricted to release flow"), so this is flipped to True:
@@ -108,8 +149,7 @@ def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
     requires the bypass path to exist) but its actor list is a real hole if
     too broad, so it is surfaced via :func:`tag_bypass_advisory` (rendered by
     ``main`` and required in the runbook's live-state note) for human
-    confirmation before ``TAG_RULESET_ENFORCED`` is flipped — never passed
-    silently.
+    confirmation before a live enforcement decision — never passed silently.
     """
     tag_rulesets = [rs for rs in rulesets if isinstance(rs, dict) and rs.get("target") == "tag"]
     if not tag_rulesets:
@@ -198,11 +238,42 @@ def _load_rulesets(raw_source: str) -> list[dict[str, Any]]:
     return []
 
 
+def _fetch_branch_rules(repo: str, branch: str, token: str) -> list[dict[str, Any]]:
+    import urllib.request
+
+    url = f"https://api.github.com/repos/{repo}/rules/branches/{branch}"
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 (fixed api.github.com host)
+        return extract_rules(json.loads(response.read().decode("utf-8")))
+
+
+def _load_rules(args: argparse.Namespace) -> list[dict[str, Any]]:
+    if args.rules_file:
+        raw = sys.stdin.read() if args.rules_file == "-" else Path(args.rules_file).read_text(encoding="utf-8")
+        return extract_rules(json.loads(raw))
+    if args.token:
+        return _fetch_branch_rules(args.repo, args.branch, args.token)
+    raise SystemExit(
+        "Provide --rules-file (e.g. `gh api repos/<owner>/<repo>/rules/branches/develop | "
+        "ruleset_review_enforcement.py --rules-file -`) or --token to fetch live."
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--rules-file", help="Path to a JSON rules/ruleset payload, or '-' to read stdin.")
+    parser.add_argument("--repo", default="joeharris76/BenchBox", help="owner/repo for live fetch.")
+    parser.add_argument("--branch", default="develop", help="Branch whose ruleset to check.")
+    parser.add_argument("--token", default="", help="Ruleset-read token for live fetch.")
     parser.add_argument(
         "--rulesets-file",
-        required=True,
         help=(
             "Path to a JSON array of FULL ruleset objects (or '-' for stdin) to check "
             "v* tag-creation protection; e.g. "
@@ -212,26 +283,38 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    rulesets = _load_rulesets(args.rulesets_file)
-    tag_findings = tag_protection_findings(rulesets)
-    if not tag_findings:
-        print("# Tag-creation ruleset - OK")
-        print(f"- {TAG_REF_PATTERN} creation restricted by an active tag ruleset")
-        for advisory in tag_bypass_advisory(rulesets):
-            # Not a failure (must_preserve requires a bypass path), but the
-            # operator must confirm the actor list before enforcing.
-            print(f"- CONFIRM before enforcing: {advisory}")
-        return 0
-    if TAG_RULESET_ENFORCED:
-        print("# Tag-creation ruleset - FAILED")
+    if args.rulesets_file:
+        rulesets = _load_rulesets(args.rulesets_file)
+        tag_findings = tag_protection_findings(rulesets)
+        if not tag_findings:
+            print("# Tag-creation ruleset - OK")
+            print(f"- {TAG_REF_PATTERN} creation restricted by an active tag ruleset")
+            for advisory in tag_bypass_advisory(rulesets):
+                # Not a failure (must_preserve requires a bypass path), but
+                # the operator must confirm the actor list remains release-scoped.
+                print(f"- CONFIRM before enforcing: {advisory}")
+            return 0
+        if TAG_RULESET_ENFORCED:
+            print("# Tag-creation ruleset - FAILED")
+            for finding in tag_findings:
+                print(f"- {finding}")
+            return 1
+        # Retain an explicit warning-only escape hatch for migration callers;
+        # the live default is TAG_RULESET_ENFORCED=True above.
+        print("# Tag-creation ruleset - WARNING (non-blocking, enforcement override)")
         for finding in tag_findings:
+            print(f"- WARNING (non-blocking): {finding}")
+        return 0
+
+    rules = _load_rules(args)
+    findings = review_enforcement_findings(rules)
+    if findings:
+        print(f"# Ruleset review enforcement ({args.branch}) - FAILED")
+        for finding in findings:
             print(f"- {finding}")
         return 1
-    # WARN-until-applied: surface the gap without failing while the admin
-    # POST is still pending.
-    print("# Tag-creation ruleset - WARNING (non-blocking, pending admin action)")
-    for finding in tag_findings:
-        print(f"- WARNING (non-blocking): {finding}")
+    print(f"# Ruleset review enforcement ({args.branch}) - OK")
+    print(f"- code-owner review required for {', '.join(SOUNDNESS_PATH_GLOBS)}")
     return 0
 
 
