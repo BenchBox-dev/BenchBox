@@ -41,6 +41,7 @@ from .base.config_utils import (
     POSTGRES_FAMILY_PLATFORM_FIELDS,
     make_platform_config_builder,
 )
+from .base.connection_wrappers import StreamConnectionCapability
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -262,6 +263,14 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     plan_capture_phase_eligible = True
+    # psycopg connections do not support true concurrent statement execution
+    # across cursors of one connection (server-side session state --
+    # transactions, SET, prepared statements -- lives on the connection, and
+    # concurrent cursor use serializes or raises). Each throughput/pool-test
+    # stream therefore gets its own independent connection/session; see
+    # new_stream_connection() below and
+    # benchbox/platforms/base/connection_wrappers.py:StreamConnectionCapability.
+    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
     def platform_name(self) -> str:
@@ -511,6 +520,63 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
         self.log_operation_complete("PostgreSQL connection", details=f"Applied: {', '.join(settings_applied)}")
         return conn
+
+    def new_stream_connection(self, connection: Any) -> Any:
+        """Open an independent PostgreSQL connection for one throughput stream.
+
+        Overrides the base ``SHARED_CURSOR`` implementation: psycopg
+        connections carry server-side session state (transactions, ``SET``
+        GUCs, prepared statements) and do not support true concurrent
+        statement execution across cursors of one connection, so sharing
+        ``connection`` across concurrent throughput streams would either
+        serialize on it or corrupt session-local state between streams. Each
+        stream instead gets a brand-new connection built from this adapter's
+        existing connection parameters, with the same session GUCs applied as
+        ``create_connection`` (schema/database creation is a one-time setup
+        step already done on the shared ``connection`` and is not repeated
+        here). The returned connection is closed by the caller (the
+        throughput/maintenance stream driver's ``finally`` block) -- see
+        ``PlatformAdapter.new_stream_connection()`` for the full contract.
+
+        Args:
+            connection: The adapter's shared platform connection. Not reused
+                here -- a fresh connection/session is always opened.
+
+        Returns:
+            A new, independent psycopg connection for this stream.
+        """
+        del connection  # not reused: INDEPENDENT_CONNECTION always opens a fresh session
+        params = self._get_connection_params()
+        conn = psycopg.connect(**params)
+
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            guc_statements = [
+                f"SET work_mem = '{self.work_mem}'",
+                f"SET maintenance_work_mem = '{self.maintenance_work_mem}'",
+                f"SET effective_cache_size = '{self.effective_cache_size}'",
+                f"SET max_parallel_workers_per_gather = {self.max_parallel_workers_per_gather}",
+            ]
+            for sql in guc_statements:
+                try:
+                    cursor.execute(sql)
+                except Exception as e:
+                    conn.rollback()
+                    self.logger.debug(f"Could not apply stream session setting ({sql}): {e}")
+
+            # Safety: self.schema validated by _validate_identifier() before use in f-string
+            if self.schema != "public" and self._validate_identifier(self.schema):
+                cursor.execute(f'SET search_path TO "{self.schema}", public')
+
+            conn.commit()
+            return conn
+        except Exception:
+            conn.close()
+            raise
+        finally:
+            if cursor is not None:
+                cursor.close()
 
     def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema using benchmark's SQL definitions."""

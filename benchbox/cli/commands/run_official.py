@@ -7,7 +7,7 @@ from collections.abc import Iterator
 
 import click
 
-from benchbox.cli.commands.run import run
+from benchbox.cli.commands.run import PlatformOptionParamType, run
 from benchbox.cli.composite_params import ValidationConfig
 from benchbox.cli.orchestrator import BenchmarkOrchestrator
 from benchbox.cli.shared import console
@@ -68,12 +68,31 @@ def _forward_requested_streams(streams: int | None) -> Iterator[None]:
 @click.option("--scale", type=float, required=True, help="TPC scale factor")
 @click.option("--phases", type=str, required=True, help="Test phases, comma-separated")
 @click.option("--streams", type=int, help="Concurrent streams for throughput")
+@click.option(
+    "--platform-option",
+    "platform_option_pairs",
+    type=PlatformOptionParamType(),
+    multiple=True,
+    help="Platform option in KEY=VALUE form (repeatable).",
+)
 @click.option("--seed", type=int, help="Random seed for reproducible official runs")
 @click.option("--output", "output_dir", type=click.Path(), help="Output directory")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
 @click.option("--validate-results", is_flag=True, help="Enable result validation")
 @click.pass_context
-def run_official(ctx, benchmark, platform, scale, phases, streams, seed, output_dir, verbose, validate_results):
+def run_official(
+    ctx,
+    benchmark,
+    platform,
+    scale,
+    phases,
+    streams,
+    platform_option_pairs,
+    seed,
+    output_dir,
+    verbose,
+    validate_results,
+):
     """Run TPC-compliant official benchmark tests. Deprecated; use `benchbox run --official`."""
     if scale not in TPC_ALLOWED_SCALE_FACTORS:
         console.print(f"[red]Error: Scale factor {scale} is not TPC-compliant[/red]")
@@ -137,6 +156,7 @@ def run_official(ctx, benchmark, platform, scale, phases, streams, seed, output_
                 output=output_dir,
                 verbose=verbose,
                 validation=ValidationConfig.parse("full") if validate_results else None,
+                platform_option_pairs=platform_option_pairs,
             )
     except Exception as e:
         console.print(f"[red]Benchmark execution failed: {e}[/red]")

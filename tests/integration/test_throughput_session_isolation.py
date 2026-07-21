@@ -43,16 +43,27 @@ engines (real DuckDB, real sqlite3) rather than mocks:
   Postgres-style ``SET`` session variable) made by one stream is invisible to
   another.
 
-SQLite is used instead of Postgres/docker per the TODO's own guidance
-(``throughput-independent-sessions-per-stream-per-stream.yaml`` work item
-w3): a stand-in server-style engine models the connection-is-a-session
-property just as faithfully, with no docker dependency and no network I/O -
-much faster and more reliable for CI.
+SQLite is used for the stand-in above per the original
+``throughput-independent-sessions-per-stream`` TODO's guidance (no docker
+dependency, faster/more reliable for CI). ``server-adapter-independent-
+connection-optin`` (the follow-up that makes a real server adapter opt into
+the capability) adds one more class below:
+
+- ``TestPostgreSQLIndependentConnectionIsolatesSessions``: proves the same
+  session-isolation property against the real ``PostgreSQLAdapter``
+  (``benchbox/platforms/postgresql.py``), which now declares
+  ``INDEPENDENT_CONNECTION`` and overrides ``new_stream_connection()`` to
+  open a fresh psycopg connection per stream. A session-local ``SET`` made on
+  one stream's connection must not leak into another stream's connection -
+  the real-engine analog of the SQLite ``TEMP TABLE`` check above. Requires a
+  local PostgreSQL Docker/mocker service (``make test-docker-up-postgresql``)
+  and is skipped cleanly (not failed) when one isn't reachable.
 """
 
 from __future__ import annotations
 
 import sqlite3
+import threading
 from typing import Any
 
 import pytest
@@ -63,6 +74,10 @@ from benchbox.platforms.base.connection_wrappers import (
     StreamConnectionCapability,
 )
 from benchbox.platforms.duckdb import DuckDBAdapter
+from benchbox.platforms.postgresql import PostgreSQLAdapter
+from benchbox.utils.clock import elapsed_seconds, mono_time
+
+from .platforms.conftest import skip_unless_docker_service
 
 pytestmark = [
     pytest.mark.integration,
@@ -248,5 +263,125 @@ class TestSharedCursorCapabilityIsDuckDBDefault:
             # finally block).
             stream_a.close()
             assert stream_b.execute("SELECT value FROM shared_state").fetchall() == [(7,)]
+        finally:
+            shared_connection.close()
+
+
+class TestPostgreSQLIndependentConnectionIsolatesSessions:
+    """Real PostgreSQL (``server-adapter-independent-connection-optin``): the
+    first production server adapter to opt into ``INDEPENDENT_CONNECTION``.
+
+    Proves the same session-isolation property as
+    ``TestIndependentConnectionCapabilityIsolatesSessions`` above, but
+    against the real ``PostgreSQLAdapter`` and a real psycopg connection
+    instead of the SQLite stand-in - closing the gap the TODO's
+    ``verification`` section calls for. Requires a local PostgreSQL
+    Docker/mocker service (``make test-docker-up-postgresql``); skipped
+    cleanly (not failed) when one isn't reachable, mirroring
+    ``tests/integration/platforms/test_postgresql_live.py``'s
+    ``skip_unless_docker_service`` gate.
+    """
+
+    pytestmark = [
+        pytest.mark.docker_integration,
+        pytest.mark.live_integration,
+        pytest.mark.live_postgresql,
+        pytest.mark.slow,
+    ]
+
+    @pytest.fixture
+    def postgresql_adapter(self):
+        skip_unless_docker_service("localhost", 5432, platform="PostgreSQL")
+        adapter = PostgreSQLAdapter(
+            host="localhost",
+            port=5432,
+            username="benchbox",
+            password="benchbox",
+            database="benchbox_test",
+        )
+        adapter.skip_database_management = True
+        return adapter
+
+    def test_declares_independent_connection(self, postgresql_adapter) -> None:
+        """PostgreSQLAdapter must declare INDEPENDENT_CONNECTION and provide
+        its own new_stream_connection() override (not the base hook, which
+        would raise NotImplementedError for this capability value)."""
+        assert postgresql_adapter.stream_connection_capability is StreamConnectionCapability.INDEPENDENT_CONNECTION
+        assert type(postgresql_adapter).new_stream_connection is not PlatformAdapter.new_stream_connection
+
+    def test_session_local_set_does_not_leak_across_streams(self, postgresql_adapter) -> None:
+        """A session-local SET (``application_name`` - connection-scoped in
+        PostgreSQL) made by one stream must be invisible to another stream -
+        proving each stream has its OWN connection/session, not a cursor of
+        one shared connection (the real-engine analog of the SQLite TEMP
+        TABLE check above)."""
+        shared_connection = postgresql_adapter.create_connection()
+        try:
+            stream_a = _stream_wrapper(postgresql_adapter, shared_connection)
+            stream_b = _stream_wrapper(postgresql_adapter, shared_connection)
+            try:
+                # Sanity: each stream really did get its own connection
+                # object, distinct from each other AND from the shared
+                # connection - zero cursor sharing.
+                assert stream_a.connection is not stream_b.connection
+                assert stream_a.connection is not shared_connection
+                assert stream_b.connection is not shared_connection
+
+                stream_a.connection.execute("SET application_name = 'stream_a_marker'")
+                own_name = stream_a.connection.execute("SHOW application_name").fetchone()[0]
+                assert own_name == "stream_a_marker"
+
+                other_name = stream_b.connection.execute("SHOW application_name").fetchone()[0]
+                assert other_name != "stream_a_marker"
+            finally:
+                stream_a.close()
+                stream_b.close()
+        finally:
+            shared_connection.close()
+
+    def test_concurrent_statements_do_not_serialize_on_one_connection(self, postgresql_adapter) -> None:
+        """Two streams issuing ``pg_sleep(1)`` concurrently on their
+        independent connections must overlap in wall-clock time. psycopg
+        connections do not support true concurrent statement execution
+        across cursors of ONE connection (the failure mode this capability
+        exists to avoid), so two 1-second sleeps sharing a connection would
+        run sequentially (~2s total); on independent connections they
+        overlap (~1s total)."""
+        shared_connection = postgresql_adapter.create_connection()
+        try:
+            stream_a = _stream_wrapper(postgresql_adapter, shared_connection)
+            stream_b = _stream_wrapper(postgresql_adapter, shared_connection)
+            try:
+                results: dict[str, float] = {}
+                errors: dict[str, BaseException] = {}
+
+                def run(name: str, wrapper: PlatformAdapterConnection) -> None:
+                    start = mono_time()
+                    try:
+                        wrapper.connection.execute("SELECT pg_sleep(1)")
+                        results[name] = elapsed_seconds(start)
+                    except BaseException as exc:  # noqa: BLE001 - surfaced via errors dict below
+                        errors[name] = exc
+
+                thread_a = threading.Thread(target=run, args=("a", stream_a))
+                thread_b = threading.Thread(target=run, args=("b", stream_b))
+                overall_start = mono_time()
+                thread_a.start()
+                thread_b.start()
+                thread_a.join(timeout=15)
+                thread_b.join(timeout=15)
+                overall_duration = elapsed_seconds(overall_start)
+
+                assert not errors, f"concurrent pg_sleep() on independent connections raised: {errors}"
+                assert "a" in results and "b" in results, "one or both streams did not complete in time"
+                # Sequential (shared-connection) execution of two 1s sleeps
+                # would take ~2s; independent connections overlap, so total
+                # wall time stays well under that.
+                assert overall_duration < 1.8, (
+                    f"streams appear serialized on one connection: {overall_duration:.2f}s for two 1s sleeps"
+                )
+            finally:
+                stream_a.close()
+                stream_b.close()
         finally:
             shared_connection.close()

@@ -601,4 +601,4 @@ def test_top_level_config_paths_exclude_generated_rerun_shards():
     this parametrized set."""
     shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
     assert all(shard_dir not in p.parents for p in _top_level_config_paths())
-    assert len(_top_level_config_paths()) == 15
+    assert len(_top_level_config_paths()) == 16
