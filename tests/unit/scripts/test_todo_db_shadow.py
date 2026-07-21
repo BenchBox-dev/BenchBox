@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
 
@@ -149,6 +150,94 @@ def test_comparison_includes_meta_and_normalizes_event_order() -> None:
     result = shadow.compare_snapshots(legacy, standalone)
     assert result["meta"]["equal"] is True
     assert result["events"]["equal_provenance"] is True
+
+
+def test_comparison_normalizes_generated_import_provenance() -> None:
+    legacy = _legacy_snapshot()
+    legacy["items"][0]["created_at"] = "2026-07-21T13:19:48Z"
+    legacy["items"][0]["deps"] = ["dependency"]
+    legacy["items"][0]["deferrals"][0].update({"created_at": "2026-07-21T13:19:48Z", "resolution": "open"})
+    legacy["events"] = [
+        {"action": "create", "item_id": "sample-item", "detail": {"title": "A sample tracked item"}},
+        {"action": "defer", "item_id": "sample-item", "detail": {"deferral_id": 4, "summary": "follow up"}},
+    ]
+    legacy["meta"] = [{"key": "schema_version", "value": "2"}]
+    standalone = _standalone_envelope()
+    standalone["tables"]["items"] = [
+        {
+            key: value
+            for key, value in legacy["items"][0].items()
+            if key
+            not in {"work", "deps", "scope", "verifications", "preserves", "anti_patterns", "prior_art", "deferrals"}
+        }
+    ]
+    standalone["tables"]["items"][0]["created_at"] = "2026-07-21T13:19:54Z"
+    standalone["tables"]["deferrals"] = [
+        {
+            **legacy["items"][0]["deferrals"][0],
+            "id": 9,
+            "created_at": "2026-07-21T13:19:54Z",
+        }
+    ]
+    standalone["tables"]["anti_patterns"] = [{"item_id": "sample-item", **legacy["items"][0]["anti_patterns"][0]}]
+    standalone["tables"]["prior_art"] = [{"item_id": "sample-item", **legacy["items"][0]["prior_art"][0]}]
+    standalone["tables"]["item_deps"] = [{"item_id": "sample-item", "needs_item": "dependency"}]
+    standalone["events"] = [
+        {
+            "action": "create",
+            "detail": {"item_id": "sample-item", "title": "A sample tracked item"},
+        },
+        {
+            "action": "defer",
+            "detail": {"item_id": "sample-item", "deferral_id": 9, "summary": "follow up"},
+        },
+        {"action": "dependency", "detail": {"item_id": "sample-item", "needs_item": "dependency"}},
+    ]
+    for table in shadow.TABLE_NAMES:
+        if table != "items":
+            legacy[table] = list(standalone["tables"][table])
+
+    result = shadow.compare_snapshots(
+        legacy,
+        standalone,
+        import_window=(
+            datetime(2026, 7, 21, 13, 19, 40, tzinfo=timezone.utc),
+            datetime(2026, 7, 21, 13, 20, 0, tzinfo=timezone.utc),
+        ),
+    )
+
+    assert result["items"]["field_diffs"] == {}
+    assert result["events"]["equal_provenance"] is True
+    assert result["events"]["standalone_supplemental_actions"] == {"dependency": 1}
+    assert result["events"]["supplemental_provenance_equal"] is True
+    assert result["meta"]["equal"] is True
+    assert result["passed"] is True
+
+
+def test_comparison_rejects_dependency_event_detail_drift() -> None:
+    legacy = {"items": [], "events": [], "meta": [], "item_deps": [{"item_id": "a", "needs_item": "b"}]}
+    standalone = _standalone_envelope()
+    standalone["tables"]["item_deps"] = [{"item_id": "a", "needs_item": "b"}]
+    standalone["events"] = [{"action": "dependency", "detail": {"item_id": "a", "needs_item": "wrong-target"}}]
+    result = shadow.compare_snapshots(legacy, standalone)
+    assert result["events"]["supplemental_provenance_equal"] is False
+    assert result["passed"] is False
+
+
+def test_comparison_does_not_hide_durable_timestamp_drift() -> None:
+    legacy = _legacy_snapshot()
+    standalone = _standalone_envelope()
+    standalone["tables"]["items"] = [
+        {
+            key: value
+            for key, value in legacy["items"][0].items()
+            if key
+            not in {"work", "deps", "scope", "verifications", "preserves", "anti_patterns", "prior_art", "deferrals"}
+        }
+    ]
+    standalone["tables"]["items"][0]["created_at"] = "2025-01-01T00:00:00Z"
+    result = shadow.compare_snapshots(legacy, standalone)
+    assert "sample-item" in result["items"]["field_diffs"]
 
 
 def test_malformed_envelope_has_actionable_error() -> None:

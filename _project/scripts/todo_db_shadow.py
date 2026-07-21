@@ -16,6 +16,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -204,10 +205,46 @@ def _event_signature(event: dict[str, Any], *, legacy: bool) -> tuple[Any, ...]:
     item_id = event.get("item_id")
     if not legacy:
         item_id = detail.pop("item_id", None)
+    if event.get("action") == "defer":
+        detail.pop("deferral_id", None)
     return (event.get("action"), item_id, detail)
 
 
-def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dict[str, Any]:
+def _timestamp_in_window(value: Any, import_window: tuple[datetime, datetime] | None) -> bool:
+    if not isinstance(value, str) or import_window is None:
+        return False
+    try:
+        timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    if timestamp.tzinfo is None:
+        return False
+    return import_window[0] <= timestamp <= import_window[1]
+
+
+def _semantic_item(
+    item: dict[str, Any], *, peer: dict[str, Any], import_window: tuple[datetime, datetime] | None
+) -> dict[str, Any]:
+    """Remove only database-generated identities while retaining durable source values."""
+
+    normalized = dict(item)
+    if _timestamp_in_window(normalized.get("created_at"), import_window) and _timestamp_in_window(
+        peer.get("created_at"), import_window
+    ):
+        normalized.pop("created_at", None)
+    normalized["deferrals"] = [
+        {key: value for key, value in deferral.items() if key not in {"id", "created_at"}}
+        for deferral in normalized.get("deferrals", [])
+    ]
+    return normalized
+
+
+def compare_snapshots(
+    legacy: dict[str, Any],
+    standalone: dict[str, Any],
+    *,
+    import_window: tuple[datetime, datetime] | None = None,
+) -> dict[str, Any]:
     legacy_items = {item["id"]: item for item in legacy.get("items", [])}
     standalone_items = {item["id"]: item for item in _standalone_items(standalone)}
     missing = sorted(set(legacy_items) - set(standalone_items))
@@ -215,17 +252,32 @@ def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dic
     item_diffs = {
         item_id: {"legacy": legacy_items[item_id], "standalone": standalone_items[item_id]}
         for item_id in sorted(set(legacy_items) & set(standalone_items))
-        if _json(legacy_items[item_id]) != _json(standalone_items[item_id])
+        if _json(_semantic_item(legacy_items[item_id], peer=standalone_items[item_id], import_window=import_window))
+        != _json(_semantic_item(standalone_items[item_id], peer=legacy_items[item_id], import_window=import_window))
     }
     legacy_events = sorted((_event_signature(event, legacy=True) for event in legacy.get("events", [])), key=_json)
-    standalone_events = sorted(
+    all_standalone_events = sorted(
         (_event_signature(event, legacy=False) for event in (standalone.get("events") or [])), key=_json
     )
+    standalone_events = [event for event in all_standalone_events if event[0] != "dependency"]
+    dependency_events = [event for event in all_standalone_events if event[0] == "dependency"]
+    expected_dependency_events = sorted(
+        [
+            ("dependency", row["item_id"], {"needs_item": row["needs_item"]})
+            for row in (standalone.get("tables") or {}).get("item_deps") or []
+        ],
+        key=_json,
+    )
+    supplemental_actions = {
+        "dependency": len(dependency_events),
+    }
     event_result = {
         "legacy_count": len(legacy_events),
-        "standalone_count": len(standalone_events),
+        "standalone_count": len(all_standalone_events),
         "legacy_actions": [list(event) for event in legacy_events],
-        "standalone_actions": [list(event) for event in standalone_events],
+        "standalone_actions": [list(event) for event in all_standalone_events],
+        "standalone_supplemental_actions": supplemental_actions,
+        "supplemental_provenance_equal": dependency_events == expected_dependency_events,
         "equal_provenance": legacy_events == standalone_events,
     }
     table_counts = {
@@ -235,7 +287,7 @@ def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dic
         }
         for table in TABLE_NAMES
     }
-    legacy_meta = {row["key"]: row["value"] for row in legacy.get("meta", [])}
+    legacy_meta = {row["key"]: row["value"] for row in legacy.get("meta", []) if row["key"] != "schema_version"}
     standalone_meta = standalone.get("metadata") or {}
     meta_result = {"legacy": legacy_meta, "standalone": standalone_meta, "equal": legacy_meta == standalone_meta}
     result = {
@@ -256,6 +308,7 @@ def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dic
         and not unexpected
         and not item_diffs
         and event_result["equal_provenance"]
+        and event_result["supplemental_provenance_equal"]
         and meta_result["equal"]
         and all(counts["legacy"] == counts["standalone"] for counts in table_counts.values())
     )
@@ -317,6 +370,7 @@ def run_shadow(
     export_path: Path | None = None
     legacy_temporary = tempfile.TemporaryDirectory(prefix="benchbox-legacy-shadow-")
     command_reports: list[dict[str, Any]] = []
+    import_started_at = datetime.now(timezone.utc)
     try:
         legacy_db = Path(legacy_temporary.name) / "legacy.sqlite"
         command_reports.append(
@@ -438,10 +492,15 @@ def run_shadow(
         )
         standalone = json.loads(export_path.read_text(encoding="utf-8"))
         _require_imported_items(standalone, source_count=len(sources), importer="standalone")
+        import_finished_at = datetime.now(timezone.utc)
         result = {
             "source": {"todo_dir": str(todo_dir), "done_dir": str(done_dir), "yaml_records": len(sources)},
             "commands": command_reports,
-            "comparison": compare_snapshots(legacy, standalone),
+            "comparison": compare_snapshots(
+                legacy,
+                standalone,
+                import_window=(import_started_at, import_finished_at),
+            ),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(_json(result) + "\n", encoding="utf-8")
