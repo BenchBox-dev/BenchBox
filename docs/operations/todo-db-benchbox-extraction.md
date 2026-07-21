@@ -1,27 +1,24 @@
 # BenchBox todo-db extraction: staged integration and acceptance handoff
 
-Status: staged BenchBox integration only. This is not a production cutover.
-The standalone repository is still unpublished and has no approved owner,
-release, hosted account, or production database target. The legacy BenchBox
-tracker remains the default and the existing `_project/scripts/todo` wrapper is
-unchanged.
+Status: migration and compatibility evidence complete; production cutover is
+still gated by package publication and the operational acceptance TODO. The
+legacy BenchBox tracker remains the default and `_project/scripts/todo` remains
+the stable entry point.
 
 ## Live evidence at this handoff
 
-- BenchBox pool branch: `feat/todo-db-benchbox-extraction`, based on
-  `origin/develop` `9f69c53c69009ff09874b64e011d876e10fa0960`.
-- The primary clone remains on `develop`, two commits behind `origin/develop`,
-  with one unrelated untracked blind-spot file. It was not edited.
-- BenchBox has no tracked YAML item records under `_project/TODO` or
-  `_project/DONE`; only ignored index snapshots and empty directory structure
-  are present. The current BenchBox database has one active item and 36 audit
-  events. An empty import would therefore be data loss, not a successful
-  migration.
-- `/Users/joe/Developer/todo-db` remains physically separate, uncommitted, and
-  unpublished. Its current validation is 28 tests passed, Ruff check passed,
-  format check passed, and wheel/sdist build passed.
-- No hosted credentials, dedicated hosted test database, package release, or
-  production infrastructure was used.
+- BenchBox compatibility hardening merged in PR #1239 (`8ad8e007d`).
+- The historical corpus at `6fde4cd36^` contains 1,364 YAML mappings plus seven
+  Markdown files. Dual import produced 1,364 items on both sides, zero skips,
+  zero semantic diffs, and equal counts for every tracker table.
+- A read-only live snapshot of the BenchBox Turso database contained 1,510
+  items and 2,862 events. It restored into standalone schema v3 with every
+  tracker/meta table equal, event provenance equal, a verified
+  `sha256-chain-v2` audit chain, and an exactly equal second clean export
+  including all three migration records.
+- `/Users/joe/Developer/todo-db` remains physically separate and unpublished.
+  Its local suite, Ruff checks, formatting check, and wheel/sdist builds pass.
+- No hosted write credential was used and the hosted primary was not modified.
 
 ## Compatibility boundary
 
@@ -55,11 +52,10 @@ schema migrations, and hash-chained events.
 | `check-scope`, `verify`, `lint` | policy gates | preserve the standalone compatibility exit contract |
 | `export` | lossless envelope | render legacy JSONL/Markdown compatibility views |
 
-The standalone YAML bridge currently omits BenchBox `anti_patterns`, `prior_art`,
-and terminal-item deferrals. This is a concrete cross-repository dependency:
-the standalone repository must either expose a lossless import API or the
-BenchBox adapter must explicitly stage those policy rows. This handoff does not
-silently patch the standalone repository.
+The standalone YAML and legacy-snapshot bridges preserve BenchBox policy rows,
+terminal deferrals, metadata, and ordered event provenance. Legacy events are
+re-hashed under the standalone audit contract during restore; the original
+timestamp, actor, action, item identity, and detail remain unchanged.
 
 ## Shadow migration and comparison
 
@@ -74,7 +70,7 @@ SHADOW_DB="${TMPDIR:-/tmp}/benchbox-todo-shadow.sqlite"
 REPORT="${TMPDIR:-/tmp}/benchbox-todo-shadow.json"
 rm -f "$SHADOW_DB" "$REPORT"  # only these explicitly named temp files
 
-uv run -- python _project/scripts/todo_db_shadow.py \
+uv run --project _project/scripts -- python _project/scripts/todo_db_shadow.py \
   --todo-dir _project/TODO \
   --done-dir _project/DONE \
   --db "$SHADOW_DB" \
@@ -88,9 +84,9 @@ scope rules, verification rows, preserves, anti-patterns, prior art, deferrals,
 metadata, and normalized audit event provenance. Ordering is canonical. On any
 failed import after the dedicated target is created, the tool removes only that
 new target and its adjacent export file; it never deletes a protected or
-pre-existing database. The current repository intentionally fails at the
-empty-source guard until the YAML source-of-truth is restored or a maintainer
-provides an approved source snapshot.
+pre-existing database. For historical parity, extract `_project/TODO` and
+`_project/DONE` from `6fde4cd36^` into scratch rather than checking out or
+modifying a live clone.
 
 Rollback is therefore: keep the existing BenchBox DB/YAML workflow active,
 discard the isolated target/report, and unset `BENCHBOX_TODO_DB_STANDALONE`.
@@ -118,19 +114,51 @@ metadata, and events before opening the snapshot PR. Missing database secrets,
 an unavailable configured package, an unreachable database, or a schema
 mismatch open/reuse the incident issue; they do not claim production readiness.
 
-Restore recipe for a maintainer-approved package release:
+The live BenchBox database uses the legacy schema; do not point standalone
+`export` directly at it. Capture the legacy tables in bulk with the BenchBox
+shadow tool, restore that snapshot locally, and only then produce the canonical
+standalone envelope. `TODO_DB_AUTH_TOKEN` below aliases the read-only token
+because the legacy adapter retains that historical variable name; it does not
+gain write authority.
+
+Runnable live read-only migration and restore drill:
 
 ```sh
-uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
-  todo-db --db ./restore.sqlite --project-id benchbox \
-  --repository https://github.com/joeharris76/BenchBox init
-uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
-  todo-db --db ./restore.sqlite --project-id benchbox \
-  --repository https://github.com/joeharris76/BenchBox \
-  restore --input _project/todo-db-export/todo-db.json --replace
-uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
-  todo-db --db ./restore.sqlite --project-id benchbox \
-  --repository https://github.com/joeharris76/BenchBox audit verify
+set -eu
+test -n "$TODO_DB_URL"
+test -n "$TODO_DB_RO_AUTH_TOKEN"
+export TODO_DB_AUTH_TOKEN="$TODO_DB_RO_AUTH_TOKEN"
+
+SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/todo-db-live-restore.XXXXXX")"
+IDENTITY="--project-id benchbox --repository https://github.com/joeharris76/BenchBox"
+
+uv run --project _project/scripts -- python _project/scripts/todo_db_shadow.py \
+  --hosted-url "$TODO_DB_URL" \
+  --hosted-snapshot-output "$SCRATCH/legacy.json"
+
+uv run --project /Users/joe/Developer/todo-db todo-db \
+  --db "$SCRATCH/restore.sqlite" $IDENTITY init
+uv run --project /Users/joe/Developer/todo-db todo-db \
+  --db "$SCRATCH/restore.sqlite" $IDENTITY \
+  restore-legacy --input "$SCRATCH/legacy.json" --replace
+uv run --project /Users/joe/Developer/todo-db todo-db \
+  --db "$SCRATCH/restore.sqlite" $IDENTITY audit verify
+uv run --project /Users/joe/Developer/todo-db todo-db \
+  --db "$SCRATCH/restore.sqlite" $IDENTITY \
+  export --output "$SCRATCH/todo-db.json"
+
+uv run --project /Users/joe/Developer/todo-db todo-db \
+  --db "$SCRATCH/roundtrip.sqlite" $IDENTITY init
+uv run --project /Users/joe/Developer/todo-db todo-db \
+  --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
+  restore --input "$SCRATCH/todo-db.json" --replace
+uv run --project /Users/joe/Developer/todo-db todo-db \
+  --db "$SCRATCH/roundtrip.sqlite" $IDENTITY audit verify
+uv run --project /Users/joe/Developer/todo-db todo-db \
+  --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
+  export --output "$SCRATCH/roundtrip.json"
+
+cmp "$SCRATCH/todo-db.json" "$SCRATCH/roundtrip.json"
 ```
 
 ## Testing, CI, release, and operations gate
@@ -191,24 +219,21 @@ databases, credentials, migrations, or project identity.
 
 ## Human acceptance decisions
 
-The following decisions remain explicitly unresolved and block production
-cutover or parent TODO completion:
+The maintainer approved the recommended decisions on 2026-07-21:
 
-1. Repository/PyPI ownership and release authority.
-2. Final repository, distribution, import, and CLI names (`todo-db`/`todo_db`,
-   canonical `todo-db`, alias `todo` are only recommended defaults).
-3. Turso/libSQL provider account, region, database target, and provisioning
-   owner for BenchBox.
-4. Backup location, retention, frequency, rotation owner, and compatibility
-   window.
-5. Whether lint findings are warnings or a required gate in each consumer.
-6. Audit integrity mechanism: chained SHA-256 only or signed export manifests,
-   including key custody and verification owner.
-7. Canonical ownership and versioning of the `todo-db` skill text; skill-sync
-   should remain text-only.
+1. Public package/repository name `todo-db`, import package `todo_db`, canonical
+   command `todo-db`, and compatibility alias `todo`.
+2. Reserve the PyPI name before setting the first release version.
+3. One physical Turso/libSQL database per project with separate read-write and
+   read-only credentials.
+4. Versioned backups and a tested compatibility/rollback window.
+5. Preserve the documented lint exit semantics at each consumer boundary.
+6. SHA-256 chained audit events, with signed export manifests where key custody
+   and verification ownership are configured.
+7. Version the `todo-db` skill text with the package; `skill-sync` remains a
+   text distributor rather than a database provisioner.
+8. Retain the legacy fallback through the compatibility and warning window.
 
-Acceptance cannot be recorded as complete until the missing YAML/source
-question and standalone importer dependency above are resolved, a real
-shadow comparison passes, the package/release and hosted gates are approved,
-and maintainers approve the consumer cutovers. No commit, push, PR, package
-publication, credential rotation, or hosted provisioning was performed here.
+These decisions authorize the operational work but do not themselves publish
+the package, reserve PyPI, provision or rotate credentials, or cut over a
+consumer. Those actions remain gated by the operational and adoption TODOs.

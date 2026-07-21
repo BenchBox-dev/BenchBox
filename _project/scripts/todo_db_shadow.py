@@ -10,6 +10,7 @@ be reported as a successful zero-item migration.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import sqlite3
@@ -78,6 +79,51 @@ def _rows(connection: sqlite3.Connection, table: str) -> list[dict[str, Any]]:
         "deferrals": "from_item, id",
     }.get(table, "rowid")
     return [dict(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY {order_by}")]
+
+
+def write_hosted_legacy_snapshot(connection: Any, output: Path) -> dict[str, int]:
+    """Write one bulk-query-per-table legacy snapshot without exposing credentials."""
+
+    if output.exists() or output.is_symlink():
+        raise ShadowMigrationError(f"hosted snapshot target must not already exist: {output}")
+    table_names = ("items", *(name for name in TABLE_NAMES if name != "items"), "events", "meta")
+    snapshot = {table: _rows(connection, table) for table in table_names}
+    output.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(output, os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(_json(snapshot) + "\n")
+    return {table: len(rows) for table, rows in snapshot.items()}
+
+
+def capture_hosted_legacy_snapshot(*, repo_root: Path, url: str, output: Path) -> dict[str, int]:
+    """Connect to the legacy hosted primary in read-only mode and capture it."""
+
+    if not os.environ.get("TODO_DB_AUTH_TOKEN"):
+        raise ShadowMigrationError("hosted snapshot requires TODO_DB_AUTH_TOKEN carrying read-only authority")
+    module_path = repo_root / "_project" / "scripts" / "todo_db.py"
+    spec = importlib.util.spec_from_file_location("benchbox_legacy_todo_db_for_snapshot", module_path)
+    if spec is None or spec.loader is None:
+        raise ShadowMigrationError(f"cannot load legacy tracker module: {module_path}")
+    legacy = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(legacy)
+    token = os.environ.get("TODO_DB_AUTH_TOKEN", "")
+    try:
+        connection = legacy.connect_backend(url, read_only=True)
+    except Exception as exc:
+        message = str(exc).replace(url, "[REDACTED]")
+        if token:
+            message = message.replace(token, "[REDACTED]")
+        raise ShadowMigrationError(f"hosted snapshot connection failed: {message}") from exc
+    try:
+        with legacy._read_txn(connection):
+            return write_hosted_legacy_snapshot(connection, output)
+    except Exception as exc:
+        message = str(exc).replace(url, "[REDACTED]")
+        if token:
+            message = message.replace(token, "[REDACTED]")
+        raise ShadowMigrationError(f"hosted snapshot failed: {message}") from exc
+    finally:
+        connection.close()
 
 
 def legacy_snapshot(connection: sqlite3.Connection) -> dict[str, Any]:
@@ -517,14 +563,28 @@ def run_shadow(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--todo-dir", type=Path, required=True)
-    parser.add_argument("--done-dir", type=Path, required=True)
-    parser.add_argument("--db", type=Path, required=True, help="new dedicated shadow target; must not exist")
-    parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--todo-dir", type=Path)
+    parser.add_argument("--done-dir", type=Path)
+    parser.add_argument("--db", type=Path, help="new dedicated shadow target; must not exist")
+    parser.add_argument("--report", type=Path)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--standalone-project", type=Path, default=Path("/Users/joe/Developer/todo-db"))
+    parser.add_argument("--hosted-url", help="legacy hosted source URL; never written to output")
+    parser.add_argument("--hosted-snapshot-output", type=Path)
     args = parser.parse_args(argv)
     try:
+        if args.hosted_snapshot_output:
+            if not args.hosted_url:
+                raise ShadowMigrationError("--hosted-snapshot-output requires --hosted-url")
+            counts = capture_hosted_legacy_snapshot(
+                repo_root=args.repo_root.resolve(),
+                url=args.hosted_url,
+                output=args.hosted_snapshot_output,
+            )
+            print(_json({"snapshot": str(args.hosted_snapshot_output), "counts": counts}))
+            return 0
+        if not all((args.todo_dir, args.done_dir, args.db, args.report)):
+            raise ShadowMigrationError("shadow mode requires --todo-dir, --done-dir, --db, and --report")
         result = run_shadow(
             repo_root=args.repo_root.resolve(),
             todo_dir=args.todo_dir.resolve(),

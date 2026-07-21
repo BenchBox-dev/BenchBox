@@ -252,6 +252,17 @@ def test_validate_target_rejects_export_sidecar(tmp_path: Path) -> None:
         shadow.validate_target(target, benchbox_db=tmp_path / "benchbox.sqlite", standalone_db=tmp_path / "plan.sqlite")
 
 
+@pytest.mark.parametrize("protected_name", ["benchbox.sqlite", "plan.sqlite"])
+def test_validate_target_rejects_protected_databases(tmp_path: Path, protected_name: str) -> None:
+    protected = tmp_path / protected_name
+    with pytest.raises(shadow.ShadowMigrationError, match="protected tracker database"):
+        shadow.validate_target(
+            protected,
+            benchbox_db=tmp_path / "benchbox.sqlite",
+            standalone_db=tmp_path / "plan.sqlite",
+        )
+
+
 def test_run_captures_success_output() -> None:
     result = shadow._run(["sh", "-c", "printf imported; printf warning >&2"], cwd=Path.cwd(), env={})
     assert result == {"stdout": "imported", "stderr": "warning", "returncode": 0}
@@ -264,6 +275,27 @@ def test_run_redacts_success_output() -> None:
         env={"TODO_DB_RO_AUTH_TOKEN": "secret"},
     )
     assert result == {"stdout": "[REDACTED]", "stderr": "[REDACTED]", "returncode": 0}
+
+
+def test_hosted_snapshot_is_bulk_complete_private_and_no_clobber(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    queried: list[str] = []
+
+    def fake_rows(connection: object, table: str) -> list[dict]:
+        queried.append(table)
+        return [{"table": table}]
+
+    monkeypatch.setattr(shadow, "_rows", fake_rows)
+    output = tmp_path / "snapshot.json"
+    counts = shadow.write_hosted_legacy_snapshot(object(), output)
+    expected_tables = ["items", *[name for name in shadow.TABLE_NAMES if name != "items"], "events", "meta"]
+    assert queried == expected_tables
+    assert counts == dict.fromkeys(expected_tables, 1)
+    assert output.stat().st_mode & 0o777 == 0o600
+    assert set(json.loads(output.read_text())) == set(expected_tables)
+    with pytest.raises(shadow.ShadowMigrationError, match="must not already exist"):
+        shadow.write_hosted_legacy_snapshot(object(), output)
 
 
 def test_empty_source_is_rejected_before_any_target_creation(tmp_path: Path) -> None:
