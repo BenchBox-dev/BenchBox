@@ -124,12 +124,12 @@ tests/uat/
 
 **Responsibility split.**
 
-| Module | Responsibility | Lines (est.) | Actual (2026-07-19) |
+| Module | Responsibility | Lines (est.) | Actual (2026-07-21) |
 |---|---|---|---|
 | `__init__.py` | UAT package marker and documentation string | — | 6 |
-| `matrix.py` | Registry-driven benchmark enumeration, platform grouping, compose-derived TCP reachability probe (connection facts now owned by `docker_assets`) | 250 | 511 |
+| `matrix.py` | Registry-driven benchmark enumeration, platform grouping, compose-derived TCP reachability probe (connection facts now owned by `docker_assets`) | 250 | 515 |
 | `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path; submit classification via shared `benchbox.core.results.submit_classification` | 120 | 353 |
-| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 741 |
+| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 751 |
 | `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 756 |
 | `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 | 123 |
 | `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 | 121 |
@@ -140,18 +140,18 @@ tests/uat/
 | `artifact_hygiene.py` | Local-artifact hygiene guard: flags worktree-local `benchmark_runs/` growth when an external output root is configured; report-only (`make uat-artifact-hygiene`) | — | 282 |
 | `cells_io.py` | `cells.jsonl` + accounting-sidecar read/write codec; single schema shared by `orchestrator.py` and `_cli.py` | — | 279 |
 | `gate_summary.py` | Writes/reads the versioned `uat_gate_summary.json` per-sweep evidence artifact; powers `make uat-gate-check` cross-stage aggregation | — | 274 |
-| `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — | 293 |
+| `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — | 318 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 | 83 |
 | `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 236 |
 | `phases/__init__.py` | UAT phase package marker and phase contract documentation string | — | 17 |
 | `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 451 |
-| `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 | 269 |
-| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 | 985 |
+| `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 | 275 |
+| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 | 997 |
 | `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 | 304 |
 | `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; `draft-pr`/`merged-to-published-results` are **stubs** (dispatcher only, per `PR_STUB_TERMINAL_STATES`) that emit the same argv as `local-stage` plus an operator warning -- PR-opening to `published-results` is not implemented | 130 | 170 |
 | `phases/explorer_smoke.py` | Branch-presence-guarded explorer smoke: always-on corpus contract, delegates build+Playwright to the Results Explorer | 60 | 387 |
 | `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 | 450 |
-| `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 | 751 |
+| `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 | 747 |
 
 **Budget reconciliation (revised 2026-06-01, `uat-loc-budget-reconciliation`; re-measured
 2026-07-19, `uat-config-schema-spec-realignment`).**
@@ -161,16 +161,19 @@ reconciliation's own causes (four unlisted modules, under-estimated phases/plumb
 
 **2026-07-19 re-measurement.** Five modules landed since 2026-06-01 —
 `artifact_hygiene.py` (282), `cells_io.py` (279), `container_cleanup.py` (557),
-`gate_summary.py` (274), `throughput.py` (293), all in-charter (artifact
+`gate_summary.py` (274), `throughput.py` (318), all in-charter (artifact
 hygiene, gate evidence, and throughput are release-gate-orchestration
 deliverables; `cells_io.py`/`container_cleanup.py` are refactors that gave
-existing inline logic its own module). Measured actual: **~9,774 production
+existing inline logic its own module). Measured actual (per-module column
+refreshed 2026-07-21, `uat-charter-spec-drift-post-t11`, correcting residual
+drift in `matrix.py`, `phases/execute.py`, `phases/enumerate.py`, `config.py`,
+`orchestrator.py`, and `throughput.py`): **~9,827 production
 LOC across 26 modules** (+ ~10,806 test LOC, ~1,880 YAML). Per-bucket actuals:
-plumbing (orchestrator/config/`_cli`) 2,248; core exercise
-(execute/matrix/runner/enumerate/cleanup/ladder) 2,322; preflight/compat/timeouts
+plumbing (orchestrator/config/`_cli`) 2,254; core exercise
+(execute/matrix/runner/enumerate/cleanup/ladder) 2,344; preflight/compat/timeouts
 1,008; Docker lifecycle (default-OFF, incl. `container_cleanup.py`) 1,734;
 chartered evidence artifacts (validate/report/package/cells_io/gate_summary)
-1,477; explorer-prep 387; throughput 293; artifact hygiene 282; package init
+1,477; explorer-prep 387; throughput 318; artifact hygiene 282; package init
 markers 23. The chartered scope is "release-gate orchestration" (§10) —
 evidence artifacts, the six phases, Docker lifecycle, and throughput are all
 in-charter, so the load-bearing buckets remain non-discretionary.
@@ -459,7 +462,8 @@ output:
 | `execute.phases_arg` not a string (e.g. a list) | Validation error (would otherwise `str()`-coerce to a nonsense value) |
 | `output.*_template` not a string (e.g. a mapping) | Validation error (same str()-coercion hazard) |
 | `validator_clean_rate_floor` outside `[0.0, 1.0]` | Validation error |
-| `preflight.free_space_min_gib` <= 0 | Validation error |
+| `preflight.free_space_min_gib` < 0 | Validation error (must be non-negative — `_require_nonnegative_float`) |
+| `preflight.free_space_min_gib` == 0 | **Not** an error — an explicit disk-gate opt-out that turns the free-space floor OFF, emitted as a loud `[disk-gate] DISABLED` warning (`disk_gate_disabled_warning`), not a validation failure |
 | `preflight` not in `phases:` but `preflight.free_space_min_gib` set | Validation warning (telemetry-only run) |
 | `platforms.include` / `benchmarks.include` entry absent from the registry | **Not** a `ConfigError` — `resolve_platforms`/`resolve_benchmarks` silently drop the id, and `enumerate_cells_with_pruning` records a visible `pruned-registry` accounting row per dropped platform/benchmark (see Section 10's compatibility-pruning note and `tests.uat.matrix.missing_platforms_from_include`/`missing_benchmarks_from_include`) |
 
@@ -942,7 +946,7 @@ One PR per work unit, vertical slices. No monolithic delivery.
 | W7 | `tests/uat/phases/explorer_smoke.py`, fast test | Fast | `make uat-explorer-smoke` |
 | W8 | `tests/uat/phases/report.py`, fast test | Fast | `make uat-report` |
 | W9 | `tests/uat/orchestrator.py`, `tests/uat/configs/stress-default.yaml`, fast test for orchestrator | Fast | `make uat-sweep`, `make uat-stress` |
-| W10 | `tests/uat/configs/uat-2026-05-02.yaml`, `tests/uat/fixtures/uat-2026-05-02-matrix-summary.tsv`, `tests/uat/test_replay_2026_05_02.py` | Slow + fast | (none) |
+| W10 | `tests/uat/configs/uat-2026-05-02.yaml`, `tests/uat/fixtures/uat-2026-05-02-matrix-summary.tsv`, `tests/uat/test_replay_2026_05_02.py` | Slow | (none) |
 | W11 | `docs/operations/uat-framework.md`, `tests/uat/README.md`, `CLAUDE.md` updates, optional bash-script delegation | (no new tests) | (none) |
 
 **Verification at each W.** Per the parent TODO's `verification:` block,
