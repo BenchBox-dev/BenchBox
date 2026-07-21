@@ -583,6 +583,22 @@ class TestClickHouseAdapter:
             duckdb_double_array = "CREATE TABLE vectors (id BIGINT, embedding DOUBLE[256])"
             assert "Array(Float64)" in adapter._optimize_table_definition(duckdb_double_array)
 
+            # Vector-search generation never emits NULL fields. Its schema
+            # must say so explicitly; ClickHouse rejects Nullable(Array(...)).
+            from benchbox.core.vector_search.benchmark import VectorSearchBenchmark
+
+            vector_benchmark = VectorSearchBenchmark(scale_factor=0.01)
+            assert adapter._get_nullable_columns_by_table(vector_benchmark) == {}
+            vector_ddl = vector_benchmark.get_create_tables_sql(dialect="duckdb")
+            rendered = [
+                adapter._optimize_table_definition(statement.strip())
+                for statement in vector_ddl.split(";")
+                if statement.strip()
+            ]
+            assert all("Nullable(Array(" not in statement for statement in rendered)
+            assert any("embedding Array(Float32)" in statement for statement in rendered)
+            assert any("query_vector Array(Float32)" in statement for statement in rendered)
+
             # \b word boundary must protect identifiers that merely contain the
             # FLOAT/DOUBLE substring; the rewrite is for type tokens only. The
             # mixed case asserts both: the real FLOAT[N] type token IS rewritten
