@@ -47,18 +47,9 @@ class TPCHThroughputTestConfig:
     # never hard-kills anything -- see benchbox/core/throughput/runner.py's
     # module docstring ("Timed-out streams") for the full design.
     cancel_on_timeout: bool = False
-    # Minimum success rate for streams (0.0-1.0). Default 0.99 = 99% must succeed.
-    #
-    # Spec citation: NOT derived from a TPC-H "acceptable failure rate" clause
-    # -- no such partial-success allowance exists. TPC-H specification 5.1.1.6
-    # defines: "A failed run is defined as a run that did not complete
-    # successfully due to unforeseen system failures," i.e. an
-    # audited/compliant run requires every stream to complete successfully.
-    # 0.99 is a BenchBox-internal tolerance for treating a run as "usable" for
-    # iterative development/CI despite an occasional stream failure; it is NOT
-    # an official TPC-H compliance gate, and results with
-    # streams_successful < num_streams are not eligible for TPC-H-compliant/
-    # audited reporting regardless of this setting.
+    # Legacy reporting threshold retained for configuration compatibility.
+    # Product scoring is stricter: StreamRunner emits Throughput@Size only
+    # when every requested stream completes successfully.
     min_success_rate: float = 0.99
 
 
@@ -205,17 +196,10 @@ class TPCHThroughputTest:
             # Execute concurrent streams
             StreamRunner.execute(self._execute_stream, config, result, self.logger)
 
-            # Calculate metrics
-            StreamRunner.compute_metrics(result, config, start_time)
-
-            # TPC-H success criteria: configurable stream success rate (see
-            # TPCHThroughputTestConfig.min_success_rate for the spec citation
-            # -- this default is a BenchBox tolerance, not an official gate).
-            if config.num_streams > 0:
-                success_rate = result.streams_successful / config.num_streams
-                result.success = success_rate >= config.min_success_rate
-            else:
-                result.success = False
+            # A throughput metric is valid only when every requested stream
+            # completed successfully. Partial success remains visible in the
+            # result details but is never published as a scored measurement.
+            result.success = StreamRunner.compute_metrics(result, config, start_time)
 
             if config.verbose:
                 self.logger.info(f"Throughput Test completed in {result.total_time:.3f}s")
@@ -503,6 +487,10 @@ class TPCHThroughputTest:
                     try:
                         # Set query context for validation
                         if hasattr(connection, "set_query_context"):
+                            # Expected-result registries currently hold one
+                            # canonical answer set. Keep every throughput query
+                            # on the stream-0 validation context until per-stream
+                            # expected results are designed and registered.
                             connection.set_query_context(query_id)
 
                         # Tell QueryValidator whether THIS query's derived seed
@@ -625,10 +613,13 @@ class TPCHThroughputTest:
         if not result.success:
             return False
 
+        if result.streams_executed != result.config.num_streams:
+            return False
+
         if result.streams_successful != result.config.num_streams:
             return False
 
-        if result.throughput_at_size <= 0:
+        if result.errors or result.throughput_at_size is None or result.throughput_at_size <= 0:
             return False
 
         # Ensure all streams executed all 22 queries

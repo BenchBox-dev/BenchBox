@@ -49,6 +49,7 @@ from benchbox.core.power_harnesses import (
 )
 from benchbox.core.results.builder import benchmark_family, normalize_benchmark_id
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
+from benchbox.core.throughput.result import throughput_result_succeeded
 from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
 from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
@@ -335,6 +336,11 @@ class TestDriversMixin:
             else:
                 throughput_test_result = throughput_test.run()
 
+            throughput_test_result.success = throughput_result_succeeded(throughput_test_result, num_streams)
+            if not throughput_test_result.success:
+                throughput_test_result.throughput_at_size = None
+                throughput_test_result.query_throughput = 0.0
+
             # Display results
             if self.very_verbose:
                 with contextlib.suppress(Exception):
@@ -459,6 +465,10 @@ class TestDriversMixin:
             else:
                 throughput_test_result = throughput_test.run()
 
+            throughput_test_result.success = throughput_result_succeeded(throughput_test_result, num_streams)
+            if not throughput_test_result.success:
+                throughput_test_result.throughput_at_size = None
+                throughput_test_result.query_throughput = 0.0
             self._last_throughput_test_result = throughput_test_result
 
             if throughput_test_result.success:

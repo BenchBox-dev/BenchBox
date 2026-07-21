@@ -209,10 +209,8 @@ class TestThroughputExecution:
         assert any("failed" in error.lower() for error in result.errors)
         assert len(result.stream_results) == 2
 
-    def test_run_success_gate_is_configurable(self) -> None:
-        """Same 1/2 streams-successful pattern as test_run_records_failing_streams,
-        but with a lowered min_success_rate: proves the gate is read from
-        config rather than a hardcoded threshold."""
+    def test_run_partial_stream_is_fatal_despite_legacy_success_threshold(self) -> None:
+        """A lowered reporting threshold cannot make a partial run scoreable."""
         benchmark = _make_benchmark_mock()
         connections: list[Mock] = []
         factory = _make_connection_factory(connections)
@@ -244,9 +242,9 @@ class TestThroughputExecution:
         with patch.object(test, "_execute_stream", side_effect=[successful_stream, failing_stream]):
             result = test.run(config)
 
-        # 1/2 = 50% successful streams >= min_success_rate=0.5 -> overall success
-        assert result.success is True
+        assert result.success is False
         assert result.streams_successful == 1
+        assert result.throughput_at_size == 0.0
 
 
 class TestThroughputReferenceSeedContext:
