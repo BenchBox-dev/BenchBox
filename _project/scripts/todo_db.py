@@ -1675,9 +1675,10 @@ def check_paths(files: list[str], rules: list[dict[str, str]]) -> list[str]:
         # (eval finding: it false-positived on worktrees with stale gitignores).
         if path == ".todo-db" or path.startswith(".todo-db/"):
             continue
-        if any(_scope_glob_matches(path, glob) for glob in deny):
+        candidates = (path, str((Path.cwd() / path).resolve())) if not Path(path).is_absolute() else (path,)
+        if any(_scope_glob_matches(candidate, glob) for candidate in candidates for glob in deny):
             violations.append(f"{path}: matches do_not_modify")
-        elif only and not any(_scope_glob_matches(path, glob) for glob in only):
+        elif only and not any(_scope_glob_matches(candidate, glob) for candidate in candidates for glob in only):
             violations.append(f"{path}: outside only_modify allowlist")
     return violations
 
@@ -2202,6 +2203,14 @@ def _print_work_order(order: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Keep the historical shell wrapper and legacy implementation available
+    # until a released standalone package has passed shadow-migration and human
+    # cutover gates.  The opt-in route is intentionally environment-gated so a
+    # normal BenchBox checkout cannot silently switch databases.
+    if os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1":
+        from todo_db_standalone_compat import main as standalone_main
+
+        return standalone_main(argv)
     parser = argparse.ArgumentParser(description="Database-backed TODO tracker")
     parser.add_argument(
         "--db",
