@@ -53,6 +53,9 @@ def validate_target(target: Path, *, benchbox_db: Path, standalone_db: Path) -> 
         raise ShadowMigrationError(f"refusing protected tracker database: {resolved}")
     if target.exists() or target.is_symlink():
         raise ShadowMigrationError(f"shadow target must not already exist: {target}")
+    export_path = target.with_suffix(".export.json")
+    if export_path.exists() or export_path.is_symlink():
+        raise ShadowMigrationError(f"shadow export path must not already exist: {export_path}")
 
 
 def _json(value: Any) -> str:
@@ -133,7 +136,11 @@ def legacy_snapshot(connection: sqlite3.Connection) -> dict[str, Any]:
 
 
 def _standalone_items(envelope: dict[str, Any]) -> list[dict[str, Any]]:
-    tables = envelope.get("tables") or {}
+    if not isinstance(envelope, dict) or not isinstance(envelope.get("tables"), dict):
+        raise ShadowMigrationError("standalone export envelope must contain an object-valued items table collection")
+    tables = envelope["tables"]
+    if not isinstance(tables.get("items"), list):
+        raise ShadowMigrationError("standalone export envelope must contain an items table")
     items = [dict(row) for row in tables.get("items") or []]
     for item in items:
         item_id = item["id"]
@@ -210,8 +217,10 @@ def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dic
         for item_id in sorted(set(legacy_items) & set(standalone_items))
         if _json(legacy_items[item_id]) != _json(standalone_items[item_id])
     }
-    legacy_events = [_event_signature(event, legacy=True) for event in legacy.get("events", [])]
-    standalone_events = [_event_signature(event, legacy=False) for event in (standalone.get("events") or [])]
+    legacy_events = sorted((_event_signature(event, legacy=True) for event in legacy.get("events", [])), key=_json)
+    standalone_events = sorted(
+        (_event_signature(event, legacy=False) for event in (standalone.get("events") or [])), key=_json
+    )
     event_result = {
         "legacy_count": len(legacy_events),
         "standalone_count": len(standalone_events),
@@ -226,6 +235,9 @@ def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dic
         }
         for table in TABLE_NAMES
     }
+    legacy_meta = {row["key"]: row["value"] for row in legacy.get("meta", [])}
+    standalone_meta = standalone.get("metadata") or {}
+    meta_result = {"legacy": legacy_meta, "standalone": standalone_meta, "equal": legacy_meta == standalone_meta}
     result = {
         "format_version": 1,
         "items": {
@@ -237,12 +249,14 @@ def compare_snapshots(legacy: dict[str, Any], standalone: dict[str, Any]) -> dic
         },
         "table_counts": table_counts,
         "events": event_result,
+        "meta": meta_result,
     }
     result["passed"] = (
         not missing
         and not unexpected
         and not item_diffs
         and event_result["equal_provenance"]
+        and meta_result["equal"]
         and all(counts["legacy"] == counts["standalone"] for counts in table_counts.values())
     )
     return result
@@ -258,20 +272,21 @@ def _require_imported_items(snapshot: dict[str, Any], *, source_count: int, impo
         )
 
 
-def _run(command: list[str], *, cwd: Path, env: dict[str, str]) -> None:
+def _run(command: list[str], *, cwd: Path, env: dict[str, str]) -> dict[str, Any]:
     result = subprocess.run(command, cwd=cwd, env=env, text=True, capture_output=True, check=False)
+    secrets = (env.get("TODO_DB_AUTH_TOKEN", ""), env.get("TODO_DB_RO_AUTH_TOKEN", ""))
+    stdout = result.stdout
+    stderr = result.stderr
+    for secret in secrets:
+        if secret:
+            stdout = stdout.replace(secret, "[REDACTED]")
+            stderr = stderr.replace(secret, "[REDACTED]")
     if result.returncode:
-        secrets = (env.get("TODO_DB_AUTH_TOKEN", ""), env.get("TODO_DB_RO_AUTH_TOKEN", ""))
-        stdout = result.stdout
-        stderr = result.stderr
-        for secret in secrets:
-            if secret:
-                stdout = stdout.replace(secret, "[REDACTED]")
-                stderr = stderr.replace(secret, "[REDACTED]")
         raise ShadowMigrationError(
             f"command failed ({result.returncode}): {' '.join(command)}\n"
             f"stdout={stdout[-2000:]}\nstderr={stderr[-2000:]}"
         )
+    return {"stdout": stdout, "stderr": stderr, "returncode": result.returncode}
 
 
 def run_shadow(
@@ -300,119 +315,132 @@ def run_shadow(
     environment.setdefault("TODO_DB_REPOSITORY", "https://github.com/joeharris76/BenchBox")
     created_target = False
     export_path: Path | None = None
+    legacy_temporary = tempfile.TemporaryDirectory(prefix="benchbox-legacy-shadow-")
+    command_reports: list[dict[str, Any]] = []
     try:
-        legacy_db = Path(tempfile.mkdtemp(prefix="benchbox-legacy-shadow-")) / "legacy.sqlite"
-        _run(
-            [
-                "uv",
-                "run",
-                "--project",
-                str(repo_root / "_project" / "scripts"),
-                "--",
-                "python",
-                str(repo_root / "_project" / "scripts" / "todo_db.py"),
-                "--db",
-                str(legacy_db),
-                "init",
-            ],
-            cwd=repo_root,
-            env=environment,
+        legacy_db = Path(legacy_temporary.name) / "legacy.sqlite"
+        command_reports.append(
+            _run(
+                [
+                    "uv",
+                    "run",
+                    "--project",
+                    str(repo_root / "_project" / "scripts"),
+                    "--",
+                    "python",
+                    str(repo_root / "_project" / "scripts" / "todo_db.py"),
+                    "--db",
+                    str(legacy_db),
+                    "init",
+                ],
+                cwd=repo_root,
+                env=environment,
+            )
         )
-        _run(
-            [
-                "uv",
-                "run",
-                "--project",
-                str(repo_root / "_project" / "scripts"),
-                "--",
-                "python",
-                str(repo_root / "_project" / "scripts" / "todo_db.py"),
-                "--db",
-                str(legacy_db),
-                "import-yaml",
-                "--todo-dir",
-                str(todo_dir),
-                "--done-dir",
-                str(done_dir),
-            ],
-            cwd=repo_root,
-            env=environment,
+        command_reports.append(
+            _run(
+                [
+                    "uv",
+                    "run",
+                    "--project",
+                    str(repo_root / "_project" / "scripts"),
+                    "--",
+                    "python",
+                    str(repo_root / "_project" / "scripts" / "todo_db.py"),
+                    "--db",
+                    str(legacy_db),
+                    "import-yaml",
+                    "--todo-dir",
+                    str(todo_dir),
+                    "--done-dir",
+                    str(done_dir),
+                ],
+                cwd=repo_root,
+                env=environment,
+            )
         )
         with sqlite3.connect(legacy_db) as connection:
             legacy = legacy_snapshot(connection)
         _require_imported_items(legacy, source_count=len(sources), importer="legacy")
         created_target = True
-        _run(
-            [
-                "uv",
-                "run",
-                "--project",
-                str(standalone_project),
-                "--extra",
-                "legacy",
-                standalone_command,
-                "--db",
-                str(target),
-                "init",
-                "--project-id",
-                "benchbox",
-                "--repository",
-                "https://github.com/joeharris76/BenchBox",
-            ],
-            cwd=repo_root,
-            env=environment,
+        command_reports.append(
+            _run(
+                [
+                    "uv",
+                    "run",
+                    "--project",
+                    str(standalone_project),
+                    "--extra",
+                    "legacy",
+                    standalone_command,
+                    "--db",
+                    str(target),
+                    "init",
+                    "--project-id",
+                    "benchbox",
+                    "--repository",
+                    "https://github.com/joeharris76/BenchBox",
+                ],
+                cwd=repo_root,
+                env=environment,
+            )
         )
-        _run(
-            [
-                "uv",
-                "run",
-                "--project",
-                str(standalone_project),
-                "--extra",
-                "legacy",
-                standalone_command,
-                "--db",
-                str(target),
-                "import-yaml",
-                "--todo-dir",
-                str(todo_dir),
-                "--done-dir",
-                str(done_dir),
-                "--project-id",
-                "benchbox",
-                "--repository",
-                "https://github.com/joeharris76/BenchBox",
-            ],
-            cwd=repo_root,
-            env=environment,
+        command_reports.append(
+            _run(
+                [
+                    "uv",
+                    "run",
+                    "--project",
+                    str(standalone_project),
+                    "--extra",
+                    "legacy",
+                    standalone_command,
+                    "--db",
+                    str(target),
+                    "import-yaml",
+                    "--todo-dir",
+                    str(todo_dir),
+                    "--done-dir",
+                    str(done_dir),
+                    "--project-id",
+                    "benchbox",
+                    "--repository",
+                    "https://github.com/joeharris76/BenchBox",
+                ],
+                cwd=repo_root,
+                env=environment,
+            )
         )
         export_path = target.with_suffix(".export.json")
-        _run(
-            [
-                "uv",
-                "run",
-                "--project",
-                str(standalone_project),
-                "--extra",
-                "legacy",
-                standalone_command,
-                "--db",
-                str(target),
-                "export",
-                "--output",
-                str(export_path),
-                "--project-id",
-                "benchbox",
-                "--repository",
-                "https://github.com/joeharris76/BenchBox",
-            ],
-            cwd=repo_root,
-            env=environment,
+        command_reports.append(
+            _run(
+                [
+                    "uv",
+                    "run",
+                    "--project",
+                    str(standalone_project),
+                    "--extra",
+                    "legacy",
+                    standalone_command,
+                    "--db",
+                    str(target),
+                    "export",
+                    "--output",
+                    str(export_path),
+                    "--project-id",
+                    "benchbox",
+                    "--repository",
+                    "https://github.com/joeharris76/BenchBox",
+                ],
+                cwd=repo_root,
+                env=environment,
+            )
         )
         standalone = json.loads(export_path.read_text(encoding="utf-8"))
         _require_imported_items(standalone, source_count=len(sources), importer="standalone")
         result = {
             "source": {"todo_dir": str(todo_dir), "done_dir": str(done_dir), "yaml_records": len(sources)},
+            "commands": command_reports,
             "comparison": compare_snapshots(legacy, standalone),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -424,6 +452,8 @@ def run_shadow(
         if export_path is not None and export_path.is_file():
             export_path.unlink()
         raise
+    finally:
+        legacy_temporary.cleanup()
 
 
 def main(argv: list[str] | None = None) -> int:

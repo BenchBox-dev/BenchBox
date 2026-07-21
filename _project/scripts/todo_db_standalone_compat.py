@@ -51,14 +51,10 @@ COMMANDS = frozenset(
         "config",
         "import-yaml",
         "sweep-stale",
-        "restore",
-        "audit",
     }
 )
 
-# The legacy BenchBox CLI uses 1 for a failed policy check or verification;
-# the standalone CLI reserves 2 for all expected command failures.
-LEGACY_STATUS_CHECK_COMMANDS = frozenset({"check-scope", "verify", "lint"})
+GLOBAL_VALUE_OPTIONS = frozenset({"--actor", "--db", "--project-id", "--repository"})
 
 
 def _repo_root() -> Path:
@@ -72,9 +68,18 @@ def _repo_root() -> Path:
 
 
 def _command_index(argv: list[str]) -> tuple[int, str] | None:
-    for index, value in enumerate(argv):
+    index = 0
+    while index < len(argv):
+        value = argv[index]
+        if value in GLOBAL_VALUE_OPTIONS:
+            index += 2
+            continue
+        if any(value.startswith(f"{option}=") for option in GLOBAL_VALUE_OPTIONS):
+            index += 1
+            continue
         if value in COMMANDS:
             return index, value
+        index += 1
     return None
 
 
@@ -133,6 +138,20 @@ def _delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True)
     if not executable:
         raise RuntimeError("BENCHBOX_TODO_DB_COMMAND must not be empty")
     environment = os.environ.copy()
+    version = subprocess.run(
+        executable + ["--version"],
+        cwd=cwd,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    reported = version.stdout.strip()
+    if version.returncode or not reported.startswith("todo-db "):
+        raise RuntimeError("standalone todo-db command does not expose a compatible --version handshake")
+    expected = os.environ.get("BENCHBOX_TODO_DB_EXPECTED_VERSION")
+    if expected and reported != f"todo-db {expected}":
+        raise RuntimeError(f"standalone todo-db version mismatch: expected {expected}, got {reported}")
     return subprocess.run(
         executable + argv,
         cwd=cwd,
@@ -203,7 +222,7 @@ def _item_rows(envelope: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _canonical_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+    return json.dumps(value, sort_keys=True) + "\n"
 
 
 def _atomic_write(path: Path, content: str) -> None:
@@ -224,8 +243,7 @@ def _write_legacy_export(output_dir: Path, envelope: dict[str, Any]) -> tuple[Pa
     _atomic_write(items_path, "".join(_canonical_json(item) for item in items))
     lines = ["# TODO export", "", "| id | state | priority | worktree | title |", "|---|---|---|---|---|"]
     for item in items:
-        title = item["title"].replace("|", "\\|")
-        lines.append(f"| `{item['id']}` | {item['state']} | {item['priority']} | {item['worktree']} | {title} |")
+        lines.append(f"| {item['id']} | {item['state']} | {item['priority']} | {item['worktree']} | {item['title']} |")
     _atomic_write(index_path, "\n".join(lines) + "\n")
     return lossless_path, items_path, index_path
 
@@ -256,7 +274,7 @@ def _export(argv: list[str], cwd: Path) -> int:
         return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def _main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     located = _command_index(args)
     if located is None:
@@ -269,6 +287,9 @@ def main(argv: list[str] | None = None) -> int:
         return result.returncode
     command_index, command = located
     root = _repo_root()
+    if not _has_option(args, "--db"):
+        args[command_index:command_index] = ["--db", str(root / ".todo-db" / "todo.sqlite")]
+        command_index += 2
     if command == "export":
         return _export(args, root)
     delegated = _with_identity(args, command_index)
@@ -287,9 +308,20 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write(_redact(result.stdout, secrets))
     if result.stderr:
         sys.stderr.write(_redact(result.stderr, secrets))
-    if result.returncode == 2 and command in LEGACY_STATUS_CHECK_COMMANDS:
-        return 1
     return result.returncode
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        return _main(argv)
+    except FileNotFoundError as exc:
+        print(f"error: standalone todo-db command not found: {exc.filename}", file=sys.stderr)
+        return 2
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except BrokenPipeError:
+        return 0
 
 
 if __name__ == "__main__":

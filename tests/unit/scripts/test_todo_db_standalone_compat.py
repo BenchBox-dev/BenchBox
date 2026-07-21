@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "_project" / "scripts"))
 import todo_db_standalone_compat as compat  # noqa: E402
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 
 def _envelope() -> dict:
@@ -141,9 +141,57 @@ def test_policy_failures_keep_legacy_status_code(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
 
-    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "check-scope", "item"]) == 1
-    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "verify", "item", "--run", "1"]) == 1
-    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "lint", "item"]) == 1
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "check-scope", "item"]) == 2
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "verify", "item", "--run", "1"]) == 2
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "lint", "item"]) == 2
+
+
+def test_option_values_that_match_commands_are_not_parsed_as_commands() -> None:
+    assert compat._command_index(["--actor", "audit", "show", "item"]) == (2, "show")
+
+
+def test_destructive_standalone_only_commands_are_not_routable() -> None:
+    assert compat._command_index(["restore", "--input", "backup.json"]) is None
+    assert compat._command_index(["audit", "verify"]) == (1, "verify")
+
+
+def test_missing_db_is_pinned_to_benchbox_database(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        calls.append(argv)
+        return CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    assert compat.main(["show", "item"]) == 0
+    assert calls[0][:2] == ["--db", str(tmp_path / ".todo-db" / "todo.sqlite")]
+
+
+def test_missing_binary_fails_cleanly(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys) -> None:
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_COMMAND", "definitely-not-a-real-todo-db-command")
+    assert compat.main(["show", "item"]) == 2
+    assert "standalone todo-db command not found" in capsys.readouterr().err
+
+
+def test_delegate_rejects_unversioned_or_mismatched_binary(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("BENCHBOX_TODO_DB_COMMAND", "todo-db")
+    monkeypatch.setenv("BENCHBOX_TODO_DB_EXPECTED_VERSION", "1.2.3")
+    monkeypatch.setattr(
+        compat.subprocess,
+        "run",
+        lambda *args, **kwargs: CompletedProcess(args[0], 0, stdout="todo-db 9.9.9\n", stderr=""),
+    )
+    with pytest.raises(RuntimeError, match="version mismatch"):
+        compat._delegate(["show", "item"], command="show", cwd=tmp_path)
+
+
+def test_broken_pipe_is_a_clean_exit(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setattr(compat, "_delegate", lambda *args, **kwargs: CompletedProcess([], 0, stdout="ok", stderr=""))
+    monkeypatch.setattr(compat.sys.stdout, "write", lambda value: (_ for _ in ()).throw(BrokenPipeError()))
+    assert compat.main(["show", "item"]) == 0
 
 
 def test_no_command_output_redacts_both_token_names(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys) -> None:
@@ -152,6 +200,8 @@ def test_no_command_output_redacts_both_token_names(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(compat, "_repo_root", lambda: tmp_path)
 
     def fake_run(command, *, cwd, env, capture_output, text, check):
+        if command[-1] == "--version":
+            return CompletedProcess(command, 0, stdout="todo-db 1.0.0\n", stderr="")
         return CompletedProcess(command, 2, stdout="rw-secret ro-secret\n", stderr="rw-secret ro-secret\n")
 
     monkeypatch.setattr(compat.subprocess, "run", fake_run)
@@ -181,6 +231,17 @@ def test_export_writes_lossless_envelope_and_legacy_views(monkeypatch: pytest.Mo
     item = json.loads((output_dir / "items.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert item["work"][0]["wid"] == "w0"
     assert "sample-item" in (output_dir / "index.md").read_text(encoding="utf-8")
+
+
+def test_export_views_are_byte_identical_to_legacy_format(tmp_path: Path) -> None:
+    envelope = _envelope()
+    envelope["tables"]["items"][0]["title"] = "Café | table"
+    compat._write_legacy_export(tmp_path, envelope)
+    item = compat._item_rows(envelope)[0]
+    assert (tmp_path / "items.jsonl").read_text(encoding="utf-8") == json.dumps(item, sort_keys=True) + "\n"
+    assert "| sample-item | planning | high | benchbox | Café | table |" in (tmp_path / "index.md").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_yaml_import_defaults_are_explicit_benchbox_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

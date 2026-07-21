@@ -2,9 +2,9 @@ name: TODO DB weekly export
 
 # Sanctioned exception to the DB-free-CI rule (_project/specs/todo-db-tracker.md,
 # "CI stays DB-free"): this is the ONLY workflow that connects to the hosted
-# TODO tracker database. It runs the opt-in BenchBox compatibility shim against
-# a pinned released `todo-db[hosted]` package with a READ-ONLY Turso token and
-# lands a lossless JSON envelope plus deterministic legacy JSONL/Markdown views
+# TODO tracker database. It always runs the in-repo legacy exporter with a
+# READ-ONLY Turso token. Once an approved package version is configured it also
+# runs the opt-in compatibility shim and validates the lossless envelope.
 # on develop through an auto-merging, path-scoped PR. The job is load-bearing for
 # provenance, so it ALERTS ON FAILURE (upserts an incident:todo-export-failed
 # issue) and clears that incident on the next success.
@@ -24,7 +24,8 @@ name: TODO DB weekly export
 # Package gate (maintainer, after the standalone repository has an approved
 # owner/release): set repository variable TODO_DB_PACKAGE_VERSION to an exact
 # published version. Until that variable and a published wheel/sdist exist, this
-# workflow is intentionally not production-ready and fails before connecting.
+# the additive standalone path stays disabled; the legacy provenance snapshot
+# continues to run successfully.
 #
 # Auto-merge requires a THIRD secret (optional but needed for hands-free weekly
 # landings):
@@ -73,7 +74,6 @@ jobs:
       SNAPSHOT_BRANCH: chore/todo-db-export-snapshot
       INCIDENT_LABEL: incident:todo-export-failed
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      TODO_DB_PACKAGE_VERSION: ${{ vars.TODO_DB_PACKAGE_VERSION }}
       TODO_DB_PROJECT_ID: benchbox
       TODO_DB_REPOSITORY: https://github.com/joeharris76/BenchBox
     steps:
@@ -91,13 +91,11 @@ jobs:
         env:
           SECRET_TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
           SECRET_TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
-          SECRET_TODO_DB_PACKAGE_VERSION: ${{ vars.TODO_DB_PACKAGE_VERSION }}
         run: |
           set -euo pipefail
           missing=()
           [ -n "${SECRET_TODO_DB_URL:-}" ] || missing+=("TODO_DB_URL")
           [ -n "${SECRET_TODO_DB_RO_AUTH_TOKEN:-}" ] || missing+=("TODO_DB_RO_AUTH_TOKEN")
-          [ -n "${SECRET_TODO_DB_PACKAGE_VERSION:-}" ] || missing+=("repository variable TODO_DB_PACKAGE_VERSION")
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error::Missing required repository secret(s): ${missing[*]}. See this workflow's header comment for provisioning steps." >&2
             exit 1
@@ -111,12 +109,24 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Run todo export (read-only token)
+      - name: Run legacy todo export (always-on fallback)
         env:
-          # The standalone CLI selects TODO_DB_RO_AUTH_TOKEN for export. Do not
-          # alias this secret to the read-write variable.
+          # The legacy CLI reads TODO_DB_AUTH_TOKEN. Feed it only the read-only
+          # export credential so this fallback cannot mutate tracker state.
+          TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
+          TODO_DB_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          uv run --project _project/scripts -- \
+            python _project/scripts/todo_db.py export --out "${EXPORT_DIR}"
+
+      - name: Run additive standalone export
+        if: vars.TODO_DB_PACKAGE_VERSION != ''
+        env:
           TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
           TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+          TODO_DB_PACKAGE_VERSION: ${{ vars.TODO_DB_PACKAGE_VERSION }}
+          BENCHBOX_TODO_DB_EXPECTED_VERSION: ${{ vars.TODO_DB_PACKAGE_VERSION }}
         run: |
           set -euo pipefail
           BENCHBOX_TODO_DB_STANDALONE=1 uv run --project _project/scripts \
@@ -124,8 +134,10 @@ jobs:
             python _project/scripts/todo_db.py export --out "${EXPORT_DIR}"
 
       - name: Validate clean-database restore
+        if: vars.TODO_DB_PACKAGE_VERSION != ''
         env:
           TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+          TODO_DB_PACKAGE_VERSION: ${{ vars.TODO_DB_PACKAGE_VERSION }}
         run: |
           set -euo pipefail
           restore_dir="${RUNNER_TEMP}/todo-db-restore"

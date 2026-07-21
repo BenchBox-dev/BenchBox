@@ -330,6 +330,17 @@ class TestVerifyRun:
         assert todo_db.run_verification(conn, "tester", "sample-item", 1)[0] == "pass"
         assert todo_db.run_verification(conn, "tester", "sample-item", 2)[0] == "fail"
 
+    def test_verify_expected_exit_status(self, conn):
+        _mk(
+            conn,
+            verifications=[
+                {"description": "successful command", "command": "true", "expected": "exit 0"},
+                {"description": "expected failure", "command": "false", "expected": "exit 1"},
+            ],
+        )
+        assert todo_db.run_verification(conn, "tester", "sample-item", 1)[0] == "pass"
+        assert todo_db.run_verification(conn, "tester", "sample-item", 2)[0] == "pass"
+
 
 class TestExport:
     def test_export_deterministic(self, conn, tmp_path):

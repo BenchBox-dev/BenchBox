@@ -9,7 +9,7 @@ from types import ModuleType
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 
 def _load_shadow() -> ModuleType:
@@ -127,6 +127,54 @@ def test_equivalent_snapshot_passes_all_semantic_gates() -> None:
     assert result["passed"] is True
     assert not result["items"]["field_diffs"]
     assert all(counts["legacy"] == counts["standalone"] for counts in result["table_counts"].values())
+
+
+def test_comparison_includes_meta_and_normalizes_event_order() -> None:
+    legacy = {
+        "items": [],
+        "events": [
+            {"action": "done", "item_id": "b", "detail": {"wid": "w1"}},
+            {"action": "create", "item_id": "a", "detail": {}},
+        ],
+        "meta": [{"key": "lint.require_scope_rules", "value": "on"}],
+    }
+    standalone = {
+        "events": [
+            {"action": "create", "detail": {"item_id": "a"}},
+            {"action": "done", "detail": {"item_id": "b", "wid": "w1"}},
+        ],
+        "metadata": {"lint.require_scope_rules": "on"},
+        "tables": {name: [] for name in shadow.TABLE_NAMES},
+    }
+    result = shadow.compare_snapshots(legacy, standalone)
+    assert result["meta"]["equal"] is True
+    assert result["events"]["equal_provenance"] is True
+
+
+def test_malformed_envelope_has_actionable_error() -> None:
+    with pytest.raises(shadow.ShadowMigrationError, match="items table"):
+        shadow.compare_snapshots({"items": [], "events": [], "meta": []}, {"tables": []})
+
+
+def test_validate_target_rejects_export_sidecar(tmp_path: Path) -> None:
+    target = tmp_path / "shadow.sqlite"
+    target.with_suffix(".export.json").write_text("keep", encoding="utf-8")
+    with pytest.raises(shadow.ShadowMigrationError, match="export path"):
+        shadow.validate_target(target, benchbox_db=tmp_path / "benchbox.sqlite", standalone_db=tmp_path / "plan.sqlite")
+
+
+def test_run_captures_success_output() -> None:
+    result = shadow._run(["sh", "-c", "printf imported; printf warning >&2"], cwd=Path.cwd(), env={})
+    assert result == {"stdout": "imported", "stderr": "warning", "returncode": 0}
+
+
+def test_run_redacts_success_output() -> None:
+    result = shadow._run(
+        ["sh", "-c", "printf secret; printf secret >&2"],
+        cwd=Path.cwd(),
+        env={"TODO_DB_RO_AUTH_TOKEN": "secret"},
+    )
+    assert result == {"stdout": "[REDACTED]", "stderr": "[REDACTED]", "returncode": 0}
 
 
 def test_empty_source_is_rejected_before_any_target_creation(tmp_path: Path) -> None:

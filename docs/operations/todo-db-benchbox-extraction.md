@@ -35,9 +35,10 @@ BENCHBOX_TODO_DB_STANDALONE=1 \
   python _project/scripts/todo_db.py --db PATH_OR_URL <command>
 ```
 
-The adapter passes an argv list to the canonical `todo-db` executable, adds the
-BenchBox project identity, preserves actor/worktree context, and maps policy
-failure statuses back to the legacy contract. It has no shell interpolation and
+The adapter passes an argv list to the canonical `todo-db` executable, verifies
+its `--version` handshake (and an exact expected version when configured), pins
+an explicit BenchBox database path, adds the BenchBox project identity, and
+preserves actor/worktree context and exit statuses. It has no shell interpolation and
 redacts both `TODO_DB_AUTH_TOKEN` and `TODO_DB_RO_AUTH_TOKEN` in delegated
 output. Export keeps the old `items.jsonl` and `index.md` views while adding a
 lossless `todo-db.json` envelope containing metadata/config, all tracker tables,
@@ -51,7 +52,7 @@ schema migrations, and hash-chained events.
 | `defer`, `promote`, `dismiss` | deferral lifecycle | preserve legacy arguments and output |
 | `complete`, `drop`, `block` | terminal/block transitions | preserve policy errors and exit behavior |
 | `list`, `ready`, `stats` | read-only views | preserve command names and legacy output mode |
-| `check-scope`, `verify`, `lint` | policy gates | map standalone failure `2` to legacy failure `1` |
+| `check-scope`, `verify`, `lint` | policy gates | preserve the standalone compatibility exit contract |
 | `export` | lossless envelope | render legacy JSONL/Markdown compatibility views |
 
 The standalone YAML bridge currently omits BenchBox `anti_patterns`, `prior_art`,
@@ -97,23 +98,25 @@ There is no production cutover or destructive replacement step in this branch.
 
 ## Export workflow and restore validation
 
-`.github/workflows/todo-db-export.yml` now fails closed unless all of these are
-available:
+`.github/workflows/todo-db-export.yml` always runs the legacy exporter when the
+two database secrets are available:
 
 - `TODO_DB_URL` repository secret for the dedicated BenchBox Turso/libSQL DB.
-- `TODO_DB_RO_AUTH_TOKEN` repository secret, used only as
-  `TODO_DB_RO_AUTH_TOKEN` by export; it is never assigned to the read-write
-  variable.
-- `TODO_DB_PACKAGE_VERSION` repository variable naming an exact published
-  `todo-db[hosted]` release.
+- `TODO_DB_RO_AUTH_TOKEN` repository secret, passed to the legacy export step
+  under its expected variable name but still carrying read-only authority.
 
-The job remains weekly, deterministic, path-scoped, and outage-alerting. It
-uses the adapter to write the lossless envelope plus compatibility views, then
-restores the envelope into a clean SQLite database, verifies the audit chain,
-and compares restored tracker data, metadata, and events before opening the
-snapshot PR. Missing secrets, an unpublished package, an unreachable database,
-or a schema mismatch open/reuse the incident issue; they do not claim
-production readiness.
+`TODO_DB_PACKAGE_VERSION` is an optional repository variable naming an exact,
+approved `todo-db[hosted]` release. When unset, the additive standalone export
+and restore validation are skipped while the legacy provenance snapshot still
+runs. When set, the same value is enforced by the adapter version handshake.
+
+The job remains weekly, deterministic, path-scoped, and outage-alerting. With
+an approved package configured, it uses the adapter to add the lossless envelope
+and refresh compatibility views, then restores the envelope into a clean SQLite
+database, verifies the audit chain, and compares restored tracker data,
+metadata, and events before opening the snapshot PR. Missing database secrets,
+an unavailable configured package, an unreachable database, or a schema
+mismatch open/reuse the incident issue; they do not claim production readiness.
 
 Restore recipe for a maintainer-approved package release:
 
@@ -132,8 +135,8 @@ uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
 
 ## Testing, CI, release, and operations gate
 
-The BenchBox-side tests cover adapter argument/identity forwarding, legacy
-status mapping, deterministic lossless/legacy export views, explicit YAML path
+The BenchBox-side tests cover adapter argument/identity forwarding, database
+and version pinning, exit fidelity, deterministic lossless/legacy export views, explicit YAML path
 defaults, empty-source rejection, semantic loss reporting, and failed-import
 rollback. Existing BenchBox tracker tests remain the regression suite for the
 default path. The standalone baseline covers local lifecycle, identity,

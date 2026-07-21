@@ -1675,9 +1675,14 @@ def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: in
         raise TodoError(f"verification seq={seq} on {item_id!r} has no command")
     proc = subprocess.run(row["command"], shell=True, capture_output=True, text=True, check=False)
     output = (proc.stdout or "") + (proc.stderr or "")
-    passed = proc.returncode == 0
-    if passed and row["expected"]:
-        passed = row["expected"] in output
+    expected = row["expected"]
+    exit_match = re.fullmatch(r"exit\s+(\d+)", expected.strip(), re.IGNORECASE) if expected else None
+    if exit_match:
+        passed = proc.returncode == int(exit_match.group(1))
+    else:
+        passed = proc.returncode == 0
+        if passed and expected:
+            passed = expected in output
     result = "pass" if passed else "fail"
     with _write_txn(conn):
         conn.execute(
