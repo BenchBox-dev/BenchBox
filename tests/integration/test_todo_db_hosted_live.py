@@ -26,7 +26,7 @@ import pytest
 
 pytestmark = [
     pytest.mark.integration,
-    pytest.mark.live_integration,
+    pytest.mark.medium,
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -61,6 +61,11 @@ def _run(args: list[str], actor: str, replica_dir: Path) -> subprocess.Completed
     )
 
 
+def test_hosted_live_lane_is_explicitly_credential_gated():
+    pytest.skip("run with -m live_integration and dedicated TODO_TEST_DB_URL/TODO_DB_AUTH_TOKEN credentials")
+
+
+@pytest.mark.live_integration
 @requires_live_db
 class TestHostedLiveLifecycle:
     def test_two_actor_lifecycle_against_real_primary(self, tmp_path):
