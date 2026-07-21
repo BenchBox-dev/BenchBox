@@ -102,17 +102,27 @@ two database secrets are available:
   under its expected variable name but still carrying read-only authority.
 
 `TODO_DB_PACKAGE_VERSION` is an optional repository variable naming an exact,
-approved `todo-db[hosted]` release. When unset, the additive standalone export
-and restore validation are skipped while the legacy provenance snapshot still
-runs. When set, the same value is enforced by the adapter version handshake.
+approved release. Enabling it also requires `TODO_DB_PACKAGE_URL`, an immutable
+HTTPS wheel URL, and `TODO_DB_PACKAGE_SHA256`, the wheel's lowercase SHA-256
+digest. The workflow downloads that artifact once, verifies it, and reuses the
+same local wheel for every command. The URL must not target public PyPI until
+the project owns the `todo-db` name. When the version is unset, the additive
+standalone export and restore validation are skipped while the legacy
+provenance snapshot still runs. When set, the version is also enforced by the
+adapter handshake.
 
-The job remains weekly, deterministic, path-scoped, and outage-alerting. With
-an approved package configured, it uses the adapter to add the lossless envelope
-and refresh compatibility views, then restores the envelope into a clean SQLite
-database, verifies the audit chain, and compares restored tracker data,
-metadata, and events before opening the snapshot PR. Missing database secrets,
-an unavailable configured package, an unreachable database, or a schema
-mismatch open/reuse the incident issue; they do not claim production readiness.
+The job remains weekly, deterministic, path-scoped, and outage-alerting. Each
+successful run uploads a uniquely named recovery artifact with 90-day automatic
+retention in addition to the versioned snapshot PR. GitHub owns expiry; the
+workflow owner responds to the existing incident issue and performs a clean-DB
+restore before any recovery is accepted. With an approved package configured,
+it uses the adapter to add the lossless envelope and refresh compatibility
+views, then restores the envelope into a clean SQLite database, verifies the
+audit chain, and compares the complete restored envelope, including
+`schema_migrations` and `audit_head`, before opening the snapshot PR. Missing
+database secrets, an unavailable configured package, an unreachable database,
+or a schema mismatch open/reuse the incident issue; they do not claim
+production readiness.
 
 The live BenchBox database uses the legacy schema; do not point standalone
 `export` directly at it. Capture the legacy tables in bulk with the BenchBox
@@ -171,26 +181,33 @@ default path. The standalone baseline covers local lifecycle, identity,
 migrations/checksums, audit/export/restore, concurrency/claim contention,
 secure hosted transport, token redaction, and credential-gated live coverage.
 
-Before package release and cutover, maintainers must add or run these gates:
+The operational acceptance implementation covers all 11 required gates. Hosted
+mutation remains credential-gated and must use only a dedicated test database;
+without those credentials the live lane skips cleanly.
 
-1. Build wheel and sdist, install each into a clean environment, and run the
-   CLI contract matrix against both `todo-db` and `todo`.
-2. Test migration checksum drift, missing/reordered migrations, transactional
-   rollback, and restore into an empty database.
-3. Exercise two concurrent claimers and a failed import against isolated local
-   databases; run hosted live tests only with a dedicated test URL and tokens.
-4. Test TLS/secure-transport refusal, read-only credential write refusal, DSN
-   and token redaction, and no credential leakage in workflow/CLI failures.
-5. Define backup frequency, location, retention, rotation ownership, and the
-   package/schema compatibility window. Keep one prior package/schema rollback
-   recipe tested before every cutover.
-6. Require a changelog entry describing public CLI/API changes, migration
-   compatibility, export format version, restore procedure, and rollback.
+| # | Gate | Durable evidence |
+|---:|---|---|
+| 1 | Real package and CLI smoke | `uv build` creates wheel and sdist; isolated installs of both artifacts run `todo-db --help` and `todo --help`. |
+| 2 | Concurrent claims | Two real processes contend on scratch SQLite; exactly one claimant wins and persisted ownership matches it. |
+| 3 | Secure hosted transport | Hosted configuration refuses insecure remote transport. |
+| 4 | Connection outage and secret redaction | Connection failures surface a bounded `TodoDBError` without URL or token material. |
+| 5 | Replica-sync failure closes stale access | A failed hosted sync closes the replica instead of allowing stale reads. |
+| 6 | Credential-gated hosted lifecycle | The dedicated hosted live lane exercises real writes and cross-replica contention only when its isolated test credentials are present, and skips otherwise. |
+| 7 | Migration checksum rollback guard | A tampered recorded migration is rejected before use. |
+| 8 | Prior-package/schema rollback guard | The current package refuses a database containing an unknown future migration. |
+| 9 | Lossless clean restore | Restore, audit verification, and a second export require exact full-envelope equality, including migrations and audit head. |
+| 10 | Package supply chain | The workflow downloads one immutable HTTPS wheel, verifies its configured SHA-256 digest, and reuses that artifact for all commands. |
+| 11 | Versioned recovery and rotation | Weekly snapshot PRs are supplemented by run/attempt-versioned artifacts retained for 90 days; failures reuse the operational incident. |
 
-Recommended operational defaults remain one physical database per project,
+Before any package release, require a changelog entry describing public CLI/API
+changes, migration compatibility, export format version, restore procedure, and
+rollback. Keep the prior-package/schema refusal and clean-restore recipe green
+through the compatibility window.
+
+Operational defaults remain one physical database per project,
 separate read-write/read-only credentials, weekly exports, clean-DB restore
-drills, and SHA-256 chained events with optional signed export manifests. These
-are recommendations, not provisioned infrastructure.
+drills, and SHA-256 chained events with optional signed export manifests. This
+work does not provision hosted infrastructure or publish a package.
 
 ## Oxbow, textcharts, and future consumers
 

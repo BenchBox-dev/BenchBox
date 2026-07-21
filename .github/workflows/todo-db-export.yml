@@ -22,10 +22,15 @@ name: TODO DB weekly export
 # noisy one.
 #
 # Package gate (maintainer, after the standalone repository has an approved
-# owner/release): set repository variable TODO_DB_PACKAGE_VERSION to an exact
-# published version. Until that variable and a published wheel/sdist exist, this
-# the additive standalone path stays disabled; the legacy provenance snapshot
-# continues to run successfully.
+# owner/release): configure all three repository variables below. The artifact
+# URL is downloaded exactly once, verified against its SHA-256 digest, and that
+# local wheel is reused for every standalone command. Do not point the URL at
+# public PyPI until the todo-db project has reserved and controls that name.
+#   TODO_DB_PACKAGE_VERSION = exact version embedded in the wheel
+#   TODO_DB_PACKAGE_URL     = immutable HTTPS wheel URL
+#   TODO_DB_PACKAGE_SHA256  = lowercase SHA-256 digest of that wheel
+# Until TODO_DB_PACKAGE_VERSION is set, the additive standalone path stays
+# disabled; the legacy provenance snapshot continues to run successfully.
 #
 # Auto-merge requires a THIRD secret (optional but needed for hands-free weekly
 # landings):
@@ -120,6 +125,25 @@ jobs:
           uv run --project _project/scripts -- \
             python _project/scripts/todo_db.py export --out "${EXPORT_DIR}"
 
+      - name: Download and verify standalone package
+        if: vars.TODO_DB_PACKAGE_VERSION != ''
+        env:
+          TODO_DB_PACKAGE_URL: ${{ vars.TODO_DB_PACKAGE_URL }}
+          TODO_DB_PACKAGE_SHA256: ${{ vars.TODO_DB_PACKAGE_SHA256 }}
+        run: |
+          set -euo pipefail
+          [ -n "${TODO_DB_PACKAGE_URL:-}" ] || { echo "::error::TODO_DB_PACKAGE_URL is required when TODO_DB_PACKAGE_VERSION is set" >&2; exit 1; }
+          [ -n "${TODO_DB_PACKAGE_SHA256:-}" ] || { echo "::error::TODO_DB_PACKAGE_SHA256 is required when TODO_DB_PACKAGE_VERSION is set" >&2; exit 1; }
+          case "${TODO_DB_PACKAGE_SHA256}" in
+            *[!0-9a-f]*|'') echo "::error::TODO_DB_PACKAGE_SHA256 must be a lowercase hexadecimal digest" >&2; exit 1 ;;
+          esac
+          [ "${#TODO_DB_PACKAGE_SHA256}" -eq 64 ] || { echo "::error::TODO_DB_PACKAGE_SHA256 must contain 64 characters" >&2; exit 1; }
+          wheel="${RUNNER_TEMP}/todo-db-${TODO_DB_PACKAGE_SHA256}.whl"
+          curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 \
+            --output "${wheel}" "${TODO_DB_PACKAGE_URL}"
+          printf '%s  %s\n' "${TODO_DB_PACKAGE_SHA256}" "${wheel}" | sha256sum --check --strict
+          echo "TODO_DB_WHEEL=${wheel}" >> "${GITHUB_ENV}"
+
       - name: Run additive standalone export
         if: vars.TODO_DB_PACKAGE_VERSION != ''
         env:
@@ -129,35 +153,32 @@ jobs:
           BENCHBOX_TODO_DB_EXPECTED_VERSION: ${{ vars.TODO_DB_PACKAGE_VERSION }}
         run: |
           set -euo pipefail
-          BENCHBOX_TODO_DB_STANDALONE=1 uv run --project _project/scripts \
-            --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+          BENCHBOX_TODO_DB_STANDALONE=1 uv run --isolated --project _project/scripts \
+            --with "${TODO_DB_WHEEL}[hosted]" -- \
             python _project/scripts/todo_db.py export --out "${EXPORT_DIR}"
 
       - name: Validate clean-database restore
         if: vars.TODO_DB_PACKAGE_VERSION != ''
-        env:
-          TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
-          TODO_DB_PACKAGE_VERSION: ${{ vars.TODO_DB_PACKAGE_VERSION }}
         run: |
           set -euo pipefail
           restore_dir="${RUNNER_TEMP}/todo-db-restore"
           mkdir -p "${restore_dir}"
-          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+          uv run --isolated --with "${TODO_DB_WHEEL}[hosted]" -- \
             todo-db --db "${restore_dir}/restore.sqlite" \
             --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" init
-          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+          uv run --isolated --with "${TODO_DB_WHEEL}[hosted]" -- \
             todo-db --db "${restore_dir}/restore.sqlite" \
             --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" \
             restore --input "${EXPORT_DIR}/todo-db.json" --replace
-          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+          uv run --isolated --with "${TODO_DB_WHEEL}[hosted]" -- \
             todo-db --db "${restore_dir}/restore.sqlite" \
             --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" audit verify
-          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+          uv run --isolated --with "${TODO_DB_WHEEL}[hosted]" -- \
             todo-db --db "${restore_dir}/restore.sqlite" \
             --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" \
             export --output "${restore_dir}/restored.json"
-          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
-            python -c 'import json, pathlib; source=json.loads(pathlib.Path("'"${EXPORT_DIR}"'/todo-db.json").read_text()); restored=json.loads(pathlib.Path("'"${restore_dir}"'/restored.json").read_text()); assert source["events"] == restored["events"]; assert source["metadata"] == restored["metadata"]; assert {k:v for k,v in source["tables"].items() if k not in {"schema_migrations", "audit_head"}} == {k:v for k,v in restored["tables"].items() if k not in {"schema_migrations", "audit_head"}}'
+          uv run --isolated --with "${TODO_DB_WHEEL}[hosted]" -- \
+            python -c 'import json, pathlib; source=json.loads(pathlib.Path("'"${EXPORT_DIR}"'/todo-db.json").read_text()); restored=json.loads(pathlib.Path("'"${restore_dir}"'/restored.json").read_text()); assert source == restored'
 
       - name: Write directory README
         run: |
@@ -187,6 +208,14 @@ jobs:
           This directory's git history is the tracker's provenance trail — the
           single sanctioned exception to the repo's DB-free-CI rule.
           MD
+
+      - name: Retain versioned recovery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: todo-db-export-${{ github.run_id }}-${{ github.run_attempt }}
+          path: _project/todo-db-export/
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Detect snapshot changes
         id: diff
