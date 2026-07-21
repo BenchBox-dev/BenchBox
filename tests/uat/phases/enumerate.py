@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from tests.uat.compatibility import CompatibilityRule, compatibility_rule_for
@@ -53,6 +54,26 @@ class EnumerationResult:
     @property
     def candidate_count(self) -> int:
         return len(self.cells) + len(self.compatibility_pruned)
+
+
+def is_registry_prune(cell: CompatibilityPrunedCell) -> bool:
+    """True when a pruned row is a registry/ladder-derived drop (``pruned-registry``).
+
+    Registry drops (a benchmark/platform id absent from the registry, or a
+    scale outside a benchmark's declared ``scale_options``) share the
+    ``CompatibilityPrunedCell`` shape with platform/benchmark compatibility-RULE
+    prunes, but must be accounted separately: `write_report` carries a distinct
+    ``registry_pruned_count`` bucket, and lumping registry rows into
+    ``compatibility_pruned_count`` mislabels them (uat-report-regen-prune-accounting w2).
+    """
+    return cell.status == REGISTRY_PRUNE_STATUS
+
+
+def count_pruned_by_kind(pruned: Iterable[CompatibilityPrunedCell]) -> tuple[int, int]:
+    """Split a mixed pruned-row stream into (compatibility_rule_count, registry_count)."""
+    rows = tuple(pruned)
+    registry = sum(1 for cell in rows if is_registry_prune(cell))
+    return len(rows) - registry, registry
 
 
 def enumerate_cells(

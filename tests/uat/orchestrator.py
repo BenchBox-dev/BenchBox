@@ -24,6 +24,7 @@ from typing import Any
 from tests.uat import cells_io, docker_assets, gate_summary, preflight_budget
 from tests.uat.config import UATConfig, disk_gate_disabled_warning, load_config
 from tests.uat.phases import (
+    enumerate as enumerate_phase,
     execute as exec_phase,
     preflight as preflight_phase,
     report as report_phase,
@@ -396,12 +397,18 @@ def _run_sweep_phases(  # noqa: C901
                     container_engine=container_engine,
                 )
                 break
+            compat_rule_pruned_count, registry_pruned_count = enumerate_phase.count_pruned_by_kind(
+                getattr(execute_outcome, "compatibility_pruned", ())
+            )
             cells_io.write_cells_jsonl(
                 cells_jsonl,
                 execute_outcome.results,
                 source_info=source_info,
                 skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
                 startup_failed_count=len(getattr(execute_outcome, "startup_failed", ())),
+                compatibility_pruned_count=compat_rule_pruned_count,
+                early_stop_pruned_count=len(getattr(execute_outcome, "pruned", ())),
+                registry_pruned_count=registry_pruned_count,
                 disk_gate_disabled=not config.disk_gate_enabled,
                 container_engine=container_engine,
             )
@@ -603,14 +610,22 @@ def _run_sweep_phases(  # noqa: C901
             # cross_scale_clean_pair_count silently degrades to a
             # passed-only check.
             validator_status_by_path = _validator_status_by_path(validator_rollup_tsv)
+            # Split registry drops out of the compatibility-rule bucket so the
+            # live report labels them under registry_pruned_count (matching the
+            # regenerated report, which reads the same split from the sidecar)
+            # -- uat-report-regen-prune-accounting w2.
+            report_compat_pruned_count, report_registry_pruned_count = enumerate_phase.count_pruned_by_kind(
+                getattr(execute_outcome, "compatibility_pruned", ())
+            )
             summary = report_phase.write_report(
                 cells,
                 output_path=tsv_path,
                 rungs=list(config.scales.requested_rungs),
                 cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
                 validator_status_by_path=validator_status_by_path,
-                compatibility_pruned_count=len(getattr(execute_outcome, "compatibility_pruned", ())),
+                compatibility_pruned_count=report_compat_pruned_count,
                 early_stop_pruned_count=len(getattr(execute_outcome, "pruned", ())),
+                registry_pruned_count=report_registry_pruned_count,
                 skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
                 startup_failed_count=len(getattr(execute_outcome, "startup_failed", ())),
                 source_info=source_info,
@@ -694,12 +709,18 @@ def _emit_abort_artifacts(
         )
     if startup_failed_count is None:
         startup_failed_count = len(getattr(execute_outcome, "startup_failed", ())) if execute_outcome is not None else 0
+    # Same registry/compatibility split as the happy path so an abort report
+    # and its regenerated counterpart agree on the buckets (w1/w2).
+    compat_rule_pruned_count, registry_pruned_count = enumerate_phase.count_pruned_by_kind(compatibility_pruned)
     cells_io.write_cells_jsonl(
         log_dir / "cells.jsonl",
         cells,
         source_info=source_info,
         skipped_unreachable_count=skipped_unreachable_count,
         startup_failed_count=startup_failed_count,
+        compatibility_pruned_count=compat_rule_pruned_count,
+        early_stop_pruned_count=early_stop_pruned_count,
+        registry_pruned_count=registry_pruned_count,
         disk_gate_disabled=not config.disk_gate_enabled,
         container_engine=container_engine,
     )
@@ -711,8 +732,9 @@ def _emit_abort_artifacts(
         output_path=_partial_report_path(log_dir / config.report.matrix_summary_tsv),
         rungs=list(config.scales.requested_rungs),
         cross_scale_floor=config.report.cross_scale_coverage_min_pairs,
-        compatibility_pruned_count=len(compatibility_pruned),
+        compatibility_pruned_count=compat_rule_pruned_count,
         early_stop_pruned_count=early_stop_pruned_count,
+        registry_pruned_count=registry_pruned_count,
         skipped_unreachable_count=skipped_unreachable_count,
         startup_failed_count=startup_failed_count,
         source_info=source_info,

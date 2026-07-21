@@ -1186,6 +1186,9 @@ def test_update_accounting_sidecar_preserves_existing_counts(tmp_path: Path):
     assert payload == {
         "skipped_unreachable_count": 3,
         "startup_failed_count": 2,
+        "compatibility_pruned_count": 0,
+        "early_stop_pruned_count": 0,
+        "registry_pruned_count": 0,
         "disk_gate_disabled": False,
         "container_engine": None,
         "explorer_smoke_status": "skipped_no_node",

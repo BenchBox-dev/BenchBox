@@ -229,6 +229,9 @@ def write_cells_jsonl(
     source_info: SourceInfo,
     skipped_unreachable_count: int = 0,
     startup_failed_count: int = 0,
+    compatibility_pruned_count: int = 0,
+    early_stop_pruned_count: int = 0,
+    registry_pruned_count: int = 0,
     disk_gate_disabled: bool = False,
     container_engine: str | None = None,
     finalize: bool = True,
@@ -258,6 +261,16 @@ def write_cells_jsonl(
                 # probe that found nothing listening. Additive field -- see
                 # uat-fail-advance-consistency w3.
                 "startup_failed_count": int(startup_failed_count),
+                # Prune counts persisted so `make uat-report` regeneration
+                # reconstructs the same total_defined the live report had,
+                # instead of defaulting these to 0 (which made a regenerated
+                # report under-count) -- uat-report-regen-prune-accounting w1.
+                # registry_pruned_count is disjoint from compatibility_pruned_count:
+                # a registry/ladder drop (pruned-registry) vs a platform/benchmark
+                # compatibility-RULE drop (w2).
+                "compatibility_pruned_count": int(compatibility_pruned_count),
+                "early_stop_pruned_count": int(early_stop_pruned_count),
+                "registry_pruned_count": int(registry_pruned_count),
                 "disk_gate_disabled": bool(disk_gate_disabled),
                 # Resolved engine binary (docker/mocker/...) at sweep start --
                 # additive field, None on older artifacts and on sweeps whose
