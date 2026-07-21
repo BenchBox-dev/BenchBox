@@ -17,6 +17,14 @@ repos:
         stages: [pre-commit]
         files: ^results-data/bundles/
 
+      - id: uat-loc-table
+        name: UAT spec LOC table drift check
+        entry: uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^(tests/uat/.*\.py|_project/specs/uat-framework\.md|_project/scripts/uat_loc_table\.py)$
+
       # Fast (<1s) allowlist-only scan. Runs on every commit.
       # The pytest-collection fast-lane checks moved to `timing-policy-fast-lane`
       # (pre-push stage) because a ~30s hook at commit time was racing with
