@@ -2167,6 +2167,14 @@ def _print_work_order(order: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Keep the historical shell wrapper and legacy implementation available
+    # until a released standalone package has passed shadow-migration and human
+    # cutover gates.  The opt-in route is intentionally environment-gated so a
+    # normal BenchBox checkout cannot silently switch databases.
+    if os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1":
+        from todo_db_standalone_compat import main as standalone_main
+
+        return standalone_main(argv)
     parser = argparse.ArgumentParser(description="Database-backed TODO tracker")
     parser.add_argument(
         "--db",

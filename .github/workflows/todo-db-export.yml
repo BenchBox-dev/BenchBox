@@ -2,13 +2,12 @@ name: TODO DB weekly export
 
 # Sanctioned exception to the DB-free-CI rule (_project/specs/todo-db-tracker.md,
 # "CI stays DB-free"): this is the ONLY workflow that connects to the hosted
-# TODO tracker database. It runs `todo export` weekly with a READ-ONLY Turso
-# token and lands the deterministic JSONL + markdown snapshot on develop through
-# an auto-merging, path-scoped PR, so the repo carries a reviewable provenance
-# trail and a vendor-lock escape hatch that contains full tracker state. The job
-# is load-bearing for provenance, so it ALERTS ON FAILURE (upserts an
-# incident:todo-export-failed issue) and clears that incident on the next
-# success.
+# TODO tracker database. It runs the opt-in BenchBox compatibility shim against
+# a pinned released `todo-db[hosted]` package with a READ-ONLY Turso token and
+# lands a lossless JSON envelope plus deterministic legacy JSONL/Markdown views
+# on develop through an auto-merging, path-scoped PR. The job is load-bearing for
+# provenance, so it ALERTS ON FAILURE (upserts an incident:todo-export-failed
+# issue) and clears that incident on the next success.
 #
 # Provisioning (maintainer, one-time -- an agent session cannot do either step;
 # minting needs the logged-in `turso` CLI and secrets need repo admin):
@@ -21,6 +20,11 @@ name: TODO DB weekly export
 # Until both secrets exist the scheduled run fails loudly and opens the incident
 # issue -- intentional: a silently non-exporting provenance job is worse than a
 # noisy one.
+#
+# Package gate (maintainer, after the standalone repository has an approved
+# owner/release): set repository variable TODO_DB_PACKAGE_VERSION to an exact
+# published version. Until that variable and a published wheel/sdist exist, this
+# workflow is intentionally not production-ready and fails before connecting.
 #
 # Auto-merge requires a THIRD secret (optional but needed for hands-free weekly
 # landings):
@@ -69,6 +73,9 @@ jobs:
       SNAPSHOT_BRANCH: chore/todo-db-export-snapshot
       INCIDENT_LABEL: incident:todo-export-failed
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      TODO_DB_PACKAGE_VERSION: ${{ vars.TODO_DB_PACKAGE_VERSION }}
+      TODO_DB_PROJECT_ID: benchbox
+      TODO_DB_REPOSITORY: https://github.com/joeharris76/BenchBox
     steps:
       - name: Checkout develop
         uses: actions/checkout@v4
@@ -84,11 +91,13 @@ jobs:
         env:
           SECRET_TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
           SECRET_TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+          SECRET_TODO_DB_PACKAGE_VERSION: ${{ vars.TODO_DB_PACKAGE_VERSION }}
         run: |
           set -euo pipefail
           missing=()
           [ -n "${SECRET_TODO_DB_URL:-}" ] || missing+=("TODO_DB_URL")
           [ -n "${SECRET_TODO_DB_RO_AUTH_TOKEN:-}" ] || missing+=("TODO_DB_RO_AUTH_TOKEN")
+          [ -n "${SECRET_TODO_DB_PACKAGE_VERSION:-}" ] || missing+=("repository variable TODO_DB_PACKAGE_VERSION")
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error::Missing required repository secret(s): ${missing[*]}. See this workflow's header comment for provisioning steps." >&2
             exit 1
@@ -104,14 +113,39 @@ jobs:
 
       - name: Run todo export (read-only token)
         env:
-          # The CLI reads TODO_DB_AUTH_TOKEN; feed it the READ-ONLY token so the
-          # export path can never mutate the shared tracker DB.
+          # The standalone CLI selects TODO_DB_RO_AUTH_TOKEN for export. Do not
+          # alias this secret to the read-write variable.
           TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
-          TODO_DB_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+          TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
         run: |
           set -euo pipefail
-          uv run --project _project/scripts -- \
+          BENCHBOX_TODO_DB_STANDALONE=1 uv run --project _project/scripts \
+            --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
             python _project/scripts/todo_db.py export --out "${EXPORT_DIR}"
+
+      - name: Validate clean-database restore
+        env:
+          TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          restore_dir="${RUNNER_TEMP}/todo-db-restore"
+          mkdir -p "${restore_dir}"
+          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+            todo-db --db "${restore_dir}/restore.sqlite" \
+            --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" init
+          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+            todo-db --db "${restore_dir}/restore.sqlite" \
+            --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" \
+            restore --input "${EXPORT_DIR}/todo-db.json" --replace
+          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+            todo-db --db "${restore_dir}/restore.sqlite" \
+            --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" audit verify
+          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+            todo-db --db "${restore_dir}/restore.sqlite" \
+            --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" \
+            export --output "${restore_dir}/restored.json"
+          uv run --with "todo-db[hosted]==${TODO_DB_PACKAGE_VERSION}" -- \
+            python -c 'import json, pathlib; source=json.loads(pathlib.Path("'"${EXPORT_DIR}"'/todo-db.json").read_text()); restored=json.loads(pathlib.Path("'"${restore_dir}"'/restored.json").read_text()); assert source["events"] == restored["events"]; assert source["metadata"] == restored["metadata"]; assert {k:v for k,v in source["tables"].items() if k not in {"schema_migrations", "audit_head"}} == {k:v for k,v in restored["tables"].items() if k not in {"schema_migrations", "audit_head"}}'
 
       - name: Write directory README
         run: |
@@ -130,9 +164,12 @@ jobs:
           (`_project/specs/todo-db-tracker.md`), written by
           `.github/workflows/todo-db-export.yml` with a read-only token.
 
-          - `items.jsonl` — one JSON object per item, keys sorted, ordered by
-            `id`, timestamps from row data (not wall-clock). Full-state
-            vendor-lock escape hatch: the tracker reconstructs from it.
+          - `todo-db.json` — lossless, versioned export envelope including
+            project identity, metadata/config, all tracker tables, migrations,
+            and hash-chained audit events. Restore validation runs in a clean
+            SQLite database before the snapshot PR is opened.
+          - `items.jsonl` — deterministic legacy compatibility view, one nested
+            item object per line, keys sorted and ordered by `id`.
           - `index.md` — rendered `id / state / priority / worktree / title`.
 
           This directory's git history is the tracker's provenance trail — the
