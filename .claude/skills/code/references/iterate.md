@@ -30,3 +30,12 @@ Use when the user asks to drive a command, test suite, CI gate, lint/typecheck, 
 - Do not mark blocked without the debug-framework hard-blocker criteria.
 - Do not hide remaining failures after one cluster turns green.
 - Prefer smallest failing repro for edits; always finish by rerunning the original command.
+- For verification-only commits, keep raw stdout in `/tmp`, CI artifacts, or
+  `BENCHBOX_OUTPUT_DIR`; commit only the durable command, checked SHA/version,
+  PASS/FAIL, and key lines/counts. Do not commit
+  `_project/verification-logs/*.log` unless it is a deliberate small fixture
+  with a named consumer.
+- After `pr-open`, skip preflight/broad diffs unless mergeability flips, a
+  required check fails, or `develop` advanced into PR paths. Command reruns
+  and the PR-open/CI gate may be delegated for run-and-report; keep clustering,
+  fixes, and stop decisions in the main session.

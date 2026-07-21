@@ -1,23 +1,51 @@
 {
   "version": 1,
-  "lockedAt": "2026-07-19T18:57:00.601Z",
+  "lockedAt": "2026-07-21T12:39:11.654Z",
   "skills": {
     "blog": {
       "source": {
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/blog",
-        "fetchedAt": "2026-07-19T18:18:22.544Z"
+        "fetchedAt": "2026-07-21T12:39:11.529Z"
       },
       "installMode": "mirror",
       "files": {
+        "references/audit.md": {
+          "sha256": "806b068e9462498ef3e46f7a0a2e122d872ae6bbcf5d013249d3f428dbb37ee1",
+          "size": 185
+        },
+        "references/cleanup.md": {
+          "sha256": "a837bc371986456d5eb504067d9557c8d6fad3a83f90dd834d343206801bb4e9",
+          "size": 144
+        },
         "references/critique.md": {
           "sha256": "95ae54273bca1e1a2d99d812b529b5f0955411ecb4d51bc8c0000de99768501c",
           "size": 2117
         },
+        "references/deformulize.md": {
+          "sha256": "17cf904d4fd63b1e1615e6865c77c477f895f5d54a4949039e186c5637a32024",
+          "size": 199
+        },
+        "references/draft.md": {
+          "sha256": "2bc7e67782bc8699362ad26700844a15c7184daf794fb4d6d052254f5e28f097",
+          "size": 228
+        },
+        "references/editorial-review.md": {
+          "sha256": "86e07271e1172621333c1a1ce46a86eab7de309b19f5e6d8563d6074abc06b66",
+          "size": 182
+        },
+        "references/plan.md": {
+          "sha256": "7bbf79c72e0e1b0cb89913f55f9c87496005a0ece3dd420ba05ba8aa063a6a22",
+          "size": 291
+        },
+        "references/research.md": {
+          "sha256": "3951e61dcff425f3023d8295e1e808013f2eaa16de7f345082422214f43d9832",
+          "size": 290
+        },
         "SKILL.md": {
-          "sha256": "4bb1876c53495598e1fe46a2e00d23628420590ca7bbae92106445ccb2fa2da4",
-          "size": 3812
+          "sha256": "7e02673521ded03df3a88523d54fa92cd2fa98e1e19046047eb1cbdd7cf7cff1",
+          "size": 1837
         },
         "skill.yaml": {
           "sha256": "44bf3fd9cae4da27eee662fb0e91b826a4d19c1757ac4474b57952eee94ec36f",
@@ -30,33 +58,41 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/code",
-        "fetchedAt": "2026-07-19T18:18:22.547Z"
+        "fetchedAt": "2026-07-21T12:39:11.531Z"
       },
       "installMode": "mirror",
       "files": {
+        "references/analysis.md": {
+          "sha256": "2b86b9e35303d84a900c0681ac0e61393f8dd8f0f4ff5a18180801c1f9e2e982",
+          "size": 310
+        },
         "references/compare.md": {
           "sha256": "225467c450947cfea167667b53f3962724860d918f04fbcbd7e3c984a663978f",
           "size": 770
         },
         "references/five-axis-review.md": {
-          "sha256": "d6a42dbc556544cf8b292c6ba23ccbef72911d1cdb6a74e76c543626d161b6f4",
-          "size": 4215
+          "sha256": "883a830c506ac11ad86eb502ed6405f67192fc7d1822791f76af0119c3f20dc6",
+          "size": 5204
         },
         "references/handoff.md": {
           "sha256": "37ecdbe8e88662d8bda26b8b87412081750ba1e23fb804a68e0803fe7cf7e8c2",
           "size": 695
         },
+        "references/implementation.md": {
+          "sha256": "f5717b828ce5ee7100c2b8eee5474e0ae942360bccd5469070b8239999901fb4",
+          "size": 739
+        },
         "references/iterate.md": {
-          "sha256": "9b969fbb22b32c75f0cda4e8802c3a4b129531324ea27e365fc0dad8fc6b3de9",
-          "size": 1335
+          "sha256": "c61b074cbafe77425c74da9cc19a345cc4d0e79f8cbffb69202792de0cea66f4",
+          "size": 1922
         },
         "references/shrink.md": {
           "sha256": "e4aa09578f50e8661b66e8947c90192159a79bb1e50d91a00978e170cafd9988",
           "size": 721
         },
         "SKILL.md": {
-          "sha256": "5017e6e44c6765e38d13decd16cbe71a0494a2bd3e2ade8568a42a8dc2ccf9ed",
-          "size": 5388
+          "sha256": "fdc241140bfcafaab60990921b146a8c91a763c6d79bfc8c4ecc3dad9aa3136d",
+          "size": 1979
         },
         "skill.yaml": {
           "sha256": "d828f5f4c7075ad76083914ad5b3525bb3ab16d59ba0c293cb8d1f2759cf75bf",
@@ -69,17 +105,37 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/test",
-        "fetchedAt": "2026-07-19T18:18:22.548Z"
+        "fetchedAt": "2026-07-21T12:39:11.533Z"
       },
       "installMode": "mirror",
       "files": {
+        "references/cleanup.md": {
+          "sha256": "de0a4346abacdc800b027d85171bf0778fe5c6fd31f76359b64abb2b9ee4472e",
+          "size": 147
+        },
+        "references/coverage.md": {
+          "sha256": "170032b8888fa3a37f26e6d57becdaf31371393d6ed55fa76cf8f1ef0e54b5b3",
+          "size": 165
+        },
+        "references/create.md": {
+          "sha256": "6aac824073f93d6f3375acc4ef299f080d51dd909735b65b36883335e1e26140",
+          "size": 184
+        },
+        "references/fix.md": {
+          "sha256": "34958400d5b2008a9390a3dba7785abfe4f7b518c2c2c1d91cdf82314c86a646",
+          "size": 214
+        },
         "references/perf.md": {
           "sha256": "7ce139984b802619008cd8dfe24feb5a1c2aa9c02249e54bd780ecc7cfe546c9",
           "size": 922
         },
+        "references/run.md": {
+          "sha256": "0b004c21f4578a31a77317ec6115720b49212d66064540ba2509433a5fd528fa",
+          "size": 360
+        },
         "SKILL.md": {
-          "sha256": "2056eb012f1fce643fa5cf05ccf10f75a54ce317c78e158234248bafa9a6b283",
-          "size": 2654
+          "sha256": "c9fb785abaf7e1d8d8708393d9eba5f2fdddd13c3b8fdf457bce51706a3f7f7c",
+          "size": 1456
         },
         "skill.yaml": {
           "sha256": "58a892c4641cea9cfb10e08f8c91c5d6c728d3cafc43fa8c8d9ed6ede4c23f27",
@@ -92,13 +148,21 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/todo",
-        "fetchedAt": "2026-07-19T18:18:22.550Z"
+        "fetchedAt": "2026-07-21T12:39:11.534Z"
       },
       "installMode": "mirror",
       "files": {
+        "references/ideate.md": {
+          "sha256": "0e51cd102318401666fa39211eb98ecb2d9e3c52a7417f3e7b149eec230361ee",
+          "size": 328
+        },
+        "references/spec.md": {
+          "sha256": "f34652aed8a07e8fbf53406f494443af43ea94315281f5148bf9d6b6cb6b0569",
+          "size": 544
+        },
         "SKILL.md": {
-          "sha256": "fbf687c0e4e0cc0feef5e5329c773ad6c9e965b849c6bb936b195f6098d4500c",
-          "size": 1964
+          "sha256": "64bfb8e5670784b73dcd9b9a9f9acfbe803bf6eed02a926d8d8e21d711434d81",
+          "size": 921
         },
         "skill.yaml": {
           "sha256": "50aa2f9d1860de47e987851ef3b1ad96fbe93194b9cf1d712afe0146b8ab645b",
@@ -111,7 +175,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/benchbox",
-        "fetchedAt": "2026-07-19T18:18:22.553Z"
+        "fetchedAt": "2026-07-21T12:39:11.536Z"
       },
       "installMode": "mirror",
       "files": {
@@ -152,8 +216,8 @@
           "size": 585
         },
         "SKILL.md": {
-          "sha256": "fc2fb02c861487cc8ed2fca241b3da03741be37672c44348118d2454eb3f5d03",
-          "size": 3000
+          "sha256": "2d913f3cf28046aa6a14855145c41f35fca089e445bade8c3a88e5bbcd37361a",
+          "size": 1915
         },
         "skill.yaml": {
           "sha256": "00bf607e7bbefc290148cd0a87620a91d2c2b84bd9895686f1dd9eca928954bd",
@@ -166,7 +230,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/commit-framework",
-        "fetchedAt": "2026-07-19T18:18:22.554Z"
+        "fetchedAt": "2026-07-21T12:39:11.537Z"
       },
       "installMode": "mirror",
       "files": {
@@ -185,7 +249,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/verify-framework",
-        "fetchedAt": "2026-07-19T18:18:22.554Z"
+        "fetchedAt": "2026-07-21T12:39:11.537Z"
       },
       "installMode": "mirror",
       "files": {
@@ -204,7 +268,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/research-framework",
-        "fetchedAt": "2026-07-19T18:18:22.555Z"
+        "fetchedAt": "2026-07-21T12:39:11.538Z"
       },
       "installMode": "mirror",
       "files": {
@@ -223,7 +287,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/compare-framework",
-        "fetchedAt": "2026-07-19T18:18:22.556Z"
+        "fetchedAt": "2026-07-21T12:39:11.538Z"
       },
       "installMode": "mirror",
       "files": {
@@ -242,7 +306,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/shrink-framework",
-        "fetchedAt": "2026-07-19T18:18:22.556Z"
+        "fetchedAt": "2026-07-21T12:39:11.539Z"
       },
       "installMode": "mirror",
       "files": {
@@ -261,13 +325,25 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/tidy-perms",
-        "fetchedAt": "2026-07-19T18:18:22.560Z"
+        "fetchedAt": "2026-07-21T12:39:11.542Z"
       },
       "installMode": "mirror",
       "files": {
+        "references/audit.md": {
+          "sha256": "214ff1446853112559e205ae06de79601458cf3e85dac060cb2412896b0f8307",
+          "size": 242
+        },
+        "references/consolidate.md": {
+          "sha256": "f4e5f30dd535fe1e27e437258628d8b267370eb94d5a0ead626843b9780b8ce0",
+          "size": 722
+        },
+        "references/permissions-model.md": {
+          "sha256": "e8f22bcfad39c624bee87984afde0f83ab2a7b660c191843e7f8415209d2c888",
+          "size": 741
+        },
         "SKILL.md": {
-          "sha256": "b007c63349e5edb7378c9f82a42591461ed5dc100052a920bfb86022b2721cb3",
-          "size": 3048
+          "sha256": "0383fc2b615df9ed978033eb73a5a40dfb7eb74f9f83f91172da451c3c2a94fd",
+          "size": 912
         },
         "skill.yaml": {
           "sha256": "6d78cd1a38c54d7c83954e28c997e980ed0e5cd02a5b190c2c2cd38663cb21c5",
@@ -280,7 +356,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/context-guide",
-        "fetchedAt": "2026-07-19T18:18:22.557Z"
+        "fetchedAt": "2026-07-21T12:39:11.539Z"
       },
       "installMode": "mirror",
       "files": {
@@ -299,7 +375,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/debug-framework",
-        "fetchedAt": "2026-07-19T18:18:22.557Z"
+        "fetchedAt": "2026-07-21T12:39:11.539Z"
       },
       "installMode": "mirror",
       "files": {
@@ -318,7 +394,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/slicing-framework",
-        "fetchedAt": "2026-07-19T18:18:22.558Z"
+        "fetchedAt": "2026-07-21T12:39:11.540Z"
       },
       "installMode": "mirror",
       "files": {
@@ -337,13 +413,17 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/skill-sync",
-        "fetchedAt": "2026-07-19T18:18:22.559Z"
+        "fetchedAt": "2026-07-21T12:39:11.541Z"
       },
       "installMode": "mirror",
       "files": {
+        "references/operations.md": {
+          "sha256": "712fbe9fe837066dbef42107183a5d0cc6d1c6938a5b47b2be151bf32b919013",
+          "size": 888
+        },
         "SKILL.md": {
-          "sha256": "f3b21bca5abb1ae938fb17a01322f31e57440fc9bf643d4439a60474077cc46b",
-          "size": 2780
+          "sha256": "0b6264d08b92681dfa8565de3b962daccd854a521eb3a3b029dfcc2399d95535",
+          "size": 1368
         },
         "skill.yaml": {
           "sha256": "a65d60707d5db13f2d80a7ecb375cf42d624e393da19fb72956426c32efe007e",
@@ -356,7 +436,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/plan-deepening-framework",
-        "fetchedAt": "2026-07-19T18:18:22.561Z"
+        "fetchedAt": "2026-07-21T12:39:11.543Z"
       },
       "installMode": "mirror",
       "files": {
@@ -375,7 +455,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/SHARED/review-protocol",
-        "fetchedAt": "2026-07-19T18:18:22.558Z"
+        "fetchedAt": "2026-07-21T12:39:11.540Z"
       },
       "installMode": "mirror",
       "files": {
@@ -394,13 +474,33 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/docs",
-        "fetchedAt": "2026-07-19T18:18:22.549Z"
+        "fetchedAt": "2026-07-21T12:39:11.534Z"
       },
       "installMode": "mirror",
       "files": {
+        "references/adversarial.md": {
+          "sha256": "9443a86129d03aa00c2facb4c504bb541e530cdef7f1e6da647e79e51d791528",
+          "size": 167
+        },
+        "references/build.md": {
+          "sha256": "5f7adc15b0b22557f26bf1e29ccf7831737b22d0aa5ddd1868e2ff969ddfecd1",
+          "size": 169
+        },
+        "references/commit.md": {
+          "sha256": "794ab65275449b0d10e4cad5d9d4c7342b1b2e1d931c3351334cb47d8be9e924",
+          "size": 139
+        },
+        "references/create.md": {
+          "sha256": "aa32e1edca7e1339ed5f95821df6a9015239c248006e6c1e50bd7356f6e54132",
+          "size": 171
+        },
+        "references/review.md": {
+          "sha256": "8995cad71c54b59c07c4be1324f7fbe5f75ac7a1c250a96539dfcc7a942f1475",
+          "size": 176
+        },
         "SKILL.md": {
-          "sha256": "ca18bd636d8b511a9a70b72b59add5aa68d76ba10984281c5fa35eb31205b0a3",
-          "size": 2549
+          "sha256": "066b7184f5d988953f4e6caf2e3f38cd9b61ecb9bdbebaf7c93920b969173f59",
+          "size": 1582
         },
         "skill.yaml": {
           "sha256": "b348d06c928d986a3714d5337723e59c40a45939e31405a8de2019171de32970",
@@ -413,7 +513,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/todo-db",
-        "fetchedAt": "2026-07-19T18:57:00.527Z"
+        "fetchedAt": "2026-07-21T12:39:11.535Z"
       },
       "installMode": "mirror",
       "files": {
@@ -421,9 +521,21 @@
           "sha256": "4bce823cf9af1727c3706a7bf5bb00eff7bdd8134f4d7765dc051d06aad1124c",
           "size": 6110
         },
+        "references/implement.md": {
+          "sha256": "bb2d86fc5851b133972e436905af70930c856d807aa279c9937ca850359b6874",
+          "size": 724
+        },
+        "references/queries.md": {
+          "sha256": "acdfa809dec27f6839f5f3efaa28f578917bc2503e2856f115be086215ce7657",
+          "size": 477
+        },
+        "references/review.md": {
+          "sha256": "716b75c1d896f01219d0d10a00192732d61f471d7f1ea5cbdb837f0a22339013",
+          "size": 318
+        },
         "SKILL.md": {
-          "sha256": "974c25ca2baf56150d43557bf6a9c1bc7fef57e83ec4dd0cadeb3d5a2ebc19d3",
-          "size": 2686
+          "sha256": "8b4cdaf7cf0f0f28fa4444b8c92aed9bd06f880aa6151ceccda29f12bc63b10e",
+          "size": 2092
         },
         "skill.yaml": {
           "sha256": "cb55ea0e50a1a1953101e929d49242dfc439d242f76933e95c0c58da177c9827",
