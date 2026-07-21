@@ -25,11 +25,10 @@ from benchbox.core.expected_results.tpch_results import (
 
 logger = logging.getLogger(__name__)
 
-# Per-benchmark parameter-sensitive query-id sets consulted by the exclusion
-# check in QueryValidator.validate_query_result(). Only TPC-H has one today
-# (see tpch_results.PARAMETER_SENSITIVE_QUERY_IDS); benchmarks with no entry
-# here get an empty set, so the exclusion never fires for them regardless of
-# reference-seed context.
+# Per-benchmark parameter-sensitive query-id sets consulted by the legacy
+# EXACT-mode fallback below. The TPC-H provider now assigns RANGE/LOOSE modes
+# to these queries directly; retaining this guard keeps an explicitly exact
+# expectation from silently failing under a non-reference seed.
 _PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK: dict[str, frozenset[str]] = {
     "tpch": _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
     "tpc-h": _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
@@ -75,7 +74,8 @@ def set_reference_seed_context(is_reference_seed: bool | None) -> None:
         False: this query is running under different substitution parameters
             than the reference answer set -- get_parameter_sensitive_query_ids
             entries are excluded from EXACT-mode failure rather than
-            compared.
+            compared. The current TPC-H provider assigns RANGE/LOOSE modes to
+            those queries, so this fallback does not bypass their validation.
         None (the default/unset value): unknown -- preserves the pre-existing
             behavior of always attempting EXACT validation. Benchmarks that
             never call this function (TPC-DS, DataFrame validation, any other
@@ -100,9 +100,9 @@ class QueryValidator:
 
     This class validates query results by comparing actual row counts against
     expected results from the registry. It supports:
-    - Exact row count validation (requires reference seed)
-    - Loose tolerance-based validation (for custom seeds, ±50% default)
-    - Range-based validation for non-deterministic queries
+    - Exact row count validation for fixed-cardinality queries
+    - Loose tolerance-based validation for designated parameter-sensitive queries
+    - Range-based validation for designated parameter-sensitive queries
     - Graceful handling of queries without expected results
 
     Automatically ensures all providers are registered on initialization.
@@ -205,31 +205,6 @@ class QueryValidator:
         # Benchmarks may use int keys but expected results use string keys
         query_id_normalized = self._normalize_query_id(benchmark_type, query_id)
 
-        # Parameter-sensitive exclusion (non-reference-seed runs only). TPC-H's
-        # answer-set-boundary queries (Q11/16/18/20 -- see
-        # get_parameter_sensitive_query_ids) only have a validated cardinality
-        # under the pinned reference seed's substitution parameters. When the
-        # caller has told us (via set_reference_seed_context) that the CURRENT
-        # query is running under different parameters, cardinality validation
-        # is inapplicable rather than a false failure -- mirrors the bounded
-        # correctness gate's existing exclusion policy (see
-        # docs/operations/release-guide.md: "Q11/Q16/Q18/Q20 ... excluded for
-        # answer-set boundary sensitivity"). Checked BEFORE the registry
-        # lookup so it applies regardless of what stream_id the caller passed.
-        # Reference-seed runs (context is True) and callers that never set the
-        # context (None, e.g. TPC-DS, DataFrame validation) are unaffected.
-        if get_reference_seed_context() is False and query_id_normalized in get_parameter_sensitive_query_ids(
-            benchmark_type
-        ):
-            return ValidationResult(
-                is_valid=True,
-                query_id=query_id_str,
-                expected_row_count=None,
-                actual_row_count=actual_row_count,
-                validation_mode=ValidationMode.SKIP,
-                warning_message=(f"Query '{query_id}' not validated (parameter-sensitive, non-reference params)."),
-            )
-
         # Get expected result from registry
         expected_result = self.registry.get_expected_result(
             benchmark_type, query_id_normalized, scale_factor, stream_id
@@ -257,6 +232,26 @@ class QueryValidator:
                 actual_row_count=actual_row_count,
                 validation_mode=ValidationMode.SKIP,
                 warning_message=warning_msg,
+            )
+
+        # Legacy fallback for callers that still provide an EXACT expectation
+        # for a parameter-sensitive TPC-H query. The TPC-H provider's current
+        # RANGE/LOOSE assignments intentionally bypass this branch so their
+        # bounds/tolerance are exercised for both reference and non-reference
+        # seeds. Reference-seed context and callers that never set it remain
+        # unchanged.
+        if (
+            expected_result.validation_mode == ValidationMode.EXACT
+            and get_reference_seed_context() is False
+            and query_id_normalized in get_parameter_sensitive_query_ids(benchmark_type)
+        ):
+            return ValidationResult(
+                is_valid=True,
+                query_id=query_id_str,
+                expected_row_count=None,
+                actual_row_count=actual_row_count,
+                validation_mode=ValidationMode.SKIP,
+                warning_message=(f"Query '{query_id}' not validated (parameter-sensitive, non-reference params)."),
             )
 
         # Get expected count (handles formulas and scale factors)

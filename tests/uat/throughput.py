@@ -239,20 +239,17 @@ def validate_throughput_metric(result_json: dict[str, Any]) -> tuple[bool, str]:
 
     HISTORICAL NOTE: prior to #1142, TPC-H throughput mode failed this check
     at SF=1 on DuckDB regardless of ``--seed`` choice -- queries 11/16/18/20
-    (TPC-H's own "non-deterministic" query set) failed BenchBox's LOOSE
-    (+-50%) row-count validation on every stream, because the throughput
-    driver's per-stream/per-position seed derivation
-    (``benchbox/core/tpch/throughput_test.py``: ``seed + stream_id * 1000 +
-    position``) meant no stream after the first query of stream 0 could ever
-    land on the reference-seed exact-match path that POWER mode gets when no
-    seed is given. #1142 fixed this at the root by adding a thread-local
-    reference-seed context (``benchbox.core.validation.query_validation.
-    set_reference_seed_context``) so the four parameter-sensitive queries are
-    excluded from EXACT row-count checks only when a non-reference seed is
-    actually in effect. This was a correctness gap orthogonal to
-    stream-count wiring -- see ``validate_stream_count`` for the check that
-    guards that separate concern, and ``validate_stream_success`` for the
-    per-stream pass/fail check this metric check doesn't cover.
+    (TPC-H's own parameter-sensitive query set) were EXACT-compared against
+    one answer-set parameterization even when throughput derived different
+    parameters for each stream and position. #1142 added a thread-local
+    reference-seed context as an interim exclusion guard. The expected-results
+    provider now assigns Q11/Q18/Q20 static RANGE bounds and Q16 LOOSE
+    validation, so the runtime validator checks those modes for both reference
+    and non-reference parameters; the context remains only as a legacy guard
+    for an explicitly EXACT expectation. This is orthogonal to stream-count
+    wiring -- see ``validate_stream_count`` for that separate concern, and
+    ``validate_stream_success`` for the per-stream pass/fail check this metric
+    check doesn't cover.
 
     Returns ``(ok, reason)``; `reason` is a human-readable explanation on
     failure, or ``"ok"`` on success.
