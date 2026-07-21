@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Correct TPC throughput metrics in newly exported results** - TPC-H and
+  TPC-DS throughput drivers now include every executed query in
+  Throughput@Size, correcting the 22x and 99x understatements produced by
+  earlier result versions. Historical result bundles remain unchanged records.
 - **Removed dead `BENCHBOX_TUNING_ENABLED` env var** - This variable set the
   `tuning.enabled` config key, which nothing at runtime ever read (only a unit
   test did); docs incorrectly claimed it "activates tuned runs in CI". Use

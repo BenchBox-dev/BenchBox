@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection as _DatabaseConnection
+from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.core.validation import (
     DatabaseValidationEngine,
     DataValidationEngine,
@@ -1425,7 +1426,13 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         # Calculate Throughput@Size metric
         throughput_at_size = 0.0
         if total_duration > 0:
-            throughput_at_size = (num_streams * 3600.0 * self.scale_factor) / total_duration
+            total_queries = sum(stream_result["queries_executed"] for stream_result in stream_results)
+            throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
+                total_queries=total_queries,
+                total_time_seconds=total_duration,
+                scale_factor=self.scale_factor,
+                num_streams=num_streams,
+            )
 
         # Create result object
         result = ThroughputTestResult(

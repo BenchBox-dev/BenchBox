@@ -23,6 +23,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
 
@@ -193,20 +194,27 @@ class TestStreamRunnerComputeMetrics:
     """Cover StreamRunner.compute_metrics()'s pure aggregation math."""
 
     def test_computes_throughput_from_stream_results(self) -> None:
-        config = _FakeConfig(num_streams=2, scale_factor=1.0)
+        config = _FakeConfig(num_streams=3, scale_factor=1.0)
         result = _make_result()
         result.stream_results = [
-            _make_stream_result(0, start_time=0.0, end_time=10.0, queries_executed=22),
-            _make_stream_result(1, start_time=1.0, end_time=11.0, queries_executed=22),
+            _make_stream_result(0, start_time=0.0, end_time=3598.0, queries_executed=22),
+            _make_stream_result(1, start_time=1.0, end_time=3599.0, queries_executed=22),
+            _make_stream_result(2, start_time=2.0, end_time=3600.0, queries_executed=22),
         ]
 
         StreamRunner.compute_metrics(result, config, start_time=0.0)
 
         # TTT spans from the earliest stream start to the latest stream end.
-        assert result.total_time == pytest.approx(11.0)
-        expected_throughput_at_size = (config.num_streams * 3600.0 * config.scale_factor) / result.total_time
-        assert result.throughput_at_size == pytest.approx(expected_throughput_at_size)
-        assert result.query_throughput == pytest.approx(44 / 11.0)
+        assert result.total_time == 3600.0
+        expected_throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
+            total_queries=66,
+            total_time_seconds=result.total_time,
+            scale_factor=config.scale_factor,
+            num_streams=config.num_streams,
+        )
+        assert expected_throughput_at_size == 66.0
+        assert result.throughput_at_size == expected_throughput_at_size
+        assert result.query_throughput == pytest.approx(66 / 3600.0)
         assert result.end_time != ""
 
     def test_zero_queries_yields_zero_query_throughput(self) -> None:
@@ -218,7 +226,7 @@ class TestStreamRunnerComputeMetrics:
 
         assert result.total_time == pytest.approx(5.0)
         assert result.query_throughput == 0.0
-        assert result.throughput_at_size > 0
+        assert result.throughput_at_size == 0.0
 
     def test_falls_back_to_elapsed_time_when_no_streams_ran(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """No stream_results (e.g. all streams raised before producing a result)."""
