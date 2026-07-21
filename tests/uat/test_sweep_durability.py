@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import json
 import signal
+from collections.abc import Callable
 from pathlib import Path
+from types import FrameType
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -175,8 +178,11 @@ def test_sigterm_shim_raises_sweepcancelled_and_records_cancellation(tmp_path: P
     try:
         handler = signal.getsignal(signal.SIGTERM)
         assert callable(handler)
+        # signal.getsignal returns an opaque callable union; give it the real
+        # handler signature so the call type-checks (ty call-top-callable).
+        typed_handler = cast(Callable[[int, FrameType | None], None], handler)
         with pytest.raises(orchestrator.SweepCancelled) as excinfo:
-            handler(int(signal.SIGTERM), None)
+            typed_handler(int(signal.SIGTERM), None)
         assert excinfo.value.signal_name == "SIGTERM"
         assert isinstance(excinfo.value, KeyboardInterrupt)
     finally:
