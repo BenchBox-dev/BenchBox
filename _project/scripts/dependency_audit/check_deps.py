@@ -27,7 +27,10 @@ import re
 import sys
 from collections import defaultdict
 
-import tomllib
+try:
+    import tomllib
+except ImportError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib
 
 try:
     import yaml
@@ -136,6 +139,7 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _strip_extras(name: str) -> str:
     return name.split("[", 1)[0]
 
@@ -217,6 +221,7 @@ def _load_allowlist(path: pathlib.Path) -> set[str]:
 # Main check
 # ---------------------------------------------------------------------------
 
+
 def run_check(root: pathlib.Path, verbose: bool = False) -> int:
     plugin_allow = _load_allowlist(PLUGIN_CLI_ALLOWLIST)
     guarded_allow = _load_allowlist(GUARDED_OPTIONAL_ALLOWLIST)
@@ -243,8 +248,10 @@ def run_check(root: pathlib.Path, verbose: bool = False) -> int:
         else:
             violations.append(pkg)
 
-    print(f"Dependency audit: {len(declared)} declared, {ok_count} with import sites, "
-          f"{allowed_count} allowlisted, {len(violations)} violations")
+    print(
+        f"Dependency audit: {len(declared)} declared, {ok_count} with import sites, "
+        f"{allowed_count} allowlisted, {len(violations)} violations"
+    )
 
     if violations:
         print("\nVIOLATIONS - declared packages with zero import sites (not allowlisted):")

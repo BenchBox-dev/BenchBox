@@ -32,7 +32,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -288,7 +288,7 @@ def evaluate_uat_gate_evidence(
         # means older/hand-authored evidence, so assume UTC -- deterministic
         # regardless of the evaluating environment, even if not necessarily
         # the exact original operator offset.
-        completed_at = completed_at.replace(tzinfo=UTC)
+        completed_at = completed_at.replace(tzinfo=timezone.utc)
     age_days = (now - completed_at).total_seconds() / 86400
     summary.append(f"- uat_age: {age_days:.1f}d")
     if age_days > max_age_days:
@@ -427,7 +427,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             result = evaluate_canary_runs(
                 data.get("workflow_runs", []),
-                now=datetime.now(UTC),
+                now=datetime.now(timezone.utc),
                 max_age_hours=args.max_age_hours,
                 head_sha=args.head_sha,
                 require_ancestor=not args.no_ancestor_check,
@@ -453,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
             evidence = _load_uat_gate_evidence(args.uat_evidence_path, args.uat_evidence_ref)
             uat_result = evaluate_uat_gate_evidence(
                 evidence,
-                now=datetime.now(UTC),
+                now=datetime.now(timezone.utc),
                 max_age_days=args.uat_max_age_days,
                 head_sha=args.head_sha,
                 require_ancestor=not args.no_ancestor_check,

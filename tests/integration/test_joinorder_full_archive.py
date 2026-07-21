@@ -33,7 +33,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import tomllib
+
+try:
+    import tomllib
+except ImportError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib  # type: ignore[import-not-found, no-redef]
 
 duckdb = pytest.importorskip("duckdb", reason="DuckDB not installed")
 

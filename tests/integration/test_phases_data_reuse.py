@@ -251,6 +251,9 @@ class TestPhasesDataReuse:
         with patch("benchbox.core.runner.runner.get_platform_adapter") as mock_adapter_factory:
             mock_adapter = Mock()
             mock_adapter.platform_name = "test"
+            # This test covers data reuse, not adapter metadata. A bare Mock's
+            # synthetic to_dict() recursively returns another Mock on Python 3.10.
+            mock_adapter.get_normalized_result_metadata.return_value = {}
             mock_adapter.run_benchmark = Mock(
                 return_value=benchmark.create_enhanced_benchmark_result(
                     platform="test",
