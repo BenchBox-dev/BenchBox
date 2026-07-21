@@ -6,7 +6,7 @@ import io
 import json
 import urllib.error
 import zipfile
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -28,7 +28,7 @@ def _run(*, conclusion: str, updated_at: datetime, sha: str = "abc123") -> dict[
 
 
 def test_latest_red_canary_blocks_even_with_older_success() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     result = evaluate_canary_runs(
         [
             _run(conclusion="success", updated_at=now - timedelta(hours=2), sha="oldgreen"),
@@ -46,7 +46,7 @@ def test_latest_red_canary_blocks_even_with_older_success() -> None:
 
 
 def test_stale_canary_blocks_release_readiness() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     result = evaluate_canary_runs(
         [_run(conclusion="success", updated_at=now - timedelta(hours=49), sha="stalesha")],
         now=now,
@@ -60,7 +60,7 @@ def test_stale_canary_blocks_release_readiness() -> None:
 
 
 def test_non_ancestor_canary_blocks_release_readiness() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     result = evaluate_canary_runs(
         [_run(conclusion="success", updated_at=now - timedelta(hours=1), sha="not-ancestor")],
         now=now,
@@ -74,7 +74,7 @@ def test_non_ancestor_canary_blocks_release_readiness() -> None:
 
 
 def test_green_fresh_ancestor_canary_passes() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     result = evaluate_canary_runs(
         [_run(conclusion="success", updated_at=now - timedelta(hours=1), sha="goodsha")],
         now=now,
@@ -88,7 +88,7 @@ def test_green_fresh_ancestor_canary_passes() -> None:
 
 
 def test_canary_artifact_sha_is_used_for_ancestor_check() -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
     checked: list[tuple[str, str]] = []
 
     def _is_ancestor(ancestor: str, head: str) -> bool:
@@ -248,7 +248,7 @@ def test_missing_workflow_can_request_bootstrap(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_artifact_lookup_404_does_not_request_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
-    now = datetime(2026, 5, 25, 12, tzinfo=UTC)
+    now = datetime(2026, 5, 25, 12, tzinfo=timezone.utc)
 
     def _fake_api_json(url: str, _token: str) -> dict:
         if url.startswith("https://api.github.com/repos/"):

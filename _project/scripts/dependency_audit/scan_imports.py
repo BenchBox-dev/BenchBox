@@ -19,7 +19,10 @@ import re
 import sys
 from collections import defaultdict
 
-import tomllib
+try:
+    import tomllib
+except ImportError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib
 
 # Package-name → top-level import-name(s) mapping. Most packages match their
 # install name, but several do not. Update this map whenever you discover a new
@@ -204,9 +207,7 @@ def main() -> int:
     declared = collect_declared(root)
 
     # benchbox/scripts/tests are runtime; docs/conf.py + docs/_static for build.
-    py_imports = collect_python_imports(
-        root, ["benchbox", "scripts", "tests", "docs/conf.py", "docs/_static"]
-    )
+    py_imports = collect_python_imports(root, ["benchbox", "scripts", "tests", "docs/conf.py", "docs/_static"])
     # _project/ tooling is captured separately so we can flag deps used only by tooling.
     tooling_imports = collect_python_imports(root, ["_project/scripts"])
     doc_imports = collect_doc_mentions(root)
@@ -248,10 +249,7 @@ def main() -> int:
     )
 
     # Print summary
-    no_use = [
-        p for p, sites in pkg_sites.items()
-        if not sites and p not in pkg_doc_only and p not in pkg_tooling_only
-    ]
+    no_use = [p for p, sites in pkg_sites.items() if not sites and p not in pkg_doc_only and p not in pkg_tooling_only]
     print(f"declared packages: {len(declared)}")
     print(f"packages with python import sites: {sum(1 for v in pkg_sites.values() if v)}")
     print(f"packages with only doc mentions:   {len(pkg_doc_only)}")

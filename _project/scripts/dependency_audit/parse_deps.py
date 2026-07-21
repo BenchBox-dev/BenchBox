@@ -21,7 +21,10 @@ import re
 import sys
 from collections import defaultdict
 
-import tomllib
+try:
+    import tomllib
+except ImportError:  # pragma: no cover - Python 3.10 compatibility
+    import tomli as tomllib
 
 # ---------------------------------------------------------------------------
 # Paths (resolved at runtime). Mirror check_deps.py: take the containing

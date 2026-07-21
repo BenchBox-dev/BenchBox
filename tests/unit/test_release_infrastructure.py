@@ -1433,13 +1433,13 @@ class TestUATGateReleaseEvidence:
 
     @staticmethod
     def _evaluate(payload, *, now=None, is_ancestor=lambda _a, _h: True, max_age_days=21.0):
-        from datetime import UTC, datetime
+        from datetime import datetime, timezone
 
         from scripts.release_readiness_check import evaluate_uat_gate_evidence
 
         return evaluate_uat_gate_evidence(
             payload,
-            now=now or datetime(2026, 7, 10, 12, tzinfo=UTC),
+            now=now or datetime(2026, 7, 10, 12, tzinfo=timezone.utc),
             max_age_days=max_age_days,
             head_sha="release-head",
             is_ancestor=is_ancestor,
@@ -1467,11 +1467,11 @@ class TestUATGateReleaseEvidence:
         assert "dirty source tree" in result.message
 
     def test_stale_evidence_blocks_release(self):
-        from datetime import UTC, datetime
+        from datetime import datetime, timezone
 
         result = self._evaluate(
             self._payload(completed_at="2026-06-01T10:00:00+00:00"),
-            now=datetime(2026, 7, 10, 12, tzinfo=UTC),
+            now=datetime(2026, 7, 10, 12, tzinfo=timezone.utc),
         )
         assert not result.ok
         assert "stale" in result.message
@@ -1509,10 +1509,10 @@ class TestUATGateReleaseEvidence:
         """
         import os
         import time
-        from datetime import UTC, datetime
+        from datetime import datetime, timezone
 
         payload = self._payload(completed_at="2026-07-09T10:00:00")  # naive, no offset
-        now = datetime(2026, 7, 10, 12, tzinfo=UTC)
+        now = datetime(2026, 7, 10, 12, tzinfo=timezone.utc)
 
         def _age_line(result):
             return next(line for line in result.summary if line.startswith("- uat_age:"))
@@ -1538,11 +1538,11 @@ class TestUATGateReleaseEvidence:
 
     def test_uat_failure_blocks_after_green_canary(self, monkeypatch, capsys):
         """main() combines a green canary with UAT evidence; missing UAT blocks."""
-        from datetime import UTC, datetime
+        from datetime import datetime, timezone
 
         from scripts import release_readiness_check
 
-        now_iso = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         def _fake_api_json(url: str, _token: str) -> dict:
             return {
@@ -1572,11 +1572,11 @@ class TestUATGateReleaseEvidence:
         assert "No committed UAT gate evidence" in capsys.readouterr().err
 
     def test_green_canary_plus_green_uat_passes(self, monkeypatch):
-        from datetime import UTC, datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         from scripts import release_readiness_check
 
-        now_iso = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         def _fake_api_json(url: str, _token: str) -> dict:
             return {
@@ -1592,7 +1592,7 @@ class TestUATGateReleaseEvidence:
                 ]
             }
 
-        payload = self._payload(completed_at=(datetime.now(UTC) - timedelta(days=1)).isoformat())
+        payload = self._payload(completed_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat())
         monkeypatch.setattr(release_readiness_check, "_api_json", _fake_api_json)
         monkeypatch.setattr(release_readiness_check, "_is_ancestor_with_git", lambda _a, _h: True)
         monkeypatch.setattr(release_readiness_check, "_load_uat_gate_evidence", lambda _p, _r: payload)
