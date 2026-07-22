@@ -239,7 +239,7 @@ class StarRocksWorkloadMixin:
         from benchbox.core.tuning.ddl_generator import get_ddl_generator
 
         generator = get_ddl_generator("starrocks")
-        tuning_clauses = self._resolve_tuned_ddl_clauses(statement, table_tunings, generator)
+        tuning_clauses, tuned_table_name = self._resolve_tuned_ddl_clauses(statement, table_tunings, generator)
 
         # Add DISTRIBUTED BY HASH (engine-mandatory) plus any tuned PARTITION BY /
         # ORDER BY clauses, in StarRocks' required clause order: PARTITION BY ->
@@ -249,16 +249,28 @@ class StarRocksWorkloadMixin:
         # DISTRIBUTED BY HASH(<first_column>) BUCKETS 8 baseline.
         if "DISTRIBUTED BY" not in current_upper and first_col:
             suffix_clauses: list[str] = []
+            # Genuinely tuned clauses (for the applied-tuning ledger, w4) -- the
+            # engine-mandatory first-column DISTRIBUTED BY is excluded because it
+            # is a baseline requirement, not a tuning choice.
+            tuned_clauses: list[str] = []
 
             if tuning_clauses is not None and tuning_clauses.partition_by and "PARTITION BY" not in current_upper:
-                suffix_clauses.append(generator.render_partition_clause(tuning_clauses.partition_by))
+                partition_clause = generator.render_partition_clause(tuning_clauses.partition_by)
+                suffix_clauses.append(partition_clause)
+                tuned_clauses.append(partition_clause)
 
             # Tuned distribution column overrides the first-column baseline.
-            dist_col = tuning_clauses.distribute_by if (tuning_clauses and tuning_clauses.distribute_by) else first_col
-            suffix_clauses.append(generator.render_distribution_clause(dist_col))
+            dist_tuned = bool(tuning_clauses and tuning_clauses.distribute_by)
+            dist_col = tuning_clauses.distribute_by if dist_tuned else first_col
+            distribution_clause = generator.render_distribution_clause(dist_col)
+            suffix_clauses.append(distribution_clause)
+            if dist_tuned:
+                tuned_clauses.append(distribution_clause)
 
             if tuning_clauses is not None and tuning_clauses.order_by and "ORDER BY" not in current_upper:
-                suffix_clauses.append(generator.render_order_by_clause(tuning_clauses.order_by))
+                order_clause = generator.render_order_by_clause(tuning_clauses.order_by)
+                suffix_clauses.append(order_clause)
+                tuned_clauses.append(order_clause)
 
             suffix = "\n".join(suffix_clauses)
             stripped = statement.rstrip()
@@ -267,23 +279,28 @@ class StarRocksWorkloadMixin:
             else:
                 statement = stripped + f"\n{suffix}"
 
+            # Record what was actually rendered into this executed CREATE TABLE.
+            self._record_starrocks_tuning_to_ledger(tuned_table_name, tuned_clauses)
+
         return statement
 
     def _resolve_tuned_ddl_clauses(self, statement: str, table_tunings: dict[str, Any] | None, generator: Any):
         """Resolve tuned PARTITION BY / DISTRIBUTED BY / ORDER BY clauses for this
         statement's table, if any.
 
-        Returns None when tuning is not enabled (``table_tunings`` is falsy), no
-        TableTuning is configured for this table, or the configured TableTuning
-        renders no clauses -- callers fall back to the engine-mandatory
-        DISTRIBUTED BY baseline in that case.
+        Returns ``(clauses, table_name)``. ``clauses`` is None when tuning is not
+        enabled (``table_tunings`` is falsy), no TableTuning is configured for
+        this table, or the configured TableTuning renders no clauses -- callers
+        fall back to the engine-mandatory DISTRIBUTED BY baseline in that case.
+        ``table_name`` is the parsed CREATE TABLE name (for ledger attribution),
+        or None when it could not be parsed.
         """
         if not table_tunings:
-            return None
+            return None, None
 
         match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+`?(\w+)`?", statement, re.IGNORECASE)
         if not match:
-            return None
+            return None, None
         table_name = match.group(1)
 
         # Benchmark table names are lowercase while shipped tuning templates key
@@ -296,12 +313,35 @@ class StarRocksWorkloadMixin:
                 break
 
         if table_tuning is None or not table_tuning.has_any_tuning():
-            return None
+            return None, table_name
 
         clauses = generator.generate_tuning_clauses(table_tuning)
         if clauses.is_empty():
-            return None
-        return clauses
+            return None, table_name
+        return clauses, table_name
+
+    def _record_starrocks_tuning_to_ledger(self, table_name: str | None, clauses: list[str]) -> None:
+        """Record rendered StarRocks tuning clauses into the applied-tuning ledger.
+
+        StarRocks applies PARTITION BY / DISTRIBUTED BY / ORDER BY as CREATE TABLE
+        clauses (not standalone statements), so the base connection-wrapping
+        capture never sees them; recording them here is what lets a tuned run
+        report ``applied_unverified`` instead of ``noop`` (w4). Only genuinely
+        tuned clauses are recorded -- the engine-mandatory first-column
+        DISTRIBUTED BY baseline is not a tuning choice. Guarded: a no-op when no
+        ledger is attached (non-tuned or non-benchmark runs), and capture never
+        breaks a run.
+        """
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        if ledger is None or not clauses:
+            return
+        try:
+            from benchbox.core.tuning.applied_ledger import PHASE_DDL
+
+            for clause in clauses:
+                ledger.record(clause, PHASE_DDL, mechanism="starrocks_ddl_generator", table=table_name)
+        except Exception as exc:  # capture must never break a run
+            self.logger.debug("StarRocks applied-ledger record degraded: %s", exc)
 
     # DuckDB/standard SQL → StarRocks type mappings.
     # Each entry is (pattern, replacement, case_sensitive). TIMESTAMP and TIME are

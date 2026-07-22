@@ -140,3 +140,70 @@ class TestStarRocksPreviewExecutionParity:
         statement = "CREATE TABLE lineitem (l_orderkey INT, l_shipdate DATE)"
         rendered = adapter._optimize_table_definition(statement, {"LINEITEM": table_tuning})
         assert "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in rendered
+
+
+class TestStarRocksAppliedLedgerInstrumentation:
+    """w4: rendered tuned clauses are recorded into the applied-tuning ledger so a
+    tuned StarRocks run reports ``applied_unverified`` rather than ``noop``."""
+
+    def _host_with_ledger(self):
+        from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
+
+        adapter = _HostAdapter()
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        return adapter
+
+    def test_tuned_clauses_recorded_with_mechanism_and_table(self):
+        from benchbox.core.tuning.applied_ledger import APPLIED_UNVERIFIED, PHASE_DDL
+
+        adapter = self._host_with_ledger()
+        table_tuning = TableTuning(
+            table_name="lineitem",
+            distribution=[TuningColumn(name="l_orderkey", type="INTEGER", order=1)],
+            partitioning=[TuningColumn(name="l_shipdate", type="DATE", order=1)],
+            sorting=[TuningColumn(name="l_linenumber", type="INTEGER", order=1)],
+        )
+        statement = "CREATE TABLE lineitem (l_orderkey INT, l_linenumber INT, l_shipdate DATE)"
+        adapter._optimize_table_definition(statement, {"lineitem": table_tuning})
+
+        ledger = adapter._applied_tuning_ledger
+        recorded = [s.statement for s in ledger.statements]
+        assert "PARTITION BY (l_shipdate)" in recorded
+        assert "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in recorded
+        assert "ORDER BY (l_linenumber)" in recorded
+        assert all(s.phase == PHASE_DDL and s.mechanism == "starrocks_ddl_generator" for s in ledger.statements)
+        assert all(s.table == "lineitem" for s in ledger.statements)
+        # A tuned run is now honestly applied_unverified, not noop.
+        assert ledger.overall_status(tuning_enabled=True, has_config=True) == APPLIED_UNVERIFIED
+
+    def test_untuned_records_nothing(self):
+        adapter = self._host_with_ledger()
+        statement = "CREATE TABLE region (r_regionkey INT, r_name VARCHAR(25))"
+        # table_tunings=None -> engine-mandatory baseline only, no tuning recorded.
+        adapter._optimize_table_definition(statement, None)
+        assert adapter._applied_tuning_ledger.is_empty()
+
+    def test_engine_mandatory_distribution_not_recorded_as_tuning(self):
+        """A tuned table with partition/sort but no explicit distribution column
+        falls back to the first-column DISTRIBUTED BY baseline; that baseline is
+        engine-mandatory, not a tuning choice, so it must NOT be recorded."""
+        adapter = self._host_with_ledger()
+        table_tuning = TableTuning(
+            table_name="lineitem",
+            partitioning=[TuningColumn(name="l_shipdate", type="DATE", order=1)],
+        )
+        statement = "CREATE TABLE lineitem (l_orderkey INT, l_shipdate DATE)"
+        adapter._optimize_table_definition(statement, {"lineitem": table_tuning})
+        recorded = [s.statement for s in adapter._applied_tuning_ledger.statements]
+        assert recorded == ["PARTITION BY (l_shipdate)"]  # baseline distribution excluded
+
+    def test_no_ledger_attribute_is_a_safe_noop(self):
+        """Capture must never break a run: a host with no ledger renders normally."""
+        adapter = _HostAdapter()  # no _applied_tuning_ledger
+        table_tuning = TableTuning(
+            table_name="lineitem",
+            distribution=[TuningColumn(name="l_orderkey", type="INTEGER", order=1)],
+        )
+        statement = "CREATE TABLE lineitem (l_orderkey INT)"
+        rendered = adapter._optimize_table_definition(statement, {"lineitem": table_tuning})
+        assert "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in rendered
