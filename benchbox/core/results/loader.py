@@ -151,10 +151,11 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
     # Load companion files if they exist
     plans_data, plans_load_error = _load_companion_file(filepath_obj, ".plans.json")
     tuning_data, _tuning_load_error = _load_companion_file(filepath_obj, ".tuning.json")
+    applied_data, _applied_load_error = _load_companion_file(filepath_obj, ".applied.json")
 
     # Reconstruct BenchmarkResults
     try:
-        result = reconstruct_benchmark_results(data, plans_data, tuning_data)
+        result = reconstruct_benchmark_results(data, plans_data, tuning_data, applied_data)
     except Exception as e:
         raise ResultLoadError(f"Failed to reconstruct BenchmarkResults: {e}") from e
 
@@ -209,6 +210,7 @@ def reconstruct_benchmark_results(
     data: dict[str, Any],
     plans_data: dict[str, Any] | None = None,
     tuning_data: dict[str, Any] | None = None,
+    applied_data: dict[str, Any] | None = None,
 ) -> BenchmarkResults:
     """Reconstruct a BenchmarkResults object from v2.0 JSON schema.
 
@@ -220,6 +222,8 @@ def reconstruct_benchmark_results(
         data: Result data in v2.0 JSON format.
         plans_data: Optional plans companion file data.
         tuning_data: Optional tuning companion file data.
+        applied_data: Optional applied-ledger companion (``.applied.json``) data,
+            the AppliedTuningLedger.to_payload() dict; carried onto the result.
 
     Returns:
         Fully reconstructed BenchmarkResults object.
@@ -296,6 +300,8 @@ def reconstruct_benchmark_results(
         tuning_config_hash=tuning["tuning_config_hash"],
         tuning_source=tuning["tuning_source"],
         tuning_validation_status=tuning["tuning_validation_status"],
+        applied_tuning_ledger=applied_data or None,
+        applied_ledger_hash=(applied_data or {}).get("applied_ledger_hash"),
         query_plans_captured=plans_captured,
         plan_capture_failures=plan_failures,
         cost_summary=cost_summary,

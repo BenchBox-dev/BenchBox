@@ -1,37 +1,19 @@
-"""Pin today's requested-config capture behavior (not applied verification).
+"""Pin that the applied-tuning ledger captures what actually executed.
 
-From the 2026-07-12 tuning review, finding R7: there is no test covering
-requested-vs-applied integrity -- whether `tunings_applied` on the result
-record reflects what the adapter actually executed, or merely what was
-asked for. Reading `benchbox/platforms/base/adapter.py`'s
-`run_enhanced_benchmark` (lines ~781-785) and `tuning_config.py`'s
-`_setup_fresh_database_phases` (which actually calls
-`adapter.apply_unified_tuning`) shows the current wiring:
+History: from the 2026-07-12 tuning review (finding R7), there was no test
+covering requested-vs-applied integrity, and this module originally *pinned the
+gap* -- that `tunings_applied` reported the full requested config while nothing
+observed what the adapter actually executed, and `tuning_validation_status`
+reflected only a metadata-row save.
 
-    tunings_applied_dict = effective_tuning_config.to_dict()
-    tuning_validation_status = "APPLIED" if tuning_metadata_saved else "FAILED_TO_SAVE"
-
-`tunings_applied` is always a serialization of the *requested*
-`UnifiedTuningConfiguration` -- it is never derived from what
-`apply_unified_tuning` actually executed against the connection.
-`tuning_validation_status` reflects only whether the metadata *row* was
-saved (`save_tuning_metadata`), not whether every requested tuning was
-actually applied.
-
-This test builds a stub adapter whose `apply_unified_tuning` deliberately
-applies only a *subset* of the requested configuration (simulating a
-platform quirk / partial failure that doesn't raise), runs
-`_setup_fresh_database_phases`, and reconstructs the same
-`tunings_applied`/`tuning_validation_status` derivation adapter.py performs.
-It asserts the *documented gap*: `tunings_applied` still reports every
-column of the full requested config, including the parts the stub adapter
-never executed, and `tuning_validation_status` still reads "APPLIED" purely
-because metadata-row-save succeeded.
-
-TODO (tracked, not fixed here): once an applied-ledger lands (see this
-TODO's `deferred` note, gated on ADR-1), this test's assertions on the gap
-should flip to asserting the ledger *does* reflect only what was executed --
-at which point this module's name and docstring should be revisited too.
+The applied-tuning ledger (TODO
+`tuning-applied-ledger-and-validation-status-20260712`) closes that gap, so this
+module's assertions have flipped: an adapter that under-applies (executes only a
+subset of the requested config, without raising) now produces a ledger that
+records *exactly* the statements that reached the connection -- and derives an
+honest `applied_unverified` status from them -- while the requested-config
+export (`tunings_applied`) is unchanged (ADR-1 additive invariant: the ledger is
+added alongside the request, never replaces or reconstructs it).
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -45,6 +27,13 @@ from typing import Any
 
 import pytest
 
+from benchbox.core.tuning.applied_ledger import (
+    APPLIED_UNVERIFIED,
+    EXECUTED,
+    PHASE_DDL,
+    AppliedTuningLedger,
+    recording_connection,
+)
 from benchbox.core.tuning.interface import (
     TableTuning,
     TuningColumn,
@@ -73,6 +62,9 @@ class _PartiallyApplyingStubAdapter(PlatformAdapter):
     constraint statements, silently skipping table-level tunings (sorting,
     partitioning, etc.) -- simulating a real-world partial-application
     scenario without raising, so the run still "succeeds".
+
+    It wraps the connection with ``recording_connection`` exactly as a real
+    adapter does, so the applied-tuning ledger observes what executed.
     """
 
     def __init__(self, **config: Any):
@@ -115,11 +107,12 @@ class _PartiallyApplyingStubAdapter(PlatformAdapter):
         return None
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        # Deliberately partial: only "apply" constraints, skip every
-        # table-level tuning (this is the drift this test pins -- a real
-        # adapter silently under-applying would look identical from
-        # tunings_applied's perspective).
-        connection.execute("APPLY CONSTRAINTS")
+        # Deliberately partial: only "apply" constraints, skip every table-level
+        # tuning. Wrap the connection so the ledger records the single statement
+        # that actually reached the database -- the honest capture this test now
+        # pins (a real adapter under-applying would look identical).
+        recording = recording_connection(connection, getattr(self, "_applied_tuning_ledger", None), PHASE_DDL)
+        recording.execute("APPLY CONSTRAINTS")
 
     def save_tuning_metadata(self, connection: Any) -> bool:
         return True
@@ -138,9 +131,9 @@ def _requested_config_with_table_tunings() -> UnifiedTuningConfiguration:
     return config
 
 
-class TestRequestedConfigCaptureNotAppliedVerification:
-    """Pins today's `tunings_applied` derivation: requested config capture,
-    not a verified record of executed statements.
+class TestAppliedLedgerCapturesExecutedStatements:
+    """The ledger records what actually executed; the requested config export
+    is preserved additively alongside it.
     """
 
     def _run_setup_phase(self, effective_config: UnifiedTuningConfiguration, tmp_path):
@@ -148,6 +141,9 @@ class TestRequestedConfigCaptureNotAppliedVerification:
             tuning_enabled=True,
             unified_tuning_configuration=effective_config,
         )
+        # run_enhanced_benchmark installs a fresh ledger before the setup phase;
+        # this test drives _setup_fresh_database_phases directly, so do the same.
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
         connection = adapter.create_connection()
         benchmark = SimpleNamespace(output_dir=tmp_path)
 
@@ -162,45 +158,55 @@ class TestRequestedConfigCaptureNotAppliedVerification:
 
         return adapter, connection, tuning_metadata_saved
 
-    def test_adapter_under_applies_table_tunings_via_connection(self, tmp_path) -> None:
+    def test_only_the_executed_statement_reaches_the_connection(self, tmp_path) -> None:
         effective_config = _requested_config_with_table_tunings()
         _adapter, connection, _saved = self._run_setup_phase(effective_config, tmp_path)
 
         # The stub only ever executes the constraint statement -- neither
-        # requested table tuning (orders/customer sorting) reaches the
-        # connection.
+        # requested table tuning (orders/customer sorting) reaches the DB.
         assert connection.executed_statements == ["APPLY CONSTRAINTS"]
 
-    def test_tunings_applied_reports_full_requested_config_regardless_of_execution(self, tmp_path) -> None:
+    def test_ledger_captures_exactly_what_executed(self, tmp_path) -> None:
         effective_config = _requested_config_with_table_tunings()
-        adapter, connection, tuning_metadata_saved = self._run_setup_phase(effective_config, tmp_path)
+        adapter, connection, _saved = self._run_setup_phase(effective_config, tmp_path)
 
-        # Reproduce adapter.py's run_enhanced_benchmark derivation verbatim
-        # (lines ~781-785) rather than re-deriving new logic, to pin the
-        # actual production wiring.
-        tunings_applied_dict = None
-        tuning_validation_status = "NOT_APPLICABLE"
-        if adapter.tuning_enabled and effective_config:
-            tunings_applied_dict = effective_config.to_dict()
-            tuning_validation_status = "APPLIED" if tuning_metadata_saved else "FAILED_TO_SAVE"
+        ledger = adapter._applied_tuning_ledger
+        # The ledger records EXACTLY the statement the connection saw -- not the
+        # requested table tunings that never executed.
+        assert [s.statement for s in ledger.executed_statements] == ["APPLY CONSTRAINTS"]
+        assert [s.statement for s in ledger.executed_statements] == connection.executed_statements
+        assert all(s.phase == PHASE_DDL and s.status == EXECUTED for s in ledger.executed_statements)
 
-        assert tuning_validation_status == "APPLIED"
+    def test_status_is_applied_unverified_from_the_ledger(self, tmp_path) -> None:
+        effective_config = _requested_config_with_table_tunings()
+        adapter, _connection, _saved = self._run_setup_phase(effective_config, tmp_path)
 
-        # The documented gap: tunings_applied still lists both tables' sort
-        # tunings even though the connection only ever saw "APPLY
-        # CONSTRAINTS" -- tunings_applied is the *requested* config, not a
-        # derivation of connection.executed_statements.
+        status = adapter._applied_tuning_ledger.overall_status(
+            tuning_enabled=adapter.tuning_enabled,
+            has_config=bool(effective_config),
+        )
+        assert status == APPLIED_UNVERIFIED
+
+    def test_requested_config_export_is_preserved_additively(self, tmp_path) -> None:
+        # ADR-1 additive invariant: the requested-config export still lists both
+        # tables' sort tunings even though only "APPLY CONSTRAINTS" executed --
+        # the ledger is ADDED alongside the request, it does not replace it.
+        effective_config = _requested_config_with_table_tunings()
+        adapter, connection, _saved = self._run_setup_phase(effective_config, tmp_path)
+
+        tunings_applied_dict = effective_config.to_dict()
         assert set(tunings_applied_dict["table_tunings"]) == {"orders", "customer"}
+        # ... but the ledger tells the truth about what physically ran.
         assert connection.executed_statements == ["APPLY CONSTRAINTS"]
-        assert "sorting" not in connection.executed_statements[0]
+        assert [s.statement for s in adapter._applied_tuning_ledger.executed_statements] == ["APPLY CONSTRAINTS"]
 
-    def test_tuning_validation_status_reflects_metadata_save_not_statement_execution(self, tmp_path) -> None:
-        # save_tuning_metadata succeeding is orthogonal to whether every
-        # requested tuning was actually executed -- pin that
-        # tuning_validation_status="APPLIED" is possible even when the
-        # connection demonstrably never saw most of the requested config.
+    def test_metadata_save_does_not_drive_the_tuning_status(self, tmp_path) -> None:
+        # save_tuning_metadata succeeding is orthogonal to what actually
+        # executed: the status comes from the ledger, and tuning_metadata_saved
+        # is a separate persistence note.
         effective_config = _requested_config_with_table_tunings()
         adapter, connection, tuning_metadata_saved = self._run_setup_phase(effective_config, tmp_path)
 
         assert tuning_metadata_saved is True
         assert len(connection.executed_statements) == 1
+        assert adapter._applied_tuning_ledger.overall_status(tuning_enabled=True, has_config=True) == APPLIED_UNVERIFIED

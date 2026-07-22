@@ -381,6 +381,16 @@ class BenchmarkResults:
     # separators). Platform-independent template identity - not a certification
     # of what was physically applied (see the separate applied-ledger hash).
     tuning_config_hash: str | None = None
+    # applied_tuning_ledger: the AppliedTuningLedger.to_payload() dict produced
+    # BY the execution path (status, applied_ledger_hash, statements, dropped) -
+    # what the adapter actually executed, never reconstructed from the requested
+    # config. None when no tuning ran. See benchbox.core.tuning.applied_ledger.
+    applied_tuning_ledger: dict[str, Any] | None = None
+    # applied_ledger_hash (ADR-1 physical-identity): SHA-256 over the ordered
+    # executed-statement list (canonical JSON). DISTINCT from tuning_config_hash
+    # above, which is the requested-config hash - this one certifies what was
+    # physically applied. None when nothing executed.
+    applied_ledger_hash: str | None = None
     # Template reference: repo-relative path, or "<basename>:<content-hash>"
     # for templates outside the repo. Never a raw local filesystem path.
     tuning_source_file: str | None = None
@@ -388,7 +398,7 @@ class BenchmarkResults:
     # "wizard", "fallback", "smart_defaults", "baseline"); see
     # benchbox.cli.tuning_resolver.TuningSource.
     tuning_source: str | None = None
-    tuning_validation_status: str = "NOT_VALIDATED"
+    tuning_validation_status: str = "not_validated"
     tuning_metadata_saved: bool = False
     system_profile: dict[str, Any] | None = None
     database_name: str | None = None

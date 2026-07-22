@@ -1270,6 +1270,14 @@ class DuckDBAdapter(PlatformAdapter):
                 self.logger.info(
                     f"Partitioning strategy for {table_name_upper}: {', '.join(column_names)} (handled at data loading level)"
                 )
+                # Requested-but-not-rendered as a DDL statement: recorded as a
+                # dropped intent so the ledger surfaces the request honestly.
+                _ledger = getattr(self, "_applied_tuning_ledger", None)
+                if _ledger is not None:
+                    _ledger.record_dropped(
+                        f"partitioning:{table_name_upper}",
+                        "DuckDB applies partitioning at data-loading time, not via DDL",
+                    )
 
             # Distribution not applicable for DuckDB
             distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
@@ -1277,6 +1285,12 @@ class DuckDBAdapter(PlatformAdapter):
                 self.logger.warning(
                     f"Distribution tuning not applicable for single-node DuckDB on table: {table_name_upper}"
                 )
+                _ledger = getattr(self, "_applied_tuning_ledger", None)
+                if _ledger is not None:
+                    _ledger.record_dropped(
+                        f"distribution:{table_name_upper}",
+                        "Distribution tuning is not applicable for single-node DuckDB",
+                    )
 
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
@@ -1286,18 +1300,25 @@ class DuckDBAdapter(PlatformAdapter):
     def apply_unified_tuning(self, tuning_config, connection) -> None:
         """Apply unified tuning configuration to DuckDB.
 
+        The connection is wrapped so the CREATE INDEX statements emitted by
+        ``apply_table_tunings`` land in the applied-tuning ledger (DDL phase).
+        Wrapping degrades to the raw connection when no ledger is present.
+
         Args:
             tuning_config: UnifiedTuningConfiguration instance
             connection: DuckDB connection
         """
+        from benchbox.core.tuning.applied_ledger import PHASE_DDL, recording_connection
+
+        recording = recording_connection(connection, getattr(self, "_applied_tuning_ledger", None), PHASE_DDL)
         try:
             # Apply table-level tunings for each table configuration
             for table_name, table_tuning in tuning_config.table_tunings.items():
                 self.logger.info(f"Applying unified tuning to table: {table_name}")
-                self.apply_table_tunings(table_name, table_tuning, connection)
+                self.apply_table_tunings(table_name, table_tuning, recording)
 
             # Apply platform-specific optimizations
-            self.apply_platform_optimizations(tuning_config, connection)
+            self.apply_platform_optimizations(tuning_config, recording)
 
             # Apply constraint configurations (already handled in schema creation)
             self.logger.info("Constraint configuration applied during schema creation")

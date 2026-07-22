@@ -124,6 +124,10 @@ def _apply_optional_builder_data(
         config_hash=kwargs.get("tuning_config_hash"),
         source_file=kwargs.get("tuning_source_file"),
         source=kwargs.get("tuning_source"),
+        validation_status=kwargs.get("tuning_validation_status"),
+        metadata_saved=kwargs.get("tuning_metadata_saved"),
+        applied_tuning_ledger=kwargs.get("applied_tuning_ledger"),
+        applied_ledger_hash=kwargs.get("applied_ledger_hash"),
     )
     builder.add_plan_capture_stats(
         kwargs.get("query_plans_captured", 0),

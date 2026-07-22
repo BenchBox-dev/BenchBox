@@ -226,6 +226,20 @@ class CloudSparkConfigMixin:
 
         self._spark_config = spark_config.to_dict()
 
+        # These configs are genuinely applied (at SparkSession build), just not
+        # via connection SETs, so record them as executed session statements in
+        # the applied-tuning ledger. Guarded: a no-op when no ledger is present.
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        if ledger is not None:
+            from benchbox.core.tuning.applied_ledger import PHASE_SESSION
+
+            for _key, _value in self._spark_config.items():
+                ledger.record(
+                    f"SET {_key}={_value}",
+                    PHASE_SESSION,
+                    mechanism="spark_session_config",
+                )
+
 
 class SparkTableFormat(str, Enum):
     """Supported Spark table formats for DDL generation."""

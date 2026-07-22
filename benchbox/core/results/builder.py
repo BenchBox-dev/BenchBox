@@ -275,6 +275,13 @@ class ResultBuilder:
         self._tuning_config_hash: str | None = None
         self._tuning_source_file: str | None = None
         self._tuning_source: str | None = None
+        # Applied-tuning ledger (execution-derived): the honest status, the
+        # to_payload() dict, and the physical-identity hash. Defaults mirror the
+        # BenchmarkResults dataclass so a caller that never sets them is a no-op.
+        self._tuning_validation_status: str = "not_validated"
+        self._tuning_metadata_saved: bool = False
+        self._applied_tuning_ledger: dict[str, Any] | None = None
+        self._applied_ledger_hash: str | None = None
 
         # Query plan capture statistics
         self._query_plans_captured: int = 0
@@ -472,6 +479,11 @@ class ResultBuilder:
         config_hash: str | None = None,
         source_file: str | None = None,
         source: str | None = None,
+        *,
+        validation_status: str | None = None,
+        metadata_saved: bool | None = None,
+        applied_tuning_ledger: dict[str, Any] | None = None,
+        applied_ledger_hash: str | None = None,
     ) -> None:
         """Set tuning configuration information.
 
@@ -482,11 +494,29 @@ class ResultBuilder:
             source_file: Template reference (repo-relative path or
                 basename+content-hash) - never a raw local path.
             source: Raw TuningSource enum value (e.g. "auto_discovered").
+            validation_status: honest execution-derived tuning_validation_status
+                (e.g. "applied_unverified"); ``None`` keeps the model default.
+            metadata_saved: tuning_metadata_saved persistence note (decoupled
+                from the tuning status); ``None`` keeps the default.
+            applied_tuning_ledger: the AppliedTuningLedger.to_payload() dict
+                produced by the execution path (ADR-1 additive companion).
+            applied_ledger_hash: physical-identity hash over the executed
+                statements; distinct from ``config_hash`` (the requested hash).
         """
         self._tunings_applied = tunings_applied
         self._tuning_config_hash = config_hash
         self._tuning_source_file = source_file
         self._tuning_source = source
+        if validation_status is not None:
+            self._tuning_validation_status = validation_status
+        if metadata_saved is not None:
+            self._tuning_metadata_saved = bool(metadata_saved)
+        # Guarded like the two above so a second set_tuning_info call that omits
+        # the ledger cannot silently wipe an already-set one.
+        if applied_tuning_ledger is not None:
+            self._applied_tuning_ledger = applied_tuning_ledger
+        if applied_ledger_hash is not None:
+            self._applied_ledger_hash = applied_ledger_hash
 
     def set_cost_summary(self, cost_summary: dict[str, Any]) -> None:
         """Set cost summary for cloud platforms."""
@@ -691,6 +721,10 @@ class ResultBuilder:
             tuning_config_hash=self._tuning_config_hash,
             tuning_source_file=self._tuning_source_file,
             tuning_source=self._tuning_source,
+            tuning_validation_status=self._tuning_validation_status,
+            tuning_metadata_saved=self._tuning_metadata_saved,
+            applied_tuning_ledger=self._applied_tuning_ledger,
+            applied_ledger_hash=self._applied_ledger_hash,
             # Query plan stats
             query_plans_captured=self._query_plans_captured,
             plan_capture_failures=self._plan_capture_failures,

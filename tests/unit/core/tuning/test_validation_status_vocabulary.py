@@ -1,20 +1,18 @@
 """Pin the real `tuning_validation_status` vocabulary.
 
-From the 2026-07-12 tuning review, finding R7: `test_tpc_tuning_template_parity.py`
-pinned a fixture value `"PASSED"` that production code never emits. The real
-values are assigned in `benchbox/platforms/base/adapter.py` (`NOT_APPLICABLE`,
-`APPLIED`, `FAILED_TO_SAVE`) and defaulted in `benchbox/core/results/models.py`
-(`NOT_VALIDATED`).
+History: from the 2026-07-12 tuning review (finding R7), the reviewed
+vocabulary used to be hand-extracted from string literals assigned to the
+`tuning_validation_status` local in `adapter.py` (`NOT_APPLICABLE`, `APPLIED`,
+`FAILED_TO_SAVE`) plus the dataclass default (`NOT_VALIDATED`).
 
-Rather than hand-copy those four strings into a hardcoded set (which could
-silently drift the moment adapter.py's literals change), this module
-statically extracts every string literal actually assigned to the
-`tuning_validation_status` local in adapter.py via `ast`, plus the dataclass
-default from `BenchmarkResults`, and pins *that derived set* against the
-reviewed vocabulary. A new/renamed/removed status in adapter.py changes the
-derived set and fails this test, forcing a conscious update here -- the same
-shape as `test_known_platform_set_stays_in_sync_with_compatibility_map` in
-`test_platform_identity_keys.py`.
+The applied-tuning ledger (TODO
+`tuning-applied-ledger-and-validation-status-20260712`) moved the vocabulary
+into one authoritative place: `benchbox.core.tuning.applied_ledger`. The status
+is now derived by `AppliedTuningLedger.overall_status()` from what actually
+executed, so `adapter.py` no longer holds bare status literals to scrape. This
+module therefore pins the exported `TUNING_STATUS_VOCABULARY` frozenset against
+the reviewed set directly, asserts the `BenchmarkResults` default matches, and
+keeps the R7 regression guard (pass/fail-style values never enter the vocab).
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -23,54 +21,40 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import ast
 import dataclasses
-import inspect
 
 import pytest
 
 from benchbox.core.results.models import BenchmarkResults
-from benchbox.platforms.base import adapter as adapter_module
+from benchbox.core.tuning.applied_ledger import (
+    APPLIED_UNVERIFIED,
+    APPLIED_VERIFIED,
+    FAILED,
+    LEGACY_STATUS_MAP,
+    NOOP,
+    NOT_APPLICABLE,
+    NOT_VALIDATED,
+    TUNING_STATUS_VOCABULARY,
+)
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
 
-# The reviewed, real vocabulary (finding R7). Production only ever assigns
-# these four values to `tuning_validation_status` -- "PASSED"/"FAILED" (a
-# pass/fail test-style vocabulary) do not exist anywhere in the codebase.
+# The reviewed, real vocabulary. Execution-derived, all-lowercase (the old
+# uppercase metadata-write proxy is gone). Adding/renaming a status must be a
+# conscious edit here AND in benchbox/core/tuning/applied_ledger.py.
 EXPECTED_VALIDATION_STATUSES = frozenset(
     {
-        "NOT_APPLICABLE",
-        "APPLIED",
-        "FAILED_TO_SAVE",
-        "NOT_VALIDATED",
+        "not_applicable",
+        "noop",
+        "applied_unverified",
+        "applied_verified",
+        "failed",
+        "not_validated",
     }
 )
-
-
-def _discover_adapter_assigned_statuses() -> set[str]:
-    """Statically extract every string literal assigned to the
-    `tuning_validation_status` local anywhere in adapter.py, including both
-    arms of the `"APPLIED" if ... else "FAILED_TO_SAVE"` conditional
-    assignment. This walks the real module source instead of redeclaring the
-    values, so it fails the moment adapter.py's literals change.
-    """
-    source = inspect.getsource(adapter_module)
-    tree = ast.parse(source)
-    statuses: set[str] = set()
-
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
-            continue
-        if not any(isinstance(target, ast.Name) and target.id == "tuning_validation_status" for target in node.targets):
-            continue
-        for sub in ast.walk(node.value):
-            if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
-                statuses.add(sub.value)
-
-    return statuses
 
 
 def _models_default_validation_status() -> str:
@@ -86,26 +70,39 @@ def _models_default_validation_status() -> str:
 
 
 class TestValidationStatusVocabulary:
-    def test_adapter_assigned_statuses_match_reviewed_set(self) -> None:
-        discovered = _discover_adapter_assigned_statuses()
-        assert discovered, "Expected to discover at least one tuning_validation_status literal in adapter.py"
-        assert discovered == EXPECTED_VALIDATION_STATUSES - {"NOT_VALIDATED"}, (
-            f"adapter.py's tuning_validation_status literals changed: {sorted(discovered)}. "
+    def test_exported_vocabulary_matches_reviewed_set(self) -> None:
+        assert TUNING_STATUS_VOCABULARY == EXPECTED_VALIDATION_STATUSES, (
+            f"applied_ledger.TUNING_STATUS_VOCABULARY changed: {sorted(TUNING_STATUS_VOCABULARY)}. "
             "Update EXPECTED_VALIDATION_STATUSES (and any fixtures/docs referencing the "
             "vocabulary) to match, or revert the unintended change."
         )
 
-    def test_models_default_is_not_validated(self) -> None:
-        assert _models_default_validation_status() == "NOT_VALIDATED"
+    def test_named_constants_are_members_of_the_vocabulary(self) -> None:
+        for status in (NOT_APPLICABLE, NOOP, APPLIED_UNVERIFIED, APPLIED_VERIFIED, FAILED, NOT_VALIDATED):
+            assert status in TUNING_STATUS_VOCABULARY
+            assert status == status.lower(), "statuses are all-lowercase now"
 
-    def test_full_vocabulary_is_adapter_literals_plus_models_default(self) -> None:
-        full_vocabulary = _discover_adapter_assigned_statuses() | {_models_default_validation_status()}
-        assert full_vocabulary == EXPECTED_VALIDATION_STATUSES
+    def test_models_default_is_not_validated(self) -> None:
+        default = _models_default_validation_status()
+        assert default == "not_validated"
+        assert default == NOT_VALIDATED
+        assert default in TUNING_STATUS_VOCABULARY
 
     def test_pass_fail_style_values_are_not_part_of_the_vocabulary(self) -> None:
-        # Regression guard for finding R7: "PASSED"/"FAILED" read like a
-        # pass/fail test result, not a tuning-validation outcome, and were
-        # never emitted by production -- pin that they never sneak back in.
-        full_vocabulary = _discover_adapter_assigned_statuses() | {_models_default_validation_status()}
-        assert "PASSED" not in full_vocabulary
-        assert "FAILED" not in full_vocabulary
+        # Regression guard for finding R7: "PASSED"/"FAILED" (uppercase, a
+        # pass/fail test-result vocabulary) must never be tuning statuses. Note
+        # the real failure token is lowercase "failed", which is fine.
+        assert "PASSED" not in TUNING_STATUS_VOCABULARY
+        assert "FAILED" not in TUNING_STATUS_VOCABULARY
+        assert FAILED == "failed"
+
+    def test_legacy_uppercase_statuses_map_into_the_vocabulary(self) -> None:
+        # Back-compat readers translate old uppercase statuses; every mapped
+        # target must be a current, valid status.
+        for legacy, new in LEGACY_STATUS_MAP.items():
+            assert legacy.upper() == legacy, "legacy keys are the old uppercase tokens"
+            assert new in TUNING_STATUS_VOCABULARY
+        # The metadata-write proxy collapses: both old APPLIED and FAILED_TO_SAVE
+        # mean "a statement executed" now.
+        assert LEGACY_STATUS_MAP["APPLIED"] == APPLIED_UNVERIFIED
+        assert LEGACY_STATUS_MAP["FAILED_TO_SAVE"] == APPLIED_UNVERIFIED
