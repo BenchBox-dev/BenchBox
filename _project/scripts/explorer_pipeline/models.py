@@ -161,6 +161,11 @@ class ManifestEntry(BaseModel):
     # legacy bundles predating these fields. Display-only, like tuning_hash.
     requested_config_hash: str | None = None
     applied_ledger_hash: str | None = None
+    # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
+    # from platform.tuning (never derived from benchbox_version). Null for
+    # legacy bundles predating the field (treated downstream as "pre-seam").
+    # Display-only, like the hashes above; NEVER a join/dedup/grouping key.
+    tuning_policy_generation: str | None = None
     test_type: str | None = None
     validation_status: str | None = None
     failed_query_count: int = 0
@@ -372,6 +377,11 @@ class DetailResult(BaseModel):
     # legacy bundles predating these fields. Display-only, like tuning_hash.
     requested_config_hash: str | None = None
     applied_ledger_hash: str | None = None
+    # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
+    # from platform.tuning (never derived from benchbox_version). Null for
+    # legacy bundles predating the field (treated downstream as "pre-seam").
+    # Display-only, like the hashes above; NEVER a join/dedup/grouping key.
+    tuning_policy_generation: str | None = None
     test_type: str | None = None
     validation_status: str | None = None
     failed_query_count: int = 0

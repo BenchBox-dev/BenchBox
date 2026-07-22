@@ -161,6 +161,7 @@ what physically applied (see `docs/development/tuning-adr-001-trust-and-hash-sem
 |-------|------|-------------|
 | `tuning_source` | string | Raw `TuningSource` enum value: `explicit_file`, `auto_discovered`, `smart_defaults`, `baseline`, `wizard`, or `fallback`. |
 | `requested_config_hash` | string | Full 64-hex-char SHA-256 over the requested `UnifiedTuningConfiguration.to_dict()` (canonical JSON, sorted keys). Identifies the requested template regardless of platform or dict ordering. |
+| `tuning_policy_generation` | string | Explicit tuning-policy generation marker (ADR-3 seam), currently `"adr-003"`. Identifies which generation of the tuning policy this run was produced under, so tuned results from different generations can be flagged as not directly comparable. Sourced from the `TUNING_POLICY_GENERATION` constant (`benchbox/core/tuning/policy_generation.py`), **never** derived from `benchbox_version`. Bundles predating this field omit it; consumers treat that absence as the "pre-seam" generation. See `docs/development/tuning-adr-003-baseline-and-single-renderer.md`. |
 | `counts.tables_tuned` | number | Number of tables with at least one table-level tuning (partitioning/clustering/distribution/sorting). |
 | `counts.tuning_types` | array | Sorted list of tuning categories actually active (constraint names, platform optimization flags, table-tuning clause types). |
 | `logical_profile` | object | Optional workload-profile coverage metadata (unrelated to the requested-config hash). |
@@ -170,9 +171,9 @@ The `.tuning.json` companion file (same base filename, `.tuning.json` suffix)
 carries the full detail: `requested.constraints` (primary/foreign key, unique,
 and check constraint settings), `requested.platform_optimizations`
 (non-default values only), `requested.table_tunings` (complete per-table
-tuning structure), plus `requested_config_hash`, `tuning_source`, and
-`source_file` (a repo-relative path or `"<basename>:<content-hash>"` -
-never a raw local filesystem path).
+tuning structure), plus `requested_config_hash`, `tuning_policy_generation`,
+`tuning_source`, and `source_file` (a repo-relative path or
+`"<basename>:<content-hash>"` - never a raw local filesystem path).
 
 #### Run Block
 | Field | Type | Description |

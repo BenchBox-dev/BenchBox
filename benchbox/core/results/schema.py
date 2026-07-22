@@ -1356,6 +1356,14 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     if applied_ledger_hash:
         payload["applied_ledger_hash"] = applied_ledger_hash
 
+    # tuning_policy_generation (ADR-3 seam): the explicit generation marker for
+    # the tuning policy this run was produced under. Emitted only when tuning is
+    # present (mirrors the hashes above). Bundles predating this field carry no
+    # value; the explorer treats absence as the "pre-seam" generation.
+    from benchbox.core.tuning.policy_generation import TUNING_POLICY_GENERATION
+
+    payload["tuning_policy_generation"] = TUNING_POLICY_GENERATION
+
     # Validation status
     if result.tuning_validation_status:
         payload["validation_status"] = result.tuning_validation_status.lower()
@@ -1504,6 +1512,15 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     applied_ledger_hash = getattr(result, "applied_ledger_hash", None)
     if applied_ledger_hash:
         summary["applied_ledger_hash"] = applied_ledger_hash
+
+    # tuning_policy_generation (ADR-3 seam): the explicit generation marker for
+    # the tuning policy this run was produced under. Emitted only when tuning is
+    # present (mirrors the hashes above). Bundles predating this field carry no
+    # value; the explorer treats absence as the "pre-seam" generation and warns
+    # (never blocks) on a cross-generation tuned comparison.
+    from benchbox.core.tuning.policy_generation import TUNING_POLICY_GENERATION
+
+    summary["tuning_policy_generation"] = TUNING_POLICY_GENERATION
 
     # Counts: replaces the old dead clauses_applied counter (which counted
     # indexes/statistics/configuration keys that to_dict() never produces).
