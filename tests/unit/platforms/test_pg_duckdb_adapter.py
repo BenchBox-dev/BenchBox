@@ -266,6 +266,30 @@ class TestPgDuckDBExtensionVerification:
         threads_set = any("threads_for_postgres_scan" in call for call in calls)
         assert threads_set
 
+    def test_new_stream_connection_reapplies_force_execution(self, pg_duckdb_stubs):
+        """Each throughput-stream connection must re-set duckdb.force_execution.
+
+        Regression (PR #1253 review follow-up): new_stream_connection inherited
+        the base PostgreSQL hook unchanged, so a stream session opened without
+        duckdb.force_execution and a multi-stream pg_duckdb run silently
+        executed on vanilla PostgreSQL instead of DuckDB. The subclass now
+        reapplies its session GUCs on every fresh stream connection.
+        """
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        pg_duckdb_stubs.connect.return_value = mock_conn
+
+        adapter = PgDuckDBAdapter(force_execution=True)
+
+        # The shared setup connection is not reused: a fresh session is opened.
+        stream_conn = adapter.new_stream_connection(Mock())
+
+        assert stream_conn is mock_conn
+        calls = [str(call) for call in mock_cursor.execute.call_args_list]
+        assert any("duckdb.force_execution" in call for call in calls), calls
+
     def test_create_connection_raises_when_extension_missing(self, pg_duckdb_stubs):
         """create_connection should raise when pg_duckdb extension is not available."""
         mock_conn = Mock()

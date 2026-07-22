@@ -155,14 +155,25 @@ def _handle_report(args: argparse.Namespace) -> int:
     )
     from tests.uat.phases.report import write_report
 
-    cells = read_cells_jsonl(Path(args.cells_jsonl))
+    cells_path = Path(args.cells_jsonl)
+    # Check the durable-sweep markers BEFORE reading the stream. A sweep
+    # SIGTERM'd during its first cell has written the `.inprogress` marker but
+    # no `cells.jsonl` rows yet, and read_cells_jsonl() would raise
+    # FileNotFoundError before the marker check runs -- so report could not emit
+    # the intended INCOMPLETE summary for an interrupted run with zero completed
+    # cells.
+    #
     # A cells.jsonl whose durable sweep began but never finalized (its
     # `.inprogress` marker still lingers with no `.finalized`) came from a
     # sweep killed mid-run (uat-sweep-durability-and-signal-teardown w1): the
     # rows present are durable but partial, so the report must not read green.
     # A legacy artifact with neither marker is unaffected -- it still
     # regenerates exactly as before.
-    finalized = not cells_run_incomplete(Path(args.cells_jsonl))
+    finalized = not cells_run_incomplete(cells_path)
+    # A missing stream is an empty (zero-cell) run: combined with the marker
+    # check above, an interrupted sweep with no completed cells reports
+    # INCOMPLETE instead of crashing on the absent file.
+    cells = read_cells_jsonl(cells_path) if cells_path.exists() else []
     # Skipped-unreachable and startup-failed cells are not JSONL rows; the
     # durable sweep writes their counts to a sidecar next to cells.jsonl.
     # Read the sidecar ONCE and take both counts from the same payload so a

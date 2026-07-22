@@ -105,6 +105,36 @@ def test_write_cells_jsonl_finalizes_and_clears_inprogress(tmp_path: Path):
     assert marker is not None and marker["row_count"] == 1
 
 
+def test_stream_writer_reset_clears_stale_finalized_marker_on_dir_reuse(tmp_path: Path):
+    """A CellStreamWriter that reuses a log dir from a previous *completed* run
+    must start from an empty stream and clear the stale `.finalized` marker, so
+    a rerun killed mid-sweep is recognized as INCOMPLETE instead of inheriting
+    the prior run's finalized signal + stale rows (PR #1251 review follow-up)."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+
+    # Model a prior completed run left behind in this (reused) directory.
+    cells_io.write_cells_jsonl(
+        cells_jsonl,
+        [_passed_cell("duckdb", "tpch", 0.01, tmp_path)],
+        source_info=_source_info(),
+    )
+    assert cells_io.cells_are_finalized(cells_jsonl) is True
+
+    # Starting a new durable stream in the same dir resets it before marking in
+    # progress: the stale finalize marker and prior rows are gone.
+    writer = cells_io.CellStreamWriter(cells_jsonl, source_info=_source_info())
+    assert cells_io.cells_are_finalized(cells_jsonl) is False
+    assert cells_io.cells_run_incomplete(cells_jsonl) is True
+    assert not cells_jsonl.exists()
+
+    # A row from the new run, then a mid-sweep death (never finalized): only the
+    # new row is durable, and the run is still recognized as killed/incomplete.
+    writer.append(_passed_cell("duckdb", "tpch", 0.1, tmp_path))
+    rows = cells_io.read_cells_jsonl(cells_jsonl)
+    assert [(r.platform, r.scale) for r in rows] == [("duckdb", 0.1)]
+    assert cells_io.cells_run_incomplete(cells_jsonl) is True
+
+
 def test_report_rejects_unfinalized_killed_run_as_nonzero(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     """make uat-report on a killed run (rows + lingering `.inprogress`, no
     `.finalized`) must exit nonzero and mark the run INCOMPLETE -- a partial
@@ -127,6 +157,24 @@ def test_report_rejects_unfinalized_killed_run_as_nonzero(tmp_path: Path, capsys
         encoding="utf-8",
     )
     cells_io.write_cells_inprogress_marker(cells_jsonl)  # killed: never finalized
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert exit_code == 2
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["finalized"] is False
+    assert "run_status=INCOMPLETE" in output_tsv.read_text(encoding="utf-8")
+
+
+def test_report_on_killed_run_with_no_rows_reports_incomplete(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+    """A sweep SIGTERM'd during its first cell leaves the `.inprogress` marker
+    but no cells.jsonl rows yet. make uat-report must treat the missing stream
+    as an empty incomplete run and emit INCOMPLETE, not crash with
+    FileNotFoundError before the marker check (PR #1251 review follow-up)."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_io.write_cells_inprogress_marker(cells_jsonl)  # started; no rows written yet
+    assert not cells_jsonl.exists()
     output_tsv = tmp_path / "matrix_summary.tsv"
 
     exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])

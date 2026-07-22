@@ -138,7 +138,18 @@ jobs:
             *[!0-9a-f]*|'') echo "::error::TODO_DB_PACKAGE_SHA256 must be a lowercase hexadecimal digest" >&2; exit 1 ;;
           esac
           [ "${#TODO_DB_PACKAGE_SHA256}" -eq 64 ] || { echo "::error::TODO_DB_PACKAGE_SHA256 must contain 64 characters" >&2; exit 1; }
-          wheel="${RUNNER_TEMP}/todo-db-${TODO_DB_PACKAGE_SHA256}.whl"
+          # uv validates a local wheel's filename against PEP 427 before it will
+          # install it (`uv run --with "<file>[hosted]"`), rejecting a SHA-only
+          # name like todo-db-<sha>.whl with "Must have an ABI tag". Keep the
+          # published wheel's own basename (e.g. todo_db-<ver>-py3-none-any.whl)
+          # so the standalone export path installs; integrity is still enforced
+          # by the SHA-256 check below.
+          wheel_name="$(basename "${TODO_DB_PACKAGE_URL%%\?*}")"
+          case "${wheel_name}" in
+            *.whl) ;;
+            *) echo "::error::TODO_DB_PACKAGE_URL must point at a .whl file (got '${wheel_name}')" >&2; exit 1 ;;
+          esac
+          wheel="${RUNNER_TEMP}/${wheel_name}"
           curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 --retry 3 \
             --output "${wheel}" "${TODO_DB_PACKAGE_URL}"
           printf '%s  %s\n' "${TODO_DB_PACKAGE_SHA256}" "${wheel}" | sha256sum --check --strict

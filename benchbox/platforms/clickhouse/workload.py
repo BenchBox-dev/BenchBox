@@ -298,6 +298,16 @@ class ClickHouseWorkloadMixin:
             data_type = segment[type_start:type_end].rstrip()
             if not data_type or data_type.upper().startswith("NULLABLE("):
                 continue
+            # ClickHouse forbids Nullable(Array(...)); an Array column expresses
+            # nullability per element (Array(Nullable(T))), never at the array
+            # level. The FLOAT[N]/DOUBLE[N] -> Array(Float32/Float64) rewrite
+            # above turns vector_search embedding/query_vector columns into
+            # exactly these Array types, and their schema metadata omits
+            # `nullable`, so they reach here as nullable candidates. Leave them
+            # non-nullable rather than emitting a type ClickHouse rejects at
+            # CREATE TABLE.
+            if data_type.upper().startswith("ARRAY("):
+                continue
             suffix = segment[type_end:]
             if re.search(r"\bNOT\s+NULL\b", suffix, re.IGNORECASE):
                 raise ValueError(f"source-nullable column {column_name!r} is declared NOT NULL")

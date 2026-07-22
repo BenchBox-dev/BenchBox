@@ -148,6 +148,17 @@ class CellStreamWriter:
         self._path = path
         self._source_info = source_info
         self.count = 0
+        # A reused log directory (stable/date-only logs_dir_template or
+        # log_dir_override) can still hold a previous *completed* run's stream
+        # plus its `.finalized` marker. If this new run is then killed before
+        # the final `write_cells_jsonl` rewrite, `cells_run_incomplete()` would
+        # see the stale `.finalized` and treat the killed rerun as clean, so
+        # `make uat-report` could pass a partial rerun as green. Start from an
+        # empty stream and clear any old finalize marker before marking this run
+        # in progress, so a partial rerun can never inherit the prior run's
+        # finalized signal or its stale rows.
+        path.unlink(missing_ok=True)
+        cells_finalized_path(path).unlink(missing_ok=True)
         write_cells_inprogress_marker(path)
 
     def append(self, cell: CellResult) -> None:
