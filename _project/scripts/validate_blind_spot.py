@@ -180,7 +180,7 @@ def _check_evidence(data: dict) -> list[str]:
         return []
     ev = data["evidence"]
     if not isinstance(ev, list):
-        return ["evidence must be a list of {path, pattern, note} mappings (or null)"]
+        return ["evidence must be a list of {path, pattern, note, line_start, line_end} mappings (or null)"]
     errors: list[str] = []
     for i, entry in enumerate(ev):
         where = f"evidence[{i}]"
@@ -200,6 +200,17 @@ def _check_evidence(data: dict) -> list[str]:
             value = entry.get(key)
             if value is not None and (not isinstance(value, int) or isinstance(value, bool)):
                 errors.append(f"{where}.{key} must be an integer (or null)")
+            elif isinstance(value, int) and not isinstance(value, bool) and value < 1:
+                errors.append(f"{where}.{key} must be >= 1")
+        start, end = entry.get("line_start"), entry.get("line_end")
+        if (
+            isinstance(start, int)
+            and isinstance(end, int)
+            and not isinstance(start, bool)
+            and not isinstance(end, bool)
+        ):
+            if start > end:
+                errors.append(f"{where}.line_start must not exceed line_end")
     return errors
 
 
@@ -289,7 +300,9 @@ def main() -> int:
         default=None,
         metavar="DIR",
         help=(
-            "validate every draft under DIR (default %(const)s); an absent or empty drafts directory is valid (exit 0)"
+            "validate every draft under DIR (bare flag uses %(const)s; or --drafts-dir=DIR); "
+            "an absent or empty drafts directory is valid (exit 0). Do not follow the bare "
+            "flag with a file to validate — pass files as positional arguments instead."
         ),
     )
     args = parser.parse_args()

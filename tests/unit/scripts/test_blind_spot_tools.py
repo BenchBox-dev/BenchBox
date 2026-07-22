@@ -467,7 +467,7 @@ def test_drafts_dir_absent_is_valid_zero_credential(tmp_path: Path, monkeypatch,
     assert "valid state" in capsys.readouterr().out
 
 
-def test_drafts_dir_validates_captured_draft(tmp_path: Path, monkeypatch) -> None:
+def test_drafts_dir_validates_captured_draft(tmp_path: Path, monkeypatch, capsys) -> None:
     drafts = tmp_path / "finding-drafts"
     drafts.mkdir()
     stem = "2026-07-22-101015-captured"
@@ -475,9 +475,10 @@ def test_drafts_dir_validates_captured_draft(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.setattr(sys, "argv", ["validate_blind_spot.py", "--drafts-dir", str(drafts)])
 
     assert validate_blind_spot.main() == 0
+    assert f"OK   {drafts / f'{stem}.md'}" in capsys.readouterr().out
 
 
-def test_drafts_dir_reports_invalid_draft(tmp_path: Path, monkeypatch) -> None:
+def test_drafts_dir_reports_invalid_draft(tmp_path: Path, monkeypatch, capsys) -> None:
     drafts = tmp_path / "finding-drafts"
     drafts.mkdir()
     stem = "2026-07-22-101016-bad"
@@ -485,3 +486,17 @@ def test_drafts_dir_reports_invalid_draft(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(sys, "argv", ["validate_blind_spot.py", "--drafts-dir", str(drafts)])
 
     assert validate_blind_spot.main() == 1
+    assert "FAIL" in capsys.readouterr().err
+
+
+def test_validator_rejects_inverted_line_range(tmp_path: Path) -> None:
+    stem = "2026-07-22-101017-inverted-range"
+    path = tmp_path / f"{stem}.md"
+    path.write_text(
+        _draft_text(stem, "evidence:\n  - path: a.py\n    line_start: 20\n    line_end: 10\n"),
+        encoding="utf-8",
+    )
+
+    errors = validate_blind_spot.validate_file(path)
+
+    assert any("line_start must not exceed line_end" in e for e in errors)
