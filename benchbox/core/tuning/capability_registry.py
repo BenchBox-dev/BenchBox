@@ -160,10 +160,23 @@ PLATFORM_ALIASES: dict[str, str] = {
 # entry in `interface._PLATFORM_COMPATIBILITY_MAP` (the historical
 # compatibility map) or explicitly named in the renderer-consolidation TODO
 # (`starrocks`, `doris`) are covered; the DDL generator registry additionally
-# covers ~10 more SQL platforms (redshift, snowflake, etc. below) whose
-# adapter execution paths were not audited/migrated this round -- their
-# entries reflect the "per-adapter mixin" renderer ADR-3 calls the third
-# rendering universe, unchanged by this TODO.
+# covers ~10 more SQL platforms (redshift, snowflake, etc. below).
+#
+# Honesty correction (`tuning-registry-mixin-honesty`): the postgresql,
+# snowflake, redshift, bigquery and mysql entries below previously claimed
+# `_ddl("adapter_mixin:<X>Adapter.generate_tuning_clause", ...)`, but that
+# mixin has no production call site anywhere -- create_schema builds DDL from
+# `benchmark.get_create_tables_sql(tuning_config=...)`, which reads
+# tuning_config only for PK/FK constraint flags, never the partition/cluster/
+# distribution/sort columns (see e.g. core/tpch/benchmark.py:423-426). Those
+# entries now describe reality: snowflake renders CLUSTERING/PARTITIONING
+# post-load via a real ALTER TABLE ... CLUSTER BY in apply_table_tunings,
+# while postgresql/redshift/bigquery/mysql render nothing at execution
+# (rendered_via="none"; their generators/*.py DDL generators, where present,
+# feed dry-run preview only) -- the same preview-only reality PR #1198
+# recorded for the 9 coverage platforms below. The set of compatible tuning
+# types per platform is unchanged, so is_compatible_with_platform behavior is
+# preserved.
 PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
     "duckdb": {
         _T.SORTING: _post_load(
@@ -257,42 +270,109 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
         **_constraint_entries(),
     },
     "snowflake": {
-        _T.CLUSTERING: _ddl(
-            "adapter_mixin:SnowflakeAdapter.generate_tuning_clause",
-            "Execution still renders via the adapter's own generate_tuning_clause mixin, independent of "
-            "core.tuning.generators.snowflake.SnowflakeDDLGenerator (dry-run preview's renderer). Third "
-            "rendering universe per ADR-3; not in this TODO's migration order (duckdb, clickhouse, "
-            "starrocks).",
+        _T.CLUSTERING: _post_load(
+            "adapter_mixin:SnowflakeAdapter.apply_table_tunings",
+            "Real execution issues ALTER TABLE ... CLUSTER BY (...) from "
+            "SnowflakeAdapter.apply_table_tunings (snowflake.py:1710), reached via apply_unified_tuning -> "
+            "apply_standard_unified_tuning after create_schema (base/result_capture.py:1751-1753). This is "
+            "NOT part of the CREATE TABLE ddl and does NOT go through the adapter's generate_tuning_clause "
+            "mixin (snowflake.py:1605): that method builds a CLUSTER BY string but has no production call "
+            "site anywhere, and get_create_tables_sql consumes tuning_config only for PK/FK constraint "
+            "flags, never clustering columns. core.tuning.generators.snowflake.SnowflakeDDLGenerator emits "
+            "CLUSTER BY for dry-run preview only.",
         ),
-        _T.PARTITIONING: _ddl("adapter_mixin:SnowflakeAdapter.generate_tuning_clause", "See CLUSTERING entry."),
+        _T.PARTITIONING: _post_load(
+            "adapter_mixin:SnowflakeAdapter.apply_table_tunings",
+            "apply_table_tunings folds partitioning columns into the same ALTER TABLE ... CLUSTER BY when "
+            "no clustering columns are configured (snowflake.py:1690-1693); Snowflake has no separate "
+            "partition clause. See CLUSTERING entry for the full mechanism/evidence.",
+        ),
         _T.MATERIALIZED_VIEWS: _none("unimplemented", "Compatible per the legacy map; no adapter implementation."),
         **_constraint_entries(),
     },
     "bigquery": {
-        _T.PARTITIONING: _ddl("adapter_mixin:BigQueryAdapter.generate_tuning_clause", "See snowflake entry note."),
-        _T.CLUSTERING: _ddl("adapter_mixin:BigQueryAdapter.generate_tuning_clause", "See snowflake entry note."),
+        _T.PARTITIONING: _none(
+            "bigquery_ddl_generator:preview_only",
+            "core.tuning.generators.bigquery.BigQueryDDLGenerator computes a real PARTITION BY clause from "
+            "tuned columns for dry-run preview, but real execution never renders it. "
+            "BigQueryAdapter.generate_tuning_clause builds PARTITION BY/CLUSTER BY (bigquery.py:1893) but "
+            "has no production call site; get_create_tables_sql consumes tuning_config only for PK/FK "
+            "flags, never partition/cluster columns; and apply_table_tunings only inspects the table and "
+            "logs 'Consider recreating the table' (bigquery.py:2023-2027) -- it never re-creates it. "
+            "Corrects the prior false _ddl(adapter_mixin:BigQueryAdapter.generate_tuning_clause) claim.",
+        ),
+        _T.CLUSTERING: _none(
+            "bigquery_ddl_generator:preview_only",
+            "Same execution gap as PARTITIONING: generate_tuning_clause emits CLUSTER BY "
+            "(bigquery.py:1940-1949) and the generator previews it, but nothing renders it at execution "
+            "(apply_table_tunings only logs a recreation hint, bigquery.py:2013-2027).",
+        ),
         _T.MATERIALIZED_VIEWS: _none("unimplemented", "Compatible per the legacy map; no adapter implementation."),
         _T.PRIMARY_KEYS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),
         _T.FOREIGN_KEYS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),
         _T.CHECK_CONSTRAINTS: _ddl(_INLINE_CONSTRAINT, _CONSTRAINT_NOTE),
     },
     "redshift": {
-        _T.DISTRIBUTION: _ddl("adapter_mixin:RedshiftAdapter.generate_tuning_clause", "See snowflake entry note."),
-        _T.SORTING: _ddl("adapter_mixin:RedshiftAdapter.generate_tuning_clause", "See snowflake entry note."),
-        _T.PARTITIONING: _ddl("adapter_mixin:RedshiftAdapter.generate_tuning_clause", "See snowflake entry note."),
+        _T.DISTRIBUTION: _none(
+            "redshift_ddl_generator:preview_only",
+            "core.tuning.generators.redshift.RedshiftDDLGenerator computes real DISTSTYLE/DISTKEY clauses "
+            "from tuned columns for dry-run preview, but real execution never renders them. "
+            "RedshiftAdapter.generate_tuning_clause builds DISTSTYLE KEY/DISTKEY (redshift.py:2464) but has "
+            "no production call site; get_create_tables_sql consumes tuning_config only for PK/FK flags, "
+            "never distribution columns; and apply_table_tunings only reads pg_table_def and logs "
+            "'Redshift requires table recreation to change distribution/sort keys' (redshift.py:2607-2611) "
+            "without recreating, then runs ANALYZE/VACUUM maintenance only (redshift.py:2616-2624). "
+            "Corrects the prior false _ddl(adapter_mixin:RedshiftAdapter.generate_tuning_clause) claim.",
+        ),
+        _T.SORTING: _none(
+            "redshift_ddl_generator:preview_only",
+            "Same execution gap as DISTRIBUTION: SORTKEY is built only by the uncalled generate_tuning_clause "
+            "mixin (redshift.py:2500-2510) and the preview generator; apply_table_tunings logs the sort-key "
+            "mismatch (redshift.py:2599-2605) but cannot apply it without table recreation.",
+        ),
+        _T.PARTITIONING: _none(
+            "redshift_no_partition_rendering",
+            "Redshift has no CREATE TABLE partition clause; generate_tuning_clause explicitly emits nothing "
+            "for partitioning (redshift.py:2512-2517) and apply_table_tunings only logs the strategy "
+            "(redshift.py:2629-2636). Nothing is rendered at execution.",
+        ),
         _T.MATERIALIZED_VIEWS: _none("unimplemented", "Compatible per the legacy map; no adapter implementation."),
         **_constraint_entries(),
     },
     "sqlite": _constraint_entries(),
     "postgresql": {
-        _T.PARTITIONING: _ddl("adapter_mixin:PostgreSQLAdapter.generate_tuning_clause", "See snowflake entry note."),
-        _T.CLUSTERING: _ddl("adapter_mixin:PostgreSQLAdapter.generate_tuning_clause", "See snowflake entry note."),
+        _T.PARTITIONING: _none(
+            "postgresql_ddl_generator:preview_only",
+            "core.tuning.generators.postgresql.PostgreSQLDDLGenerator computes a real PARTITION BY RANGE/"
+            "LIST/HASH clause from tuned columns (generators/postgresql.py:139) for dry-run preview, but "
+            "real execution never renders it. PostgreSQLAdapter.generate_tuning_clause unconditionally "
+            "returns '' (postgresql.py:972-977) and has no production call site; apply_table_tunings and "
+            "apply_unified_tuning are both no-ops (postgresql.py:968-970, 979-981); and get_create_tables_sql "
+            "consumes tuning_config only for PK/FK constraint flags. Corrects the prior false "
+            "_ddl(adapter_mixin:PostgreSQLAdapter.generate_tuning_clause) claim (already flagged in the "
+            "pg-duckdb entry below).",
+        ),
+        _T.CLUSTERING: _none(
+            "postgresql_ddl_generator:preview_only",
+            "Same execution gap as PARTITIONING: the preview generator emits a CREATE INDEX + CLUSTER pair "
+            "(generators/postgresql.py:141-159) but the uncalled generate_tuning_clause mixin returns '' and "
+            "the no-op apply path renders nothing at execution.",
+        ),
         _T.BLOOM_FILTERS: _none("unimplemented", "Compatible per the legacy map; no adapter implementation."),
         _T.MATERIALIZED_VIEWS: _none("unimplemented", "Compatible per the legacy map; no adapter implementation."),
         **_constraint_entries(),
     },
     "mysql": {
-        _T.PARTITIONING: _ddl("adapter_mixin:MySQLAdapter.generate_tuning_clause", "See snowflake entry note."),
+        _T.PARTITIONING: _none(
+            "mysql_no_generator_dead_mixin",
+            "No MySQLAdapter class exists (the prior mechanism named a nonexistent class); MySQL-wire "
+            "adapters mix in base.mysql_wire.NoOpTableTuningMixin, whose generate_tuning_clause returns '' "
+            "(base/mysql_wire.py:475-476) and whose apply_table_tunings/apply_unified_tuning are no-ops "
+            "(base/mysql_wire.py:472-473, 478-479). get_ddl_generator('mysql') has no real generator and "
+            "falls through to NoOpDDLGenerator, so no MySQL PARTITION BY is rendered at preview or "
+            "execution. Corrects the prior false "
+            "_ddl(adapter_mixin:MySQLAdapter.generate_tuning_clause) claim.",
+        ),
         **_constraint_entries(),
     },
     # Explicitly named by the renderer-consolidation TODO even though absent
