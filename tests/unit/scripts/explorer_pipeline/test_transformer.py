@@ -617,6 +617,45 @@ class TestExtendedManifestFields:
         assert transformer.to_manifest_entry(bundle_file).tuning_policy_generation is None
         assert transformer.to_detail_result(bundle_file, result_id="legacy").tuning_policy_generation is None
 
+    def test_dataframe_bundle_applied_ledger_hash_ingests_end_to_end(self, tmp_path: Path) -> None:
+        """A real tuned DataFrame run's exported bundle carries its applied-ledger
+        hash in platform.tuning, and the explorer ingests it verbatim.
+
+        This exercises the whole DataFrame parity chain: the DF adapter records
+        applied runtime settings into the shared ledger, ``build_result_payload``
+        emits the ``platform.tuning`` summary block, and the transformer ingests
+        ``applied_ledger_hash`` -- the same seam #1264 added for SQL bundles.
+        """
+        from types import SimpleNamespace
+
+        from benchbox.core.dataframe.tuning.interface import DataFrameTuningConfiguration
+        from benchbox.core.results.schema import build_result_payload
+        from benchbox.core.schemas import BenchmarkConfig
+        from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        cfg = DataFrameTuningConfiguration()
+        cfg.parallelism.thread_count = 4
+        cfg.execution.streaming_mode = True
+        adapter = PolarsDataFrameAdapter(tuning_config=cfg)
+        result = adapter.run_benchmark(
+            SimpleNamespace(name="tpch", display_name="TPC-H", scale_factor=1.0, tables={}),
+            benchmark_config=BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=1.0),
+            phases=DataFramePhases(load=False, execute=False),
+            options=DataFrameRunOptions(ignore_memory_warnings=True, prefer_parquet=False),
+        )
+        assert result.applied_ledger_hash is not None
+
+        bundle = tmp_path / "dataframe_run.json"
+        bundle.write_text(json.dumps(build_result_payload(result)), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+        assert entry.platform == "Polars"
+        assert entry.applied_ledger_hash == result.applied_ledger_hash
+
+        detail = BundleTransformer().to_detail_result(bundle, result_id="df-ledger")
+        assert detail.applied_ledger_hash == result.applied_ledger_hash
+
     def test_tuning_hash_dict_detail_is_hashed_canonically(self, tmp_path: Path) -> None:
         """A dict tuning_config is machine-readable, so key order must not affect the hash."""
         import copy
