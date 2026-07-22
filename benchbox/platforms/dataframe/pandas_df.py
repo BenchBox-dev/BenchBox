@@ -45,6 +45,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 from benchbox.platforms.dataframe.pandas_family import (
     PandasFamilyAdapter,
 )
+from benchbox.platforms.dataframe.shared_loading import coerce_empty_string_columns
 from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter
 
 logger = logging.getLogger(__name__)
@@ -375,15 +376,13 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
         df = pd.read_csv(path, **read_kwargs)
         df = _coerce_date_columns(df, date_columns)
 
-        # When the SQL loader's dialect keeps empty fields as empty strings
-        # (null_marker is None, e.g. ClickBench), restore "" on declared text
-        # columns: pandas reads an empty field as NaN, which would surface as None
-        # where the DuckDB SQL reference emits "". Skipped when null_marker == ""
-        # (empty -> NULL, e.g. JoinOrder), preserving that surface's NULLs.
-        if null_marker is None and string_columns:
-            present = [column for column in string_columns if column in df.columns]
-            if present:
-                df[present] = df[present].fillna("")
+        # Restore "" on declared text columns when the SQL loader's dialect keeps
+        # empty fields as empty strings (null_marker is None, e.g. ClickBench):
+        # pandas reads an empty field as NaN, which would surface as None where
+        # the DuckDB SQL reference emits "". Skipped when null_marker == "" (empty
+        # -> NULL, e.g. JoinOrder), preserving that surface's NULLs. Shared step:
+        # see coerce_empty_string_columns.
+        df = coerce_empty_string_columns(df, string_columns, null_marker)
 
         # Drop trailing column if present
         if TRAILING_DUMMY_COLUMN in df.columns:

@@ -292,6 +292,11 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             # empty->null. Without this, a prefer_parquet=False load reintroduces the
             # empty-string->null divergence (the cross-surface Q6/Q17/Q18 bug) on the
             # Polars surface. Numeric columns always treat an empty field as null.
+            # This is the same null_marker-is-None decision that
+            # shared_loading.resolve_empty_string_restore_columns makes for every
+            # other adapter; Polars applies it natively as a single scan_csv flag
+            # (over all UTF-8 columns) instead of a per-column post-read restore, so
+            # there is no post-hoc coercion step here to consolidate.
             "missing_utf8_is_empty_string": null_marker is None,
         }
 
