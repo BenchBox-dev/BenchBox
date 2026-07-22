@@ -9,6 +9,12 @@ Usage::
 
     uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py <path>
     uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py --all
+    uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py --drafts-dir ~/.benchbox/finding-drafts
+
+``--all`` validates the tracked legacy corpus under ``_project/blind-spots/``.
+``--drafts-dir`` validates the out-of-tree capture directory (findings domain);
+an absent or empty drafts directory is a valid state (exit 0) — capturing
+findings needs no credentials and no network.
 """
 
 from __future__ import annotations
@@ -31,8 +37,30 @@ ALLOWED_KIND = {
     "other",
 }
 REQUIRED_FIELDS = {"id", "date", "status", "finding_kind", "review_context"}
-OPTIONAL_FIELDS = {"related_paths", "suggested_sweep", "todo_id"}
+# Optional at capture only. The findings-domain (phase 1) additions carry
+# provenance (observed_sha, evidence) or triage judgment (urgency, breadth,
+# confidence) — the judgment fields are assigned later at triage (phase 3
+# `todo finding triage`), never required when a finding is first captured.
+OPTIONAL_FIELDS = {
+    "related_paths",
+    "suggested_sweep",
+    "todo_id",
+    "observed_sha",
+    "evidence",
+    "urgency",
+    "breadth",
+    "confidence",
+}
 ALLOWED_FIELDS = REQUIRED_FIELDS | OPTIONAL_FIELDS
+
+# Keys permitted inside each `evidence` entry. Grep-pattern-based per the
+# suggested_sweep precedent; line ranges are permitted but discouraged (they
+# rot), matching the phase-3 finding_evidence table shape.
+EVIDENCE_KEYS = {"path", "pattern", "note", "line_start", "line_end"}
+
+# Default per-machine drafts directory, outside every worktree (survives
+# worktree churn; zero-credential capture).
+DEFAULT_DRAFTS_DIR = "~/.benchbox/finding-drafts"
 
 # YYYY-MM-DD-HHMMSS-<slug>; slug is kebab-case, lowercase letters/digits.
 FILENAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-\d{6}-[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -138,6 +166,55 @@ def _check_optional_shapes(data: dict) -> list[str]:
             errors.append("todo_id must be a string or null")
         elif isinstance(ti, str) and not ti.strip():
             errors.append("todo_id must be non-empty when present")
+    if "observed_sha" in data and data["observed_sha"] is not None:
+        sha = data["observed_sha"]
+        if not isinstance(sha, str) or not sha.strip():
+            errors.append("observed_sha must be a non-empty string (or null)")
+    errors.extend(_check_evidence(data))
+    errors.extend(_check_judgment_fields(data))
+    return errors
+
+
+def _check_evidence(data: dict) -> list[str]:
+    if "evidence" not in data or data["evidence"] is None:
+        return []
+    ev = data["evidence"]
+    if not isinstance(ev, list):
+        return ["evidence must be a list of {path, pattern, note} mappings (or null)"]
+    errors: list[str] = []
+    for i, entry in enumerate(ev):
+        where = f"evidence[{i}]"
+        if not isinstance(entry, dict):
+            errors.append(f"{where} must be a mapping")
+            continue
+        unknown = sorted(set(entry) - EVIDENCE_KEYS)
+        if unknown:
+            errors.append(f"{where} has unknown key(s): {unknown}")
+        path = entry.get("path")
+        if not isinstance(path, str) or not path.strip():
+            errors.append(f"{where}.path is required and must be a non-empty string")
+        for key in ("pattern", "note"):
+            if key in entry and entry[key] is not None and not isinstance(entry[key], str):
+                errors.append(f"{where}.{key} must be a string (or null)")
+        for key in ("line_start", "line_end"):
+            value = entry.get(key)
+            if value is not None and (not isinstance(value, int) or isinstance(value, bool)):
+                errors.append(f"{where}.{key} must be an integer (or null)")
+    return errors
+
+
+def _check_judgment_fields(data: dict) -> list[str]:
+    # urgency / breadth / confidence are optional at capture (assigned at
+    # triage). Accept a string label or an integer scale; reject other shapes.
+    errors: list[str] = []
+    for field in ("urgency", "breadth", "confidence"):
+        if field not in data or data[field] is None:
+            continue
+        value = data[field]
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            errors.append(f"{field} must be a string or integer (or null)")
+        elif isinstance(value, str) and not value.strip():
+            errors.append(f"{field} must be non-empty when present as a string")
     return errors
 
 
@@ -205,6 +282,16 @@ def main() -> int:
         action="store_true",
         help="validate every finding under _project/blind-spots/",
     )
+    parser.add_argument(
+        "--drafts-dir",
+        nargs="?",
+        const=DEFAULT_DRAFTS_DIR,
+        default=None,
+        metavar="DIR",
+        help=(
+            "validate every draft under DIR (default %(const)s); an absent or empty drafts directory is valid (exit 0)"
+        ),
+    )
     args = parser.parse_args()
 
     targets: list[Path] = []
@@ -214,6 +301,12 @@ def main() -> int:
             print("error: could not locate _project/blind-spots/", file=sys.stderr)
             return 2
         targets.extend(sorted(p for p in bs_dir.glob("*.md") if p.name != "README.md"))
+    if args.drafts_dir is not None:
+        drafts = Path(args.drafts_dir).expanduser()
+        if drafts.is_dir():
+            targets.extend(sorted(p for p in drafts.glob("*.md") if p.name != "README.md"))
+        else:
+            print(f"No drafts directory at {drafts} (zero captured findings is a valid state).")
     for p in args.paths:
         path = Path(p)
         if path.is_dir():
@@ -222,6 +315,11 @@ def main() -> int:
             targets.append(path)
 
     if not targets:
+        # A requested but empty drafts directory is success (no findings captured
+        # yet), not a usage error.
+        if args.drafts_dir is not None:
+            print("No draft findings to validate.")
+            return 0
         parser.print_help(sys.stderr)
         return 2
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -35,9 +36,20 @@ def test_blind_spot_command_uses_repo_tracked_protocol() -> None:
 
     assert "docs/development/review-protocol.md" in command_text
     assert "_project/blind-spots/README.md" in command_text
-    assert "~/" not in command_text
+    # findings-domain phase 1: capture now writes drafts OUT of the Git tree.
+    assert "~/.benchbox/finding-drafts" in command_text
     assert ".claude/skills" not in command_text
     assert (REPO_ROOT / "docs" / "development" / "review-protocol.md").is_file()
+
+
+def test_blind_spot_command_forbids_direct_db_write() -> None:
+    # The capture command must never land a finding straight into the tracker DB
+    # (review-protocol §4); syncing is a separate authorized step.
+    command_text = (REPO_ROOT / ".claude" / "commands" / "blind-spot.md").read_text(encoding="utf-8")
+
+    assert "do not commit" in command_text
+    assert "todo finding sync" in command_text
+    assert "local-only" in command_text
 
 
 def _finding_text(
@@ -352,3 +364,124 @@ def test_report_oldest_section_surfaces_actionable_alongside_open(
     assert "2026-04-29-120020-stale-open" in out
     assert "2026-04-30-120021-confirmed-actionable" in out
     assert "2026-04-29-120022-already-dismissed" not in out
+
+
+# --- findings-domain phase 1: optional capture fields + drafts directory ---
+
+_DRAFT_BODY = """# Draft class finding
+
+## Finding
+A class of issue.
+
+## Why this matters
+It matters.
+
+## Suggested next steps
+- [ ] Sweep siblings.
+"""
+
+
+def _draft_text(stem: str, extra: str = "") -> str:
+    return f"""---
+id: {stem}
+date: 2026-07-22
+status: open
+finding_kind: framework-gap
+review_context: "phase1 unit"
+{extra}---
+
+{_DRAFT_BODY}"""
+
+
+def test_validator_accepts_new_optional_capture_fields(tmp_path: Path) -> None:
+    stem = "2026-07-22-101010-optional-fields"
+    extra = (
+        "observed_sha: abc1234\n"
+        "evidence:\n"
+        "  - path: _project/scripts/todo_db.py\n"
+        "    pattern: EXPORT_TABLE_ALLOWLIST\n"
+        "    note: boundary constant\n"
+        "  - path: docs/x.md\n"
+        "    line_start: 10\n"
+        "    line_end: 20\n"
+        "urgency: high\n"
+        "breadth: 3\n"
+        "confidence: medium\n"
+    )
+    path = tmp_path / f"{stem}.md"
+    path.write_text(_draft_text(stem, extra), encoding="utf-8")
+
+    assert validate_blind_spot.validate_file(path) == []
+
+
+def test_validator_rejects_evidence_without_path(tmp_path: Path) -> None:
+    stem = "2026-07-22-101011-evidence-no-path"
+    path = tmp_path / f"{stem}.md"
+    path.write_text(_draft_text(stem, "evidence:\n  - pattern: no-path-here\n"), encoding="utf-8")
+
+    errors = validate_blind_spot.validate_file(path)
+
+    assert any("evidence[0].path is required" in e for e in errors)
+
+
+def test_validator_rejects_unknown_evidence_key(tmp_path: Path) -> None:
+    stem = "2026-07-22-101012-evidence-unknown-key"
+    path = tmp_path / f"{stem}.md"
+    path.write_text(
+        _draft_text(stem, "evidence:\n  - path: a.py\n    bogus: nope\n"),
+        encoding="utf-8",
+    )
+
+    errors = validate_blind_spot.validate_file(path)
+
+    assert any("unknown key(s): ['bogus']" in e for e in errors)
+
+
+def test_validator_rejects_non_list_evidence(tmp_path: Path) -> None:
+    stem = "2026-07-22-101013-evidence-scalar"
+    path = tmp_path / f"{stem}.md"
+    path.write_text(_draft_text(stem, "evidence: just-a-string\n"), encoding="utf-8")
+
+    errors = validate_blind_spot.validate_file(path)
+
+    assert any("evidence must be a list" in e for e in errors)
+
+
+def test_validator_rejects_bad_judgment_field(tmp_path: Path) -> None:
+    stem = "2026-07-22-101014-bad-urgency"
+    path = tmp_path / f"{stem}.md"
+    path.write_text(_draft_text(stem, "urgency:\n  - 1\n  - 2\n"), encoding="utf-8")
+
+    errors = validate_blind_spot.validate_file(path)
+
+    assert any("urgency must be a string or integer" in e for e in errors)
+
+
+def test_drafts_dir_absent_is_valid_zero_credential(tmp_path: Path, monkeypatch, capsys) -> None:
+    # Zero captured findings is a valid state: an absent drafts directory must
+    # exit 0 (capture needs no credentials and no network).
+    missing = tmp_path / "no-such-drafts"
+    monkeypatch.setattr(sys, "argv", ["validate_blind_spot.py", "--drafts-dir", str(missing)])
+
+    assert validate_blind_spot.main() == 0
+    assert "valid state" in capsys.readouterr().out
+
+
+def test_drafts_dir_validates_captured_draft(tmp_path: Path, monkeypatch) -> None:
+    drafts = tmp_path / "finding-drafts"
+    drafts.mkdir()
+    stem = "2026-07-22-101015-captured"
+    (drafts / f"{stem}.md").write_text(_draft_text(stem, "observed_sha: deadbeef\n"), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["validate_blind_spot.py", "--drafts-dir", str(drafts)])
+
+    assert validate_blind_spot.main() == 0
+
+
+def test_drafts_dir_reports_invalid_draft(tmp_path: Path, monkeypatch) -> None:
+    drafts = tmp_path / "finding-drafts"
+    drafts.mkdir()
+    stem = "2026-07-22-101016-bad"
+    (drafts / f"{stem}.md").write_text(_draft_text(stem, "bogus_field: nope\n"), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["validate_blind_spot.py", "--drafts-dir", str(drafts)])
+
+    assert validate_blind_spot.main() == 1
