@@ -282,6 +282,22 @@ def _applied_ledger_hash(data: dict[str, Any]) -> str | None:
     return str(val) if val else None
 
 
+def _tuning_policy_generation(data: dict[str, Any]) -> str | None:
+    """Ingest the ADR-3 explicit tuning-policy generation marker from the bundle.
+
+    Read verbatim from ``platform.tuning.tuning_policy_generation`` (emitted by
+    ``_build_tuning_summary``); never derived from ``benchbox_version`` or
+    recomputed here. ``None`` for legacy bundles that predate the field -- the
+    explorer treats that absence as the "pre-seam" generation. Display-only,
+    like the tuning hashes: never a join/dedup/grouping/match key.
+    """
+    summary = _tuning_summary(data)
+    if summary is None:
+        return None
+    val = summary.get("tuning_policy_generation")
+    return str(val) if val else None
+
+
 def _logical_profile(data: dict[str, Any]) -> dict[str, Any] | None:
     """Extract the `platform.tuning.logical_profile` block (ADR-2 §3).
 
@@ -972,6 +988,7 @@ class BundleTransformer:
             tuning_hash=_tuning_hash(bundle_data),
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
+            tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
             failed_query_count=failed_query_count,
@@ -1056,6 +1073,7 @@ class BundleTransformer:
             tuning_hash=_tuning_hash(bundle_data),
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
+            tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
             failed_query_count=bundle_failed_query_count(bundle_data),

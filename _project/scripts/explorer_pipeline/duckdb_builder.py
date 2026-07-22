@@ -402,6 +402,10 @@ class DuckDBSnapshotBuilder:
                 -- physical applied-ledger hash. NULL for legacy bundles.
                 requested_config_hash VARCHAR,
                 applied_ledger_hash   VARCHAR,
+                -- ADR-3 seam: explicit tuning-policy generation marker
+                -- (display-only, never a join/dedup key). NULL for legacy
+                -- bundles, treated downstream as the "pre-seam" generation.
+                tuning_policy_generation VARCHAR,
                 test_type            VARCHAR,
                 validation_status    VARCHAR,
                 cost_usd             DOUBLE,
@@ -468,6 +472,7 @@ class DuckDBSnapshotBuilder:
                 r.tuning_hash,
                 r.requested_config_hash,
                 r.applied_ledger_hash,
+                r.tuning_policy_generation,
                 r.test_type,
                 r.validation_status,
                 r.cost_usd,
@@ -794,6 +799,7 @@ class DuckDBSnapshotBuilder:
                     entry.tuning_hash,
                     entry.requested_config_hash,
                     entry.applied_ledger_hash,
+                    entry.tuning_policy_generation,
                     entry.test_type,
                     entry.validation_status,
                     entry.cost_usd,

@@ -292,6 +292,7 @@ def run_dataframe_benchmark(
                 builder.add_query_result(normalize_query_result(qr))
             builder.set_phase_status("power_test", "COMPLETED")
 
+        _attach_applied_tuning_ledger(adapter, builder)
         builder.mark_completed()
         return builder.build()
 
@@ -302,8 +303,22 @@ def run_dataframe_benchmark(
             {"error": str(e), "error_type": type(e).__name__},
         )
         builder.add_execution_metadata("error", str(e))
+        _attach_applied_tuning_ledger(adapter, builder)
         builder.mark_completed()
         return builder.build()
+
+
+def _attach_applied_tuning_ledger(adapter: Any, builder: Any) -> None:
+    """Feed the adapter's applied-tuning ledger into ``builder`` before build.
+
+    Parity with the production adapter path: delegates to
+    ``TuningConfigurableMixin._write_applied_tuning_ledger`` so the built result
+    carries ``applied_tuning_ledger`` + ``applied_ledger_hash`` + the honest
+    ``tuning_validation_status``. Guarded for adapters without the tuning mixin.
+    """
+    writer = getattr(adapter, "_write_applied_tuning_ledger", None)
+    if callable(writer):
+        writer(builder)
 
 
 def _load_dataframe_data(
@@ -386,6 +401,13 @@ def _load_dataframe_data(
                 error_message=str(e),
             )
             logger.error(f"Failed to load {table_name}: {e}")
+
+    # Parity with the production adapter path: fold the physical write-layout the
+    # loader actually applied into the adapter's applied-tuning ledger (POST_LOAD).
+    # Guarded -- a no-op for adapters without the tuning mixin or when no
+    # non-default layout was applied.
+    if hasattr(adapter, "_fold_write_layout_into_ledger"):
+        adapter._fold_write_layout_into_ledger(getattr(loader, "applied_write_layout", None))
 
     return table_stats, per_table_stats
 

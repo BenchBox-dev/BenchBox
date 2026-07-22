@@ -92,7 +92,61 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
   const physicalMechanismsField = buildPhysicalMechanismsField(results);
   if (physicalMechanismsField) fields.push(physicalMechanismsField);
 
+  const tuningPolicyGenerationField = buildTuningPolicyGenerationField(results);
+  if (tuningPolicyGenerationField) fields.push(tuningPolicyGenerationField);
+
   return fields;
+}
+
+/**
+ * The generation attributed to tuned runs that predate the ADR-3
+ * tuning-policy generation marker (absent `tuning_policy_generation`). Unlike
+ * the physical-mechanisms warning -- which treats `undefined` as "unknown, do
+ * not compare" -- an absent generation is a *concrete* value here: two legacy
+ * runs are same-generation (no warning), but a legacy run compared against a
+ * marked run IS a cross-seam comparison (warning). See ADR-3.
+ */
+const PRE_SEAM_GENERATION = "pre-seam";
+
+/**
+ * ADR-3 seam: warn (never fail the match) when two or more `tuned` runs were
+ * produced under different tuning-policy generations. Tuning policy evolves
+ * across a generation seam (ADR-3's baseline redefinition + single-renderer
+ * consolidation), so tuned results from different generations are not directly
+ * comparable -- exactly the concern the cross-mechanism warning above handles
+ * for physical mechanisms. Mirrors that warning's shape, with one deliberate
+ * difference: an absent marker is the concrete "pre-seam" generation, not
+ * "unknown" -- so two legacy runs stay same-generation (no warning), while a
+ * legacy-vs-marked pair warns. Returns null when there's nothing to compare
+ * (fewer than two `tuned` runs). This is a WARNING only: facet matching is
+ * unchanged and the generation is never a match/dedup/grouping key.
+ */
+function buildTuningPolicyGenerationField(results: DetailResult[]): ComparabilityField | null {
+  const tunedResults = results.filter((result) => result.tuning_mode === "tuned");
+  if (tunedResults.length < 2) return null;
+
+  const generationOf = (result: DetailResult) => result.tuning_policy_generation ?? PRE_SEAM_GENERATION;
+  const uniqueGenerations = [...new Set(tunedResults.map(generationOf))];
+
+  if (uniqueGenerations.length === 1) {
+    return {
+      label: "Tuning policy generation",
+      status: "match",
+      summary: uniqueGenerations[0]!,
+    };
+  }
+
+  return {
+    label: "Tuning policy generation",
+    status: "diff",
+    summary: "Tuned runs span different tuning-policy generations",
+    detail: formatPerPlatform(
+      tunedResults.map((result) => ({
+        platform: result.platform,
+        value: generationOf(result),
+      })),
+    ),
+  };
 }
 
 /**

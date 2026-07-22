@@ -23,6 +23,7 @@ from benchbox.core.results.schema import (
     build_tuning_payload,
 )
 from benchbox.core.tuning.interface import TableTuning, TuningColumn, UnifiedTuningConfiguration
+from benchbox.core.tuning.policy_generation import TUNING_POLICY_GENERATION
 
 pytestmark = [
     pytest.mark.unit,
@@ -266,6 +267,33 @@ def test_no_tuning_returns_no_platform_tuning_block_or_companion():
 
     assert build_tuning_payload(result) is None
     assert build_result_payload(result)["platform"].get("tuning") is None
+
+
+def test_tuned_bundle_carries_explicit_tuning_policy_generation_marker():
+    """ADR-3 seam: a new-generation tuned bundle stamps the explicit generation
+    marker in both the platform.tuning summary and the .tuning.json companion,
+    next to the requested/applied hashes (never derived from benchbox_version)."""
+    config = _tuned_config()
+    result = _make_result(
+        tunings_applied=config.to_dict(),
+        tuning_source="auto_discovered",
+        tuning_config_hash=config.get_configuration_hash(),
+    )
+
+    summary = build_result_payload(result)["platform"]["tuning"]
+    companion = build_tuning_payload(result)
+
+    assert summary["tuning_policy_generation"] == TUNING_POLICY_GENERATION
+    assert companion["tuning_policy_generation"] == TUNING_POLICY_GENERATION
+
+
+def test_no_tuning_omits_tuning_policy_generation_marker():
+    """The generation marker rides with tuning: a run with no tuning emits no
+    platform.tuning block at all, so no marker leaks onto untuned bundles."""
+    result = _make_result(tunings_applied=None)
+
+    assert build_result_payload(result)["platform"].get("tuning") is None
+    assert build_tuning_payload(result) is None
 
 
 def test_packaged_resource_source_maps_to_yaml_legacy_bridge():

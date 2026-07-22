@@ -64,6 +64,10 @@ export interface ResultRow extends CostDeploymentFields {
   // columns default to undefined. Display-only; never a join/dedup key.
   requested_config_hash?: string | null;
   applied_ledger_hash?: string | null;
+  // ADR-3 seam: explicit tuning-policy generation marker (see DetailResult in
+  // types.ts). Optional so fixtures/SQL paths predating this column default to
+  // undefined. Display-only; never a join/dedup key.
+  tuning_policy_generation?: string | null;
   test_type: string | null;
   validation_status: string | null;
   cost_usd: number | null;
@@ -300,6 +304,7 @@ const RESULT_COLUMNS = [
   "tuning_hash",
   "requested_config_hash",
   "applied_ledger_hash",
+  "tuning_policy_generation",
   "test_type",
   "validation_status",
   "cost_usd",
@@ -359,6 +364,7 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "tuning_hash",
   "requested_config_hash",
   "applied_ledger_hash",
+  "tuning_policy_generation",
   "test_type",
   "validation_status",
   "cost_usd",
@@ -645,6 +651,7 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     tuning_hash: wide.tuning_hash,
     requested_config_hash: wide.requested_config_hash ?? null,
     applied_ledger_hash: wide.applied_ledger_hash ?? null,
+    tuning_policy_generation: wide.tuning_policy_generation ?? null,
     test_type: wide.test_type,
     validation_status: wide.validation_status,
     cost_usd: wide.cost_usd,
