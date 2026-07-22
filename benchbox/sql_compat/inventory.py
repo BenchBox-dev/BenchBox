@@ -165,6 +165,12 @@ _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("snowflake", "_optimize_table_definition"): ("snowflake_ddl_optimizer",),
     ("spark", "optimize_spark_table_definition"): ("spark_ddl_optimizer",),
     ("starrocks", "_optimize_table_definition"): ("starrocks_ddl_optimizer",),
+    # _resolve_tuned_ddl_clauses is a helper invoked by _optimize_table_definition
+    # to compute the PARTITION BY/DISTRIBUTED BY/ORDER BY clauses it splices into
+    # the statement via the single StarRocksDDLGenerator; it is part of the same
+    # registered DDL_OPTIMIZE transform, not a second independent rewrite (mirrors
+    # the clickhouse entry above).
+    ("starrocks", "_resolve_tuned_ddl_clauses"): ("starrocks_ddl_optimizer",),
     ("synapse", "_optimize_table_definition"): ("azure_synapse_ddl_optimizer",),
     ("trino", "_optimize_table_definition"): ("trino_ddl_optimizer",),
     ("velox", "optimize_spark_table_definition"): ("velox_ddl_optimizer",),
