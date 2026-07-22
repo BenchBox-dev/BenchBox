@@ -236,4 +236,62 @@ describe("ComparabilityReceipt", () => {
       expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
     });
   });
+
+  describe("tuning policy generation warning (ADR-3 seam)", () => {
+    it("warns -- without failing the match -- when two tuned runs span different generations", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
+        // Absent marker = the concrete "pre-seam" generation, so this is a
+        // genuine cross-seam comparison, not "unknown, skip".
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
+      ]);
+
+      const field = fields.find((f) => f.label === "Tuning policy generation");
+      expect(field).toMatchObject({ status: "diff", summary: "Tuned runs span different tuning-policy generations" });
+      expect(field?.detail).toContain("DuckDB: adr-003");
+      expect(field?.detail).toContain("SQLite: pre-seam");
+
+      // A warning, not a match failure: the receipt stays facet-matchable and
+      // the difference only surfaces in the warning list.
+      const warnings = comparabilityWarningFields(fields);
+      expect(warnings.some((f) => f.label === "Tuning policy generation")).toBe(true);
+    });
+
+    it("matches (no warning) when two tuned runs share the same generation", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Tuning policy generation")).toMatchObject({
+        status: "match",
+        summary: "adr-003",
+      });
+    });
+
+    it("matches (no warning) when both tuned runs are pre-seam (both markers absent)", () => {
+      // Two legacy runs are same-generation ("pre-seam" both), so no warning --
+      // the key distinction from the physical-mechanisms warning, where two
+      // undefineds mean "unknown" and the field is omitted entirely.
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", tuning_policy_generation: undefined }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Tuning policy generation")).toMatchObject({
+        status: "match",
+        summary: "pre-seam",
+      });
+      expect(comparabilityWarningFields(fields).some((f) => f.label === "Tuning policy generation")).toBe(false);
+    });
+
+    it("is omitted when fewer than two results are labeled tuned", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
+        makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "notuning" }),
+      ]);
+
+      expect(fields.find((f) => f.label === "Tuning policy generation")).toBeUndefined();
+    });
+  });
 });

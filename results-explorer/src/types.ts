@@ -103,6 +103,12 @@ export interface DetailResult extends CostDeploymentFields {
   // Display-only, like tuning_hash.
   requested_config_hash?: string | null;
   applied_ledger_hash?: string | null;
+  // ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
+  // from platform.tuning (see explorer_pipeline/transformer.py); never derived
+  // from benchbox_version. Null/undefined for legacy bundles predating the
+  // field -- the ComparabilityReceipt treats that absence as the "pre-seam"
+  // generation. Display-only, like the hashes above; never a match key.
+  tuning_policy_generation?: string | null;
   test_type: string | null;
   validation_status: string | null;
   cost_usd: number | null;
