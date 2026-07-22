@@ -23,6 +23,8 @@ A later request to fix/address review findings is write authorization; follow th
 
 Capture authorizes only the local file write. Final terminal action is a chat line such as `Recorded: <path>`; the user decides whether to PR.
 
+For findings specifically: the only authorized capture write is the append-only draft file under `~/.benchbox/finding-drafts/`; writing a finding straight into the hosted tracker DB during review is forbidden (it lands with no PR cycle). `todo finding sync` is a separate, user-authorized landing step, never part of the review.
+
 For verification, run only commands the review scope demands. Long output goes to a temp log; cite paths/lines, do not paste large source blocks or command output.
 
 ## Defect Gate

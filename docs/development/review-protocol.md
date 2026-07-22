@@ -124,6 +124,19 @@ This applies whether the capture happened during `/code review`, via
 the `/blind-spot` slash command, or as a side-effect of any other
 review-shaped action.
 
+**Findings capture, specifically.** For a blind-spot / finding captured
+during any review-shaped action, the *only* authorized write is the
+append-only **draft file** under `~/.benchbox/finding-drafts/` (outside
+every worktree; see `_project/specs/findings-domain.md`). Writing a finding
+straight into the hosted tracker database during a review is **forbidden**:
+a hosted write is immediately visible to every other session with no PR
+cycle (`_project/specs/todo-db-tracker.md`, "the DB is the record"), which
+is exactly the *landing* that §1 reserves for a separately authorized turn.
+Syncing drafts into the tracker (`todo finding sync`) is that separate,
+user-authorized landing step — never part of the review itself. The draft
+file is the sole in-review write; the sync is a distinct action in a later
+authorized turn.
+
 ---
 
 ## Section 5 - Project bindings
