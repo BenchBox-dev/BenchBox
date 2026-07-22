@@ -383,6 +383,7 @@ class BenchmarkExecutionMixin:
                         {"error": str(load_err), "phase": "data_loading"},
                     )
                     builder.set_phase_status("data_loading", "FAILED")
+                    self._attach_applied_tuning_ledger(builder)
                     builder.mark_completed()
                     return builder.build()
             elif phases.load and skip_data_loading:
@@ -415,6 +416,7 @@ class BenchmarkExecutionMixin:
                 )
                 builder.set_phase_status("power_test", "COMPLETED")
 
+            self._attach_applied_tuning_ledger(builder)
             builder.mark_completed()
             return builder.build()
 
@@ -425,8 +427,22 @@ class BenchmarkExecutionMixin:
                 {"error": str(e), "error_type": type(e).__name__},
             )
             builder.add_execution_metadata("error", str(e))
+            self._attach_applied_tuning_ledger(builder)
             builder.mark_completed()
             return builder.build()
+
+    def _attach_applied_tuning_ledger(self, builder: Any) -> None:
+        """Feed the applied-tuning ledger into ``builder`` before it builds.
+
+        Delegates to ``TuningConfigurableMixin._write_applied_tuning_ledger``
+        (present on every real DataFrame adapter) so the built ``BenchmarkResults``
+        carries ``applied_tuning_ledger`` + ``applied_ledger_hash`` + the honest
+        ``tuning_validation_status`` through the existing export path. Guarded so
+        non-tuning stub adapters (which lack the tuning mixin) are a no-op.
+        """
+        writer = getattr(self, "_write_applied_tuning_ledger", None)
+        if callable(writer):
+            writer(builder)
 
     def load_benchmark_into_context(
         self,
@@ -773,9 +789,18 @@ class BenchmarkExecutionMixin:
         column_names_map, csv_delimiter = self._resolve_column_names_and_delimiter(benchmark_config, benchmark_instance)
 
         # Load tables into context
-        return self._load_tables_into_context(
+        loaded = self._load_tables_into_context(
             ctx, data_paths, column_names_map, csv_delimiter, benchmark=benchmark_instance
         )
+
+        # Fold the physical write-layout the loader actually applied (its
+        # honest ``applied_write_layout`` signal) into the applied-tuning ledger
+        # as POST_LOAD statements. Guarded: a no-op for non-tuning adapters or
+        # when no non-default layout was applied.
+        if hasattr(self, "_fold_write_layout_into_ledger"):
+            self._fold_write_layout_into_ledger(getattr(loader, "applied_write_layout", None))
+
+        return loaded
 
     def _execute_queries_phase(
         self,
