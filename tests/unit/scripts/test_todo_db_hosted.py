@@ -1070,6 +1070,10 @@ def test_export_all_uses_one_read_transaction(tmp_path):
 
     assert statements[0] == "BEGIN"
     assert statements[-1] == "COMMIT"
+    # The whole bundle (items + events) must come from ONE read snapshot, so
+    # there is exactly one transaction, not one per table.
+    assert statements.count("BEGIN") == 1
+    assert statements.count("COMMIT") == 1
 
 
 def test_export_command_uses_read_only_connect(monkeypatch):
