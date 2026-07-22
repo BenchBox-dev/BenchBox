@@ -193,6 +193,17 @@ raw commit subjects, which step 3 requires you to curate anyway.
    design (per A3 in `_project/decisions/single-repo-migration.md`); the
    release squash on `release` does not need to be replayed onto develop.
 
+**Syncing `develop`'s version.** `release-cut`/`release-finalize` never modify
+`develop` (step 6), so its declared version does not track releases on its own —
+D5's original "rebase `develop` onto `main`" step became impossible once
+`release`/`develop` diverged as unrelated roots. After a release publishes, bump
+`develop` to match on a branch off `develop`:
+`scripts/update_version.py --version X.Y.Z --update-pyproject`, then `uv lock`,
+then PR back to `develop`. This realigns all six version sources
+(`benchbox/__init__.py`, `pyproject.toml`, the three `Current release:` doc
+markers, and the `landing/index.html` badge) with the latest published release,
+so `develop` no longer trails PyPI.
+
 Push-to-release jobs are post-merge signals. They may still start when `release`
 advances, but they are not pre-publish evidence: the tag push follows the
 successful release PR merge and `.github/workflows/release.yml` begins from
