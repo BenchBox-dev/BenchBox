@@ -134,5 +134,18 @@ class ClickHouseAdapter(
 
         return ClickHouseQueryPlanParser()
 
+    def get_tuning_introspector(self):
+        """Read ``system.tables`` keys to corroborate the applied ledger.
+
+        Surfaces ClickHouse ``sorting_key`` / ``partition_key`` as receipt
+        evidence (see ``benchbox.platforms.clickhouse.introspection``). Note the
+        documented limitation: ClickHouse's key-bearing DDL runs at
+        ``CREATE TABLE`` time outside the tuning ledger, so this reports the
+        physical keys but does not, on its own, mint ``applied_verified``.
+        """
+        from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
+
+        return ClickHouseTuningIntrospector()
+
 
 __all__ = ["ClickHouseAdapter"]

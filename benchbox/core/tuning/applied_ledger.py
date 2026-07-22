@@ -246,14 +246,26 @@ class AppliedTuningLedger:
         payload = json.dumps(executed, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    def to_payload(self, *, status: str) -> dict[str, Any]:
-        """The ``.applied.json`` companion payload."""
-        return {
+    def to_payload(self, *, status: str, receipt: dict[str, Any] | None = None) -> dict[str, Any]:
+        """The ``.applied.json`` companion payload.
+
+        ``receipt`` (when supplied) is the post-load introspection receipt
+        (``benchbox.core.tuning.introspection.IntrospectionReceipt.to_payload``)
+        that corroborated the ledger against the live catalog. It rides inside
+        this companion rather than in a separate file. A ``receipt`` is present
+        only when the run status was ``applied_unverified`` and introspection was
+        attempted; the ``applied_verified`` status it may carry is derived solely
+        from that receipt's corroboration, never from the ledger alone.
+        """
+        payload: dict[str, Any] = {
             "status": status,
             "applied_ledger_hash": self.applied_ledger_hash(),
             "statements": [s.to_dict() for s in self.statements],
             "dropped": [d.to_dict() for d in self.dropped],
         }
+        if receipt is not None:
+            payload["receipt"] = receipt
+        return payload
 
     def is_empty(self) -> bool:
         return not self.statements and not self.dropped

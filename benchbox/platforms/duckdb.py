@@ -505,6 +505,17 @@ class DuckDBAdapter(PlatformAdapter):
     def platform_name(self) -> str:
         return "DuckDB"
 
+    def get_tuning_introspector(self):
+        """Corroborate the applied ledger against ``duckdb_indexes()``.
+
+        Enables the ``applied_unverified -> applied_verified`` upgrade for DuckDB
+        when the recorded ``CREATE INDEX`` statements are confirmed present in
+        the catalog (see ``benchbox.platforms.duckdb_introspection``).
+        """
+        from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
+
+        return DuckDBTuningIntrospector()
+
     @staticmethod
     def add_cli_arguments(parser) -> None:
         """Add DuckDB-specific CLI arguments."""

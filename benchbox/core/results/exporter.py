@@ -440,7 +440,40 @@ class ResultExporter:
                 # database_name - drop it here for the same reason.
                 entry.pop("table", None)
                 entry["statement_redacted"] = True
+        # The post-load introspection receipt (tuning-introspection-receipts)
+        # rides inside this companion and echoes the same free-text statement /
+        # identifier fields (plus catalog evidence), so it is scrubbed by the
+        # same policy: keep the structural verdict/kind/summary, drop everything
+        # that could embed a path, catalog, or user-chosen identifier.
+        self._sanitize_applied_receipt(sanitized.get("receipt"))
         return sanitized
+
+    @staticmethod
+    def _sanitize_applied_receipt(receipt: Any) -> None:
+        """Drop free-text / identifier fields from an embedded receipt, in place.
+
+        Mirrors the ``.applied.json`` statement-redaction policy: the receipt's
+        per-statement ``statement`` / ``diff`` / ``evidence`` and the ``table`` /
+        column / index-name identifiers can embed paths or user-chosen catalog
+        names, so they are dropped outright for anonymized exports. The
+        structural ``verdict`` / ``kind`` / ``phase`` / ``reason`` and the
+        top-level ``corroborated`` / ``summary`` are retained.
+        """
+        if not isinstance(receipt, dict):
+            return
+        _drop = ("statement", "diff", "evidence", "table", "name", "expected_columns", "observed_columns")
+        for entry in receipt.get("entries") or []:
+            if isinstance(entry, dict):
+                for key in _drop:
+                    entry.pop(key, None)
+                entry["statement_redacted"] = True
+        for obj in receipt.get("observed") or []:
+            if isinstance(obj, dict):
+                obj.pop("table", None)
+                obj.pop("name", None)
+                obj.pop("columns", None)
+                obj.pop("evidence", None)
+                obj["redacted"] = True
 
     def _convert_datetimes_to_iso(self, obj: Any) -> Any:
         """Convert datetime objects to ISO format strings."""
