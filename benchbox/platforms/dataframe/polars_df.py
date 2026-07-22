@@ -142,26 +142,31 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         if config.parallelism.thread_count is not None:
             os.environ["POLARS_MAX_THREADS"] = str(config.parallelism.thread_count)
             self._log_verbose(f"Set POLARS_MAX_THREADS={config.parallelism.thread_count}")
+            self._record_runtime_tuning(f"POLARS_MAX_THREADS={config.parallelism.thread_count}")
 
         # Apply streaming mode only if explicitly enabled in tuning config
         if config.execution.streaming_mode:
             self.streaming = True
             self._log_verbose("Enabled streaming mode from tuning configuration")
+            self._record_runtime_tuning("streaming_mode=on")
 
         # Apply rechunk only if explicitly disabled in tuning config (default is True)
         if not config.memory.rechunk_after_filter:
             self.rechunk = False
             self._log_verbose("Disabled rechunk from tuning configuration")
+            self._record_runtime_tuning("rechunk_after_filter=off")
 
         # Configure streaming chunk size if specified (None is default)
         if config.memory.chunk_size is not None:
             pl.Config.set_streaming_chunk_size(config.memory.chunk_size)
             self._log_verbose(f"Set streaming chunk size={config.memory.chunk_size}")
+            self._record_runtime_tuning(f"streaming_chunk_size={config.memory.chunk_size}")
 
         # Configure engine affinity (affects .collect() behavior)
         if config.execution.engine_affinity == "streaming":
             self.streaming = True
             self._log_verbose("Set streaming mode from engine_affinity='streaming'")
+            self._record_runtime_tuning("engine_affinity=streaming")
 
     @property
     def platform_name(self) -> str:

@@ -301,6 +301,7 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
         if config.data_types.dtype_backend != "numpy_nullable":
             self.dtype_backend = config.data_types.dtype_backend
             self._log_verbose(f"Set dtype_backend={self.dtype_backend} from tuning configuration")
+            self._record_runtime_tuning(f"dtype_backend={self.dtype_backend}")
 
         # Store categorization settings for use during data loading
         self._auto_categorize = config.data_types.auto_categorize_strings
@@ -308,6 +309,7 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
 
         if self._auto_categorize:
             self._log_verbose(f"Auto-categorize strings enabled (threshold={self._categorical_threshold})")
+            self._record_runtime_tuning(f"auto_categorize_strings=on;threshold={self._categorical_threshold}")
 
     @property
     def platform_name(self) -> str:

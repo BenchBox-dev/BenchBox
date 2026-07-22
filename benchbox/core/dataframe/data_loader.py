@@ -895,6 +895,13 @@ class DataFrameDataLoader:
         self.prefer_parquet = prefer_parquet
         self.force_regenerate = force_regenerate
         self.write_config = write_config
+        # Honest signal for the applied-tuning ledger (ADR-1): the non-default
+        # physical write-layout that was actually applied to the data returned by
+        # the most recent ``prepare_benchmark_data`` call. ``None`` when no layout
+        # was applied (default config, or source returned as-is without going
+        # through the converter). Read by the DataFrame adapters to fold POST_LOAD
+        # write-layout statements into the applied ledger.
+        self.applied_write_layout: DataFrameWriteConfiguration | None = None
 
         # Get platform capabilities
         try:
@@ -975,6 +982,10 @@ class DataFrameDataLoader:
 
         # Resolve write config before the format check so sort_by can force conversion.
         effective_write_config = write_config or self.write_config
+        # Reset the applied-layout signal; set it only on paths where the returned
+        # data actually carries a non-default physical layout (see below).
+        self.applied_write_layout = None
+        layout_applied = bool(effective_write_config and not effective_write_config.is_default())
 
         # Check if source is already in target format.
         # Skip conversion unless write_config requests physical layout changes (e.g. sort_by),
@@ -982,6 +993,8 @@ class DataFrameDataLoader:
         source_format = self._detect_source_format(source_files)
         needs_layout_transform = bool(effective_write_config and effective_write_config.sort_by)
         if source_format == target_format and not needs_layout_transform:
+            # Source returned verbatim: no conversion ran, so no write-layout was
+            # applied even if a config was supplied.
             logger.info(f"Source data already in {target_format.value} format")
             return source_files
         if source_format == target_format and needs_layout_transform:
@@ -1011,11 +1024,16 @@ class DataFrameDataLoader:
         ):
             cached = self.cache.get_cached_files(benchmark_name, scale_factor, target_format)
             if cached:
+                # Cache key folds in the non-default write_config (above), so the
+                # cached files physically carry the requested layout.
                 logger.info(f"Using cached {target_format.value} data")
+                if layout_applied:
+                    self.applied_write_layout = effective_write_config
                 return cached
 
-        # Convert to target format
-        return self._convert_data(
+        # Convert to target format. Conversion routes the data through the
+        # FormatConverter, which applies the write_config's physical layout.
+        converted = self._convert_data(
             benchmark=benchmark,
             benchmark_name=benchmark_name,
             scale_factor=scale_factor,
@@ -1025,6 +1043,9 @@ class DataFrameDataLoader:
             source_hash=source_hash,
             write_config=effective_write_config,
         )
+        if layout_applied:
+            self.applied_write_layout = effective_write_config
+        return converted
 
     def _get_source_files(self, benchmark: Any, data_dir: Path | None) -> dict[str, list[Path]]:
         """Get source data file paths.
