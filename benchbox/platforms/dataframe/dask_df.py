@@ -61,6 +61,7 @@ from benchbox.platforms.dataframe.pandas_df import _pandas_string_columns
 from benchbox.platforms.dataframe.pandas_family import (
     PandasFamilyAdapter,
 )
+from benchbox.platforms.dataframe.shared_loading import coerce_empty_string_columns
 from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter
 
 logger = logging.getLogger(__name__)
@@ -449,13 +450,9 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
 
         # Match the SQL dialect's empty-field semantics (null_marker None -> keep '';
         # '' -> NULL), as the pandas adapter does, so an empty text field does not
-        # surface as None where the SQL reference emits ''.
-        if null_marker is None and string_columns:
-            for column in string_columns:
-                if column in df.columns:
-                    # Per-column (not df[list]=...) so it works across dask/modin/cudf,
-                    # whose multi-column assignment support differs from pandas.
-                    df[column] = df[column].fillna("")
+        # surface as None where the SQL reference emits ''. Shared step: see
+        # coerce_empty_string_columns.
+        df = coerce_empty_string_columns(df, string_columns, null_marker)
 
         # Drop trailing column if present (lazy operation)
         if TRAILING_DUMMY_COLUMN in df.columns:

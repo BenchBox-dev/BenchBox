@@ -127,6 +127,7 @@ from benchbox.platforms.dataframe.pandas_df import _pandas_string_columns  # noq
 from benchbox.platforms.dataframe.pandas_family import (  # noqa: E402
     PandasFamilyAdapter,
 )
+from benchbox.platforms.dataframe.shared_loading import coerce_empty_string_columns  # noqa: E402
 from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -311,13 +312,9 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         df = mpd.read_csv(path, **read_kwargs)
 
         # Match the SQL dialect's empty-field semantics (null_marker None -> keep '';
-        # '' -> NULL), as the pandas adapter does.
-        if null_marker is None and string_columns:
-            for column in string_columns:
-                if column in df.columns:
-                    # Per-column (not df[list]=...) so it works across dask/modin/cudf,
-                    # whose multi-column assignment support differs from pandas.
-                    df[column] = df[column].fillna("")
+        # '' -> NULL), as the pandas adapter does. Shared step: see
+        # coerce_empty_string_columns.
+        df = coerce_empty_string_columns(df, string_columns, null_marker)
 
         # Drop trailing column if present
         if TRAILING_DUMMY_COLUMN in df.columns:
