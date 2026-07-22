@@ -460,8 +460,8 @@
       "installMode": "mirror",
       "files": {
         "SKILL.md": {
-          "sha256": "c9163a1459530450a089bbbfff366c3d549c5c1b93045668d922b6f45c363c92",
-          "size": 2221
+          "sha256": "2027131f5f2fbba2f2d379a838469e955259f4339d9ebaa5d5685cddb8e11763",
+          "size": 2551
         },
         "skill.yaml": {
           "sha256": "efe5d79366ee8ff39450f8e68b47c2fcd021f547585d1546a35e3e3f66078545",

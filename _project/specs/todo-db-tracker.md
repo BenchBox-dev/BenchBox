@@ -66,9 +66,19 @@ constraints enforce the lifecycle, fronted by a thin `todo` CLI that is the
 - **The DB is the record; the harness session task list is display only.**
   Durable per-work-unit status stays in the DB so a successor session can
   resume a dead session's item.
-- **No offline write queue.** Reads degrade to a gitignored local cache with
-  a staleness banner; writes fail loudly. A write queue is a second
-  consistency system and is explicitly rejected.
+- **No offline write queue for work state.** Reads degrade to a gitignored
+  local cache with a staleness banner; work-state writes (items, work units,
+  claims, deferrals) fail loudly. A write queue for work state is a second
+  consistency system and is explicitly rejected. This rejection is scoped to
+  *work state*: an append-only **directory of finding draft files** (the
+  findings domain's capture format — see `_project/specs/findings-domain.md`)
+  is a permitted local write. Each draft is a write-once file keyed by a
+  filename-stem id — the directory grows, individual files are immutable — so
+  the drafts carry no cross-session consistency contract and are landed later
+  through the separately authorized `todo finding sync` step, never queued into
+  the primary. Narrowed here per the 2026-07-22 findings-domain adversarial
+  review, which found the previously unscoped rejection would silently forbid
+  the findings design's local capture.
 
 ## Schema (DDL sketch)
 
@@ -554,7 +564,9 @@ hardening round below): reads serve from the local replica after one freshness
 transaction — are delegated statement-by-statement to the primary, so the
 check-then-act gates serialize against all other writers exactly as they do
 against the local file. On sync failure, reads degrade to the stale replica
-with a `STALE` banner and writes fail loudly (no offline queue, per design).
+with a `STALE` banner and writes fail loudly (no offline work-state queue,
+per design; append-only finding draft files are the sole permitted local
+write — see "No offline write queue for work state" above).
 
 The client is close to sqlite3 but not close enough (verified live): rows
 are plain tuples with no `row_factory`, cursors are not iterable, and

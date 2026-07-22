@@ -661,6 +661,58 @@ TRANSFER_TABLES = (
     "events",
 )
 
+# Tables whose data is written to the repo-committed export snapshot
+# (_project/todo-db-export/, via write_export). This is deliberately the ITEMS
+# DOMAIN ONLY -- a *subset* of the full backup/restore scope (TRANSFER_TABLES),
+# maintained as an INDEPENDENT literal, not derived from TRANSFER_TABLES, so
+# adding a table to the backup scope never silently widens what gets committed.
+# It exists so the version-controlled provenance snapshot can never carry a
+# table that must not be committed -- notably any findings-domain table, whose
+# review prose is deliberately not version-controlled and travels via the CI
+# artifact channel only (see _project/specs/findings-domain.md, "Export
+# boundary"). The pinning test
+# (tests/unit/scripts/test_todo_db_export_allowlist.py) asserts the export
+# covers exactly this set, so any `finding%` table fails CLOSED by
+# construction: the exporter never reads it, and it cannot be added to this
+# allowlist without the test rejecting the finding-prefixed name.
+EXPORT_TABLE_ALLOWLIST = frozenset(
+    {
+        "items",
+        "work_units",
+        "work_needs",
+        "item_deps",
+        "scope_rules",
+        "verifications",
+        "preserves",
+        "anti_patterns",
+        "prior_art",
+        "deferrals",
+        "events",
+    }
+)
+
+# The item-nested part of the committed export (items + its child tables,
+# assembled by _export_all_unlocked into items.jsonl). `events` is committed
+# separately (events.jsonl) because config-scoped events carry item_id = NULL
+# and do not nest under any item. Together these must exhaust
+# EXPORT_TABLE_ALLOWLIST -- asserted in write_export so drift between the
+# exporter's coverage and the allowlist fails loudly instead of silently
+# dropping or leaking a table.
+_ITEM_NESTED_EXPORT_TABLES = frozenset(
+    {
+        "items",
+        "work_units",
+        "work_needs",
+        "item_deps",
+        "scope_rules",
+        "verifications",
+        "preserves",
+        "anti_patterns",
+        "prior_art",
+        "deferrals",
+    }
+)
+
 
 def _hrana_endpoint(url: str) -> str:
     url = _require_secure_url(url)
@@ -1828,13 +1880,48 @@ def export_all(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         return _export_all_unlocked(conn)
 
 
-def write_export(conn: sqlite3.Connection, out_dir: Path) -> tuple[Path, Path]:
+def _export_events_unlocked(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    # The append-only provenance trail. Ordered by the monotonic `seq` PK for a
+    # deterministic, reproducible diff. Row data (including the `at` timestamp)
+    # is real tracker state, not generation-time state, so the ordering + values
+    # are stable across runs -- the committed snapshot's clean-diff property.
+    return [dict(row) for row in conn.execute("SELECT * FROM events ORDER BY seq")]
+
+
+def export_events(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    with _read_txn(conn):
+        return _export_events_unlocked(conn)
+
+
+def write_export(conn: sqlite3.Connection, out_dir: Path) -> tuple[Path, Path, Path]:
+    # Fail closed: the exporter's own coverage (item-nested tables + events)
+    # must equal the committed-snapshot allowlist. If a future change teaches
+    # the exporter a new table without allowlisting it (or allowlists one the
+    # exporter does not emit), this raises instead of silently leaking or
+    # dropping data. Findings tables are excluded by construction -- they are
+    # neither in _ITEM_NESTED_EXPORT_TABLES nor EXPORT_TABLE_ALLOWLIST -- so
+    # their review prose can never reach the version-controlled snapshot.
+    covered = _ITEM_NESTED_EXPORT_TABLES | {"events"}
+    if covered != EXPORT_TABLE_ALLOWLIST:
+        raise RuntimeError(
+            "committed export coverage drifted from EXPORT_TABLE_ALLOWLIST: "
+            f"covered={sorted(covered)} allowlist={sorted(EXPORT_TABLE_ALLOWLIST)}"
+        )
     out_dir.mkdir(parents=True, exist_ok=True)
-    items = export_all(conn)
+    # One read snapshot for the WHOLE bundle: items and events must come from the
+    # same consistent view, or a concurrent write between two transactions could
+    # emit an events.jsonl row referencing an item absent from items.jsonl.
+    with _read_txn(conn):
+        items = _export_all_unlocked(conn)
+        events = _export_events_unlocked(conn)
     jsonl_path = out_dir / "items.jsonl"
     with open(jsonl_path, "w", encoding="utf-8") as handle:
         for item in items:
             handle.write(json.dumps(item, sort_keys=True) + "\n")
+    events_path = out_dir / "events.jsonl"
+    with open(events_path, "w", encoding="utf-8") as handle:
+        for event in events:
+            handle.write(json.dumps(event, sort_keys=True) + "\n")
     index_path = out_dir / "index.md"
     with open(index_path, "w", encoding="utf-8") as handle:
         handle.write("# TODO export\n\n| id | state | priority | worktree | title |\n")
@@ -1843,7 +1930,7 @@ def write_export(conn: sqlite3.Connection, out_dir: Path) -> tuple[Path, Path]:
             handle.write(
                 f"| {item['id']} | {item['state']} | {item['priority']} | {item['worktree']} | {item['title']} |\n"
             )
-    return jsonl_path, index_path
+    return jsonl_path, events_path, index_path
 
 
 # ---------------------------------------------------------------------------
@@ -2719,8 +2806,8 @@ def _cmd_sweep_stale(conn, actor, args):
 
 def _cmd_export(conn, actor, args):
     out_dir = Path(args.out) if args.out else git_main_root() / ".todo-db" / "export"
-    jsonl_path, index_path = write_export(conn, out_dir)
-    print(f"wrote {jsonl_path} and {index_path}")
+    jsonl_path, events_path, index_path = write_export(conn, out_dir)
+    print(f"wrote {jsonl_path}, {events_path} and {index_path}")
     return 0
 
 
