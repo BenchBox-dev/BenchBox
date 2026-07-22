@@ -38,6 +38,7 @@ from benchbox.core.tuning.generators.clickhouse import ClickHouseDDLGenerator
 from benchbox.core.tuning.generators.pg_duckdb import PgDuckDBDDLGenerator
 from benchbox.core.tuning.generators.pg_mooncake import PgMooncakeDDLGenerator
 from benchbox.core.tuning.generators.questdb import QuestDBDDLGenerator
+from benchbox.core.tuning.generators.starrocks import StarRocksDDLGenerator
 
 pytestmark = [
     pytest.mark.unit,
@@ -185,6 +186,16 @@ class TestNewPlatformGeneratorRegistration:
         assert isinstance(generator, PgMooncakeDDLGenerator)
         assert not isinstance(generator, NoOpDDLGenerator)
 
+    def test_starrocks_is_registered(self) -> None:
+        """StarRocks now has a real generator (StarRocksDDLGenerator) reachable via
+        get_ddl_generator, so dry-run preview and the workload's schema-creation
+        path render tuned PARTITION BY / DISTRIBUTED BY / ORDER BY through the same
+        single renderer. Previously this fell through to a warning NoOp fallback.
+        """
+        generator = get_ddl_generator("starrocks")
+        assert isinstance(generator, StarRocksDDLGenerator)
+        assert not isinstance(generator, NoOpDDLGenerator)
+
     def test_clickhouse_cloud_is_registered(self) -> None:
         """PR #1180 review: clickhouse-cloud was missing from the registry, so
         dry-run preview (core/dryrun.py's get_ddl_generator(database_config.type))
@@ -224,17 +235,6 @@ class TestNoOpFallbackWarning:
             "totally-unregistered-platform-xyz" in record.getMessage() and record.levelno == logging.WARNING
             for record in caplog.records
         )
-
-    def test_starrocks_falls_back_loudly(self, caplog: pytest.LogCaptureFixture) -> None:
-        """StarRocks has no generator yet (deferred pending ADR-3) - this is
-        exactly the "silently-empty tuning preview" symptom from review finding
-        R2, so it must now warn rather than stay silent.
-        """
-        with caplog.at_level(logging.WARNING, logger="benchbox.core.tuning.ddl_generator"):
-            generator = get_ddl_generator("starrocks")
-
-        assert isinstance(generator, NoOpDDLGenerator)
-        assert any("starrocks" in record.getMessage() for record in caplog.records)
 
     @pytest.mark.parametrize("platform_key", ["sqlite", "sqlite3", "pandas", "modin", "cudf", "dask", "polars"])
     def test_known_tuning_free_platforms_stay_silent(self, platform_key: str, caplog: pytest.LogCaptureFixture) -> None:

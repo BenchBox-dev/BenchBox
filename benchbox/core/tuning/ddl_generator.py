@@ -664,6 +664,7 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
     from benchbox.core.tuning.generators.redshift import RedshiftDDLGenerator
     from benchbox.core.tuning.generators.snowflake import SnowflakeDDLGenerator
     from benchbox.core.tuning.generators.spark_family import DeltaDDLGenerator
+    from benchbox.core.tuning.generators.starrocks import StarRocksDDLGenerator
     from benchbox.core.tuning.generators.timescaledb import TimescaleDBDDLGenerator
     from benchbox.core.tuning.generators.trino import AthenaDDLGenerator, TrinoDDLGenerator
 
@@ -677,6 +678,10 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
         "redshift": RedshiftDDLGenerator,
         "postgresql": PostgreSQLDDLGenerator,
         "timescaledb": TimescaleDBDDLGenerator,
+        # StarRocks (MPP; DISTRIBUTED BY HASH is engine-mandatory). Both the
+        # dry-run preview and the workload's schema-creation path render tuned
+        # PARTITION BY / DISTRIBUTED BY / ORDER BY through this one generator.
+        "starrocks": StarRocksDDLGenerator,
         # ClickHouse (all first-class platform names map to the shared generator,
         # matching workload.py's execution path, which always renders tuned DDL
         # via the "clickhouse" generator regardless of variant)
@@ -721,9 +726,8 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
     # with no indexes, partitioning, or clustering clauses to emit). NoOp is the
     # correct, permanent answer for these, so the fallback stays silent. Anything
     # else falling through here is either a platform that should get a real
-    # generator eventually (e.g. StarRocks, deferred pending ADR-3) or a typo'd
-    # platform string - both are worth a warning since dry-run/tuning preview
-    # would otherwise go silently empty.
+    # generator eventually or a typo'd platform string - both are worth a
+    # warning since dry-run/tuning preview would otherwise go silently empty.
     if platform_lower not in _TUNING_FREE_PLATFORMS:
         logger.warning(
             "No DDL generator registered for platform %r; tuning clauses will be "

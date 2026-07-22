@@ -511,14 +511,19 @@ CAPABILITY_SUPPORTED_KEYS = _discover_capability_supported_platforms(GENERATOR_R
 # the generator registry deliberately carries CLI aliases (clickhouse-local/
 # -server/-cloud/chdb, pg-duckdb/pg_duckdb, pg-mooncake/pg_mooncake), platform
 # families the compat map has no per-tuning-type opinion on yet (doris,
-# firebolt, azure_synapse/synapse, trino/presto/athena, the Spark/Delta
-# family, questdb, timescaledb). Consolidating these into one canonical key
+# starrocks, firebolt, azure_synapse/synapse, trino/presto/athena, the
+# Spark/Delta family, questdb, timescaledb). starrocks stays generator-only by
+# design: it gets a real generator + capability_registry entry for rendering
+# lookups, but is deliberately kept out of interface.py's "known" compatibility
+# set (see capability_registry's module docstring and
+# test_platform_identity_keys.py). Consolidating these into one canonical key
 # set is gated on ADR-3 (see interface.py's _PLATFORM_COMPATIBILITY_MAP
 # docstring and test_ddl_generator_registry.py) -- do not grow the compat map
 # to silence this without that ADR.
 EXPECTED_GENERATOR_ONLY_KEYS = frozenset(
     {
         "doris",
+        "starrocks",
         "clickhouse-local",
         "clickhouse-server",
         "clickhouse-cloud",
