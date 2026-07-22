@@ -379,29 +379,30 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
     # from interface.py's historical compatibility map (see module docstring
     # for why that stays true after this consolidation).
     "starrocks": {
-        _T.PARTITIONING: _none(
-            "log_only",
-            "StarRocksTuningMixin.apply_table_tunings only logs configured partitioning columns; no "
-            "PARTITION BY clause is generated. No StarRocks entry exists in "
-            "core.tuning.ddl_generator.get_ddl_generator, so dry-run preview is also empty (NoOp "
-            "fallback) -- there is no drift between preview and execution, both are silent. Documented "
-            "gap; this TODO explicitly scopes StarRocks generator-writing out (no generator exists to "
-            "migrate to).",
+        _T.PARTITIONING: _ddl(
+            "starrocks_ddl_generator",
+            "core.tuning.generators.starrocks.StarRocksDDLGenerator renders PARTITION BY from tuned "
+            "partitioning columns at CREATE TABLE time. Consumed by both dry-run preview "
+            "(get_ddl_generator('starrocks')) and real execution -- benchbox/platforms/starrocks/"
+            "workload.py's _optimize_table_definition resolves the same generator via "
+            "_resolve_tuned_ddl_clauses and injects the tuned PARTITION BY clause. No drift between "
+            "preview and execution.",
         ),
-        _T.SORTING: _none(
-            "log_only",
-            "Same log-only gap as PARTITIONING; StarRocks data-model keys (DUPLICATE KEY / PRIMARY KEY) "
-            "are chosen from the source DDL's primary key, not tuned sort columns.",
+        _T.SORTING: _ddl(
+            "starrocks_ddl_generator",
+            "Rendered as StarRocks' ORDER BY sort-key clause from tuned sorting columns via the shared "
+            "generator (see PARTITIONING entry for the shared preview/execution note). The table's key "
+            "model (DUPLICATE KEY / PRIMARY KEY) is still chosen from the source DDL's primary key by the "
+            "workload rewrite, independent of the ORDER BY sort key.",
         ),
-        _T.DISTRIBUTION: _none(
-            "engine_mandatory_baseline_not_tuned",
-            "benchbox/platforms/starrocks/workload.py's schema rewrite unconditionally appends "
-            "DISTRIBUTED BY HASH(<first_column>) BUCKETS 8 when no distribution clause is already "
-            "present, in every tuning mode. This is engine-mandatory baseline (StarRocks requires a "
-            "distribution clause for a working table), not a tuned rendering of TuningType.DISTRIBUTION "
-            "-- configured distribution columns are only logged, never used to pick the hash key. Per "
-            "the TODO: no StarRocks generator exists and none is written this round; tuned distribution "
-            "stays a documented gap.",
+        _T.DISTRIBUTION: _ddl(
+            "starrocks_ddl_generator",
+            "DISTRIBUTED BY HASH(...) BUCKETS N is engine-mandatory (StarRocks requires a distribution "
+            "key). The generator renders it, and a tuned distribution column now overrides the "
+            "first-column default: the workload picks the hash key from the tuned config when present, "
+            "falling back to StarRocksDDLGenerator.render_distribution_clause(<first_column>) for untuned "
+            "tables -- byte-identical to the previous bespoke injection (BUCKETS 8). Preview and "
+            "execution render through the same generator.",
         ),
     },
     "doris": {
