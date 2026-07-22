@@ -1,5 +1,5 @@
 import type { DetailResult, Environment } from "@/types";
-import { humanizeBenchmark } from "@/utils";
+import { humanizeBenchmark, shortHash } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 import { formatCount, formatWarningCount } from "@/lib/copyFormatters";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
@@ -227,10 +227,21 @@ function queryCount(result: DetailResult) {
 }
 
 function formatTuning(result: DetailResult) {
-  if (!result.tuning_mode && !result.tuning_hash && !result.has_tuning) return "Not recorded";
+  // The fingerprint is built from the ADR-1 bundle-emitted identities only:
+  // the canonical requested-config hash and the physical applied-ledger hash.
+  // The self-derived `tuning_hash` is NOT used here -- it must stay
+  // display-only and never act as a comparability key. When neither identity
+  // hash exists (legacy / mode-only bundles) the coarse `tuning_mode` is shown
+  // as a plain label, not dressed up as a hash-level fingerprint it isn't.
+  const requestedHash = result.requested_config_hash;
+  const appliedHash = result.applied_ledger_hash;
+  if (!result.tuning_mode && !requestedHash && !appliedHash && !result.has_tuning) {
+    return "Not recorded";
+  }
   const parts = [
     result.tuning_mode ? result.tuning_mode : "Recorded",
-    result.tuning_hash ? `hash ${result.tuning_hash}` : null,
+    requestedHash ? `requested ${shortHash(requestedHash)}` : null,
+    appliedHash ? `applied ${shortHash(appliedHash)}` : null,
   ].filter((part): part is string => part !== null);
   return parts.join(", ");
 }

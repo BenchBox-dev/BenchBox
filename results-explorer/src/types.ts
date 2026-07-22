@@ -92,7 +92,17 @@ export interface DetailResult extends CostDeploymentFields {
   platform_version: string | null;
   execution_mode: string | null;
   tuning_mode: string | null;
+  // Self-derived, display-only tuning fingerprint. Kept for legacy bundles;
+  // never a join/dedup/grouping key.
   tuning_hash: string | null;
+  // ADR-1 bundle-emitted tuning identities, ingested verbatim from the
+  // bundle's platform.tuning summary (see explorer_pipeline/transformer.py):
+  // the canonical requested-config hash and the physical applied-ledger hash.
+  // Null/undefined for legacy bundles predating these fields (optional so
+  // fixtures/factories and SQL paths predating them default to undefined).
+  // Display-only, like tuning_hash.
+  requested_config_hash?: string | null;
+  applied_ledger_hash?: string | null;
   test_type: string | null;
   validation_status: string | null;
   cost_usd: number | null;

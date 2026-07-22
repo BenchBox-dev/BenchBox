@@ -68,6 +68,17 @@ export function errMsg(err: unknown): string {
 }
 
 /**
+ * Shorten a full-length identity hash (e.g. the ADR-1 requested-config /
+ * applied-ledger SHA-256s, 64 hex chars) to a readable prefix for display.
+ * Returns short hashes unchanged. Display-only helper: the full value is kept
+ * elsewhere (e.g. a `title` tooltip) so nothing depends on the prefix for
+ * identity.
+ */
+export function shortHash(hash: string, length = 12): string {
+  return hash.length > length ? hash.slice(0, length) : hash;
+}
+
+/**
  * Render the parenthetical compliance tag used next to benchmark titles.
  * Mirrors the `compliance_class` values written by the Python pipeline.
  */

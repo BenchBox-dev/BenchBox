@@ -237,6 +237,51 @@ def _tuning_hash(data: dict[str, Any]) -> str | None:
     return hashlib.sha256(payload.encode()).hexdigest()[:8]
 
 
+def _tuning_summary(data: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the ``platform.tuning`` summary block, or None when absent.
+
+    This is the per-platform tuning summary emitted by
+    ``benchbox/core/results/schema.py::_build_tuning_summary`` -- the same
+    block that carries ``logical_profile`` (see ``_logical_profile``). None
+    for legacy bundles that never recorded a tuning summary.
+    """
+    platform = data.get("platform", {})
+    if not isinstance(platform, dict):
+        return None
+    tuning = platform.get("tuning", {})
+    return tuning if isinstance(tuning, dict) else None
+
+
+def _requested_config_hash(data: dict[str, Any]) -> str | None:
+    """Ingest the ADR-1 canonical requested-config hash from the bundle.
+
+    Read verbatim from ``platform.tuning.requested_config_hash`` (emitted by
+    ``_build_tuning_summary``); never recomputed here. None for legacy bundles
+    that predate the field. Display-only, like ``tuning_hash`` -- never a
+    join/dedup/grouping key.
+    """
+    summary = _tuning_summary(data)
+    if summary is None:
+        return None
+    val = summary.get("requested_config_hash")
+    return str(val) if val else None
+
+
+def _applied_ledger_hash(data: dict[str, Any]) -> str | None:
+    """Ingest the ADR-1 physical applied-ledger hash from the bundle.
+
+    Read verbatim from ``platform.tuning.applied_ledger_hash`` (emitted by
+    ``_build_tuning_summary`` from the execution-path applied ledger); never
+    recomputed here. None for legacy bundles, or new-generation bundles whose
+    applied ledger recorded no executed statements. Display-only.
+    """
+    summary = _tuning_summary(data)
+    if summary is None:
+        return None
+    val = summary.get("applied_ledger_hash")
+    return str(val) if val else None
+
+
 def _logical_profile(data: dict[str, Any]) -> dict[str, Any] | None:
     """Extract the `platform.tuning.logical_profile` block (ADR-2 §3).
 
@@ -925,6 +970,8 @@ class BundleTransformer:
             execution_mode=_execution_mode(bundle_data),
             tuning_mode=_tuning_mode(bundle_data),
             tuning_hash=_tuning_hash(bundle_data),
+            requested_config_hash=_requested_config_hash(bundle_data),
+            applied_ledger_hash=_applied_ledger_hash(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
             failed_query_count=failed_query_count,
@@ -1007,6 +1054,8 @@ class BundleTransformer:
             execution_mode=_execution_mode(bundle_data),
             tuning_mode=_tuning_mode(bundle_data),
             tuning_hash=_tuning_hash(bundle_data),
+            requested_config_hash=_requested_config_hash(bundle_data),
+            applied_ledger_hash=_applied_ledger_hash(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
             failed_query_count=bundle_failed_query_count(bundle_data),
