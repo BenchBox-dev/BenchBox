@@ -67,6 +67,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
 )
+from benchbox.platforms.dataframe.shared_loading import resolve_empty_string_restore_columns
 from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delimiter
 
 if TYPE_CHECKING:
@@ -476,10 +477,10 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
             # Let Spark infer schema
             df = reader.option("inferSchema", "true").csv(path_str)
 
-        if null_marker is None and string_columns:
-            present = [name for name in string_columns if name in df.columns]
-            if present:
-                df = df.fillna("", subset=present)
+        # Shared guard: see resolve_empty_string_restore_columns.
+        present = resolve_empty_string_restore_columns(string_columns, null_marker, df.columns)
+        if present:
+            df = df.fillna("", subset=present)
 
         return df
 

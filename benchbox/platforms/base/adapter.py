@@ -21,6 +21,8 @@ from typing import Any
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.core.tuning.applied_ledger import (
+    APPLIED_UNVERIFIED,
+    APPLIED_VERIFIED,
     EXECUTED,
     PHASE_POST_LOAD,
     PHASE_SESSION,
@@ -28,6 +30,7 @@ from benchbox.core.tuning.applied_ledger import (
     AppliedTuningLedger,
     recording_connection,
 )
+from benchbox.core.tuning.introspection import Introspector, corroborate
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
     DriverIsolationCapability,
@@ -330,6 +333,19 @@ class PlatformAdapter(
         if config_type:
             return str(config_type).strip().lower()
         return self.platform_name.strip().lower().replace(" ", "-")
+
+    def get_tuning_introspector(self) -> Introspector | None:
+        """Return a post-load schema introspector for this platform, or None.
+
+        An introspector corroborates the applied-tuning ledger against the real
+        database catalog, letting an ``applied_unverified`` run be upgraded to
+        ``applied_verified`` -- but only when every catalog-backed tuning
+        statement is corroborated (see
+        ``benchbox.core.tuning.introspection``). Platforms with a structured
+        catalog (DuckDB, ClickHouse) override this; the base returns None, so a
+        platform without an introspector keeps the honest ledger-derived status.
+        """
+        return None
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get platform information for results traceability.
@@ -980,16 +996,32 @@ class PlatformAdapter(
             final_tuning_status = tuning_validation_status
             applied_ledger_payload = None
             applied_ledger_hash = None
+            applied_receipt_payload = None
             try:
                 final_tuning_status = self._applied_tuning_ledger.overall_status(
                     tuning_enabled=self.tuning_enabled,
                     has_config=bool(effective_tuning_config),
                 )
+                # Post-load introspection receipt (tuning-introspection-receipts):
+                # corroborate the ledger against the live catalog (connection is
+                # still open here) and upgrade applied_unverified ->
+                # applied_verified ONLY when every catalog-backed tuning statement
+                # is corroborated. applied_verified is emitted HERE and *only* via
+                # corroboration -- overall_status never returns it. Bounded +
+                # fully guarded (see _corroborate_applied_ledger): any
+                # introspection error leaves the honest applied_unverified status
+                # and records why in the receipt. A no-op unless the derived
+                # status is applied_unverified (see _corroborate_applied_ledger).
+                final_tuning_status, applied_receipt_payload = self._corroborate_applied_ledger(
+                    connection, final_tuning_status
+                )
                 # Only carry the companion when something was actually captured
                 # (executed statements or dropped intents); an empty ledger writes
                 # no .applied.json (a non-tuned run with no session SETs is a no-op).
                 if not self._applied_tuning_ledger.is_empty():
-                    applied_ledger_payload = self._applied_tuning_ledger.to_payload(status=final_tuning_status)
+                    applied_ledger_payload = self._applied_tuning_ledger.to_payload(
+                        status=final_tuning_status, receipt=applied_receipt_payload
+                    )
                     applied_ledger_hash = self._applied_tuning_ledger.applied_ledger_hash()
             except Exception as exc:  # capture must never break a successful run
                 self.logger.debug("applied-ledger read-back degraded: %s", exc)
@@ -1039,6 +1071,45 @@ class PlatformAdapter(
             if hasattr(self, "connection") and self.connection:
                 self.close_connection(self.connection)
                 self.connection = None
+
+    def _corroborate_applied_ledger(self, connection: Any, status: str) -> tuple[str, dict[str, Any] | None]:
+        """Corroborate the applied ledger against the live catalog.
+
+        Returns ``(status, receipt_payload)``. When this platform exposes a
+        tuning introspector (``get_tuning_introspector``), runs bounded catalog
+        reads, corroborates, and upgrades ``applied_unverified`` ->
+        ``applied_verified`` iff every catalog-backed tuning statement is
+        corroborated (``benchbox.core.tuning.introspection.corroborate``).
+
+        Must-preserve invariants: introspection NEVER breaks or materially slows
+        a run (the introspector is bounded and returns an errored state rather
+        than raising; this method is additionally wrapped), and
+        ``applied_verified`` is claimable ONLY via corroboration here -- on any
+        introspector, no-introspector, or corroboration miss, ``status`` is
+        returned unchanged (staying ``applied_unverified``) and the receipt (when
+        one was produced) records why.
+        """
+        # applied_verified is reachable ONLY from applied_unverified via
+        # corroboration; every other status (noop/failed/not_applicable) is left
+        # exactly as the ledger derived it.
+        if status != APPLIED_UNVERIFIED:
+            return status, None
+        introspector = None
+        try:
+            introspector = self.get_tuning_introspector()
+        except Exception as exc:  # pragma: no cover - defensive
+            self.logger.debug("tuning introspector lookup degraded: %s", exc)
+        if introspector is None:
+            return status, None
+        try:
+            state = introspector.introspect(connection, self._applied_tuning_ledger)
+            receipt = corroborate(self._applied_tuning_ledger, state)
+            if receipt.corroborated:
+                status = APPLIED_VERIFIED
+            return status, receipt.to_payload()
+        except Exception as exc:  # introspection must never break a run
+            self.logger.debug("applied-ledger corroboration degraded: %s", exc)
+            return status, None
 
     def _attach_applied_ledger_payload(self, result: Any, status: str) -> None:
         """Attach the applied-tuning ledger payload + hash onto a built result.
