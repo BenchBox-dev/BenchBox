@@ -228,7 +228,7 @@ def test_tuning_companion_payload_carries_logical_profile_metadata() -> None:
         tunings_applied={"configuration": {"tuning_mode": "tuned"}},
         tuning_source_file="examples/tunings/duckdb/tpch_tuned.yaml",
         tuning_config_hash="abc123",
-        tuning_validation_status="APPLIED",  # real value adapter.py emits; see test_validation_status_vocabulary.py
+        tuning_validation_status="applied_unverified",  # execution-derived; see test_validation_status_vocabulary.py
         execution_metadata={"tuning_profile": metadata},
     )
 
@@ -267,7 +267,7 @@ def test_result_payload_platform_tuning_summary_carries_logical_profile_metadata
         tunings_applied={"configuration": {"tuning_mode": "tuned"}},
         tuning_source_file="examples/tunings/duckdb/tpch_tuned.yaml",
         tuning_config_hash="abc123",
-        tuning_validation_status="APPLIED",  # real value adapter.py emits; see test_validation_status_vocabulary.py
+        tuning_validation_status="applied_unverified",  # execution-derived; see test_validation_status_vocabulary.py
         execution_metadata={"tuning_profile": metadata},
     )
 

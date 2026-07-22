@@ -43,6 +43,7 @@ from benchbox.core.results.normalizer import get_query_map, normalize_result_dic
 from benchbox.core.results.schema import (
     SchemaV2ValidationError,
     SchemaV2Validator,
+    build_applied_ledger_payload,
     build_plans_payload,
     build_result_payload,
     build_tuning_payload,
@@ -280,6 +281,16 @@ class ResultExporter:
             self._write_file(tuning_path, canonical_json_text(tuning_payload))
             self.console.print(f"[dim]Exported tuning: {tuning_path}[/dim]")
 
+        # Applied-tuning ledger companion file (ADR-1): what the execution path
+        # actually ran, additive to the requested-config .tuning.json above.
+        applied_payload = build_applied_ledger_payload(result)
+        if applied_payload:
+            if self.anonymize and self.anonymization_manager:
+                applied_payload = self._anonymize_applied_payload(applied_payload)
+            applied_path = self._create_file_path(f"{filename_base}.applied.json")
+            self._write_file(applied_path, canonical_json_text(applied_payload))
+            self.console.print(f"[dim]Exported applied ledger: {applied_path}[/dim]")
+
     def _record_plan_history(self, result: ResultLike) -> None:
         """Opt-in: append this run's plan fingerprints to a PlanHistory store.
 
@@ -394,6 +405,42 @@ class ResultExporter:
             physical_operator["platform_metadata"] = {}
         for child in node.get("children") or []:
             self._strip_operator_platform_metadata(child)
+
+    def _anonymize_applied_payload(self, applied_payload: dict[str, Any]) -> dict[str, Any]:
+        """Drop raw statement/error text from the applied-ledger companion for
+        anonymized exports.
+
+        Like ``.plans.json`` (see ``_anonymize_plans_payload``), the
+        ``.applied.json`` companion is written outside ``_apply_anonymization``.
+        Its per-statement ``statement`` text is captured verbatim from the
+        execution path and can embed absolute paths, buckets, or hostnames -- a
+        Spark session config records ``SET spark.sql.warehouse.dir=/abs/path``,
+        an object-store path, etc. No structured scrubber can safely redact
+        arbitrary per-platform SQL/config text, so the free-text ``statement``
+        and ``error`` fields are dropped outright, mirroring the plans policy.
+
+        The structural fields (``phase``, ``status``, ``mechanism``, ``table``)
+        and the top-level ``status`` / ``applied_ledger_hash`` / ``dropped``
+        (code-authored reason strings) are retained: the hash still certifies
+        the real executed statements for cross-run comparison, and the honest
+        status is preserved. Operates on a deep copy; the caller's payload and
+        the in-memory result are never mutated.
+        """
+        sanitized = copy.deepcopy(applied_payload)
+        statements = sanitized.get("statements")
+        if isinstance(statements, list):
+            for entry in statements:
+                if not isinstance(entry, dict):
+                    continue
+                entry.pop("statement", None)
+                entry.pop("error", None)
+                # `table` can be a fully-qualified catalog.schema.table for a
+                # folded Databricks layout op, embedding a user-chosen catalog
+                # name that the main payload separately anonymizes as
+                # database_name - drop it here for the same reason.
+                entry.pop("table", None)
+                entry["statement_redacted"] = True
+        return sanitized
 
     def _convert_datetimes_to_iso(self, obj: Any) -> Any:
         """Convert datetime objects to ISO format strings."""

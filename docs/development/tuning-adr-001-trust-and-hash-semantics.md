@@ -115,6 +115,66 @@ The exact serialization format of the applied-statement ledger itself
 representation) is implementation detail owned by
 `tuning-applied-ledger-and-validation-status-20260712`, not this ADR.
 
+### 3. Realized ledger: the `.applied.json` companion and vocabulary
+
+The applied-statement ledger (`benchbox.core.tuning.applied_ledger`) is
+produced **by the execution path** — each tuning-relevant statement is
+recorded as it runs against a transparent recording proxy over the
+tuning/session connection — and is never reconstructed from the
+requested config. It is exported as an additive `.applied.json` companion
+alongside the existing `.tuning.json` (which is unchanged and still
+carries the *requested* config + `requested_config_hash`).
+
+`.applied.json` shape (the ledger's `to_payload(status=...)`):
+
+```json
+{
+  "status": "applied_unverified",
+  "applied_ledger_hash": "<sha256 | null>",
+  "statements": [
+    {"statement": "CREATE INDEX IF NOT EXISTS ...", "phase": "ddl",
+     "status": "executed", "mechanism": null, "table": null}
+  ],
+  "dropped": [
+    {"intent": "partitioning:LINEITEM", "reason": "handled at load time"}
+  ]
+}
+```
+
+- **`applied_ledger_hash`** — `sha256` over the ordered list of
+  *executed* statement records, serialized as canonical JSON
+  (`sort_keys=True`, compact separators). List order is preserved (only
+  each record's keys are sorted), so statement chronology is part of the
+  identity. `null` when nothing executed (no physical layout to
+  identify). Mirrored onto the bundle's `platform.tuning` summary and the
+  `.tuning.json` companion next to `requested_config_hash`.
+- **`phase`** ∈ {`ddl`, `post_load`, `session`}; statement `status` ∈
+  {`executed`, `failed`}. `dropped` records requested intents that never
+  rendered to a statement (capability-filtered / load-time-only).
+
+`tuning_validation_status` vocabulary (execution-derived, all-lowercase),
+replacing the old metadata-write proxy where `APPLIED` meant only "a
+metadata INSERT succeeded":
+
+| status | meaning |
+| --- | --- |
+| `not_applicable` | tuning disabled, or no effective configuration |
+| `noop` | tuning requested but the execution path ran no statement |
+| `applied_unverified` | ≥1 statement executed; self-attested, not yet introspection-corroborated |
+| `applied_verified` | executed **and** corroborated by a post-load introspection receipt (RESERVED — only the introspection-receipts TODO emits it; never the ledger alone) |
+| `failed` | tuning attempted but every statement failed / the apply path raised |
+| `not_validated` | dataclass default, pre-run (before any derivation) |
+
+Metadata-persistence outcome is **no longer** a tuning status: the old
+`FAILED_TO_SAVE` is downgraded to the separate boolean
+`tuning_metadata_saved` note, fully decoupled from the tuning status.
+
+Legacy back-compat readers map old uppercase statuses via
+`LEGACY_STATUS_MAP`: `NOT_APPLICABLE→not_applicable`,
+`APPLIED→applied_unverified`, `FAILED_TO_SAVE→applied_unverified` (both
+old values meant "a statement executed" under the new model), and
+`NOT_VALIDATED→not_validated`.
+
 ## Consequences
 
 Implementing TODOs must honor these decisions as fixed constraints:

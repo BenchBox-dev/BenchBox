@@ -19,15 +19,25 @@ if TYPE_CHECKING:
 
 
 def apply_standard_unified_tuning(adapter: Any, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-    """Apply the standard constraint, platform, then table-tuning hook sequence."""
+    """Apply the standard constraint, platform, then table-tuning hook sequence.
+
+    The connection is wrapped so every tuning-relevant statement the hooks
+    execute (DDL phase) is recorded into the adapter's applied-tuning ledger.
+    Wrapping degrades to the raw connection when no ledger is present, so this
+    never changes control flow for the tuning hooks.
+    """
     if not unified_config:
         return
 
-    adapter.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, connection)
+    from benchbox.core.tuning.applied_ledger import PHASE_DDL, recording_connection
+
+    recording = recording_connection(connection, getattr(adapter, "_applied_tuning_ledger", None), PHASE_DDL)
+
+    adapter.apply_constraint_configuration(unified_config.primary_keys, unified_config.foreign_keys, recording)
     if unified_config.platform_optimizations:
-        adapter.apply_platform_optimizations(unified_config.platform_optimizations, connection)
+        adapter.apply_platform_optimizations(unified_config.platform_optimizations, recording)
     for _table_name, table_tuning in unified_config.table_tunings.items():
-        adapter.apply_table_tunings(table_tuning, connection)
+        adapter.apply_table_tunings(table_tuning, recording)
 
 
 class TuningConfigMixin:

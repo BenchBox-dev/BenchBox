@@ -20,6 +20,14 @@ from typing import Any
 
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
+from benchbox.core.tuning.applied_ledger import (
+    EXECUTED,
+    PHASE_POST_LOAD,
+    PHASE_SESSION,
+    STATEMENT_FAILED,
+    AppliedTuningLedger,
+    recording_connection,
+)
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
     DriverIsolationCapability,
@@ -213,6 +221,11 @@ class PlatformAdapter(
         # DatabaseConfig/platform_config channel; see _promote_tuning_to_database_config.
         self.tuning_source: str | None = config.get("tuning_source")
         self.tuning_source_file: str | None = config.get("tuning_source_file")
+        # Applied-tuning ledger: populated BY the execution path (schema/data +
+        # session phases) during run_enhanced_benchmark, read back once at result
+        # construction for the honest status, the physical-identity hash, and the
+        # .applied.json companion. Reset per run; None-safe on non-tuned paths.
+        self._applied_tuning_ledger: AppliedTuningLedger | None = None
 
         # Verbose logging configuration
         self.apply_verbosity(VerbositySettings.from_mapping(config))
@@ -769,6 +782,13 @@ class PlatformAdapter(
                 quiet_console.print("✅ Unified tuning configuration validated")
 
             # Step 4: Schema creation and data loading
+            # Fresh applied-tuning ledger for this run. Populated as the schema/
+            # data phases (DDL, post-load) and the session-configuration phase
+            # actually execute tuning-relevant statements against the wrapped
+            # connection; read back once at result construction. Reset here so a
+            # reused adapter instance never carries a prior run's statements.
+            self._applied_tuning_ledger = AppliedTuningLedger()
+
             self.log_verbose(f"Checking database_was_reused flag before schema creation: {self.database_was_reused}")
             if self.database_was_reused:
                 (
@@ -792,18 +812,43 @@ class PlatformAdapter(
             quiet_console.print("Validating benchmark data...")
             validation_phase = self._create_enhanced_validation_phase(benchmark, connection, table_stats)
 
+            # Requested-config export is unchanged (ADR-1 additive contract): the
+            # requested tunings + requested_config_hash still come straight from
+            # the effective configuration, independent of what actually executed.
             tunings_applied_dict = None
-            tuning_validation_status = "NOT_APPLICABLE"
             requested_config_hash = None
             if self.tuning_enabled and effective_tuning_config:
                 tunings_applied_dict = effective_tuning_config.to_dict()
-                tuning_validation_status = "APPLIED" if tuning_metadata_saved else "FAILED_TO_SAVE"
                 # requested_config_hash (ADR-1): canonical hash of the requested
                 # config, independent of whether every clause actually applied.
                 requested_config_hash = effective_tuning_config.get_configuration_hash()
 
+            # Surface requested-but-not-rendered intents at run time (w4) so the
+            # author sees them; they are also carried in the ledger payload.
+            for _dropped in self._applied_tuning_ledger.dropped:
+                self.logger.warning(
+                    "Requested tuning intent not applied: %s (%s)",
+                    _dropped.intent,
+                    _dropped.reason,
+                )
+
+            # Honest tuning_validation_status derived from what the execution
+            # path actually ran (apply-phase statements only at this point;
+            # session SETs at line ~827 run later and are folded in before the
+            # success result is built). tuning_metadata_saved is a separate
+            # persistence note, fully decoupled from this status.
+            tuning_validation_status = self._applied_tuning_ledger.overall_status(
+                tuning_enabled=self.tuning_enabled,
+                has_config=bool(effective_tuning_config),
+            )
+
             if self._check_validation_failure(validation_phase):
-                return self._create_failed_benchmark_result(
+                # Data validation failed before session SETs ran, so the ledger
+                # holds only apply-phase statements. _create_failed_benchmark_result
+                # lives in the CODEOWNERS-locked result_capture.py, so the ledger
+                # payload/hash are attached here (adapter-side) rather than by
+                # extending that method's signature.
+                failed_result = self._create_failed_benchmark_result(
                     benchmark,
                     validation_phase,
                     table_stats,
@@ -815,11 +860,30 @@ class PlatformAdapter(
                     tuning_metadata_saved,
                     requested_config_hash,
                 )
+                self._attach_applied_ledger_payload(failed_result, tuning_validation_status)
+                return failed_result
 
             quiet_console.print("✅ Data validation passed")
 
+            # Fold post-load layout ops (e.g. Databricks OPTIMIZE/ZORDER recorded
+            # on self._applied_layout_operations) into the ledger HERE: they
+            # physically execute during data loading, so recording them before the
+            # session SETs below keeps the ledger - and the order-sensitive
+            # applied_ledger_hash - in true execution chronology (ddl -> post_load
+            # -> session). Internally guarded; a no-op when the attribute is empty.
+            self._fold_layout_operations_into_ledger()
+
             benchmark_type = run_config.get("benchmark_type", "olap")
-            self.configure_for_benchmark(connection, benchmark_type)
+            # Wrap the connection so session-configuration SETs are captured into
+            # the ledger (PHASE_SESSION) for every mode, including baseline. Only
+            # the argument handed to configure_for_benchmark is wrapped; the raw
+            # connection continues to drive statistics/query execution so timed
+            # query statements are never recorded. recording_connection degrades
+            # to the raw connection if the ledger is missing or wrapping fails.
+            self.configure_for_benchmark(
+                recording_connection(connection, self._applied_tuning_ledger, PHASE_SESSION),
+                benchmark_type,
+            )
 
             # Opt-in statistics phase: load -> statistics -> query, so
             # stats-build wall-clock is attributed to neither load nor query.
@@ -905,6 +969,31 @@ class PlatformAdapter(
                 existing_errors=list(self.plan_capture_errors),
             )
 
+            # Final honest status now includes the session SETs captured at the
+            # configure_for_benchmark wrap above (post-load layout ops were folded
+            # before it). The ledger payload + physical-identity hash are the
+            # ADR-1 additive companion; the requested-config export
+            # (tunings_applied / requested_config_hash) is unchanged. Guarded
+            # end-to-end: capture must never break an otherwise-successful run, so
+            # any derive/serialize failure degrades the companion to None and the
+            # status falls back to the apply-phase value computed above.
+            final_tuning_status = tuning_validation_status
+            applied_ledger_payload = None
+            applied_ledger_hash = None
+            try:
+                final_tuning_status = self._applied_tuning_ledger.overall_status(
+                    tuning_enabled=self.tuning_enabled,
+                    has_config=bool(effective_tuning_config),
+                )
+                # Only carry the companion when something was actually captured
+                # (executed statements or dropped intents); an empty ledger writes
+                # no .applied.json (a non-tuned run with no session SETs is a no-op).
+                if not self._applied_tuning_ledger.is_empty():
+                    applied_ledger_payload = self._applied_tuning_ledger.to_payload(status=final_tuning_status)
+                    applied_ledger_hash = self._applied_tuning_ledger.applied_ledger_hash()
+            except Exception as exc:  # capture must never break a successful run
+                self.logger.debug("applied-ledger read-back degraded: %s", exc)
+
             return benchmark.create_enhanced_benchmark_result(
                 platform=self.platform_name,
                 query_results=query_results,
@@ -925,9 +1014,11 @@ class PlatformAdapter(
                 platform_info=platform_info,
                 **normalized_metadata,
                 tunings_applied=tunings_applied_dict,
-                tuning_validation_status=tuning_validation_status,
+                tuning_validation_status=final_tuning_status,
                 tuning_metadata_saved=tuning_metadata_saved,
                 tuning_config_hash=requested_config_hash,
+                applied_tuning_ledger=applied_ledger_payload,
+                applied_ledger_hash=applied_ledger_hash,
                 tuning_source_file=self.tuning_source_file,
                 tuning_source=self.tuning_source,
                 system_profile=system_profile,
@@ -948,6 +1039,51 @@ class PlatformAdapter(
             if hasattr(self, "connection") and self.connection:
                 self.close_connection(self.connection)
                 self.connection = None
+
+    def _attach_applied_ledger_payload(self, result: Any, status: str) -> None:
+        """Attach the applied-tuning ledger payload + hash onto a built result.
+
+        Used on the validation-failure path, where the result is built by
+        ``_create_failed_benchmark_result`` (defined in the CODEOWNERS-locked
+        ``result_capture.py``): the ledger companion is attached adapter-side
+        rather than by threading extra parameters through that method. Capture
+        never breaks a run - failures degrade to a debug log.
+        """
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        if ledger is None or result is None or ledger.is_empty():
+            return
+        try:
+            result.applied_tuning_ledger = ledger.to_payload(status=status)
+            result.applied_ledger_hash = ledger.applied_ledger_hash()
+        except Exception as exc:  # capture must never break a run
+            self.logger.debug("applied-ledger attach degraded: %s", exc)
+
+    def _fold_layout_operations_into_ledger(self) -> None:
+        """Fold platform-recorded post-load layout ops into the applied ledger.
+
+        Some platforms (Databricks) accumulate post-load layout statements
+        (OPTIMIZE / ZORDER) on ``self._applied_layout_operations`` rather than
+        executing them through the wrapped tuning connection. Fold each into the
+        ledger as a PHASE_POST_LOAD statement so they show up in the companion.
+        Generic + guarded: a no-op when the attribute is absent or empty.
+        """
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        layout_ops = getattr(self, "_applied_layout_operations", None)
+        if ledger is None or not layout_ops:
+            return
+        for op in layout_ops:
+            try:
+                op_status = EXECUTED if op.get("status") == "applied" else STATEMENT_FAILED
+                ledger.record(
+                    op.get("statement", ""),
+                    op.get("phase") or PHASE_POST_LOAD,
+                    status=op_status,
+                    mechanism=op.get("mechanism"),
+                    table=op.get("table"),
+                    error=op.get("error_message"),
+                )
+            except Exception as exc:  # capture must never break a run
+                self.logger.debug("applied-ledger layout fold degraded: %s", exc)
 
     def run_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:
         """Run complete benchmark with enhanced phase tracking.

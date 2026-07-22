@@ -1349,6 +1349,13 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
         payload["requested_config_hash"] = result.tuning_config_hash
         payload["hash"] = result.tuning_config_hash
 
+    # applied_ledger_hash (ADR-1 physical-identity): distinct from the requested
+    # hash above - SHA-256 over the ordered executed-statement list. None until
+    # the applied ledger recorded at least one executed statement.
+    applied_ledger_hash = getattr(result, "applied_ledger_hash", None)
+    if applied_ledger_hash:
+        payload["applied_ledger_hash"] = applied_ledger_hash
+
     # Validation status
     if result.tuning_validation_status:
         payload["validation_status"] = result.tuning_validation_status.lower()
@@ -1361,6 +1368,31 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     if requested:
         payload["requested"] = requested
 
+    return payload
+
+
+def build_applied_ledger_payload(result: BenchmarkResults) -> dict[str, Any] | None:
+    """Build the applied-tuning ledger companion (``.applied.json``) payload.
+
+    Returns the ``result.applied_tuning_ledger`` dict verbatim - the
+    ``AppliedTuningLedger.to_payload()`` output produced BY the execution path
+    (``status``, ``applied_ledger_hash``, ``statements``, ``dropped``) - or
+    ``None`` when no ledger was captured. Never reconstructed from the requested
+    config: this is the physical record of what actually executed (ADR-1).
+
+    Args:
+        result: A BenchmarkResults instance.
+
+    Returns:
+        The applied-ledger companion payload, or None if none was captured.
+    """
+    payload = getattr(result, "applied_tuning_ledger", None)
+    if not payload:
+        return None
+    # Nothing was actually captured (no executed statements, no dropped intents)
+    # -> no companion, mirroring build_tuning_payload's "nothing to record" None.
+    if not payload.get("statements") and not payload.get("dropped"):
+        return None
     return payload
 
 
@@ -1466,6 +1498,12 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     if result.tuning_config_hash:
         summary["requested_config_hash"] = result.tuning_config_hash
         summary["hash"] = result.tuning_config_hash
+
+    # applied_ledger_hash (ADR-1 physical-identity): what was physically applied,
+    # distinct from the requested_config_hash above.
+    applied_ledger_hash = getattr(result, "applied_ledger_hash", None)
+    if applied_ledger_hash:
+        summary["applied_ledger_hash"] = applied_ledger_hash
 
     # Counts: replaces the old dead clauses_applied counter (which counted
     # indexes/statistics/configuration keys that to_dict() never produces).

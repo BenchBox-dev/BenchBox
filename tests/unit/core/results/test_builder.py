@@ -322,6 +322,47 @@ class TestResultBuilder:
         assert result.tuning_config_hash == "abc123"
         assert result.tuning_source_file == "tuning.yaml"
 
+    def test_build_threads_applied_ledger_fields(self) -> None:
+        """Applied-tuning ledger payload/hash + honest status survive onto the
+        built result (ADR-1 additive companion; distinct from the requested
+        config hash)."""
+        builder = self.create_builder()
+        ledger_payload = {
+            "status": "applied_unverified",
+            "applied_ledger_hash": "deadbeef" * 8,
+            "statements": [{"statement": "CREATE INDEX i ON t (a)", "phase": "ddl", "status": "executed"}],
+            "dropped": [],
+        }
+        builder.set_tuning_info(
+            tunings_applied={"memory": "8GB"},
+            config_hash="requested-hash",
+            validation_status="applied_unverified",
+            metadata_saved=True,
+            applied_tuning_ledger=ledger_payload,
+            applied_ledger_hash=ledger_payload["applied_ledger_hash"],
+        )
+
+        result = builder.build()
+
+        assert result.applied_tuning_ledger == ledger_payload
+        assert result.applied_ledger_hash == ledger_payload["applied_ledger_hash"]
+        assert result.tuning_validation_status == "applied_unverified"
+        assert result.tuning_metadata_saved is True
+        # The requested-config hash stays distinct from the applied hash.
+        assert result.tuning_config_hash == "requested-hash"
+        assert result.applied_ledger_hash != result.tuning_config_hash
+
+    def test_build_defaults_applied_ledger_fields_to_none(self) -> None:
+        """A build with no tuning info leaves the applied-ledger fields unset and
+        the status at the lowercase default."""
+        builder = self.create_builder()
+
+        result = builder.build()
+
+        assert result.applied_tuning_ledger is None
+        assert result.applied_ledger_hash is None
+        assert result.tuning_validation_status == "not_validated"
+
     def test_build_with_cost_summary(self) -> None:
         """Test building results with cost summary."""
         builder = self.create_builder()

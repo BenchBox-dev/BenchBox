@@ -17,7 +17,11 @@ from datetime import datetime
 import pytest
 
 from benchbox.core.results.models import BenchmarkResults
-from benchbox.core.results.schema import build_result_payload, build_tuning_payload
+from benchbox.core.results.schema import (
+    build_applied_ledger_payload,
+    build_result_payload,
+    build_tuning_payload,
+)
 from benchbox.core.tuning.interface import TableTuning, TuningColumn, UnifiedTuningConfiguration
 
 pytestmark = [
@@ -60,14 +64,33 @@ def _make_result(**overrides) -> BenchmarkResults:
     return BenchmarkResults(**defaults)
 
 
+def _applied_ledger_payload(status: str = "applied_unverified") -> dict:
+    """A representative AppliedTuningLedger.to_payload() dict for a tuned run."""
+    return {
+        "status": status,
+        "applied_ledger_hash": "f" * 64,
+        "statements": [
+            {
+                "statement": "CREATE INDEX IF NOT EXISTS idx_lineitem_sort ON LINEITEM (l_orderkey)",
+                "phase": "ddl",
+                "status": "executed",
+            }
+        ],
+        "dropped": [],
+    }
+
+
 def test_template_run_bundle_carries_source_enum_template_ref_and_hash():
     config = _tuned_config()
+    applied = _applied_ledger_payload()
     result = _make_result(
         tunings_applied=config.to_dict(),
         tuning_source="auto_discovered",
         tuning_source_file="examples/tunings/duckdb/tpch_tuned.yaml",
         tuning_config_hash=config.get_configuration_hash(),
-        tuning_validation_status="APPLIED",
+        tuning_validation_status="applied_unverified",
+        applied_tuning_ledger=applied,
+        applied_ledger_hash=applied["applied_ledger_hash"],
     )
 
     payload = build_result_payload(result)
@@ -80,13 +103,49 @@ def test_template_run_bundle_carries_source_enum_template_ref_and_hash():
     assert summary["hash"] == config.get_configuration_hash()
     assert summary["counts"]["tables_tuned"] == 1
     assert "sorting" in summary["counts"]["tuning_types"]
+    # applied_ledger_hash (physical identity) rides alongside requested_config_hash.
+    assert summary["applied_ledger_hash"] == applied["applied_ledger_hash"]
 
     companion = build_tuning_payload(result)
     assert companion["tuning_source"] == "auto_discovered"
     assert companion["source_file"] == "examples/tunings/duckdb/tpch_tuned.yaml"
     assert companion["requested_config_hash"] == config.get_configuration_hash()
     assert companion["hash"] == config.get_configuration_hash()
+    assert companion["applied_ledger_hash"] == applied["applied_ledger_hash"]
+    assert companion["validation_status"] == "applied_unverified"
     assert companion["requested"]["table_tunings"]["lineitem"]["sorting"][0]["name"] == "l_orderkey"
+
+
+def test_applied_ledger_companion_payload_is_the_execution_record():
+    config = _tuned_config()
+    applied = _applied_ledger_payload()
+    result = _make_result(
+        tunings_applied=config.to_dict(),
+        tuning_source="auto_discovered",
+        tuning_config_hash=config.get_configuration_hash(),
+        tuning_validation_status="applied_unverified",
+        applied_tuning_ledger=applied,
+        applied_ledger_hash=applied["applied_ledger_hash"],
+    )
+
+    companion = build_applied_ledger_payload(result)
+
+    assert companion is not None
+    assert companion["status"] == "applied_unverified"
+    assert companion["applied_ledger_hash"] == applied["applied_ledger_hash"]
+    assert companion["statements"][0]["statement"].startswith("CREATE INDEX IF NOT EXISTS")
+    assert companion["statements"][0]["status"] == "executed"
+
+
+def test_no_applied_ledger_returns_no_applied_companion():
+    result = _make_result(
+        tunings_applied=_tuned_config().to_dict(),
+        tuning_source="auto_discovered",
+        tuning_config_hash=_tuned_config().get_configuration_hash(),
+    )
+    assert build_applied_ledger_payload(result) is None
+    # And the .tuning.json companion must not invent an applied_ledger_hash.
+    assert "applied_ledger_hash" not in build_tuning_payload(result)
 
 
 def test_explicit_file_source_also_bridges_to_legacy_yaml():
