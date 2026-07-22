@@ -93,12 +93,13 @@ class TestExportFailsClosed:
         # tables, the sentinel row is never read -> never written.
         _mk(conn, item_id="real-item")
         sentinel = "LEAK-SENTINEL-finding-prose-do-not-commit"
-        # Two differently-named findings tables, so the guarantee is not tied to
-        # one table name the exporter's SELECTs happen not to reference.
-        conn.execute("CREATE TABLE finding_evidence (id TEXT PRIMARY KEY, body TEXT)")
-        conn.execute("INSERT INTO finding_evidence (id, body) VALUES (?, ?)", ("f1", sentinel))
-        conn.execute("CREATE TABLE finding_links (id TEXT PRIMARY KEY, body TEXT)")
-        conn.execute("INSERT INTO finding_links (id, body) VALUES (?, ?)", ("l1", sentinel + "-link"))
+        # Every findings-domain table (including the prose-heavy `findings` and
+        # `finding_events`), so the guarantee is not tied to one table name the
+        # exporter's SELECTs happen not to reference.
+        finding_tables = ("findings", "finding_evidence", "finding_links", "finding_events")
+        for table in finding_tables:
+            conn.execute(f"CREATE TABLE {table} (id TEXT PRIMARY KEY, body TEXT)")
+            conn.execute(f"INSERT INTO {table} (id, body) VALUES (?, ?)", ("x1", f"{sentinel}-{table}"))
         conn.commit()
 
         out_dir = tmp_path / "export"
@@ -107,8 +108,8 @@ class TestExportFailsClosed:
         for produced in sorted(out_dir.iterdir()):
             text = produced.read_text(encoding="utf-8")
             assert sentinel not in text, f"findings data leaked into committed export file {produced.name}"
-            assert "finding_evidence" not in text, f"findings table name leaked into {produced.name}"
-            assert "finding_links" not in text, f"findings table name leaked into {produced.name}"
+            for table in finding_tables:
+                assert table not in text, f"findings table name {table!r} leaked into {produced.name}"
 
     def test_write_export_raises_if_coverage_drifts(self, conn, tmp_path, monkeypatch):
         # If the allowlist and the exporter's coverage disagree, write_export

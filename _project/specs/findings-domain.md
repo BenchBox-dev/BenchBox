@@ -44,8 +44,8 @@ the design does not silently contradict a settled decision:
 1. **`_project/specs/todo-db-tracker.md` — "No offline write queue"** is
    narrowed to *work state* (items, work units, claims, deferrals). Append-only
    **finding draft files** are a permitted local write: they carry no
-   cross-session consistency contract and are landed later through the ordinary
-   sync + PR cycle, never queued into the primary.
+   cross-session consistency contract and are landed later through the
+   separately authorized `todo finding sync` step, never queued into the primary.
 2. **`docs/development/review-protocol.md` §4** (and its `SHARED/review-protocol`
    skill mirror) name the append-only draft file under
    `~/.benchbox/finding-drafts/` as the **sole** in-review finding write.

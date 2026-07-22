@@ -109,8 +109,9 @@ Therefore:
 ## Section 4 - Capture is local-only
 
 When this protocol authorizes a write (to a TODO, a blind-spot
-directory, an audits folder, a handoff file), the file lives on the
-local branch in the worktree. The disk-write authorizes the file
+directory, an audits folder, a handoff file), the file is a local file
+(on the branch in the worktree, or — for findings drafts — outside every
+worktree; see "Findings capture" below). The disk-write authorizes the file
 creation and **nothing else**. Specifically, it does not authorize:
 
 - Committing any file, including the capture file.

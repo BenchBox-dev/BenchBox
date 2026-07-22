@@ -75,7 +75,8 @@ constraints enforce the lifecycle, fronted by a thin `todo` CLI that is the
   is a permitted local write. Each draft is a write-once file keyed by a
   filename-stem id — the directory grows, individual files are immutable — so
   the drafts carry no cross-session consistency contract and are landed later
-  through the ordinary sync + PR cycle, never queued into the primary. Narrowed here per the 2026-07-22 findings-domain adversarial
+  through the separately authorized `todo finding sync` step, never queued into
+  the primary. Narrowed here per the 2026-07-22 findings-domain adversarial
   review, which found the previously unscoped rejection would silently forbid
   the findings design's local capture.
 

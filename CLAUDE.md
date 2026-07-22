@@ -71,11 +71,13 @@ full PR/release/CI flow.
 Behavior is governed by `~/.claude/skills/SHARED/review-protocol/SKILL.md`.
 BenchBox bindings:
 
-- Path: `_project/blind-spots/YYYY-MM-DD-HHMMSS-<slug>.md`
+- Path: `~/.benchbox/finding-drafts/YYYY-MM-DD-HHMMSS-<slug>.md` (out of the Git
+  tree; the sole in-review write per §4 — never a tracked `_project/blind-spots/`
+  file, which is legacy read-only until the findings migration lands)
 - Schema: `_project/blind-spots/README.md`
 - Validate: `uv run --project _project/scripts -- python _project/scripts/validate_blind_spot.py <file>`
-- Sweep: `make blind-spots-{list,report,sweep}`
-- Chat marker: prefix the body quote with `Recorded: _project/blind-spots/<file>.md`
+- Sweep: `make blind-spots-{list,report,sweep}` (reads the legacy tracked corpus)
+- Chat marker: prefix the body quote with `Recorded: ~/.benchbox/finding-drafts/<file>.md`
 
 Per SHARED §4: capture is local-only — do not commit beyond the
 capture file, do not push, do not run `make pr-open`. Apply the
