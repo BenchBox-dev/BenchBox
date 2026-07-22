@@ -616,3 +616,157 @@ class TestCapabilityMapperVsCompatibilityMapDrift:
         # additions (or removals) are caught even though they wouldn't
         # necessarily create a compat-map divergence.
         assert frozenset({"databricks", "duckdb", "bigquery", "redshift", "snowflake"}) == CAPABILITY_SUPPORTED_KEYS
+
+
+# ---------------------------------------------------------------------------
+# w2 (`tuning-registry-mixin-honesty`): honesty guards on the registry's
+# rendering-mechanism claims. Standalone functions (rather than edits to the
+# allowlists/classes above) so they merge cleanly with concurrent registry
+# work. Before this fix, postgresql/snowflake/redshift/bigquery/mysql claimed
+# `_ddl("adapter_mixin:<X>Adapter.generate_tuning_clause", ...)`, but that
+# mixin has no production call site: schema DDL comes from
+# `benchmark.get_create_tables_sql(tuning_config=...)`, which reads
+# tuning_config only for PK/FK constraint flags. These guards make any
+# dead-mechanism ddl/post_load/session claim fail.
+# ---------------------------------------------------------------------------
+
+_ADAPTER_MIXIN_MECHANISM = r"^adapter_mixin:(\w+)\.(\w+)$"
+_platform_source_cache: tuple[tuple[str, str], ...] | None = None
+
+
+def _platform_source_texts() -> tuple[tuple[str, str], ...]:
+    """(path, text) for every .py under benchbox/platforms/, read once and cached.
+
+    The platforms tree is where create_schema / apply_table_tunings /
+    apply_unified_tuning live, and it deliberately excludes
+    capability_registry.py's own note strings (which mention
+    ``.generate_tuning_clause(`` in prose, not as a call site).
+    """
+    global _platform_source_cache
+    if _platform_source_cache is None:
+        import pathlib
+
+        import benchbox.core.tuning.capability_registry as capreg
+
+        platforms_dir = pathlib.Path(capreg.__file__).resolve().parents[2] / "platforms"
+        sources: list[tuple[str, str]] = []
+        for path in sorted(platforms_dir.rglob("*.py")):
+            try:
+                sources.append((str(path), path.read_text(encoding="utf-8")))
+            except (OSError, UnicodeDecodeError):
+                continue
+        _platform_source_cache = tuple(sources)
+    return _platform_source_cache
+
+
+def _iter_registry_capabilities():
+    for platform, entries in PLATFORM_TUNING_CAPABILITIES.items():
+        for tuning_type, capability in entries.items():
+            yield platform, tuning_type, capability
+
+
+def _method_has_call_site(method_name: str) -> bool:
+    """True if ``.<method_name>(`` is invoked anywhere under benchbox/platforms/.
+
+    The leading dot means a definition (``def <method_name>(``) never matches;
+    only genuine ``self.foo(`` / ``adapter.foo(`` call expressions do.
+    """
+    needle = f".{method_name}("
+    return any(needle in text for _path, text in _platform_source_texts())
+
+
+def _find_adapter_method_source(class_name: str, method_name: str) -> str | None:
+    """Source of ``<class_name>.<method_name>`` if defined under benchbox/platforms/, else None."""
+    for _path, text in _platform_source_texts():
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                for item in node.body:
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == method_name:
+                        return ast.get_source_segment(text, item)
+    return None
+
+
+def _method_only_returns_empty_string(method_source: str) -> bool:
+    """True if every ``return`` in the method yields ``""`` (an inert stub)."""
+    import textwrap
+
+    func = ast.parse(textwrap.dedent(method_source)).body[0]
+    returns = [node for node in ast.walk(func) if isinstance(node, ast.Return)]
+    if not returns:
+        return False
+    return all(isinstance(node.value, ast.Constant) and node.value.value == "" for node in returns)
+
+
+def test_generate_tuning_clause_has_no_production_call_site():
+    """The ``generate_tuning_clause`` adapter mixin is never invoked in production.
+
+    Every SQL adapter defines it, but a scan of benchbox/platforms/ for
+    ``.generate_tuning_clause(`` call sites (create_schema, apply_table_tunings,
+    apply_unified_tuning, ...) finds none. This is the empirical basis for the
+    ``tuning-registry-mixin-honesty`` correction: no registry entry may claim a
+    tuning type renders via that dead mixin. If a real call site is ever wired
+    in, this flips red on purpose -- update the registry to point at the new
+    call site and relax this guard.
+    """
+    assert not _method_has_call_site("generate_tuning_clause"), (
+        "generate_tuning_clause now has a production call site under benchbox/platforms/; the capability "
+        "registry's 'no ddl claim rests on this dead mixin' invariant needs revisiting."
+    )
+
+
+def test_no_registry_entry_rests_on_generate_tuning_clause_mixin():
+    """No capability entry may name the dead ``generate_tuning_clause`` mixin as its mechanism.
+
+    Reintroducing ``_ddl("adapter_mixin:<X>Adapter.generate_tuning_clause", ...)``
+    for postgresql/snowflake/redshift/bigquery/mysql (the pre-honesty claim)
+    turns this red immediately.
+    """
+    offenders = [
+        f"{platform}/{tuning_type.value} (rendered_via={cap.rendered_via}, mechanism={cap.mechanism_id})"
+        for platform, tuning_type, cap in _iter_registry_capabilities()
+        if "generate_tuning_clause" in cap.mechanism_id
+    ]
+    assert offenders == [], (
+        "Capability entries claim rendering via the dead generate_tuning_clause mixin (no production call "
+        "site -- see test_generate_tuning_clause_has_no_production_call_site):\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_adapter_mixin_rendering_mechanisms_are_live_and_nonempty():
+    """Any ``adapter_mixin:<Class>.<method>`` rendering mechanism must be live and non-stub.
+
+    For every entry that claims rendering (rendered_via ddl/post_load/session)
+    via an ``adapter_mixin:<Class>.<method>`` mechanism, the named method must
+    (a) exist on that class under benchbox/platforms/, (b) have a production
+    call site, and (c) not be a stub that only ``return ""``. This generalises
+    the generate_tuning_clause fix: a dead-mechanism claim -- an uncalled
+    method, an empty-return stub, or a nonexistent class (e.g. the old
+    ``MySQLAdapter``) -- fails here. Today only snowflake's live
+    ``apply_table_tunings`` mechanism exercises this guard.
+    """
+    import re
+
+    offenders: list[str] = []
+    for platform, tuning_type, cap in _iter_registry_capabilities():
+        if cap.rendered_via not in ("ddl", "post_load", "session"):
+            continue
+        match = re.match(_ADAPTER_MIXIN_MECHANISM, cap.mechanism_id)
+        if match is None:
+            continue
+        class_name, method_name = match.group(1), match.group(2)
+        label = f"{platform}/{tuning_type.value} (mechanism={cap.mechanism_id})"
+        source = _find_adapter_method_source(class_name, method_name)
+        if source is None:
+            offenders.append(f"{label}: {class_name}.{method_name} is not defined under benchbox/platforms/")
+            continue
+        if _method_only_returns_empty_string(source):
+            offenders.append(f"{label}: {class_name}.{method_name} unconditionally returns '' (dead stub)")
+        if not _method_has_call_site(method_name):
+            offenders.append(f"{label}: {method_name} has no production call site under benchbox/platforms/")
+    assert offenders == [], "adapter_mixin rendering mechanisms that are dead, empty, or unresolved:\n  " + "\n  ".join(
+        offenders
+    )
