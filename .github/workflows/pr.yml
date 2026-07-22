@@ -424,6 +424,54 @@ jobs:
             tests/integration/test_plan_capture_phase.py \
             -m "medium" -n 0 --tb=short -q
 
+      - name: Run promoted TPC-DS power-test drain-before-commit reproducer
+        run: |
+          # This file is 100% slow-marked and otherwise never runs in ANY CI
+          # workflow (make test-slow/test-stress are invoked by no workflow).
+          # The TPC-H side of this exact fix (#1137/#1144: draining a raw
+          # DB-API cursor must happen BEFORE commit(), some drivers reject/
+          # invalidate commit() on unread SELECT results) is already required
+          # via the fast-marked test_tpc_power_tests.py, but TPC-DS has a
+          # separate, parallel implementation (benchbox/core/tpcds/power_test.py
+          # _execute_one_query - the only call site TPCDSPowerTest.run() uses)
+          # with no coverage anywhere. Bounded: the single reproducer node.
+          uv run -- python -m pytest \
+            tests/integration/test_tpcds_power_test.py \
+            -m "slow" -n 0 -k "test_execute_one_query_drains_raw_cursor_before_commit" --tb=short -q
+
+      - name: Run promoted DuckDB FK tuning load-ordering reproducers
+        run: |
+          # tuning-fk-load-ordering-fix-20260716: TPCHBenchmark.get_table_loading_order
+          # derives a FK-topological load order so a tuned run with
+          # foreign_keys.enabled really loads under real FK enforcement; without
+          # it, DataLoader falls back to alphabetical order, which zeros out
+          # every FK-dependent table under DuckDB constraint enforcement. This
+          # file is 100% slow-marked and otherwise never runs in ANY CI
+          # workflow. Bounded: one small (SF=0.01) file, 3 tests, ~5s.
+          uv run -- python -m pytest \
+            tests/integration/tuning/test_duckdb_fk_load_ordering.py \
+            -m "slow" -n 0 --tb=short -q
+
+      - name: Run promoted TPC-H power/throughput boundary-query (w0 defect) reproducers
+        run: |
+          # The w0 defect: with a custom (non-reference) seed at SF=1.0, TPC-H's
+          # answer-set-boundary queries (Q11/16/18/20) came back falsely FAILED.
+          # The shared validator exclusion is already unit-tested in the
+          # required fast lane (test_validation_engine.py), but the
+          # set_reference_seed_context() WIRING at each call site
+          # (benchbox/core/tpch/power_test.py and .../throughput_test.py - two
+          # separate production code paths) is not: breaking either site's
+          # wiring is invisible to the unit test and only caught here. Both
+          # files are 100% slow-marked and otherwise never run in ANY CI
+          # workflow. Bounded: the single boundary_query reproducer node(s) in
+          # each file, not the surrounding slow suites.
+          uv run -- python -m pytest \
+            tests/integration/test_tpch_power_test.py \
+            -m "slow" -n 0 -k "boundary_query" --tb=short -q
+          uv run -- python -m pytest \
+            tests/integration/test_tpch_throughput_test.py \
+            -m "slow" -n 0 -k "boundary_query" --tb=short -q
+
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
