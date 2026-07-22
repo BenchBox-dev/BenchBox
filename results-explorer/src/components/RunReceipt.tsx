@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import type { DetailResult } from "@/types";
-import { humanizeBenchmark } from "@/utils";
+import { humanizeBenchmark, shortHash } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 import {
   formatFunding,
@@ -51,6 +51,22 @@ function rowFromSummary(label: string, value: string): ReceiptRow {
   return recordedRow(label, value);
 }
 
+/**
+ * Row for a full-length identity hash (ADR-1 requested-config / applied-ledger
+ * SHA-256). Renders a monospace prefix for readability while the full value
+ * stays available in the `title` tooltip, keeping the receipt compact without
+ * hiding identity. Missing for legacy bundles that never recorded the hash.
+ */
+function hashRow(label: string, raw: string | null | undefined): ReceiptRow {
+  if (raw === null || raw === undefined || raw === "") return missingRow(label);
+  return recordedRow(
+    label,
+    <code class="font-mono text-xs" title={raw}>
+      {shortHash(raw)}
+    </code>,
+  );
+}
+
 export function RunReceipt({
   detail,
   shortId = null,
@@ -82,6 +98,12 @@ export function RunReceipt({
         rowFromString("Execution mode", detail.execution_mode),
         rowFromString("Tuning mode", detail.tuning_mode),
         rowFromString("Tuning hash", detail.tuning_hash),
+        // ADR-1 bundle-emitted tuning identities, shown as distinct labeled
+        // kinds: the canonical requested-config hash and the physical
+        // applied-ledger hash. Distinct from the self-derived "Tuning hash"
+        // above; null for legacy bundles.
+        hashRow("Requested config hash", detail.requested_config_hash),
+        hashRow("Applied ledger hash", detail.applied_ledger_hash),
       ],
     },
     {

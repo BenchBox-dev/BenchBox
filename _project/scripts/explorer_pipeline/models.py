@@ -152,7 +152,15 @@ class ManifestEntry(BaseModel):
     platform_version: str | None = None
     execution_mode: str | None = None
     tuning_mode: str | None = None
+    # Self-derived, display-only tuning fingerprint (see transformer._tuning_hash).
+    # Kept for legacy bundles; NEVER a join/dedup/grouping key.
     tuning_hash: str | None = None
+    # ADR-1 bundle-emitted tuning identities, ingested verbatim from the
+    # bundle's platform.tuning summary (never recomputed here): the canonical
+    # requested-config hash and the physical applied-ledger hash. Null for
+    # legacy bundles predating these fields. Display-only, like tuning_hash.
+    requested_config_hash: str | None = None
+    applied_ledger_hash: str | None = None
     test_type: str | None = None
     validation_status: str | None = None
     failed_query_count: int = 0
@@ -355,7 +363,15 @@ class DetailResult(BaseModel):
     platform_version: str | None = None
     execution_mode: str | None = None
     tuning_mode: str | None = None
+    # Self-derived, display-only tuning fingerprint (see transformer._tuning_hash).
+    # Kept for legacy bundles; NEVER a join/dedup/grouping key.
     tuning_hash: str | None = None
+    # ADR-1 bundle-emitted tuning identities, ingested verbatim from the
+    # bundle's platform.tuning summary (never recomputed here): the canonical
+    # requested-config hash and the physical applied-ledger hash. Null for
+    # legacy bundles predating these fields. Display-only, like tuning_hash.
+    requested_config_hash: str | None = None
+    applied_ledger_hash: str | None = None
     test_type: str | None = None
     validation_status: str | None = None
     failed_query_count: int = 0

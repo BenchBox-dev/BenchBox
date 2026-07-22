@@ -558,6 +558,42 @@ class TestExtendedManifestFields:
         assert entry.tuning_hash is not None
         assert len(entry.tuning_hash) == 8
 
+    def test_config_hashes_ingested_verbatim_from_tuning_summary(self, tmp_path: Path) -> None:
+        """New-generation bundles carry requested_config_hash + applied_ledger_hash,
+        read verbatim from platform.tuning (never recomputed)."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["platform"]["tuning"] = {
+            "requested_config_hash": "a" * 64,
+            "applied_ledger_hash": "b" * 64,
+        }
+        bundle = tmp_path / "hashes.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+        assert entry.requested_config_hash == "a" * 64
+        assert entry.applied_ledger_hash == "b" * 64
+
+    def test_config_hashes_none_for_legacy_bundle(self, bundle_file: Path) -> None:
+        """Legacy bundles (no platform.tuning hashes) keep current behavior: None."""
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+        assert entry.requested_config_hash is None
+        assert entry.applied_ledger_hash is None
+
+    def test_applied_ledger_hash_none_when_only_requested_present(self, tmp_path: Path) -> None:
+        """A tuned run whose applied ledger recorded nothing emits requested only."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["platform"]["tuning"] = {"requested_config_hash": "c" * 64}
+        bundle = tmp_path / "req_only.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+        assert entry.requested_config_hash == "c" * 64
+        assert entry.applied_ledger_hash is None
+
     def test_tuning_hash_dict_detail_is_hashed_canonically(self, tmp_path: Path) -> None:
         """A dict tuning_config is machine-readable, so key order must not affect the hash."""
         import copy

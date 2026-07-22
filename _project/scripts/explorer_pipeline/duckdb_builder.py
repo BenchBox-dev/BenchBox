@@ -397,6 +397,11 @@ class DuckDBSnapshotBuilder:
                 execution_mode       VARCHAR,
                 tuning_mode          VARCHAR,
                 tuning_hash          VARCHAR,
+                -- ADR-1 bundle-emitted tuning identities (display-only, never
+                -- a join/dedup key): canonical requested-config hash and the
+                -- physical applied-ledger hash. NULL for legacy bundles.
+                requested_config_hash VARCHAR,
+                applied_ledger_hash   VARCHAR,
                 test_type            VARCHAR,
                 validation_status    VARCHAR,
                 cost_usd             DOUBLE,
@@ -461,6 +466,8 @@ class DuckDBSnapshotBuilder:
                 r.execution_mode,
                 r.tuning_mode,
                 r.tuning_hash,
+                r.requested_config_hash,
+                r.applied_ledger_hash,
                 r.test_type,
                 r.validation_status,
                 r.cost_usd,
@@ -785,6 +792,8 @@ class DuckDBSnapshotBuilder:
                     entry.execution_mode,
                     entry.tuning_mode,
                     entry.tuning_hash,
+                    entry.requested_config_hash,
+                    entry.applied_ledger_hash,
                     entry.test_type,
                     entry.validation_status,
                     entry.cost_usd,
