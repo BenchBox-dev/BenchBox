@@ -15,15 +15,9 @@ lands on the instance. It is intentionally parametrized over the live
 platform registry (not a fixed platform list) so a future platform that adds
 ``from_config`` without forwarding fails this test automatically.
 
-No live connections are made: ``from_config``/``__init__`` only build
-constructor kwargs and set instance attributes; they never open a socket or
-touch a real cloud API. Platforms whose adapter class registers successfully
-(the module imports cleanly) but whose actual driver package is not installed
-in this environment raise ``ImportError``/``ConfigurationError`` with a
-"Missing dependencies for <platform> platform" message from deep inside
-``__init__`` -- those are skipped rather than failed, mirroring the
-skip-gating already used by ``PlatformRegistry.get_available_platforms()``
-for adapters whose *module* fails to import.
+No live connections are made. The concrete adapter constructor is isolated
+only for the duration of each case so the real ``from_config()`` implementation
+can be exercised even when its optional runtime driver is not installed.
 """
 
 from __future__ import annotations
@@ -33,6 +27,7 @@ from typing import Any
 import pytest
 
 from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.platforms.base import PlatformAdapter
 
 pytestmark = [
     pytest.mark.unit,
@@ -58,14 +53,6 @@ TUNING_CONFIG_SENTINEL = _TuningConfigSentinel()
 TUNING_ENABLED_SENTINEL = True
 TUNING_SOURCE_SENTINEL = "auto_discovered"
 TUNING_SOURCE_FILE_SENTINEL = "tuning/templates/duckdb_tuned.yaml"
-
-# Substring marking a construction failure as "optional runtime dependency not
-# installed" rather than a real defect (see check_platform_dependencies /
-# get_dependency_error_message). These adapters register successfully in
-# PlatformRegistry (their module-level driver imports are wrapped in
-# try/except ImportError) but raise once __init__ discovers the actual driver
-# package is missing.
-_MISSING_DEPENDENCY_MARKER = "Missing dependencies for"
 
 
 def _registered_platform_names() -> list[str]:
@@ -162,7 +149,7 @@ def _build_stub_config(tmp_dir: str) -> dict[str, Any]:
 
 
 @pytest.mark.parametrize("platform_name", _registered_platform_names())
-def test_from_config_forwards_tuning_kwargs(platform_name: str, tmp_path) -> None:
+def test_from_config_forwards_tuning_kwargs(platform_name: str, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Every registered adapter's from_config() must preserve the tuning keys.
 
     Constructs the adapter through the real ``from_config()`` classmethod
@@ -178,12 +165,18 @@ def test_from_config_forwards_tuning_kwargs(platform_name: str, tmp_path) -> Non
 
     stub_config = _build_stub_config(str(tmp_path))
 
-    try:
+    # The forwarding contract is independent of optional driver availability.
+    # Patch only this adapter class's constructor, for this one call, so the
+    # real from_config() implementation still builds the constructor kwargs
+    # under test without opening a driver-specific dependency gate.
+    original_init = adapter_class.__init__
+    with monkeypatch.context() as constructor_patch:
+        constructor_patch.setattr(adapter_class, "__init__", PlatformAdapter.__init__)
         instance = adapter_class.from_config(dict(stub_config))
-    except Exception as exc:  # noqa: BLE001 - re-raised below unless it's a dep-availability skip
-        if _MISSING_DEPENDENCY_MARKER in str(exc):
-            pytest.skip(f"{platform_name}: missing optional runtime dependency ({exc})")
-        raise
+
+    # Make the isolation contract explicit: this test must not leave a
+    # constructor patch behind for later parametrized cases or tests.
+    assert adapter_class.__init__ is original_init
 
     assert instance.tuning_enabled is TUNING_ENABLED_SENTINEL, (
         f"{platform_name}: from_config() did not forward tuning_enabled onto the adapter"
