@@ -79,7 +79,7 @@ only the token/theme scans and unit/fast tests).
   flake data collected during w9 of
   `implement-results-explorer-browser-functional-tests` supports it.
 
-All three jobs upload Playwright reports on failure with a 14-day retention
+All three jobs upload Playwright reports on failure with a 3-day retention
 so maintainers can download a full trace from the PR checks page. The CI
 jobs call the same shared browser scripts that maintainers run locally,
 rather than re-encoding fixture/build/test sequencing in the workflow.

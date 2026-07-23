@@ -122,7 +122,11 @@ test.describe("Funding on card surfaces", () => {
 
   test("@smoke the legend is reachable from the platform index", async ({ page }) => {
     await page.goto("/results/p/duckdb/");
-    await waitForShell(page);
+    // Mirror the sibling test above: the toggle only mounts once the
+    // platform-index data query resolves, which can exceed the default
+    // 10s expect timeout on webkit's cold-start DuckDB-WASM attach
+    // (webkit-smoke-fix-or-demote-2).
+    await waitForDataLoaded(page, /DuckDB Results/);
 
     const toggle = page.getByRole("button", { name: /What do these labels mean\?/i });
     await expect(toggle).toBeVisible();

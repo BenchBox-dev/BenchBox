@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForShell } from "../support/fixtures";
+import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 test.describe("BenchmarkIndex", () => {
   test("@smoke loads directly at /results/tpch/ and syncs SF filter into the URL", async ({
@@ -8,6 +8,10 @@ test.describe("BenchmarkIndex", () => {
     await page.goto("/results/tpch/");
     await waitForShell(page);
 
+    // The heading text only resolves once the corpus query completes.
+    // WebKit's cold-start DuckDB-WASM attach regularly exceeds the default
+    // 10s expect timeout even at --workers=1 (webkit-smoke-fix-or-demote-2).
+    await waitForDataLoaded(page, /TPC-H Results/);
     await expect(page.getByRole("heading", { name: /TPC-H Results/ })).toBeVisible();
 
     // Scale-factor selector writes to the `sf` query parameter. The
