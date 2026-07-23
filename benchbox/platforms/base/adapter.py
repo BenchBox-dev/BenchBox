@@ -780,6 +780,17 @@ class PlatformAdapter(
             quiet_console.print(f"Connecting to {self.platform_name}...")
             self.log_very_verbose(f"database_was_reused flag BEFORE connection: {self.database_was_reused}")
             self.benchmark = benchmark  # Store for handle_existing_database() to access
+            # Reset the rerun drift-validation stash BEFORE connecting. For a reused
+            # database the drift check is captured *during* create_connection() ->
+            # handle_existing_database() -> DatabaseValidator/TuningValidator ->
+            # _validate_database_tunings, NOT during the later validation phase
+            # (_create_enhanced_validation_phase only runs row-count/schema/integrity
+            # checks). The reset must therefore precede that capture: resetting it
+            # afterwards discards the only captured result before
+            # _build_drift_check_payload() can route it into the .applied.json
+            # companion. Resetting here still clears any prior run's drift on a
+            # reused adapter instance (ADR-001 addendum).
+            self._drift_validation_result = None
             connection = self.create_connection(**run_config.get("connection", {}))
             self.connection = connection
             self.log_very_verbose(f"database_was_reused flag AFTER connection: {self.database_was_reused}")
@@ -826,11 +837,6 @@ class PlatformAdapter(
                 ) = self._setup_fresh_database_phases(benchmark, connection, effective_tuning_config)
 
             quiet_console.print("Validating benchmark data...")
-            # Reset the rerun drift-validation stash before the validation phase
-            # populates it (via _validate_database_tunings), so a reused adapter
-            # never carries a prior run's drift into this run's .applied.json
-            # companion (ADR-001 addendum).
-            self._drift_validation_result = None
             validation_phase = self._create_enhanced_validation_phase(benchmark, connection, table_stats)
 
             # Requested-config export is unchanged (ADR-1 additive contract): the
@@ -1148,8 +1154,9 @@ class PlatformAdapter(
 
         Routes the rerun drift-validation result (the
         ``MetadataValidationResult`` from ``_validate_database_tunings``, stashed
-        on ``self._drift_validation_result`` during the validation phase) into
-        the bundle per the ADR-001 addendum (drift-validation bundle routing).
+        on ``self._drift_validation_result`` during connection-time reuse
+        validation) into the bundle per the ADR-001 addendum (drift-validation
+        bundle routing).
         Scoped to reused tuned databases -- a fresh DB just persisted its
         metadata, so nothing could have drifted, and an untuned run has no
         expected tuning to compare. Guarded: ``None`` when not a reused tuned
