@@ -65,6 +65,23 @@ def test_checked_in_artifacts_are_current(rows):
     assert not problems, "oracle coverage map is stale:\n" + "\n".join(problems)
 
 
+def test_check_artifacts_fix_hint_names_exact_regen_command(rows, monkeypatch):
+    """guards-fix-regen-target-2: a stale/missing artifact must name the exact
+    regen command (`make oracle-coverage-map`) and point at `make guards-fix`
+    as the one-command alternative -- not just say "stale, go figure it out"."""
+    from _project.scripts import generate_oracle_coverage_map as gocm
+
+    # Must resolve under _REPO_ROOT: check_artifacts() calls path.relative_to(_REPO_ROOT).
+    missing_path = gocm.ARTIFACT_DIR / "does-not-exist-guard-messages-test.md"
+    monkeypatch.setattr(gocm, "MARKDOWN_ARTIFACT", missing_path)
+
+    problems = check_artifacts(rows)
+    assert problems, "expected a missing-artifact problem to be reported"
+    hint_problems = [p for p in problems if "does-not-exist-guard-messages-test.md" in p]
+    assert hint_problems, problems
+    assert any("make oracle-coverage-map" in p and "make guards-fix" in p for p in hint_problems)
+
+
 def test_every_shipped_benchmark_is_classified(rows):
     """Every registry benchmark appears exactly once with a primary oracle."""
     from benchbox.core.benchmark_registry import list_benchmark_ids

@@ -63,6 +63,16 @@ def _count_lines(path: Path) -> int:
         return sum(1 for _ in handle)
 
 
+def _allowlist_snippet(path: Path, line_count: int) -> str:
+    """Ready-to-paste ALLOWLIST entry for a module that just tripped the guard.
+
+    No regen mode exists for this guard (guards-fix never edits allowlists,
+    per policy) -- the fix is always a human-reviewed hand edit, so the
+    failure prints the exact entry to paste.
+    """
+    return f'    Path(\n        "{path.as_posix()}"\n    ): {line_count},  # <justification -- why this module must exceed the default>'
+
+
 def test_runtime_modules_respect_size_limits() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     violations = []
@@ -83,10 +93,14 @@ def test_runtime_modules_respect_size_limits() -> None:
 
     if violations:
         details = "\n".join(f"{path} has {lines} lines (limit {limit})" for path, lines, limit in violations)
+        snippets = "\n".join(_allowlist_snippet(path, lines) for path, lines, _limit in violations)
         raise AssertionError(
             "Runtime module size guardrails tripped:\n"
             + details
-            + "\nReduce the module size or update the allowlist with justification."
+            + "\nReduce the module size, or -- if the size is justified -- paste this into "
+            "ALLOWLIST in tests/system/test_module_size_thresholds.py with a real "
+            "justification (ALLOWLIST_HEADROOM is added automatically on top; no `make "
+            "guards-fix` regen exists for this guard, it is always a reviewed hand edit):\n" + snippets
         )
 
 

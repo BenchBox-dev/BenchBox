@@ -768,6 +768,55 @@ mutation-test:
 	@echo "--- Mutation test results ---"
 	uv run -- mutmut results
 
+##@ Guards / drift-guard remediation
+#
+# guards-fix-regen-target: a "drift-guard" class of CI checks -- dependency
+# inventory, oracle coverage map, parity fixtures, compat docs, UAT LOC
+# table, skill-sync -- each fails on drift against a checked-in artifact and
+# each has ONE known mechanical regen command. This target runs every regen
+# that exists, in one place, so agents stop rediscovering the right command
+# per guard from a hand-carried prompt.
+#
+# guards-fix ONLY regenerates artifacts -- it never edits allowlists,
+# ceilings, or curation lists. Each guard's CHECK target still fails CI on
+# drift; regen is remediation, not suppression. Never wire this into CI to
+# self-heal -- it is an operator command, run locally, with the diff reviewed
+# and committed by a human.
+#
+# Some CHECK guards in this class have NO regen mode (the fix is always a
+# reviewed hand edit, not a mechanical rewrite) -- guards-fix does not touch
+# them; it only echoes where to look:
+#   - module-size guard (tests/system/test_module_size_thresholds.py) --
+#     the failure message prints a ready-to-paste ALLOWLIST entry.
+#   - DDL governance drift (benchbox/sql_compat/inventory.py --check-ddl-drift)
+#     -- register the transform, add a _DDL_GOVERNANCE_TRANSFORMER_ALIASES
+#     alias, or add a _DDL_DRIFT_EXEMPTIONS entry.
+#   - release curation list (scripts/check_release_curation.py) -- classify
+#     the path as main-only (docs) or release-cut curated (Makefile), by hand.
+.PHONY: guards-fix
+guards-fix:
+	@echo "== guards-fix: regenerating every mechanically-regenerable drift-guard artifact =="
+	@echo "-- dependency inventory (audit-raw) --"
+	@$(MAKE) -s audit-raw
+	@echo "-- benchmark correctness-oracle coverage map --"
+	@$(MAKE) -s oracle-coverage-map
+	@echo "-- visualization parity fixtures --"
+	@$(MAKE) -s parity-fixtures
+	@echo "-- sql_compat capability matrix / skip-reference docs --"
+	@$(MAKE) -s compat-docs
+	@echo "-- UAT spec module-LOC table --"
+	@uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py
+	@echo "-- skill-sync (no-ops with a notice if the skill-sync CLI is not installed) --"
+	@$(MAKE) -s skill-sync
+	@echo ""
+	@echo "No regen mode -- these are reviewed hand edits, guards-fix does not touch them:"
+	@echo "  - module-size guard: tests/system/test_module_size_thresholds.py (see its failure output for the ALLOWLIST entry to paste)"
+	@echo "  - DDL governance drift: benchbox/sql_compat/inventory.py --check-ddl-drift (register the transform, alias it, or exempt it)"
+	@echo "  - release curation list: scripts/check_release_curation.py (classify the path as main-only or release-cut curated)"
+	@echo ""
+	@echo "== guards-fix done. Review the diff below, then commit what you intend to keep. =="
+	@git status --porcelain
+
 ##@ CI Local Equivalents
 # These targets mirror GitHub Actions workflows for local validation
 
@@ -1039,7 +1088,7 @@ parity-check:
 	diff -r --exclude='.gitkeep' tests/parity/fixtures $$tmpdir && \
 	echo "parity-check: fixtures match Python source" && \
 	rm -rf $$tmpdir || \
-	(echo "parity-check FAILED: fixtures are out of date - run 'make parity-fixtures' to regenerate" && rm -rf $$tmpdir && exit 1)
+	(echo "parity-check FAILED: fixtures are out of date - run 'make parity-fixtures' to regenerate (or 'make guards-fix' to regenerate every mechanical drift-guard artifact)" && rm -rf $$tmpdir && exit 1)
 
 # Create distribution packages
 dist: clean
@@ -1734,6 +1783,10 @@ worktree-claim-attempt:
 			|| [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
 			( cd "$$wt" && uv sync --group dev >/dev/null ); \
 		fi; \
+		if [ -f "$$wt/.pre-commit-config.yaml" ]; then \
+			( cd "$$wt" && uv run -- pre-commit install >/dev/null 2>&1 ) \
+				|| echo "note: pre-commit install failed/unavailable in $$wt; codespell etc. won't run at commit time (run \`uv run -- pre-commit install\` manually)" >&2; \
+		fi; \
 		rm -f "$$marker"; \
 		marker=""; \
 		claim_ok=1; \
@@ -2365,6 +2418,7 @@ help:
 	@echo "  make validate-imports Validate import structure and detect circular dependencies"
 	@echo "  make dependency-check Validate lock file against pyproject specs (ARGS='--matrix' to show summary)"
 	@echo "  make duplicate-check Detect duplicate code via AST structural hashing"
+	@echo "  make guards-fix      Regenerate every mechanical drift-guard artifact (inventory/oracle-map/parity/compat-docs/UAT-LOC/skill-sync), then print git status"
 	@echo "  make mutation-test   Run mutation testing on critical modules (mutmut)"
 	@echo "  make format          Format code with ruff"
 	@echo "  make clean           Remove build artifacts"

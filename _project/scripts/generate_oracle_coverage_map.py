@@ -247,7 +247,10 @@ def oracle_independence_and_rationale(primary: str, strength: str, benchmark_id:
         return _cross_surface_independence(benchmark_id)
     independence = oracle_reference_independence(primary, strength, benchmark_id)
     if independence == INDEPENDENCE_SELF:
-        return independence, "Reference is a shared/generated surface or frozen benchbox snapshot, not an external authority."
+        return (
+            independence,
+            "Reference is a shared/generated surface or frozen benchbox snapshot, not an external authority.",
+        )
     if independence == INDEPENDENCE_SEMI:
         return independence, "External TPC answer sets provide row-count authority only; result values are not checked."
     if independence == INDEPENDENCE_INDEPENDENT:
@@ -557,15 +560,16 @@ def check_artifacts(rows: list[dict[str, Any]]) -> list[str]:
         (JSON_ARTIFACT, render_json(rows), False),
         (MARKDOWN_ARTIFACT, render_markdown(rows), True),
     )
+    fix_hint = "run `make oracle-coverage-map` (or `make guards-fix`) and commit"
     for path, expected, strip in checks:
         if not path.exists():
-            problems.append(f"missing artifact: {path.relative_to(_REPO_ROOT)} (run the generator)")
+            problems.append(f"missing artifact: {path.relative_to(_REPO_ROOT)} ({fix_hint})")
             continue
         actual = path.read_text(encoding="utf-8")
         if strip:
             actual = _strip_provenance(actual)
         if actual != expected:
-            problems.append(f"stale artifact: {path.relative_to(_REPO_ROOT)} (run the generator and commit)")
+            problems.append(f"stale artifact: {path.relative_to(_REPO_ROOT)} ({fix_hint})")
     return problems
 
 
