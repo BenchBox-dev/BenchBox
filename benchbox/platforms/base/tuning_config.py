@@ -137,13 +137,16 @@ class TuningConfigMixin:
 
                 effective_config = self.get_effective_tuning_configuration()
                 if effective_config:
-                    return metadata_manager.validate_unified_tunings(effective_config)
+                    result = metadata_manager.validate_unified_tunings(effective_config)
                 else:
                     existing_tunings = metadata_manager.load_unified_tunings()
                     result = MetadataValidationResult()
                     if existing_tunings:
                         result.add_warning("Database contains tuning metadata but no tunings expected")
-                    return result
+                # Stash for the .applied.json companion's drift_check section
+                # (routed into the bundle for reused DBs; see ADR-001 addendum).
+                self._drift_validation_result = result
+                return result
 
             finally:
                 self.close_connection(temp_connection)
@@ -155,6 +158,7 @@ class TuningConfigMixin:
             self._validating_database = False
             result = MetadataValidationResult()
             result.add_error(f"Failed to validate database tunings: {e}")
+            self._drift_validation_result = result
             return result
 
     def save_tuning_metadata(self, connection: Any) -> bool:

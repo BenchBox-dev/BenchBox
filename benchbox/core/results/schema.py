@@ -1397,9 +1397,11 @@ def build_applied_ledger_payload(result: BenchmarkResults) -> dict[str, Any] | N
     payload = getattr(result, "applied_tuning_ledger", None)
     if not payload:
         return None
-    # Nothing was actually captured (no executed statements, no dropped intents)
-    # -> no companion, mirroring build_tuning_payload's "nothing to record" None.
-    if not payload.get("statements") and not payload.get("dropped"):
+    # Nothing was actually captured (no executed statements, no dropped intents,
+    # no reused-DB drift_check) -> no companion, mirroring build_tuning_payload's
+    # "nothing to record" None. A reused DB re-applies no tuning DDL (empty
+    # statements/dropped) but its drift_check must still ship (ADR-001 addendum).
+    if not payload.get("statements") and not payload.get("dropped") and not payload.get("drift_check"):
         return None
     return payload
 
