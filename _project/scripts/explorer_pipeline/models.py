@@ -161,6 +161,13 @@ class ManifestEntry(BaseModel):
     # legacy bundles predating these fields. Display-only, like tuning_hash.
     requested_config_hash: str | None = None
     applied_ledger_hash: str | None = None
+    # ADR-1 tuning verified-state, ingested verbatim from platform.tuning
+    # (never recomputed): not_applicable / noop / applied_unverified /
+    # applied_verified / failed. applied_verified is earned only via the
+    # post-load introspection receipt's corroboration. Null for legacy bundles
+    # predating the applied ledger (treated downstream as "unknown"). Distinct
+    # from the run/query validation_status field.
+    tuning_validation_status: str | None = None
     # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
     # from platform.tuning (never derived from benchbox_version). Null for
     # legacy bundles predating the field (treated downstream as "pre-seam").
@@ -377,6 +384,13 @@ class DetailResult(BaseModel):
     # legacy bundles predating these fields. Display-only, like tuning_hash.
     requested_config_hash: str | None = None
     applied_ledger_hash: str | None = None
+    # ADR-1 tuning verified-state, ingested verbatim from platform.tuning
+    # (never recomputed): not_applicable / noop / applied_unverified /
+    # applied_verified / failed. applied_verified is earned only via the
+    # post-load introspection receipt's corroboration. Null for legacy bundles
+    # predating the applied ledger (treated downstream as "unknown"). Distinct
+    # from the run/query validation_status field.
+    tuning_validation_status: str | None = None
     # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
     # from platform.tuning (never derived from benchbox_version). Null for
     # legacy bundles predating the field (treated downstream as "pre-seam").

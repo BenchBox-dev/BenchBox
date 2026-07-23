@@ -10,6 +10,7 @@ import {
   formatVisibility,
 } from "@/lib/displayLabels";
 import { StatusBadge } from "@/components/StatusBadge";
+import { TuningVerificationBadge } from "@/components/TuningVerificationBadge";
 
 interface RunReceiptProps {
   detail: DetailResult;
@@ -104,6 +105,13 @@ export function RunReceipt({
         // above; null for legacy bundles.
         hashRow("Requested config hash", detail.requested_config_hash),
         hashRow("Applied ledger hash", detail.applied_ledger_hash),
+        // ADR-1 tuning verified-state: applied_verified means the applied tuning
+        // was corroborated by the post-load introspection receipt; the other
+        // states are the honest execution-derived ledger statuses. Missing
+        // (behind the disclosure) for legacy bundles predating the ledger.
+        detail.tuning_validation_status
+          ? recordedRow("Tuning verification", <TuningVerificationBadge status={detail.tuning_validation_status} />)
+          : missingRow("Tuning verification"),
       ],
     },
     {

@@ -1515,6 +1515,17 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any] | None:
     if applied_ledger_hash:
         summary["applied_ledger_hash"] = applied_ledger_hash
 
+    # validation_status (ADR-1 honest verified-state): the execution-derived
+    # applied-ledger status -- not_applicable / noop / applied_unverified /
+    # applied_verified / failed. applied_verified is earned only via the post-load
+    # introspection receipt's corroboration (the receipt itself rides in the
+    # .applied.json companion). Surfaced in this main-bundle summary -- mirroring
+    # the .tuning.json companion's field -- so the explorer, which reads only the
+    # main bundle, can display the verification state. Absent for legacy bundles
+    # predating the applied ledger; the explorer treats absence as "unknown".
+    if result.tuning_validation_status:
+        summary["validation_status"] = result.tuning_validation_status.lower()
+
     # tuning_policy_generation (ADR-3 seam): the explicit generation marker for
     # the tuning policy this run was produced under. Emitted only when tuning is
     # present (mirrors the hashes above). Bundles predating this field carry no

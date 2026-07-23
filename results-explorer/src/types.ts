@@ -103,6 +103,12 @@ export interface DetailResult extends CostDeploymentFields {
   // Display-only, like tuning_hash.
   requested_config_hash?: string | null;
   applied_ledger_hash?: string | null;
+  // ADR-1 tuning verified-state, ingested verbatim from platform.tuning:
+  // not_applicable / noop / applied_unverified / applied_verified / failed.
+  // applied_verified is earned only via the post-load introspection receipt's
+  // corroboration. Null/undefined for legacy bundles predating the applied
+  // ledger (treated as "unknown"). Distinct from validation_status (run/query).
+  tuning_validation_status?: string | null;
   // ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
   // from platform.tuning (see explorer_pipeline/transformer.py); never derived
   // from benchbox_version. Null/undefined for legacy bundles predating the

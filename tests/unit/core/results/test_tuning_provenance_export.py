@@ -106,6 +106,10 @@ def test_template_run_bundle_carries_source_enum_template_ref_and_hash():
     assert "sorting" in summary["counts"]["tuning_types"]
     # applied_ledger_hash (physical identity) rides alongside requested_config_hash.
     assert summary["applied_ledger_hash"] == applied["applied_ledger_hash"]
+    # ADR-1 verified-state is surfaced in the MAIN-bundle summary (not just the
+    # .tuning.json companion) so the explorer, which reads only the main bundle,
+    # can display it.
+    assert summary["validation_status"] == "applied_unverified"
 
     companion = build_tuning_payload(result)
     assert companion["tuning_source"] == "auto_discovered"

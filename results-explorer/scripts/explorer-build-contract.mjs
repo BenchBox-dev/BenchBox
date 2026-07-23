@@ -2,8 +2,8 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const EXPECTED_CONTRACT_VERSION = "4";
-export const EXPECTED_READ_MODEL_VERSION = 4;
+const EXPECTED_CONTRACT_VERSION = "5";
+export const EXPECTED_READ_MODEL_VERSION = 5;
 const REQUIRED_FLAGS = ["--data-dir", "--output", "--trust-label", "--visibility"];
 const REQUIRED_OUTPUTS = ["results.duckdb", "bundles/{result_id}.json"];
 const REMOVED_LEGACY_OUTPUTS = [
