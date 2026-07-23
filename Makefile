@@ -1559,6 +1559,9 @@ dev-loop-metrics:
 			"Conflict rate: \(rate($$conflicts; $$total)) (\($$conflicts)/\($$total))", \
 			"runner minutes total: \($$runner)" \
 		] | .[]' $$FILES
+	@echo "---"; \
+	echo "Dev-loop PR metrics (CI-failure baseline, see dev-loop-metrics-ci-failure-baseline-2):"; \
+	test -f _project/scripts/dev_loop_pr_metrics.py && uv run -- python _project/scripts/dev_loop_pr_metrics.py --days "$(DEV_LOOP_METRICS_DAYS)" || true
 
 # Initialize retained pool worktrees. Existing pool-NN paths are left untouched.
 worktree-pool-init:
