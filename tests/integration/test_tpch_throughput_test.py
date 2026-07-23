@@ -331,31 +331,34 @@ class TestThroughputReferenceSeedContext:
 
     def test_boundary_query_not_failed_on_stream1_with_default_seed_at_sf1(self) -> None:
         """End-to-end regression for the w0 defect: at SF=1.0 with the
-        default base_seed, Q11/16/18/20 must not come back FAILED on ANY
-        stream (w0 found both stream 0 and stream 1 failing -- see w1 notes
-        on the separate, not-fixed-here set_query_context() stream_id
-        omission that widens EXACT-attempts to every stream; the parameter-
-        sensitive exclusion resolves it regardless of that omission).
+        default base_seed, every stream/position derives a non-reference seed
+        (base_seed 42 never lands on the pinned reference), so Q11/16/18/20 are
+        relaxed from EXACT to their RANGE/LOOSE bounds and must not come back
+        FAILED on ANY stream. The test deliberately supplies in-bounds counts
+        for those four queries and an invalid count for the remaining
+        EXACT-mode queries.
 
         Routes through the REAL PlatformAdapterConnection + DuckDBAdapter +
         QueryValidator stack via a connection_factory whose raw cursor
-        deliberately returns a row count (999) that mismatches every real
-        SF=1 answer -- so the OTHER (non-boundary) 18 queries are EXPECTED to
-        genuinely fail here (that's correct EXACT-mode behavior, not this
-        test's concern); only Q11/16/18/20 must be absent from the failures.
+        deliberately returns query-specific counts so the OTHER
+        (non-boundary) 18 queries genuinely fail their EXACT checks while
+        Q11/16/18/20 exercise their relaxed bounds.
         """
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         benchmark = Mock()
-        benchmark.get_query = Mock(return_value="SELECT 1")
+        benchmark.get_query = Mock(side_effect=lambda query_id, **_kwargs: f"SELECT {query_id}")
 
         def factory() -> PlatformAdapterConnection:
             raw_connection = Mock()
 
             def raw_execute(query_text):
                 raw_result = Mock()
-                raw_result.fetchall = Mock(return_value=[(1,)] * 999)
+                in_spec_counts = {11: 999, 16: 18_000, 18: 20, 20: 186}
+                query_id = int(query_text.rsplit(" ", 1)[-1])
+                row_count = in_spec_counts.get(query_id, 999)
+                raw_result.fetchall = Mock(return_value=[(1,)] * row_count)
                 return raw_result
 
             raw_connection.execute = Mock(side_effect=raw_execute)

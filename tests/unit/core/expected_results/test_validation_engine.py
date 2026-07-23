@@ -8,7 +8,12 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import pytest
 
 from benchbox.core.expected_results.models import ValidationMode
-from benchbox.core.expected_results.tpch_results import PARAMETER_SENSITIVE_QUERY_IDS
+from benchbox.core.expected_results.tpch_results import (
+    PARAMETER_SENSITIVE_QUERY_IDS,
+    TPCH_LOOSE_QUERY_IDS,
+    TPCH_RANGE_ROW_COUNT_BOUNDS,
+    get_tpch_expected_results,
+)
 from benchbox.core.validation.query_validation import (
     QueryValidator,
     clear_reference_seed_context,
@@ -105,13 +110,10 @@ class TestQueryValidator:
         assert "SKIP" in result.warning_message or "skip" in result.warning_message
 
 
-class TestParameterSensitiveExclusion:
-    """Tests for the tpch-throughput-seed-validation-fix parameter-sensitive
-    exclusion: TPC-H's answer-set-boundary queries (Q11/16/18/20) should not
-    EXACT-fail when the caller (a TPC-H power/throughput driver) has recorded
-    that the current query is NOT running under the pinned reference seed's
-    substitution parameters (see set_reference_seed_context()).
-    """
+class TestParameterSensitiveValidation:
+    """Tests for TPC-H's reference-seed-aware validation of the answer-set
+    boundary queries: EXACT against the answer file at the reference seed,
+    relaxed to RANGE/LOOSE only under a non-reference seed."""
 
     @pytest.fixture(autouse=True)
     def _reset_reference_seed_context(self):
@@ -128,9 +130,41 @@ class TestParameterSensitiveExclusion:
 
     def test_parameter_sensitive_query_ids_constant(self):
         """The TPC-H parameter-sensitive set matches the four documented
-        answer-set-boundary queries (mirrors the bounded correctness gate's
-        exclusion list -- docs/operations/release-guide.md)."""
+        answer-set-boundary queries."""
         assert frozenset({"11", "16", "18", "20"}) == PARAMETER_SENSITIVE_QUERY_IDS
+        assert set(TPCH_RANGE_ROW_COUNT_BOUNDS) | set(TPCH_LOOSE_QUERY_IDS) == PARAMETER_SENSITIVE_QUERY_IDS
+
+    def test_tpch_provider_assigns_exact_mode_with_ride_along_bounds(self):
+        """Every query -- parameter-sensitive or not -- carries canonical EXACT
+        mode and its answer-file count, so a reference-seed run is exact-checked.
+        The parameter-sensitive queries additionally carry the RANGE bounds
+        (Q11/18/20) / LOOSE tolerance (Q16) that QueryValidator applies only
+        under a non-reference seed. The preserved exact count sits inside the
+        query's own bounds."""
+        results = get_tpch_expected_results(scale_factor=1.0)
+        assert results is not None
+
+        for query_id, (minimum, maximum) in TPCH_RANGE_ROW_COUNT_BOUNDS.items():
+            result = results.get_expected_result(query_id)
+            assert result is not None
+            assert result.validation_mode == ValidationMode.EXACT
+            assert result.expected_row_count is not None  # answer-file count preserved
+            assert minimum <= result.expected_row_count <= maximum
+            assert result.expected_row_count_min == minimum
+            assert result.expected_row_count_max == maximum
+
+        q16 = results.get_expected_result("16")
+        assert q16 is not None
+        assert q16.validation_mode == ValidationMode.EXACT
+        assert q16.expected_row_count == 18_314
+        assert q16.expected_row_count_min is None
+        assert q16.expected_row_count_max is None
+        assert q16.loose_tolerance_percent == 50.0
+
+        # The provider no longer advertises a per-query "static" RANGE/LOOSE mode
+        # -- the relaxation is a runtime, reference-seed-aware decision.
+        for query_id, result in results.query_results.items():
+            assert result.validation_mode == ValidationMode.EXACT
 
     def test_get_parameter_sensitive_query_ids_tpch(self):
         assert get_parameter_sensitive_query_ids("tpch") == PARAMETER_SENSITIVE_QUERY_IDS
@@ -156,51 +190,141 @@ class TestParameterSensitiveExclusion:
         clear_reference_seed_context()
         assert get_reference_seed_context() is None
 
-    @pytest.mark.parametrize("query_id", sorted(PARAMETER_SENSITIVE_QUERY_IDS))
-    def test_boundary_query_excluded_when_non_reference_seed(self, query_id):
-        """Q11/16/18/20 with a row count that would FAIL exact match are
-        excluded (SKIP, is_valid=True) once the context says non-reference."""
+    @pytest.mark.parametrize("query_id,bounds", sorted(TPCH_RANGE_ROW_COUNT_BOUNDS.items()))
+    def test_range_queries_accept_both_documented_bounds_under_non_reference_context(self, query_id, bounds):
+        """The old non-reference exclusion must not preempt the provider's
+        RANGE mode."""
         set_reference_seed_context(False)
         validator = QueryValidator()
-        result = validator.validate_query_result(
+        minimum, maximum = bounds
+
+        for actual_count in (minimum, maximum):
+            result = validator.validate_query_result(
+                benchmark_type="tpch",
+                query_id=query_id,
+                actual_row_count=actual_count,
+                scale_factor=1.0,
+            )
+            assert result.is_valid
+            assert result.validation_mode == ValidationMode.RANGE
+
+    @pytest.mark.parametrize(
+        "query_id,actual_count",
+        [(query_id, minimum - 1) for query_id, (minimum, _) in sorted(TPCH_RANGE_ROW_COUNT_BOUNDS.items())]
+        + [(query_id, maximum + 1) for query_id, (_, maximum) in sorted(TPCH_RANGE_ROW_COUNT_BOUNDS.items())],
+    )
+    def test_range_queries_reject_counts_outside_documented_bounds(self, query_id, actual_count):
+        set_reference_seed_context(False)
+        result = QueryValidator().validate_query_result(
             benchmark_type="tpch",
             query_id=query_id,
-            actual_row_count=999_999_999,  # deliberately implausible/wrong
+            actual_row_count=actual_count,
             scale_factor=1.0,
         )
-        assert result.is_valid
-        assert result.validation_mode == ValidationMode.SKIP
-        assert result.warning_message is not None
-        assert "parameter-sensitive" in result.warning_message
-        assert "non-reference params" in result.warning_message
+        assert not result.is_valid
+        assert result.validation_mode == ValidationMode.RANGE
 
-    @pytest.mark.parametrize("query_id", sorted(PARAMETER_SENSITIVE_QUERY_IDS))
-    def test_boundary_query_still_exact_validated_when_reference_seed(self, query_id):
-        """Reference-seed runs (context True) keep EXACT-match validation for
-        Q11/16/18/20 -- the exclusion must not fire (must_preserve)."""
+    def test_loose_query_uses_tolerance_under_non_reference_context(self):
+        set_reference_seed_context(False)
+        validator = QueryValidator()
+
+        accepted = validator.validate_query_result(
+            benchmark_type="tpch",
+            query_id="16",
+            actual_row_count=18_000,
+            scale_factor=1.0,
+        )
+        rejected = validator.validate_query_result(
+            benchmark_type="tpch",
+            query_id="16",
+            actual_row_count=9_156,
+            scale_factor=1.0,
+        )
+
+        assert accepted.is_valid
+        assert accepted.validation_mode == ValidationMode.LOOSE
+        assert not rejected.is_valid
+        assert rejected.validation_mode == ValidationMode.LOOSE
+
+    @pytest.mark.parametrize("query_id,bounds", sorted(TPCH_RANGE_ROW_COUNT_BOUNDS.items()))
+    def test_range_query_exact_compared_at_reference_seed(self, query_id, bounds):
+        """Under the reference seed a parameter-sensitive RANGE query is
+        EXACT-compared against its answer-file count: an in-range but wrong
+        count -- the regression an unconditional RANGE mode would have let pass
+        (the reviewer's Q11=999-in-[514,1469] case) -- must FAIL, and the exact
+        answer must PASS.
+        """
+        minimum, maximum = bounds
         set_reference_seed_context(True)
         validator = QueryValidator()
-        result = validator.validate_query_result(
+
+        # Derive the pinned reference answer from the registry (never hardcoded).
+        expected = validator.registry.get_expected_result("tpch", query_id, 1.0)
+        assert expected is not None
+        reference_count = expected.get_expected_count(1.0)
+        assert reference_count is not None
+        assert minimum <= reference_count <= maximum
+
+        # An in-range value that is NOT the exact answer.
+        in_range_wrong = maximum if reference_count != maximum else minimum
+        assert minimum <= in_range_wrong <= maximum
+        assert in_range_wrong != reference_count
+
+        rejected = validator.validate_query_result(
             benchmark_type="tpch",
             query_id=query_id,
-            actual_row_count=999_999_999,  # deliberately implausible/wrong
+            actual_row_count=in_range_wrong,
+            scale_factor=1.0,
+        )
+        assert not rejected.is_valid
+        assert rejected.validation_mode == ValidationMode.EXACT
+
+        accepted = validator.validate_query_result(
+            benchmark_type="tpch",
+            query_id=query_id,
+            actual_row_count=reference_count,
+            scale_factor=1.0,
+        )
+        assert accepted.is_valid
+        assert accepted.validation_mode == ValidationMode.EXACT
+
+    def test_parameter_sensitive_query_exact_when_context_unset(self):
+        """An unset reference-seed context (the default -- qgen defaults, or any
+        non-TPC-H caller) keeps EXACT validation for a parameter-sensitive
+        query, so an in-range but wrong count still fails (preserves the
+        pre-existing always-EXACT behavior for callers that never signal a
+        seed)."""
+        assert get_reference_seed_context() is None  # sanity: truly unset
+        validator = QueryValidator()
+        expected = validator.registry.get_expected_result("tpch", "11", 1.0)
+        assert expected is not None
+        reference_count = expected.get_expected_count(1.0)
+        assert reference_count is not None
+
+        minimum, maximum = TPCH_RANGE_ROW_COUNT_BOUNDS["11"]
+        in_range_wrong = maximum if reference_count != maximum else minimum
+        assert in_range_wrong != reference_count
+
+        result = validator.validate_query_result(
+            benchmark_type="tpch",
+            query_id="11",
+            actual_row_count=in_range_wrong,  # in-range, wrong answer
             scale_factor=1.0,
         )
         assert not result.is_valid
         assert result.validation_mode == ValidationMode.EXACT
-        assert result.error_message is not None
 
-    @pytest.mark.parametrize("query_id", sorted(PARAMETER_SENSITIVE_QUERY_IDS))
-    def test_boundary_query_still_exact_validated_when_context_unset(self, query_id):
-        """No caller ever set the context (e.g. a QueryValidator caller other
-        than the TPC-H power/throughput drivers) -- preserves the pre-existing
-        always-EXACT behavior exactly, so nothing regresses silently."""
-        assert get_reference_seed_context() is None  # sanity: truly unset
+    def test_loose_query_exact_compared_at_reference_seed(self):
+        """Q16 is EXACT-compared at the reference seed: a within-±50% but wrong
+        count fails, closing the same broadening the reviewer flagged for the
+        LOOSE branch."""
+        set_reference_seed_context(True)
         validator = QueryValidator()
+        # 18_000 is within ±50% of the 18_314 answer but is not the exact count.
         result = validator.validate_query_result(
             benchmark_type="tpch",
-            query_id=query_id,
-            actual_row_count=999_999_999,
+            query_id="16",
+            actual_row_count=18_000,
             scale_factor=1.0,
         )
         assert not result.is_valid
@@ -221,47 +345,6 @@ class TestParameterSensitiveExclusion:
         )
         assert not result.is_valid
         assert result.validation_mode == ValidationMode.EXACT
-
-    def test_boundary_query_skipped_regardless_of_count_when_non_reference_seed(self):
-        """The exclusion is deterministic: it fires BEFORE the registry
-        lookup, so under a non-reference context a parameter-sensitive query
-        is SKIPped no matter what count it returned -- even a count that
-        happens to equal the reference answer. This pins the always-SKIP
-        semantics (a coincidental match is NOT reported as an EXACT PASS,
-        because under different substitution parameters the reference
-        expectation is meaningless either way)."""
-        validator = QueryValidator()
-
-        # Wrong count -> SKIP (not FAILED).
-        set_reference_seed_context(False)
-        wrong = validator.validate_query_result(
-            benchmark_type="tpch",
-            query_id="11",
-            actual_row_count=999_999_999,
-            scale_factor=1.0,
-        )
-        assert wrong.is_valid
-        assert wrong.validation_mode == ValidationMode.SKIP
-
-        # Reference-matching count -> still SKIP (not an EXACT PASS). Derive
-        # the reference expectation from the registry itself so this test
-        # never hardcodes an answer-set row count.
-        reference_expected = validator.registry.get_expected_result("tpch", "11", 1.0)
-        assert reference_expected is not None
-        reference_count = reference_expected.get_expected_count(1.0)
-        assert reference_count is not None
-
-        set_reference_seed_context(False)
-        coincidental = validator.validate_query_result(
-            benchmark_type="tpch",
-            query_id="11",
-            actual_row_count=reference_count,
-            scale_factor=1.0,
-        )
-        assert coincidental.is_valid
-        assert coincidental.validation_mode == ValidationMode.SKIP
-        assert coincidental.warning_message is not None
-        assert "parameter-sensitive" in coincidental.warning_message
 
     def test_tpcds_query_unaffected_by_reference_seed_context(self):
         """TPC-DS never sets the reference-seed context, and has no entry in

@@ -453,9 +453,9 @@ class TPCHThroughputTest:
             # whether EACH query's derived seed (seed + stream_id*1000 + position,
             # same formula _resolve_query_text() uses to generate the SQL; not
             # re-derived here, just re-read for validation-context purposes)
-            # matches the reference answer set, so parameter-sensitive queries
-            # (Q11/16/18/20) can be excluded instead of EXACT-failed when it
-            # doesn't. See benchbox.core.validation.query_validation.
+            # matches the reference answer set. This context is authoritative for
+            # the parameter-sensitive queries: a reference match keeps their EXACT
+            # answer-file check, a non-reference seed relaxes them to RANGE/LOOSE.
             from benchbox.core.tpch.benchmark import get_reference_seed
 
             reference_seed = get_reference_seed(config.scale_factor)
@@ -497,12 +497,12 @@ class TPCHThroughputTest:
                         # (_derive_query_seed -- the same single definition query
                         # generation uses, so validation can never desynchronize
                         # from the generated SQL) matches the pinned reference
-                        # seed -- lets parameter-sensitive queries (Q11/16/18/20)
-                        # be excluded instead of EXACT-failed when the derivation
-                        # doesn't happen to reproduce the reference answer set.
-                        # Cleared in the finally below regardless of outcome so it
-                        # never leaks into unrelated validate_query_result() calls
-                        # on this thread.
+                        # seed. This context is authoritative for the parameter-
+                        # sensitive queries: a reference match keeps their EXACT
+                        # answer-file check, a non-reference seed relaxes them to
+                        # RANGE/LOOSE. Cleared in the finally below regardless of
+                        # outcome so it never leaks into unrelated
+                        # validate_query_result() calls on this thread.
                         stream_seed = _derive_query_seed(seed, stream_id, position)
                         set_reference_seed_context(stream_seed == reference_seed)
 

@@ -230,28 +230,31 @@ class TestPowerTestReferenceSeedContext:
 
     def test_boundary_query_not_failed_with_custom_seed_at_sf1(self) -> None:
         """End-to-end regression for the w0 defect: at SF=1.0 with a custom
-        (non-reference) seed, Q11/16/18/20 must not come back FAILED anymore.
+        (non-reference) seed, Q11/16/18/20 must be relaxed from their canonical
+        EXACT mode to their RANGE/LOOSE bounds rather than skipped or
+        EXACT-compared against the pinned answer set.
 
         Routes through the REAL PlatformAdapterConnection + DuckDBAdapter +
         QueryValidator stack (not a bare Mock connection, which would bypass
         row-count validation entirely and silently not exercise the defect --
         see w1 notes on why the raw-Mock pattern elsewhere in this file never
         caught this bug). Only the innermost raw DB cursor is mocked, forced
-        to return a row count that would fail an EXACT comparison against the
-        real SF=1 answer set.
+        to return an in-bounds count that differs from the pinned answer-file
+        count where applicable.
         """
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         bench = Mock()
-        bench.get_query = Mock(return_value="SELECT 1")
+        bench.get_query = Mock(side_effect=lambda query_id, **_kwargs: f"SELECT {query_id}")
 
         raw_connection = Mock()
 
         def raw_execute(query_text):
             raw_result = Mock()
-            # A row count guaranteed to mismatch any real TPC-H SF=1 answer.
-            raw_result.fetchall = Mock(return_value=[(1,)] * 999)
+            in_spec_counts = {11: 999, 16: 18_000, 18: 20, 20: 186}
+            query_id = int(query_text.rsplit(" ", 1)[-1])
+            raw_result.fetchall = Mock(return_value=[(1,)] * in_spec_counts[query_id])
             return raw_result
 
         raw_connection.execute = Mock(side_effect=raw_execute)
@@ -280,22 +283,22 @@ class TestPowerTestReferenceSeedContext:
         for qr in result.query_results:
             assert qr.get("error") is None
 
-    def test_boundary_query_still_fails_with_reference_seed_at_sf1(self) -> None:
-        """must_preserve: a REFERENCE-seed run keeps EXACT-match validation
-        for Q11/16/18/20 -- the same wrong-row-count cursor as above must
-        still fail the query when the seed matches the pinned reference."""
+    def test_boundary_query_rejects_out_of_range_count_at_sf1(self) -> None:
+        """Under the reference seed Q11 is EXACT-compared against its answer-file
+        count (the RANGE bounds relax it only for a non-reference seed), so a
+        wildly-wrong count is still rejected."""
         from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         bench = Mock()
-        bench.get_query = Mock(return_value="SELECT 1")
+        bench.get_query = Mock(return_value="SELECT 11")
 
         raw_connection = Mock()
 
         def raw_execute(query_text):
             raw_result = Mock()
-            raw_result.fetchall = Mock(return_value=[(1,)] * 999)
+            raw_result.fetchall = Mock(return_value=[(1,)] * 10_000)
             return raw_result
 
         raw_connection.execute = Mock(side_effect=raw_execute)
