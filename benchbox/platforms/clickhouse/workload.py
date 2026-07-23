@@ -59,13 +59,20 @@ class ClickHouseWorkloadMixin:
                 # Optimize table definitions for ClickHouse
                 table_name = self._extract_table_name(statement)
                 nullable_columns = nullable_columns_by_table.get(table_name.lower(), set()) if table_name else set()
-                statement = self._optimize_table_definition(
+                optimized = self._optimize_table_definition(
                     statement,
                     table_tunings,
                     nullable_columns=nullable_columns,
                 )
-                connection.execute(statement)
-                self.logger.debug(f"Executed schema statement: {statement[:100]}...")
+                connection.execute(optimized)
+                # Fold a tuned MergeTree ORDER BY into the applied ledger. The
+                # tuned sort key is rendered into the CREATE TABLE executed here
+                # on the raw connection (outside the tuning RecordingConnection),
+                # so without this it never enters the ledger and the run cannot
+                # reach applied_verified even though system.tables.sorting_key
+                # carries the key.
+                self._record_tuned_sort_key_op(statement, optimized, table_name, table_tunings)
+                self.logger.debug(f"Executed schema statement: {optimized[:100]}...")
 
             self.logger.info(f"Schema created (PKs: {enable_primary_keys}, FKs: {enable_foreign_keys})")
 
@@ -172,6 +179,54 @@ class ClickHouseWorkloadMixin:
                 statement = statement + order_by_clause
 
         return statement
+
+    def _record_tuned_sort_key_op(
+        self,
+        original_statement: str,
+        executed_statement: str,
+        table_name: str | None,
+        table_tunings: dict[str, Any] | None,
+    ) -> None:
+        """Record a tuned MergeTree ORDER BY as a post-load layout op.
+
+        ``_fold_layout_operations_into_ledger`` folds this into the applied
+        ledger as a ``PHASE_DDL`` statement, so the introspection receipt can
+        corroborate the recorded ``CREATE TABLE ... ORDER BY (cols)`` against the
+        catalog ``system.tables.sorting_key`` and upgrade the run to
+        ``applied_verified``.
+
+        Only the *tuned* sort key is recorded. The engine-mandatory baseline
+        ``ORDER BY`` (primary-key derived or ``tuple()``) is not tuning and stays
+        out of the ledger, matching the tuned-branch condition in
+        ``_optimize_table_definition`` (rendered only when the source statement
+        carried no ``ORDER BY`` and the tuned generator produced a ``sort_by``).
+        Never breaks a run: any failure degrades to a debug log.
+        """
+        try:
+            if not (getattr(self, "tuning_enabled", False) and table_tunings):
+                return
+            if "ORDER BY" in original_statement.upper():
+                return  # pre-existing ORDER BY was not overridden by tuning
+            tuning_clauses = self._resolve_tuned_ddl_clauses(original_statement, table_tunings)
+            if tuning_clauses is None or not tuning_clauses.sort_by:
+                return
+            from benchbox.core.tuning.applied_ledger import PHASE_DDL
+
+            ops = getattr(self, "_applied_layout_operations", None)
+            if ops is None:
+                ops = []
+                self._applied_layout_operations = ops
+            ops.append(
+                {
+                    "statement": executed_statement,
+                    "phase": PHASE_DDL,
+                    "status": "applied",
+                    "mechanism": "sort_key",
+                    "table": table_name,
+                }
+            )
+        except Exception as exc:  # capture must never break a run
+            self.logger.debug("clickhouse tuned sort-key ledger fold degraded: %s", exc)
 
     @staticmethod
     def _extract_table_name(statement: str) -> str | None:
