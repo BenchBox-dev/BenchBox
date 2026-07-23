@@ -877,6 +877,98 @@ def test_fallback_wizard_baseline_reclassifies_runtime_state_for_dataframe_platf
     assert mock_save_last_run.call_args.kwargs["tuning_mode"] == "notuning"
 
 
+def test_direct_dataframe_tuning_config_propagates_to_benchmark_config(tmp_path: Path):
+    """Non-interactive `benchbox run` must forward the resolved DataFrame tuning
+    config into benchmark_config.options so the adapter is built tuned.
+
+    Regression for cli-dataframe-tuning-config-propagation: the direct builder
+    resolved df_tuning_config onto the run state but never placed it in
+    benchmark_config.options (the interactive path did), so a plain
+    ``benchbox run --tuning <file>`` on a DataFrame platform reached the adapter
+    untuned and its bundle carried no applied ledger.
+    """
+    runner = CliRunner()
+
+    profiler = Mock()
+    profiler.get_system_profile.return_value = SimpleNamespace(
+        cpu_cores_logical=8,
+        memory_total_gb=32,
+        architecture="x86_64",
+        os_type="darwin",
+    )
+    profiler.display_profile.return_value = None
+
+    database_config = SimpleNamespace(
+        type="polars-df",
+        options={},
+        execution_mode="dataframe",
+        driver_version_actual=None,
+        driver_version_resolved=None,
+    )
+    db_manager = Mock()
+    db_manager.create_config.return_value = database_config
+
+    bench_manager = Mock()
+    bench_manager.benchmarks = {
+        "tpch": {
+            "display_name": "TPC-H",
+            "estimated_time_range": (2, 10),
+            "complexity": "medium",
+            "num_queries": 22,
+        }
+    }
+    bench_manager.validate_scale_factor.return_value = None
+
+    orchestrator = Mock()
+    result_payload = SimpleNamespace(validation_status="PASSED", execution_id="exec-123", query_results=[])
+    df_tuning_config = SimpleNamespace(name="df-direct-tuned")
+
+    with ExitStack() as stack:
+        stack.enter_context(patch.object(_run_module, "SystemProfiler", return_value=profiler))
+        stack.enter_context(patch.object(_run_module, "DatabaseManager", return_value=db_manager))
+        stack.enter_context(patch.object(_run_module, "BenchmarkManager", return_value=bench_manager))
+        stack.enter_context(patch.object(_run_module, "BenchmarkOrchestrator", return_value=orchestrator))
+        stack.enter_context(patch.object(_run_module, "display_system_recommendations"))
+        stack.enter_context(
+            patch.object(
+                _run_module.PlatformRegistry,
+                "get_platform_capabilities",
+                return_value=SimpleNamespace(default_mode="dataframe", supports_sql=False, supports_dataframe=True),
+            )
+        )
+        stack.enter_context(patch.object(_run_module.PlatformRegistry, "requires_cloud_storage", return_value=False))
+        # Isolate the plumbing under test: pretend the resolver produced a
+        # DataFrame tuning config regardless of tuning-mode internals.
+        mock_resolve = stack.enter_context(
+            patch.object(_run_module, "resolve_dataframe_tuning_config", return_value=df_tuning_config)
+        )
+        mock_execute = stack.enter_context(
+            patch.object(_run_module, "_execute_orchestrated_run", return_value=result_payload)
+        )
+        stack.enter_context(
+            patch.object(
+                _run_module,
+                "_export_orchestrated_result",
+                return_value={"json": str(tmp_path / "results.json")},
+            )
+        )
+        stack.enter_context(patch.object(_run_module, "_render_post_run_charts"))
+        stack.enter_context(patch("benchbox.cli.onboarding.check_and_run_first_time_setup", return_value=False))
+        stack.enter_context(patch("benchbox.cli.preferences.load_last_run_config", return_value=None))
+        stack.enter_context(patch("benchbox.cli.preferences.save_last_run_config"))
+
+        result = runner.invoke(
+            run,
+            ["--platform", "polars-df", "--benchmark", "tpch", "--non-interactive"],
+            obj=_run_obj(),
+        )
+
+    assert result.exit_code == 0, result.output
+    assert mock_resolve.called
+    executed_benchmark_config = mock_execute.call_args.args[1]
+    assert executed_benchmark_config.options["df_tuning_config"] is df_tuning_config
+
+
 def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
     """Declining tuning must set tuning_enabled=False and suppress --tuning in the preview."""
     runner = CliRunner()
