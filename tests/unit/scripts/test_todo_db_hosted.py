@@ -533,6 +533,39 @@ class TestHostedAdapter:
         exported = todo_db.export_all(conn)
         assert exported[0]["anti_patterns"] == order["anti_patterns"]
 
+
+class TestHostedFindings:
+    """Findings writes travel the SAME hosted _write_txn + per-statement
+    delegation as items. CI exercises that path here so the phase-3 anti-pattern
+    (hosted write paths are only manually acceptance-tested) has fake-backend
+    coverage; w8 is the manual prod acceptance on top of this."""
+
+    def test_finding_insert_and_dismiss_through_hosted_delegation(self, fake_libsql):
+        todo_findings = todo_db.todo_findings
+        conn = _hosted_conn(fake_libsql)
+        fields = {
+            "id": "2026-01-02-030405-hosted-class",
+            "date": "2026-01-02",
+            "finding_kind": "framework-gap",
+            "review_context": "hosted path",
+            "title": "Hosted finding class",
+            "finding_text": "the review never checks the hosted delegation",
+            "why_matters": "hosted writes are only manually acceptance-tested",
+            "next_steps": "- [ ] exercise the hosted cursor",
+            "disposition": "open",
+        }
+        with todo_db._write_txn(conn):
+            todo_findings.insert_finding(conn, "tester", fields)
+        stored = todo_findings.get_finding(conn, fields["id"])
+        assert stored is not None and stored["disposition"] == "open"
+        assert [event["action"] for event in stored["events"]] == ["sync"]
+        # A disposition transition travels the same hosted write path.
+        with todo_db._write_txn(conn):
+            todo_findings._set_disposition(conn, "tester", fields["id"], "dismissed", "not load-bearing")
+        assert todo_findings.get_finding(conn, fields["id"])["disposition"] == "dismissed"
+        # Findings never leak into the items-domain export, even from a hosted conn.
+        assert todo_db.export_all(conn) == []
+
     def test_cursor_is_iterable(self, fake_libsql):
         conn = _hosted_conn(fake_libsql)
         _make_item(conn, item_id="iter-one")
@@ -975,7 +1008,10 @@ class TestHostedBulkImport:
 
 class TestHostedMigrate:
     def _v1_schema(self) -> str:
-        script = todo_db.SCHEMA_SQL
+        # CORE (pre-findings) schema minus the v2 columns: a real v1 DB had
+        # neither the started_* columns nor the v3 findings tables, so migrate
+        # can add both without a 'table findings already exists' collision.
+        script = todo_db._CORE_SCHEMA_SQL
         for column in ("started_at TEXT", "started_worktree TEXT", "started_branch TEXT"):
             script = script.replace(f"  {column},\n", "")
         assert "started_at" not in script
@@ -993,12 +1029,15 @@ class TestHostedMigrate:
         # current CLI must refuse it ...
         with pytest.raises(todo_db.TodoError, match="todo migrate"):
             todo_db.connect_backend(HOSTED_URL)
-        # ... and migrate must fix it in place
+        # ... and migrate must fix it in place, applying every pending version
         applied = todo_db.migrate_backend(HOSTED_URL)
-        assert applied == [2]
+        assert applied == [2, 3]
         conn = todo_db.connect_backend(HOSTED_URL)
         cols = [row[1] for row in conn.execute("PRAGMA table_info(work_units)").fetchall()]
         assert "started_at" in cols
+        # v3 findings tables landed too.
+        tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        assert "findings" in tables
 
 
 # ---------------------------------------------------------------------------

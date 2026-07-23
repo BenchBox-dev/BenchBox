@@ -88,23 +88,48 @@ class TestExportAllowlistShape:
 
 class TestExportFailsClosed:
     def test_unlisted_finding_table_never_reaches_the_snapshot(self, conn, tmp_path):
-        # A future findings table with real data must not leak into any
-        # committed export file. Because the exporter reads only allowlisted
-        # tables, the sentinel row is never read -> never written.
+        # The real findings-domain tables (v3 schema) carrying prose in every
+        # prose-heavy column must not leak into any committed export file.
+        # Because the exporter reads only allowlisted tables, this data is never
+        # read -> never written. Exercises all four tables so the guarantee is
+        # not tied to one name the exporter's SELECTs happen not to reference.
         _mk(conn, item_id="real-item")
         sentinel = "LEAK-SENTINEL-finding-prose-do-not-commit"
-        # Every findings-domain table (including the prose-heavy `findings` and
-        # `finding_events`), so the guarantee is not tied to one table name the
-        # exporter's SELECTs happen not to reference.
-        finding_tables = ("findings", "finding_evidence", "finding_links", "finding_events")
-        for table in finding_tables:
-            conn.execute(f"CREATE TABLE {table} (id TEXT PRIMARY KEY, body TEXT)")
-            conn.execute(f"INSERT INTO {table} (id, body) VALUES (?, ?)", ("x1", f"{sentinel}-{table}"))
+        fid = "2026-01-01-000000-leak-class"
+        conn.execute(
+            "INSERT INTO findings (id, date, finding_kind, review_context, title,"
+            " finding_text, why_matters, next_steps, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                fid,
+                "2026-01-01",
+                "framework-gap",
+                f"{sentinel}-review-context",
+                f"{sentinel}-title",
+                f"{sentinel}-finding",
+                f"{sentinel}-why",
+                f"{sentinel}-next",
+                "2026-01-01T00:00:00Z",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO finding_evidence (finding_id, path, note) VALUES (?, ?, ?)",
+            (fid, "some/path.py", f"{sentinel}-evidence"),
+        )
+        conn.execute(
+            "INSERT INTO finding_links (finding_id, kind, note) VALUES (?, 'informs', ?)",
+            (fid, f"{sentinel}-link"),
+        )
+        conn.execute(
+            "INSERT INTO finding_events (at, actor, finding_id, action, detail) VALUES (?, ?, ?, ?, ?)",
+            ("2026-01-01T00:00:00Z", "tester", fid, "sync", f"{sentinel}-event"),
+        )
         conn.commit()
 
         out_dir = tmp_path / "export"
         todo_db.write_export(conn, out_dir)
 
+        finding_tables = ("findings", "finding_evidence", "finding_links", "finding_events")
         for produced in sorted(out_dir.iterdir()):
             text = produced.read_text(encoding="utf-8")
             assert sentinel not in text, f"findings data leaked into committed export file {produced.name}"
