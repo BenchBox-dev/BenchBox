@@ -804,6 +804,11 @@ class PlatformAdapter(
             # connection; read back once at result construction. Reset here so a
             # reused adapter instance never carries a prior run's statements.
             self._applied_tuning_ledger = AppliedTuningLedger()
+            # Fresh post-load layout-op accumulator for the same reason: adapters
+            # that record post-load layout statements here (DuckDB sort-index
+            # re-creation, ClickHouse tuned sort-key DDL, Databricks OPTIMIZE/
+            # ZORDER) must not fold a prior run's ops into this run's ledger.
+            self._applied_layout_operations = []
 
             self.log_verbose(f"Checking database_was_reused flag before schema creation: {self.database_was_reused}")
             if self.database_was_reused:

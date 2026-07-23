@@ -20,9 +20,11 @@ from benchbox.core.tuning.applied_ledger import (
     APPLIED_UNVERIFIED,
     APPLIED_VERIFIED,
     PHASE_DDL,
+    PHASE_POST_LOAD,
     AppliedTuningLedger,
     recording_connection,
 )
+from benchbox.core.tuning.interface import TableTuning, TuningColumn, UnifiedTuningConfiguration
 from benchbox.core.tuning.introspection import ABSENT, CORROBORATED, KIND_INDEX, corroborate
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
@@ -182,3 +184,67 @@ class TestAdapterUpgradeWiring:
 
     def test_duckdb_adapter_exposes_introspector(self):
         assert isinstance(DuckDBAdapter().get_tuning_introspector(), DuckDBTuningIntrospector)
+
+
+# ---------------------------------------------------------------------------
+# CTAS-sort index re-creation: the sort footprint survives to corroboration.
+# ---------------------------------------------------------------------------
+def _sorted_tuning_config() -> UnifiedTuningConfiguration:
+    config = UnifiedTuningConfiguration()
+    config.table_tunings["LINEITEM"] = TableTuning(
+        table_name="LINEITEM",
+        sorting=[
+            TuningColumn(name="L_ORDERKEY", type="INTEGER", order=1),
+            TuningColumn(name="L_LINENUMBER", type="INTEGER", order=2),
+        ],
+    )
+    return config
+
+
+class TestCtasSortIndexReCreation:
+    """The CTAS `CREATE OR REPLACE TABLE` drops the pre-load sort index; the
+    adapter re-creates it post-CTAS so the footprint survives and corroborates.
+    """
+
+    def _adapter_with_loaded_table(self) -> tuple[DuckDBAdapter, object]:
+        con = duckdb.connect(":memory:")
+        con.execute("CREATE TABLE LINEITEM(L_ORDERKEY INTEGER, L_LINENUMBER INTEGER, L_COMMENT VARCHAR)")
+        con.execute("INSERT INTO LINEITEM VALUES (3, 1, 'c'), (1, 2, 'a'), (2, 1, 'b')")
+        adapter = DuckDBAdapter()
+        adapter.tuning_enabled = True
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        adapter._applied_layout_operations = []
+        return adapter, con
+
+    def test_ctas_sort_recreates_index_and_records_post_load_op(self):
+        adapter, con = self._adapter_with_loaded_table()
+        config = _sorted_tuning_config()
+        # Pre-load tuning creates the index (recorded via the wrapped connection).
+        adapter.apply_unified_tuning(config, recording_connection(con, adapter._applied_tuning_ledger, PHASE_DDL))
+        # CTAS sort drops-and-recreates the table; the override re-makes the index.
+        assert adapter.apply_ctas_sort("LINEITEM", config, con) is True
+
+        indexes = {row[0] for row in con.execute("SELECT index_name FROM duckdb_indexes()").fetchall()}
+        assert "idx_lineitem_sort" in indexes
+        post_load = [op for op in adapter._applied_layout_operations if op["mechanism"] == "sort_index"]
+        assert len(post_load) == 1
+        assert post_load[0]["phase"] == PHASE_POST_LOAD
+        assert post_load[0]["status"] == "applied"
+
+    def test_full_flow_reaches_applied_verified(self):
+        adapter, con = self._adapter_with_loaded_table()
+        config = _sorted_tuning_config()
+        adapter.apply_unified_tuning(config, recording_connection(con, adapter._applied_tuning_ledger, PHASE_DDL))
+        adapter.apply_ctas_sort("LINEITEM", config, con)
+        adapter._fold_layout_operations_into_ledger()
+        status, receipt = adapter._corroborate_applied_ledger(con, APPLIED_UNVERIFIED)
+        assert status == APPLIED_VERIFIED
+        assert receipt["corroborated"] is True
+
+    def test_dry_run_does_not_recreate_index(self):
+        adapter, con = self._adapter_with_loaded_table()
+        adapter.dry_run_mode = True
+        config = _sorted_tuning_config()
+        adapter.apply_ctas_sort("LINEITEM", config, con)
+        # Dry run captures SQL but must not execute the re-creation or record an op.
+        assert not [op for op in adapter._applied_layout_operations if op["mechanism"] == "sort_index"]

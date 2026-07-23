@@ -11,14 +11,18 @@ tables) and non-fatal (any failure returns an :class:`IntrospectedState` with
 ``error`` set). Uses structured catalog columns, never ``SHOW CREATE TABLE``
 DDL text.
 
-Limitation (see the design note): ClickHouse applies ``ORDER BY`` /
-``PARTITION BY`` at ``CREATE TABLE`` time in the schema phase, which is not
-wrapped by the tuning recording connection, so those column-bearing DDLs
-never enter the applied ledger -- the ledger's ClickHouse tuning entries are
-``OPTIMIZE TABLE`` (maintenance, non-blocking) and session SETs. The observed
-keys are therefore reported as informational evidence but do NOT, on their
-own, mint ``applied_verified`` (a MergeTree table's ``sorting_key`` is always
-present, so that would be an unearned upgrade).
+ClickHouse applies ``ORDER BY`` / ``PARTITION BY`` at ``CREATE TABLE`` time in
+the schema phase, which is not wrapped by the tuning recording connection. A
+*tuned* sort key is therefore folded into the applied ledger explicitly by
+``create_schema`` (``_record_tuned_sort_key_op`` records the executed
+``CREATE TABLE ... ORDER BY (cols)`` as a ``PHASE_DDL`` statement), so this
+introspector's ``sorting_key`` read can corroborate that recorded intent and
+earn ``applied_verified``. The *engine-mandatory baseline* ``ORDER BY``
+(primary-key derived or ``tuple()``) is not tuning and is deliberately NOT
+recorded -- a MergeTree table's ``sorting_key`` is always present, so
+corroborating it against nothing would be an unearned upgrade. The ledger's
+other ClickHouse tuning entries remain ``OPTIMIZE TABLE`` (maintenance,
+non-blocking) and session SETs.
 
 Copyright 2026 Joe Harris / BenchBox Project
 

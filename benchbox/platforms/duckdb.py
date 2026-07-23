@@ -125,6 +125,18 @@ def _build_duckdb_ctas_sort_sql(table_name: str, sort_columns) -> str:
     )
 
 
+def _duckdb_sort_index_sql(table_name_upper: str, column_names: list[str]) -> str:
+    """CREATE INDEX DDL for a DuckDB sort index.
+
+    Shared by the pre-load tuning path (``apply_table_tunings``) and the
+    post-CTAS re-creation (``_recreate_sort_index_after_ctas``) so both land the
+    SAME ``idx_<table>_sort`` footprint -- the one ``duckdb_indexes()`` (and thus
+    the introspection receipt) corroborates.
+    """
+    index_name = f"idx_{table_name_upper.lower()}_sort"
+    return f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name_upper} ({', '.join(column_names)})"
+
+
 def _resolve_external_data_source(benchmark: Any, data_dir: Path, adapter: Any = None) -> Any:
     """Resolve the DataSource for external table/view registration."""
     from benchbox.platforms.base.data_loading import DataSourceResolver
@@ -946,6 +958,67 @@ class DuckDBAdapter(PlatformAdapter):
         """Build DuckDB CTAS SQL used by PlatformAdapter.apply_ctas_sort."""
         return _build_duckdb_ctas_sort_sql(table_name, sort_columns)
 
+    def apply_ctas_sort(self, table_name: str, tuning_config: Any, connection: Any) -> bool:
+        """CTAS-sort a table, then re-create its sort index so the footprint survives.
+
+        The shared CTAS sort issues ``CREATE OR REPLACE TABLE ... ORDER BY``,
+        which drops the ``idx_<table>_sort`` index ``apply_table_tunings`` built
+        pre-load. Left there, post-load introspection finds no catalog footprint
+        (``duckdb_indexes()`` is empty for the table) and the run stays
+        ``applied_unverified`` even though it physically sorted. Re-create the
+        index post-CTAS so introspection can corroborate it.
+        """
+        applied = super().apply_ctas_sort(table_name, tuning_config, connection)
+        if applied and not self.dry_run_mode:
+            self._recreate_sort_index_after_ctas(table_name, tuning_config, connection)
+        return applied
+
+    def _recreate_sort_index_after_ctas(self, table_name: str, tuning_config: Any, connection: Any) -> None:
+        """Re-create the sort index the CTAS re-materialization dropped.
+
+        Records the re-creation as a ``PHASE_POST_LOAD`` layout op (folded into
+        the applied ledger by ``_fold_layout_operations_into_ledger``) so the
+        introspection receipt can corroborate a real, surviving
+        ``duckdb_indexes()`` footprint and upgrade the run to
+        ``applied_verified``. Never breaks a run: a failed re-creation is logged
+        and recorded as a failed op, and the load continues.
+        """
+        sort_columns = self._resolve_ctas_sort_columns(table_name, tuning_config)
+        if not sort_columns:
+            return
+        sorted_cols = sorted(sort_columns, key=lambda col: col.order)
+        table_name_upper = table_name.upper()
+        index_sql = _duckdb_sort_index_sql(table_name_upper, [col.name for col in sorted_cols])
+        try:
+            connection.execute(index_sql)
+            self.log_verbose(f"Re-created sort index on {table_name_upper} after CTAS sort")
+        except Exception as exc:  # capture never breaks a run
+            self.logger.warning(f"Failed to re-create sort index on {table_name_upper} after CTAS: {exc}")
+            self._record_sort_index_layout_op(index_sql, table_name_upper, status="failed", error=exc)
+            return
+        self._record_sort_index_layout_op(index_sql, table_name_upper, status="applied")
+
+    def _record_sort_index_layout_op(
+        self, statement: str, table: str, *, status: str, error: Exception | None = None
+    ) -> None:
+        """Append a post-load sort-index op for ``_fold_layout_operations_into_ledger``."""
+        from benchbox.core.tuning.applied_ledger import PHASE_POST_LOAD
+
+        ops = getattr(self, "_applied_layout_operations", None)
+        if ops is None:
+            ops = []
+            self._applied_layout_operations = ops
+        ops.append(
+            {
+                "statement": statement,
+                "phase": PHASE_POST_LOAD,
+                "status": status,
+                "mechanism": "sort_index",
+                "table": table,
+                "error_message": str(error) if error is not None else None,
+            }
+        )
+
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply DuckDB-specific optimizations based on benchmark type."""
         # Enable profiling only when displaying plans; skip when capture_plans is active.
@@ -1247,8 +1320,7 @@ class DuckDBAdapter(PlatformAdapter):
                 column_names = [col.name for col in sorted_cols]
 
                 # Create index for sort optimization
-                index_name = f"idx_{table_name_upper.lower()}_sort"
-                index_sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name_upper} ({', '.join(column_names)})"
+                index_sql = _duckdb_sort_index_sql(table_name_upper, column_names)
 
                 try:
                     connection.execute(index_sql)

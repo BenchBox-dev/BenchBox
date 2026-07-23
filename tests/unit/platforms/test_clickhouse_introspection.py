@@ -15,11 +15,15 @@ from __future__ import annotations
 import pytest
 
 from benchbox.core.tuning.applied_ledger import (
+    APPLIED_UNVERIFIED,
+    APPLIED_VERIFIED,
     PHASE_DDL,
     PHASE_SESSION,
     AppliedTuningLedger,
 )
+from benchbox.core.tuning.interface import TableTuning, TuningColumn, UnifiedTuningConfiguration
 from benchbox.core.tuning.introspection import KIND_PARTITION_KEY, KIND_SORT_KEY, corroborate
+from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
 from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -79,13 +83,82 @@ class TestClickHouseIntrospector:
         assert state.objects == []
 
     def test_optimize_ledger_reports_keys_but_stays_unverified(self):
-        # Documented limitation: ClickHouse's key DDL runs outside the ledger, so
-        # the ledger's OPTIMIZE (maintenance) + SET (transient) statements are
-        # non-blocking and there is nothing catalog-backed to earn verification.
-        # The observed keys still surface in the receipt as evidence.
+        # A ClickHouse ledger carrying only OPTIMIZE (maintenance) + SET
+        # (transient) statements is non-blocking and has nothing catalog-backed
+        # to earn verification. The observed keys still surface as evidence.
+        # (The tuned sort key IS folded into the ledger separately -- see
+        # TestTunedSortKeyFold below.)
         rows = [("lineitem", "l_orderkey, l_linenumber", "")]
         ledger = _optimize_ledger()
         receipt = corroborate(ledger, ClickHouseTuningIntrospector().introspect(_FakeCHConnection(rows), ledger))
         assert receipt.corroborated is False
         assert receipt.summary["verifiable_total"] == 0
         assert any(o.kind == KIND_SORT_KEY for o in receipt.observed)
+
+
+def _sorted_tuning_config() -> UnifiedTuningConfiguration:
+    config = UnifiedTuningConfiguration()
+    config.table_tunings["LINEITEM"] = TableTuning(
+        table_name="LINEITEM",
+        sorting=[
+            TuningColumn(name="l_orderkey", type="INTEGER", order=1),
+            TuningColumn(name="l_linenumber", type="INTEGER", order=2),
+        ],
+    )
+    return config
+
+
+class TestTunedSortKeyFold:
+    """The tuned MergeTree ORDER BY is folded into the applied ledger so it can
+    corroborate against ``system.tables.sorting_key`` and earn verification.
+    """
+
+    def _tuned_adapter(self) -> ClickHouseAdapter:
+        adapter = ClickHouseAdapter()
+        adapter.tuning_enabled = True
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        adapter._applied_layout_operations = []
+        return adapter
+
+    def test_tuned_order_by_records_sort_key_op(self):
+        adapter = self._tuned_adapter()
+        tunings = _sorted_tuning_config().table_tunings
+        original = "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER, l_comment VARCHAR)"
+        optimized = adapter._optimize_table_definition(original, tunings, nullable_columns=set())
+        assert "ORDER BY (l_orderkey, l_linenumber)" in optimized
+
+        adapter._record_tuned_sort_key_op(original, optimized, "lineitem", tunings)
+        ops = [op for op in adapter._applied_layout_operations if op["mechanism"] == "sort_key"]
+        assert len(ops) == 1
+        assert ops[0]["phase"] == PHASE_DDL and ops[0]["table"] == "lineitem"
+
+    def test_full_flow_reaches_applied_verified(self):
+        adapter = self._tuned_adapter()
+        tunings = _sorted_tuning_config().table_tunings
+        original = "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER, l_comment VARCHAR)"
+        optimized = adapter._optimize_table_definition(original, tunings, nullable_columns=set())
+        adapter._record_tuned_sort_key_op(original, optimized, "lineitem", tunings)
+        adapter._fold_layout_operations_into_ledger()
+
+        conn = _FakeCHConnection([("lineitem", "l_orderkey, l_linenumber", "")])
+        status, receipt = adapter._corroborate_applied_ledger(conn, APPLIED_UNVERIFIED)
+        assert status == APPLIED_VERIFIED
+        assert receipt["corroborated"] is True
+
+    def test_baseline_order_by_not_recorded(self):
+        # An untuned table (not in the tuning config) gets only the
+        # engine-mandatory baseline ORDER BY, which is NOT tuning -> not recorded.
+        adapter = self._tuned_adapter()
+        tunings = _sorted_tuning_config().table_tunings
+        original = "CREATE TABLE nation (n_nationkey INTEGER PRIMARY KEY, n_name VARCHAR)"
+        optimized = adapter._optimize_table_definition(original, tunings, nullable_columns=set())
+        adapter._record_tuned_sort_key_op(original, optimized, "nation", tunings)
+        assert not [op for op in adapter._applied_layout_operations if op["mechanism"] == "sort_key"]
+
+    def test_no_record_when_tuning_disabled(self):
+        adapter = self._tuned_adapter()
+        adapter.tuning_enabled = False
+        tunings = _sorted_tuning_config().table_tunings
+        original = "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER)"
+        adapter._record_tuned_sort_key_op(original, original, "lineitem", tunings)
+        assert adapter._applied_layout_operations == []
