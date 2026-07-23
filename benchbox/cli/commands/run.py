@@ -773,6 +773,21 @@ def _tuning_override_entries(s: types.SimpleNamespace) -> dict[str, Any]:
     return entries
 
 
+def _df_tuning_config_option_entry(s: types.SimpleNamespace) -> dict[str, Any]:
+    """benchmark_config.options entry carrying the resolved DataFrame tuning config.
+
+    The interactive path sets ``options["df_tuning_config"]`` directly in
+    ``_interactive_tuning_step``; the non-interactive builders assemble
+    ``options`` inline and previously omitted it, so a plain
+    ``benchbox run --tuning <file>`` on a DataFrame platform reached the adapter
+    untuned (``orchestrator._build_platform_adapter`` reads the config from
+    ``benchmark_config.options``) and its bundle carried no applied ledger.
+    Mirror the interactive assignment here so the direct, data/load-only, and
+    dry-run builders propagate it identically.
+    """
+    return {"df_tuning_config": s.df_tuning_config} if s.df_tuning_config else {}
+
+
 def _validate_non_interactive(s: types.SimpleNamespace) -> None:
     """Set env flag and validate required args for non-interactive mode."""
     if not s.non_interactive:
@@ -1376,6 +1391,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
             "tuning_enabled": s.tuning_enabled,
             "table_mode": s.table_mode,
             "unified_tuning_configuration": s.loaded_unified_config,
+            **_df_tuning_config_option_entry(s),
             **({"data_organization": s.data_organization_payload} if s.data_organization_payload is not None else {}),
             "force_regenerate": s.force_regenerate,
             "enable_preflight_validation": s.enable_preflight_validation,
@@ -1564,6 +1580,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
             "tuning_enabled": s.tuning_enabled,
             "table_mode": s.table_mode,
             "unified_tuning_configuration": s.loaded_unified_config,
+            **_df_tuning_config_option_entry(s),
             **({"data_organization": s.data_organization_payload} if s.data_organization_payload is not None else {}),
             "force_regenerate": s.force_regenerate,
             "enable_preflight_validation": s.enable_preflight_validation,
@@ -1812,6 +1829,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
             "estimated_time_range": benchmark_info["estimated_time_range"],
             "table_mode": s.table_mode,
             "unified_tuning_configuration": s.loaded_unified_config,
+            **_df_tuning_config_option_entry(s),
             **({"data_organization": s.data_organization_payload} if s.data_organization_payload is not None else {}),
             "force_regenerate": s.force_regenerate,
             "enable_preflight_validation": s.enable_preflight_validation,
