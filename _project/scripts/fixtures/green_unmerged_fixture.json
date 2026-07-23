@@ -1,0 +1,113 @@
+{
+  "as_of": "2026-07-23T12:00:00Z",
+  "repo": "joeharris76/BenchBox",
+  "grace_hours": 2.0,
+  "prs": [
+    {
+      "number": 2001,
+      "title": "stranded hit: green, auto-merge off, aged past grace",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2001",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "changed_files": ["benchbox/platforms/duckdb/adapter.py"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+      ]
+    },
+    {
+      "number": 2002,
+      "title": "soundness-gated exclusion: otherwise identical to the stranded hit",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2002",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "changed_files": ["benchbox/core/equivalence/compare.py"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+      ]
+    },
+    {
+      "number": 2003,
+      "title": "auto-merge-on exclusion: green and aged, but auto-merge is already enabled",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2003",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": {"enabled_by": {"login": "joeharris76"}, "merge_method": "squash"},
+      "changed_files": ["benchbox/platforms/snowflake/adapter.py"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+      ]
+    },
+    {
+      "number": 2004,
+      "title": "draft exclusion: draft is a deliberate not-ready signal",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2004",
+      "draft": true,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "changed_files": ["README.md"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+      ]
+    },
+    {
+      "number": 2005,
+      "title": "red-lane exclusion: required check failed",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2005",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "changed_files": ["docs/development/adding-new-platforms.md"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "failure", "started_at": "2026-07-23T08:10:00Z"}
+      ]
+    },
+    {
+      "number": 2006,
+      "title": "within-grace exclusion: pushed 30 minutes ago",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2006",
+      "draft": false,
+      "updated_at": "2026-07-23T11:30:00Z",
+      "head_pushed_at": "2026-07-23T11:30:00Z",
+      "auto_merge": null,
+      "changed_files": ["docs/development/adding-new-platforms.md"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T11:35:00Z"}
+      ]
+    },
+    {
+      "number": 2007,
+      "title": "stale-conclusion guard: an older failed run must not shadow the latest success",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2007",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "changed_files": ["benchbox/platforms/bigquery/adapter.py"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "failure", "started_at": "2026-07-23T07:00:00Z"},
+        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+      ]
+    }
+  ],
+  "expected_stranded": [2001, 2007],
+  "expected_excluded_reasons": {
+    "2002": "soundness_gated",
+    "2003": "auto_merge_on",
+    "2004": "draft",
+    "2005": "not_green",
+    "2006": "within_grace"
+  },
+  "post_merge_run": {
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/joeharris76/BenchBox/actions/runs/999999"
+  },
+  "expected_post_merge_red": true
+}

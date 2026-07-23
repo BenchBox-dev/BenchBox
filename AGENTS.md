@@ -422,3 +422,4 @@ Markers: `fast`, `unit`, `integration`, `tpch`, `tpcds`, `ssb`,
 - SQL compatibility: `benchbox/sql_compat/README.md`
 - Dependency compatibility: `docs/development/dependency-compatibility.md`
 - Test taxonomy and lock: `tests/README.md`
+- PR triage judgment rules: `docs/operations/pr-triage.md`
