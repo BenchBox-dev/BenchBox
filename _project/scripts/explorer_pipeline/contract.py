@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-EXPLORER_BUILD_CONTRACT_VERSION = "4"
+EXPLORER_BUILD_CONTRACT_VERSION = "5"
 # v2: added the results.funding column (result provenance funding disclosure).
 # v3: projected funding into platform_index_rows and benchmark_rankings so the
 #     card surfaces can render it. A v2 snapshot has the base column but not the
@@ -14,7 +14,11 @@ EXPLORER_BUILD_CONTRACT_VERSION = "4"
 #     projections now select it unconditionally - a v3 snapshot passing this
 #     check would hit a DuckDB binder error instead of the intended rebuild
 #     message.
-EXPLORER_READ_MODEL_VERSION = 4
+# v5: added results.tuning_validation_status (ADR-1 tuning verified-state,
+#     surfaced in the RunReceipt). A v4 snapshot lacks the column and the detail
+#     projection now selects it unconditionally, so a v4 snapshot would hit a
+#     DuckDB binder error instead of the intended rebuild message.
+EXPLORER_READ_MODEL_VERSION = 5
 
 EXPLORER_BUILD_CONTRACT = {
     "version": EXPLORER_BUILD_CONTRACT_VERSION,

@@ -617,6 +617,28 @@ class TestExtendedManifestFields:
         assert transformer.to_manifest_entry(bundle_file).tuning_policy_generation is None
         assert transformer.to_detail_result(bundle_file, result_id="legacy").tuning_policy_generation is None
 
+    def test_tuning_validation_status_ingested_verbatim_from_tuning_summary(self, tmp_path: Path) -> None:
+        """ADR-1 verified-state: a new-generation bundle carries the honest
+        applied-ledger tuning_validation_status in platform.tuning, read verbatim
+        (never recomputed) onto both the manifest entry and the detail."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["platform"]["tuning"] = {"validation_status": "applied_verified"}
+        bundle = tmp_path / "verified.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        assert transformer.to_manifest_entry(bundle).tuning_validation_status == "applied_verified"
+        assert transformer.to_detail_result(bundle, result_id="v").tuning_validation_status == "applied_verified"
+
+    def test_tuning_validation_status_none_for_legacy_bundle(self, bundle_file: Path) -> None:
+        """Legacy bundles (no platform.tuning.validation_status) load unchanged:
+        the field stays None -- downstream that absence is "unknown"."""
+        transformer = BundleTransformer()
+        assert transformer.to_manifest_entry(bundle_file).tuning_validation_status is None
+        assert transformer.to_detail_result(bundle_file, result_id="legacy").tuning_validation_status is None
+
     def test_dataframe_bundle_applied_ledger_hash_ingests_end_to_end(self, tmp_path: Path) -> None:
         """A real tuned DataFrame run's exported bundle carries its applied-ledger
         hash in platform.tuning, and the explorer ingests it verbatim.

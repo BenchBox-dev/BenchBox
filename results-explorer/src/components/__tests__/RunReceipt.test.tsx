@@ -53,6 +53,7 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     tuning_hash: "tuning123",
     requested_config_hash: "a".repeat(64),
     applied_ledger_hash: "b".repeat(64),
+    tuning_validation_status: "applied_verified",
     test_type: "power",
     validation_status: "exact",
     cost_usd: null,
@@ -353,5 +354,32 @@ describe("RunReceipt", () => {
     expect(within(receipt).getByText("Requested config hash")).toBeTruthy();
     expect(within(receipt).getByText("Applied ledger hash")).toBeTruthy();
     expect(within(receipt).getAllByText("Not recorded").length).toBeGreaterThan(0);
+  });
+
+  it("renders the ADR-1 tuning verified-state as a verification badge", () => {
+    render(<RunReceipt detail={makeDetail({ tuning_validation_status: "applied_verified" })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
+    expect(within(receipt).getByText("Verified")).toBeTruthy();
+  });
+
+  it("labels a self-attested (applied_unverified) run distinctly from a verified one", () => {
+    render(<RunReceipt detail={makeDetail({ tuning_validation_status: "applied_unverified" })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("Applied (self-attested)")).toBeTruthy();
+    expect(within(receipt).queryByText("Verified")).toBeNull();
+  });
+
+  it("marks an unrecorded tuning verification state as not-recorded, not verified", () => {
+    render(<RunReceipt detail={makeDetail({ tuning_validation_status: null })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    // Legacy bundles: the row is hidden behind the disclosure, never shown as verified.
+    expect(within(receipt).queryByText("Tuning verification")).toBeNull();
+    expect(within(receipt).queryByText("Verified")).toBeNull();
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
   });
 });

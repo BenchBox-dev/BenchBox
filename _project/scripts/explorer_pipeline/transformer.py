@@ -282,6 +282,24 @@ def _applied_ledger_hash(data: dict[str, Any]) -> str | None:
     return str(val) if val else None
 
 
+def _tuning_validation_status(data: dict[str, Any]) -> str | None:
+    """Ingest the ADR-1 tuning verified-state from the bundle.
+
+    Read verbatim from ``platform.tuning.validation_status`` (emitted by
+    ``_build_tuning_summary`` from the execution-path applied ledger's honest
+    ``tuning_validation_status``: not_applicable / noop / applied_unverified /
+    applied_verified / failed). ``applied_verified`` means the post-load
+    introspection receipt corroborated the applied ledger against the live
+    catalog. ``None`` for legacy bundles predating the field -- the explorer
+    treats absence as "unknown". Display-only; never a join/match key.
+    """
+    summary = _tuning_summary(data)
+    if summary is None:
+        return None
+    val = summary.get("validation_status")
+    return str(val) if val else None
+
+
 def _tuning_policy_generation(data: dict[str, Any]) -> str | None:
     """Ingest the ADR-3 explicit tuning-policy generation marker from the bundle.
 
@@ -988,6 +1006,7 @@ class BundleTransformer:
             tuning_hash=_tuning_hash(bundle_data),
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
+            tuning_validation_status=_tuning_validation_status(bundle_data),
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
@@ -1073,6 +1092,7 @@ class BundleTransformer:
             tuning_hash=_tuning_hash(bundle_data),
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
+            tuning_validation_status=_tuning_validation_status(bundle_data),
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),

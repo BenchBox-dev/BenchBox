@@ -31,7 +31,7 @@ def test_explorer_build_contract_command_emits_expected_json() -> None:
 def test_explorer_build_contract_matches_duckdb_only_output_contract() -> None:
     outputs = EXPLORER_BUILD_CONTRACT["outputs"]
 
-    assert EXPLORER_BUILD_CONTRACT["version"] == "4"
+    assert EXPLORER_BUILD_CONTRACT["version"] == "5"
     assert EXPLORER_BUILD_CONTRACT["read_model_version"] == EXPLORER_READ_MODEL_VERSION
     assert isinstance(EXPLORER_BUILD_CONTRACT["read_model_version"], int)
     assert EXPLORER_BUILD_CONTRACT["read_model_version"] >= 1
