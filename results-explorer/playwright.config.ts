@@ -40,9 +40,9 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
-    trace: "retain-on-failure",
+    trace: "on-first-retry",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: "on-first-retry",
   },
 
   projects: [

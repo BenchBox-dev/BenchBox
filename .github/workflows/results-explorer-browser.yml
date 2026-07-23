@@ -85,7 +85,7 @@ jobs:
             results-explorer/playwright-report
             results-explorer/test-results
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 3
 
   # Non-blocking: Firefox runs the `@smoke` subset. Graduates to blocking
   # once flake data supports it (tracked by w9 of the parent TODO).
@@ -145,7 +145,7 @@ jobs:
             results-explorer/playwright-report
             results-explorer/test-results
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 3
 
   # Non-blocking: WebKit runs the `@smoke` subset. Graduates to blocking
   # once flake data supports it (tracked by w9 of the parent TODO).
@@ -205,4 +205,4 @@ jobs:
             results-explorer/playwright-report
             results-explorer/test-results
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 3
