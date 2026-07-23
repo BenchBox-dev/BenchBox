@@ -35,6 +35,7 @@ const BASE_SCHEMA_COLUMNS = [
   { name: "cloud_region", type: "VARCHAR" },
   { name: "instance_or_warehouse", type: "VARCHAR" },
   { name: "storage_format", type: "VARCHAR" },
+  { name: "physical_rendering_id", type: "VARCHAR" },
 ];
 let schemaColumns = BASE_SCHEMA_COLUMNS;
 
@@ -201,6 +202,9 @@ beforeEach(() => {
     }
     if (isFacetCountSql(normalized, "storage_format")) {
       return [{ value: "parquet", count: 1 }];
+    }
+    if (isFacetCountSql(normalized, "physical_rendering_id")) {
+      return [{ value: "databricks_liquid_auto", count: 1 }];
     }
     if (normalized.includes("SELECT CASE WHEN cost_usd IS NULL THEN 'no' ELSE 'yes' END AS value")) {
       return [
@@ -700,6 +704,29 @@ describe("Query", () => {
     expect(params.get("deployment")).toBe("cloud");
     expect(params.get("cloud_provider")).toBe("aws");
     expect(params.get("shape")).toBe("MEDIUM");
+  });
+
+  it("applies the physical_rendering_id secondary facet to the generated query", async () => {
+    render(<Query />);
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("Physical rendering").length).toBeGreaterThan(0));
+
+    const desktopFilters = screen.getByTestId("query-desktop-filters");
+    const physical = within(desktopFilters)
+      .getByRole("heading", { name: "Physical rendering" })
+      .closest("section")!;
+    fireEvent.click(within(physical).getByRole("button", { name: /^Physical rendering/ }));
+    fireEvent.click(within(physical).getByLabelText(/^Physical rendering: databricks liquid auto/i));
+
+    await waitFor(() => {
+      const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
+      expect(String(selectCalls.at(-1)?.[0])).toContain("physical_rendering_id IN (?)");
+    });
+    // ADR-2 §3: it is a page-local URL facet, not a coarse FACET_KEYS chip, so
+    // it persists under its own literal query key.
+    expect(new URL(window.location.href).searchParams.get("physical_rendering_id")).toBe(
+      "databricks_liquid_auto",
+    );
   });
 
   it("does not build facet SQL for URL params absent from the introspected schema", async () => {
