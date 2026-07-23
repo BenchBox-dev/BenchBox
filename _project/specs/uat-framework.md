@@ -130,7 +130,7 @@ tests/uat/
 | `matrix.py` | Registry-driven benchmark enumeration, platform grouping, compose-derived TCP reachability probe (connection facts now owned by `docker_assets`) | 250 | 515 |
 | `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path; submit classification via shared `benchbox.core.results.submit_classification` | 120 | 353 |
 | `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 751 |
-| `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 791 |
+| `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 806 |
 | `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 | 123 |
 | `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 | 121 |
 | `compatibility.py` | Platform/benchmark compatibility rules; record compatibility-pruned cells with rule metadata | — | 198 |
@@ -175,7 +175,7 @@ remain hand-tracked.
 
 **Per-bucket production LOC** (auto-generated -- run the script to refresh):
 
-- plumbing (orchestrator/config/`_cli`): 2,448
+- plumbing (orchestrator/config/`_cli`): 2,463
 - core exercise (execute/matrix/runner/enumerate/cleanup/ladder): 2,365
 - preflight/compat/timeouts: 1,008
 - Docker lifecycle (default-OFF, incl. `container_cleanup.py`): 1,743
@@ -185,7 +185,7 @@ remain hand-tracked.
 - artifact hygiene: 282
 - package init markers: 23
 
-**Total: 10,248 production LOC across 26 modules.**
+**Total: 10,263 production LOC across 26 modules.**
 
 <!-- UAT-LOC-SUMMARY:END -->
 
