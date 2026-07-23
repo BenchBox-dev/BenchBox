@@ -1297,7 +1297,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-list worktree-prune blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-list worktree-prune blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -2094,6 +2094,14 @@ blind-spots-report:
 # Alias: 'sweep' as the verb users will reach for; report is the v1 sweep view.
 blind-spots-sweep: blind-spots-report
 
+# Soundness-PR drain digest (read-only local run; the scheduled workflow
+# runs the same script with --apply). See docs/operations/soundness-drain.md.
+soundness-drain-report:
+	@uv run -- python _project/scripts/soundness_drain_report.py
+
+soundness-drain-self-test:
+	@uv run -- python _project/scripts/soundness_drain_report.py --self-test
+
 # ----------------------------------------------------------------------
 # UAT framework (tests/uat/) — see _project/specs/uat-framework.md.
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
@@ -2408,6 +2416,10 @@ help:
 	@echo "  make blind-spots-list   List open findings (one row each)"
 	@echo "  make blind-spots-report Counts by status + kind, oldest active first"
 	@echo "  make blind-spots-sweep  Alias for blind-spots-report"
+	@echo ""
+	@echo "Soundness-PR Drain Digest (see docs/operations/soundness-drain.md):"
+	@echo "  make soundness-drain-report     Read-only local digest of parked soundness-path PRs"
+	@echo "  make soundness-drain-self-test  Run the fixture-based classifier self-test (no network)"
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
 	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs release (re-run to resume)"
