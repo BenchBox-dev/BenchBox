@@ -727,3 +727,34 @@ jobs:
       - name: Run PySpark tests
         run: |
           make test-pyspark
+
+  green-unmerged-sweep:
+    # External read-only observer for the harden-auto-merge-on-open-stranding
+    # failure class: auto-merge-on-open.yml's `enable` job can complete
+    # `conclusion: success` while the PR's own `auto_merge` field never ends
+    # up populated (see the script's "Known timing behavior" note). This job
+    # does NOT modify auto-merge-on-open.yml and does NOT enable auto-merge
+    # itself -- it only alerts via one marker-tagged tracking issue. See
+    # docs/operations/pr-triage.md.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Run green-unmerged sweep
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run -- python _project/scripts/green_unmerged_sweep.py --apply --check-post-merge
