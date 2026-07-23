@@ -185,6 +185,22 @@ def test_report_on_killed_run_with_no_rows_reports_incomplete(tmp_path: Path, ca
     assert "run_status=INCOMPLETE" in output_tsv.read_text(encoding="utf-8")
 
 
+def test_report_on_missing_stream_without_marker_is_a_hard_error(tmp_path: Path):
+    """A missing cells.jsonl with NEITHER marker is a wrong --cells-jsonl path
+    or a pruned artifact, not an interrupted sweep. make uat-report must raise
+    rather than regenerate an empty COMPLETED (green) report, so a typo cannot
+    produce a passing UAT report (PR #1259 review follow-up)."""
+    cells_jsonl = tmp_path / "typo_cells.jsonl"
+    assert not cells_jsonl.exists()
+    assert not cells_io.cells_inprogress_path(cells_jsonl).exists()
+    output_tsv = tmp_path / "matrix_summary.tsv"
+
+    with pytest.raises(FileNotFoundError):
+        uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
+
+    assert not output_tsv.exists()
+
+
 def test_report_regenerates_marker_less_legacy_artifact_unchanged(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
     """A legacy cells.jsonl carrying NEITHER marker predates the finalize
     machinery; the report must still regenerate it green, not conflate
