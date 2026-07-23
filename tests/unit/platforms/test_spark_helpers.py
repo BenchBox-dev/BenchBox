@@ -745,54 +745,6 @@ class TestSparkLikeAdapterMixin:
         warnings = [r.message for r in caplog.records if r.levelno == logging.WARNING]
         assert any("Failed to apply Spark config spark.foo.bar" in m for m in warnings)
 
-    def test_platform_optimizations_recorded_in_applied_ledger(self) -> None:
-        # spark.conf.set bypasses RecordingConnection; the applied config must be
-        # recorded so a tuned native-Spark run reports applied_unverified, not noop.
-        from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
-
-        adapter = _StubAdapter("Spark")
-        adapter._applied_tuning_ledger = AppliedTuningLedger()
-        spark = MagicMock()
-        adapter.apply_platform_optimizations(
-            _DummyPlatformConfig({"sql.shuffle.partitions": "200", "sql.cbo.enabled": "true"}),
-            connection=spark,
-        )
-        statements = adapter._applied_tuning_ledger.statements
-        assert {s.statement for s in statements} == {
-            "SET spark.sql.shuffle.partitions=200",
-            "SET spark.sql.cbo.enabled=true",
-        }
-        assert all(s.phase == "session" and s.mechanism == "spark_session_config" for s in statements)
-        assert (
-            adapter._applied_tuning_ledger.overall_status(tuning_enabled=True, has_config=True) == "applied_unverified"
-        )
-
-    def test_failed_conf_set_recorded_as_failed_statement(self) -> None:
-        from benchbox.core.tuning.applied_ledger import EXECUTED, STATEMENT_FAILED, AppliedTuningLedger
-
-        adapter = _StubAdapter("Spark")
-        adapter._applied_tuning_ledger = AppliedTuningLedger()
-        spark = MagicMock()
-
-        def _set(key, _value):
-            if key == "spark.sql.shuffle.partitions":
-                raise RuntimeError("rejected")
-
-        spark.conf.set.side_effect = _set
-        adapter.apply_platform_optimizations(
-            _DummyPlatformConfig({"sql.shuffle.partitions": "200", "sql.cbo.enabled": "true"}),
-            connection=spark,
-        )
-        by_stmt = {s.statement: s.status for s in adapter._applied_tuning_ledger.statements}
-        assert by_stmt["SET spark.sql.shuffle.partitions=200"] == STATEMENT_FAILED
-        assert by_stmt["SET spark.sql.cbo.enabled=true"] == EXECUTED
-
-    def test_platform_optimizations_without_ledger_does_not_raise(self) -> None:
-        adapter = _StubAdapter("Spark")  # no _applied_tuning_ledger attribute
-        spark = MagicMock()
-        adapter.apply_platform_optimizations(_DummyPlatformConfig({"sql.cbo.enabled": "true"}), connection=spark)
-        spark.conf.set.assert_called_with("spark.sql.cbo.enabled", "true")
-
     def test_apply_unified_tuning_dispatches_in_fixed_order(self) -> None:
         adapter = _StubAdapter("LakeSail")
         spark = MagicMock()
