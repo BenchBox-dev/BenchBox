@@ -51,6 +51,8 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     execution_mode: "sql",
     tuning_mode: "tuned",
     tuning_hash: "tuning123",
+    requested_config_hash: "a".repeat(64),
+    applied_ledger_hash: "b".repeat(64),
     test_type: "power",
     validation_status: "exact",
     cost_usd: null,
@@ -307,5 +309,49 @@ describe("RunReceipt", () => {
   it("humanizes a disclosed funding source on the receipt", () => {
     render(<RunReceipt detail={makeDetail({ funding: "vendor-sponsored" })} />);
     expect(screen.getByText("vendor sponsored")).toBeTruthy();
+  });
+
+  it("renders the ADR-1 requested-config and applied-ledger hashes as monospace fingerprints", () => {
+    const requested = "a".repeat(64);
+    const applied = "b".repeat(64);
+    render(<RunReceipt detail={makeDetail({ requested_config_hash: requested, applied_ledger_hash: applied })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("Requested config hash")).toBeTruthy();
+    expect(within(receipt).getByText("Applied ledger hash")).toBeTruthy();
+    // Each renders a monospace <code> with the SHORT prefix visible and the
+    // FULL hash preserved in the title tooltip (identity kept, receipt compact).
+    const requestedCode = receipt.querySelector(`code[title="${requested}"]`);
+    const appliedCode = receipt.querySelector(`code[title="${applied}"]`);
+    expect(requestedCode).not.toBeNull();
+    expect(appliedCode).not.toBeNull();
+    expect(requestedCode?.textContent).toBe("aaaaaaaaaaaa");
+    expect(appliedCode?.textContent).toBe("bbbbbbbbbbbb");
+  });
+
+  it("does NOT dress the self-derived tuning_hash up as an identity fingerprint", () => {
+    // The mode-only `tuning_hash` is a coarse self-derived value, not an
+    // ADR-1 bundle identity, so it renders as a plain labeled string rather
+    // than a monospace hash fingerprint (no title-tooltip <code>).
+    render(<RunReceipt detail={makeDetail({ tuning_hash: "tuning123" })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("Tuning hash")).toBeTruthy();
+    expect(within(receipt).getByText("tuning123")).toBeTruthy();
+    // It must NOT be wrapped in the identity-hash <code title=...> fingerprint.
+    expect(receipt.querySelector('code[title="tuning123"]')).toBeNull();
+  });
+
+  it("marks missing ADR-1 hashes as not-recorded rather than fabricating a fingerprint", () => {
+    render(<RunReceipt detail={makeDetail({ requested_config_hash: null, applied_ledger_hash: null })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    // Missing hash rows are hidden behind the disclosure, not rendered as a hash.
+    expect(within(receipt).queryByText("Requested config hash")).toBeNull();
+    expect(within(receipt).queryByText("Applied ledger hash")).toBeNull();
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    expect(within(receipt).getByText("Requested config hash")).toBeTruthy();
+    expect(within(receipt).getByText("Applied ledger hash")).toBeTruthy();
+    expect(within(receipt).getAllByText("Not recorded").length).toBeGreaterThan(0);
   });
 });

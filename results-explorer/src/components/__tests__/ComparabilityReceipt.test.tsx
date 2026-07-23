@@ -294,4 +294,36 @@ describe("ComparabilityReceipt", () => {
       expect(fields.find((f) => f.label === "Tuning policy generation")).toBeUndefined();
     });
   });
+
+  describe("tuning identity fingerprint (ADR-1)", () => {
+    it("includes the requested-config and applied-ledger hashes in the Tuning fingerprint", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({
+          has_tuning: true,
+          tuning_mode: "tuned",
+          requested_config_hash: "a".repeat(64),
+          applied_ledger_hash: "b".repeat(64),
+        }),
+        makeDetail({ result_id: "r2", platform: "SQLite", platform_id: "sqlite", tuning_mode: "notuning" }),
+      ]);
+      const tuning = fields.find((f) => f.label === "Tuning");
+      expect(tuning?.detail).toContain("requested aaaaaaaaaaaa");
+      expect(tuning?.detail).toContain("applied bbbbbbbbbbbb");
+    });
+
+    it("shows a mode-only tuning value as a plain label, never a hash fingerprint", () => {
+      // The self-derived tuning_hash must never act as a comparability key, and a
+      // mode-only bundle (no ADR-1 identity hash) shows the coarse tuning_mode
+      // plainly rather than a fabricated `requested`/`applied` fingerprint.
+      const fields = buildComparabilityFields([
+        makeDetail({ has_tuning: true, tuning_mode: "tuned", tuning_hash: "tuning123" }),
+        makeDetail({ result_id: "r2", platform: "SQLite", platform_id: "sqlite", tuning_mode: "notuning" }),
+      ]);
+      const tuning = fields.find((f) => f.label === "Tuning");
+      expect(tuning?.detail).toContain("DuckDB: tuned");
+      expect(tuning?.detail).not.toContain("requested");
+      expect(tuning?.detail).not.toContain("applied");
+      expect(tuning?.detail).not.toContain("tuning123");
+    });
+  });
 });
