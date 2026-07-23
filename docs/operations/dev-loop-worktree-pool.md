@@ -37,7 +37,7 @@ The minimum surface for routine work — start here.
 
 | When | Command | Effect |
 |---|---|---|
-| Start a new task | `make worktree-claim BRANCH=fix/foo` | Pick a free slot, fetch + reset to current `origin/develop`, create branch, refresh `.venv/` only if `uv.lock`/`pyproject.toml` changed. Prints `WORKTREE_PATH=…`. |
+| Start a new task | `make worktree-claim BRANCH=fix/foo` | Pick a free slot, fetch + reset to current `origin/develop`, create branch, refresh `.venv/` only if `uv.lock`/`pyproject.toml` changed, and (re)install the pre-commit hooks (idempotent; `\|\| true` with a notice if `pre-commit` is unavailable). Prints `WORKTREE_PATH=…`. |
 | Inside the slot, ship the work | `make pr-preflight && make pr-open` | Run the local lint + fast-test gate, push, open PR vs `develop`, enable squash auto-merge. Walk away — auto-merge lands it once CI is green. |
 | After the PR merges | `make worktree-release` | Detach the slot back to `origin/develop`, delete the local feature branch. Refuses unless the PR state is `MERGED` (use `FORCE=1` to escape — only when intentional). |
 | See pool state any time | `make worktree-pool-status` | Tabular: pool, path, branch, state, claim age, venv health, disk size. Read-only; safe to run during other operations. |
@@ -140,6 +140,13 @@ Creates `BenchBox.pool-01..10` as detached siblings, runs `uv sync
 leaves existing slots alone, only fills missing ones. Override defaults
 via env: `POOL_SIZE=N` and `WORKTREE_POOL_PARENT=…` (used by the test
 suite for disposable pools).
+
+`worktree-claim` also (re)installs the pre-commit hooks every time it
+hands you a slot — not just at pool-init — so slots created before this
+step existed, or a `.git/hooks` that got clobbered, still get codespell
+et al. running at commit time. It's a no-op if the hook is already
+current, and it never fails the claim: if `pre-commit` isn't available
+it prints a notice and moves on.
 
 ### Publish across many open branches
 

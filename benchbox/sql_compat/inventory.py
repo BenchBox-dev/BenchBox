@@ -1068,9 +1068,15 @@ def main(argv: list[str] | None = None) -> int:
                 if d.detail:
                     emit(f"    {d.detail}", stderr=True)
             emit(
-                "Register each unregistered transform in "
-                "benchbox/sql_compat/rules/ddl_optimize/{platform}_ddl_rewrites.py "
-                "or add an explicit drift exemption with rationale.",
+                "Fix by one of:\n"
+                "  1) register the transform's rule in "
+                "benchbox/sql_compat/rules/ddl_optimize/{platform}_ddl_rewrites.py, or\n"
+                "  2) if it IS registered but under a different function name, add a "
+                "(platform_key, func_name) -> (registered_name, ...) entry to "
+                "_DDL_GOVERNANCE_TRANSFORMER_ALIASES in benchbox/sql_compat/inventory.py, or\n"
+                "  3) add an explicit drift exemption (_DDL_DRIFT_EXEMPTIONS) with rationale.\n"
+                "No regen mode exists for this guard -- it is always a reviewed hand edit, "
+                "not covered by `make guards-fix`.",
                 stderr=True,
             )
             exit_code = 1

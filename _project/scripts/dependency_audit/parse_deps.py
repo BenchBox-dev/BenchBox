@@ -164,7 +164,8 @@ def main() -> int:
         if current != content:
             print(
                 f"DRIFT: {out.relative_to(_ROOT)} is out of date with pyproject.toml.\n"
-                f"Regenerate it with: uv run -- python {_GENERATOR_REL}",
+                f"Regenerate it with: uv run -- python {_GENERATOR_REL}\n"
+                "(or `make guards-fix` to regenerate every mechanical drift-guard artifact)",
                 file=sys.stderr,
             )
             return 1
