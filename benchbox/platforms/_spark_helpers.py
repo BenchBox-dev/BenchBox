@@ -378,12 +378,23 @@ class SparkLikeAdapterMixin:
         apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: Any, connection: Any) -> None:
-        """Forward ``platform_config.spark`` settings to ``spark.conf.set``."""
+        """Forward ``platform_config.spark`` settings to ``spark.conf.set``.
+
+        ``spark.conf.set(...)`` is a native Spark call, not an ``execute()`` /
+        ``cursor().execute()``, so it bypasses the applied-ledger
+        ``RecordingConnection`` that wraps this connection -- without the explicit
+        record below, a tuned native-Spark run would apply real session config
+        yet report ``noop`` (never a false ``applied``). Mirror the cloud-Spark
+        capture (``CloudSparkConfigMixin.configure_for_benchmark``): record each
+        setting that actually took effect as an executed ``PHASE_SESSION``
+        statement in the shared ledger.
+        """
         if not platform_config:
             return
 
         spark = connection
         platform = self.platform_name  # type: ignore[attr-defined]
+        ledger = getattr(self, "_applied_tuning_ledger", None)
         if hasattr(platform_config, "spark") and platform_config.spark:
             for key, value in platform_config.spark.items():
                 try:
@@ -393,8 +404,36 @@ class SparkLikeAdapterMixin:
                     self.logger.warning(  # type: ignore[attr-defined]
                         f"Failed to apply {platform} config spark.{key}: {exc}"
                     )
+                    self._record_spark_conf_ledger(ledger, key, value, applied=False, error=exc)
+                    continue
+                # Record only after the set actually took effect (honest ledger).
+                self._record_spark_conf_ledger(ledger, key, value, applied=True)
 
         self.logger.info(f"{platform} platform optimizations applied")  # type: ignore[attr-defined]
+
+    @staticmethod
+    def _record_spark_conf_ledger(ledger: Any, key: str, value: Any, *, applied: bool, error: Any = None) -> None:
+        """Record a ``spark.conf.set`` into the applied-tuning ledger. Never raises.
+
+        Reuses the shared ``benchbox.core.tuning.applied_ledger`` vocabulary (a
+        ``PHASE_SESSION`` ``SET spark.<key>=<value>`` statement, executed/failed)
+        so native Spark session config appears in the same ledger + hash as every
+        other platform's tuning statements.
+        """
+        if ledger is None:
+            return
+        try:
+            from benchbox.core.tuning.applied_ledger import EXECUTED, PHASE_SESSION, STATEMENT_FAILED
+
+            ledger.record(
+                f"SET spark.{key}={value}",
+                PHASE_SESSION,
+                status=EXECUTED if applied else STATEMENT_FAILED,
+                mechanism="spark_session_config",
+                error=error,
+            )
+        except Exception:  # pragma: no cover - capture must never break a run
+            pass
 
 
 def run_spark_schema_creation_loop(
