@@ -140,7 +140,7 @@ tests/uat/
 | `artifact_hygiene.py` | Local-artifact hygiene guard: flags worktree-local `benchmark_runs/` growth when an external output root is configured; report-only (`make uat-artifact-hygiene`) | — | 282 |
 | `cells_io.py` | `cells.jsonl` + accounting-sidecar read/write codec; single schema shared by `orchestrator.py` and `_cli.py` | — | 464 |
 | `gate_summary.py` | Writes/reads the versioned `uat_gate_summary.json` per-sweep evidence artifact; powers `make uat-gate-check` cross-stage aggregation | — | 274 |
-| `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — | 318 |
+| `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — | 316 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 | 83 |
 | `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 236 |
 | `phases/__init__.py` | UAT phase package marker and phase contract documentation string | — | 17 |
@@ -181,11 +181,11 @@ remain hand-tracked.
 - Docker lifecycle (default-OFF, incl. `container_cleanup.py`): 1,743
 - chartered evidence artifacts (validate/report/package/cells_io/gate_summary): 1,674
 - explorer-prep: 387
-- throughput: 318
+- throughput: 316
 - artifact hygiene: 282
 - package init markers: 23
 
-**Total: 10,263 production LOC across 26 modules.**
+**Total: 10,261 production LOC across 26 modules.**
 
 <!-- UAT-LOC-SUMMARY:END -->
 
