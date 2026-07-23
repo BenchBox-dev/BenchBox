@@ -113,6 +113,28 @@ class MetadataValidationResult:
         """Check if there are any errors or warnings."""
         return len(self.errors) > 0 or len(self.warnings) > 0
 
+    def to_payload(self) -> dict[str, Any]:
+        """Serialize for the ``.applied.json`` companion ``drift_check`` section.
+
+        Deterministic (sets rendered as sorted lists) so two identical drift
+        outcomes serialize byte-identically. Empty collections are omitted so a
+        clean reuse renders a minimal ``{"is_valid": true}``.
+        """
+        payload: dict[str, Any] = {"is_valid": self.is_valid}
+        if self.errors:
+            payload["errors"] = list(self.errors)
+        if self.warnings:
+            payload["warnings"] = list(self.warnings)
+        if self.missing_tables:
+            payload["missing_tables"] = sorted(self.missing_tables)
+        if self.extra_tables:
+            payload["extra_tables"] = sorted(self.extra_tables)
+        if self.configuration_mismatches:
+            payload["configuration_mismatches"] = dict(sorted(self.configuration_mismatches.items()))
+        if self.drifted_sections:
+            payload["drifted_sections"] = sorted(self.drifted_sections)
+        return payload
+
 
 class TuningMetadataManager:
     """Manages tuning metadata operations for database validation.

@@ -139,6 +139,47 @@ class _LifecycleAdapter(PlatformAdapter):
         pass
 
 
+class _DriftLifecycleAdapter(_LifecycleAdapter):
+    """Reused-DB adapter that stashes a drift result at connection-validation time.
+
+    Mirrors the real lifecycle: for a reused database the tuning drift check is
+    computed during ``create_connection()`` -> ``handle_existing_database()`` ->
+    ``DatabaseValidator``/``TuningValidator`` -> ``_validate_database_tunings``
+    (which sets ``self._drift_validation_result``), NOT during the later
+    validation phase. This lets the test prove the run-scoped reset does not
+    discard that capture before it reaches the ``.applied.json`` companion.
+    """
+
+    def _validate_database_compatibility(self, **connection_config: Any) -> Any:
+        from benchbox.core.tuning.metadata import MetadataValidationResult
+
+        drift = MetadataValidationResult()
+        drift.add_error("constraints section drifted from expected tuning")
+        drift.configuration_mismatches["constraints"] = "hash a != b"
+        drift.drifted_sections.add("constraints")
+        self._drift_validation_result = drift
+        return super()._validate_database_compatibility(**connection_config)
+
+
+def test_reused_db_drift_check_survives_reset_into_applied_ledger(tmp_path: Path) -> None:
+    """Regression: the run-scoped ``_drift_validation_result`` reset must precede
+    ``create_connection()`` so the reused-DB drift captured there survives into
+    the ``.applied.json`` companion. Resetting after connection (as the original
+    routing did) discarded the only capture and made the feature a no-op for the
+    exact reused-DB case it targets (PR #1277 review follow-up)."""
+    adapter = _DriftLifecycleAdapter(existing_databases=[True])
+    adapter.tuning_enabled = True
+    benchmark = _LifecycleBenchmark(tmp_path)
+
+    result = adapter.run_benchmark(benchmark, benchmark_name="tpch")
+
+    assert adapter.database_was_reused is True
+    ledger = result.applied_tuning_ledger
+    assert ledger is not None, "reused-DB drift_check was dropped before reaching the companion"
+    assert ledger["drift_check"]["is_valid"] is False
+    assert ledger["drift_check"]["drifted_sections"] == ["constraints"]
+
+
 def test_sequential_reuse_resets_run_scoped_adapter_state(tmp_path: Path) -> None:
     adapter = _LifecycleAdapter(existing_databases=[True, False])
     benchmark = _LifecycleBenchmark(tmp_path)

@@ -246,7 +246,13 @@ class AppliedTuningLedger:
         payload = json.dumps(executed, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    def to_payload(self, *, status: str, receipt: dict[str, Any] | None = None) -> dict[str, Any]:
+    def to_payload(
+        self,
+        *,
+        status: str,
+        receipt: dict[str, Any] | None = None,
+        drift_check: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """The ``.applied.json`` companion payload.
 
         ``receipt`` (when supplied) is the post-load introspection receipt
@@ -256,6 +262,13 @@ class AppliedTuningLedger:
         only when the run status was ``applied_unverified`` and introspection was
         attempted; the ``applied_verified`` status it may carry is derived solely
         from that receipt's corroboration, never from the ledger alone.
+
+        ``drift_check`` (when supplied) is the rerun tuning drift-validation
+        result (``MetadataValidationResult.to_payload``) computed when a reused
+        database's persisted tuning metadata is validated against the expected
+        configuration. It rides in this same companion per the ADR-001 addendum
+        (drift-validation bundle routing); it is descriptive, never a source of
+        ``applied_verified``.
         """
         payload: dict[str, Any] = {
             "status": status,
@@ -265,6 +278,8 @@ class AppliedTuningLedger:
         }
         if receipt is not None:
             payload["receipt"] = receipt
+        if drift_check is not None:
+            payload["drift_check"] = drift_check
         return payload
 
     def is_empty(self) -> bool:

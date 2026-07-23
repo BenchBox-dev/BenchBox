@@ -446,7 +446,33 @@ class ResultExporter:
         # same policy: keep the structural verdict/kind/summary, drop everything
         # that could embed a path, catalog, or user-chosen identifier.
         self._sanitize_applied_receipt(sanitized.get("receipt"))
+        # The reused-DB drift check (ADR-001 addendum) rides in this companion and
+        # its free-text errors/identifiers can embed a path/DSN or user-chosen
+        # catalog/table name, so it follows the same drop-free-text policy.
+        self._sanitize_applied_drift_check(sanitized.get("drift_check"))
         return sanitized
+
+    @staticmethod
+    def _sanitize_applied_drift_check(drift_check: Any) -> None:
+        """Drop free-text / identifier fields from an embedded drift_check, in place.
+
+        Mirrors the companion statement-redaction policy: drift ``errors`` can
+        embed an exception's path/DSN, and ``warnings`` /
+        ``configuration_mismatches`` / ``missing_tables`` / ``extra_tables`` can
+        embed user-chosen catalog or table identifiers, so they are dropped for
+        anonymized exports. The structural ``is_valid`` and the coarse
+        ``drifted_sections`` (code-controlled section names) are retained so drift
+        is still visible without free text.
+        """
+        if not isinstance(drift_check, dict):
+            return
+        dropped = False
+        for key in ("errors", "warnings", "configuration_mismatches", "missing_tables", "extra_tables"):
+            if key in drift_check:
+                drift_check.pop(key, None)
+                dropped = True
+        if dropped:
+            drift_check["drift_redacted"] = True
 
     @staticmethod
     def _sanitize_applied_receipt(receipt: Any) -> None:

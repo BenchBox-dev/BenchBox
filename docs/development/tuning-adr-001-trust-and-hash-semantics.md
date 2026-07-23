@@ -230,6 +230,48 @@ should be corrected by the owning TODO.
   evaluators currently have no signal that `tunings_applied` is a
   request, not a certified outcome.
 
+## Addendum (2026-07-23): drift-validation bundle routing
+
+`tuning-drift-validation-bundle-routing-20260722` asked where the rerun
+**drift-validation** result belongs in the published bundle. When a run
+reuses an existing database, `TuningValidator` compares the database's
+persisted tuning metadata against the expected
+`UnifiedTuningConfiguration` (`platforms/base/tuning_config.py`
+`_validate_database_tunings` → `MetadataValidationResult`). That result
+was previously computed and then dropped — only the first three error
+strings survived, as validation messages; the structured drift
+(`drifted_sections`, `configuration_mismatches`, `missing_tables` /
+`extra_tables`) never reached the bundle.
+
+**Decision:** the drift-validation result rides in the existing
+`.applied.json` companion (ADR §3) as an additive `drift_check` section —
+**not** a new sibling file. This reuses the established companion (the
+same file that already carries the applied-statement ledger and the
+introspection receipt), matches the `MetadataValidationResult` docstring's
+own anticipation of an "applied-ledger drift_check companion", and keeps
+one place to look for "what actually happened to the database this run".
+
+`drift_check` shape (`MetadataValidationResult.to_payload()`): `is_valid`
+plus, when non-empty, `errors`, `warnings`, `missing_tables`,
+`extra_tables`, `configuration_mismatches`, and `drifted_sections`. It is
+**descriptive only** and is never a source of `applied_verified` — that
+status remains reserved for post-load introspection corroboration.
+
+Scope and honesty constraints:
+
+- **Reused databases only.** A fresh database just persisted its metadata,
+  so nothing could have drifted; `drift_check` is emitted only when
+  `database_was_reused` and the run is tuned.
+- **Empty-ledger carry.** A reused DB re-applies no tuning DDL, so its
+  applied-statement ledger is empty. The companion is still written when a
+  `drift_check` is present (the "nothing captured → no companion" prune in
+  `build_applied_ledger_payload` is relaxed to keep a drift-only companion).
+- **Anonymized exports.** `drift_check` free text (`errors` can embed an
+  exception's path/DSN; `warnings` / `configuration_mismatches` /
+  `missing_tables` / `extra_tables` can embed catalog/table identifiers) is
+  dropped under the same policy as the statement/receipt text, leaving the
+  structural `is_valid` + `drifted_sections` and a `drift_redacted` marker.
+
 ## References
 
 - `benchbox/platforms/base/adapter.py:743-747`
