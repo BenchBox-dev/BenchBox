@@ -14,18 +14,21 @@ TPC-H supports multiple validation modes to handle different testing scenarios:
    - Reference seed for SF=1.0: 0o0101000000 (17039360 decimal)
    - Example: benchbox run --platform duckdb --benchmark tpch --scale 1
 
-2. LOOSE Mode (Q16)
+2. LOOSE Mode (Q16, non-reference seeds only)
    - Allows ±50% tolerance by default
    - Used for Q16 because its eight size parameters have a combinatorial
      substitution domain that is not tractable to exhaustively bound
    - Guards against 0-row failures (always fails if expecting >0 but get 0)
-   - Applied to Q16 regardless of which seed generated its parameters
+   - Applied to Q16 only under a non-reference seed; a reference-seed run keeps
+     EXACT validation against the answer-file count (see SEED-BASED PARAMETER
+     GENERATION)
 
-3. RANGE Mode
+3. RANGE Mode (Q11/Q18/Q20, non-reference seeds only)
    - Validates min/max bounds
-   - Used for queries whose row count is a spec-sanctioned function of their
-     substitution parameters even at a FIXED (including the reference) seed --
-     see NON-DETERMINISTIC ROW-COUNT QUERIES below. Bounds are the exact
+   - Applied under a non-reference seed to queries whose row count is a
+     spec-sanctioned function of their substitution parameters -- see
+     NON-DETERMINISTIC ROW-COUNT QUERIES below. A reference-seed run keeps EXACT
+     validation against the answer-file count instead. Bounds are the exact
      min/max row count over the query's full substitution-parameter domain
      (spanning both the literal qgen "-d" defaults used for the official
      answer files AND the qgen "-r"/"-s" randomized-substitution range),
@@ -51,10 +54,15 @@ For most TPC-H queries this is harmless -- their row count is a fixed function o
 the schema (e.g. Q1 always groups into <=4 rows), not of the substitution
 parameters -- so EXACT validation still matches regardless of seed. The exception
 is the small set of queries listed under NON-DETERMINISTIC ROW-COUNT QUERIES below,
-whose row count genuinely varies with the chosen parameters; those are assigned
-RANGE (or LOOSE) validation_mode unconditionally in this module, independent of
-which seed produced the query actually being validated -- validation_mode here is
-a static per-query property, not re-selected at run time based on the seed in use.
+whose row count genuinely varies with the chosen parameters. Those queries carry
+EXACT as their canonical validation_mode (their reference-seed answer-file count is
+known and must still be matched exactly on a reference/qgen-default run) and also
+carry the RANGE bounds / LOOSE tolerance below. QueryValidator relaxes them from
+EXACT to RANGE/LOOSE at run time ONLY when the TPC-H power/throughput driver
+signals a non-reference seed via set_reference_seed_context(False); a reference
+seed (or an unset context) keeps the exact comparison. This is the tightest-safe
+policy: full regression detection at the reference seed, and a bound (not an
+unconditional skip) under legitimate parameter variance.
 
 NON-DETERMINISTIC ROW-COUNT QUERIES (RANGE / LOOSE mode assignment)
 =====================================================================
@@ -116,7 +124,7 @@ seed is a genuine correctness signal, not spec-sanctioned variance.
 USAGE EXAMPLES
 ==============
 
-# Auto-detect mode (uses qgen defaults and per-query validation modes at SF=1.0)
+# Auto-detect mode (qgen defaults = reference seed, so every query validates EXACT at SF=1.0)
 benchbox run --platform datafusion --benchmark tpch --scale 1
 
 # Custom seed (Q11/Q18/Q20 use RANGE; Q16 uses LOOSE)
@@ -128,8 +136,8 @@ benchbox run --platform datafusion --benchmark tpch --scale 1 --validation-mode 
 # Disable validation (performance testing)
 benchbox run --platform datafusion --benchmark tpch --scale 1 --validation-mode disabled
 
-# Explicit run-level EXACT mode with custom seed (static per-query RANGE/LOOSE
-# assignments remain authoritative)
+# Force run-level EXACT mode with a custom seed (the parameter-sensitive
+# queries will likely fail, since a non-reference seed shifts their row counts)
 benchbox run --platform datafusion --benchmark tpch --scale 1 --seed 99 --validation-mode exact
 
 Copyright 2026 Joe Harris / BenchBox Project
@@ -150,8 +158,9 @@ logger = logging.getLogger(__name__)
 
 # Queries whose result cardinality is sensitive to the specific substitution
 # parameters used (not just the scale factor) -- TPC-H's "answer-set boundary"
-# queries. Their per-query validation specifications below are authoritative for
-# both reference and non-reference parameterizations.
+# queries. They validate EXACT against the answer file at the reference seed and
+# relax to the bounds/tolerance below only under a non-reference seed (see the
+# module docstring and query_validation.QueryValidator).
 #
 # Exact SF=1.0 row-count bounds for the parameter domains documented above.
 TPCH_RANGE_ROW_COUNT_BOUNDS: dict[str, tuple[int, int]] = {
@@ -165,8 +174,9 @@ TPCH_RANGE_ROW_COUNT_BOUNDS: dict[str, tuple[int, int]] = {
 TPCH_LOOSE_QUERY_IDS: frozenset[str] = frozenset({"16"})
 
 # The bounded correctness gate still excludes this set from its separate
-# reference-seed value oracle; the runtime row-count validator uses the static
-# RANGE/LOOSE specifications here instead of skipping these queries.
+# reference-seed value oracle; the runtime row-count validator relaxes these
+# queries from EXACT to the RANGE/LOOSE specifications here only under a
+# non-reference seed, instead of skipping them.
 PARAMETER_SENSITIVE_QUERY_IDS: frozenset[str] = frozenset(TPCH_RANGE_ROW_COUNT_BOUNDS) | TPCH_LOOSE_QUERY_IDS
 
 
@@ -211,24 +221,33 @@ def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRes
     for query_id, row_count in row_counts.items():
         is_scale_independent = scale_independent_queries.get(query_id, False)
 
+        # Parameter-sensitive "answer-set boundary" queries (Q11/16/18/20) keep
+        # EXACT as their canonical validation_mode: under the reference seed
+        # (qgen defaults) their answer-file cardinality is known exactly, so a
+        # reference-seed regression must still be caught by an exact comparison
+        # (e.g. Q11 -> 1048, not merely "somewhere in 514-1469"). The RANGE
+        # bounds (Q11/18/20) / LOOSE tolerance (Q16) ride along on the same
+        # result and are applied by QueryValidator ONLY when a caller signals a
+        # non-reference seed (set_reference_seed_context(False)); under different
+        # substitution parameters the exact count no longer holds, but the bound
+        # still guards against 0-row / wildly-wrong results. See the module
+        # docstring and benchbox.core.validation.query_validation.
         range_bounds = TPCH_RANGE_ROW_COUNT_BOUNDS.get(query_id)
         if range_bounds is not None:
-            validation_mode = ValidationMode.RANGE
-            expected_row_count = None
             expected_row_count_min, expected_row_count_max = range_bounds
             mode_notes = (
-                f"Parameter-sensitive TPC-H query; valid SF=1.0 row-count range is "
+                f"Parameter-sensitive TPC-H query; EXACT against the answer file at the "
+                f"reference seed, non-reference seeds accept the SF=1.0 row-count range "
                 f"{expected_row_count_min}-{expected_row_count_max}."
             )
         elif query_id in TPCH_LOOSE_QUERY_IDS:
-            validation_mode = ValidationMode.LOOSE
-            expected_row_count = row_count
             expected_row_count_min = None
             expected_row_count_max = None
-            mode_notes = "Parameter-sensitive TPC-H query; uses the default ±50% loose row-count tolerance."
+            mode_notes = (
+                "Parameter-sensitive TPC-H query; EXACT against the answer file at the "
+                "reference seed, non-reference seeds use the default ±50% loose row-count tolerance."
+            )
         else:
-            validation_mode = ValidationMode.EXACT
-            expected_row_count = row_count
             expected_row_count_min = None
             expected_row_count_max = None
             mode_notes = "Expected result from the TPC-H answer file; output cardinality is fixed for SF=1.0."
@@ -236,10 +255,10 @@ def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRes
         query_results[query_id] = ExpectedQueryResult(
             query_id=query_id,
             scale_factor=scale_factor,
-            expected_row_count=expected_row_count,
+            expected_row_count=row_count,
             expected_row_count_min=expected_row_count_min,
             expected_row_count_max=expected_row_count_max,
-            validation_mode=validation_mode,
+            validation_mode=ValidationMode.EXACT,
             scale_independent=is_scale_independent,
             notes=f"{mode_notes} SF={scale_factor}",
             value_digest=value_digests.get(query_id),

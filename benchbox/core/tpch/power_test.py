@@ -320,11 +320,11 @@ class TPCHPowerTest:
                         # Tell QueryValidator whether THIS query's parameters match the
                         # pinned reference seed (None/qgen-defaults counts as reference-
                         # equivalent, matching the __init__ seed-selection logic above).
-                        # The TPC-H provider's static RANGE/LOOSE assignments are
-                        # authoritative; this context remains only as a legacy fallback
-                        # for an explicitly EXACT parameter-sensitive expectation.
-                        # Cleared in the finally below regardless of outcome so it never
-                        # leaks into unrelated validate_query_result() calls on this thread.
+                        # This context is authoritative for the parameter-sensitive queries
+                        # (Q11/16/18/20): a reference match keeps their EXACT answer-file
+                        # check, a non-reference seed relaxes them to their RANGE/LOOSE
+                        # bounds. Cleared in the finally below regardless of outcome so it
+                        # never leaks into unrelated validate_query_result() calls on this thread.
                         set_reference_seed_context(stream_seed is None or stream_seed == self.reference_seed)
 
                         cursor = self.connection.execute(query_text)

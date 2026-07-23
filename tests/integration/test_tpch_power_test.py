@@ -230,16 +230,17 @@ class TestPowerTestReferenceSeedContext:
 
     def test_boundary_query_not_failed_with_custom_seed_at_sf1(self) -> None:
         """End-to-end regression for the w0 defect: at SF=1.0 with a custom
-        (non-reference) seed, Q11/16/18/20 must be validated by their static
-        RANGE/LOOSE specifications rather than skipped or EXACT-compared.
+        (non-reference) seed, Q11/16/18/20 must be relaxed from their canonical
+        EXACT mode to their RANGE/LOOSE bounds rather than skipped or
+        EXACT-compared against the pinned answer set.
 
         Routes through the REAL PlatformAdapterConnection + DuckDBAdapter +
         QueryValidator stack (not a bare Mock connection, which would bypass
         row-count validation entirely and silently not exercise the defect --
         see w1 notes on why the raw-Mock pattern elsewhere in this file never
         caught this bug). Only the innermost raw DB cursor is mocked, forced
-        to return an in-spec count for each static mode that differs from the
-        pinned answer-file count where applicable.
+        to return an in-bounds count that differs from the pinned answer-file
+        count where applicable.
         """
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter
@@ -283,8 +284,9 @@ class TestPowerTestReferenceSeedContext:
             assert qr.get("error") is None
 
     def test_boundary_query_rejects_out_of_range_count_at_sf1(self) -> None:
-        """The static Q11 RANGE assignment must reject a count outside its
-        documented bounds even when the reference seed is selected."""
+        """Under the reference seed Q11 is EXACT-compared against its answer-file
+        count (the RANGE bounds relax it only for a non-reference seed), so a
+        wildly-wrong count is still rejected."""
         from benchbox.core.tpch.benchmark import TPCH_SF1_REFERENCE_SEED
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter

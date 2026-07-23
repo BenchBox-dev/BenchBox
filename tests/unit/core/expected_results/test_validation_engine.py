@@ -111,7 +111,9 @@ class TestQueryValidator:
 
 
 class TestParameterSensitiveValidation:
-    """Tests for TPC-H's static RANGE/LOOSE validation assignments."""
+    """Tests for TPC-H's reference-seed-aware validation of the answer-set
+    boundary queries: EXACT against the answer file at the reference seed,
+    relaxed to RANGE/LOOSE only under a non-reference seed."""
 
     @pytest.fixture(autouse=True)
     def _reset_reference_seed_context(self):
@@ -132,29 +134,37 @@ class TestParameterSensitiveValidation:
         assert frozenset({"11", "16", "18", "20"}) == PARAMETER_SENSITIVE_QUERY_IDS
         assert set(TPCH_RANGE_ROW_COUNT_BOUNDS) | set(TPCH_LOOSE_QUERY_IDS) == PARAMETER_SENSITIVE_QUERY_IDS
 
-    def test_tpch_provider_assigns_static_modes_and_bounds(self):
-        """The provider must materialize the documented mode for every
-        parameter-sensitive query instead of defaulting all queries to EXACT."""
+    def test_tpch_provider_assigns_exact_mode_with_ride_along_bounds(self):
+        """Every query -- parameter-sensitive or not -- carries canonical EXACT
+        mode and its answer-file count, so a reference-seed run is exact-checked.
+        The parameter-sensitive queries additionally carry the RANGE bounds
+        (Q11/18/20) / LOOSE tolerance (Q16) that QueryValidator applies only
+        under a non-reference seed. The preserved exact count sits inside the
+        query's own bounds."""
         results = get_tpch_expected_results(scale_factor=1.0)
         assert results is not None
 
         for query_id, (minimum, maximum) in TPCH_RANGE_ROW_COUNT_BOUNDS.items():
             result = results.get_expected_result(query_id)
             assert result is not None
-            assert result.validation_mode == ValidationMode.RANGE
-            assert result.expected_row_count is None
+            assert result.validation_mode == ValidationMode.EXACT
+            assert result.expected_row_count is not None  # answer-file count preserved
+            assert minimum <= result.expected_row_count <= maximum
             assert result.expected_row_count_min == minimum
             assert result.expected_row_count_max == maximum
 
         q16 = results.get_expected_result("16")
         assert q16 is not None
-        assert q16.validation_mode == ValidationMode.LOOSE
+        assert q16.validation_mode == ValidationMode.EXACT
         assert q16.expected_row_count == 18_314
+        assert q16.expected_row_count_min is None
+        assert q16.expected_row_count_max is None
         assert q16.loose_tolerance_percent == 50.0
 
+        # The provider no longer advertises a per-query "static" RANGE/LOOSE mode
+        # -- the relaxation is a runtime, reference-seed-aware decision.
         for query_id, result in results.query_results.items():
-            if query_id not in PARAMETER_SENSITIVE_QUERY_IDS:
-                assert result.validation_mode == ValidationMode.EXACT
+            assert result.validation_mode == ValidationMode.EXACT
 
     def test_get_parameter_sensitive_query_ids_tpch(self):
         assert get_parameter_sensitive_query_ids("tpch") == PARAMETER_SENSITIVE_QUERY_IDS
@@ -235,6 +245,90 @@ class TestParameterSensitiveValidation:
         assert accepted.validation_mode == ValidationMode.LOOSE
         assert not rejected.is_valid
         assert rejected.validation_mode == ValidationMode.LOOSE
+
+    @pytest.mark.parametrize("query_id,bounds", sorted(TPCH_RANGE_ROW_COUNT_BOUNDS.items()))
+    def test_range_query_exact_compared_at_reference_seed(self, query_id, bounds):
+        """Under the reference seed a parameter-sensitive RANGE query is
+        EXACT-compared against its answer-file count: an in-range but wrong
+        count -- the regression an unconditional RANGE mode would have let pass
+        (the reviewer's Q11=999-in-[514,1469] case) -- must FAIL, and the exact
+        answer must PASS.
+        """
+        minimum, maximum = bounds
+        set_reference_seed_context(True)
+        validator = QueryValidator()
+
+        # Derive the pinned reference answer from the registry (never hardcoded).
+        expected = validator.registry.get_expected_result("tpch", query_id, 1.0)
+        assert expected is not None
+        reference_count = expected.get_expected_count(1.0)
+        assert reference_count is not None
+        assert minimum <= reference_count <= maximum
+
+        # An in-range value that is NOT the exact answer.
+        in_range_wrong = maximum if reference_count != maximum else minimum
+        assert minimum <= in_range_wrong <= maximum
+        assert in_range_wrong != reference_count
+
+        rejected = validator.validate_query_result(
+            benchmark_type="tpch",
+            query_id=query_id,
+            actual_row_count=in_range_wrong,
+            scale_factor=1.0,
+        )
+        assert not rejected.is_valid
+        assert rejected.validation_mode == ValidationMode.EXACT
+
+        accepted = validator.validate_query_result(
+            benchmark_type="tpch",
+            query_id=query_id,
+            actual_row_count=reference_count,
+            scale_factor=1.0,
+        )
+        assert accepted.is_valid
+        assert accepted.validation_mode == ValidationMode.EXACT
+
+    def test_parameter_sensitive_query_exact_when_context_unset(self):
+        """An unset reference-seed context (the default -- qgen defaults, or any
+        non-TPC-H caller) keeps EXACT validation for a parameter-sensitive
+        query, so an in-range but wrong count still fails (preserves the
+        pre-existing always-EXACT behavior for callers that never signal a
+        seed)."""
+        assert get_reference_seed_context() is None  # sanity: truly unset
+        validator = QueryValidator()
+        expected = validator.registry.get_expected_result("tpch", "11", 1.0)
+        assert expected is not None
+        reference_count = expected.get_expected_count(1.0)
+        assert reference_count is not None
+
+        minimum, maximum = TPCH_RANGE_ROW_COUNT_BOUNDS["11"]
+        in_range_wrong = maximum if reference_count != maximum else minimum
+        assert in_range_wrong != reference_count
+
+        result = validator.validate_query_result(
+            benchmark_type="tpch",
+            query_id="11",
+            actual_row_count=in_range_wrong,  # in-range, wrong answer
+            scale_factor=1.0,
+        )
+        assert not result.is_valid
+        assert result.validation_mode == ValidationMode.EXACT
+
+    def test_loose_query_exact_compared_at_reference_seed(self):
+        """Q16 is EXACT-compared at the reference seed: a within-±50% but wrong
+        count fails, closing the same broadening the reviewer flagged for the
+        LOOSE branch."""
+        set_reference_seed_context(True)
+        validator = QueryValidator()
+        # 18_000 is within ±50% of the 18_314 answer but is not the exact count.
+        result = validator.validate_query_result(
+            benchmark_type="tpch",
+            query_id="16",
+            actual_row_count=18_000,
+            scale_factor=1.0,
+        )
+        assert not result.is_valid
+        assert result.validation_mode == ValidationMode.EXACT
 
     def test_non_boundary_query_not_excluded_when_non_reference_seed(self):
         """The exclusion is scoped to the parameter-sensitive set only -- a

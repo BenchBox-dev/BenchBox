@@ -331,16 +331,18 @@ class TestThroughputReferenceSeedContext:
 
     def test_boundary_query_not_failed_on_stream1_with_default_seed_at_sf1(self) -> None:
         """End-to-end regression for the w0 defect: at SF=1.0 with the
-        default base_seed, Q11/16/18/20 must use their static RANGE/LOOSE
-        modes and not come back FAILED on ANY stream. The test deliberately
-        supplies in-spec counts for those four queries and an invalid count
-        for the remaining EXACT-mode queries.
+        default base_seed, every stream/position derives a non-reference seed
+        (base_seed 42 never lands on the pinned reference), so Q11/16/18/20 are
+        relaxed from EXACT to their RANGE/LOOSE bounds and must not come back
+        FAILED on ANY stream. The test deliberately supplies in-bounds counts
+        for those four queries and an invalid count for the remaining
+        EXACT-mode queries.
 
         Routes through the REAL PlatformAdapterConnection + DuckDBAdapter +
         QueryValidator stack via a connection_factory whose raw cursor
         deliberately returns query-specific counts so the OTHER
         (non-boundary) 18 queries genuinely fail their EXACT checks while
-        Q11/16/18/20 exercise their assigned modes.
+        Q11/16/18/20 exercise their relaxed bounds.
         """
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter

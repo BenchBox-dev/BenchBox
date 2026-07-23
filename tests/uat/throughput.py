@@ -242,14 +242,15 @@ def validate_throughput_metric(result_json: dict[str, Any]) -> tuple[bool, str]:
     (TPC-H's own parameter-sensitive query set) were EXACT-compared against
     one answer-set parameterization even when throughput derived different
     parameters for each stream and position. #1142 added a thread-local
-    reference-seed context as an interim exclusion guard. The expected-results
-    provider now assigns Q11/Q18/Q20 static RANGE bounds and Q16 LOOSE
-    validation, so the runtime validator checks those modes for both reference
-    and non-reference parameters; the context remains only as a legacy guard
-    for an explicitly EXACT expectation. This is orthogonal to stream-count
-    wiring -- see ``validate_stream_count`` for that separate concern, and
-    ``validate_stream_success`` for the per-stream pass/fail check this metric
-    check doesn't cover.
+    reference-seed context that excluded those queries under a non-reference
+    seed. The expected-results provider now gives Q11/Q18/Q20 exact SF=1.0
+    RANGE bounds and Q16 a LOOSE tolerance, and the runtime validator uses that
+    same reference-seed context to relax the four queries from EXACT to
+    RANGE/LOOSE under a non-reference seed while keeping the exact answer-file
+    check under the reference seed -- a bound instead of the old skip. This is
+    orthogonal to stream-count wiring -- see ``validate_stream_count`` for that
+    separate concern, and ``validate_stream_success`` for the per-stream
+    pass/fail check this metric check doesn't cover.
 
     Returns ``(ok, reason)``; `reason` is a human-readable explanation on
     failure, or ``"ok"`` on success.
