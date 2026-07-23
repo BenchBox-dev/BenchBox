@@ -569,6 +569,12 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             if self.schema != "public" and self._validate_identifier(self.schema):
                 cursor.execute(f'SET search_path TO "{self.schema}", public')
 
+            # Reapply any subclass-specific session-local state (e.g. pg_duckdb's
+            # duckdb.force_execution) so this stream session is configured the
+            # same way as the setup connection instead of running as vanilla
+            # PostgreSQL. No-op for the base adapter.
+            self._apply_stream_session_state(conn)
+
             conn.commit()
             return conn
         except Exception:
@@ -577,6 +583,26 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         finally:
             if cursor is not None:
                 cursor.close()
+
+    def _apply_stream_session_state(self, connection: Any) -> None:
+        """Reapply subclass session-local state to a fresh throughput-stream connection.
+
+        ``new_stream_connection`` opens an independent connection per stream and
+        applies this adapter's shared GUCs (work_mem, search_path, ...) inline.
+        Postgres-family subclasses whose ``create_connection`` sets *additional*
+        session-scoped state -- pg_duckdb's ``duckdb.force_execution`` / thread /
+        MotherDuck GUCs, pg_mooncake's ``mooncake.default_bucket`` -- MUST
+        override this hook so every stream session is configured the same way as
+        the setup connection; otherwise a multi-stream throughput/maintenance
+        run silently executes on differently-configured (often vanilla-
+        PostgreSQL) sessions and mismeasures the requested engine. One-time
+        database setup (extension creation, database/schema creation) stays in
+        ``create_connection`` and is deliberately NOT repeated per stream.
+
+        The base implementation is a no-op: plain PostgreSQL carries no
+        session-local state beyond the GUCs ``new_stream_connection`` applies.
+        """
+        del connection  # base adapter has no extra per-session state to reapply
 
     def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema using benchmark's SQL definitions."""

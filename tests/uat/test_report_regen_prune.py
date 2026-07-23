@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -69,6 +70,36 @@ def test_count_pruned_by_kind_splits_registry_from_compatibility():
     assert count_pruned_by_kind(rows) == (1, 2)  # (compatibility_rule, registry)
     assert count_pruned_by_kind(()) == (0, 0)
     assert count_pruned_by_kind(iter(rows)) == (1, 2)  # accepts any iterable
+
+
+def test_gate_summary_no_report_path_splits_registry_prunes():
+    """The execute-only gate summary (report_summary=None, e.g. `make uat-execute`)
+    must attribute registry/ladder drops to registry_pruned rather than lumping
+    them into compatibility_pruned with registry_pruned=0, so it agrees with the
+    report-phase regeneration of the same run (PR #1257 review follow-up)."""
+    outcome = SimpleNamespace(
+        results=[_passed_cell("tpch")],
+        compatibility_pruned=[
+            _registry_prune("nope", "benchmark-not-in-registry"),
+            _registry_prune("nope-platform", "platform-not-in-registry"),
+            _compat_rule_prune("ssb"),
+        ],
+        pruned=[],
+        skipped_unreachable=[],
+        startup_failed=[],
+        aborted=False,
+    )
+
+    accounting = orchestrator._accounting_for_gate_summary(None, outcome)
+
+    assert accounting.registry_pruned == 2
+    assert accounting.compatibility_pruned == 1
+    # Prunes stay counted in skipped + total_defined -- the split re-attributes,
+    # it must not drop or double-count any pruned row.
+    assert accounting.skipped == 3
+    assert accounting.total_defined == (
+        accounting.attempted + accounting.skipped + accounting.unreachable + accounting.startup_failed
+    )
 
 
 # ----------------------------------------------------------------------- w1

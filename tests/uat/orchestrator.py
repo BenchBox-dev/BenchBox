@@ -776,12 +776,22 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
     timed_out = sum(1 for r in results if r.status == "timed-out")
     row_skipped = sum(1 for r in results if report_phase.is_skipped_status(r.status))
     row_unreachable = sum(1 for r in results if report_phase.is_unreachable_status(r.status))
-    compatibility_pruned = len(getattr(execute_outcome, "compatibility_pruned", ()))
+    # Mirror the sidecar accounting written by the streaming path above:
+    # execute_outcome.compatibility_pruned is a MIXED stream of compatibility-
+    # rule drops and registry/ladder drops, so split it by kind rather than
+    # attributing every pruned row to compatibility. Otherwise a no-report run
+    # (e.g. `make uat-execute`'s scoped [preflight, execute] loop) records
+    # registry drops as compatibility_pruned with registry_pruned=0, which
+    # disagrees with the report-phase regeneration of the same run that reports
+    # registry_pruned_count>0 (uat-report-regen-prune-accounting w1/w2).
+    compatibility_pruned, registry_pruned = enumerate_phase.count_pruned_by_kind(
+        getattr(execute_outcome, "compatibility_pruned", ())
+    )
     early_stop_pruned = len(getattr(execute_outcome, "pruned", ()))
     unreachable = row_unreachable + len(getattr(execute_outcome, "skipped_unreachable", ()))
     startup_failed = len(getattr(execute_outcome, "startup_failed", ()))
     attempted = len(results) - row_skipped - row_unreachable
-    skipped = row_skipped + compatibility_pruned + early_stop_pruned
+    skipped = row_skipped + compatibility_pruned + registry_pruned + early_stop_pruned
     return gate_summary.PhaseAccounting(
         attempted=attempted,
         passed=passed,
@@ -792,7 +802,7 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
         skipped=skipped,
         compatibility_pruned=compatibility_pruned,
         early_stop_pruned=early_stop_pruned,
-        registry_pruned=0,
+        registry_pruned=registry_pruned,
         total_defined=attempted + skipped + unreachable + startup_failed,
     )
 

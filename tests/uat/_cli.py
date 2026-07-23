@@ -148,6 +148,7 @@ def _handle_preflight(args: argparse.Namespace) -> int:
 def _handle_report(args: argparse.Namespace) -> int:
     """Implements `make uat-report`. Reads cells from a JSON-lines stream."""
     from tests.uat.cells_io import (
+        cells_inprogress_path,
         cells_run_incomplete,
         coerce_accounting_count,
         read_accounting_sidecar,
@@ -155,14 +156,39 @@ def _handle_report(args: argparse.Namespace) -> int:
     )
     from tests.uat.phases.report import write_report
 
-    cells = read_cells_jsonl(Path(args.cells_jsonl))
+    cells_path = Path(args.cells_jsonl)
+    # Check the durable-sweep markers BEFORE reading the stream. A sweep
+    # SIGTERM'd during its first cell has written the `.inprogress` marker but
+    # no `cells.jsonl` rows yet, and read_cells_jsonl() would raise
+    # FileNotFoundError before the marker check runs -- so report could not emit
+    # the intended INCOMPLETE summary for an interrupted run with zero completed
+    # cells.
+    #
     # A cells.jsonl whose durable sweep began but never finalized (its
     # `.inprogress` marker still lingers with no `.finalized`) came from a
     # sweep killed mid-run (uat-sweep-durability-and-signal-teardown w1): the
     # rows present are durable but partial, so the report must not read green.
     # A legacy artifact with neither marker is unaffected -- it still
     # regenerates exactly as before.
-    finalized = not cells_run_incomplete(Path(args.cells_jsonl))
+    finalized = not cells_run_incomplete(cells_path)
+    # A missing stream is only a legitimate empty (zero-cell) run when a durable
+    # sweep is mid-flight: the `.inprogress` marker proves a sweep started and
+    # was SIGTERM'd before writing its first cell, so -- combined with the marker
+    # check above -- the report emits INCOMPLETE (finalized=False) instead of
+    # crashing on the absent file. Without that marker a missing stream is a
+    # wrong --cells-jsonl path or a pruned artifact; regenerating it as an empty
+    # COMPLETED run would let a typo produce a green UAT report, so it stays a
+    # hard error (PR #1259 review follow-up).
+    if cells_path.exists():
+        cells = read_cells_jsonl(cells_path)
+    elif cells_inprogress_path(cells_path).exists():
+        cells = []
+    else:
+        raise FileNotFoundError(
+            f"cells stream not found: {cells_path} -- no in-progress marker present, "
+            f"so this is not an interrupted sweep. Check the --cells-jsonl path; a "
+            f"genuinely killed run leaves a {cells_inprogress_path(cells_path).name} marker."
+        )
     # Skipped-unreachable and startup-failed cells are not JSONL rows; the
     # durable sweep writes their counts to a sidecar next to cells.jsonl.
     # Read the sidecar ONCE and take both counts from the same payload so a

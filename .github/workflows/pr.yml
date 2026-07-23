@@ -273,6 +273,14 @@ jobs:
       - name: Timing policy (wall-clock allowlist)
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
+      - name: UAT spec LOC table drift check
+        # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
+        # develop PR path is the routine dev-flow gate, so without this a UAT
+        # LOC/table doc that drifts from source could merge through a normal
+        # develop PR, leaving the drift guard dependent on the local pre-commit
+        # hook alone.
+        run: uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check
+
       - name: Compatibility governance drift check
         run: make compat-docs-check
 

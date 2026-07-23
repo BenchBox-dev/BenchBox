@@ -177,14 +177,8 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
                         "the 'postgresql' or 'duckdb' platform instead."
                     )
 
-            # Configure object storage if in S3 mode
-            if self.storage_mode == "s3" and self.mooncake_bucket:
-                cursor.execute(
-                    psycopg_sql.SQL("SET mooncake.default_bucket = {}").format(
-                        psycopg_sql.Literal(self.mooncake_bucket)
-                    )
-                )
-                self.logger.info(f"Set mooncake.default_bucket = {self.mooncake_bucket}")
+            # Configure object storage session GUCs (shared with per-stream sessions).
+            self._apply_mooncake_session_gucs(cursor)
 
             conn.commit()
 
@@ -200,6 +194,34 @@ class PgMooncakeAdapter(PostgreSQLAdapter):
                 cursor.close()
 
         return conn
+
+    def _apply_mooncake_session_gucs(self, cursor: Any) -> None:
+        """Apply pg_mooncake's session-local GUCs on an open cursor.
+
+        Shared by ``create_connection`` and ``_apply_stream_session_state`` so a
+        throughput/maintenance stream sees the same object-storage configuration
+        as the setup session.
+        """
+        if self.storage_mode == "s3" and self.mooncake_bucket:
+            cursor.execute(
+                psycopg_sql.SQL("SET mooncake.default_bucket = {}").format(psycopg_sql.Literal(self.mooncake_bucket))
+            )
+            self.logger.info(f"Set mooncake.default_bucket = {self.mooncake_bucket}")
+
+    def _apply_stream_session_state(self, connection: Any) -> None:
+        """Reapply pg_mooncake session GUCs to a fresh throughput-stream connection.
+
+        Without this, a stream connection built by the base
+        ``new_stream_connection`` would not carry ``mooncake.default_bucket``,
+        so a multi-stream run could resolve object storage differently than the
+        setup session. Extension verification / creation stays a one-time step
+        in ``create_connection``.
+        """
+        cursor = connection.cursor()
+        try:
+            self._apply_mooncake_session_gucs(cursor)
+        finally:
+            cursor.close()
 
     def _transform_create_statement(self, stmt: str) -> str:
         """Leave CREATE TABLE statements as heap tables for bulk loading.
