@@ -47,15 +47,44 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 2
+# Make this script's own directory importable so the findings sibling resolves
+# whether todo_db runs via `uv run ... todo_db.py` (dir already on sys.path[0])
+# or is loaded by file path in tests (spec_from_file_location adds nothing).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# Alias THIS module as "todo_db" so the findings sibling's `import todo_db`
+# binds this exact instance instead of re-executing the file under the canonical
+# name. Without it, running as __main__ (`python todo_db.py`) or loading under a
+# synthetic name in tests would create a SECOND todo_db instance, and a
+# TodoError raised inside todo_findings would then be a different class than the
+# one main() catches -- a traceback instead of a clean exit 2. setdefault never
+# clobbers a genuine prior import of todo_db. Guarded with .get(): a few tests
+# exec this file via a loader that does not pre-register the module, so
+# sys.modules[__name__] may be absent -- skip the alias there (those paths do
+# not cross the findings boundary).
+_self_module = sys.modules.get(__name__)
+if _self_module is not None:
+    sys.modules.setdefault("todo_db", _self_module)
+
+# Sibling module: findings-domain schema + `todo finding` CLI (phase 3). Imported
+# here (not lazily) because SCHEMA_SQL and MIGRATIONS below compose its DDL. The
+# import cycle (todo_findings imports todo_db) is safe: the alias above keeps it a
+# single instance, and todo_findings defines its schema constants before it first
+# touches todo_db. See todo_findings.py's header.
+import todo_findings  # noqa: E402
+
+SCHEMA_VERSION = 3
 
 # Applied in order by `todo migrate`; each version's statements are additive.
+# v3 lands the findings domain; its DDL comes from todo_findings so the fresh
+# schema (SCHEMA_SQL) and the migration delta are ONE source and cannot drift.
 MIGRATIONS: dict[int, list[str]] = {
     2: [
         "ALTER TABLE work_units ADD COLUMN started_at TEXT",
         "ALTER TABLE work_units ADD COLUMN started_worktree TEXT",
         "ALTER TABLE work_units ADD COLUMN started_branch TEXT",
     ],
+    3: todo_findings.finding_schema_statements(),
 }
 
 PRIORITIES = ("critical", "high", "medium-high", "medium", "low")
@@ -72,7 +101,7 @@ SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
 WID_RE = re.compile(r"^w[0-9]{1,3}$")
 DEFAULT_LEASE_TTL_HOURS = 24
 
-SCHEMA_SQL = """
+_CORE_SCHEMA_SQL = """
 CREATE TABLE items (
   id             TEXT PRIMARY KEY,
   title          TEXT NOT NULL CHECK (length(title) BETWEEN 5 AND 200),
@@ -192,6 +221,11 @@ CREATE TABLE meta (
 CREATE INDEX idx_items_state ON items(state);
 CREATE INDEX idx_deferrals_open ON deferrals(from_item, resolution);
 """
+
+# The full current schema = core (items domain) + findings domain (phase 3). A
+# fresh bootstrap runs this; an existing v2 DB reaches the same schema through
+# MIGRATIONS[3], which applies todo_findings.FINDINGS_SCHEMA_SQL verbatim.
+SCHEMA_SQL = _CORE_SCHEMA_SQL + todo_findings.FINDINGS_SCHEMA_SQL
 
 
 class TodoError(Exception):
@@ -902,6 +936,13 @@ def _command_mutates_tracker(args: argparse.Namespace) -> bool:
         return args.run is not None
     if args.command == "config":
         return args.value is not None
+    if args.command == "finding":
+        # The nested `finding` subcommands share one top-level command name, so
+        # classify by the subcommand (create/candidates/list/show are draft-only
+        # or read-only; sync/dismiss/triage/link/promote mutate). Interactive
+        # finding reads use the normal embedded-replica path, exactly like item
+        # `list`/`show`, so they are absent from READ_ONLY_COMMANDS by design.
+        return todo_findings.finding_command_mutates(args)
     return args.command not in _IMPLICIT_LOCAL_READ_COMMANDS
 
 
@@ -2416,8 +2457,22 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("export", help="deterministic JSONL + markdown index")
     p.add_argument("--out", default=None)
 
+    pf = sub.add_parser("finding", help="findings domain: capture, sync, triage, promote")
+    todo_findings.add_finding_subparsers(pf)
+
     args = parser.parse_args(argv)
     actor = args.actor or default_actor()
+
+    # Zero-credential capture: `finding create` writes (and `finding candidates`
+    # reads) only the local drafts directory -- no backend, no network, no token.
+    # Handled before any backend resolution so capture works with no creds (R5).
+    if args.command == "finding" and args.finding_command in todo_findings.FINDING_OFFLINE_SUBCOMMANDS:
+        try:
+            return todo_findings.run_offline(actor, args)
+        except TodoError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+
     backend, implicit_default_local = _resolve_backend(args.db)
     _report_backend(backend, implicit_default_local=implicit_default_local)
     if implicit_default_local and _command_mutates_tracker(args):
@@ -2861,6 +2916,11 @@ _HANDLERS = {
 
 
 def _dispatch(conn: sqlite3.Connection, actor: str, args: argparse.Namespace) -> int:
+    # `finding` is dispatched by name (not via _HANDLERS) so this module never
+    # references a todo_findings symbol at load time -- keeping the todo_db <->
+    # todo_findings import cycle resolvable regardless of load order.
+    if args.command == "finding":
+        return todo_findings.dispatch_finding(conn, actor, args)
     return _HANDLERS[args.command](conn, actor, args)
 
 

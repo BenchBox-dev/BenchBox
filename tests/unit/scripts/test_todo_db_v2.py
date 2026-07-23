@@ -200,12 +200,16 @@ class TestResumeLocation:
 
 class TestSchemaMigration:
     def _make_v1_db(self, tmp_path):
-        """Reconstruct a v1 database: current schema minus the v2 columns."""
+        """Reconstruct a v1 database: the CORE (pre-findings) schema minus the
+        v2 columns. Uses _CORE_SCHEMA_SQL, not SCHEMA_SQL: a real v1/v2 DB never
+        had findings tables, and MIGRATIONS[3] recreates them on upgrade -- so
+        seeding from the full current schema would collide ('table findings
+        already exists')."""
         import sqlite3
 
         v1_sql = "\n".join(
             line
-            for line in todo_db.SCHEMA_SQL.splitlines()
+            for line in todo_db._CORE_SCHEMA_SQL.splitlines()
             if "started_at" not in line and "started_worktree" not in line and "started_branch" not in line
         )
         db_path = tmp_path / "v1.sqlite"
@@ -225,9 +229,13 @@ class TestSchemaMigration:
         db_path = self._make_v1_db(tmp_path)
         applied = todo_db.migrate_db(db_path)
         assert applied  # at least one migration ran
+        assert todo_db.SCHEMA_VERSION in applied  # ... reaching the current version
         conn = todo_db.connect(db_path)  # no longer refuses
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(work_units)")}
         assert {"started_at", "started_worktree", "started_branch"} <= columns
+        # v3 (findings domain) tables exist after the upgrade.
+        tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert {"findings", "finding_evidence", "finding_links", "finding_events"} <= tables
         conn.close()
 
     def test_migrate_is_idempotent(self, tmp_path):
