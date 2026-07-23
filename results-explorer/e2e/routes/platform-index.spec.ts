@@ -1,10 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { waitForShell } from "../support/fixtures";
+import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 test.describe("PlatformIndex", () => {
   test("@smoke loads directly at /results/p/duckdb/ and renders the platform heading", async ({ page }) => {
     await page.goto("/results/p/duckdb/");
     await waitForShell(page);
+    // Same webkit cold-start DuckDB-WASM latency noted in
+    // benchmark-index.spec.ts (webkit-smoke-fix-or-demote-2): wait for the
+    // data-bound heading text before asserting its role.
+    await waitForDataLoaded(page, /DuckDB Results/i);
     await expect(page.getByRole("heading", { name: /DuckDB Results/i })).toBeVisible();
   });
 

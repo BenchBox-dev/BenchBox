@@ -21,6 +21,7 @@ export interface QueryFilterState {
   instanceTypes: string[];
   warehouseSizes: string[];
   storageFormats: string[];
+  physicalRenderingIds: string[];
   hasCost: "all" | "yes" | "no";
   dateWindow: DateWindowFacet;
 }
@@ -82,6 +83,7 @@ const ALLOWED_COLUMNS = new Set([
   "node_count",
   "cluster_size",
   "storage_format",
+  "physical_rendering_id",
   "storage_tier",
   "compliance_class",
   "is_ranking_eligible",
@@ -131,6 +133,7 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
     params,
   );
   expandListFilter("storage_format", filters.storageFormats, clauses, params);
+  expandListFilter("physical_rendering_id", filters.physicalRenderingIds, clauses, params);
 
   if (filters.hasCost === "yes") clauses.push("cost_usd IS NOT NULL");
   if (filters.hasCost === "no") clauses.push("cost_usd IS NULL");
@@ -194,6 +197,8 @@ export function buildFacetCountQuery(
     instanceTypes: options.exclude === "instanceTypes" ? [] : filters.instanceTypes,
     warehouseSizes: options.exclude === "warehouseSizes" ? [] : filters.warehouseSizes,
     storageFormats: options.exclude === "storageFormats" ? [] : filters.storageFormats,
+    physicalRenderingIds:
+      options.exclude === "physicalRenderingIds" ? [] : filters.physicalRenderingIds,
     hasCost: options.exclude === "hasCost" ? "all" : filters.hasCost,
     dateWindow: options.exclude === "dateWindow" ? "all" : filters.dateWindow,
   };

@@ -6,6 +6,10 @@ test.describe("Query workbench", () => {
     await page.goto("/results/query");
     await waitForShell(page);
 
+    // Same webkit cold-start DuckDB-WASM latency noted in
+    // benchmark-index.spec.ts (webkit-smoke-fix-or-demote-2): wait for the
+    // data-bound heading text before asserting its role.
+    await waitForDataLoaded(page, /Results Query Workbench/i);
     await expect(page.getByRole("heading", { name: /Results Query Workbench/i })).toBeVisible();
 
     // Match count text is the stable landmark that renders once both the

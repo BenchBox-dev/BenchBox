@@ -102,6 +102,16 @@ export function Query(_: RoutableProps) {
   const [cloudRegions, setCloudRegions] = useFacetField("cloud_region");
   const [instanceOrWarehouses, setInstanceOrWarehouses] = useFacetField("instance_or_warehouse");
   const [storageFormats, setStorageFormats] = useFacetField("storage_format");
+  // ADR-2 §3: `physical_rendering_id` is a *secondary*, on-demand narrowing
+  // facet — deliberately page-local (like `cost_model`) rather than part of
+  // the shared FACET_KEYS coarse-comparability set, which the comparison
+  // matcher iterates. Registering it there would silently fold it into the
+  // coarse facet match; ADR-2 rejects that. See `physicalRenderingIdsMatch`.
+  const [physicalRenderingIds, setPhysicalRenderingIds] = useUrlState<string[]>(
+    "physical_rendering_id",
+    EMPTY_STRING_ARRAY,
+    arraySerde,
+  );
   const [rowLimitRaw, setRowLimitRaw] = useUrlState<string>("limit", "default", stringSerde);
   const [hasCost, setHasCost] = useUrlState<string>("has_cost", "all", stringSerde);
   const [dateWindow, setDateWindowFacet] = useFacetField("date_window");
@@ -157,6 +167,7 @@ export function Query(_: RoutableProps) {
       instanceTypes: EMPTY_STRING_ARRAY,
       warehouseSizes: EMPTY_STRING_ARRAY,
       storageFormats,
+      physicalRenderingIds,
       hasCost: hasCost === "yes" || hasCost === "no" ? hasCost : "all",
       dateWindow,
     }),
@@ -170,6 +181,7 @@ export function Query(_: RoutableProps) {
       deploymentClasses,
       hasCost,
       instanceOrWarehouses,
+      physicalRenderingIds,
       platforms,
       scaleFactors,
       storageFormats,
@@ -376,6 +388,13 @@ export function Query(_: RoutableProps) {
       defaultCollapsed: true,
     }),
     makeFacetGroup(
+      "physical_rendering_id",
+      "Physical rendering",
+      facetCounts.physical_rendering_id ?? [],
+      physicalRenderingIds,
+      { defaultCollapsed: true },
+    ),
+    makeFacetGroup(
       "has_cost",
       "Has cost",
       [{ value: "all", count: rows.length }, ...(facetCounts.has_cost ?? [])],
@@ -410,6 +429,12 @@ export function Query(_: RoutableProps) {
     ...makeActiveChips("cloud_region", "Cloud region", cloudRegions, setCloudRegions),
     ...makeActiveChips("instance_or_warehouse", "Instance / warehouse", instanceOrWarehouses, setInstanceOrWarehouses),
     ...makeActiveChips("storage_format", "Storage", storageFormats, setStorageFormats),
+    ...makeActiveChips(
+      "physical_rendering_id",
+      "Physical rendering",
+      physicalRenderingIds,
+      setPhysicalRenderingIds,
+    ),
     ...(hasCost === "all"
       ? []
       : [{
@@ -507,6 +532,9 @@ export function Query(_: RoutableProps) {
       case "storage_format":
         toggleMulti(value, storageFormats, setStorageFormats);
         break;
+      case "physical_rendering_id":
+        toggleMulti(value, physicalRenderingIds, setPhysicalRenderingIds);
+        break;
       case "has_cost":
         setHasCost(value);
         break;
@@ -530,6 +558,7 @@ export function Query(_: RoutableProps) {
     setCloudRegions([]);
     setInstanceOrWarehouses([]);
     setStorageFormats([]);
+    setPhysicalRenderingIds([]);
     setHasCost("all");
     setDateWindow("all");
   }
@@ -1211,6 +1240,11 @@ function buildQueryFacetCountQueries(
       exclude: "storageFormats",
     });
   }
+  if (schemaColumns.has("physical_rendering_id")) {
+    facetQueries.physical_rendering_id = buildFacetCountQuery("physical_rendering_id", activeFilters, {
+      exclude: "physicalRenderingIds",
+    });
+  }
   return facetQueries;
 }
 
@@ -1227,6 +1261,7 @@ function applySchemaFilterSupport(filters: QueryFilterState, schema: SchemaColum
     instanceTypes: [],
     warehouseSizes: [],
     storageFormats: columns.has("storage_format") ? filters.storageFormats : [],
+    physicalRenderingIds: columns.has("physical_rendering_id") ? filters.physicalRenderingIds : [],
   };
 }
 

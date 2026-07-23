@@ -1,0 +1,55 @@
+name: Soundness-PR Drain Digest
+
+# Soundness-path PRs correctly WITHHOLD auto-merge (auto-merge-on-open.yml +
+# _project/scripts/auto_merge_soundness_paths.py): the owner must review and
+# merge them by hand. That gate is intentional and this workflow does not
+# touch it -- no auto-merge, no auto-approve. What was missing is an
+# observability signal: those PRs can park silently and grow conflicts
+# (#1116, #1142 sat for days before anyone noticed). This job runs
+# _project/scripts/soundness_drain_report.py, which:
+#   - classifies open develop PRs that are green on required checks,
+#     awaiting the owner (auto-merge off + soundness-path touch, or
+#     review-requested-from-owner), and idle > 24h;
+#   - syncs the `awaiting-owner` label to match that set;
+#   - upserts ONE pinned issue ("Soundness-PR drain queue") with the digest,
+#     but ONLY when the queue is non-empty -- silent otherwise, so this is
+#     one digest a day, never a per-PR/per-event ping.
+#
+# See docs/operations/soundness-drain.md for the full design and the label
+# semantics.
+
+on:
+  schedule:
+    # Daily, 05:00 UTC -- off-peak, distinct from the other daily/weekly
+    # scheduled jobs (release-canary 08:00, nightly 06:00, cross-platform
+    # 03:00, extension-smoke 06:00).
+    - cron: "0 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  drain-digest:
+    name: Report parked soundness-path PRs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run drain report (observe + apply label/digest only)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: uv run -- python _project/scripts/soundness_drain_report.py --apply

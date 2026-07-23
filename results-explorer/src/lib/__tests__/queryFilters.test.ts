@@ -22,6 +22,7 @@ const EMPTY_FILTERS: QueryFilterState = {
   instanceTypes: [],
   warehouseSizes: [],
   storageFormats: [],
+  physicalRenderingIds: [],
   hasCost: "all",
   dateWindow: "all",
 };
@@ -185,6 +186,34 @@ describe("buildWhereClause - normalized cost/deployment facets", () => {
     expect(sql).toContain("cost_status IN (?)");
     expect(sql).not.toContain("cloud_provider IN (?)");
     expect(params).toEqual(["normalized"]);
+  });
+
+  it("filters on the physical_rendering_id secondary facet", () => {
+    const filters: QueryFilterState = {
+      ...EMPTY_FILTERS,
+      physicalRenderingIds: ["databricks_liquid_auto"],
+    };
+
+    const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
+
+    expect(sql).toContain("physical_rendering_id IN (?)");
+    expect(params).toEqual(["databricks_liquid_auto"]);
+  });
+
+  it("excludes the physical_rendering_id facet from its own count while preserving others", () => {
+    const filters: QueryFilterState = {
+      ...EMPTY_FILTERS,
+      storageFormats: ["parquet"],
+      physicalRenderingIds: ["databricks_liquid_auto"],
+    };
+
+    const { sql, params } = buildFacetCountQuery("physical_rendering_id", filters, {
+      exclude: "physicalRenderingIds",
+    });
+
+    expect(sql).toContain("storage_format IN (?)");
+    expect(sql).not.toContain("physical_rendering_id IN (?)");
+    expect(params).toEqual(["parquet"]);
   });
 });
 

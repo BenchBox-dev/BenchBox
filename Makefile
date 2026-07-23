@@ -768,6 +768,55 @@ mutation-test:
 	@echo "--- Mutation test results ---"
 	uv run -- mutmut results
 
+##@ Guards / drift-guard remediation
+#
+# guards-fix-regen-target: a "drift-guard" class of CI checks -- dependency
+# inventory, oracle coverage map, parity fixtures, compat docs, UAT LOC
+# table, skill-sync -- each fails on drift against a checked-in artifact and
+# each has ONE known mechanical regen command. This target runs every regen
+# that exists, in one place, so agents stop rediscovering the right command
+# per guard from a hand-carried prompt.
+#
+# guards-fix ONLY regenerates artifacts -- it never edits allowlists,
+# ceilings, or curation lists. Each guard's CHECK target still fails CI on
+# drift; regen is remediation, not suppression. Never wire this into CI to
+# self-heal -- it is an operator command, run locally, with the diff reviewed
+# and committed by a human.
+#
+# Some CHECK guards in this class have NO regen mode (the fix is always a
+# reviewed hand edit, not a mechanical rewrite) -- guards-fix does not touch
+# them; it only echoes where to look:
+#   - module-size guard (tests/system/test_module_size_thresholds.py) --
+#     the failure message prints a ready-to-paste ALLOWLIST entry.
+#   - DDL governance drift (benchbox/sql_compat/inventory.py --check-ddl-drift)
+#     -- register the transform, add a _DDL_GOVERNANCE_TRANSFORMER_ALIASES
+#     alias, or add a _DDL_DRIFT_EXEMPTIONS entry.
+#   - release curation list (scripts/check_release_curation.py) -- classify
+#     the path as main-only (docs) or release-cut curated (Makefile), by hand.
+.PHONY: guards-fix
+guards-fix:
+	@echo "== guards-fix: regenerating every mechanically-regenerable drift-guard artifact =="
+	@echo "-- dependency inventory (audit-raw) --"
+	@$(MAKE) -s audit-raw
+	@echo "-- benchmark correctness-oracle coverage map --"
+	@$(MAKE) -s oracle-coverage-map
+	@echo "-- visualization parity fixtures --"
+	@$(MAKE) -s parity-fixtures
+	@echo "-- sql_compat capability matrix / skip-reference docs --"
+	@$(MAKE) -s compat-docs
+	@echo "-- UAT spec module-LOC table --"
+	@uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py
+	@echo "-- skill-sync (no-ops with a notice if the skill-sync CLI is not installed) --"
+	@$(MAKE) -s skill-sync
+	@echo ""
+	@echo "No regen mode -- these are reviewed hand edits, guards-fix does not touch them:"
+	@echo "  - module-size guard: tests/system/test_module_size_thresholds.py (see its failure output for the ALLOWLIST entry to paste)"
+	@echo "  - DDL governance drift: benchbox/sql_compat/inventory.py --check-ddl-drift (register the transform, alias it, or exempt it)"
+	@echo "  - release curation list: scripts/check_release_curation.py (classify the path as main-only or release-cut curated)"
+	@echo ""
+	@echo "== guards-fix done. Review the diff below, then commit what you intend to keep. =="
+	@git status --porcelain
+
 ##@ CI Local Equivalents
 # These targets mirror GitHub Actions workflows for local validation
 
@@ -1039,7 +1088,7 @@ parity-check:
 	diff -r --exclude='.gitkeep' tests/parity/fixtures $$tmpdir && \
 	echo "parity-check: fixtures match Python source" && \
 	rm -rf $$tmpdir || \
-	(echo "parity-check FAILED: fixtures are out of date - run 'make parity-fixtures' to regenerate" && rm -rf $$tmpdir && exit 1)
+	(echo "parity-check FAILED: fixtures are out of date - run 'make parity-fixtures' to regenerate (or 'make guards-fix' to regenerate every mechanical drift-guard artifact)" && rm -rf $$tmpdir && exit 1)
 
 # Create distribution packages
 dist: clean
@@ -1297,7 +1346,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-list worktree-prune blind-spots-list blind-spots-report blind-spots-sweep
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-list worktree-prune blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1559,6 +1608,9 @@ dev-loop-metrics:
 			"Conflict rate: \(rate($$conflicts; $$total)) (\($$conflicts)/\($$total))", \
 			"runner minutes total: \($$runner)" \
 		] | .[]' $$FILES
+	@echo "---"; \
+	echo "Dev-loop PR metrics (CI-failure baseline, see dev-loop-metrics-ci-failure-baseline-2):"; \
+	test -f _project/scripts/dev_loop_pr_metrics.py && uv run -- python _project/scripts/dev_loop_pr_metrics.py --days "$(DEV_LOOP_METRICS_DAYS)" || true
 
 # Initialize retained pool worktrees. Existing pool-NN paths are left untouched.
 worktree-pool-init:
@@ -1730,6 +1782,10 @@ worktree-claim-attempt:
 		if [ ! -f "$$wt/.venv/pyvenv.cfg" ] \
 			|| [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
 			( cd "$$wt" && uv sync --group dev >/dev/null ); \
+		fi; \
+		if [ -f "$$wt/.pre-commit-config.yaml" ]; then \
+			( cd "$$wt" && uv run -- pre-commit install >/dev/null 2>&1 ) \
+				|| echo "note: pre-commit install failed/unavailable in $$wt; codespell etc. won't run at commit time (run \`uv run -- pre-commit install\` manually)" >&2; \
 		fi; \
 		rm -f "$$marker"; \
 		marker=""; \
@@ -2094,6 +2150,14 @@ blind-spots-report:
 # Alias: 'sweep' as the verb users will reach for; report is the v1 sweep view.
 blind-spots-sweep: blind-spots-report
 
+# Soundness-PR drain digest (read-only local run; the scheduled workflow
+# runs the same script with --apply). See docs/operations/soundness-drain.md.
+soundness-drain-report:
+	@uv run -- python _project/scripts/soundness_drain_report.py
+
+soundness-drain-self-test:
+	@uv run -- python _project/scripts/soundness_drain_report.py --self-test
+
 # ----------------------------------------------------------------------
 # UAT framework (tests/uat/) — see _project/specs/uat-framework.md.
 # Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
@@ -2362,6 +2426,7 @@ help:
 	@echo "  make validate-imports Validate import structure and detect circular dependencies"
 	@echo "  make dependency-check Validate lock file against pyproject specs (ARGS='--matrix' to show summary)"
 	@echo "  make duplicate-check Detect duplicate code via AST structural hashing"
+	@echo "  make guards-fix      Regenerate every mechanical drift-guard artifact (inventory/oracle-map/parity/compat-docs/UAT-LOC/skill-sync), then print git status"
 	@echo "  make mutation-test   Run mutation testing on critical modules (mutmut)"
 	@echo "  make format          Format code with ruff"
 	@echo "  make clean           Remove build artifacts"
@@ -2408,6 +2473,10 @@ help:
 	@echo "  make blind-spots-list   List open findings (one row each)"
 	@echo "  make blind-spots-report Counts by status + kind, oldest active first"
 	@echo "  make blind-spots-sweep  Alias for blind-spots-report"
+	@echo ""
+	@echo "Soundness-PR Drain Digest (see docs/operations/soundness-drain.md):"
+	@echo "  make soundness-drain-report     Read-only local digest of parked soundness-path PRs"
+	@echo "  make soundness-drain-self-test  Run the fixture-based classifier self-test (no network)"
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
 	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs release (re-run to resume)"

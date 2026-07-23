@@ -170,6 +170,7 @@ def main() -> int:
             sys.stderr.write(
                 "\nUAT LOC table/summary is stale. Run:\n"
                 "  uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py\n"
+                "(or `make guards-fix` to regenerate every mechanical drift-guard artifact)\n"
             )
             return 1
         print("UAT LOC table + summary match the tree.")
