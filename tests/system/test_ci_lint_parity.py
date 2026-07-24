@@ -15,6 +15,14 @@ in ``EXCLUDED_STEPS`` below with a reason -- never silently dropped and
 never faked by weakening the CI guard to pass locally. See
 docs/operations/ci-local-parity.md for the parity invariant and how to add
 a new lint guard without breaking this test.
+
+This module also pins the `code-lint` job's report-all structure: every
+guard step runs to completion in one CI cycle (via `continue-on-error`)
+instead of the job stopping at the first failure, and a final
+`lint-guard-summary` step derives the guard set from the `guard-*` id
+naming convention -- never a hand-maintained id list, which would let a
+newly added guard silently escape aggregation. See
+docs/operations/ci-local-parity.md for the naming-convention contract.
 """
 
 from __future__ import annotations
@@ -35,6 +43,14 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PR_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr.yml"
 MAKEFILE = REPO_ROOT / "Makefile"
 LINT_JOB_ID = "code-lint"
+
+# Naming convention the `code-lint` job's report-all aggregation relies on:
+# every independent guard step gets `id: guard-<slug>` + `continue-on-error:
+# true`, and the aggregator (below) discovers the guard set by filtering the
+# `steps` context on this prefix -- never a hand-maintained id list, which
+# would let a newly added guard silently escape aggregation.
+GUARD_ID_PREFIX = "guard-"
+AGGREGATOR_STEP_NAME = "lint-guard-summary"
 
 # Steps whose `run:` command is a setup/install action, not a guard -- they
 # have no failure-condition semantics of their own and ci-lint doesn't need
@@ -73,9 +89,12 @@ def _load_lint_job_steps() -> list[dict]:
 def _guard_commands() -> dict[str, list[str]]:
     """Map step name -> list of individual shell command lines.
 
-    Steps with no `run:` key (pure `uses:` actions like checkout/setup-python)
-    and the dependency-install step are excluded here; everything else is a
-    candidate guard.
+    Steps with no `run:` key (pure `uses:` actions like checkout/setup-python),
+    the dependency-install step, and the `lint-guard-summary` aggregator itself
+    are excluded here; everything else is a candidate guard. The aggregator
+    has no local equivalent to mirror -- it's the report-all mechanism, not a
+    policy guard -- so ci-lint's own report-all block (see the `ci-lint`
+    target's comment) covers the same job without needing a matching line.
     """
     commands: dict[str, list[str]] = {}
     for step in _load_lint_job_steps():
@@ -83,7 +102,7 @@ def _guard_commands() -> dict[str, list[str]]:
         run = step.get("run")
         if not name or not run:
             continue
-        if name in SETUP_STEP_NAMES:
+        if name in SETUP_STEP_NAMES or name == AGGREGATOR_STEP_NAME:
             continue
         lines = [line.strip() for line in run.splitlines() if line.strip()]
         commands[name] = lines
@@ -118,6 +137,17 @@ def _normalize_recipe_lines(recipe_text: str) -> list[str]:
         stripped = stripped.lstrip("@")
         if not stripped or stripped.startswith("#"):
             continue
+        # ci-lint runs every guard inside one shell invocation (the whole
+        # recipe is a single logical line joined with `\` continuations) so
+        # it can collect every guard's exit code instead of `make` aborting
+        # at the first failure -- see the report-all comment on the
+        # `ci-lint` target. Each guard-command line therefore ends with a
+        # `; \` continuation marker that isn't part of the guard command
+        # itself, so strip it before comparing.
+        if stripped.endswith("\\"):
+            stripped = stripped[:-1].rstrip()
+        if stripped.endswith(";"):
+            stripped = stripped[:-1].rstrip()
         normalized.append(stripped)
     return normalized
 
@@ -174,3 +204,60 @@ def test_excluded_steps_still_exist() -> None:
         "EXCLUDED_STEPS references pr.yml `lint`-job step name(s) that no "
         f"longer exist (renamed or removed) -- update the exclusion: {stale}"
     )
+
+
+def test_guard_steps_follow_naming_convention() -> None:
+    """Every independent guard step in `code-lint` must carry both
+    `id: guard-*` and `continue-on-error: true` -- that's what lets the
+    `lint-guard-summary` aggregator discover the guard set programmatically
+    (see GUARD_ID_PREFIX) instead of a hand-maintained id list that a new
+    guard could silently escape. Non-guard steps (checkout/setup-python/
+    setup-uv/install-deps, and the aggregator itself) must carry neither."""
+    violations: list[str] = []
+    for step in _load_lint_job_steps():
+        name = step.get("name")
+        step_id = step.get("id", "")
+        has_run = "run" in step
+        is_setup = name in SETUP_STEP_NAMES or "run" not in step
+        is_aggregator = name == AGGREGATOR_STEP_NAME
+        is_guard = has_run and not is_setup and not is_aggregator
+
+        has_guard_id = step_id.startswith(GUARD_ID_PREFIX)
+        has_continue_on_error = step.get("continue-on-error") is True
+
+        if is_guard:
+            if not has_guard_id:
+                violations.append(f"{name!r}: guard step missing id prefix {GUARD_ID_PREFIX!r}")
+            if not has_continue_on_error:
+                violations.append(f"{name!r}: guard step missing `continue-on-error: true`")
+        else:
+            if has_guard_id:
+                violations.append(f"{name!r}: non-guard step must not carry a {GUARD_ID_PREFIX!r} id")
+            if has_continue_on_error:
+                violations.append(f"{name!r}: non-guard step must not carry `continue-on-error: true`")
+
+    assert not violations, (
+        "code-lint step(s) violate the guard naming convention (id prefix "
+        f"{GUARD_ID_PREFIX!r} + continue-on-error: true for guards, neither "
+        "for setup/aggregator steps):\n  " + "\n  ".join(violations)
+    )
+
+
+def test_lint_guard_summary_step_exists() -> None:
+    """The report-all aggregator step must exist, be named exactly
+    `lint-guard-summary`, and run with `if: always()` so it still executes
+    (and reports) after an earlier guard fails with continue-on-error."""
+    steps = _load_lint_job_steps()
+    matches = [step for step in steps if step.get("name") == AGGREGATOR_STEP_NAME]
+    assert matches, f"code-lint job has no {AGGREGATOR_STEP_NAME!r} step"
+    assert len(matches) == 1, f"code-lint job has multiple {AGGREGATOR_STEP_NAME!r} steps"
+
+    aggregator = matches[0]
+    assert aggregator.get("id") == AGGREGATOR_STEP_NAME, (
+        f"{AGGREGATOR_STEP_NAME!r} step must use a matching `id:` (found {aggregator.get('id')!r})"
+    )
+    assert aggregator.get("if") == "always()", (
+        f"{AGGREGATOR_STEP_NAME!r} step must run with `if: always()` so it still reports after an earlier guard fails"
+    )
+    # Must be the last step -- it aggregates every guard that ran before it.
+    assert steps[-1] is aggregator, f"{AGGREGATOR_STEP_NAME!r} must be the last step in the code-lint job"
