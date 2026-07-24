@@ -820,21 +820,38 @@ guards-fix:
 ##@ CI Local Equivalents
 # These targets mirror GitHub Actions workflows for local validation
 
-# CI lint check - exact match for lint.yml workflow
+# CI lint check - superset covering both lint.yml (release-branch gate) and
+# the pr.yml `lint` job (job id `code-lint`, the routine dev-PR gate), plus a
+# few extra local-only conveniences (lint-explorer-tokens,
+# lint-site-theme-tokens, skill-sync-check, spellcheck). Every guard the
+# pr.yml `lint` job runs (after dependency install) must also run here at the
+# COMMAND level, or tests/system/test_ci_lint_parity.py fails — see
+# docs/operations/ci-local-parity.md. One guard is a documented, tested
+# exception: the pinned `npx github:...#sha verify` skill-sync step needs
+# network access this sandbox/local dev flow cannot rely on (verified: it
+# hangs with no route even when npx is installed) — see that doc and the
+# parity test's exclusion dict for the full rationale.
 ci-lint:
 	@echo "Running CI lint checks..."
 	uv run ruff check .
 	uv run ruff format --check .
 	uv run ty check
 	$(MAKE) lint-markers
+	$(MAKE) lint-imports
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
 	$(MAKE) artifact-hygiene
 	$(MAKE) skill-sync-check
 	uv run -- python _project/scripts/timing_policy_check.py --strict
+	uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check
 	$(MAKE) compat-docs-check
 	$(MAKE) oracle-coverage-map-check
+	uv run -- python scripts/check_public_contract_drift.py
 	$(MAKE) audit-deps
+	$(MAKE) audit-raw-check
+	uv run -- python scripts/check_release_curation.py
+	sh scripts/check_untracked_skill_mirrors.sh
+	$(MAKE) spellcheck
 	@echo "✅ CI lint checks passed"
 
 # CI test check - exact match for test.yml workflow (fast tests with coverage)
@@ -1359,17 +1376,22 @@ pr-preflight:
 	@$(MAKE) pr-preflight-fast-tests
 	@$(MAKE) -s uat-artifact-hygiene
 
+# Always runs pr-content-guard (YAML/markdown/docs hygiene + artifact
+# hygiene) regardless of whether code changes are present -- it used to run
+# only on the no-code-changes path, so a docs-plus-code PR could skip it
+# locally and hit those guards for the first time in CI's content-guard job.
+# The needs-code-ci decision still gates only the fast-test run below.
 pr-preflight-fast-tests:
 	@DECISION=$$(mktemp); \
 	LISTS=$$(mktemp -d); \
 	trap 'rm -f "$$DECISION"; rm -rf "$$LISTS"' EXIT; \
 	git fetch origin develop --quiet; \
 	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
+	$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
 	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
 		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
 		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
 	else \
-		$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
 		echo "No code changes detected; skipping fast tests."; \
 	fi
 
