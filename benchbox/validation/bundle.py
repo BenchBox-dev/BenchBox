@@ -50,8 +50,12 @@ REQUIRED_QUERY_KEYS = {"id", "ms"}
 ACCEPTED_VERSION_PREFIX = "2."
 NUMERIC_SCHEMA_VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 
-# Companion file suffixes - skipped during bundle discovery.
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
+# Companion file suffixes - skipped during bundle discovery, and copied
+# alongside their result bundle by publish/submit. `.applied.json` carries the
+# applied tuning ledger + `applied_ledger_hash`; leaving it out of this tuple
+# dropped that evidence from public bundles and surfaced it as a standalone run
+# in discovery paths.
+COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json")
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 PUBLIC_CLEAN_VALIDATION_STATUS = "passed"

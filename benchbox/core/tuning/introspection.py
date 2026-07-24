@@ -402,6 +402,14 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
         state_error = "introspection unavailable (no state)"
     elif introspected_state.error:
         state_error = introspected_state.error
+    elif introspected_state.truncated:
+        # A bound hit means the catalog snapshot is incomplete: a match would
+        # only prove the object appeared among the rows we happened to fetch,
+        # and an ABSENT verdict cannot be trusted at all. Per this module's
+        # contract (see IntrospectedState) a truncated snapshot is treated
+        # exactly like a degraded one -- refuse the upgrade rather than certify
+        # partial evidence as applied_verified.
+        state_error = "introspection truncated (catalog row bound hit)"
 
     entries: list[ReceiptEntry] = []
     for stmt in ledger.executed_statements:

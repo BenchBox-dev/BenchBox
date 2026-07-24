@@ -123,6 +123,31 @@ def _benchmark_provides_dataframe_queries(benchmark_instance: Any | None) -> boo
     return _benchmark_defines_hook(benchmark_instance, "get_dataframe_queries")
 
 
+def _serialize_tuning_config(tuning_config: Any) -> dict[str, Any] | None:
+    """Render a DataFrame tuning config as a JSON-safe dict for run-config metadata.
+
+    ``BenchmarkConfig.options["df_tuning_config"]`` holds a live
+    ``DataFrameTuningConfiguration`` because adapters need the object itself.
+    ``RunConfigInput.tuning_config`` is typed ``dict`` and is emitted verbatim
+    into ``execution_metadata.run_config``, which the JSON exporter writes with
+    plain ``json.dumps`` -- so the live object must never reach it or export
+    raises and the run silently produces no result JSON and no ``.applied.json``
+    companion. Falls back to dropping the value (``None``) rather than failing
+    the run when the object exposes no usable ``to_dict()``.
+    """
+    if tuning_config is None:
+        return None
+    if isinstance(tuning_config, dict):
+        return tuning_config
+    to_dict = getattr(tuning_config, "to_dict", None)
+    if callable(to_dict):
+        rendered = to_dict()
+        if isinstance(rendered, dict):
+            return rendered
+    logger.debug("Dropping non-serializable df_tuning_config (%s) from run-config metadata", type(tuning_config))
+    return None
+
+
 @dataclass
 class DataFramePhases:
     """Phases for DataFrame benchmark execution."""
@@ -222,7 +247,13 @@ def run_dataframe_benchmark(
             phases=options_map.get("phases"),
             query_subset=getattr(benchmark_config, "queries", None),
             tuning_mode=options_map.get("tuning_mode"),
-            tuning_config=options_map.get("df_tuning_config"),
+            # `df_tuning_config` is the *live* DataFrameTuningConfiguration kept in
+            # options for adapter construction. RunConfigInput.tuning_config is
+            # emitted verbatim into execution_metadata.run_config and the JSON
+            # exporter uses plain json.dumps, so passing the object through makes
+            # export raise -- the run then yields no result JSON and no
+            # .applied.json companion. Serialize it before it reaches metadata.
+            tuning_config=_serialize_tuning_config(options_map.get("df_tuning_config")),
         )
     )
 

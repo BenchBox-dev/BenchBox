@@ -23,6 +23,7 @@ from mcp.types import ToolAnnotations
 from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
 from benchbox.mcp.errors import ErrorCode, make_error
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +109,7 @@ def _list_recent_runs_impl(
     if not results_dir.exists():
         return {"runs": [], "count": 0, "message": f"No results directory found at {results_dir}"}
 
-    result_files = [
-        path
-        for path in results_dir.glob("*.json")
-        if not path.name.endswith(".plans.json") and not path.name.endswith(".tuning.json")
-    ]
+    result_files = [path for path in results_dir.glob("*.json") if not path.name.endswith(COMPANION_SUFFIXES)]
 
     runs = []
     for file_path in sorted(result_files, key=lambda p: p.stat().st_mtime, reverse=True):

@@ -27,6 +27,7 @@ from benchbox.core.results.models import (
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.core.results.query_plan_models import QueryPlanDAG
 from benchbox.core.results.schema_policy import LOADER_SCHEMA_POLICY, is_loader_supported_result_schema
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
@@ -64,11 +65,7 @@ def find_latest_result(
         return None
 
     # Find all JSON files, excluding companion files
-    result_files = [
-        f
-        for f in directory_path.glob("*.json")
-        if not f.name.endswith(".plans.json") and not f.name.endswith(".tuning.json")
-    ]
+    result_files = [f for f in directory_path.glob("*.json") if not f.name.endswith(COMPANION_SUFFIXES)]
 
     if not result_files:
         return None

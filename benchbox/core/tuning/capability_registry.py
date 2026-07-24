@@ -324,11 +324,17 @@ PLATFORM_TUNING_CAPABILITIES: dict[str, dict[TuningType, TuningCapability]] = {
             "without recreating, then runs ANALYZE/VACUUM maintenance only (redshift.py:2616-2624). "
             "Corrects the prior false _ddl(adapter_mixin:RedshiftAdapter.generate_tuning_clause) claim.",
         ),
-        _T.SORTING: _none(
-            "redshift_ddl_generator:preview_only",
-            "Same execution gap as DISTRIBUTION: SORTKEY is built only by the uncalled generate_tuning_clause "
-            "mixin (redshift.py:2500-2510) and the preview generator; apply_table_tunings logs the sort-key "
-            "mismatch (redshift.py:2599-2605) but cannot apply it without table recreation.",
+        _T.SORTING: _post_load(
+            "redshift_ctas_sort",
+            "Conditional post-load mechanism, gated on sorted ingestion being enabled "
+            "(resolve_sorted_ingestion_strategy). After COPY/INSERT the loader calls apply_ctas_sort "
+            "(redshift.py:1524, 1602), which resolves TuningType.SORTING columns and executes the SQL built "
+            "by _build_ctas_sort_sql (redshift.py:207-224) -- either 'VACUUM SORT ONLY' or a CTAS "
+            "'... ORDER BY <sort cols>' + DROP + RENAME. Inline SORTKEY remains preview-only: it is built by "
+            "the uncalled generate_tuning_clause mixin (redshift.py:2500-2510) and the preview generator, and "
+            "apply_table_tunings only logs the sort-key mismatch (redshift.py:2599-2605) because it cannot "
+            "rewrite the key without table recreation. With sorted ingestion off, _build_ctas_sort_sql "
+            "returns None and nothing is rendered.",
         ),
         _T.PARTITIONING: _none(
             "redshift_no_partition_rendering",
