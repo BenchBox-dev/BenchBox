@@ -77,6 +77,21 @@ EXCLUDED_STEPS: dict[str, str] = {
         "it is simply not runnable as a blocking local gate. See "
         "docs/operations/ci-local-parity.md."
     ),
+    "Fast lane ceiling delta vs develop": (
+        "CI-cache-dependent, no local equivalent: the guard's input is "
+        "`fast-lane-count.txt`, restored from the GitHub Actions cache "
+        "(`actions/cache/restore@v4`, key `fast-lane-count-develop-<sha>`, "
+        "populated by develop-post-merge.yml's own cache-save step) -- "
+        "there is no Actions cache to restore from in a local shell. This "
+        "is fail-open by design: `timing_policy_check.py --delta-check` "
+        "prints `DELTA_CHECK_SKIPPED (no develop baseline available - "
+        "absolute ceiling still enforced)` and exits 0 whenever the count "
+        "file is missing, which is exactly the state a local run is always "
+        "in. `guard-timing-policy` (the `--strict` step just above this "
+        "one) already enforces the absolute `max_fast_tests` ceiling "
+        "locally via `ci-lint` -- this guard is additive to that, not a "
+        "replacement for it. See docs/operations/fast-lane-budget.md."
+    ),
 }
 
 

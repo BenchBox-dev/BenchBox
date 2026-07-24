@@ -766,3 +766,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run -- python _project/scripts/green_unmerged_sweep.py --apply --check-post-merge
+
+  fast-lane-ratchet-check:
+    # Auto-ratchet signal for the fast-lane test-count ceiling (see
+    # fast-lane-decouple-ceiling-contention-2 and
+    # docs/operations/fast-lane-budget.md): runs the same fast-lane collect
+    # pr.yml's guard-timing-policy step uses and, when headroom drops below
+    # the warning threshold, files/updates ONE marker-tagged tracking issue
+    # with the current numbers and the exact edit to make -- it does NOT
+    # push a branch or open a PR itself (GITHUB_TOKEN-authored PRs get no
+    # required checks; same known constraint green_unmerged_sweep.py's own
+    # docstring notes). A ceiling bump stays a deliberate human/agent PR;
+    # this job only surfaces the need before the next test-adding PR
+    # collides with the cap.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run fast-lane ceiling ratchet check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run -- python _project/scripts/fast_lane_ratchet_check.py --apply

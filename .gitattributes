@@ -1,3 +1,8 @@
 # >>> skill-sync managed (do not edit) >>>
 /.claude/skills/** -text
 # <<< skill-sync managed <<<
+
+# Append-only bump log for the fast-lane test-count ceiling: two branches
+# each appending a dated entry should compose cleanly on merge instead of
+# conflicting on adjacent lines. See _project/config/fast_lane_ceiling_log.md.
+/_project/config/fast_lane_ceiling_log.md merge=union
