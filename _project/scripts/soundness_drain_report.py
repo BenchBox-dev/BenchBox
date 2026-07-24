@@ -391,7 +391,16 @@ def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str
                 "updated_at": raw.get("updated_at"),
                 "auto_merge": raw.get("auto_merge"),
                 "requested_reviewers": [r.get("login") for r in (raw.get("requested_reviewers") or [])],
-                "changed_files": [f.get("filename", "") for f in files],
+                # GitHub reports a rename as the *new* `filename` plus a
+                # `previous_filename`. The live auto-merge gate deliberately uses
+                # `git diff --name-only --no-renames` (both sides of a rename) and
+                # tests/unit/test_auto_merge_soundness_paths.py pins that, so a PR
+                # that moves a protected soundness file OUT to an unprotected path
+                # still disables auto-merge. Keep both names here or this report
+                # would miss exactly those parked soundness-gated PRs.
+                "changed_files": [
+                    name for f in files for name in (f.get("filename", ""), f.get("previous_filename", "")) if name
+                ],
                 "check_runs": [
                     {
                         "name": run.get("name"),

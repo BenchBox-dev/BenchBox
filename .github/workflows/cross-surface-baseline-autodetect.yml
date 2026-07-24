@@ -106,7 +106,7 @@ jobs:
             echo "detect step produced no summary - see the failing step above"
             exit 0
           fi
-          python3 - <<'PY'
+          uv run -- python - <<'PY'
           import json
           import os
 

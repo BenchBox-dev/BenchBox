@@ -35,6 +35,7 @@ from benchbox.core.results.loader import (
     iter_query_results,
     load_result_file,
 )
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 
 class ResultFileMetadata:
@@ -112,11 +113,7 @@ def _discover_result_files_with_metadata(
         # Find JSON files, sorted by modification time (newest first)
         # Skip companion files
         json_files = sorted(
-            (
-                f
-                for f in search_dir.glob("**/*.json")
-                if not f.name.endswith(".plans.json") and not f.name.endswith(".tuning.json")
-            ),
+            (f for f in search_dir.glob("**/*.json") if not f.name.endswith(COMPANION_SUFFIXES)),
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )

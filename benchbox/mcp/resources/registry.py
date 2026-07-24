@@ -25,6 +25,7 @@ from benchbox.core.benchmark_registry import (
     get_public_benchmark_class,
     list_public_benchmark_ids,
 )
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
@@ -195,11 +196,7 @@ def _build_recent_results(results_dir: Path) -> str:
             }
         )
 
-    result_files = [
-        path
-        for path in results_dir.glob("*.json")
-        if not path.name.endswith(".plans.json") and not path.name.endswith(".tuning.json")
-    ]
+    result_files = [path for path in results_dir.glob("*.json") if not path.name.endswith(COMPANION_SUFFIXES)]
     runs = []
 
     for file_path in sorted(result_files, key=lambda p: p.stat().st_mtime, reverse=True)[:20]:

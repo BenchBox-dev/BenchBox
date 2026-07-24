@@ -51,6 +51,7 @@ from benchbox.core.results.schema import (
 from benchbox.core.results.schema_policy import is_loader_supported_result_schema
 from benchbox.core.runtime_paths import resolve_results_dir
 from benchbox.utils.cloud_storage import create_path_handler, is_cloud_path
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
@@ -731,11 +732,7 @@ class ResultExporter:
 
         for json_file in self.output_dir.glob("*.json"):
             # Skip companion files
-            if (
-                json_file.name.endswith(".plans.json")
-                or json_file.name.endswith(".tuning.json")
-                or json_file.name.endswith(".submission.json")
-            ):
+            if json_file.name.endswith(COMPANION_SUFFIXES) or json_file.name.endswith(".submission.json"):
                 continue
 
             try:

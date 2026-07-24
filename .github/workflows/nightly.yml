@@ -742,6 +742,14 @@ jobs:
       contents: read
       pull-requests: read
       issues: write
+      # green_unmerged_sweep.py lists check runs (commits/{sha}/check-runs) for
+      # every candidate PR, and with --check-post-merge also lists workflow runs
+      # (actions/workflows/develop-post-merge.yml/runs). A job-level permissions
+      # map sets every unlisted scope to "no access", so without these two the
+      # scheduled sweep 403s before it can classify PRs or update its tracking
+      # issue.
+      checks: read
+      actions: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

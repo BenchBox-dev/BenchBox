@@ -718,7 +718,14 @@ artifact-hygiene:
 SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js
 
 skill-sync:
-	@if [ -f "$(SKILL_SYNC)" ]; then \
+	@# This recipe contains $$(MAKE), so make runs it even under `-n` (recursive
+	@# dry-run passthrough). Without the guard below, `make -n skill-sync` and
+	@# `make -n guards-fix` really execute `node ... sync` and mutate the skill
+	@# mirrors, so a documented "preview" was not read-only.
+	@case "$(firstword -$(MAKEFLAGS))" in \
+		*n*) echo "dry-run (-n): skipping skill-sync"; exit 0 ;; \
+	esac; \
+	if [ -f "$(SKILL_SYNC)" ]; then \
 		$(MAKE) -s agent-write-preflight; \
 		node "$(SKILL_SYNC)" sync; \
 	else \
@@ -796,6 +803,11 @@ mutation-test:
 .PHONY: guards-fix
 guards-fix:
 	@echo "== guards-fix: regenerating every mechanically-regenerable drift-guard artifact =="
+	@# Enforce the pool-worktree write rule BEFORE the first regen rewrites a
+	@# checked-in artifact. skill-sync runs this guard too, but only after
+	@# several earlier write steps -- and not at all when the skill-sync CLI is
+	@# absent, which would leave this whole write target unguarded.
+	@$(MAKE) -s agent-write-preflight
 	@echo "-- dependency inventory (audit-raw) --"
 	@$(MAKE) -s audit-raw
 	@echo "-- benchmark correctness-oracle coverage map --"

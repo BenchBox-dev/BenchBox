@@ -142,6 +142,14 @@ def _urllib_api(path: str, token: str) -> object | None:
     return None
 
 
+class ApiFailure(RuntimeError):
+    """A GitHub API page fetch failed, so any list built from it is incomplete.
+
+    Raised instead of returning a short list, so a partial API outage surfaces
+    as a skipped/partial report rather than as understated exact metrics.
+    """
+
+
 class GitHubClient:
     """Thin GET-only GitHub API client: gh CLI first, urllib+token fallback."""
 
@@ -174,7 +182,14 @@ class GitHubClient:
         while True:
             data = self.get(f"{path}{sep}per_page=100&page={page}")
             if data is None:
-                break
+                # A failed page (rate limit, timeout, transient `gh api` error)
+                # must not read as "no more items". Callers derive exact metrics
+                # from this list, so silently returning the partial (usually
+                # empty) accumulation would record real-looking values such as
+                # pushes_after_open=0 or touched_fast_test_lane_policy=False for
+                # a run that simply could not read GitHub -- understating the
+                # very CI-failure metrics this baseline exists to track.
+                raise ApiFailure(f"GitHub API page fetch failed: {path} (page {page})")
             batch = data.get(item_key, []) if item_key else data
             if not isinstance(batch, list) or not batch:
                 break
@@ -231,9 +246,32 @@ def fetch_merged_prs(client: GitHubClient, since: datetime) -> list[dict]:
     return merged
 
 
-def pushes_after_open(client: GitHubClient, number: int) -> int:
+def pushes_after_open(client: GitHubClient, number: int, created_at: str) -> int:
+    """Count commits that landed on the PR *after* it was opened (fix-forward proxy).
+
+    `len(commits) - 1` counted every pre-open local commit beyond the first as a
+    fix-forward push even when nothing was pushed after the PR existed. The
+    repo's review-followup flow deliberately opens a PR over several
+    pre-existing per-comment commits (`_project/scripts/pr_review_followups.py`),
+    so those PRs alone would inflate the fix-forward rate. Compare each commit's
+    timestamp against the PR's `created_at` instead.
+    """
     commits = client.get_paginated(f"/repos/{client.repo}/pulls/{number}/commits")
-    return max(0, len(commits) - 1)
+    opened = _iso_to_dt(created_at)
+    after = 0
+    for entry in commits:
+        commit = entry.get("commit") or {}
+        # Prefer committer date: a rebase/amend rewrites it, which is what
+        # "landed on the PR" means here; author date can predate the push.
+        stamp = (commit.get("committer") or {}).get("date") or (commit.get("author") or {}).get("date")
+        if not stamp:
+            continue
+        try:
+            if _iso_to_dt(stamp) > opened:
+                after += 1
+        except (TypeError, ValueError):
+            continue
+    return after
 
 
 def touched_fast_test_lane_policy(client: GitHubClient, number: int) -> bool:
@@ -278,7 +316,7 @@ def collect_pr_metrics(client: GitHubClient, pr: dict) -> PrMetrics:
         created_at=created_at,
         merged_at=merged_at,
         open_to_merge_seconds=open_to_merge,
-        pushes_after_open=pushes_after_open(client, number),
+        pushes_after_open=pushes_after_open(client, number, created_at),
         touched_fast_test_lane_policy=touched_fast_test_lane_policy(client, number),
         first_pass_green=first_pass_green,
         fast_test_job_seconds=fast_test_seconds,
@@ -385,8 +423,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     since = datetime.now(timezone.utc) - timedelta(days=args.days)
-    prs = fetch_merged_prs(client, since)
-    metrics = [collect_pr_metrics(client, pr) for pr in prs]
+    # A mid-run API failure makes every derived metric understate reality (see
+    # ApiFailure), so report the run as skipped instead of publishing a
+    # partial-but-valid-looking baseline. Mirrors the no-API-access branch above.
+    try:
+        prs = fetch_merged_prs(client, since)
+        metrics = [collect_pr_metrics(client, pr) for pr in prs]
+    except ApiFailure as exc:
+        print(f"SKIPPED: GitHub API access failed mid-collection, metrics would be understated ({exc}).")
+        return 0
     summary = summarize(metrics)
 
     if args.json:

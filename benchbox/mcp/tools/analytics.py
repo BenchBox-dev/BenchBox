@@ -24,6 +24,7 @@ from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.mcp.errors import ErrorCode, make_error, make_not_found_error
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
 from benchbox.utils.printing import get_quiet_console
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
 
@@ -228,11 +229,7 @@ def register_analytics_tools(mcp: FastMCP, *, results_dir: Path) -> None:
 
 def _list_result_files(results_dir: Path) -> list[Path]:
     """List and sort result JSON files, excluding plans and tuning files."""
-    result_files = [
-        path
-        for path in results_dir.glob("*.json")
-        if not path.name.endswith(".plans.json") and not path.name.endswith(".tuning.json")
-    ]
+    result_files = [path for path in results_dir.glob("*.json") if not path.name.endswith(COMPANION_SUFFIXES)]
     return sorted(result_files, key=lambda p: p.stat().st_mtime, reverse=True)
 
 

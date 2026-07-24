@@ -123,12 +123,12 @@ class BundlePublisher:
                 errors=[f"Source bundle not found: {source_bundle}"],
             )
 
-        if bundle_path.suffix != ".json" or bundle_path.name.endswith((".plans.json", ".tuning.json")):
+        if bundle_path.suffix != ".json" or bundle_path.name.endswith(COMPANION_SUFFIXES):
             return BundlePublishResult(
                 success=False,
                 errors=[
                     f"Expected a primary .json result bundle, got: {bundle_path.name}. "
-                    "Companion files (.plans.json, .tuning.json) are published automatically."
+                    f"Companion files ({', '.join(COMPANION_SUFFIXES)}) are published automatically."
                 ],
             )
 
