@@ -191,6 +191,15 @@ _CROSS_SURFACE_IDS = {"datafusion", "pandas", "polars"}
 @contextlib.contextmanager
 def _adapter_context(case: _AdapterCase) -> Any:
     if not case.available:
+        # Essential-driver skip -- do NOT "un-skip" this by isolating the adapter
+        # constructor. These tests load the CSV *through* the adapter (see
+        # ``load_benchmark_into_context`` in ``_load_phrase_values``) and assert on
+        # the driver's own empty-string-vs-NULL result, so the driver *is* the
+        # system under test and an absent driver cannot be isolated away. This looks
+        # like PR #1290's ``from_config()`` forwarding sweep -- which does swap in
+        # ``PlatformAdapter.__init__`` to drop the driver gate -- but that test only
+        # inspects constructor-set attributes; here the assertion is on loaded data,
+        # so the same isolation would assert nothing (or crash on the driver import).
         pytest.skip(f"{case.id} DataFrame adapter is not installed")
     with contextlib.ExitStack() as stack:
         if case.id == "dask":
