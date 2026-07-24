@@ -36,6 +36,32 @@ jobs:
       - name: Run CI lint mirror
         run: make ci-lint
 
+      - name: Persist fast-lane count for PR-lane delta guard
+        # Feeds the pr.yml `code-lint` job's guard-fast-lane-delta step (see
+        # docs/operations/fast-lane-budget.md): that guard restores this
+        # cache entry to diff a PR's fast-lane collect count against
+        # develop's own count, on top of the absolute ceiling that
+        # guard-timing-policy already enforces above. This step must never
+        # fail the post-merge job itself -- it always runs (`if: always()`,
+        # independent of whether `make ci-lint` passed) and never propagates
+        # a nonzero exit from the underlying collect.
+        if: always()
+        run: |
+          uv run -- python _project/scripts/timing_policy_check.py --emit-fast-count > fast-lane-count.txt || echo "unknown" > fast-lane-count.txt
+          cat fast-lane-count.txt
+
+      - name: Cache fast-lane count
+        # Well-known key on this push's SHA, so the PR lane's restore-keys
+        # prefix match (fast-lane-count-develop-) always finds the most
+        # recent develop count. continue-on-error: a cache-service hiccup
+        # (or, in principle, a same-key collision) must not fail post-merge.
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: fast-lane-count.txt
+          key: fast-lane-count-develop-${{ github.sha }}
+
       - name: Emit lint signature
         # Bare python is intentional: the signature builder is stdlib-only.
         # `job.status` already reflects the lint step above by this point;

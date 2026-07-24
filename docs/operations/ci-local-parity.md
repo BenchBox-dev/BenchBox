@@ -111,7 +111,9 @@ for the only current example), add it to the `EXCLUDED_STEPS` dict in the
 parity test with a concrete reason -- do not silently omit it, and do not
 weaken the CI guard itself so a lossier local equivalent can "pass."
 
-## The one documented exception: skill-sync `npx` verify
+## Documented exceptions
+
+### skill-sync `npx` verify
 
 The `lint` job's "skill-sync tracked snapshot verify (cloud/CI integrity
 gate)" step runs a pinned `npx -y github:joeharris76/skill-sync#<sha>
@@ -136,6 +138,21 @@ considered:
 `make ci-lint` therefore does not run this step. `make skill-sync-check`
 (`node skill-sync doctor`) is a different, unrelated local convenience and
 does not substitute for it -- see the command-level-parity note above.
+
+### Fast lane delta guard vs. develop
+
+The `lint` job's "Fast lane ceiling delta vs develop" step
+(`guard-fast-lane-delta`) restores a GitHub Actions cache entry (the
+develop fast-lane baseline count, populated by `develop-post-merge.yml`
+after every push to develop) and diffs this PR's own fast-lane collect
+count against it. There is no local equivalent for an Actions cache
+restore, so this has no `ci-lint` counterpart. It does not weaken local
+enforcement: `guard-timing-policy` (the `--strict` step immediately above
+it) already runs the absolute `max_fast_tests` ceiling check both in CI and
+in `make ci-lint` -- the delta guard is additive to that check, not a
+replacement, and is fail-open (`DELTA_CHECK_SKIPPED`, exit 0) whenever no
+baseline is available, which is always true locally. See
+docs/operations/fast-lane-budget.md for the full model.
 
 ## `pr-preflight` and the content guard
 

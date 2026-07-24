@@ -1,0 +1,43 @@
+{
+  "as_of": "2026-07-24T06:00:00Z",
+  "repo": "joeharris76/BenchBox",
+  "warn_threshold": 100,
+  "scenarios": [
+    {
+      "name": "healthy_headroom",
+      "collected": 25000,
+      "ceiling": 26050,
+      "expect_needs_ratchet": false
+    },
+    {
+      "name": "at_warn_threshold_boundary",
+      "collected": 25950,
+      "ceiling": 26050,
+      "expect_needs_ratchet": false
+    },
+    {
+      "name": "low_headroom",
+      "collected": 25960,
+      "ceiling": 26050,
+      "expect_needs_ratchet": true
+    },
+    {
+      "name": "at_ceiling",
+      "collected": 26050,
+      "ceiling": 26050,
+      "expect_needs_ratchet": true
+    },
+    {
+      "name": "over_ceiling",
+      "collected": 26060,
+      "ceiling": 26050,
+      "expect_needs_ratchet": true
+    },
+    {
+      "name": "far_over_ceiling_needs_multiple_quanta",
+      "collected": 26800,
+      "ceiling": 26050,
+      "expect_needs_ratchet": true
+    }
+  ]
+}

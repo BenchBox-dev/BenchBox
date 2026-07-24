@@ -295,6 +295,33 @@ jobs:
         continue-on-error: true
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
+      - name: Restore fast-lane develop baseline count
+        # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
+        # naming-convention comment above): a cache miss here is not a
+        # failure, it's the normal "no baseline yet" state that the delta
+        # guard below fails open on. Primary key intentionally never matches
+        # (this PR's merge SHA is never a develop-post-merge cache key); the
+        # restore-keys prefix always falls back to the most recently cached
+        # develop count.
+        uses: actions/cache/restore@v4
+        with:
+          path: fast-lane-count.txt
+          key: fast-lane-count-develop-${{ github.sha }}
+          restore-keys: |
+            fast-lane-count-develop-
+
+      - name: Fast lane ceiling delta vs develop
+        # Additive to guard-timing-policy above, never a replacement: that
+        # step enforces the absolute max_fast_tests ceiling unconditionally.
+        # This guard fails open (exit 0, DELTA_CHECK_SKIPPED) when the cache
+        # restore above found no baseline -- see
+        # docs/operations/fast-lane-budget.md and the EXCLUDED_STEPS entry
+        # in tests/system/test_ci_lint_parity.py (the restored cache has no
+        # local equivalent).
+        id: guard-fast-lane-delta
+        continue-on-error: true
+        run: uv run -- python _project/scripts/timing_policy_check.py --delta-check --develop-count-file fast-lane-count.txt
+
       - name: UAT spec LOC table drift check
         # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
         # develop PR path is the routine dev-flow gate, so without this a UAT

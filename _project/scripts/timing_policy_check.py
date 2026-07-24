@@ -23,7 +23,8 @@ class AllowlistEntry(TypedDict, total=False):
 
 
 # Keys prefixed with "_" in the fast-lane policy JSON are human-facing annotations
-# (e.g. "_ceiling_note") and are intentionally not modeled here.
+# (e.g. "_ceiling_log", a pointer string to _project/config/fast_lane_ceiling_log.md)
+# and are intentionally not modeled here.
 class FastLanePolicy(TypedDict, total=False):
     enabled: bool
     max_fast_tests: int
@@ -65,6 +66,19 @@ def _is_allowed(path: str, text: str, symbol: str, entry: AllowlistEntry) -> boo
 
 
 _COLLECT_COUNT_PATTERN = re.compile(r"(\d+)/(\d+) tests collected(?: \((\d+) deselected\))?")
+
+# Headroom (max_fast_tests - collected) below this triggers a FAST_LANE_WARNING
+# (advisory only -- does not affect exit code) pointing at the +500 quantum
+# bump convention in fast_lane_ceiling_log.md. See
+# fast-lane-decouple-ceiling-contention-2 / docs/operations/fast-lane-budget.md.
+FAST_LANE_HEADROOM_WARNING_THRESHOLD = 100
+
+# Delta-guard thresholds for --delta-check (PR lane, additive to the absolute
+# ceiling enforced by _check_fast_lane_policy -- never a substitute for it).
+FAST_LANE_DELTA_FAIL_THRESHOLD = 150
+FAST_LANE_DELTA_WARN_THRESHOLD = 75
+
+CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 
 
 def _run_pytest_collect(repo_root: Path, markexpr: str) -> tuple[int, str]:
@@ -121,6 +135,14 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str
         print(f"Fast lane tests collected: {fast_count}")
         if fast_count > max_fast_tests:
             violations.append(f"fast lane count {fast_count} exceeds limit {max_fast_tests}")
+        else:
+            headroom = max_fast_tests - fast_count
+            if headroom < FAST_LANE_HEADROOM_WARNING_THRESHOLD:
+                print(
+                    f"FAST_LANE_WARNING: headroom {headroom} below "
+                    f"{FAST_LANE_HEADROOM_WARNING_THRESHOLD} - bump per {CEILING_LOG_PATH} "
+                    "conventions (+500 quantum)"
+                )
         if forbidden_path_substrings:
             offending_lines = [
                 line
@@ -144,6 +166,75 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str
             violations.append(f"fast lane unexpectedly includes {count} test(s) matching 'fast and {expr}'")
 
     return violations
+
+
+def _emit_fast_count(repo_root: Path) -> int:
+    """Collect the fast lane and print ONLY the machine-readable count.
+
+    Used by develop-post-merge.yml to persist a baseline count for the PR
+    lane's --delta-check (see below) to diff against. Deliberately minimal
+    output (bare integer, nothing else on stdout) so a workflow step can
+    redirect stdout straight into a cache-backed file. On a parse failure,
+    prints a message to stderr and returns nonzero -- the *workflow* step
+    that calls this is responsible for never failing the post-merge job
+    itself (guarded with `|| true`/a fallback there), not this function.
+    """
+    _rc, output = _run_pytest_collect(repo_root, "fast")
+    count = _parse_collect_count(output)
+    if count is None:
+        print("could not parse fast lane collect count", file=sys.stderr)
+        return 1
+    print(count)
+    return 0
+
+
+def _delta_check(repo_root: Path, develop_count_file: Path) -> int:
+    """Compare this run's fast-lane collect count against a develop baseline.
+
+    FAIL-OPEN BY DESIGN when no baseline is available (missing/unreadable
+    file): the absolute ceiling check (_check_fast_lane_policy, run as its
+    own separate --strict step) remains the enforced backstop in that case.
+    This delta guard is additive on top of it, never a replacement.
+    """
+    if not develop_count_file.exists():
+        print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
+        return 0
+
+    try:
+        develop_count = int(develop_count_file.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
+        return 0
+
+    _rc, output = _run_pytest_collect(repo_root, "fast")
+    pr_count = _parse_collect_count(output)
+    if pr_count is None:
+        print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
+        return 0
+
+    delta = pr_count - develop_count
+    print(f"Fast lane delta vs develop: pr={pr_count} develop={develop_count} delta={delta:+d}")
+
+    if delta > FAST_LANE_DELTA_FAIL_THRESHOLD:
+        print(
+            f"FAST_LANE_DELTA_VIOLATION: this PR adds {delta} fast tests over develop's baseline "
+            f"of {develop_count} (limit +{FAST_LANE_DELTA_FAIL_THRESHOLD} per PR). Mark new/converted "
+            "tests medium instead of fast (pytestmark = [pytest.mark.unit, pytest.mark.medium]), split "
+            "the change across PRs, or -- if the addition is genuinely warranted -- bump the ceiling "
+            f"per the +500 quantum convention in {CEILING_LOG_PATH} and note the justification there."
+        )
+        return 1
+
+    if delta > FAST_LANE_DELTA_WARN_THRESHOLD:
+        print(
+            f"FAST_LANE_DELTA_WARNING: this PR adds {delta} fast tests over develop's baseline of "
+            f"{develop_count} (soft warning threshold +{FAST_LANE_DELTA_WARN_THRESHOLD}, hard limit "
+            f"+{FAST_LANE_DELTA_FAIL_THRESHOLD}). Consider marking new tests medium if they don't need "
+            "sub-second fast-lane execution."
+        )
+        return 0
+
+    return 0
 
 
 def main() -> int:
@@ -180,9 +271,41 @@ def main() -> int:
         action="store_true",
         help="Run only the pytest-collection fast-lane policy checks (skips the allowlist scan).",
     )
+    parser.add_argument(
+        "--emit-fast-count",
+        action="store_true",
+        help=(
+            "Collect the fast lane and print ONLY the machine-readable count (stdout), then exit. "
+            "Ignores every other mode; used to persist a develop baseline count for --delta-check."
+        ),
+    )
+    parser.add_argument(
+        "--delta-check",
+        action="store_true",
+        help=(
+            "Compare this run's fast-lane collect count against a develop baseline count file "
+            "(--develop-count-file). Additive to the absolute ceiling check, never a replacement."
+        ),
+    )
+    parser.add_argument(
+        "--develop-count-file",
+        help="Path (repo-root-relative or absolute) to the develop baseline count file, used with --delta-check.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[2]
+
+    if args.emit_fast_count:
+        return _emit_fast_count(repo_root)
+
+    if args.delta_check:
+        if not args.develop_count_file:
+            print("--delta-check requires --develop-count-file", file=sys.stderr)
+            return 2
+        develop_count_file = Path(args.develop_count_file)
+        if not develop_count_file.is_absolute():
+            develop_count_file = repo_root / develop_count_file
+        return _delta_check(repo_root, develop_count_file)
 
     violations: list[Any] = []
     fast_lane_violations: list[str] = []
@@ -195,15 +318,13 @@ def main() -> int:
         candidate_violations = [
             f
             for f in findings
-            if f.symbol in {"time.time", "datetime.now"}
-            and f.classification == "elapsed_or_timeout_wall_clock"
+            if f.symbol in {"time.time", "datetime.now"} and f.classification == "elapsed_or_timeout_wall_clock"
         ]
 
         unknown_wall_clock = [
             f
             for f in findings
-            if f.symbol in {"time.time", "datetime.now"}
-            and f.classification == "wall_clock_unknown"
+            if f.symbol in {"time.time", "datetime.now"} and f.classification == "wall_clock_unknown"
         ]
 
         allowed = 0
