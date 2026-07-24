@@ -985,7 +985,18 @@ class DataFrameDataLoader:
         # Reset the applied-layout signal; set it only on paths where the returned
         # data actually carries a non-default physical layout (see below).
         self.applied_write_layout = None
-        layout_applied = bool(effective_write_config and not effective_write_config.is_default())
+        layout_applied = bool(
+            effective_write_config
+            and not effective_write_config.is_default()
+            # Only the Parquet path physically writes the requested layout:
+            # `_convert_data` logs a warning and returns the source files
+            # unchanged for any other target format. That is reachable for
+            # pandas-df (whose optimal format is CSV) once a `sort_by` config
+            # pushes past the already-in-target-format early return. Claiming the
+            # layout there folds POST_LOAD statements and an applied hash into
+            # the ledger for a layout that was never written.
+            and target_format == DataFormat.PARQUET
+        )
 
         # Check if source is already in target format.
         # Skip conversion unless write_config requests physical layout changes (e.g. sort_by),

@@ -134,6 +134,53 @@ describe("buildWhereClause - tuning_mode not-recorded/untuned sentinels", () => 
   });
 });
 
+describe("buildWhereClause - physical_rendering_id unknown sentinel", () => {
+  it("matches NULL physical_rendering_id rows for the unknown bucket", () => {
+    // Regression (PR #1289 review follow-up): the `unknown` option is produced
+    // by buildFacetCountQuery's `CASE WHEN <col> IS NULL THEN 'unknown'`, but the
+    // filter sent it through a plain IN (...) predicate, so selecting the
+    // advertised bucket returned zero rows instead of the NULL rows.
+    const filters: QueryFilterState = { ...EMPTY_FILTERS, physicalRenderingIds: ["unknown"] };
+
+    const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
+
+    expect(sql).toContain("(physical_rendering_id IS NULL)");
+    expect(sql).not.toContain("physical_rendering_id IN (?)");
+    expect(params).toEqual([]);
+  });
+
+  it("combines a real rendering id with the unknown sentinel via OR", () => {
+    const filters: QueryFilterState = {
+      ...EMPTY_FILTERS,
+      physicalRenderingIds: ["databricks_liquid_auto", "unknown"],
+    };
+
+    const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
+
+    expect(sql).toContain("(physical_rendering_id IN (?) OR physical_rendering_id IS NULL)");
+    expect(params).toEqual(["databricks_liquid_auto"]);
+  });
+
+  it("still emits a plain IN predicate when no unknown bucket is selected", () => {
+    const filters: QueryFilterState = {
+      ...EMPTY_FILTERS,
+      physicalRenderingIds: ["databricks_liquid_auto"],
+    };
+
+    const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
+
+    expect(sql).toContain("(physical_rendering_id IN (?))");
+    expect(sql).not.toContain("physical_rendering_id IS NULL");
+    expect(params).toEqual(["databricks_liquid_auto"]);
+  });
+
+  it("keeps the facet-count producer and the filter consumer on one token", () => {
+    const { sql } = buildFacetCountQuery("physical_rendering_id", EMPTY_FILTERS);
+
+    expect(sql).toContain("THEN 'unknown'");
+  });
+});
+
 describe("buildWhereClause - normalized cost/deployment facets", () => {
   it("filters by normalized cost status and deployment metadata", () => {
     const filters: QueryFilterState = {
