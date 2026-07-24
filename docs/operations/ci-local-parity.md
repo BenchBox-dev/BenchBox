@@ -28,17 +28,83 @@ what CI checks.
 
 When you add a new guard step to the `lint` job in `pr.yml`:
 
-1. Add the equivalent command to the `ci-lint:` recipe in the `Makefile`
+1. Give the step an `id: guard-<slug>` (see "Report-all: one CI cycle,
+   every guard's result" below for why) and `continue-on-error: true`.
+2. Add the equivalent command to the `ci-lint:` recipe in the `Makefile`
    (a `$(MAKE) <target>` line if the guard already has a `make` target, or
-   the same `uv run ...` / script invocation the CI step uses).
-2. If the guard has meaningful inline logic (more than a couple of lines)
+   the same `uv run ...` / script invocation the CI step uses), followed
+   by its own `[ $$? -eq 0 ] || failed="$$failed <slug>"` bookkeeping line
+   -- copy the pattern of an existing guard pair in the recipe.
+3. If the guard has meaningful inline logic (more than a couple of lines)
    and would otherwise live only inside the workflow YAML, extract it to a
    script under `scripts/` first and have both `pr.yml` and `ci-lint` call
    that script. Duplicating logic into the Makefile as a second
    implementation is exactly the drift this invariant exists to prevent.
-3. Run `uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q`.
-   If it fails, either step 1 was missed or the command text doesn't match
-   verbatim.
+4. Run `uv run -- python -m pytest tests/system/test_ci_lint_parity.py -q`.
+   If it fails: either step 2 was missed, the command text doesn't match
+   verbatim, or step 1's `id`/`continue-on-error` are missing or malformed
+   (`test_guard_steps_follow_naming_convention` enforces the convention;
+   `test_lint_job_guards_run_in_ci_lint` enforces command parity).
+
+## Report-all: one CI cycle, every guard's result
+
+The `lint` job runs around fifteen independent guards. Historically the
+job stopped at the first failing step, so a PR that tripped two unrelated
+guards paid one full CI round trip per guard, discovered one at a time.
+Every guard step now sets `continue-on-error: true` so a failure doesn't
+stop the job -- every guard still runs, and each one's own pass/fail is
+still visible as its own step in the Actions UI with its own log and
+timing. What changes is that the *job's* overall result no longer
+silently skips the guards after the first failure.
+
+**Naming convention (this is what the aggregation is keyed on, not a
+hand-maintained list):** every independent guard step's `id:` starts with
+the prefix `guard-` (e.g. `guard-ruff`, `guard-audit-deps`). Setup steps
+(checkout, `setup-python`, `setup-uv`, install dependencies) are not
+guards -- they get no `id: guard-*` and no `continue-on-error`, because a
+setup failure should stop the job immediately (there's nothing meaningful
+to report about guards that never ran because `uv sync` failed).
+
+The job's last step, `lint-guard-summary`, aggregates: it reads the
+Actions `steps` context (`${{ toJSON(steps) }}`, passed in via an env var
+rather than interpolated directly into the script), finds every step id
+that starts with `guard-`, and checks that step's `outcome` (the raw
+per-step result *before* `continue-on-error` is applied -- `conclusion`
+would show `success` for every failed-but-continued guard and defeat the
+whole point). It writes a pass/fail table to `$GITHUB_STEP_SUMMARY` and
+exits nonzero if any guard's `outcome` was `failure`. Because
+`lint-guard-summary` itself has no `continue-on-error`, that nonzero exit
+makes the `code-lint` job's own result `failure` -- so `ci-required-result`
+(which gates on `needs.code-lint.result`) still blocks the merge exactly
+as before. Nothing here softens the gate; it only changes *when* you find
+out a second guard also failed.
+
+Deriving the guard set from the `guard-` id prefix (rather than hand-listing
+step ids in the aggregator) is deliberate: a new guard added without the
+prefix would otherwise run, fail, and be silently invisible to the
+summary and its own `continue-on-error: true` would swallow the job-level
+failure entirely. `tests/system/test_ci_lint_parity.py::test_guard_steps_follow_naming_convention`
+pins the convention (every guard has the prefix + `continue-on-error`,
+every non-guard step has neither), and
+`test_lint_guard_summary_step_exists` pins that the aggregator step exists,
+is named exactly `lint-guard-summary`, runs with `if: always()` (so it
+still executes -- and reports -- after an earlier guard fails), and is the
+job's last step.
+
+`make ci-lint` mirrors the same report-all shape locally: the whole
+recipe runs as one shell invocation (via `\` line continuations) with
+`set +e`, running every guard command in turn and collecting failures
+into a `$$failed` list instead of `make` aborting at the first nonzero
+exit, then printing a consolidated `❌ FAILED guards:` list and exiting
+nonzero if the list is non-empty. Guard output still streams live as each
+guard runs -- nothing is buffered or captured, only the exit code is
+checked after each command -- so `make ci-lint`'s console output looks the
+same as before, just with the run continuing past a failure instead of
+stopping. Because the `ci-lint` recipe body is now one logical shell line,
+the parity test's line-matching normalizes away each guard command's
+trailing `; \` continuation marker before comparing it against the `pr.yml`
+command text -- see `_normalize_recipe_lines` in
+`tests/system/test_ci_lint_parity.py`.
 
 If a guard genuinely cannot run locally (see the network exception below
 for the only current example), add it to the `EXCLUDED_STEPS` dict in the

@@ -843,28 +843,62 @@ guards-fix:
 # network access this sandbox/local dev flow cannot rely on (verified: it
 # hangs with no route even when npx is installed) — see that doc and the
 # parity test's exclusion dict for the full rationale.
+#
+# Report-all: mirrors pr.yml's `lint-guard-summary` design. Every guard runs
+# to completion in one pass (no stopping at the first failure) with its
+# output streamed live as it runs; failures are collected into `failed` and
+# a single consolidated FAILED-guards list prints at the end, with a
+# nonzero exit iff at least one guard failed. `set +e` plus a `[ $$? -eq 0 ]`
+# check after each guard is what keeps this one shell session (the whole
+# recipe is one logical line via `\` continuations) going past a failing
+# guard instead of `make` aborting at the first nonzero exit.
 ci-lint:
 	@echo "Running CI lint checks..."
-	uv run ruff check .
-	uv run ruff format --check .
-	uv run ty check
-	$(MAKE) lint-markers
-	$(MAKE) lint-imports
-	$(MAKE) lint-explorer-tokens
-	$(MAKE) lint-site-theme-tokens
-	$(MAKE) artifact-hygiene
-	$(MAKE) skill-sync-check
-	uv run -- python _project/scripts/timing_policy_check.py --strict
-	uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check
-	$(MAKE) compat-docs-check
-	$(MAKE) oracle-coverage-map-check
-	uv run -- python scripts/check_public_contract_drift.py
-	$(MAKE) audit-deps
-	$(MAKE) audit-raw-check
-	uv run -- python scripts/check_release_curation.py
-	sh scripts/check_untracked_skill_mirrors.sh
-	$(MAKE) spellcheck
-	@echo "✅ CI lint checks passed"
+	@set +e; failed=""; \
+	uv run ruff check .; \
+	[ $$? -eq 0 ] || failed="$$failed ruff-check"; \
+	uv run ruff format --check .; \
+	[ $$? -eq 0 ] || failed="$$failed ruff-format"; \
+	uv run ty check; \
+	[ $$? -eq 0 ] || failed="$$failed ty-check"; \
+	$(MAKE) lint-markers; \
+	[ $$? -eq 0 ] || failed="$$failed lint-markers"; \
+	$(MAKE) lint-imports; \
+	[ $$? -eq 0 ] || failed="$$failed lint-imports"; \
+	$(MAKE) lint-explorer-tokens; \
+	[ $$? -eq 0 ] || failed="$$failed lint-explorer-tokens"; \
+	$(MAKE) lint-site-theme-tokens; \
+	[ $$? -eq 0 ] || failed="$$failed lint-site-theme-tokens"; \
+	$(MAKE) artifact-hygiene; \
+	[ $$? -eq 0 ] || failed="$$failed artifact-hygiene"; \
+	$(MAKE) skill-sync-check; \
+	[ $$? -eq 0 ] || failed="$$failed skill-sync-check"; \
+	uv run -- python _project/scripts/timing_policy_check.py --strict; \
+	[ $$? -eq 0 ] || failed="$$failed timing-policy"; \
+	uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check; \
+	[ $$? -eq 0 ] || failed="$$failed uat-loc-table"; \
+	$(MAKE) compat-docs-check; \
+	[ $$? -eq 0 ] || failed="$$failed compat-docs-check"; \
+	$(MAKE) oracle-coverage-map-check; \
+	[ $$? -eq 0 ] || failed="$$failed oracle-coverage-map-check"; \
+	uv run -- python scripts/check_public_contract_drift.py; \
+	[ $$? -eq 0 ] || failed="$$failed public-contract-drift"; \
+	$(MAKE) audit-deps; \
+	[ $$? -eq 0 ] || failed="$$failed audit-deps"; \
+	$(MAKE) audit-raw-check; \
+	[ $$? -eq 0 ] || failed="$$failed audit-raw-check"; \
+	uv run -- python scripts/check_release_curation.py; \
+	[ $$? -eq 0 ] || failed="$$failed release-curation"; \
+	sh scripts/check_untracked_skill_mirrors.sh; \
+	[ $$? -eq 0 ] || failed="$$failed skill-mirror-drift"; \
+	$(MAKE) spellcheck; \
+	[ $$? -eq 0 ] || failed="$$failed spellcheck"; \
+	if [ -n "$$failed" ]; then \
+		echo ""; \
+		echo "❌ FAILED guards:$$failed"; \
+		exit 1; \
+	fi; \
+	echo "✅ CI lint checks passed"
 
 # CI test check - exact match for test.yml workflow (fast tests with coverage)
 # Note: -p pytest_cov re-enables pytest-cov which is disabled by default in pytest.ini

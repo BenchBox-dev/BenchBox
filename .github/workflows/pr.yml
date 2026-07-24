@@ -253,24 +253,46 @@ jobs:
         run: |
           uv sync --group dev
 
+      # --- Lint guards ------------------------------------------------
+      # Every guard below is independent: `id: guard-*` (the naming
+      # convention the `lint-guard-summary` step and
+      # tests/system/test_ci_lint_parity.py both key off of) plus
+      # `continue-on-error: true` so one guard's failure doesn't hide the
+      # others' results behind a stopped job. The job as a whole still
+      # fails iff any guard failed -- see the `lint-guard-summary` step,
+      # which is what `ci-required-result` actually gates on. Setup steps
+      # above (checkout/setup-python/setup-uv/install deps) are not
+      # guards and carry neither `id: guard-*` nor `continue-on-error`.
       - name: Lint and format check with ruff
+        id: guard-ruff
+        continue-on-error: true
         run: |
           uv run ruff check .
           uv run ruff format --check .
 
       - name: Type check with ty
+        id: guard-ty
+        continue-on-error: true
         run: uv run ty check
 
       - name: Validate test marker annotations
+        id: guard-lint-markers
+        continue-on-error: true
         run: make lint-markers
 
       - name: Validate import layering
+        id: guard-lint-imports
+        continue-on-error: true
         run: make lint-imports
 
       - name: Validate artifact hygiene
+        id: guard-artifact-hygiene
+        continue-on-error: true
         run: make artifact-hygiene
 
       - name: Timing policy (wall-clock allowlist)
+        id: guard-timing-policy
+        continue-on-error: true
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
       - name: UAT spec LOC table drift check
@@ -279,30 +301,46 @@ jobs:
         # LOC/table doc that drifts from source could merge through a normal
         # develop PR, leaving the drift guard dependent on the local pre-commit
         # hook alone.
+        id: guard-uat-loc-table
+        continue-on-error: true
         run: uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check
 
       - name: Compatibility governance drift check
+        id: guard-compat-docs
+        continue-on-error: true
         run: make compat-docs-check
 
       - name: Oracle coverage map drift check
+        id: guard-oracle-coverage-map
+        continue-on-error: true
         run: make oracle-coverage-map-check
 
       - name: Public contract drift check
+        id: guard-public-contract-drift
+        continue-on-error: true
         run: uv run -- python scripts/check_public_contract_drift.py
 
       - name: Dependency audit (no unused declarations)
+        id: guard-audit-deps
+        continue-on-error: true
         run: make audit-deps
 
       - name: Dependency inventory drift check
+        id: guard-audit-raw
+        continue-on-error: true
         run: make audit-raw-check
 
       - name: Release curation list drift check
+        id: guard-release-curation
+        continue-on-error: true
         run: uv run -- python scripts/check_release_curation.py
 
       - name: skill-sync tracked snapshot verify (cloud/CI integrity gate)
         # Public tool, pinned by sha (no token). Proves .claude/skills matches
         # skill-sync.lock + the regenerated config — fails on any hand-edit or
         # stale snapshot. Switch to `npx -y skill-sync@<ver>` once published.
+        id: guard-skill-sync-verify
+        continue-on-error: true
         run: npx -y github:joeharris76/skill-sync#d3c9c45 verify --project .
 
       - name: Untracked skill-mirror drift guard (cloud parity)
@@ -312,7 +350,62 @@ jobs:
         # (it skips untracked targets and `ignore`d paths), so it cannot catch these
         # being force-added. Fail the build if any become git-tracked.
         # Rationale: _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
+        id: guard-skill-mirror-drift
+        continue-on-error: true
         run: sh scripts/check_untracked_skill_mirrors.sh
+
+      # --- Aggregator ---------------------------------------------------
+      # Reports every guard's pass/fail in one CI cycle instead of stopping
+      # at the first failure. Derives the guard set programmatically from
+      # the `guard-*` id prefix (never hand-list ids here -- a guard added
+      # above without the prefix silently escapes aggregation, which is
+      # exactly what tests/system/test_ci_lint_parity.py now checks for).
+      - name: lint-guard-summary
+        id: lint-guard-summary
+        if: always()
+        env:
+          STEPS_CONTEXT: ${{ toJSON(steps) }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$STEPS_CONTEXT" > "$RUNNER_TEMP/steps_context.json"
+
+          # FAIL CLOSED: the whole gate rests on this step's exit code, so a
+          # jq parse failure or an empty guard set must fail the job -- never
+          # fall through to "all passed" with zero guards inspected.
+          ids=$(jq -r 'keys[] | select(startswith("guard-"))' "$RUNNER_TEMP/steps_context.json" | sort) || {
+            echo "aggregator: jq failed to parse the steps context" >&2
+            exit 1
+          }
+          if [ -z "$ids" ]; then
+            echo "aggregator: no guard-* steps found in the steps context" >&2
+            exit 1
+          fi
+
+          {
+            echo "## Lint guard summary"
+            echo
+            echo "| Guard | Outcome |"
+            echo "| --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          for id in $ids; do
+            outcome=$(jq -r --arg id "$id" '.[$id].outcome' "$RUNNER_TEMP/steps_context.json")
+            if [ "$outcome" = "failure" ]; then
+              echo "| $id | ❌ failure |" >> "$GITHUB_STEP_SUMMARY"
+              echo "FAILED: $id"
+              failed=1
+            else
+              echo "| $id | ✅ $outcome |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+          if [ "$failed" -eq 1 ]; then
+            echo "One or more lint guards failed -- see the table above and the" \
+              "per-step logs for details." >&2
+            exit 1
+          fi
+          echo "All lint guards passed."
 
   code-test:
     name: test (ubuntu-latest, 3.12)
