@@ -141,6 +141,24 @@ class DatabricksPath:
         """Return the path as a POSIX string."""
         return self._path.as_posix()
 
+    @property
+    def suffix(self) -> str:
+        """Get the final component's suffix."""
+        return self._path.suffix
+
+    def joinpath(self, *other: Union[str, Path]) -> Path:
+        """Join path components - returns a regular Path, like ``__truediv__``.
+
+        Required for parity with a plain ``Path``: the runner reaches the
+        datagen manifest through ``output_dir.joinpath(...)`` and treats an
+        object without it as an *unconfigured* output directory.
+        """
+        return self._path.joinpath(*other)
+
+    def stat(self, *, follow_symlinks: bool = True):
+        """Stat the local path."""
+        return self._path.stat(follow_symlinks=follow_symlinks)
+
     def resolve(self, strict: bool = False) -> Path:
         """Resolve to absolute path."""
         return self._path.resolve(strict=strict)
