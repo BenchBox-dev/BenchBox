@@ -59,13 +59,19 @@ path — no silent root switching for a configured sweep.
 
 ## Local-artifact hygiene (external-root invariant)
 
-**Invariant:** when an external output root is configured — `BENCHBOX_OUTPUT_DIR`
-set (or `--output` pointing outside the worktree) — the worktree-local
-`benchmark_runs/` must **not** grow. Datagen, databases, and result JSONs all
-belong under the external root. This guards the 2026-06-01 incident, where a
-corpus sweep launched from a pool worktree with
+**Invariant:** whenever the resolved output root lies outside the worktree, the
+worktree-local `benchmark_runs/` must **not** grow. Datagen, databases, and
+result JSONs all belong under that root. This guards the 2026-06-01 incident,
+where a corpus sweep launched from a pool worktree with
 `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` still accumulated ~4.2 GB
 under the worktree-local `benchmark_runs/datagen/`.
+
+Since the default root became the work tree's sibling (`../benchmark_runs`),
+"outside the worktree" is the **ordinary** case, not only the configured one:
+a plain `benchbox run` with no `--output` and no `BENCHBOX_OUTPUT_DIR` is
+covered too. The guard steps aside only when the resolved root is *inside* the
+worktree, or when the run starts outside a Git work tree (where the historical
+cwd-anchored default applies and any growth is local by definition).
 
 The guardrails are **report-only** — they detect and name the offending paths
 but never delete or move artifacts.
@@ -73,9 +79,9 @@ but never delete or move artifacts.
 * The UAT runner (`tests/uat/runner.py`) snapshots `cwd/benchmark_runs` before
   each external-root cell and fails loudly if it grows, naming both the
   unexpected local path and the configured external root.
-* `make uat-artifact-hygiene` audits the live worktree (no-op unless an
-  external root is configured) and is wired into `make pr-preflight`. Ordinary
-  default local runs (no `BENCHBOX_OUTPUT_DIR`) are never blocked.
+* `make uat-artifact-hygiene` audits the live worktree (no-op only when the
+  resolved root is inside it) and is wired into `make pr-preflight`. A run
+  whose root really is worktree-local is never blocked.
 
   ```bash
   # Audit the current worktree (skips silently with no external root):
