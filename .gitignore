@@ -66,6 +66,10 @@ docs/site/
 data/
 generated/
 benchmark_runs/
+# Defence in depth: a Snowflake stage path (@~/...) must never resolve to a
+# local directory, but if one ever does it must not become a commit. Left
+# unanchored so a run started from any subdirectory is covered too.
+@~/
 spark-warehouse/
 *.db
 *.csv
