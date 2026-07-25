@@ -68,6 +68,10 @@ DEFAULT_REPO = "joeharris76/BenchBox"
 FAST_LANE_POLICY_PATH = "_project/config/fast_test_lane_policy.json"
 REQUIRED_LANE_WORKFLOW_NAME = "Develop PR"
 FAST_TEST_JOB_NAME = "test (ubuntu-latest, 3.12)"
+# medium-test is the other required lane and the one that runs closest to its
+# timeout, so its wall time is tracked here to make the next resize proactive
+# rather than a reaction to a cancelled job (see pr.yml medium-test).
+MEDIUM_TEST_JOB_NAME = "medium-test"
 API_RETRY_ATTEMPTS = 3
 
 
@@ -83,6 +87,7 @@ class PrMetrics:
     touched_fast_test_lane_policy: bool
     first_pass_green: bool | None
     fast_test_job_seconds: float | None
+    medium_test_job_seconds: float | None
 
 
 # ---------------------------------------------------------------------------
@@ -279,8 +284,10 @@ def touched_fast_test_lane_policy(client: GitHubClient, number: int) -> bool:
     return any(f.get("filename") == FAST_LANE_POLICY_PATH for f in files)
 
 
-def first_pass_green_and_job_seconds(client: GitHubClient, head_ref: str) -> tuple[bool | None, float | None]:
-    """First "Develop PR" pull_request-event run on head_ref: (green?, fast-test job seconds)."""
+def first_pass_green_and_job_seconds(
+    client: GitHubClient, head_ref: str
+) -> tuple[bool | None, float | None, float | None]:
+    """First "Develop PR" run on head_ref: (green?, fast-test seconds, medium-test seconds)."""
     runs = client.get_paginated(
         f"/repos/{client.repo}/actions/runs?branch={head_ref}&event=pull_request",
         item_key="workflow_runs",
@@ -291,15 +298,18 @@ def first_pass_green_and_job_seconds(client: GitHubClient, head_ref: str) -> tup
     first_run = min(candidates, key=lambda r: _iso_to_dt(r["created_at"]))
     green = first_run.get("conclusion") == "success"
 
-    job_seconds: float | None = None
+    seconds_by_job: dict[str, float] = {}
     jobs = client.get_paginated(f"/repos/{client.repo}/actions/runs/{first_run['id']}/jobs", item_key="jobs")
     for job in jobs:
-        if job.get("name") == FAST_TEST_JOB_NAME and job.get("started_at") and job.get("completed_at"):
+        name = job.get("name")
+        if name in (FAST_TEST_JOB_NAME, MEDIUM_TEST_JOB_NAME) and job.get("started_at") and job.get("completed_at"):
             started = _iso_to_dt(job["started_at"])
             completed = _iso_to_dt(job["completed_at"])
-            job_seconds = (completed - started).total_seconds()
-            break
-    return green, job_seconds
+            # A cancelled (timed-out) job still reports a duration; it is a floor,
+            # not a true wall time, so it is recorded and flagged rather than
+            # silently averaged in as if the job had finished.
+            seconds_by_job.setdefault(name, (completed - started).total_seconds())
+    return green, seconds_by_job.get(FAST_TEST_JOB_NAME), seconds_by_job.get(MEDIUM_TEST_JOB_NAME)
 
 
 def collect_pr_metrics(client: GitHubClient, pr: dict) -> PrMetrics:
@@ -308,7 +318,7 @@ def collect_pr_metrics(client: GitHubClient, pr: dict) -> PrMetrics:
     created_at = pr["created_at"]
     merged_at = pr["merged_at"]
     open_to_merge = (_iso_to_dt(merged_at) - _iso_to_dt(created_at)).total_seconds()
-    first_pass_green, fast_test_seconds = first_pass_green_and_job_seconds(client, head_ref)
+    first_pass_green, fast_test_seconds, medium_test_seconds = first_pass_green_and_job_seconds(client, head_ref)
     return PrMetrics(
         number=number,
         title=pr.get("title", ""),
@@ -320,6 +330,7 @@ def collect_pr_metrics(client: GitHubClient, pr: dict) -> PrMetrics:
         touched_fast_test_lane_policy=touched_fast_test_lane_policy(client, number),
         first_pass_green=first_pass_green,
         fast_test_job_seconds=fast_test_seconds,
+        medium_test_job_seconds=medium_test_seconds,
     )
 
 
@@ -331,10 +342,33 @@ def _pct(values: list[float], p: int) -> float | None:
     return s[idx]
 
 
+# medium-test's timeout in .github/workflows/pr.yml. Kept here so the metric
+# and the budget it is measured against cannot drift apart silently.
+MEDIUM_TEST_TIMEOUT_MINUTES = 40
+# Warn once p95 eats into the headroom the timeout was sized to provide.
+MEDIUM_TEST_BUDGET_WARN_FRACTION = 0.75
+
+
+def _medium_budget_warning(p95_seconds: float | None) -> str | None:
+    """Return a resize warning when medium-test p95 approaches its timeout."""
+    if p95_seconds is None:
+        return None
+    budget_seconds = MEDIUM_TEST_TIMEOUT_MINUTES * 60
+    used = p95_seconds / budget_seconds
+    if used < MEDIUM_TEST_BUDGET_WARN_FRACTION:
+        return None
+    return (
+        f"medium-test p95 is {p95_seconds / 60:.1f} min, "
+        f"{used:.0%} of its {MEDIUM_TEST_TIMEOUT_MINUTES} min timeout - "
+        "resize the timeout (or split the tier) before it starts cancelling jobs"
+    )
+
+
 def summarize(metrics: list[PrMetrics]) -> dict:
     merge_times = [m.open_to_merge_seconds for m in metrics]
     pushes = [m.pushes_after_open for m in metrics]
     fast_job = [m.fast_test_job_seconds for m in metrics if m.fast_test_job_seconds is not None]
+    medium_job = [m.medium_test_job_seconds for m in metrics if m.medium_test_job_seconds is not None]
     green_known = [m for m in metrics if m.first_pass_green is not None]
     green_count = sum(1 for m in green_known if m.first_pass_green)
     return {
@@ -348,6 +382,13 @@ def summarize(metrics: list[PrMetrics]) -> dict:
         "first_pass_green_sample_size": len(green_known),
         "fast_test_job_seconds_avg": statistics.fmean(fast_job) if fast_job else None,
         "fast_test_job_seconds_p95": _pct(fast_job, 95),
+        "medium_test_job_seconds_avg": statistics.fmean(medium_job) if medium_job else None,
+        "medium_test_job_seconds_p95": _pct(medium_job, 95),
+        # Warn while there is still room to act, rather than after a job is
+        # cancelled: a cancelled run never reports a true wall time, so the
+        # observed p95 is censored by the timeout itself and looks healthy
+        # right up to the moment the lane starts failing.
+        "medium_test_budget_warning": _medium_budget_warning(_pct(medium_job, 95)),
     }
 
 
@@ -459,13 +500,20 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"  fast-test job seconds avg/p95: {summary['fast_test_job_seconds_avg']!r} / {summary['fast_test_job_seconds_p95']!r}"
     )
+    print(
+        f"  medium-test job seconds avg/p95: {summary['medium_test_job_seconds_avg']!r} / "
+        f"{summary['medium_test_job_seconds_p95']!r}"
+    )
+    if summary["medium_test_budget_warning"]:
+        print(f"  MEDIUM_TEST_BUDGET_WARNING: {summary['medium_test_budget_warning']}")
     for m in metrics:
         print(
             f"  PR #{m.number}: pushes_after_open={m.pushes_after_open} "
             f"open_to_merge_s={m.open_to_merge_seconds:.0f} "
             f"fast_lane_policy_touched={m.touched_fast_test_lane_policy} "
             f"first_pass_green={m.first_pass_green} "
-            f"fast_test_job_s={m.fast_test_job_seconds}"
+            f"fast_test_job_s={m.fast_test_job_seconds} "
+            f"medium_test_job_s={m.medium_test_job_seconds}"
         )
     return 0
 
