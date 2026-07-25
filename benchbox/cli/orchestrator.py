@@ -46,6 +46,21 @@ from benchbox.utils.verbosity import VerbositySettings
 console = quiet_console
 
 
+def resolved_deployment_mode(database_config) -> Optional[str]:
+    """Return the deployment mode this run selected, or None for the default.
+
+    Platforms that expose a deployment choice register it as a
+    ``deployment_mode`` platform option, so an explicit selection arrives in
+    ``database_config.options``. Returning None lets the registry fall back to
+    the platform's ``default_deployment``.
+    """
+    if not database_config:
+        return None
+    options = getattr(database_config, "options", None) or {}
+    mode = options.get("deployment_mode")
+    return mode or None
+
+
 def _build_failure_result(config: BenchmarkConfig, exc: Exception) -> BenchmarkResults:
     """Build a BenchmarkResults sentinel for a failed execute_benchmark() invocation."""
     from benchbox.core.results.models import ExecutionPhases, SetupPhase
@@ -372,12 +387,20 @@ class BenchmarkOrchestrator:
             return _build_failure_result(config, e)
 
     def _apply_default_cloud_output_dir(self, database_config) -> None:
-        """If no custom output dir is set and platform requires cloud storage, pull default from credentials."""
+        """If no custom output dir is set and this run stages remotely, pull default from credentials.
+
+        Gated on the *deployment* rather than the platform category: platforms
+        like firebolt (Core), motherduck and starburst are categorised as cloud
+        but their default deployment does not stage through cloud storage, so
+        pulling a cloud output location for them would redirect a local run's
+        data at a remote stage it never needed.
+        """
         if self.custom_output_dir or not database_config:
             return
         from benchbox.security.credentials import CredentialManager
 
-        if not PlatformRegistry.requires_cloud_storage(database_config.type):
+        deployment_mode = resolved_deployment_mode(database_config)
+        if not PlatformRegistry.requires_cloud_storage_for_deployment(database_config.type, deployment_mode):
             return
         cred_manager = CredentialManager()
         if not cred_manager.has_credentials(database_config.type):

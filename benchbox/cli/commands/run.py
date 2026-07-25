@@ -41,7 +41,7 @@ from benchbox.cli.exceptions import (
     create_error_handler,
 )
 from benchbox.cli.help import BenchBoxCommand, advanced_option
-from benchbox.cli.orchestrator import BenchmarkOrchestrator
+from benchbox.cli.orchestrator import BenchmarkOrchestrator, resolved_deployment_mode
 from benchbox.cli.output import ResultExporter
 from benchbox.cli.platform import get_platform_manager, normalize_platform_name
 from benchbox.cli.platform_checks import check_and_setup_platform_credentials
@@ -2198,10 +2198,16 @@ def _interactive_resolve_mode_for_selected_platform(s: types.SimpleNamespace) ->
         s.database_config.execution_mode = s.mode if s.mode is not None else "sql"
 
 
+def _run_stages_through_cloud_storage(s: types.SimpleNamespace) -> bool:
+    """Whether this run's *deployment* stages remotely; firebolt Core, motherduck and starburst do not."""
+    mode = resolved_deployment_mode(s.database_config)
+    return PlatformRegistry.requires_cloud_storage_for_deployment(s.database_config.type, mode)
+
+
 def _interactive_cloud_setup_if_needed(s: types.SimpleNamespace) -> None:
-    """Perform cloud credentials + output location setup for cloud-requiring platforms."""
+    """Perform cloud credentials + output location setup for runs that stage remotely."""
     ctx = s.ctx
-    if not PlatformRegistry.requires_cloud_storage(s.database_config.type):
+    if not _run_stages_through_cloud_storage(s):
         return
 
     credentials_ok = check_and_setup_platform_credentials(
@@ -2218,7 +2224,7 @@ def _interactive_cloud_setup_if_needed(s: types.SimpleNamespace) -> None:
     if s.output:
         return
     default_output = None
-    if PlatformRegistry.requires_cloud_storage(s.database_config.type):
+    if _run_stages_through_cloud_storage(s):
         from benchbox.security.credentials import CredentialManager
 
         cred_manager = CredentialManager()
@@ -2282,7 +2288,7 @@ def _interactive_prompt_output_and_format(
     prompt_table_format_fn: Any,
 ) -> None:
     """Prompt for optional output directory and table-format selection."""
-    if not s.output and not PlatformRegistry.requires_cloud_storage(s.database_config.type):
+    if not s.output and not _run_stages_through_cloud_storage(s):
         custom_output = prompt_output_fn(default_output="benchmark_runs/")
         if custom_output:
             s.output = custom_output
@@ -2484,7 +2490,7 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
     # already shows the user, instead of silently running with the defaults.
     s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
     s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
-    if PlatformRegistry.requires_cloud_storage(s.database_config.type) and not s.output:
+    if _run_stages_through_cloud_storage(s) and not s.output:
         console.print()
         console.print("[red]❌ Error: Cloud platform requires --output parameter[/red]")
         console.print(
