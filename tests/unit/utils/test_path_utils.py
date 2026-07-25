@@ -13,6 +13,7 @@ import pytest
 
 from benchbox.utils.path_utils import (
     ensure_directory,
+    find_work_tree_root,
     get_benchmark_runs_databases_path,
     get_benchmark_runs_dataframe_path,
     get_benchmark_runs_datagen_path,
@@ -416,7 +417,11 @@ class TestBenchboxOutputDirRedirection:
         assert resolve_benchmark_runs_dir() == tmp_path / "runs"
 
     def test_resolve_benchmark_runs_dir_falls_back_to_cwd(self):
-        """When no env var is set, fall back to cwd-anchored default."""
+        """Outside a Git work tree, the cwd-anchored default is unchanged.
+
+        ``/repo`` has no ``.git`` entry in any parent, so this exercises the
+        installed-package path where there is no work tree to anchor to.
+        """
         with (
             patch.dict(os.environ, {}, clear=True),
             patch("benchbox.utils.path_utils.Path.cwd", return_value=Path("/repo")),
@@ -430,3 +435,133 @@ class TestBenchboxOutputDirRedirection:
             patch("benchbox.utils.path_utils.Path.cwd", return_value=Path("/repo")),
         ):
             assert resolve_benchmark_runs_dir() == Path("/repo/benchmark_runs")
+
+
+class TestWorkTreeAnchoredDefault:
+    """The default benchmark_runs root is a sibling of the enclosing work tree.
+
+    A cwd-anchored default put multi-gigabyte datagen artifacts *inside* the
+    checkout and gave every pool worktree its own copy. Anchoring to the work
+    tree's parent yields one shared ``../benchmark_runs`` for the clone and
+    every linked worktree.
+    """
+
+    def _make_work_tree(self, root: Path, *, linked: bool) -> Path:
+        """Create a fake work tree whose .git is a file (linked) or directory."""
+        root.mkdir(parents=True, exist_ok=True)
+        marker = root / ".git"
+        if linked:
+            # A linked worktree's .git is a *file* pointing at the real gitdir.
+            marker.write_text("gitdir: /elsewhere/.git/worktrees/wt\n")
+        else:
+            marker.mkdir()
+        return root
+
+    @pytest.mark.parametrize("linked", [False, True], ids=["clone", "linked_worktree"])
+    def test_find_work_tree_root_accepts_both_git_marker_forms(self, tmp_path, linked):
+        """.git is a directory in a clone and a file in a linked worktree."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=linked)
+        nested = work_tree / "benchbox" / "utils"
+        nested.mkdir(parents=True)
+
+        assert find_work_tree_root(work_tree) == work_tree
+        assert find_work_tree_root(nested) == work_tree
+
+    def test_find_work_tree_root_returns_none_outside_a_work_tree(self, tmp_path):
+        """No .git in any parent means no work tree."""
+        plain = tmp_path / "not_a_repo" / "deep"
+        plain.mkdir(parents=True)
+        assert find_work_tree_root(plain) is None
+
+    @pytest.mark.parametrize("linked", [False, True], ids=["clone", "linked_worktree"])
+    def test_default_root_is_the_work_tree_sibling(self, tmp_path, monkeypatch, linked):
+        """The resolved default is <work_tree>.parent/'benchmark_runs'."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=linked)
+        monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+        monkeypatch.chdir(work_tree)
+
+        assert resolve_benchmark_runs_dir() == tmp_path / "benchmark_runs"
+
+    def test_default_root_is_never_inside_the_work_tree(self, tmp_path, monkeypatch):
+        """The regression this item exists to prevent: no in-repo artifacts."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=False)
+        monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+        monkeypatch.chdir(work_tree)
+
+        resolved = resolve_benchmark_runs_dir()
+
+        assert resolved != work_tree
+        assert work_tree not in resolved.parents
+
+    def test_default_root_is_cwd_independent_within_a_work_tree(self, tmp_path, monkeypatch):
+        """Running from a nested subdirectory resolves to the same root."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=False)
+        nested = work_tree / "tests" / "unit"
+        nested.mkdir(parents=True)
+        monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+
+        monkeypatch.chdir(work_tree)
+        from_root = resolve_benchmark_runs_dir()
+        monkeypatch.chdir(nested)
+        from_nested = resolve_benchmark_runs_dir()
+
+        assert from_root == from_nested == tmp_path / "benchmark_runs"
+
+    def test_sibling_worktrees_share_one_root(self, tmp_path, monkeypatch):
+        """A clone and its pool worktrees resolve to the SAME shared root."""
+        clone = self._make_work_tree(tmp_path / "BenchBox", linked=False)
+        pool = self._make_work_tree(tmp_path / "BenchBox.pool-01", linked=True)
+        monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+
+        monkeypatch.chdir(clone)
+        from_clone = resolve_benchmark_runs_dir()
+        monkeypatch.chdir(pool)
+        from_pool = resolve_benchmark_runs_dir()
+
+        assert from_clone == from_pool == tmp_path / "benchmark_runs"
+
+    def test_directory_name_is_still_benchmark_runs(self, tmp_path, monkeypatch):
+        """The name is unchanged, so the existing corpus keeps working."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=False)
+        monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+        monkeypatch.chdir(work_tree)
+
+        assert resolve_benchmark_runs_dir().name == "benchmark_runs"
+
+    def test_env_var_still_wins_inside_a_work_tree(self, tmp_path, monkeypatch):
+        """BENCHBOX_OUTPUT_DIR keeps absolute precedence over the new default."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=False)
+        override = tmp_path / "explicit_root"
+        monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(override))
+        monkeypatch.chdir(work_tree)
+
+        assert resolve_benchmark_runs_dir() == override
+
+    def test_relative_env_var_still_wins_inside_a_work_tree(self, tmp_path, monkeypatch):
+        """A relative BENCHBOX_OUTPUT_DIR is still accepted verbatim."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=False)
+        monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", "local_runs")
+        monkeypatch.chdir(work_tree)
+
+        assert resolve_benchmark_runs_dir() == Path("local_runs")
+
+    def test_env_var_tilde_still_expands_inside_a_work_tree(self, tmp_path, monkeypatch):
+        """``~`` expansion is unaffected by the work-tree anchor."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=False)
+        home = tmp_path / "home"
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("USERPROFILE", str(home))
+        monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", "~/runs")
+        monkeypatch.chdir(work_tree)
+
+        assert resolve_benchmark_runs_dir() == home / "runs"
+
+    def test_derived_subdirs_follow_the_resolved_root(self, tmp_path, monkeypatch):
+        """datagen/databases helpers hang off the new root, not off cwd."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=False)
+        monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
+        monkeypatch.chdir(work_tree)
+
+        expected_root = tmp_path / "benchmark_runs"
+        assert get_benchmark_runs_datagen_path("tpch", 0.01) == expected_root / "datagen" / "tpch_sf001"
+        assert get_benchmark_runs_databases_path("tpch", 0.01) == expected_root / "databases" / "tpch_sf001"

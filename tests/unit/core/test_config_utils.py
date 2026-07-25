@@ -28,6 +28,7 @@ from benchbox.core.config_utils import (
     validate_config_sections,
     validate_numeric_config,
 )
+from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 
 pytestmark = [
     pytest.mark.unit,
@@ -227,7 +228,7 @@ class TestBuildBenchmarkConfig:
             "scale_factor": 0.5,
             "verbose": True,
             "force_regenerate": False,
-            "output_dir": str(Path.cwd() / "benchmark_runs" / "datagen" / "tpcds_sf05"),
+            "output_dir": str(resolve_benchmark_runs_dir() / "datagen" / "tpcds_sf05"),
         }
         assert result == expected
 
@@ -237,7 +238,7 @@ class TestBuildBenchmarkConfig:
 
         result = build_benchmark_config(config)
 
-        assert result["output_dir"] == str(Path.cwd() / "benchmark_runs" / "datagen" / "tpch_sf001")
+        assert result["output_dir"] == str(resolve_benchmark_runs_dir() / "datagen" / "tpch_sf001")
 
     def test_build_clickhouse_output_dir(self):
         """Test building config for ClickHouse platform."""

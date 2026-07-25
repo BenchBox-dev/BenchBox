@@ -18,6 +18,7 @@ import pytest
 
 from benchbox.base import BaseBenchmark
 from benchbox.core.connection import DatabaseConnection, DatabaseError
+from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 
 pytestmark = [
     pytest.mark.unit,
@@ -107,7 +108,7 @@ class TestMockBaseBenchmarkInitialization:
         """Test basic benchmark initialization."""
         benchmark = MockBaseBenchmark(scale_factor=1.0)
         assert benchmark.scale_factor == 1.0
-        assert benchmark.output_dir == Path.cwd() / "benchmark_runs" / "datagen" / "mockbase_sf1"
+        assert benchmark.output_dir == resolve_benchmark_runs_dir() / "datagen" / "mockbase_sf1"
         assert not benchmark._data_generated
         assert not benchmark._load_data_called
 
@@ -769,7 +770,7 @@ class TestMockBaseBenchmarkBackwardCompatibility:
 
         # Test basic functionality that existing benchmarks rely on
         assert benchmark.scale_factor == 1.0
-        assert benchmark.output_dir == Path.cwd() / "benchmark_runs" / "datagen" / "mockbase_sf1"
+        assert benchmark.output_dir == resolve_benchmark_runs_dir() / "datagen" / "mockbase_sf1"
 
         # Test query methods
         queries = benchmark.get_queries()

@@ -32,6 +32,7 @@ from benchbox.core.ssb.benchmark import SSBBenchmark
 from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark
 from benchbox.core.vector_search.benchmark import VectorSearchBenchmark
+from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 
 pytestmark = [
     pytest.mark.unit,
@@ -105,13 +106,13 @@ def test_explicit_output_root_propagates_post_construction(benchmark_cls, kwargs
         assert str(gen.output_dir) == str(explicit), (benchmark_cls.__name__, gen.output_dir)
 
 
-def test_default_falls_back_to_cwd_when_unset(monkeypatch):
-    """With neither CLI --output nor BENCHBOX_OUTPUT_DIR set, the cwd default holds."""
+def test_default_falls_back_to_resolved_root_when_unset(monkeypatch):
+    """With neither CLI --output nor BENCHBOX_OUTPUT_DIR set, the default root holds."""
     monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
 
     benchmark = H2OBenchmark(scale_factor=0.01)
 
-    expected = Path.cwd() / "benchmark_runs" / "datagen" / "h2odb_sf001"
+    expected = resolve_benchmark_runs_dir() / "datagen" / "h2odb_sf001"
     assert Path(str(benchmark.output_dir)) == expected
     assert Path(str(benchmark.data_generator.output_dir)) == expected
 

@@ -29,7 +29,9 @@ developer guide for hacking on the framework itself is
 ## Output artefacts
 
 By default every BenchBox runtime artefact lands under the shared
-`~/Developer/benchmark_runs/` root:
+`benchmark_runs/` root alongside the checkout — `~/Developer/benchmark_runs/`
+for a clone at `~/Developer/BenchBox`, and the same root for every sibling
+pool worktree:
 
 ```
 ~/Developer/benchmark_runs/

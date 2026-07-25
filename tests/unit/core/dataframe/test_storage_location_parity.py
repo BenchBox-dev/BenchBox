@@ -15,7 +15,11 @@ from unittest.mock import patch
 import pytest
 
 from benchbox.core.dataframe.data_loader import DEFAULT_CACHE_DIR, DataCache
-from benchbox.utils.path_utils import get_benchmark_runs_dataframe_path, get_benchmark_runs_datagen_path
+from benchbox.utils.path_utils import (
+    get_benchmark_runs_dataframe_path,
+    get_benchmark_runs_datagen_path,
+    resolve_benchmark_runs_dir,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -54,7 +58,7 @@ class TestStorageLocationParity:
             env.pop("BENCHBOX_CACHE_DIR", None)
             with patch.dict("os.environ", env, clear=True):
                 cache = DataCache()
-                assert cache.cache_dir == Path.cwd() / "benchmark_runs" / "datagen"
+                assert cache.cache_dir == resolve_benchmark_runs_dir() / "datagen"
 
     def test_benchbox_cache_dir_env_overrides_default(self):
         """BENCHBOX_CACHE_DIR environment variable should override the default."""
@@ -77,7 +81,7 @@ class TestStorageLocationParity:
     def test_path_helper_default(self):
         """get_benchmark_runs_dataframe_path() returns benchmark_runs/datagen/."""
         path = get_benchmark_runs_dataframe_path()
-        assert path == Path.cwd() / "benchmark_runs" / "datagen"
+        assert path == resolve_benchmark_runs_dir() / "datagen"
 
     def test_path_helper_override(self):
         """get_benchmark_runs_dataframe_path() respects base_dir override."""
