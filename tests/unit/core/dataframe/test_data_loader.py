@@ -1552,6 +1552,30 @@ class TestDataFrameDataLoaderWithWriteConfig:
             assert source in returned
             assert loader.applied_write_layout is None
 
+    def test_applied_write_layout_none_when_target_format_is_not_parquet(self):
+        """Regression (PR #1269 review follow-up): `_convert_data` returns the source
+        files unchanged for a non-Parquet target, so no physical layout is written --
+        the signal must stay None even though a sort_by config forced us past the
+        already-in-target-format early return. Otherwise the adapter folds POST_LOAD
+        statements and an applied hash into the ledger for a layout never applied."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            source = tmpdir / "customer.csv"
+            source.write_text("1|Alice|100.00\n")
+
+            # prefer_parquet=False -> optimal target format is CSV, not Parquet.
+            loader = DataFrameDataLoader(prefer_parquet=False)
+            benchmark = MagicMock()
+            benchmark.name = "tpch"
+            benchmark.tables = {"customer": source}
+
+            # sort_by forces the conversion path (past the verbatim early return),
+            # but _convert_data cannot apply a layout to a non-Parquet target.
+            write_config = DataFrameWriteConfiguration(sort_by=[SortColumn(name="c_custkey", order="asc")])
+            loader.prepare_benchmark_data(benchmark, scale_factor=1.0, write_config=write_config)
+
+            assert loader.applied_write_layout is None
+
     def test_applied_write_layout_none_for_default_config_on_cache_hit(self):
         """A default write_config applies no physical layout -> signal stays None."""
         with tempfile.TemporaryDirectory() as tmpdir:

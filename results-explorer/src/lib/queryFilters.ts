@@ -1,5 +1,7 @@
 import {
+  NULL_PHYSICAL_RENDERING_SENTINELS,
   NULL_TUNING_MODE_SENTINELS,
+  UNKNOWN_FACET_VALUE,
   addNullableSentinelClause,
   dateWindowCutoffIso,
   type DateWindowFacet,
@@ -133,7 +135,17 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
     params,
   );
   expandListFilter("storage_format", filters.storageFormats, clauses, params);
-  expandListFilter("physical_rendering_id", filters.physicalRenderingIds, clauses, params);
+  // `buildFacetCountQuery` surfaces rows with a NULL physical_rendering_id as an
+  // `unknown` option, so that token must become `IS NULL` rather than being sent
+  // through `IN (...)` -- which matched nothing and returned zero rows for a
+  // bucket the UI advertised. Mirrors the tuning_mode handling above.
+  addNullableSentinelClause(
+    "physical_rendering_id",
+    filters.physicalRenderingIds,
+    NULL_PHYSICAL_RENDERING_SENTINELS,
+    clauses,
+    params,
+  );
 
   if (filters.hasCost === "yes") clauses.push("cost_usd IS NOT NULL");
   if (filters.hasCost === "no") clauses.push("cost_usd IS NULL");
@@ -245,7 +257,7 @@ export function buildFacetCountQuery(
 
   return {
     sql: `
-      SELECT CASE WHEN ${column} IS NULL THEN 'unknown' ELSE CAST(${column} AS VARCHAR) END AS value, COUNT(*) AS count
+      SELECT CASE WHEN ${column} IS NULL THEN '${UNKNOWN_FACET_VALUE}' ELSE CAST(${column} AS VARCHAR) END AS value, COUNT(*) AS count
       FROM bench.results
       ${where.sql}
       GROUP BY 1
