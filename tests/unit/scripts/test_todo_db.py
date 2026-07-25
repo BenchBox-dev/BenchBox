@@ -326,6 +326,14 @@ class TestVerifyRun:
         assert [(r["seq"], r["last_result"]) for r in rows] == [(1, "pass"), (2, "fail")]
 
     def test_verify_expected_is_human_acceptance_text(self, conn):
+        """`expected` documents a rung; it must never be graded.
+
+        Deliberate: 95% of the corpus's `expected` strings are prose like
+        "All tests pass" that would never match command output literally, so
+        evaluating them would fail almost every verification in the tracker.
+        Rungs assert via their command's exit status instead -- lint_item
+        flags the ones that cannot (see TestUnsatisfiableVerificationLint).
+        """
         _mk(
             conn,
             verifications=[
@@ -700,3 +708,76 @@ class TestCliSmoke:
         assert todo_db.main(base + ["complete", "cli-item", "--pr", "42"]) == 0
         assert todo_db.main(base + ["stats"]) == 0
         assert '"done": 1' in capsys.readouterr().out
+
+
+class TestUnsatisfiableVerificationLint:
+    """Rungs whose command cannot express their expectation.
+
+    A rung is graded only on exit status, so an expectation naming a string
+    that must be ABSENT describes something the exit code cannot encode. Such
+    a rung reports fail forever, however correct the implementation is --
+    confirmed twice in practice (a `--strict` checker whose correct behaviour
+    is a non-zero exit, and an `open http://...` command that always exits 0).
+    """
+
+    def _lint(self, conn, command, expected):
+        _mk(conn, verifications=[{"description": "d", "command": command, "expected": expected}])
+        return [f for f in todo_db.lint_item(conn, "sample-item") if "expects output that must be absent" in f]
+
+    def test_flags_absent_output_expectation_with_a_bare_command(self, conn):
+        """The real case: exit status cannot show a string was not printed."""
+        findings = self._lint(
+            conn,
+            "uv run -- python _project/scripts/timing_policy_check.py --strict",
+            "reports a tooling/environment error, not 'Fast lane policy violations: 4'",
+        )
+        assert findings, "expected the unsatisfiable-rung finding"
+        assert "self-asserting" in findings[0]
+
+    def test_flags_a_command_that_can_never_fail(self, conn):
+        """`open URL` exits 0 regardless of what the page renders."""
+        assert self._lint(
+            conn,
+            "open http://localhost:5173/results/does-not-exist/",
+            "Page renders the NotFound component, not 'DOES-NOT-EXIST Results'",
+        )
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "cmd 2>&1 | grep -q FAST_LANE_ENVIRONMENT_ERROR",
+            "! cmd --strict",
+            "cmd && test -f out.json",
+            "uv run -- python script.py --check",
+        ],
+    )
+    def test_does_not_flag_a_self_asserting_command(self, conn, command):
+        """Composing the assertion into the command is the fix, not a finding."""
+        assert not self._lint(conn, command, "reports the error, not 'policy violations'")
+
+    @pytest.mark.parametrize(
+        "expected",
+        ["All tests pass", "Exit code 0", "No errors", "Adapter lifecycle tests pass."],
+    )
+    def test_does_not_flag_ordinary_prose_expectations(self, conn, expected):
+        """Regression guard: the corpus is 95% prose paired with plain commands.
+
+        Calibrated against the live tracker -- this rule flags 8 of 2958
+        verifications. A rule that fired on ordinary prose would be noise on
+        thousands of items and would be ignored.
+        """
+        assert not self._lint(conn, "uv run -- python -m pytest -m fast -q", expected)
+
+    def test_does_not_flag_a_rung_with_no_command(self, conn):
+        """A command-less rung is already reported by a different finding."""
+        assert not self._lint(conn, None, "must not print 'boom'")
+
+    def test_clean_item_still_lints_clean(self, conn):
+        """The new rule must not disturb an otherwise healthy item."""
+        _mk(
+            conn,
+            work=[{"id": "w0", "summary": "do it"}],
+            scope=[("only_modify", "benchbox/core/*")],
+            verifications=[{"description": "fast tests", "command": "true", "expected": "All tests pass"}],
+        )
+        assert todo_db.lint_item(conn, "sample-item") == []

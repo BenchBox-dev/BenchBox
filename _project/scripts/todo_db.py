@@ -1820,6 +1820,32 @@ def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: in
 EVIDENCE_PIN_RE = re.compile(r"verified on|@ [0-9a-f]{7,}|\bPASS\b", re.IGNORECASE)
 
 
+# A rung is graded ONLY on its command's exit status (see run_verification);
+# `expected` is human acceptance text and is never evaluated. So an expectation
+# that names a string which must be ABSENT from the output describes something
+# the exit code cannot encode -- unless the command asserts on output itself.
+# Such a rung can never pass, however correct the implementation is.
+_EXPECTED_NEGATES_OUTPUT_RE = re.compile(
+    r"\bnot\s+['\"]|rather than|instead of|must not|does not (print|contain|report)|no longer (print|report)s?\b",
+    re.IGNORECASE,
+)
+# Constructs that turn output into an exit status, or compose an assertion.
+_COMMAND_ASSERTS_ON_OUTPUT_RE = re.compile(r"grep|rg\b|test\s|\[\s|&&|\|\||^\s*!|assert|--check|jq\b", re.IGNORECASE)
+
+
+def _unsatisfiable_verifications(item: dict) -> list[int]:
+    """Return seqs of rungs whose command cannot express their expectation."""
+    offenders = []
+    for ver in item["verifications"]:
+        command = ver.get("command") or ""
+        expected = ver.get("expected") or ""
+        if not command:
+            continue
+        if _EXPECTED_NEGATES_OUTPUT_RE.search(expected) and not _COMMAND_ASSERTS_ON_OUTPUT_RE.search(command):
+            offenders.append(ver["seq"])
+    return offenders
+
+
 def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
     item = get_item(conn, item_id)
     findings = []
@@ -1827,6 +1853,13 @@ def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
         findings.append("no verification steps recorded")
     elif not any(v["command"] for v in item["verifications"]):
         findings.append("verification steps exist but none has a runnable command")
+    unsatisfiable = _unsatisfiable_verifications(item)
+    if unsatisfiable:
+        findings.append(
+            f"verification seq {unsatisfiable} expects output that must be absent, but the command is graded "
+            "only on exit status - make the command self-asserting (exit 0 iff satisfied), e.g. pipe to `grep -q` "
+            "or negate with `!`"
+        )
     if get_config(conn, "lint.require_scope_rules") == "on" and item["work"] and not item["scope"]:
         findings.append("has work units but no scope rules (only_modify/do_not_modify)")
     if (
@@ -2379,7 +2412,19 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--only-modify", action="append", default=[], metavar="GLOB")
     p.add_argument("--do-not-modify", action="append", default=[], metavar="GLOB")
     p.add_argument("--preserve", action="append", default=[], metavar="BEHAVIOR")
-    p.add_argument("--verify", action="append", default=[], metavar="DESC[::COMMAND[::EXPECTED]]")
+    p.add_argument(
+        "--verify",
+        action="append",
+        default=[],
+        metavar="DESC[::COMMAND[::EXPECTED]]",
+        help=(
+            "A verification rung. COMMAND is graded ONLY on its exit status, so it must be "
+            "self-asserting: exit 0 if and only if the criterion holds. Assert on output by "
+            "composing (`cmd | grep -q PATTERN`), and on expected failure by negating (`! cmd`). "
+            "EXPECTED is human acceptance text and is never evaluated - it documents the rung, "
+            "it does not check it."
+        ),
+    )
 
     for name, help_text in (
         ("show", "show one item"),
