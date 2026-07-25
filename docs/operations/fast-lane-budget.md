@@ -138,3 +138,36 @@ signal and wall-clock as the final gate) needs real data first -- the
 nightly ratchet signal above starts accumulating exactly that data (each
 fired/cleared cycle is a headroom-vs-time data point). Revisit after
 roughly 4 weeks of that signal running, per the TODO's guidance.
+
+## medium-test wall-clock budget (distinct from w6 above)
+
+Not to be confused with w6: that gate is about *replacing* the fast lane's
+count ceiling. This is the `medium-test` job's `timeout-minutes` in
+`.github/workflows/pr.yml` -- a hard cancel, not a policy check.
+
+Sizing rule: **observed p95 + >=30% headroom**, rounded up. The timeout is
+the only backstop against a genuinely hung medium tier, so it is not set to
+a large "never think about it again" value -- that converts a hang into an
+hour-long queue stall.
+
+**2026-07-25 resize, 30 -> 40 min.** Last 20 `pr.yml` runs: min 20.2 /
+median 27.4 / p95 29.9 min, with 8 of 19 successful runs within 48s of the
+old 30-minute cap. PR #1306 was cancelled twice at 30m16s having reached
+95% of the suite; it added three monkeypatched tests worth ~2s, so it was
+the straw, not the cause. `29.9 * 1.3 = 38.9 -> 40`.
+
+**Read the old numbers as a floor, not a distribution.** A cancelled job
+never reports a true wall time, so runs that would have exceeded the cap
+are absent from the successful sample entirely. The observed p95 is
+censored by the timeout itself: it looks healthy right up to the moment the
+lane starts cancelling.
+
+**Review hook.** `make dev-loop-metrics` reports `medium-test job seconds
+avg/p95` beside the fast-test figures and prints
+`MEDIUM_TEST_BUDGET_WARNING` once p95 reaches 75% of the timeout
+(30 min against the current 40). That threshold is deliberately the point
+at which the *previous* cap began cancelling, so the next regression of
+this shape is flagged with ~10 minutes still in hand. On a warning: resize
+per the rule above, or split the tier. `MEDIUM_TEST_TIMEOUT_MINUTES` in
+`_project/scripts/dev_loop_pr_metrics.py` must be updated with the workflow
+so the metric and the budget it measures cannot drift apart.
