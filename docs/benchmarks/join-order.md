@@ -70,12 +70,13 @@ The manifest hash fields have separate roles:
 Subsequent runs reuse the verified data under:
 
 ```text
-benchmark_runs/datagen/joinorder_sf1/
+<benchmark_runs>/datagen/joinorder_sf1/
 ```
 
-If `BENCHBOX_OUTPUT_DIR` is set, the same relative datagen path is resolved
-under that root. Air-gapped environments can pre-populate that directory with
-the 21 Parquet files; BenchBox still verifies the manifest before running.
+`<benchmark_runs>` is the resolved output root: `../benchmark_runs` alongside
+the checkout by default, or `BENCHBOX_OUTPUT_DIR` when set. Air-gapped
+environments can pre-populate that directory with the 21 Parquet files;
+BenchBox still verifies the manifest before running.
 
 ## BYO Data Path
 
@@ -85,7 +86,7 @@ re-hosted archive can instead provide their own canonical Parquet files. Place
 the 21 files named in `benchbox/core/joinorder/data_manifest.toml` under:
 
 ```text
-benchmark_runs/datagen/joinorder_sf1/
+../benchmark_runs/datagen/joinorder_sf1/
 ```
 
 or, when `BENCHBOX_OUTPUT_DIR` is set:

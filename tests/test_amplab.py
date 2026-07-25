@@ -14,6 +14,7 @@ import pytest
 
 from benchbox import AMPLab
 from benchbox.core.amplab.benchmark import AMPLabBenchmark
+from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 
 from .fixtures.benchmark_test_mixin import BenchmarkTestMixin
 
@@ -277,7 +278,7 @@ class TestAMPLabBenchmarkDirectly(BenchmarkTestMixin):
         assert benchmark.scale_factor == 0.01
         # Default path follows: benchmark_runs/datagen/{benchmark}_sf{formatted_sf}
         # 0.01 formats as "sf001" per format_scale_factor()
-        assert benchmark.output_dir == Path.cwd() / "benchmark_runs" / "datagen" / "amplab_sf001"
+        assert benchmark.output_dir == resolve_benchmark_runs_dir() / "datagen" / "amplab_sf001"
         assert benchmark._name == "AMPLab Big Data Benchmark"
         assert benchmark._version == "1.0"
 
