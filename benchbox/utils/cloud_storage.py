@@ -245,6 +245,25 @@ class CloudStagingPath:
         """Get path components."""
         return self._path.parts
 
+    @property
+    def suffix(self) -> str:
+        """Get the final component's suffix."""
+        return self._path.suffix
+
+    def joinpath(self, *other: Union[str, Path]) -> Path:
+        """Join path components - returns a regular Path, like ``__truediv__``.
+
+        Required for parity with the plain ``Path`` that callers used to
+        receive: the runner joins ``_datagen_manifest.json`` onto the output
+        dir, and one call site skips manifest validation entirely when the
+        object has no ``joinpath``.
+        """
+        return self._path.joinpath(*other)
+
+    def stat(self, *, follow_symlinks: bool = True):
+        """Stat the local path."""
+        return self._path.stat(follow_symlinks=follow_symlinks)
+
     def as_posix(self) -> str:
         """Return the path as a POSIX string."""
         return self._path.as_posix()
@@ -516,6 +535,13 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
     """
     # If already a DatabricksPath instance, return as-is (avoids double-wrapping)
     if isinstance(path, DatabricksPath):
+        return path
+
+    # Same for CloudStagingPath. Without this it fell through to the local
+    # branch and was rebuilt as a plain Path of the staging directory, silently
+    # discarding cloud_target — so a handler that had been carrying its upload
+    # destination stopped doing so the moment it was re-wrapped.
+    if isinstance(path, CloudStagingPath):
         return path
 
     # If already a CloudPath instance, return as-is (avoids double-wrapping)
