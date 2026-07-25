@@ -187,7 +187,13 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
         stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard", return_value=guided_config))
         mock_preview = stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -328,7 +334,13 @@ def test_interactive_stats_controls_reach_benchmark_config(tmp_path: Path):
         stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard", return_value=guided_config))
         stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -438,7 +450,13 @@ def test_interactive_execution_type_derived_from_phases(tmp_path: Path):
         stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard"))
         stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -543,7 +561,13 @@ def test_interactive_dataframe_tuning_acceptance_applies_runtime_defaults(tmp_pa
             patch("benchbox.core.dataframe.tuning.get_smart_defaults", return_value=df_tuning_config)
         )
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="dataframe", supports_sql=False, supports_dataframe=True)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="dataframe",
+            supports_sql=False,
+            supports_dataframe=True,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -647,7 +671,13 @@ def test_interactive_wizard_baseline_maps_to_notuning_for_external_mode(tmp_path
         stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard", return_value=baseline_config))
         mock_preview = stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -754,7 +784,13 @@ def test_interactive_dataframe_wizard_baseline_skips_runtime_defaults(tmp_path: 
         mock_preview = stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_df_defaults = stack.enter_context(patch("benchbox.core.dataframe.tuning.get_smart_defaults"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="dataframe", supports_sql=False, supports_dataframe=True)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="dataframe",
+            supports_sql=False,
+            supports_dataframe=True,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -827,7 +863,13 @@ def test_fallback_wizard_baseline_reclassifies_runtime_state_for_dataframe_platf
             patch.object(
                 _run_module.PlatformRegistry,
                 "get_platform_capabilities",
-                return_value=SimpleNamespace(default_mode="dataframe", supports_sql=False, supports_dataframe=True),
+                return_value=SimpleNamespace(
+                    default_mode="dataframe",
+                    supports_sql=False,
+                    supports_dataframe=True,
+                    deployment_modes={},
+                    default_deployment=None,
+                ),
             )
         )
         stack.enter_context(patch.object(_run_module.PlatformRegistry, "requires_cloud_storage", return_value=False))
@@ -933,7 +975,13 @@ def test_direct_dataframe_tuning_config_propagates_to_benchmark_config(tmp_path:
             patch.object(
                 _run_module.PlatformRegistry,
                 "get_platform_capabilities",
-                return_value=SimpleNamespace(default_mode="dataframe", supports_sql=False, supports_dataframe=True),
+                return_value=SimpleNamespace(
+                    default_mode="dataframe",
+                    supports_sql=False,
+                    supports_dataframe=True,
+                    deployment_modes={},
+                    default_deployment=None,
+                ),
             )
         )
         stack.enter_context(patch.object(_run_module.PlatformRegistry, "requires_cloud_storage", return_value=False))
@@ -1052,7 +1100,13 @@ def test_interactive_tuning_declined_sets_notuning_state(tmp_path: Path):
         mock_wizard = stack.enter_context(patch("benchbox.cli.tuning.run_tuning_wizard"))
         mock_preview = stack.enter_context(patch("benchbox.cli.dryrun.display_interactive_preview"))
         mock_confirm = stack.enter_context(patch.object(_run_module.Confirm, "ask"))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         def _confirm_side_effect(prompt, default=False):
             text = str(prompt)
@@ -1115,7 +1169,13 @@ def test_interactive_cloud_platform_stops_when_credentials_are_missing():
         stack.enter_context(patch.object(_run_module, "check_and_setup_platform_credentials", return_value=False))
         stack.enter_context(patch("benchbox.cli.onboarding.check_and_run_first_time_setup", return_value=False))
         stack.enter_context(patch("benchbox.cli.preferences.load_last_run_config", return_value=None))
-        mock_caps.return_value = SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False)
+        mock_caps.return_value = SimpleNamespace(
+            default_mode="sql",
+            supports_sql=True,
+            supports_dataframe=False,
+            deployment_modes={},
+            default_deployment=None,
+        )
 
         result = runner.invoke(run, [], obj=_run_obj())
 
@@ -1176,7 +1236,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1288,7 +1354,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1322,7 +1394,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1344,7 +1422,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1376,7 +1460,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1399,7 +1489,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1422,7 +1518,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
@@ -1445,7 +1547,13 @@ class TestRunCommandValidation:
                 patch.object(
                     _run_module.PlatformRegistry,
                     "get_platform_capabilities",
-                    return_value=SimpleNamespace(default_mode="sql", supports_sql=True, supports_dataframe=False),
+                    return_value=SimpleNamespace(
+                        default_mode="sql",
+                        supports_sql=True,
+                        supports_dataframe=False,
+                        deployment_modes={},
+                        default_deployment=None,
+                    ),
                 )
             )
             stack.enter_context(
