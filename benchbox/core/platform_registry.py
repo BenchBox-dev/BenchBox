@@ -99,6 +99,14 @@ _PLATFORM_SUPPORT_STATUS: dict[str, SupportStatus] = {
     "clickhouse": "deprecated",
 }
 
+# The output location the Snowflake credential prompt advertises as its
+# default. It lives next to get_cloud_path_examples() — and is the first entry
+# of the snowflake example list — so the prompt and the documented examples
+# cannot drift apart again. Any value here must stay acceptable to
+# benchbox.utils.cloud_storage.is_cloud_path, which is the classifier the run
+# path uses; a test pins that agreement.
+SNOWFLAKE_DEFAULT_OUTPUT_LOCATION = "@~/benchbox"
+
 _NATIVE_IMPORT_ERROR_MARKERS = (
     "dlopen",
     "dylib",
@@ -763,6 +771,9 @@ class PlatformRegistry:
                 "gs://my-bucket/benchbox/data",
             ],
             "snowflake": [
+                # User stage first: it is what the credential prompt defaults to
+                # and needs no cloud-storage setup.
+                SNOWFLAKE_DEFAULT_OUTPUT_LOCATION,
                 "s3://my-bucket/benchbox/data",
                 "azure://my-container/benchbox/data",
                 "gcs://my-bucket/benchbox/data",
