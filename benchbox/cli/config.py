@@ -143,7 +143,10 @@ def _apply_environment_overrides(config_dict: dict[str, Any]) -> dict[str, Any]:
         "BENCHBOX_VERBOSE": ("execution", "verbose", lambda v: v.lower() in ["true", "1", "yes", "on"]),
         "BENCHBOX_MAX_WORKERS": ("execution", "max_workers", int),
         "BENCHBOX_TUNING_CONFIG": ("tuning", "default_config_file", str),
-        "BENCHBOX_OUTPUT_DIR": ("output", "directory", str),
+        # NOTE: BENCHBOX_OUTPUT_DIR is deliberately absent. It is resolved on the
+        # run path by benchbox.utils.path_utils.resolve_benchmark_runs_dir(), not
+        # through this config object. Mapping it to a config key nothing reads
+        # made the setting look authoritative while having no effect.
         "BENCHBOX_MEMORY_LIMIT_GB": ("execution", "memory_limit_gb", int),
     }
 
@@ -251,7 +254,9 @@ class ConfigManager:
             },
             output={
                 "formats": ["json", "console"],
-                "directory": "./benchmark_runs/results",
+                # No "directory" key: the results root is resolved at run time
+                # from BENCHBOX_OUTPUT_DIR / the work-tree-anchored default, so a
+                # config default here would be dead and misleading.
                 "timestamp_format": "%Y%m%d_%H%M%S",
                 "submit_to_service": False,
                 "service_url": "https://api.benchbox.dev/v1",

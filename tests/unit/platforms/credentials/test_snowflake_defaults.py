@@ -604,7 +604,9 @@ class TestPromptDefaultOutputLocation:
         # wants default=True; 1st path invalid, user declines → retry; 2nd path valid, user confirms
         mock_confirm.side_effect = [True, False, True]
         mock_prompt.side_effect = ["bad-path", "@~/good"]
-        mock_is_cloud.side_effect = [False, False]  # called for bad-path only (second is @~)
+        # The prompt now validates with is_cloud_path alone; that classifier
+        # accepts stage paths directly, so '@~/good' is valid on the retry.
+        mock_is_cloud.side_effect = [False, True]
 
         creds = {"account": "acct"}
         _prompt_default_output_location(mgr, console, creds)
