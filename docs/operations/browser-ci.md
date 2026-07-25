@@ -11,7 +11,7 @@ and anyone triaging a red or advisory browser-lane check on a PR.
 
 | Browser  | Job name                          | Scope                | Gate       | Status as of 2026-07-23 |
 |----------|------------------------------------|-----------------------|------------|--------------------------|
-| Chromium | `Chromium (full suite, blocking)` | Full `e2e/` suite      | Blocking   | Green - unaffected by this note |
+| Chromium | `Chromium (full suite, blocking)` | Full `e2e/` suite      | Blocking   | Cold-start flake mitigated 2026-07-25 (see below) |
 | Firefox  | `Firefox (@smoke, non-blocking)`  | `@smoke`-tagged subset | Advisory   | Green in recent history |
 | WebKit   | `WebKit (@smoke, non-blocking)`   | `@smoke`-tagged subset | Advisory   | Fixed 2026-07-23 (see below) - was deterministically red on PRs #1264 and #1270 |
 
@@ -28,6 +28,32 @@ assertions in the same spec files that already called `waitForDataLoaded()`
 what pointed at timeout margin rather than a functional break. The fix adds
 `waitForDataLoaded()` calls ahead of the four assertions, matching the
 existing in-file pattern - no test was skipped, no assertion was weakened.
+
+## Chromium cold-start flake (2026-07-25)
+
+On PR #1298 the Chromium blocking gate went red on a *genuinely flaky*
+(varies run-to-run) data-load timeout: a different spec timed out each run
+(`result-detail-failures` one run, `compare` the next), always the same
+symptom - the first data-bound element never rendered within the wait window
+- while 103-107 of 111 tests passed. Two independent runs failed on different
+specs, which is the "varies across attempts" signal from the triage rule
+below, not a functional break in the PR under test. The cause is DuckDB-WASM
+cold-start under the gate's 2 parallel workers occasionally exceeding the 30s
+`waitForDataLoaded` budget - the same *concurrent-worker* contention class the
+earlier `stabilize-webkit-browser-smoke-flake-under-parallel-workers` fix
+addressed for WebKit by serializing to `--workers=1`.
+
+Mitigation (harness-only, no `results-explorer/src/**` change; Chromium keeps
+its 2 workers so the blocking gate stays fast rather than serializing):
+
+- `waitForDataLoaded` budget 30s -> 45s (matches the margin the suite's
+  careful inline data waits already use, and the exact value the failing
+  `result-detail-failures` inline wait used).
+- Per-test `timeout` 60s -> 90s so a ~45s data wait plus the rest of a flow
+  fits inside the cap.
+- CI `retries` 1 -> 2 so a spec slow on both its first attempts gets a third.
+  A real regression still fails all three attempts (deterministic), so this
+  does not mask functional breaks.
 
 ## Triage rule
 

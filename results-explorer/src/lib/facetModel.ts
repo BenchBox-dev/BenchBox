@@ -42,6 +42,18 @@ export const NULL_TUNING_MODE_SENTINELS = [
   LEGACY_UNLABELLED_TUNING_MODE,
 ] as const;
 
+/**
+ * The token `buildFacetCountQuery` emits for a NULL value in any facet column
+ * (`CASE WHEN <col> IS NULL THEN 'unknown'`). Exported so the count query that
+ * *produces* the bucket and the WHERE builder that *consumes* it share one
+ * literal: a filter that sends this token through a plain `IN (...)` predicate
+ * matches no rows, silently returning nothing for a bucket the UI advertised.
+ */
+export const UNKNOWN_FACET_VALUE = "unknown";
+
+/** Facet tokens that must match a NULL physical_rendering_id row (ADR-2 secondary facet). */
+export const NULL_PHYSICAL_RENDERING_SENTINELS = [UNKNOWN_FACET_VALUE] as const;
+
 export interface FacetState {
   benchmark: string[];
   scale_factor: string[];
