@@ -419,6 +419,48 @@ def is_cloud_path(path: Union[str, Path]) -> bool:
     return is_snowflake_stage_path(path)
 
 
+# cloudpathlib registers only az://, gs://, s3:// (plus http/https). BenchBox
+# documents two aliases for those, so they are normalised at the hand-off to
+# cloudpathlib rather than by widening what is_cloud_path accepts.
+_CLOUD_SCHEME_ALIASES = {"gcs": "gs", "azure": "az"}
+
+
+def _normalize_cloud_scheme(path: str) -> str:
+    """Rewrite a documented scheme alias to the one cloudpathlib registers.
+
+    ``gcs://bucket/p`` and ``azure://container/p`` are spelling variants of
+    ``gs://`` and ``az://`` — same bucket/container, same credentials — so the
+    rewrite is lossless. Anything else is returned unchanged.
+    """
+    scheme, separator, rest = path.partition("://")
+    if separator and scheme.lower() in _CLOUD_SCHEME_ALIASES:
+        return f"{_CLOUD_SCHEME_ALIASES[scheme.lower()]}://{rest}"
+    return path
+
+
+def is_adls_path(path: Union[str, Path]) -> bool:
+    """Check if a path is an Azure Data Lake Storage Gen2 URI (``abfss://``).
+
+    These encode the storage account in the authority
+    (``abfss://container@account.dfs.core.windows.net/path``), which
+    cloudpathlib's ``az://container/path`` form cannot represent, so they are
+    staged locally rather than rewritten.
+
+    Args:
+        path: Path to check
+
+    Returns:
+        True if path uses the abfss:// scheme
+    """
+    if isinstance(path, Path):
+        path = str(path)
+
+    if not isinstance(path, str):
+        return False
+
+    return urlparse(path).scheme == "abfss"
+
+
 def is_databricks_path(path: Union[str, Path]) -> bool:
     """Check if a path is a Databricks DBFS or UC Volume path.
 
@@ -522,6 +564,24 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
 
         return staging_path
 
+    # Handle abfss:// specially - the URI encodes the storage account, which
+    # cloudpathlib's az:// form cannot carry, so rewriting one would silently
+    # point at whatever account the credentials happen to name. Stage locally
+    # and keep the URI for the adapter, exactly as dbfs:// and stages do. This
+    # also matches what the orchestrator already does with an abfss --output.
+    if is_adls_path(path):
+        path_str = str(path)
+
+        import tempfile
+
+        temp_dir_str = tempfile.mkdtemp(prefix="benchbox_abfss_")
+        staging_path = CloudStagingPath(temp_dir_str, path_str)
+
+        logger.info(f"Created temporary directory for ADLS path: {staging_path}")
+        logger.debug(f"Target ADLS URI: {path_str}")
+
+        return staging_path
+
     if not is_cloud_path(path):
         return Path(path)
 
@@ -529,8 +589,9 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
     if cloud_path_cls is None:
         raise ImportError(f"cloudpathlib is required for cloud storage paths. {get_install_command('cloudstorage')}")
 
+    normalized = _normalize_cloud_scheme(str(path))
     try:
-        return cloud_path_cls(str(path))
+        return cloud_path_cls(normalized)
     except Exception as e:
         raise ValueError(f"Invalid cloud path format '{path}': {e}") from e
 
@@ -651,9 +712,22 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
                 "env_vars": expected_vars,
             }
 
-    # Try to create a cloud path to test credentials
+    # abfss:// cannot be opened by cloudpathlib at all (the account lives in the
+    # authority), so probing it here would surface a prefix error dressed up as
+    # a credential failure. The env-var check above is the validation we can do;
+    # the Azure adapter validates the rest.
+    if is_adls_path(path):
+        return {
+            "valid": True,
+            "provider": provider,
+            "error": None,
+            "env_vars": expected_vars,
+        }
+
+    # Try to create a cloud path to test credentials. Scheme aliases are
+    # normalised first for the same reason as in create_path_handler.
     try:
-        cloud_path = cloud_path_cls(str(path))
+        cloud_path = cloud_path_cls(_normalize_cloud_scheme(str(path)))
         # Test basic operations
         _ = cloud_path.exists()
         return {
