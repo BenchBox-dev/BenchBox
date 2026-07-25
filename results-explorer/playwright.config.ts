@@ -30,12 +30,21 @@ export default defineConfig({
   outputDir: "./test-results",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  // 2 CI retries (up from 1): the Chromium full-suite blocking gate runs 2
+  // parallel workers, and concurrent DuckDB-WASM cold-start occasionally
+  // exceeds even the extended data-load wait on back-to-back attempts. The
+  // failing spec varies run-to-run (genuinely flaky, not a deterministic
+  // break), so a third attempt clears the timing tail. A real regression still
+  // fails all three attempts. See docs/operations/browser-ci.md.
+  retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI
     ? [["github"], ["html", { outputFolder: "playwright-report", open: "never" }]]
     : [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
-  timeout: 60_000,
+  // 90s per-test cap (up from 60s) so a single ~45s data-load wait plus the
+  // rest of a flow does not collide with the global timeout under a slow
+  // DuckDB-WASM cold-start. Happy-path tests still finish in a few seconds.
+  timeout: 90_000,
   expect: { timeout: 10_000 },
 
   use: {
