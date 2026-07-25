@@ -81,11 +81,16 @@ def test_emit_fast_count_deselected_suffix_still_parses(
 def test_emit_fast_count_unparseable_output_fails_closed(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:
-    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("some pytest crash with no collect line"))
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("some pytest crash with no collect line", rc=1))
     rc = mod._emit_fast_count(Path("/nonexistent"))
     err = capsys.readouterr().err
     assert rc == 1
-    assert "could not parse" in err
+    # Reported as an environment failure, not as a parse/policy problem: the
+    # lane was never measured, so nothing is known to be wrong with it.
+    assert "FAST_LANE_ENVIRONMENT_ERROR" in err
+    assert "could not run pytest --collect-only" in err
+    # The diagnostic must be actionable - it names the interpreter used.
+    assert sys.executable in err
 
 
 # ------------------------------------------------------------------ #
@@ -202,3 +207,53 @@ def test_check_fast_lane_policy_no_warning_above_threshold(
     out = capsys.readouterr().out
     assert violations == []
     assert "FAST_LANE_WARNING" not in out
+
+
+# ------------------------------------------------------------------ #
+# Environment failure vs policy violation                             #
+# ------------------------------------------------------------------ #
+def test_check_fast_lane_policy_raises_when_collect_cannot_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A collect that never ran is not a set of policy violations.
+
+    Running the check with an interpreter that lacks pytest used to yield four
+    FAST_LANE_VIOLATIONs on a perfectly healthy tree, indistinguishable from a
+    genuine cap breach.
+    """
+    monkeypatch.setattr(
+        mod, "_run_pytest_collect", _fake_collect("ModuleNotFoundError: No module named 'pytest'", rc=1)
+    )
+    policy = {"enabled": True, "max_fast_tests": 10000, "forbidden_marker_expressions": ["stress"]}
+
+    with pytest.raises(mod.FastLaneCollectError) as excinfo:
+        mod._check_fast_lane_policy(Path("/nonexistent"), policy)  # type: ignore[arg-type]
+
+    message = str(excinfo.value)
+    assert "could not run pytest --collect-only" in message
+    assert sys.executable in message
+
+
+def test_check_fast_lane_policy_still_reports_a_real_breach(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Must-preserve: a genuine cap breach is still a FAST_LANE_VIOLATION."""
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("25810/28000 tests collected"))
+    policy = {"enabled": True, "max_fast_tests": 10}
+
+    violations = mod._check_fast_lane_policy(Path("/nonexistent"), policy)  # type: ignore[arg-type]
+
+    assert any("exceeds limit 10" in v for v in violations), violations
+
+
+def test_delta_check_names_the_collect_failure_not_a_missing_baseline(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    """The skip reason must not blame a baseline that is present and valid."""
+    baseline = tmp_path / "develop-count.txt"
+    baseline.write_text("25000", encoding="utf-8")
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("pytest crashed, no collect line", rc=1))
+
+    rc = mod._delta_check(Path("/nonexistent"), baseline)
+    out = capsys.readouterr().out
+
+    assert rc == 0  # still non-blocking; the absolute ceiling is enforced elsewhere
+    assert "DELTA_CHECK_SKIPPED" in out
+    assert "could not run pytest --collect-only" in out
+    assert "no develop baseline available" not in out

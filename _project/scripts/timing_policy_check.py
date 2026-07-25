@@ -108,6 +108,28 @@ def _run_pytest_collect(repo_root: Path, markexpr: str) -> tuple[int, str]:
     return result.returncode, output
 
 
+class FastLaneCollectError(RuntimeError):
+    """The collect subprocess could not run, so the policy was never checked.
+
+    Distinct from a policy violation: nothing is known to be wrong with the
+    fast lane, we simply failed to measure it. Conflating the two reports a
+    green tree as several FAST_LANE_VIOLATIONs.
+    """
+
+
+def _collect_environment_error(markexpr: str, returncode: int, output: str) -> FastLaneCollectError:
+    """Build an actionable error for a collect run that produced no count."""
+    tail = "\n".join(line for line in output.strip().splitlines()[-5:])
+    return FastLaneCollectError(
+        f"could not run pytest --collect-only for '-m {markexpr}' "
+        f"(exit {returncode}) using interpreter {sys.executable}. "
+        "This usually means pytest or benchbox is not importable in that "
+        "environment - run the check from the project environment, e.g. "
+        "`uv run -- python _project/scripts/timing_policy_check.py --strict`. "
+        f"Last output lines:\n{tail}"
+    )
+
+
 def _parse_collect_count(output: str) -> int | None:
     match = _COLLECT_COUNT_PATTERN.search(output)
     if match:
@@ -130,7 +152,7 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str
     fast_count = _parse_collect_count(fast_output)
     print(f"Fast lane collect exit code: {rc}")
     if fast_count is None:
-        violations.append("could not parse fast lane collect count")
+        raise _collect_environment_error("fast", rc, fast_output)
     else:
         print(f"Fast lane tests collected: {fast_count}")
         if fast_count > max_fast_tests:
@@ -159,8 +181,7 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str
         count = _parse_collect_count(output)
         print(f"Fast lane intersection '{expr}' exit code: {rc}")
         if count is None:
-            violations.append(f"could not parse collect count for 'fast and {expr}'")
-            continue
+            raise _collect_environment_error(f"fast and {expr}", rc, output)
         print(f"Fast lane intersection '{expr}' count: {count}")
         if count != 0:
             violations.append(f"fast lane unexpectedly includes {count} test(s) matching 'fast and {expr}'")
@@ -179,10 +200,10 @@ def _emit_fast_count(repo_root: Path) -> int:
     that calls this is responsible for never failing the post-merge job
     itself (guarded with `|| true`/a fallback there), not this function.
     """
-    _rc, output = _run_pytest_collect(repo_root, "fast")
+    rc, output = _run_pytest_collect(repo_root, "fast")
     count = _parse_collect_count(output)
     if count is None:
-        print("could not parse fast lane collect count", file=sys.stderr)
+        print(f"FAST_LANE_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}", file=sys.stderr)
         return 1
     print(count)
     return 0
@@ -206,10 +227,13 @@ def _delta_check(repo_root: Path, develop_count_file: Path) -> int:
         print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
         return 0
 
-    _rc, output = _run_pytest_collect(repo_root, "fast")
+    rc, output = _run_pytest_collect(repo_root, "fast")
     pr_count = _parse_collect_count(output)
     if pr_count is None:
-        print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
+        # Still non-blocking (the absolute ceiling is enforced separately), but
+        # name the real cause: the collect failed, which has nothing to do with
+        # whether a develop baseline exists.
+        print(f"DELTA_CHECK_SKIPPED ({_collect_environment_error('fast', rc, output)})")
         return 0
 
     delta = pr_count - develop_count
@@ -309,6 +333,7 @@ def main() -> int:
 
     violations: list[Any] = []
     fast_lane_violations: list[str] = []
+    fast_lane_environment_error = False
 
     if not args.only_fast_lane:
         allowlist_path = repo_root / args.allowlist
@@ -346,12 +371,20 @@ def main() -> int:
     if not args.skip_fast_lane:
         fast_lane_policy_path = repo_root / args.fast_lane_policy
         fast_lane_policy = _load_fast_lane_policy(fast_lane_policy_path)
-        fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy)
-        print(f"Fast lane policy violations: {len(fast_lane_violations)}")
-        for violation in fast_lane_violations:
-            print(f"FAST_LANE_VIOLATION: {violation}")
+        try:
+            fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy)
+        except FastLaneCollectError as exc:
+            # Not a policy violation: the lane was never measured. Reported
+            # separately so a broken environment cannot masquerade as a set of
+            # fast-lane breaches.
+            print(f"FAST_LANE_ENVIRONMENT_ERROR: {exc}", file=sys.stderr)
+            fast_lane_environment_error = True
+        else:
+            print(f"Fast lane policy violations: {len(fast_lane_violations)}")
+            for violation in fast_lane_violations:
+                print(f"FAST_LANE_VIOLATION: {violation}")
 
-    if args.strict and (violations or fast_lane_violations):
+    if args.strict and (violations or fast_lane_violations or fast_lane_environment_error):
         return 1
     return 0
 
