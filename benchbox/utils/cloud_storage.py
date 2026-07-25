@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any, List, Protocol, Union, runtime_checkable
 from urllib.parse import urlparse
@@ -341,24 +342,81 @@ class DatabricksVolumeAdapter:
             return []
 
 
-def is_cloud_path(path: Union[str, Path]) -> bool:
-    """Check if a path is a cloud storage path.
+# Snowflake stage references are schemeless, so urlparse never yields a scheme
+# for them and the scheme list in is_cloud_path() cannot express this shape.
+# Grammar (always anchored at a leading '@'):
+#   @~/sub/path                  user stage
+#   @%table/sub/path             table stage
+#   @stage/sub/path              named stage
+#   @db.schema.stage/sub/path    qualified named stage
+# Identifiers are unquoted (letter/underscore lead) or double-quoted.
+# The stage and sub-path groups make this regex the single source of truth for
+# both matching and splitting, so a quoted stage name containing '/' can never
+# be mis-split by a separate parser.
+_STAGE_IDENTIFIER = r'(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_$]*)'
+_SNOWFLAKE_STAGE_RE = re.compile(
+    rf"^@(?P<stage>~|%{_STAGE_IDENTIFIER}|{_STAGE_IDENTIFIER}(?:\.{_STAGE_IDENTIFIER}){{0,2}})"
+    rf"(?:/(?P<sub_path>.*))?$"
+)
 
-    Includes dbfs:// paths (Databricks File System / Unity Catalog Volumes)
-    which require special handling via Databricks Files API.
+
+def _match_snowflake_stage(path: Union[str, Path]) -> Union[re.Match, None]:
+    """Match a Snowflake stage reference, returning the match or None.
+
+    Shared by the predicate and by :func:`get_cloud_path_info` so the grammar
+    and the stage/sub-path split can never drift apart.
+    """
+    if isinstance(path, Path):
+        path = str(path)
+
+    if not isinstance(path, str):
+        return None
+
+    return _SNOWFLAKE_STAGE_RE.match(path)
+
+
+def is_snowflake_stage_path(path: Union[str, Path]) -> bool:
+    """Check if a path is a Snowflake stage reference (``@~/...``, ``@stage/...``).
+
+    Stage paths have no URI scheme, so they must be matched structurally rather
+    than through :func:`urlparse`. The match is anchored at a leading ``@`` so
+    that cloud URIs which merely contain ``@`` — notably
+    ``abfss://container@account.dfs.core.windows.net/path`` — are never
+    misrouted here.
 
     Args:
         path: Path to check
 
     Returns:
-        True if path is a cloud storage path (s3://, gs://, abfss://, dbfs://, etc.)
+        True if path is a Snowflake user, table, named or qualified-named stage
+    """
+    return _match_snowflake_stage(path) is not None
+
+
+def is_cloud_path(path: Union[str, Path]) -> bool:
+    """Check if a path is a cloud storage path.
+
+    Includes dbfs:// paths (Databricks File System / Unity Catalog Volumes)
+    which require special handling via Databricks Files API, and Snowflake
+    stage references (``@~/...``), which are remote namespaces even though they
+    carry no URI scheme.
+
+    Args:
+        path: Path to check
+
+    Returns:
+        True if path is a cloud storage path (s3://, gs://, abfss://, dbfs://,
+        @stage/..., etc.)
     """
     # Convert Path objects (including CloudPath from cloudpathlib) to strings
     if not isinstance(path, str):
         path = str(path)
 
     parsed = urlparse(path)
-    return parsed.scheme in ["s3", "gs", "gcs", "az", "abfss", "azure", "dbfs"]
+    if parsed.scheme in ["s3", "gs", "gcs", "az", "abfss", "azure", "dbfs"]:
+        return True
+
+    return is_snowflake_stage_path(path)
 
 
 def is_databricks_path(path: Union[str, Path]) -> bool:
@@ -393,20 +451,22 @@ def validate_cloud_path_support() -> bool:
     return cloud_path is not None
 
 
-def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, DatabricksPath]:
+def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, DatabricksPath, CloudStagingPath]:
     """Create appropriate path handler for local or cloud paths.
 
-    Note: dbfs:// paths (Databricks UC Volumes) cannot be handled directly by
-    cloudpathlib. For these paths, we create a local temporary directory for
-    data generation and store the target dbfs:// path as an attribute. The actual
-    upload is handled by DatabricksAdapter during the load phase.
+    Note: dbfs:// paths (Databricks UC Volumes) and Snowflake stage paths
+    (``@~/...``) cannot be handled directly by cloudpathlib. For these paths, we
+    create a local temporary directory for data generation and store the remote
+    target as an attribute. The actual upload is handled by the platform adapter
+    during the load phase.
 
     Args:
         path: Local or cloud storage path (or already-created DatabricksPath/CloudPath)
 
     Returns:
         Path object for local paths, CloudPath for cloud paths,
-        DatabricksPath for dbfs:// paths (either created or passed through)
+        DatabricksPath for dbfs:// paths (either created or passed through),
+        CloudStagingPath for Snowflake stage paths
 
     Raises:
         ImportError: If cloud path is provided but cloudpathlib not installed
@@ -445,6 +505,22 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
         logger.debug(f"Target UC Volume: {path_str}")
 
         return databricks_path
+
+    # Handle Snowflake stage paths specially - like dbfs://, they are a remote
+    # namespace cloudpathlib cannot open, so data is generated locally and the
+    # stage target is carried alongside for the adapter to upload.
+    if is_snowflake_stage_path(path):
+        path_str = str(path)
+
+        import tempfile
+
+        temp_dir_str = tempfile.mkdtemp(prefix="benchbox_stage_")
+        staging_path = CloudStagingPath(temp_dir_str, path_str)
+
+        logger.info(f"Created temporary directory for Snowflake stage path: {staging_path}")
+        logger.debug(f"Target stage: {path_str}")
+
+        return staging_path
 
     if not is_cloud_path(path):
         return Path(path)
@@ -670,6 +746,21 @@ def get_cloud_path_info(path: Union[str, Path]) -> dict[str, Any]:
             "path": parsed.path,
             "credentials_valid": True,  # Checked by Databricks adapter
             "volume_info": volume_info,
+        }
+
+    # Handle Snowflake stage paths specially - the stage name is the container
+    # and there is no scheme/netloc for urlparse to split.
+    stage_match = _match_snowflake_stage(path)
+    if stage_match is not None:
+        stage_name = stage_match.group("stage")
+        sub_path = stage_match.group("sub_path") or ""
+        return {
+            "is_cloud": True,
+            "provider": "snowflake_stage",
+            "bucket": stage_name,
+            "path": sub_path,
+            "credentials_valid": True,  # Checked by the Snowflake adapter
+            "stage_info": {"stage": stage_name, "sub_path": sub_path},
         }
 
     if not is_cloud_path(path):
