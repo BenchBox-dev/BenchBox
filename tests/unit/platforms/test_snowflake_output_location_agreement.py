@@ -65,18 +65,12 @@ class TestRegistryExamplesAreAllUsable:
     def test_no_example_resolves_to_a_relative_local_path(self, example):
         """No advertised value may put generated data under the cwd.
 
-        ``azure://`` and ``gcs://`` are accepted by ``is_cloud_path`` but raise
-        in ``create_path_handler`` because cloudpathlib only knows ``az://`` /
-        ``gs://`` / ``s3://``. That alias gap is a pre-existing defect tracked
-        separately (it predates this batch and spans abfss:// too); it is still
-        a *remote* classification, which is what this test is about, so the
-        raise is tolerated here rather than silently asserted away.
+        The ``azure://`` and ``gcs://`` examples used to raise here, because
+        cloudpathlib only registers ``az://`` / ``gs://`` / ``s3://``. The
+        scheme aliases are now normalised at the hand-off, so every advertised
+        example resolves and the raise no longer needs tolerating.
         """
-        try:
-            handler = create_path_handler(example)
-        except ValueError as exc:
-            assert "Invalid cloud path format" in str(exc), exc
-            return
+        handler = create_path_handler(example)
         assert not (isinstance(handler, Path) and not handler.is_absolute()), (example, handler)
 
     def test_examples_still_cover_external_stages(self):
