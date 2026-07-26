@@ -235,11 +235,20 @@ class TestPathInfo:
         assert info["path"] == "path/to/data"
 
     def test_get_cloud_path_info_azure(self):
-        """Test path info for Azure paths."""
+        """Test path info for Azure paths.
+
+        ADLS Gen2 packs two values into the authority
+        (``abfss://<container>@<account>.dfs.core.windows.net/<path>``). This
+        used to assert the whole netloc as the bucket, which handed consumers a
+        container literally named "container@account.dfs.core.windows.net" —
+        the Azure Synapse adapter assigned exactly that to ``self.container``.
+        Container and account are now reported separately.
+        """
         info = get_cloud_path_info("abfss://container@account.dfs.core.windows.net/path/to/data")
         assert info["is_cloud"] is True
         assert info["provider"] == "abfss"
-        assert info["bucket"] == "container@account.dfs.core.windows.net"
+        assert info["bucket"] == "container"
+        assert info["account"] == "account"
         assert info["path"] == "path/to/data"
 
 

@@ -14,7 +14,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, List, Protocol, Union, runtime_checkable
+from typing import Any, List, NamedTuple, Protocol, Union, runtime_checkable
 from urllib.parse import urlparse
 
 from benchbox.utils.dependencies import get_install_command, get_package_install_message
@@ -450,16 +450,79 @@ def is_cloud_path(path: Union[str, Path]) -> bool:
         path = str(path)
 
     parsed = urlparse(path)
-    if parsed.scheme in ["s3", "gs", "gcs", "az", "abfss", "azure", "dbfs"]:
+    if parsed.scheme.lower() in _SCHEME_BY_NAME:
         return True
 
     return is_snowflake_stage_path(path)
 
 
-# cloudpathlib registers only az://, gs://, s3:// (plus http/https). BenchBox
-# documents two aliases for those, so they are normalised at the hand-off to
-# cloudpathlib rather than by widening what is_cloud_path accepts.
-_CLOUD_SCHEME_ALIASES = {"gcs": "gs", "azure": "az"}
+class CloudScheme(NamedTuple):
+    """One cloud URI scheme family and everything that depends on it.
+
+    Single source of truth. Scheme identity used to be spelled out separately
+    in is_cloud_path's list, the cloudpathlib alias map, the ADLS predicate,
+    the credential env-var map and azure_synapse's provider gate -- so adding a
+    scheme to one left the others behind. That produced abfs:// classifying as
+    *local* (and so resolving to a relative directory that spills generated
+    data into the cwd), azure:// being rejected by Synapse despite being a
+    documented form, and az:// skipping its credential check entirely.
+    """
+
+    canonical: str
+    """Scheme cloudpathlib registers, or the canonical spelling for staged families."""
+
+    aliases: tuple[str, ...]
+    """Accepted alternative spellings, rewritten to ``canonical`` at the hand-off."""
+
+    family: str
+    """Provider family, for platform-level gating (e.g. Azure Synapse)."""
+
+    env_vars: tuple[str, ...]
+    """Credential environment variables checked by validate_cloud_credentials."""
+
+    stages_locally: bool = False
+    """True when cloudpathlib cannot open it, so data stages locally instead."""
+
+
+_CLOUD_SCHEMES: tuple[CloudScheme, ...] = (
+    CloudScheme("s3", (), "aws", ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")),
+    CloudScheme("gs", ("gcs",), "gcp", ("GOOGLE_APPLICATION_CREDENTIALS",)),
+    CloudScheme("az", ("azure",), "azure", ("AZURE_STORAGE_ACCOUNT_NAME", "AZURE_STORAGE_ACCOUNT_KEY")),
+    # ADLS Gen2. Both spellings encode the storage account in the authority
+    # (abfss://container@account.dfs.core.windows.net/path), which cloudpathlib's
+    # az://container/path form cannot represent, so they stage locally rather
+    # than being rewritten -- rewriting would silently retarget whatever account
+    # the credentials happen to name.
+    CloudScheme(
+        "abfss",
+        ("abfs",),
+        "azure",
+        ("AZURE_STORAGE_ACCOUNT_NAME", "AZURE_STORAGE_ACCOUNT_KEY"),
+        stages_locally=True,
+    ),
+    # dbfs keeps its own DatabricksPath handling; listed so scheme recognition
+    # stays in one place.
+    CloudScheme("dbfs", (), "databricks", ()),
+)
+
+_SCHEME_BY_NAME: dict[str, CloudScheme] = {
+    name: scheme for scheme in _CLOUD_SCHEMES for name in (scheme.canonical, *scheme.aliases)
+}
+
+# Aliases that cloudpathlib cannot open under their own name and which are NOT
+# staged locally, so they must be rewritten to the canonical scheme.
+_CLOUD_SCHEME_ALIASES = {
+    alias: scheme.canonical for scheme in _CLOUD_SCHEMES if not scheme.stages_locally for alias in scheme.aliases
+}
+
+
+def _scheme_for(path: Union[str, Path]) -> Union[CloudScheme, None]:
+    """Return the CloudScheme for a path's URI scheme, or None if unrecognised."""
+    if isinstance(path, Path):
+        path = str(path)
+    if not isinstance(path, str):
+        return None
+    return _SCHEME_BY_NAME.get(urlparse(path).scheme.lower())
 
 
 def _normalize_cloud_scheme(path: str) -> str:
@@ -476,26 +539,32 @@ def _normalize_cloud_scheme(path: str) -> str:
 
 
 def is_adls_path(path: Union[str, Path]) -> bool:
-    """Check if a path is an Azure Data Lake Storage Gen2 URI (``abfss://``).
+    """Check if a path is an Azure Data Lake Storage Gen2 URI.
 
-    These encode the storage account in the authority
-    (``abfss://container@account.dfs.core.windows.net/path``), which
-    cloudpathlib's ``az://container/path`` form cannot represent, so they are
-    staged locally rather than rewritten.
+    Covers both ``abfss://`` and ``abfs://``. These encode the storage account
+    in the authority (``abfss://container@account.dfs.core.windows.net/path``),
+    which cloudpathlib's ``az://container/path`` form cannot represent, so they
+    are staged locally rather than rewritten.
 
     Args:
         path: Path to check
 
     Returns:
-        True if path uses the abfss:// scheme
+        True if path uses an ADLS Gen2 scheme
     """
-    if isinstance(path, Path):
-        path = str(path)
+    scheme = _scheme_for(path)
+    return scheme is not None and scheme.family == "azure" and scheme.stages_locally
 
-    if not isinstance(path, str):
-        return False
 
-    return urlparse(path).scheme == "abfss"
+def cloud_provider_family(path: Union[str, Path]) -> Union[str, None]:
+    """Return the provider family for a cloud path, or None if not one.
+
+    Platform adapters gate on the family rather than on a literal list of
+    scheme spellings, so a new alias cannot be accepted by the classifier and
+    rejected by the platform.
+    """
+    scheme = _scheme_for(path)
+    return scheme.family if scheme is not None else None
 
 
 def is_databricks_path(path: Union[str, Path]) -> bool:
@@ -706,15 +775,12 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
     parsed = urlparse(str(path))
     provider = parsed.scheme
 
-    # Define expected environment variables for each provider
-    env_checks = {
-        "s3": ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
-        "gs": ["GOOGLE_APPLICATION_CREDENTIALS"],
-        "gcs": ["GOOGLE_APPLICATION_CREDENTIALS"],
-        "abfss": ["AZURE_STORAGE_ACCOUNT_NAME", "AZURE_STORAGE_ACCOUNT_KEY"],
-        "azure": ["AZURE_STORAGE_ACCOUNT_NAME", "AZURE_STORAGE_ACCOUNT_KEY"],
-    }
-    expected_vars = env_checks.get(provider, [])
+    # Expected environment variables, derived from the scheme table so an alias
+    # cannot be recognised by the classifier yet skip its credential check --
+    # which is exactly what happened to the canonical `az://` spelling while
+    # its `azure://` alias was checked.
+    scheme_entry = _SCHEME_BY_NAME.get(provider.lower())
+    expected_vars = list(scheme_entry.env_vars) if scheme_entry else []
 
     # For S3, check multiple credential sources (not just env vars)
     if provider == "s3":
@@ -895,6 +961,16 @@ def get_cloud_path_info(path: Union[str, Path]) -> dict[str, Any]:
     bucket = parsed.netloc
     cloud_path = parsed.path.lstrip("/")
 
+    # ADLS Gen2 encodes two things in the authority:
+    # abfss://<container>@<account>.dfs.core.windows.net/<path>. Reporting the
+    # whole netloc as the bucket hands consumers a container name of
+    # "container@account.dfs.core.windows.net", so split them apart and expose
+    # the account separately.
+    account = None
+    if is_adls_path(path) and "@" in bucket:
+        bucket, _, account_host = bucket.partition("@")
+        account = account_host.split(".", 1)[0] or None
+
     # Use scheme directly so provider identity matches the URI protocol.
     provider = scheme
 
@@ -904,6 +980,7 @@ def get_cloud_path_info(path: Union[str, Path]) -> dict[str, Any]:
         "is_cloud": True,
         "provider": provider,
         "bucket": bucket,
+        "account": account,
         "path": cloud_path,
         "credentials_valid": credential_check["valid"],
     }

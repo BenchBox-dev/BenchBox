@@ -1180,3 +1180,40 @@ class TestAzureSynapseDataLoading:
             mock_conn.cursor.return_value = Mock()
             with pytest.raises(ValueError, match="No data files found"):
                 adapter.load_data(Mock(), mock_conn, tmp_path)
+
+
+class TestSynapseStagingRootAcceptsEveryAzureSpelling:
+    """The gate keys off the provider family, not a literal list of spellings.
+
+    The old literal accepted a provider string ("abfs") the classifier never
+    produced, while rejecting the documented `azure://` form outright.
+    """
+
+    @pytest.mark.parametrize(
+        "staging_root",
+        [
+            "az://container/benchbox",
+            "azure://container/benchbox",
+            "abfss://container@account.dfs.core.windows.net/benchbox",
+            "abfs://container@account.dfs.core.windows.net/benchbox",
+        ],
+    )
+    def test_azure_staging_roots_are_accepted(self, synapse_stubs, staging_root):
+        adapter = AzureSynapseAdapter(
+            server="myworkspace.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            staging_root=staging_root,
+        )
+        assert adapter.container == "container"
+
+    @pytest.mark.parametrize("staging_root", ["s3://bucket/benchbox", "gs://bucket/benchbox"])
+    def test_non_azure_staging_roots_are_still_rejected(self, synapse_stubs, staging_root):
+        """Widening the accepted spellings must not accept another cloud."""
+        with pytest.raises(ValueError, match="requires Azure storage"):
+            AzureSynapseAdapter(
+                server="myworkspace.sql.azuresynapse.net",
+                username="admin",
+                password="secret",
+                staging_root=staging_root,
+            )
