@@ -87,10 +87,13 @@ class AzureSynapseAdapter(PlatformAdapter):
         # Azure storage configuration for data loading
         staging_root = config.get("staging_root")
         if staging_root:
-            from benchbox.utils.cloud_storage import get_cloud_path_info
+            from benchbox.utils.cloud_storage import cloud_provider_family, get_cloud_path_info
 
             path_info = get_cloud_path_info(staging_root)
-            if path_info["provider"] in ("az", "abfs", "abfss"):
+            # Gate on the provider *family*, not a literal list of spellings:
+            # the literal accepted "abfs" (which the classifier never produced)
+            # while rejecting the documented "azure://" form.
+            if cloud_provider_family(staging_root) == "azure":
                 self.storage_account = path_info.get("account") or self._extract_storage_account(staging_root)
                 self.container = path_info["bucket"]
                 self.storage_path = path_info["path"].strip("/") if path_info["path"] else "benchbox-data"
@@ -99,7 +102,8 @@ class AzureSynapseAdapter(PlatformAdapter):
                 )
             else:
                 raise ValueError(
-                    f"Azure Synapse requires Azure storage (az://, abfs://, abfss://), got: {path_info['provider']}://"
+                    "Azure Synapse requires Azure storage (az://, azure://, abfs://, abfss://), "
+                    f"got: {path_info['provider']}://"
                 )
         else:
             # Fall back to explicit storage configuration
