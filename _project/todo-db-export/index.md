@@ -7,6 +7,7 @@
 | acl-benchmark-enhancement | done | medium | metadata-primitives | Enhance Metadata Primitives with Access Control (ACL) Performance Testing |
 | adapt-benchbox-to-textcharts-neutral-defaults | done | medium-high | main | Adapt BenchBox to textcharts neutralized defaults and new APIs |
 | adapter-run-context-and-reuse-contract | done | medium-high | main | Architecture hardening: document adapter lifecycle and isolate run-scoped state if needed |
+| adapter-schema-phase-ddl-ledger-capture-20260724 | planning | medium-high | main | Schema-phase tuning DDL bypasses the ledger recorder (ClickHouse exports noop despite physical tuning) |
 | add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the | planning | medium | main | Add a CI check that the UAT charter (or pointer) exists on the release branch |
 | add-a-streams-concurrency-cli-option-to-benchbox-run-itself | planning | medium | main | Add a --streams/--concurrency CLI option to `benchbox run` itself
 (benchbox/cli/commands/run.py) so BenchmarkConfig.concurrency is
@@ -52,6 +53,8 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | ai-ml-sql-function-performance-testing | done | medium | ai-ml-functions | AI/ML SQL Function Performance Testing |
 | align-benchbox-with-textcharts-de-benchboxing | done | medium-high | main | Align BenchBox call sites with textcharts de-benchboxed API |
 | align-coffeeshop-benchmark-with-reference-generator | done | high | coffeeshop-parity | ✅ Align CoffeeShop Benchmark with Reference Generator |
+| anchor-benchmark-runs-default-to-worktree-parent | done | high | core-functionality | Anchor the default benchmark_runs root to the work tree's parent (cwd-relative default writes into the repo) |
+| anchor-default-benchmark-runs-root-outside-worktree | dropped | high | core-functionality | Anchor the default benchmark_runs root to the work tree's parent (cwd-relative default writes into the repo) |
 | apache-doris-olap-platform | done | medium-high | platform-expansion | Add Apache Doris MPP OLAP platform support |
 | apache-spark-platform-adapter | done | high | platform-expansion-spark | Apache Spark Platform Adapter |
 | approx-analytics-cloud-survey | planning | medium-high | benchmark-expansion | Approximate Analytics Cloud SQL Survey — read_primitives + SQL write_primitives at SF=0.1/1/10 |
@@ -78,6 +81,8 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | auto-merge-predicate-base-ref-execution | done | medium-high | main | Run the auto-merge soundness predicate from the base ref, not the PR's own checkout |
 | auto-merge-review-gate-admin-enforcement | done | high | main | Make the soundness-path review gate enforceable at the repo layer, not just code |
 | auto-merge-review-gate-soundness-paths | done | medium | main | Require a review pass before squash-auto-merge for soundness-critical paths (comparator + plan parsers) |
+| auto-merge-verify-and-triage-runbook | dropped | medium | ci-failure-reduction | Verify auto-merge actually engages (nightly green-but-unmerged sweep) and codify the PR-triage judgment rules |
+| auto-merge-verify-and-triage-runbook-2 | done | medium | ci-failure-reduction | Verify auto-merge actually engages (nightly green-but-unmerged sweep) and codify the PR-triage judgment rules |
 | auto-retirement-workflow-run-repros-on-every-sqlglot-upgrade | planning | medium | main | Auto-retirement workflow (run repros on every sqlglot upgrade) |
 | auto-revert-signature-attribution | done | high | auto-revert-incident | Make auto-revert-on-failure signature-aware so persistent red does not blame every subsequent merge |
 | automate-corpus-inventory-generation | done | medium-high | main | Automate corpus-inventory.json generation from results-data/bundles/ |
@@ -113,6 +118,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | benchmark-support-status-visibility-invariants | done | medium | main | Harden benchmark support-status visibility invariants across public surfaces |
 | bidirectional-repo-sync-v2 | done | high | release-sync | Bidirectional Repository Sync (Redesigned) |
 | bidirectional-sync-and-true-up-releases | done | medium-high | release-sync | Bidirectional Sync and True-Up Releases for Public/Private Repos |
+| blind-spot-command-protocol-alignment-20260724 | planning | medium-high | findings-domain | /blind-spot command conflicts with the review-protocol drafts-only write invariant |
 | blog-apply-changes-into-vs-standard-sql | done | low | main | Blog - Evaluate Databricks APPLY CHANGES INTO vs Standard SQL MERGE for SCD Type 2 |
 | blog-scd2-sf1-scale-row | planning | low | scd2-audit-followup | Add the SF1 basic row to the SCD2 blog scale table for balance |
 | bodo-dataframe-platform | done | medium | platform-expansion | Bodo DataFrame Platform Adapter |
@@ -144,13 +150,21 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | centralize-file-format-detection | done | medium-high | core-functionality | Centralize File Format and Compression Extension Detection |
 | centralize-output-control-and-eliminate-print-leaks | done | high | main | Centralize user output control and eliminate print leaks across CLI/core/MCP paths |
 | chromium-blocking-suite-not-in-required-checks | planning | high | main | Wire the Chromium full-suite e2e into the required merge gate — its job says 'blocking' but nothing enforces it |
+| ci-baseline-representative-remeasure-sample | planning | medium | ci-failure-reduction | Representative 28-day per-PR API sample for the WS9 re-measure (cheaper query shape) |
+| ci-failure-baseline-dev-loop-metrics | dropped | high | ci-failure-reduction | Baseline CI-failure metrics in dev-loop-metrics before landing the reduction workstreams |
+| ci-lint-local-parity-pin | dropped | high | ci-failure-reduction | Make `make ci-lint` mirror the pr.yml lint job 1:1 and pin the parity with a fast test |
+| ci-lint-parity-pin | dropped | high | ci-failure-reduction | Make `make ci-lint` mirror the pr.yml lint job 1:1 and pin the parity with a fast test |
+| ci-lint-parity-pin-2 | done | high | ci-failure-reduction | Make `make ci-lint` mirror the pr.yml lint job 1:1 and pin the parity with a fast test |
+| ci-lint-report-all-guards | dropped | medium-high | ci-failure-reduction | Lint lane reports ALL guard failures in one CI round trip (no fail-fast between independent guards) |
 | ci-pipeline-for-docker-based-integration-tests | planning | medium | main | CI pipeline for Docker-based integration tests |
 | circular-import-issues-completed | done | medium | unknown | Circular Import Issues ✅ COMPLETED |
 | clarify-alpha-status-and-set-user-expectations | done | high | unknown | ✅ Clarify Alpha Status and Set User Expectations |
 | clarify-optional-dependency-installation | done | medium | docs-experience | ✅ Clarify Optional Dependency Installation |
+| classify-snowflake-stage-paths-as-non-local | done | high | platform-expansion | Snowflake internal stage paths (@~/...) are classified as local and become relative directories |
 | clean-up-unused-sphinx-dev-deps | done | low | main | Clean up unused Sphinx dev deps (sphinx-rtd-theme, sphinx-copybutton) |
 | cleanup-project-scratch-directory | done | medium-high | main | Relocate canonical assets out of _project/ scratch area to proper homes |
 | cli-data-only-and-load-only-execution-options | done | medium | unknown | CLI Data-Only and Load-Only Execution Options |
+| cli-dataframe-tuning-config-propagation-20260722 | done | medium | main | Non-interactive CLI --tuning does not propagate DataFrame tuning config to the adapter |
 | cli-detect-and-skip-unneeded-data-generation | done | medium | unknown | "✅ CLI: Detect and Skip Unneeded Data Generation" |
 | cli-detect-and-skip-unneeded-data-generation-2 | done | medium | unknown | "CLI: Detect and Skip Unneeded Data Generation ✅" |
 | cli-guided-run-enhancements-completed | done | medium | unknown | CLI Guided Run Enhancements ✅ COMPLETED |
@@ -166,6 +180,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | clickbench-dataframe-queries-446-stmts-30-5 | planning | medium | main | ClickBench dataframe queries (446 stmts, 30.5%) |
 | clickbench-empty-string-vs-null-constraint-issue-completed | done | medium | unknown | ✅ ClickBench Empty String vs NULL Constraint Issue (COMPLETED) |
 | clickhouse-alias-removal-post-deprecation | done | low | main | Remove temporary clickhouse→clickhouse-local/server compatibility aliases after deprecation window |
+| clickhouse-applied-ledger-fidelity-20260724 | planning | medium-high | main | ClickHouse applied-ledger fidelity: corroborate partition keys, record schema DDL in execution order |
 | clickhouse-cloud-deployment | done | medium | platform-expansion | ClickHouse Cloud Deployment Mode |
 | clickhouse-coffeeshop-dialect-overrides | done | medium-high | platform-expansion | Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type) |
 | clickhouse-delta-support-via-conversion-or-external-tooling | planning | medium | main | ClickHouse Delta support via conversion or external tooling |
@@ -178,11 +193,13 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | clickhouse-tpcdi-dialect-overrides | done | medium | platform-expansion | Add ClickHouse dialect overrides for TPC-DI analytics queries (JULIANDAY, NULLIF, FILTER, subqueries) |
 | clickhouse-tpcds-silent-empty-query-bug | done | critical | platform-expansion | Fix TPC-DS silent empty-query bug - surface FAILED when power test returns 0 queries |
 | clickhouse-tpchavoc-q6-decimal-bug | done | medium-high | platform-expansion | Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6) |
+| clickhouse-tuning-ledger-soundness-1275-followups-20260724 | planning | medium-high | main | ClickHouse tuning-ledger soundness follow-ups from #1275 (partition-key corroboration + applied_ledger_hash DDL ordering) |
 | close-pre-beta-release-blockers | done | critical | main | Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating |
 | cloud-adapter-staged-load-template | planning | medium | main | Extract a shared staged-load template method for redshift/snowflake (and evaluate bigquery/databricks) |
 | cloud-dw-sorted-data-ingestion | done | high | physical-tuning | Add sorted data ingestion support for cloud data warehouses to compare against clustering/Z-order/partitioning |
 | cloud-integration-test-gaps | done | medium-high | platform-expansion | Cloud Integration Test Infrastructure - Address Review Gaps |
 | cloud-integration-test-infrastructure | done | medium-high | platform-expansion | Cloud Platform Integration Test Infrastructure - Deferred Live Tests |
+| cloud-path-scheme-aliases-raise-in-create-path-handler | done | medium | platform-expansion | azure://, gcs:// and abfss:// classify as cloud but raise in create_path_handler |
 | cloud-platform-benchmarking-notebooks | done | medium | unknown | ✅ Cloud Platform Benchmarking Notebooks |
 | cloud-platform-cost-estimation | done | high | platform-expansion | Add cost estimation support for cloud platforms (Firebolt, Fabric, Synapse) |
 | cloud-platform-error-context | done | medium | observability-quality | Cloud Platform Error Message Context |
@@ -195,6 +212,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | cloud-spark-shared-infrastructure | done | critical | platform-expansion | Cloud Spark Shared Infrastructure |
 | cloud-sql-open-table-format-loading | done | medium | main | Finish Delta loading closure for Redshift and BigQuery adapters |
 | cloud-staging-path-cloudstagingpath-databrickspath-construct | planning | medium | main | Cloud staging path (CloudStagingPath/DatabricksPath) construction-time injection edge cases |
+| cloud-staging-path-rewrap-drops-cloud-target | done | low | platform-expansion | create_path_handler drops cloud_target when re-wrapping a CloudStagingPath |
 | code-review-checklist-additions-for-spec-docs | done | medium | main | Add proposal/spec-doc checks to the /code review checklist |
 | codex-pr-review-followups-week-2026-05-01 | done | high | main | Address unresolved Codex PR review follow-ups from the week ending 2026-05-01 |
 | codex-pr-review-followups-week-2026-05-03 | done | high | main | Address unresolved Codex PR review follow-ups from the week ending 2026-05-03 |
@@ -271,7 +289,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | create-tuning-configuration-variants-for-benchmark-examples-completed | done | medium | unknown | Create Tuning Configuration Variants for Benchmark Examples ✅ COMPLETED |
 | create-unified-multi-platform-benchmark-runner-completed | done | medium | unknown | Create Unified Multi-Platform Benchmark Runner - COMPLETED ✅ |
 | cross-platform-benchmark-suite | done | medium | dataframe-performance | DataFrame Cross-Platform Benchmark Suite |
-| cross-surface-baseline-stale-entry-autodetect | planning | low | main | Auto-detect and PR resolved cross-surface known-divergence baseline entries on a schedule |
+| cross-surface-baseline-stale-entry-autodetect | done | low | main | Auto-detect and PR resolved cross-surface known-divergence baseline entries on a schedule |
 | cross-surface-baseline-update-flag | done | medium | main | Build the --update-baseline flag/target promised by cross-surface known-divergence hygiene |
 | cross-surface-comparator-boundary-tie-soundness | done | low | main | Cross-surface comparator: make the final-tie-group guard boundary-aware (one-visible-row LIMIT ties) |
 | cross-surface-comparator-complete-final-tie-group-soundness | done | medium | main | Cross-surface comparator: close the >=2 final-tie-group gap for a complete (non-truncated) final tie |
@@ -301,10 +319,12 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | databricks-example-modernization-completed | done | medium | unknown | Databricks Example Modernization ✅ COMPLETED |
 | databricks-liquid-clustering-tuning-review-20260526 | active | high | main | Databricks liquid clustering review follow-up: runtime compatibility, validation gaps, and live certification |
 | databricks-liquid-clustering-tuning-support | done | high | physical-tuning | Add first-class Databricks Liquid Clustering support in BenchBox tuning configurations |
+| databricks-path-missing-joinpath-skips-manifest-validation | done | medium | platform-expansion | DatabricksPath lacks joinpath, so runner silently skips datagen manifest validation for Databricks runs |
 | databricks-tpc-liquid-clustering-profile-rendering | done | high | main | Model Databricks TPC Liquid Clustering as a first-class reusable profile rendering |
+| dataframe-adapter-ledger-instrumentation-20260724 | planning | medium-high | dataframe-benchmarks | DataFrame adapters export an empty applied ledger (datafusion-df, dask-df publish noop for tuned runs) |
 | dataframe-ai-primitives | done | medium | dataframe-benchmarks | Implement DataFrame Version of AI Primitives Benchmark |
 | dataframe-backwards-compatibility-and-mode-coexistence | done | critical | dataframe-phase0-compat | DataFrame Backwards Compatibility and Mode Coexistence |
-| dataframe-csv-coercion-single-shared-step | planning | medium | main | Consolidate per-adapter empty-string/null CSV coercion into one shared step |
+| dataframe-csv-coercion-single-shared-step | done | medium | main | Consolidate per-adapter empty-string/null CSV coercion into one shared step |
 | dataframe-csv-empty-string-null-uniform | done | medium-high | main | Normalize empty-string-vs-null semantics across all DataFrame adapters on the CSV-direct load path |
 | dataframe-csv-empty-string-parity-coverage | done | medium | main | Pin empty-string/null CSV parity across all DataFrame adapters, not just DataFusion+PySpark |
 | dataframe-data-loading-strategy-and-format-management | done | critical | dataframe-phase0-data-loading | DataFrame Data Loading Strategy and Format Management |
@@ -372,6 +392,8 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | derive-credential-secondary-port-literals-password-http-port | planning | medium | main | Derive credential/secondary-port literals (password=, http_port=, be_http_port=) from canonical sources |
 | design-and-implement-core-dataframe-abstractions | done | critical | dataframe-core | Design and Implement Core DataFrame Abstractions |
 | design-results-ingest-storage-and-derived-read-model | done | high | main | Design results ingest, storage, and derived read-model architecture |
+| dev-loop-metrics-ci-failure-baseline | dropped | high | ci-failure-reduction | Baseline CI-failure metrics in dev-loop-metrics before landing the reduction workstreams |
+| dev-loop-metrics-ci-failure-baseline-2 | done | high | ci-failure-reduction | Baseline CI-failure metrics in dev-loop-metrics before landing the reduction workstreams |
 | dev-loop-queue-acceptance-criteria-from-blind-spots | active | medium | main | Pre-register four 2026-04-30 blind-spots as Step 6 queue acceptance criteria |
 | dev-loop-step-0-verify-assumptions | done | high | main | Dev-loop simplification — Step 0: verify assumptions before changing anything |
 | dev-loop-step-1-local-loop-cleanup | done | high | main | Dev-loop simplification — Step 1: opt-in pre-push, bounded fanout, conservative test lock |
@@ -380,7 +402,10 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | dev-loop-step-3a-path-based-ci-skip | done | high | main | Dev-loop simplification — Step 3a: path-based CI skip for content-only PRs |
 | dev-loop-step-4-post-merge-safety-net | done | high | main | Dev-loop simplification — Step 4: develop-post-merge auto-revert + dev-loop metrics |
 | dev-loop-step-5-measurement-window | active | medium-high | main | Dev-loop simplification — Step 5: 30-day measurement window with queue decision thresholds |
-| dev-loop-step-6-queue-decision-gate | active | medium | main | Dev-loop simplification — Step 6: queue implementation gate — DEFERRED until Step 5 justifies |
+| dev-loop-step-6-gate-refresh | done | medium | ci-failure-reduction | Refresh the stale merge-queue decision gate: dev-loop-step-6-queue-decision-gate targets the retired YAML tracker and ignores the WS9 baseline |
+| dev-loop-step-6-queue-decision-gate | dropped | medium | main | Dev-loop simplification — Step 6: queue implementation gate — DEFERRED until Step 5 justifies |
+| dev-loop-step-6-queue-decision-gate-2 | dropped | medium | main | Dev-loop simplification — Step 6: queue implementation gate (re-homed to hosted tracker; gated on Step 5 + WS9 baseline) |
+| dev-loop-step-6-queue-decision-gate-3 | planning | medium | main | Dev-loop simplification — Step 6: queue implementation gate (re-homed to hosted tracker; gated on Step 5 + WS9 baseline) |
 | df-suffix-platform-options-unreachable | done | medium | main | DataFrame -df platform options are unreachable from `benchbox run` |
 | df-support-flightdata | done | medium-high | main | Add DataFrame execution support to FlightData benchmark |
 | df-support-joinorder | done | medium-high | main | Add DataFrame execution support to JoinOrder benchmark |
@@ -388,6 +413,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | df-support-tpchavoc | done | medium | main | Add DataFrame execution support to TPC-Havoc benchmark |
 | df-support-transaction-primitives | done | medium | main | Add DataFrame execution support to Transaction Primitives benchmark |
 | distinct-database-naming-based-on-configuration-characteristics | done | medium | unknown | Distinct Database Naming Based on Configuration Characteristics |
+| docs-browser-duckdb-schema-column-drift-20260724 | planning | low | main | Sync browser-duckdb-schema.sql with the ADR-2 physical_mechanisms / physical_rendering_id columns |
 | docs-document-undocumented-cli-commands | done | high | main | Document 10 undocumented CLI commands and 13 undocumented run flags |
 | docs-fix-critical-accuracy-errors | done | high | main | Fix critical documentation accuracy errors - broken code, phantom benchmark, wrong flags |
 | docs-fix-deprecated-references | done | medium-high | main | Clean up deprecated command references and stale content across docs |
@@ -398,7 +424,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | document-driver-versioning-for-polars-clickhouse-postgresql | done | low | main | Add driver version management callouts to Polars, ClickHouse Cloud, and PostgreSQL platform docs |
 | document-stdout-patches | done | high | tpcds-docs | Document TPC-DS stdout patches and credit tpcds-kit origin |
 | documentation-structure-reorganization | done | high | unknown | ✅ Documentation Structure Reorganization |
-| done-item-metric-truthfulness-audit | planning | medium | main | Audit metric/scope truthfulness across all historical DONE items and add a recurrence guard |
+| done-item-metric-truthfulness-audit | active | medium | main | Audit metric/scope truthfulness across all historical DONE items and add a recurrence guard |
 | drop-chdb-core-from-core-dependencies | done | medium | main | Drop chdb-core from [project] dependencies (transitive of optional chdb) |
 | drop-lxml-dev-dep-or-port-test-to-stdlib | done | low | main | Drop lxml dev dep (port single test to stdlib xml.etree) |
 | drop-pandas-from-core-dependencies | done | critical | main | Drop pandas from core dependencies for v0.3.1 by fixing the eager import surface |
@@ -466,6 +492,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | explorer-add-tuning-config-visibility | done | medium-high | main | Surface tuning config in explorer detail pages and enable cross-tuning comparison |
 | explorer-align-duration-metric | done | high | main | Align explorer duration metric to geomean; retire wall-clock as primary comparison axis |
 | explorer-align-ranking-metric-with-tpc-standards | done | high | main | Select ranking metric per benchmark family (power_score for TPC, geomean elsewhere) |
+| explorer-applied-receipt-drilldown-20260724 | planning | medium | main | Explorer drill-down for the per-statement applied-tuning receipt (.applied.json) |
 | explorer-benchmark-summary-review-followups | done | low | main | Address follow-up findings from benchmark-summary artifact code review |
 | explorer-canonical-browser-duckdb-read-model | done | high | main | Make DuckDB-WASM the sole browser store for all user-visible explorer metrics |
 | explorer-chart-correctness-and-navigation | done | high | main | Explorer: chart correctness, log-scale latency encoding, and chart navigation |
@@ -481,6 +508,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | explorer-cross-benchmark-meta-leaderboard | done | medium | main | Add cross-benchmark meta-leaderboard to the home page |
 | explorer-csp-frame-ancestors-meta-cleanup | done | low | main | Remove the inert frame-ancestors directive from the explorer CSP meta tag |
 | explorer-dev-snapshot-dx | done | medium | explorer-dev-snapshot-dx | Eliminate the stale-snapshot wall blocking explorer `npm run dev` |
+| explorer-e2e-dataload-flakiness-20260724 | planning | medium-high | main | Stabilize explorer e2e data-load flakiness (waitForDataLoaded timeouts under parallel CI load) |
 | explorer-emit-benchmark-summary-artifact | done | high | main | Emit per-benchmark summary artifact for matrix leaderboard view |
 | explorer-emit-comparison-artifact-from-pipeline | done | high | main | Emit pre-computed comparison artifact from pipeline so Compare page becomes a renderer |
 | explorer-establish-cli-explorer-parity-tests | done | critical | main | Establish CLI↔explorer visualization parity test infrastructure (fixture-driven) |
@@ -498,6 +526,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | explorer-parity-tests-review-followups | done | low | main | Address follow-up findings from parity-tests code review |
 | explorer-performance-perceived-latency | done | medium-high | main | Explorer: DuckDB-WASM load performance and perceived-latency hardening |
 | explorer-phase-a-f-review-followups | done | low | main | Fix nit-level findings from six explorer phase A-F code reviews (2026-04-17 TODOs) |
+| explorer-physical-rendering-id-facet-20260722 | done | medium | main | Surface physical_rendering_id secondary facet in explorer UI |
 | explorer-pipeline-frontend-handoff | active | medium | results-labels-funding | Project funding into read-model views + render the funding chip/legend + e2e |
 | explorer-pipeline-meta-leaderboard-widening | done | high | main | Explorer pipeline: widen MetaRank cells and emit results_schema.json |
 | explorer-query-workbench | done | high | main | Explorer: CloudSpecs-style /results/query workbench over results.duckdb |
@@ -514,6 +543,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | explorer-unify-visualization-foundations | done | high | main | Unify visualization foundations: dual-speedup bug, theme constants, error UX, responsive SVG |
 | explorer-unify-visualization-review-followups | done | low | main | Address follow-up findings from unify-visualization-foundations code review |
 | explorer-url-synced-filter-state | done | medium-high | main | Explorer: URL-synced filter state via useUrlState hook |
+| explorer-verified-state-display-20260722 | done | medium | main | Explorer receipt display of tuning verified-state (applied_verified) |
 | explorer-visualization-review-followup-nits | done | low | main | Fix nit-level findings from explorer visualization code reviews |
 | expose-query-comparability-metadata-in-cli-output-and-persis | planning | medium | main | Expose query comparability metadata in CLI output and persisted result artifacts |
 | extend-blog-critique-vendor-response-axes | done | medium | main | Add Currency, Partisan-Reader, and Shelf-life axes to the /blog critique rubric |
@@ -530,7 +560,22 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | fabric-spark-platform | done | medium-high | platform-expansion | Microsoft Fabric Spark Platform |
 | factor-shared-helper-libraries-across-presto-trino-spark-fam | planning | medium | main | Factor shared helper libraries across Presto/Trino/Spark-family DDL optimizers after parity is established |
 | fail-open-policy-and-translation-strictness | done | medium-high | main | Architecture hardening: define fail-open vs fail-closed policy for translation and validation |
+| fast-lane-ceiling-decouple-contention | dropped | high | ci-failure-reduction | Fast-lane budget: remove per-PR contention on fast_test_lane_policy.json (log split, quantum, base-relative delta, auto-ratchet) |
+| fast-lane-decouple-ceiling-contention | dropped | high | ci-failure-reduction | Fast-lane budget: remove per-PR contention on fast_test_lane_policy.json (log split, quantum, base-relative delta, auto-ratchet) |
+| fast-lane-decouple-ceiling-contention-2 | done | high | ci-failure-reduction | Fast-lane budget: remove per-PR contention on fast_test_lane_policy.json (log split, quantum, base-relative delta, auto-ratchet) |
+| fast-lane-wallclock-budget-decision | planning | medium | ci-failure-reduction | DECISION GATE: adopt a wall-clock fast-lane budget once 4 weeks of WS9 duration data exist |
 | finalize-monitoring-module-scope | done | medium | observability-quality | Finalize Monitoring Module Scope |
+| findings-link-fk-delete-safety-20260724 | planning | medium-high | findings-domain | finding_links FK is not delete-safe: a hosted --replace reload can fail or leave stale links |
+| findings-phase0-governance | done | high | findings-domain | Findings domain phase 0: governance amendments + land the spec |
+| findings-phase1-capture-redirect | done | high | findings-domain | Findings domain phase 1: redirect capture to gitignored drafts, retarget validator |
+| findings-phase2-export-boundary | done | high | findings-domain | Findings domain phase 2: pin the repo-committed export allowlist + fix events export |
+| findings-phase2-standalone-guard | planning | medium | findings-domain | Findings export: guard the standalone package committed lossless envelope |
+| findings-phase3-schema-cli | done | medium-high | findings-domain | Findings domain phase 3: deferral-shaped schema v3 + todo finding CLI + sync |
+| findings-phase4-surfacing | planning | medium-high | findings-domain | Findings domain phase 4: surface candidates in ready/stats + reroute skills |
+| findings-phase5-migration | planning | medium | findings-domain | Findings domain phase 5: migrate 67 records with defined parity, freeze the tree |
+| findings-phase6-demolition | planning | medium | findings-domain | Findings domain phase 6: delete the Markdown tree + retire the old tooling |
+| findings-schema-legacy-frontmatter-mapping-20260724 | planning | medium | findings-domain | findings schema has no lossless home for legacy optional frontmatter (related_paths, suggested_sweep) |
+| findings-sync-full-payload-comparison-20260724 | planning | medium-high | findings-domain | findings sync drops edited evidence: _finding_matches ignores fields outside _CONTENT_FIELDS |
 | firebolt-cloud-deployment | done | low | platform-expansion | Firebolt Cloud Deployment Mode |
 | firebolt-mode-validation | done | medium | platform-expansion | Firebolt Core/Cloud Mode Validation |
 | firebolt-platform-documentation | done | high | docs-experience | Firebolt Platform Documentation |
@@ -581,6 +626,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | full-public-site-visual-regression-suite | planning | medium | main | Full public-site visual regression suite |
 | full-string-to-array-support-returning-actual-list-expressio | planning | medium | dataframe-benchmarks | Full string_to_array support (returning actual list expressions, not split_part proxy) |
 | future-ideas-backlog | planning | low | main | Future Ideas Backlog - Specialized Benchmarks and Infrastructure |
+| gate-cloud-output-default-by-deployment-mode | done | medium | core-functionality | Cloud output-location default is applied by platform category, ignoring the deployment mode |
 | gate-monitoring-behind-optional-extra | done | high | main | Gate monitoring behind a benchbox[monitoring] optional extra |
 | gcp-dataproc-platform | done | high | platform-expansion | GCP Dataproc Managed Spark Platform |
 | gcs-azure-object-storage-backends-for-data-path | planning | medium | ducklake-platform | GCS / Azure object storage backends for DATA_PATH |
@@ -599,10 +645,13 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | guard-browser-fixture-generator-against-benchbox-cli-drift | done | medium | main | Guard the browser fixture generator against silent `benchbox explorer build` CLI drift |
 | guard-todo-cleanup-direct-commits | done | medium | main | Prevent accidental direct commits on develop/main branches by todo_cli cleanup |
 | guard-tpc-ds-fractional-scale-defaults | done | high | benchmark-expansion | Guard TPC-DS Fractional Scale Defaults |
+| guards-fix-regen-target | dropped | medium | ci-failure-reduction | make guards-fix: one command regenerates every regenerable guard artifact; every drift guard prints its exact remediation |
+| guards-fix-regen-target-2 | done | medium | ci-failure-reduction | make guards-fix: one command regenerates every regenerable guard artifact; every drift guard prints its exact remediation |
 | harden-auto-merge-on-open-stranding | done | low | main | Diagnose + guard the auto-merge-on-open stranding that orphaned 3 remediation fixes |
 | harden-is-dml-query-replace-upsert | done | low | main | Defensively cover REPLACE INTO / UPSERT INTO in is_dml_query |
 | harden-normalized-plan-fingerprint | done | medium | main | Harden normalized plan fingerprint: literal-masking gaps + cross-mode mixing marker |
 | harden-operator-type-handling | done | high | query-plan-remediation | Harden plan comparison and visualization for unknown operator types |
+| harden-tpc-binary-checksum-verification | planning | medium | core-functionality | Harden TPC binary checksum verification (BSD-format manifests silently skip) |
 | harden-unified-runner-cli-parsing | done | high | docs-experience | ✅ Harden Unified Runner CLI Parsing |
 | harden-unit-tests-against-optional-dependencies | done | medium | unknown | ✅ Harden Unit Tests Against Optional Dependencies |
 | harmonize-benchmark-runtime-contract-and-base-classes | done | high | core-functionality | Harmonize benchmark runtime contract and base classes across all benchmarks |
@@ -722,6 +771,8 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | landing-prompts-static-route | done | high | main | Implement the static /prompts/ landing route and prompt builder UI |
 | launch-results-explorer-acceptance-and-seed | done | medium-high | main | Launch results explorer: acceptance testing, seed corpus verification, and go-live |
 | library-performance-testing | done | medium | unknown | ✅ Library Performance Testing |
+| lint-lane-report-all-guards | dropped | medium-high | ci-failure-reduction | Lint lane reports ALL guard failures in one CI round trip (no fail-fast between independent guards) |
+| lint-lane-report-all-guards-2 | done | medium-high | ci-failure-reduction | Lint lane reports ALL guard failures in one CI round trip (no fail-fast between independent guards) |
 | live-integration-tests-with-starburst-galaxy-w22-w24 | planning | medium | platform-expansion | Live integration tests with Starburst Galaxy (w22-w24) |
 | livy-spark-adapters-open-table-format-loading | done | medium-high | main | Close open-table-format loading gaps for Livy-based Spark adapters |
 | local-ci-equivalents | done | high | ci-infrastructure | Ensure local equivalents exist for all CI workflow steps |
@@ -731,6 +782,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | lxml-cve-pysec-2026-87-blocked-by-redshift-connector | active | medium | main | Unblock lxml PYSEC-2026-87 fix once redshift-connector relaxes its lxml pin |
 | maintainer-review-g4-uncertain-deferrals | planning | medium | main | Maintainer review of 27 G4 UNCERTAIN deferrals |
 | make-benchmark-query-tests-hermetic | done | medium | unknown | ✅ Make Benchmark Query Tests Hermetic |
+| make-cloud-output-default-gate-deployment-aware | dropped | medium | core-functionality | Cloud output-location default is applied by platform category, ignoring the deployment mode |
 | make-parquet-default-for-tpcds-obt | done | high | main | Make Parquet the default output format for TPC-DS OBT |
 | make-platform-capabilities-entirely-test-derived | planning | medium | main | Make platform capabilities entirely test-derived |
 | managed-spark-adapter-follow-up-items | planning | medium | main | Managed Spark adapter follow-up items |
@@ -741,6 +793,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | mcp-statistics-phase-opt-in | done | low | main | feat(mcp): expose the statistics-phase opt-in through the MCP run_benchmark tool |
 | mcp-visualization-tools | done | medium-high | mcp-integration | Add visualization tools to MCP server |
 | measure-actual-uncompressed-sizes-at-sf-1-for-all-benchmarks | planning | medium | main | Measure actual uncompressed sizes at SF=1 for all benchmarks |
+| medium-test-timeout-headroom | done | medium-high | ci-failure-reduction | medium-test job runs at ~29min against a 30min timeout - one scheduling hiccup cancels the required lane |
 | medium-tier-ci-home | done | medium | main | Give the medium pytest speed tier a CI ring (currently local-only for ~81 files) |
 | medium-tier-pre-merge-lane | done | high | auto-revert-incident | Run the medium test tier pre-merge on code PRs so medium breakage cannot land unexecuted |
 | medium-tier-red-disposition-and-promotion | done | medium-high | main | Disposition the medium tier's live failures on develop, get medium-test green, then wire it into auto-revert per its recorded criterion |
@@ -775,7 +828,8 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | multi-region-performance-testing | done | medium | enterprise-ops-multi-region | Multi-Region Performance Testing |
 | natural-language-to-sql-testing-framework | done | medium | ai-ml-nl2sql | Natural Language to SQL Testing Framework |
 | negative-wait-test-a-healthcheck-that-never-passes | planning | medium | main | Negative --wait test (a healthcheck that never passes) |
-| nightly-throughput-gate-restoration | planning | medium-high | uat-hardening | Remove continue-on-error from the nightly throughput UAT sweep and strengthen stream-count semantics |
+| nightly-throughput-gate-restoration | done | medium-high | uat-hardening | Remove continue-on-error from the nightly throughput UAT sweep and strengthen stream-count semantics |
+| nightly-throughput-operator-green-run | planning | medium | uat-hardening | Operator: confirm nightly throughput-uat green with gating (workflow_dispatch) |
 | non-dataframe-test-coverage | done | high | main | Increase core, CLI, platform, and utils test coverage to 80% |
 | normalize-pg-family-driver-package-fallback | done | low | main | Normalize driver_package fallback string across pg-family config builders |
 | notimplementederror-completions-completed | done | medium | unknown | NotImplementedError Completions ✅ COMPLETED |
@@ -799,6 +853,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | parallel-test-run-lock | done | medium | ci-infrastructure | Prevent concurrent parallel test runs via fcntl.flock mutex |
 | parity-check-develop-ring | done | medium | main | Give make parity-check a CI ring on develop (currently main-only) |
 | parity-check-promotion | done | medium | main | Promote parity-check from non-blocking to the required develop-PR lane once its two recorded criteria hold |
+| parity-fixture-regen-float-determinism | planning | low | ci-failure-reduction | parity-fixtures regen is not byte-deterministic across platforms (last-digit float diff) |
 | patch-and-redistribute-tpcds-dsdgen-subscale-support | done | high | main | Patch and redistribute TPC-DS dsdgen binaries for subscale support |
 | patch-tpcds-source-stdout | done | high | tpcds-stdout-fix | Patch TPC-DS source to fix stdout data generation |
 | patch-tpch-source-stdout | done | high | tpch-stdout-fix | Patch TPC-H source to fix stdout data generation |
@@ -859,6 +914,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | power-run-iterations-configuration-completed | done | medium | unknown | Power Run Iterations Configuration ✅ COMPLETED |
 | pr-gate-package-and-audit-promotion | done | medium-high | main | Promote package build/install smoke and pip-audit to the develop-PR required lane |
 | pr-gate-path-filter-output-lockstep-test | done | medium-high | main | Pin ci-paths job-level outputs to the path-filter groups so a missing output mapping can never silently disable a gate again |
+| pr-gate-tpch-binary-framing-coverage | planning | medium | ci-infrastructure | Close PR-gate gap: darwin/windows TPC-H binaries behaviorally validated only on nightly |
 | pr-postgres-sample-antiskip-guard | done | medium | main | Back-port nightly's anti-skip guard to pr.yml's non-blocking postgres-integration sample |
 | pre-cell-predictive-disk-check-so-one-oversized-cell-cannot | planning | medium | uat-hardening | Pre-cell (predictive) disk check so one oversized cell cannot fill the disk before the post-cell watch fires |
 | pre-compile-tpc-binaries-for-multiple-platforms-completed | done | medium | unknown | Pre-Compile TPC Binaries for Multiple Platforms ✅ COMPLETED |
@@ -867,7 +923,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | presorted-open-table-format-datasets | done | high | physical-tuning | Support creation of pre-sorted / pre-clustered datasets in open table formats |
 | presto-trino-platform-documentation | done | high | docs-experience | Presto and Trino Platform Documentation |
 | productize-result-publishing-and-artifact-sharing | done | high | main | Productize result publishing and artifact sharing workflow |
-| promote-non-required-regression-reproducers-suite-audit | planning | medium | main | Audit the whole suite for regression reproducers parked outside required develop CI |
+| promote-non-required-regression-reproducers-suite-audit | done | medium | main | Audit the whole suite for regression reproducers parked outside required develop CI |
 | promote-vector-search-beta-stable-once-it-has-a-benchmarkspe | planning | medium | main | Promote vector_search beta -> stable once it has a BenchmarkSpec |
 | prompts-landing-phase1-cli-hygiene | done | high | main | Prompts landing — Phase 1: --non-interactive, output discipline, summary, force-datagen footer |
 | prompts-landing-phase2-cost-aware-gating | done | medium-high | main | Prompts landing — Phase 2: cost-class flag + smoke-at-0.01 + cost-acknowledgment step |
@@ -962,7 +1018,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | query-plan-capture-misc-parser-live-validation | planning | medium | platform-expansion | Validate the Databend / QuestDB / Doris / SingleStore plan parsers against real EXPLAIN output |
 | query-plan-capture-misc-platforms | done | low | platform-expansion | Implement or resolve query plan capture for QuestDB, Velox, Databend, MotherDuck, cuDF, Doris, and SingleStore |
 | query-plan-capture-parser-live-validation | planning | medium | platform-expansion | Track and validate plan parsers that were only tested against synthetic fixtures |
-| query-plan-capture-phase-analyze-opt-in | planning | low | main | Add an opt-in to capture ANALYZE plans in the post-measurement phase |
+| query-plan-capture-phase-analyze-opt-in | dropped | low | main | Add an opt-in to capture ANALYZE plans in the post-measurement phase |
 | query-plan-capture-phase-respect-analyze | done | high | main | Make the isolated capture phase respect analyze_plans (restore the ANALYZE knob) |
 | query-plan-capture-post-measurement-divergence | done | medium-high | main | Resolve post-measurement plan divergence when the workload mutates data mid-run |
 | query-plan-capture-postgresql-dml-guard | done | high | platform-expansion | Add DML guard to PostgreSQLAdapter.get_query_plan() to prevent double-execution of writes |
@@ -973,7 +1029,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | query-plan-capture-spark-databricks | done | medium | platform-expansion | Implement query plan parser and end-to-end capture for Spark and Databricks adapters |
 | query-plan-capture-strict-error-swallow | done | high | platform-expansion | Fix strict-mode PlanCaptureError swallowing in SQLite and MotherDuck execute_query |
 | query-plan-capture-timeout-mechanism-fix | done | medium | main | Fix plan capture timeout: ThreadPoolExecutor shutdown blocks despite TimeoutError |
-| query-plan-capture-tpc-power-driver-persistence | planning | medium | main | Persist captured query plans for the TPC-H and TPC-DS power drivers |
+| query-plan-capture-tpc-power-driver-persistence | dropped | medium | main | Persist captured query plans for the TPC-H and TPC-DS power drivers |
 | query-plan-cli-visualization | done | high | query-plan-cli | Query Plan CLI & Visualization |
 | query-plan-comparison-engine | done | high | query-plan-comparison | Query Plan Comparison Engine |
 | query-plan-core-infrastructure-models-storage | done | critical | query-plan-core | Query Plan Core Infrastructure (Models & Storage) |
@@ -998,8 +1054,11 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | read-primitives-waivers-classified-divergence | done | medium-high | main | Convert Read Primitives' 17 bare-string known-divergence waivers to detail-bounded ClassifiedDivergence |
 | rebuild-tpcds-binaries | done | high | tpcds-stdout-fix | Rebuild TPC-DS binaries with stdout fix for all platforms |
 | rebuild-tpch-binaries | done | high | tpch-stdout-fix | Rebuild TPC-H binaries with stdout fix for all platforms |
+| recognize-snowflake-stage-paths-in-path-classification | dropped | high | platform-expansion | Snowflake internal stage paths (@~/...) are classified as local and become relative directories |
 | reconcile-docs-from-spec-gap-analysis | done | medium-high | main | Reconcile documentation gaps found in archived spec review |
 | reconcile-docs-review-code-followups | done | medium-high | main | Reconcile three code-level inconsistencies surfaced by docs review |
+| reconcile-snowflake-output-location-guidance | dropped | low | platform-expansion | Snowflake output-location guidance contradicts itself (credential prompt defaults to a stage the registry never lists) |
+| reconcile-snowflake-output-location-sources | done | low | platform-expansion | Snowflake output-location guidance contradicts itself (credential prompt defaults to a stage the registry never lists) |
 | redshift-maximum-approximate-coverage | done | medium-high | main | Redshift: bring approximate-aggregate + sketch coverage to the natural HLL-only ceiling |
 | redshift-tpc-h-production-readiness-fixes | done | critical | unknown | ✅ Redshift TPC-H Production Readiness Fixes |
 | redshift-tpc-h-validation-fixes-critical-bug-repairs | done | critical | unknown | ✅ Redshift TPC-H Validation Fixes - Critical Bug Repairs |
@@ -1027,10 +1086,12 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | reinstate-benchmark-coverage-with-test-doubles | done | high | unknown | ✅ Reinstate Benchmark Coverage with Test Doubles |
 | release-accounting-drift-correction | done | high | main | Correct CHANGELOG/README release accounting drift and add a tag-claim guard |
 | release-automation-unit-tests | done | medium-high | core-functionality | Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks, scripts) |
+| release-canary-ruleset-drift-baseline-refresh | active | high | release-tooling | Refresh the ruleset-drift baseline so release-canary goes green (release PRs are blocked on canary freshness) |
 | release-canary-scheduled-activation | active | high | main | Get release-canary.yml actually firing: the workflow is not on the default branch, so its daily schedule has never run |
 | release-finalize-pretag-ci-wait | done | critical | main | Make release-finalize wait for release-required checks before tagging |
 | release-flow-dry-run-rc1 | done | high | main | Dry-run release on 0.3.0-rc.1 to validate the 2-command flow end-to-end |
 | release-full-suite-canary-and-ruleset-drift | done | high | main | Add full-suite canary and GitHub ruleset drift detection for release readiness |
+| release-readiness-py310-utc-compat | active | medium-high | release-tooling | Fix py3.10 incompatibility in release_readiness_check.py (from datetime import UTC) |
 | release-recovery-v0-3-1 | done | critical | main | Recover the failed v0.3.0 install smoke with a monotonic v0.3.1 release |
 | release-required-main-pr-test-contract | done | critical | main | Create a mandatory release-required test contract for main PRs |
 | release-tag-publish-hardening | done | high | main | Harden release.yml so PyPI publish requires a validated, on-main tag |
@@ -1171,8 +1232,10 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | results-explorer-uat-multi-scale-corpus-sweep | done | medium-high | main | Results Explorer UAT: multi-scale, multi-platform corpus sweep |
 | results-normalized-cost-contract-cloud-facets | done | high | main | Results pipeline: normalized cost contract and cloud deployment facets |
 | results-publishing-coverage-work | planning | medium | main | Results-publishing coverage work |
+| resync-tpch-darwin-x86-64-binaries | planning | medium-high | tpch-stdout-fix | Resync stale darwin-x86_64 TPC-H binaries (parallel to darwin-arm64 #1256) |
 | retire-sqlglot-duckdb-all-workaround | done | medium | main | Retire obsolete _restore_group_order_by_all_keyword DuckDB workaround and update related docs |
 | review-dependency-upper-bounds-quarterly | planning | low | main | Quarterly review of dependency upper bounds |
+| review-remediations-verify-per-instance | planning | low | main | Verify remediation reviews per-instance, not per-claim (SCD2 audit L2 blind-spot) |
 | revisit-extras-naming-topology-e-g-dataframe-pandas-vs-panda | planning | medium | main | Revisit extras naming / topology (e.g. `dataframe-pandas` vs `pandas` aliases) |
 | rework-results-secondary-navigation-information-architecture | planning | medium | main | Rework Results secondary navigation information architecture |
 | rewrite-architecture-md-around-the-new-contract-map | planning | medium | main | Rewrite architecture.md around the new contract map |
@@ -1214,7 +1277,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | shrink-followup-restore-dataframe-orientation-docs | done | low | main | Restore orientation docstrings dropped by the dataframe-query body removals |
 | shrink-followup-sql-catalog-yaml-block-scalars | done | high | main | Re-serialize migrated SQL catalogs as YAML block scalars instead of escaped quoted strings |
 | shrink-objective-function-and-guardrail | done | high | main | Ratify and validate the corrected shrink objective function now encoded in the goal statement |
-| sigterm-sigint-handler-for-orphaned-compose-stacks-on-hard-k | planning | medium | uat-hardening | SIGTERM/SIGINT handler for orphaned compose stacks on hard kill |
+| sigterm-sigint-handler-for-orphaned-compose-stacks-on-hard-k | dropped | medium | uat-hardening | SIGTERM/SIGINT handler for orphaned compose stacks on hard kill |
 | simple-cloud-storage-path-support-completed | done | medium | unknown | Simple Cloud Storage Path Support ✅ COMPLETED |
 | simple-cloud-storage-path-support-completed-2 | done | medium | unknown | Simple Cloud Storage Path Support ✅ COMPLETED |
 | simplify-dataframe-extra-naming | done | medium-high | main | Simplify pyproject.toml extras: add plain-name aliases and unify DataFrame platform extras |
@@ -1239,6 +1302,8 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | smart-data-generation-completed | done | medium | unknown | Smart Data Generation ✅ COMPLETED |
 | snowflake-clickhouse-open-table-format-loading | done | medium | main | Finish delta/iceberg loading gaps for Snowflake and ClickHouse adapter modes |
 | snowpark-connect-platform | done | medium-high | platform-expansion | Snowpark Connect for Spark Platform |
+| soundness-pr-drain-signal | dropped | medium | ci-failure-reduction | Daily drain signal for soundness-gated PRs: green + auto-merge-withheld + idle > 24h |
+| soundness-pr-drain-signal-2 | done | medium | ci-failure-reduction | Daily drain signal for soundness-gated PRs: green + auto-merge-withheld + idle > 24h |
 | soundness-surface-widening | done | high | main | Widen the auto-merge soundness-review surface to cover oracle-adjacent assets |
 | spark-aqe-blog-reverify-claims | planning | medium | main | Re-verify search-derived claims in the Spark AQE research file against live primary sources |
 | spark-aqe-toggle-defects | done | medium | main | Fix Spark adapter AQE toggle: CLI flag cannot disable, run-time config force-re-enables |
@@ -1262,6 +1327,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | standardize-sql-dialect-handling-across-all-benchmarks-and-platform-adapters-com | done | medium | unknown | Standardize SQL Dialect Handling Across All Benchmarks and Platform Adapters ✅ COMPLETED |
 | standardize-test-commands | done | high | unknown | ✅ Standardize Test Commands |
 | starburst-platform-adapter | done | low | platform-expansion | Starburst Platform Adapter |
+| starrocks-distribute-by-clause-contract-20260724 | planning | medium | main | Decide the distribute_by contract (SQL clause vs summary) - StarRocks dry-run preview emits a stray bare column |
 | starrocks-olap-platform | done | medium | platform-expansion | Add StarRocks MPP OLAP platform support |
 | streamline-pytest-run-profiles | done | high | unknown | ✅ Streamline Pytest Run Profiles |
 | structural-debt-base-layer-tpc-and-module-split | done | low | main | Structural debt: extract TPC harnesses out of platforms/base/execution.py and split the cross_surface god-module |
@@ -1298,6 +1364,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | throughput-real-db-integration-tests | done | high | main | Add real-database multi-stream throughput integration tests (currently mocks only) |
 | throughput-result-handling-and-metrics | done | medium-high | main | Standardize throughput result handling: avoid GIL-serialized fetchall, fix TPC-DS row counts |
 | throughput-stream-count-wiring-defect | done | critical | main | Fix dropped stream count: user-requested concurrency never reaches the throughput driver |
+| throughput-stream-success-propagation | done | medium-high | uat-hardening | Propagate per-stream success into exported throughput results; make dead streams fatal outside the UAT lane |
 | throughput-timeout-leak-and-success-gates | done | medium | main | Mitigate timed-out stream leakage and reconcile divergent throughput success gates |
 | throughput-uat-and-ci-coverage | done | high | main | Add UAT and CI coverage for the throughput/concurrent phase (currently zero) |
 | tigerdata-cloud-enhancements | planning | low | platform-expansion | TigerData Cloud Enhancements |
@@ -1309,11 +1376,13 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | timing-clock-foundation-and-correctness | done | high | main | Establish centralized clock module and fix timing correctness bugs |
 | timing-full-repo-audit-and-allowlist-enforcement | done | medium-high | main | Perform full-repo timing audit/migration with wall-clock allowlist enforcement |
 | timing-guardrails-and-legacy-cleanup | done | medium | main | Enforce timing guardrails and remove legacy timing compatibility paths |
+| timing-policy-check-misreports-pytest-failure-as-violation | done | low | ci-failure-reduction | timing_policy_check.py reports 4 spurious FAST_LANE_VIOLATIONs when its subprocess pytest cannot run |
 | timing-policy-split-review-followups | done | medium | main | Address follow-up findings from timing-policy pre-commit split review |
 | timing-query-contract-unification | done | high | main | Unify runtime query timing contract to execution_time_seconds |
 | timing-runtime-wide-monotonic-migration | done | medium-high | main | Migrate runtime elapsed and timeout timing to centralized monotonic clock |
 | todo-add-todo-validation-to-pr-preflight | planning | medium | main | Add a pre-commit hook for validate_todo.py to catch invalid TODO YAML at commit time |
 | todo-backcompat-removal-matrix-formalize | planning | low | main | Decide fate of remove-alpha-backward-compatibility-surface-removal-matrix.md in main/active/ |
+| todo-cli-local-fallback-guard | done | medium-high | todo-db-standalone-extraction | Make the todo CLI's implicit local-SQLite fallback loud (it silently masquerades as the production tracker) |
 | todo-db-cutover-g5 | planning | medium-high | main | G5: cut over to the DB-backed TODO tracker (freeze & delete legacy) |
 | todo-dep-graph-unblocking-sweep | planning | medium-high | main | Sweep TODO dep graph after each release batch to surface items whose blockers are now in DONE |
 | todo-done-tree-location-convention | planning | low | main | Document and enforce a consistent location convention for items moved to the DONE tree |
@@ -1324,6 +1393,8 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | todo-schema-require-id-field | planning | medium | main | Add id to TODO_SCHEMA.yaml required fields so missing IDs are caught at validation time |
 | todo-skill-evidence-durability-conventions | done | medium | main | Add evidence-durability conventions to the TODO schema and review skill |
 | todo-sweep-completed-items-from-open-tree | done | low | main | Sweep planning/ directories for items with status: Completed and move them to DONE |
+| todo-verification-uv-project-self-contained | planning | medium | todo-db-standalone-extraction | Make todo verification commands self-contained across uv project boundaries |
+| todo-verify-grades-only-on-exit-code | done | medium | main | todo verify grades rungs solely on exit code, so 'expected output' verifications are unsatisfiable |
 | tpc-di-data-generator-compression-support | done | critical | unknown | ✅ TPC-DI Data Generator Compression Support |
 | tpc-di-dataframe-implementation-38-operations | planning | medium | dataframe-benchmarks | TPC-DI DataFrame implementation (38 operations) |
 | tpc-ds-dry-run-execute-real-test-sql-capture-power-throughput-maintenance | done | medium | unknown | "TPC-DS Dry Run: Execute Real Test SQL Capture (Power/Throughput/Maintenance) ✅" |
@@ -1342,12 +1413,14 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | tpcds-stdout-fix-integrate-stdout-datagen | done | high | tpcds-stdout-fix | Integrate stdout datagen with compression and format pipelines |
 | tpcds-stdout-fix-test-stdout-datagen | done | high | tpcds-stdout-fix | Add regression tests for TPC-DS stdout data generation |
 | tpcds-throughput-permutation-compliance | done | medium-high | main | Use dsqgen -STREAMS for TPC-DS throughput instead of home-grown ordering and parameters |
+| tpch-darwin-arm64-deployment-target-rebuild-20260724 | planning | high | main | Rebuild darwin-arm64 TPC-H qgen/dbgen with a lower MACOSX_DEPLOYMENT_TARGET (minos 26.0 breaks macOS <= 15) |
 | tpch-dataframe-unseeded-q11-scale-fraction | active | medium | main | Unseeded TPC-H DataFrame runs use the SF=1 Q11 fraction at every scale |
 | tpch-stdout-fix-integrate-stdout-datagen | done | high | tpch-stdout-fix | Integrate TPC-H stdout datagen with compression and format pipelines |
 | tpch-stdout-fix-test-stdout-datagen | done | high | tpch-stdout-fix | Add regression tests for TPC-H stdout data generation |
-| tpch-throughput-parameter-aware-rowcounts | planning | medium | uat-hardening | Parameter-aware expected row counts for TPC-H Q11/16/18/20 (validate instead of exclude) |
+| tpch-throughput-parameter-aware-rowcounts | active | medium | uat-hardening | Parameter-aware expected row counts for TPC-H Q11/16/18/20 (validate instead of exclude) |
 | tpch-throughput-rowcount-validation-range-mode | planning | medium-high | main | Fix TPC-H throughput row-count validation for the spec's non-deterministic queries (wire up RANGE mode) |
 | tpch-throughput-seed-validation-fix | done | high | uat-hardening | Fix TPC-H Q11/16/18/20 row-count validation under non-reference seeds so throughput runs can be clean |
+| tpch-tpcds-throughput-at-size-formula | done | high | uat-hardening | Fix exported Throughput@Size: driver formula omits the queries-per-stream factor (22x/99x understated) |
 | tpchavoc-correlated-subquery-self-binding | done | medium-high | main | Fix tpchavoc variants whose correlated subqueries silently self-bind to the inner alias |
 | tpchavoc-cross-dialect-equivalence-sampling | done | medium | main | Sample TPC-Havoc variant equivalence on a second SQL engine beyond DuckDB |
 | tpchavoc-dataframe-variant-equivalence-gate | done | high | main | Extend the TPC-Havoc result-equivalence gate to the DataFrame variants |
@@ -1366,43 +1439,53 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | tuning-adr-baseline-definition-and-renderer-20260712 | done | high | main | DECISION GATE: what 'notuning' promises, and the single tuning-DDL renderer (ADR-3) |
 | tuning-adr-mode-vocabulary-fallback-facets-20260712 | done | high | main | DECISION GATE: tuning mode vocabulary, fallback labeling, and facet semantics (ADR-2) |
 | tuning-adr-trust-and-hash-semantics-20260712 | done | critical | main | DECISION GATE: tuning trust/attestation model and hash semantics (ADR-1) |
-| tuning-applied-ledger-and-validation-status-20260712 | planning | critical | main | Applied-tuning ledger: record what actually executed; honest validation_status; session-settings capture |
+| tuning-applied-ledger-and-validation-status-20260712 | done | critical | main | Applied-tuning ledger: record what actually executed; honest validation_status; session-settings capture |
 | tuning-author-experience-honesty-quickfixes-20260712 | done | medium-high | main | Author-facing honesty quickfixes: dry-run preview lookup, misleading displays, CLI footguns |
 | tuning-bundle-provenance-and-config-export-20260712 | done | critical | main | Export tuning provenance, requested config, and requested-config hash into bundles |
 | tuning-capability-registry-coverage-20260716 | done | medium | main | Extend the tuning capability registry to the remaining platforms (trino/athena/firebolt/presto/synapse/timescaledb...) |
 | tuning-corpus-drop-pre-provenance-tuned-bundles-20260716 | done | high | main | Drop pre-provenance 'tuned' seed-corpus bundles (physically untuned runs) |
-| tuning-df-ledger-parity-20260716 | planning | medium | main | DataFrame runtime-tuning ledger parity (applied observations, not config blobs) |
+| tuning-df-ledger-parity-20260716 | done | medium | main | DataFrame runtime-tuning ledger parity (applied observations, not config blobs) |
 | tuning-docs-env-contract-fixes-20260712 | done | medium-high | main | Fix broken tuning docs/env contract: dead env var, stale README, undocumented precedence, dishonest auto mode |
 | tuning-drift-detection-persistence-widening-20260716 | done | medium-high | main | Widen tuning drift-detection persistence: unique/check constraints and platform optimizations |
-| tuning-explorer-consume-bundle-hashes-20260716 | planning | medium-high | main | Explorer consumes requested_config_hash / applied_ledger_hash from bundles instead of computing its own |
+| tuning-drift-validation-bundle-routing-20260722 | done | medium | main | Route rerun drift-validation results into the published bundle |
+| tuning-explorer-consume-bundle-hashes-20260716 | done | medium-high | main | Explorer consumes requested_config_hash / applied_ledger_hash from bundles instead of computing its own |
+| tuning-explorer-hash-ts-unit-tests-20260722 | done | medium | main | TS unit tests for explorer non-null requested/applied hash rows |
 | tuning-explorer-ingest-mode-extraction-20260712 | done | high | main | Explorer ingest: read tuning_mode from all bundle generations; stop conflating absent with baseline |
 | tuning-fk-load-ordering-fix-20260716 | done | high | main | Fix FK-enforcement table-load-ordering defect surfaced by working tuning |
 | tuning-from-config-forwarding-sweep-20260716 | done | high | main | Sweep all platform from_config implementations to forward tuning configuration |
 | tuning-generator-registry-completeness-20260712 | done | medium-high | main | Register orphaned DDL generators and make NoOp fallback loud + tested |
-| tuning-introspection-receipts-20260716 | planning | medium-high | main | Post-load schema introspection receipts: upgrade applied_unverified to applied_verified |
+| tuning-introspection-receipts-20260716 | done | medium-high | main | Post-load schema introspection receipts: upgrade applied_unverified to applied_verified |
 | tuning-mode-vocabulary-and-facet-implementation-20260712 | done | high | main | Implement decided mode vocabulary, fallback labeling, and facet/receipt semantics end-to-end |
+| tuning-native-spark-snowpark-ledger-capture-20260722 | done | medium | main | Applied-ledger capture for native Spark/Snowpark session tuning |
 | tuning-platform-identity-canonical-keys-20260712 | done | high | main | Use canonical platform type keys (not display names) in tuning validation and metadata |
-| tuning-policy-generation-seam-20260716 | planning | medium | main | Record tuning-policy generation in bundles; explorer warns when comparing across the ADR-003 seam |
-| tuning-registry-mixin-honesty-20260717 | planning | medium | main | Correct capability-registry entries resting on the dead generate_tuning_clause adapter mixin (postgresql, snowflake, redshift, bigquery, mysql) |
+| tuning-policy-generation-seam-20260716 | done | medium | main | Record tuning-policy generation in bundles; explorer warns when comparing across the ADR-003 seam |
+| tuning-registry-mixin-honesty-20260717 | done | medium | main | Correct capability-registry entries resting on the dead generate_tuning_clause adapter mixin (postgresql, snowflake, redshift, bigquery, mysql) |
 | tuning-renderer-consolidation-and-baseline-policy-20260712 | done | medium-high | main | Single tuning renderer + capability registry; enforce decided baseline policy |
 | tuning-repr-serialization-leak-fix-20260712 | done | medium-high | main | Stop publishing Python repr() strings in bundle raw_config; make serialization fallbacks loud |
 | tuning-residual-cleanups-20260716 | done | medium | main | Tuning batch residual cleanups: display-name path, dead CH optimizations code, guardrail headroom, blind-spot bookkeeping |
+| tuning-snowpark-session-ledger-capture-20260723 | planning | medium | main | Applied-ledger capture for Snowpark session tuning |
 | tuning-soundness-test-coverage-20260712 | done | high | main | Test coverage for tuning soundness boundaries (registries, statuses, hashes, vocabulary) |
-| tuning-starrocks-ddl-generator-20260716 | planning | high | main | StarRocks DDL generator: render tuned PARTITION BY / DISTRIBUTED BY / ORDER BY via the single renderer |
+| tuning-starrocks-ddl-generator-20260716 | done | high | main | StarRocks DDL generator: render tuned PARTITION BY / DISTRIBUTED BY / ORDER BY via the single renderer |
 | tuning-template-packaging-20260716 | done | medium | main | Ship discoverable tuning templates with the installed package |
+| tuning-verification-footprint-duckdb-clickhouse-20260722 | done | medium | main | Make DuckDB sorting + ClickHouse keys verification-eligible for applied_verified |
 | tutorial-benchmark-verification | done | medium | blog-content | [Tutorials] Verify benchmark commands in tutorial posts |
 | uat-accounting-hardening | done | medium | main | UAT harness accounting: stop silently shrinking the coverage denominator and make report exit codes reflect failures |
 | uat-artifact-integrity-and-failure-capture | done | high | main | UAT: make every sweep produce a traceable, abort-safe certification artifact |
 | uat-certification-rerun-ordering-and-gate | active | high | main | UAT release-gate re-run: enforce ordering, fresh root, and an explicit approval gate |
 | uat-certification-wording-charter-decision | done | medium | main | UAT boundary reset: certification wording reset OR explicit charter decision |
+| uat-charter-spec-drift-post-t11 | done | low | uat-hardening | Fix 3 residual UAT charter-spec drifts (post-T11 realignment) |
 | uat-charter-visibility-on-main | done | low | main | UAT boundary reset: land the UAT charter (or a pointer) on main so gate and charter ship together |
 | uat-clickhouse-loader-empty-value-nullability | done | high | main | Decide ClickHouse-server loader empty-value nullability policy: Nullable(...) DDL vs default coercion |
+| uat-clickhouse-nullability-ddl-and-dialect-landing | dropped | high | uat-hardening | Land the ClickHouse nullable-DDL + CSV dialect remediation (rework of stranded 5f266e76f) |
+| uat-clickhouse-nullable-ddl-and-csv-dialect-landing | done | high | uat-hardening | Land the ClickHouse nullable-DDL + CSV dialect remediation (rework of stranded 5f266e76f) |
 | uat-clickhouse-server-data-and-timeout-tail | planning | low | main | Triage ClickHouse-server corpus tail: JoinOrder data availability and SF1 timeouts |
 | uat-clickhouse-server-ddl-compatibility | planning | high | main | Close ClickHouse-server DDL and orphaned setup gaps |
-| uat-clickhouse-server-loader-type-coverage | active | high | main | Fix ClickHouse-server client-insert type coverage exposed by corpus UAT |
+| uat-clickhouse-server-loader-type-coverage | done | high | main | Fix ClickHouse-server client-insert type coverage exposed by corpus UAT |
 | uat-clickhouse-server-query-compatibility | planning | medium | main | Route ClickHouse-server query failures and preserve partial result JSON paths |
 | uat-clickhouse-server-rc1-recovery | done | high | main | Recover ClickHouse-server UAT RC-1 after confirmed localhost:9000 refusal |
-| uat-config-schema-spec-realignment | planning | medium | uat-hardening | Enforce the schema rules the spec claims; validate platform includes and frozen shards; realign the UAT charter spec with reality |
+| uat-clickhouse-tpcds-sf001-runtime-cap | dropped | medium | uat-hardening | Diagnose ClickHouse TPC-DS SF=0.01 UAT runtime cap |
+| uat-clickhouse-tpcds-sf001-runtime-performance | planning | medium | uat-hardening | Diagnose and remove ClickHouse TPC-DS SF=0.01 runtime cap |
+| uat-config-schema-spec-realignment | done | medium | uat-hardening | Enforce the schema rules the spec claims; validate platform includes and frozen shards; realign the UAT charter spec with reality |
 | uat-container-engine-routing | done | high | uat-hardening | Route UAT container lifecycle through a resolved engine (mocker on macOS, docker elsewhere); record engine provenance; fix cleanup gaps |
 | uat-cross-engine-dataframe-defects | done | high | main | Fix cross-engine DataFrame schema/loader defects surfaced by UAT |
 | uat-dask-stability-under-sweep | done | medium | main | Stabilize dask-df under UAT so cluster failures record FAIL and the sweep continues |
@@ -1411,6 +1494,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | uat-docker-stack-recovery | active | high | main | Recover UAT Docker stacks: LakeSail startup timeout + empty Docker-OLTP run |
 | uat-duckdb-reference-triage | done | high | main | Triage DuckDB reference-platform failures before any certification re-run |
 | uat-enabled-platforms-full-sweep-release-gate | done | critical | uat-enabled-platforms-remediation | UAT: rerun enabled-platform full sweep and publish compact release-gate summary |
+| uat-evidence-provenance-binding | planning | medium-high | uat-hardening | Bind release-gate evidence to stage artifacts (digests) and reject unknown-SHA evidence at gate-check |
 | uat-execute-path-unification | done | medium-high | uat-hardening | Unify make uat-execute with the orchestrator path; single cells.jsonl codec; de-duplicate phase logic in _cli/execute |
 | uat-explorer-smoke-external-corpus | done | high | uat-enabled-platforms-remediation | UAT: make Results Explorer smoke tests validate external UAT corpora |
 | uat-explorer-smoke-release-hygiene | done | high | main | UAT boundary reset: explorer-smoke branch-presence guard + delegate browser mechanics |
@@ -1422,22 +1506,27 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | uat-loc-budget-reconciliation | done | medium | main | UAT boundary reset: reconcile the ~1,500 LOC budget with the ~6,500 prod LOC reality |
 | uat-matrix-compatibility-policy | done | high | uat-enabled-platforms-remediation | UAT: add explicit platform-benchmark compatibility rules and run accounting |
 | uat-native-dataframe-compatibility-rules | done | high | main | UAT: add compatibility-prune rules for read-only native + dataframe engine gaps |
-| uat-operator-provisioning | planning | medium | uat-hardening | Un-strand the second operator: venv extras for all release-gate platforms, coherent output-root contract, engine/sizing/prepull docs |
+| uat-operator-provisioning | done | medium | uat-hardening | Un-strand the second operator: venv extras for all release-gate platforms, coherent output-root contract, engine/sizing/prepull docs |
 | uat-pg-extension-auth-propagation | done | critical | uat-enabled-platforms-remediation | UAT: propagate PostgreSQL extension Docker credentials into runtime cells |
 | uat-preflight-disk-headroom-gate | done | medium-high | main | UAT: preflight disk report + headroom gate sized to the largest configured scale |
 | uat-release-gate-enforcement | done | critical | uat-hardening | Make UAT a real release gate: machine-readable gate summary, ancestry+freshness check in release readiness, tuned cross-scale floors |
+| uat-release-gate-first-evidence-bootstrap | planning | high | uat-hardening | Commit first UAT release-gate evidence before the second release (trusted-base activation) |
+| uat-report-regen-prune-accounting | done | medium | uat-hardening | Fix make uat-report regeneration prune-drop and registry_pruned mislabel |
 | uat-resume-retirement-artifact-durability | done | high | uat-hardening | Delete UAT resume machinery; make durable artifacts atomic and run dirs collision-free |
 | uat-resume-shard-config-sprawl | done | medium | main | UAT boundary reset: prune resume-shard config sprawl; define config lifecycle policy |
+| uat-review-p3-followups | planning | low | uat-hardening | P3 sweep from the 2026-07-21 UAT adversarial review (accounting, docs, docstrings, Makefile engine drift) |
 | uat-shared-submit-classifier | done | high | main | UAT boundary reset: extract shared submit-classification policy consumed by CLI and UAT |
 | uat-single-connection-registry | done | high | main | UAT boundary reset: single platform connection registry; stop hardcoding ports/creds in UAT |
 | uat-skipped-unreachable-release-accounting | done | high | main | Account for skipped/unreachable UAT cells in release-report candidate counts (release-evidence integrity) |
-| uat-spec-module-loc-table-autogen | planning | low | uat-hardening | Auto-generate the UAT spec's module/LOC table from the tree |
+| uat-spec-hygiene-guard-description-drift | done | low | uat-hardening | UAT spec describes the artifact-hygiene guard as external-root-only after it became default-applicable |
+| uat-spec-module-loc-table-autogen | done | low | uat-hardening | Auto-generate the UAT spec's module/LOC table from the tree |
 | uat-status-taxonomy-exit-code-fixes | done | high | uat-hardening | Fix UAT status-taxonomy corruption and exit-code soundness holes (timed-out overwrite, all([]) pass, failed=submittable, unpersisted throughput_check) |
+| uat-sweep-durability-and-signal-teardown | done | medium | uat-hardening | Incremental cells.jsonl durability + SIGTERM teardown parity for UAT sweeps |
 | uat-template-success-metric-terminal-state-and-gating | done | medium | main | Add submission terminal-state vocab + open_questions gating schema relaxation |
 | uat-template-validator-clean-rate-runner | done | medium | main | Add validator-clean-rate runner step + roll-up TSV for sweep-shape UATs |
 | uat-throughput-regression-threshold-policy | planning | medium | uat-hardening | Define throughput performance-regression thresholds (Throughput@Size floor per platform/scale) |
 | uat-throughput-result-path-manifest | planning | medium | uat-hardening | Replace throughput glob resolution with a result-path manifest emitted by run-official |
-| uat-throughput-result-resolution-hardening | planning | medium-high | uat-hardening | Harden the throughput result-path resolver: exact platform token, scale token, deterministic tie-break, narrower nightly window |
+| uat-throughput-result-resolution-hardening | done | medium-high | uat-hardening | Harden the throughput result-path resolver: exact platform token, scale token, deterministic tie-break, narrower nightly window |
 | uat-timeout-enforcement-hardening | done | high | uat-enabled-platforms-remediation | UAT: harden per-cell timeout enforcement for process trees |
 | unified-adapter-interface | done | medium-high | core-functionality | Unify SQL and DataFrame Adapter Execution Interfaces |
 | unified-frame-error-parsing-hardening | done | medium | main | Replace DataFusion error-message-text parsing in unified_frame.py with a version/capability check |
@@ -1467,6 +1556,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | velox-gluten-spark-adapter | done | medium | platform-expansion | Add Velox + Gluten Spark Acceleration Platform Adapter |
 | vendor-duckdb-wasm-bundle-to-remove-jsdelivr-dependency | done | medium-high | main | Vendor the DuckDB-WASM bundle to remove the jsDelivr dependency for tests and production |
 | vendor-label-codeowners-governance | active | high | results-labels-funding | Gate vendor-supplied bundles: reject non-maintainer vendor/ additions on published-results |
+| verification-rungs-authored-with-unsatisfiable-commands | planning | medium | main | Verification rung commands that cannot express their stated intent (grep -A1, output expectations) |
 | verify-ci-validation-workflow-end-to-end | done | critical | main | Verify the validate-submission CI workflow end-to-end with a real PR |
 | verify-trust-badge-rendering-in-explorer | done | high | main | Visually verify TrustBadge rendering across all 4 explorer pages |
 | version-management-consistency | done | high | unknown | "✅ Version Management & Consistency" |
@@ -1478,6 +1568,8 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | visualization-suggestions-and-render-orchestration | done | high | main | Visualization hardening: centralize chart suggestions and render orchestration across CLI and MCP |
 | w4-docker-postgres-throughput-uat-cell-see-work-w4-notes | planning | medium | main | w4 (Docker Postgres throughput UAT cell) -- see work[].w4 notes.
  |
+| webkit-smoke-fix-or-demote | dropped | medium-high | ci-failure-reduction | WebKit @smoke is deterministically red - diagnose, then fix or demote to nightly (never perma-red in the PR lane) |
+| webkit-smoke-fix-or-demote-2 | done | medium-high | ci-failure-reduction | WebKit @smoke is deterministically red - diagnose, then fix or demote to nightly (never perma-red in the PR lane) |
 | wikipedia-pageviews-benchmark | planning | low | benchmark-expansion | Wikipedia Pageviews Benchmark - Web Traffic Analytics Workload |
 | windows-ci-hardening | done | high | main | Harden CI and static analysis to catch Windows-specific failures before merge |
 | wire-plan-capture-for-dataframe-execution-path-in-benchbox-c | planning | medium | platform-expansion | Wire plan capture for DataFrame execution path in benchbox/core/dataframe/profiling.py |
@@ -1500,3 +1592,4 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | write-primitives-v2-and-transaction-primitives-split | done | high | unknown | ✅ Write Primitives v2 and Transaction Primitives Split |
 | write-primitives-validation-result-gating | done | high | scd2-audit-followup | Gate write/transaction-primitives run status on validation_passed |
 | write-results-platform-phase-2-operations-runbook | done | medium | main | Write the Phase 2 results-platform operations runbook |
+| xdist-worker-crash-on-utils-runner-cli-subset | done | medium | ci-failure-reduction | pytest worker aborts with gilstate_tss_set fatal error when utils+runner+cli suites run together |
