@@ -169,6 +169,10 @@ class TestCredentialValidationHandlesAliases:
         monkeypatch.setenv("AZURE_STORAGE_ACCOUNT_NAME", "acct")
         monkeypatch.setenv("AZURE_STORAGE_ACCOUNT_KEY", "key")
 
+        import benchbox.utils.cloud_storage as cs
+
+        monkeypatch.setattr(cs, "_load_cloudpathlib", lambda: (_ for _ in ()).throw(AssertionError("must stay lazy")))
+
         result = validate_cloud_credentials("abfss://c@a.dfs.core.windows.net/p")
 
         assert result["valid"] is True
@@ -183,6 +187,20 @@ class TestCredentialValidationHandlesAliases:
 
         assert result["valid"] is False
         assert "AZURE_STORAGE_ACCOUNT_NAME" in result["error"]
+
+    def test_snowflake_stage_validation_stays_independent_of_cloudpathlib(self, monkeypatch):
+        import benchbox.utils.cloud_storage as cs
+
+        monkeypatch.setattr(cs, "_load_cloudpathlib", lambda: (_ for _ in ()).throw(AssertionError("must stay lazy")))
+
+        result = validate_cloud_credentials("@~/benchbox")
+
+        assert result == {
+            "valid": True,
+            "provider": "snowflake_stage",
+            "error": None,
+            "env_vars": [],
+        }
 
 
 class TestExistingBehaviourUnchanged:

@@ -1190,22 +1190,33 @@ class TestSynapseStagingRootAcceptsEveryAzureSpelling:
     """
 
     @pytest.mark.parametrize(
-        "staging_root",
+        ("staging_root", "storage_account"),
         [
-            "az://container/benchbox",
-            "azure://container/benchbox",
-            "abfss://container@account.dfs.core.windows.net/benchbox",
-            "abfs://container@account.dfs.core.windows.net/benchbox",
+            ("az://container/benchbox", "explicit-account"),
+            ("azure://container/benchbox", "explicit-account"),
+            ("abfss://container@account.dfs.core.windows.net/benchbox", None),
+            ("abfs://container@account.dfs.core.windows.net/benchbox", None),
         ],
     )
-    def test_azure_staging_roots_are_accepted(self, synapse_stubs, staging_root):
+    def test_azure_staging_roots_are_accepted(self, synapse_stubs, staging_root, storage_account):
         adapter = AzureSynapseAdapter(
             server="myworkspace.sql.azuresynapse.net",
             username="admin",
             password="secret",
             staging_root=staging_root,
+            **({"storage_account": storage_account} if storage_account else {}),
         )
         assert adapter.container == "container"
+        assert adapter.storage_account == (storage_account or "account")
+
+    def test_blob_staging_root_requires_account_or_explicit_option(self, synapse_stubs):
+        with pytest.raises(ValueError, match="must include a storage account"):
+            AzureSynapseAdapter(
+                server="myworkspace.sql.azuresynapse.net",
+                username="admin",
+                password="secret",
+                staging_root="azure://container/benchbox",
+            )
 
     @pytest.mark.parametrize("staging_root", ["s3://bucket/benchbox", "gs://bucket/benchbox"])
     def test_non_azure_staging_roots_are_still_rejected(self, synapse_stubs, staging_root):

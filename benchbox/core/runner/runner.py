@@ -58,7 +58,7 @@ from benchbox.platforms.base.runtime_metadata import (
     collect_normalized_result_metadata,
 )
 from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
-from benchbox.utils.cloud_storage import create_path_handler
+from benchbox.utils.cloud_storage import CloudStagingPath, create_path_handler
 from benchbox.utils.dialect_utils import (
     SqlTranslationOutcome,
     sql_translation_context,
@@ -1568,10 +1568,14 @@ def _check_table_directory_collisions(output_dir: Any, tables: dict) -> bool:
     """Return True if any unrecorded table-name directory collides with the manifest."""
     from pathlib import Path
 
-    if not isinstance(output_dir, Path):
+    if isinstance(output_dir, CloudStagingPath):
+        local_output_dir = Path(str(output_dir))
+    elif isinstance(output_dir, Path):
+        local_output_dir = output_dir
+    else:
         return False
     for table_name, table_data in tables.items():
-        table_dir = output_dir / table_name
+        table_dir = local_output_dir / table_name
         if not table_dir.is_dir():
             continue
         all_entries = _collect_all_entries(table_data)

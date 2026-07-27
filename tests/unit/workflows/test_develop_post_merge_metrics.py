@@ -88,6 +88,13 @@ def test_workflow_metrics_expression_uses_min_not_max() -> None:
     assert ".completed_at] | max // null" not in workflow
 
 
+def test_lint_baseline_cache_writes_are_serialized() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert "group: develop-post-merge-lint-${{ github.ref }}" in workflow
+    assert "cancel-in-progress: false" in workflow
+
+
 def test_explorer_tokens_failure_counted_in_red_at() -> None:
     # Mirror of test_failed_post_merge_jobs_use_earliest_completion_timestamp
     # but with an `explorer-tokens` failure as the earliest. Locks in the

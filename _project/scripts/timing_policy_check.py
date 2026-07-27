@@ -139,6 +139,41 @@ def _parse_collect_count(output: str) -> int | None:
     return None
 
 
+def _has_justified_ceiling_bump(repo_root: Path) -> bool:
+    """Return whether this PR records a convention-compliant fast-lane bump."""
+    policy_path = repo_root / "_project" / "config" / "fast_test_lane_policy.json"
+    try:
+        current_limit = int(_load_fast_lane_policy(policy_path).get("max_fast_tests", 500))
+        base_policy = subprocess.run(
+            ["git", "show", f"origin/develop:{policy_path.relative_to(repo_root)}"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if base_policy.returncode != 0:
+            return False
+        base_limit = int(json.loads(base_policy.stdout).get("max_fast_tests", 500))
+        if current_limit <= base_limit or (current_limit - base_limit) % 500 != 0:
+            return False
+        log_diff = subprocess.run(
+            ["git", "diff", "origin/develop...HEAD", "--", CEILING_LOG_PATH],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+
+    return any(
+        line.startswith("+")
+        and not line.startswith("+++")
+        and re.search(r"\+\s*-\s*\d{4}-\d{2}-\d{2}:.*\bBump(?:ed)?\b", line, re.IGNORECASE)
+        for line in log_diff.stdout.splitlines()
+    )
+
+
 def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str]:
     if not policy or not policy.get("enabled", True):
         return []
@@ -149,37 +184,38 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str
     forbidden_path_substrings = policy.get("forbidden_path_substrings", [])
 
     rc, fast_output = _run_pytest_collect(repo_root, "fast")
-    fast_count = _parse_collect_count(fast_output)
     print(f"Fast lane collect exit code: {rc}")
+    if rc not in (0, 5):
+        raise _collect_environment_error("fast", rc, fast_output)
+    fast_count = _parse_collect_count(fast_output)
     if fast_count is None:
         raise _collect_environment_error("fast", rc, fast_output)
+    print(f"Fast lane tests collected: {fast_count}")
+    if fast_count > max_fast_tests:
+        violations.append(f"fast lane count {fast_count} exceeds limit {max_fast_tests}")
     else:
-        print(f"Fast lane tests collected: {fast_count}")
-        if fast_count > max_fast_tests:
-            violations.append(f"fast lane count {fast_count} exceeds limit {max_fast_tests}")
-        else:
-            headroom = max_fast_tests - fast_count
-            if headroom < FAST_LANE_HEADROOM_WARNING_THRESHOLD:
-                print(
-                    f"FAST_LANE_WARNING: headroom {headroom} below "
-                    f"{FAST_LANE_HEADROOM_WARNING_THRESHOLD} - bump per {CEILING_LOG_PATH} "
-                    "conventions (+500 quantum)"
-                )
-        if forbidden_path_substrings:
-            offending_lines = [
-                line
-                for line in fast_output.splitlines()
-                if "::" in line and any(substring in line for substring in forbidden_path_substrings)
-            ]
-            if offending_lines:
-                violations.append(
-                    "fast lane includes Java/Spark-adjacent test paths: " + ", ".join(offending_lines[:10])
-                )
+        headroom = max_fast_tests - fast_count
+        if headroom < FAST_LANE_HEADROOM_WARNING_THRESHOLD:
+            print(
+                f"FAST_LANE_WARNING: headroom {headroom} below "
+                f"{FAST_LANE_HEADROOM_WARNING_THRESHOLD} - bump per {CEILING_LOG_PATH} "
+                "conventions (+500 quantum)"
+            )
+    if forbidden_path_substrings:
+        offending_lines = [
+            line
+            for line in fast_output.splitlines()
+            if "::" in line and any(substring in line for substring in forbidden_path_substrings)
+        ]
+        if offending_lines:
+            violations.append("fast lane includes Java/Spark-adjacent test paths: " + ", ".join(offending_lines[:10]))
 
     for expr in forbidden_marker_expressions:
         rc, output = _run_pytest_collect(repo_root, f"fast and {expr}")
-        count = _parse_collect_count(output)
         print(f"Fast lane intersection '{expr}' exit code: {rc}")
+        if rc not in (0, 5):
+            raise _collect_environment_error(f"fast and {expr}", rc, output)
+        count = _parse_collect_count(output)
         if count is None:
             raise _collect_environment_error(f"fast and {expr}", rc, output)
         print(f"Fast lane intersection '{expr}' count: {count}")
@@ -201,6 +237,9 @@ def _emit_fast_count(repo_root: Path) -> int:
     itself (guarded with `|| true`/a fallback there), not this function.
     """
     rc, output = _run_pytest_collect(repo_root, "fast")
+    if rc not in (0, 5):
+        print(f"FAST_LANE_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}", file=sys.stderr)
+        return 1
     count = _parse_collect_count(output)
     if count is None:
         print(f"FAST_LANE_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}", file=sys.stderr)
@@ -228,11 +267,14 @@ def _delta_check(repo_root: Path, develop_count_file: Path) -> int:
         return 0
 
     rc, output = _run_pytest_collect(repo_root, "fast")
-    pr_count = _parse_collect_count(output)
-    if pr_count is None:
+    if rc not in (0, 5):
         # Still non-blocking (the absolute ceiling is enforced separately), but
         # name the real cause: the collect failed, which has nothing to do with
         # whether a develop baseline exists.
+        print(f"DELTA_CHECK_SKIPPED ({_collect_environment_error('fast', rc, output)})")
+        return 0
+    pr_count = _parse_collect_count(output)
+    if pr_count is None:
         print(f"DELTA_CHECK_SKIPPED ({_collect_environment_error('fast', rc, output)})")
         return 0
 
@@ -240,6 +282,12 @@ def _delta_check(repo_root: Path, develop_count_file: Path) -> int:
     print(f"Fast lane delta vs develop: pr={pr_count} develop={develop_count} delta={delta:+d}")
 
     if delta > FAST_LANE_DELTA_FAIL_THRESHOLD:
+        if _has_justified_ceiling_bump(repo_root):
+            print(
+                "FAST_LANE_DELTA_BUMP_AUTHORIZED: this PR records a +500 ceiling bump "
+                f"with a dated justification in {CEILING_LOG_PATH}"
+            )
+            return 0
         print(
             f"FAST_LANE_DELTA_VIOLATION: this PR adds {delta} fast tests over develop's baseline "
             f"of {develop_count} (limit +{FAST_LANE_DELTA_FAIL_THRESHOLD} per PR). Mark new/converted "

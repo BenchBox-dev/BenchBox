@@ -21,13 +21,11 @@ export async function waitForShell(page: Page) {
  * real data. We assert on a user-visible element rather than internal
  * state so these waits also double as user-flow assertions.
  *
- * The 45s budget (up from 30s) absorbs the tail of DuckDB-WASM cold-start
- * under the Chromium blocking gate's parallel workers: concurrent WASM
- * compile + `results.duckdb` attach across workers on a small CI runner
- * occasionally pushed a first data render past 30s, producing genuinely
- * flaky (varies run-to-run) `waitForDataLoaded` timeouts. 45s matches the
- * margin the more careful inline data waits in the suite already use and
- * sits inside the 90s per-test timeout. See docs/operations/browser-ci.md.
+ * The 45s budget (up from 30s) absorbs the serial DuckDB-WASM cold-start tail
+ * in the Chromium blocking command (`test:e2e:chromium` overrides Playwright
+ * to `--workers=1`). It matches the margin the more careful inline data waits
+ * in the suite already use and sits inside the 90s per-test timeout. See
+ * docs/operations/browser-ci.md.
  */
 const DATA_LOADED_TIMEOUT_MS = 45_000;
 

@@ -2157,6 +2157,8 @@ def _interactive_normal_flow(s: types.SimpleNamespace, system_profile: Any) -> N
     s.database_config = db_manager.select_database(style_filter=style_filter)
 
     _interactive_resolve_mode_for_selected_platform(s)
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        _interactive_prompt_platform_options(s)
     _interactive_cloud_setup_if_needed(s)
 
     console.print("\n[bold]Step 4 of 6:[/bold] [cyan]Benchmark Configuration[/cyan]")
@@ -2204,10 +2206,19 @@ def _run_stages_through_cloud_storage(s: types.SimpleNamespace) -> bool:
     return PlatformRegistry.requires_cloud_storage_for_deployment(s.database_config.type, mode)
 
 
+def _run_requires_platform_credentials(s: types.SimpleNamespace) -> bool:
+    mode = resolved_deployment_mode(s.database_config) or PlatformRegistry.get_default_deployment(
+        s.database_config.type
+    )
+    capability = PlatformRegistry.get_deployment_capability(s.database_config.type, mode) if mode else None
+    return bool(capability and capability.requires_credentials)
+
+
 def _interactive_cloud_setup_if_needed(s: types.SimpleNamespace) -> None:
-    """Perform cloud credentials + output location setup for runs that stage remotely."""
+    """Perform credential setup and, when required, remote output setup."""
     ctx = s.ctx
-    if not _run_stages_through_cloud_storage(s):
+    stages_remotely = _run_stages_through_cloud_storage(s)
+    if not stages_remotely and not _run_requires_platform_credentials(s):
         return
 
     credentials_ok = check_and_setup_platform_credentials(
@@ -2221,16 +2232,15 @@ def _interactive_cloud_setup_if_needed(s: types.SimpleNamespace) -> None:
         console.print(f"\n[dim]To configure later: benchbox setup --platform {s.database_config.type}[/dim]")
         ctx.exit(1)
 
-    if s.output:
+    if not stages_remotely or s.output:
         return
     default_output = None
-    if _run_stages_through_cloud_storage(s):
-        from benchbox.security.credentials import CredentialManager
+    from benchbox.security.credentials import CredentialManager
 
-        cred_manager = CredentialManager()
-        if cred_manager.has_credentials(s.database_config.type):
-            creds = cred_manager.get_platform_credentials(s.database_config.type)
-            default_output = creds.get("default_output_location") if creds else None
+    cred_manager = CredentialManager()
+    if cred_manager.has_credentials(s.database_config.type):
+        creds = cred_manager.get_platform_credentials(s.database_config.type)
+        default_output = creds.get("default_output_location") if creds else None
 
     cloud_output_hint = prompt_cloud_output_location(
         platform_name=s.database_config.type,
@@ -2311,7 +2321,6 @@ def _interactive_collect_flags(
         prompt_official_mode,
         prompt_output_location,
         prompt_phases,
-        prompt_platform_options,
         prompt_query_subset,
         prompt_seed,
         prompt_table_format,
@@ -2356,16 +2365,29 @@ def _interactive_collect_flags(
             db_manager.set_verbosity(s.verbosity_settings)
             bench_manager.set_verbosity(s.verbosity_settings)
 
-    if not s.parsed_platform_options:
-        platform_opts = prompt_platform_options(s.database_config.type)
-        if platform_opts:
-            if s.database_config.options is None:
-                s.database_config.options = {}
-            s.database_config.options.update(platform_opts)
-            s.benchmark_config.options["platform_options"] = dict(platform_opts)
-            s.benchmark_config.options["platform_option_sources"] = {
-                str(key): "runtime_override" for key in platform_opts
-            }
+    _interactive_prompt_platform_options(s)
+
+
+def _interactive_prompt_platform_options(s: types.SimpleNamespace) -> None:
+    if s.parsed_platform_options:
+        return
+
+    platform_opts = getattr(s, "_interactive_platform_options", None)
+    if platform_opts is None:
+        from benchbox.cli.benchmarks import prompt_platform_options
+
+        platform_opts = prompt_platform_options(s.database_config.type) or {}
+        s._interactive_platform_options = platform_opts
+
+    if not platform_opts:
+        return
+    if s.database_config.options is None:
+        s.database_config.options = {}
+    s.database_config.options.update(platform_opts)
+    benchmark_config = getattr(s, "benchmark_config", None)
+    if benchmark_config is not None:
+        benchmark_config.options["platform_options"] = dict(platform_opts)
+        benchmark_config.options["platform_option_sources"] = {str(key): "runtime_override" for key in platform_opts}
 
 
 def _interactive_prompt_seed(s: types.SimpleNamespace, prompt_seed_fn: Any) -> None:

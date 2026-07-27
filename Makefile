@@ -854,7 +854,8 @@ guards-fix:
 # guard instead of `make` aborting at the first nonzero exit.
 ci-lint:
 	@echo "Running CI lint checks..."
-	@set +e; failed=""; \
+	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
+	set +e; failed=""; \
 	uv run ruff check .; \
 	[ $$? -eq 0 ] || failed="$$failed ruff-check"; \
 	uv run ruff format --check .; \
@@ -1443,14 +1444,24 @@ pr-preflight-fast-tests:
 
 pr-content-guard:
 	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
+	EXISTING=$$(mktemp); \
+	trap 'rm -f "$$EXISTING"' EXIT; \
 	$(MAKE) artifact-hygiene; \
 	if [ -s "$(PATH_LISTS)/yaml.txt" ]; then \
-		uv run -- pre-commit run check-yaml --files $$(cat "$(PATH_LISTS)/yaml.txt"); \
+		: > "$$EXISTING"; \
+		while IFS= read -r path; do \
+			if [ -e "$$path" ]; then printf '%s\n' "$$path" >> "$$EXISTING"; else echo "Skipping deleted YAML path: $$path"; fi; \
+		done < "$(PATH_LISTS)/yaml.txt"; \
+		if [ -s "$$EXISTING" ]; then uv run -- pre-commit run check-yaml --files $$(cat "$$EXISTING"); else echo "No existing YAML content paths to lint."; fi; \
 	else \
 		echo "No YAML content paths changed."; \
 	fi; \
 	if [ -s "$(PATH_LISTS)/markdown.txt" ]; then \
-		uv run -- pre-commit run markdownlint --files $$(cat "$(PATH_LISTS)/markdown.txt"); \
+		: > "$$EXISTING"; \
+		while IFS= read -r path; do \
+			if [ -e "$$path" ]; then printf '%s\n' "$$path" >> "$$EXISTING"; else echo "Skipping deleted markdown path: $$path"; fi; \
+		done < "$(PATH_LISTS)/markdown.txt"; \
+		if [ -s "$$EXISTING" ]; then uv run -- pre-commit run markdownlint --files $$(cat "$$EXISTING"); else echo "No existing markdown content paths to lint."; fi; \
 	else \
 		echo "No markdown content paths changed."; \
 	fi; \

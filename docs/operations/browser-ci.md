@@ -37,14 +37,13 @@ On PR #1298 the Chromium blocking gate went red on a *genuinely flaky*
 symptom - the first data-bound element never rendered within the wait window
 - while 103-107 of 111 tests passed. Two independent runs failed on different
 specs, which is the "varies across attempts" signal from the triage rule
-below, not a functional break in the PR under test. The cause is DuckDB-WASM
-cold-start under the gate's 2 parallel workers occasionally exceeding the 30s
-`waitForDataLoaded` budget - the same *concurrent-worker* contention class the
-earlier `stabilize-webkit-browser-smoke-flake-under-parallel-workers` fix
-addressed for WebKit by serializing to `--workers=1`.
+below, not a functional break in the PR under test. The required
+`test:e2e:chromium` command runs both Playwright invocations with
+`--workers=1`, so the live cause is serial DuckDB-WASM cold-start exceeding
+the 30s `waitForDataLoaded` budget, not concurrent-worker contention.
 
-Mitigation (harness-only, no `results-explorer/src/**` change; Chromium keeps
-its 2 workers so the blocking gate stays fast rather than serializing):
+Mitigation (harness-only, no `results-explorer/src/**` change; the blocking
+command remains serial):
 
 - `waitForDataLoaded` budget 30s -> 45s (matches the margin the suite's
   careful inline data waits already use, and the exact value the failing

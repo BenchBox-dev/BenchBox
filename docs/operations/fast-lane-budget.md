@@ -109,9 +109,10 @@ pointer string.
   (`pytestmark = [pytest.mark.unit, pytest.mark.medium]`).
 - **`FAST_LANE_DELTA_VIOLATION` (`guard-fast-lane-delta`, blocking):** this
   PR alone adds more than 150 fast tests over develop's baseline. Mark new
-  tests medium, split the change across PRs, or -- if the addition is
-  genuinely warranted as fast -- bump the ceiling per the quantum
-  convention and note the justification in the log entry.
+  tests medium or split the change across PRs. A genuinely warranted increase
+  is accepted only when the same PR bumps the absolute ceiling by the
+  prescribed +500 quantum and adds a dated justification entry; the delta
+  guard validates that convention before allowing the bump.
 - **`DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling
   still enforced)` (`guard-fast-lane-delta`, exits 0):** no cached develop
   count was found (cold cache, first run after this feature landed, or an

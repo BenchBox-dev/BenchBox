@@ -53,6 +53,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import statistics
 import subprocess
@@ -294,7 +295,7 @@ def first_pass_green_and_job_seconds(
     )
     candidates = [r for r in runs if r.get("name") == REQUIRED_LANE_WORKFLOW_NAME]
     if not candidates:
-        return None, None
+        return None, None, None
     first_run = min(candidates, key=lambda r: _iso_to_dt(r["created_at"]))
     green = first_run.get("conclusion") == "success"
 
@@ -342,24 +343,33 @@ def _pct(values: list[float], p: int) -> float | None:
     return s[idx]
 
 
-# medium-test's timeout in .github/workflows/pr.yml. Kept here so the metric
-# and the budget it is measured against cannot drift apart silently.
-MEDIUM_TEST_TIMEOUT_MINUTES = 40
+MEDIUM_TEST_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "pr.yml"
+_MEDIUM_TEST_TIMEOUT_RE = re.compile(r"(?ms)^  medium-test:\s*$.*?^\s{4}timeout-minutes:\s*(\d+)\s*$")
 # Warn once p95 eats into the headroom the timeout was sized to provide.
 MEDIUM_TEST_BUDGET_WARN_FRACTION = 0.75
+
+
+def _medium_test_timeout_minutes() -> int:
+    """Read the medium-test timeout from the workflow that enforces it."""
+    workflow = MEDIUM_TEST_WORKFLOW_PATH.read_text(encoding="utf-8")
+    match = _MEDIUM_TEST_TIMEOUT_RE.search(workflow)
+    if match is None:
+        raise ValueError(f"Could not find medium-test timeout in {MEDIUM_TEST_WORKFLOW_PATH}")
+    return int(match.group(1))
 
 
 def _medium_budget_warning(p95_seconds: float | None) -> str | None:
     """Return a resize warning when medium-test p95 approaches its timeout."""
     if p95_seconds is None:
         return None
-    budget_seconds = MEDIUM_TEST_TIMEOUT_MINUTES * 60
+    timeout_minutes = _medium_test_timeout_minutes()
+    budget_seconds = timeout_minutes * 60
     used = p95_seconds / budget_seconds
     if used < MEDIUM_TEST_BUDGET_WARN_FRACTION:
         return None
     return (
         f"medium-test p95 is {p95_seconds / 60:.1f} min, "
-        f"{used:.0%} of its {MEDIUM_TEST_TIMEOUT_MINUTES} min timeout - "
+        f"{used:.0%} of its {timeout_minutes} min timeout - "
         "resize the timeout (or split the tier) before it starts cancelling jobs"
     )
 
