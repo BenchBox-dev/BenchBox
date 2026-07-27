@@ -290,6 +290,11 @@ jobs:
         continue-on-error: true
         run: make artifact-hygiene
 
+      - name: Validate agent instruction authority and efficiency
+        id: guard-agent-instructions
+        continue-on-error: true
+        run: make agent-instructions-check
+
       - name: Timing policy (wall-clock allowlist)
         id: guard-timing-policy
         continue-on-error: true
@@ -365,7 +370,7 @@ jobs:
         # stale snapshot. Switch to `npx -y skill-sync@<ver>` once published.
         id: guard-skill-sync-verify
         continue-on-error: true
-        run: npx -y github:joeharris76/skill-sync#d3c9c45 verify --project .
+        run: npx -y github:joeharris76/skill-sync#1780825 verify --project .
 
       - name: Untracked skill-mirror drift guard (cloud parity)
         # The codex/gemini/antigravity mirrors and the curated-out `blog` skill are

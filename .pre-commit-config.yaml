@@ -113,6 +113,22 @@ repos:
         stages: [pre-commit]
         files: ^\.claude/skills/
 
+      - id: agent-instructions-check
+        name: agent instruction authority and efficiency audit
+        entry: make agent-instructions-check
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^(AGENTS\.md|CLAUDE\.md|GEMINI\.md|ANTIGRAVITY\.md|\.claude/(commands/|settings\.json)|\.claude/skills/|docs/(development/agent-|operations/agent-instruction)|_project/(evals/agent-instructions/|scripts/agent_instruction_audit\.py)|skill-sync\.(yaml|lock))
+
+      - id: agent-git-identity
+        name: reject stale agent Git identity
+        entry: make agent-identity-check
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
   # Code formatting with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.13

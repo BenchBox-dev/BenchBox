@@ -10,9 +10,23 @@ per-item implement/commit/PR/auto-merge cycle: the TODOs already carry their
 guardrails (the CLI prints them as the work order), so you do not re-ask per
 item.
 
+## Preflight and auth-failure halts
+
+Before claiming the first item, run `todo doctor` (todo-db >= 0.3.0; skip if
+the command is absent) and resolve any FAIL before starting. If any tracker
+command exits 4 mid-batch (hosted auth failure — the wrapper already tried one
+automatic token re-mint), HALT the batch immediately: record every item whose
+tracker state is behind reality in the ledger with the blocker reason, then
+surface the ALERT and the remediation commands (`turso auth login`, or
+`export TODO_DB_AUTH_TOKEN=$(turso db tokens create <db>)`) to the user. Do
+not keep implementing or opening PRs while tracker writes are failing — that
+desynchronizes the record from the work. After auth is restored, replay the
+recorded tracker writes from the ledger before taking new items.
+
 ## The database is the record
 
-Tracker state lives in the DB, reachable through `_project/scripts/todo`:
+Tracker state lives in the DB, reachable through the resolved `todo` command
+(see SKILL.md):
 claim/lease (`claim`), per-unit worktree+branch (`start`/`done`), completion
 and PR (`complete --pr`). Never write tracker state to files. Reconstruct
 progress from `todo list`, `todo stats`, and `todo deps <id>` — not a parallel
