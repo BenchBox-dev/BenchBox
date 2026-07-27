@@ -15,7 +15,7 @@ BUNDLES_DIR = Path("results-data/bundles")
 INVENTORY_PATH = Path("results-data/corpus-inventory.json")
 
 SKIP_NAMES = {"corpus-inventory.json", "submission-manifest.json"}
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json")
+COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json")
 SUBMISSION_MANIFEST = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 
