@@ -462,12 +462,29 @@ class ValidationRules:
             )
 
     @staticmethod
-    def validate_output_directory(output_dir: str) -> None:
+    def validate_output_directory(output_dir: str, *, platform: str | None = None, table_mode: str = "native") -> None:
         """Validate output directory."""
         from benchbox.utils.cloud_storage import (
             is_cloud_path,
+            is_snowflake_stage_path,
+            snowflake_stage_mode_error,
             validate_cloud_credentials,
         )
+
+        if is_snowflake_stage_path(output_dir):
+            stage_error = snowflake_stage_mode_error(output_dir, table_mode=table_mode)
+            if stage_error:
+                raise CloudStorageError(
+                    f"Invalid Snowflake staging configuration: {stage_error}",
+                    details={
+                        "path": output_dir,
+                        "provider": "snowflake_stage",
+                        "platform": platform,
+                        "table_mode": table_mode,
+                        "error": stage_error,
+                    },
+                )
+            return
 
         if is_cloud_path(output_dir):
             # Validate cloud credentials

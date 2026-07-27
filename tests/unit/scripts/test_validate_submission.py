@@ -604,6 +604,7 @@ class TestDiscoverBundles:
         (tmp_path / "result.json").write_text("{}", encoding="utf-8")
         (tmp_path / "result.plans.json").write_text("{}", encoding="utf-8")
         (tmp_path / "result.tuning.json").write_text("{}", encoding="utf-8")
+        (tmp_path / "result.applied.json").write_text("{}", encoding="utf-8")
         (tmp_path / "result.manifest.json").write_text("{}", encoding="utf-8")
         (tmp_path / "corpus-inventory.json").write_text("{}", encoding="utf-8")
         (tmp_path / "submission-manifest.json").write_text("{}", encoding="utf-8")

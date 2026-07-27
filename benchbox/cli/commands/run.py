@@ -1239,7 +1239,7 @@ def _validate_output_dir(s: types.SimpleNamespace) -> None:
     if not s.output:
         return
     try:
-        ValidationRules.validate_output_directory(s.output)
+        ValidationRules.validate_output_directory(s.output, table_mode=s.table_mode)
         if is_cloud_path(s.output):
             console.print(f"\n[green]✅[/green] Cloud storage output validated: {s.output}")
         else:

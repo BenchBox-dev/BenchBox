@@ -303,12 +303,17 @@ def first_pass_green_and_job_seconds(
     jobs = client.get_paginated(f"/repos/{client.repo}/actions/runs/{first_run['id']}/jobs", item_key="jobs")
     for job in jobs:
         name = job.get("name")
-        if name in (FAST_TEST_JOB_NAME, MEDIUM_TEST_JOB_NAME) and job.get("started_at") and job.get("completed_at"):
+        if (
+            name in (FAST_TEST_JOB_NAME, MEDIUM_TEST_JOB_NAME)
+            and job.get("conclusion") == "success"
+            and job.get("started_at")
+            and job.get("completed_at")
+        ):
             started = _iso_to_dt(job["started_at"])
             completed = _iso_to_dt(job["completed_at"])
-            # A cancelled (timed-out) job still reports a duration; it is a floor,
-            # not a true wall time, so it is recorded and flagged rather than
-            # silently averaged in as if the job had finished.
+            # Cancelled, failed, and in-progress jobs may expose partial
+            # timestamps. They are censored observations, not completed lane
+            # runtimes, so keep them out of the p95 distribution.
             seconds_by_job.setdefault(name, (completed - started).total_seconds())
     return green, seconds_by_job.get(FAST_TEST_JOB_NAME), seconds_by_job.get(MEDIUM_TEST_JOB_NAME)
 

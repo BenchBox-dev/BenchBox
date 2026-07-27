@@ -145,6 +145,7 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
     NULL_PHYSICAL_RENDERING_SENTINELS,
     clauses,
     params,
+    true,
   );
 
   if (filters.hasCost === "yes") clauses.push("cost_usd IS NOT NULL");

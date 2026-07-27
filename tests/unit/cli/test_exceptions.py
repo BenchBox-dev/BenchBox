@@ -312,3 +312,14 @@ class TestValidationRules:
         assert "Cloud storage credentials validation failed" in str(exc_info.value)
         # Provider can be 's3' (cloudpathlib installed) or 'unknown' (not installed)
         assert exc_info.value.details["provider"] in ("s3", "unknown")
+
+    def test_validate_output_directory_allows_user_stage_for_native_snowflake(self):
+        ValidationRules.validate_output_directory("@~/benchbox", platform="snowflake", table_mode="native")
+
+    def test_validate_output_directory_rejects_named_stage_for_native_snowflake(self):
+        with pytest.raises(CloudStorageError, match="named or table stage"):
+            ValidationRules.validate_output_directory("@my_stage/data", platform="snowflake", table_mode="native")
+
+    def test_validate_output_directory_rejects_stage_for_external_snowflake(self):
+        with pytest.raises(CloudStorageError, match="requires a cloud URI"):
+            ValidationRules.validate_output_directory("@~/benchbox", platform="snowflake", table_mode="external")

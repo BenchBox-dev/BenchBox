@@ -76,14 +76,16 @@ cwd-anchored default applies and any growth is local by definition).
 The guardrails are **report-only** — they detect and name the offending paths
 but never delete or move artifacts.
 
-* The UAT runner (`tests/uat/runner.py`) snapshots `cwd/benchmark_runs` before
-  each external-root cell and fails loudly if it grows, naming both the
-  unexpected local path and the configured external root.
+* The UAT runner (`tests/uat/runner.py`) snapshots the worktree-local
+  `benchmark_runs/` before each external-root cell and fails loudly if it
+  grows, naming both the unexpected local path and the configured external
+  root. The guard resolves the enclosing Git worktree, so launching UAT from a
+  nested directory does not create a second, misleading local boundary.
 * `make uat-artifact-hygiene` audits the live worktree and is wired into `make
   pr-preflight`. It is a no-op when the resolved root is inside the worktree,
-  or when the run starts outside a Git work tree with no external root
-  configured (the cwd-local default is preserved). A run whose root really is
-  worktree-local is never blocked.
+  or when the run starts outside a Git work tree with no explicit external
+  root configured (the cwd-local default is preserved). An explicit external
+  root remains audited even when the launch directory is outside Git.
 
   ```bash
   # Audit the current worktree (also a no-op outside a Git worktree with no

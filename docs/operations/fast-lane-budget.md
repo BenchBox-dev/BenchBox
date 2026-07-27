@@ -113,6 +113,10 @@ pointer string.
   is accepted only when the same PR bumps the absolute ceiling by the
   prescribed +500 quantum and adds a dated justification entry; the delta
   guard validates that convention before allowing the bump.
+- **`DELTA_CHECK_ENVIRONMENT_ERROR` (`guard-fast-lane-delta`, blocking):** a
+  develop baseline exists, but the PR's fast-lane collection failed or did not
+  produce a count. Fix the collection environment before relying on the delta
+  result; this is distinct from a cold-cache baseline miss.
 - **`DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling
   still enforced)` (`guard-fast-lane-delta`, exits 0):** no cached develop
   count was found (cold cache, first run after this feature landed, or an

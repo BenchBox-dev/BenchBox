@@ -143,6 +143,7 @@ class TestGenerateInventory:
         _write_bundle(bundle_dir / "b.json", benchmark_id="tpch", platform="DuckDB")
         _write_bundle(bundle_dir / "a.json", benchmark_id="tpch", platform="DataFusion")
         (bundle_dir / "a.plans.json").write_text("{}", encoding="utf-8")
+        (bundle_dir / "a.applied.json").write_text("{}", encoding="utf-8")
         (bundle_dir / "a.manifest.json").write_text("{}", encoding="utf-8")
         (bundle_dir / "submission-manifest.json").write_text("{}", encoding="utf-8")
 

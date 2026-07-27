@@ -131,6 +131,13 @@ class TestStageClassification:
         assert info["bucket"] == "~"
         assert info["path"] == ""
 
+    def test_quoted_stage_identifier_supports_escaped_quotes(self):
+        info = get_cloud_path_info('@"My ""Stage"""/data')
+
+        assert info["provider"] == "snowflake_stage"
+        assert info["bucket"] == '"My ""Stage"""'
+        assert info["path"] == "data"
+
     @pytest.mark.parametrize(
         ("path", "stage", "sub_path"),
         [

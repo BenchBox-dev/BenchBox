@@ -80,8 +80,9 @@ EXCLUDED_STEPS: dict[str, str] = {
     "Fast lane ceiling delta vs develop": (
         "CI-cache-dependent, no local equivalent: the guard's input is "
         "`fast-lane-count.txt`, restored from the GitHub Actions cache "
-        "(`actions/cache/restore@v4`, key `fast-lane-count-develop-<sha>`, "
-        "populated by develop-post-merge.yml's own cache-save step) -- "
+        "(`actions/cache/restore@v4`, exact key "
+        "`fast-lane-count-develop-<base-sha>`, populated by "
+        "develop-post-merge.yml's own cache-save step) -- "
         "there is no Actions cache to restore from in a local shell. This "
         "is fail-open by design: `timing_policy_check.py --delta-check` "
         "prints `DELTA_CHECK_SKIPPED (no develop baseline available - "
@@ -276,3 +277,22 @@ def test_lint_guard_summary_step_exists() -> None:
     )
     # Must be the last step -- it aggregates every guard that ran before it.
     assert steps[-1] is aggregator, f"{AGGREGATOR_STEP_NAME!r} must be the last step in the code-lint job"
+
+
+def test_lint_guard_summary_only_marks_success_as_passing() -> None:
+    aggregator = next(step for step in _load_lint_job_steps() if step.get("name") == AGGREGATOR_STEP_NAME)
+    run = aggregator["run"]
+
+    assert 'if [ "$outcome" = "success" ]; then' in run
+    assert 'echo "FAILED: $id ($outcome)"' in run
+    assert "All lint guards passed." in run
+
+
+def test_delta_baseline_restore_is_keyed_to_the_pr_base_sha() -> None:
+    step = next(
+        step for step in _load_lint_job_steps() if step.get("name") == "Restore fast-lane develop baseline count"
+    )
+    cache_key = step["with"]["key"]
+
+    assert cache_key == "fast-lane-count-develop-${{ github.event.pull_request.base.sha }}"
+    assert "restore-keys" not in step["with"]
