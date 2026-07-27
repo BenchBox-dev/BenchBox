@@ -298,17 +298,14 @@ jobs:
       - name: Restore fast-lane develop baseline count
         # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
         # naming-convention comment above): a cache miss here is not a
-        # failure, it's the normal "no baseline yet" state that the delta
-        # guard below fails open on. Primary key intentionally never matches
-        # (this PR's merge SHA is never a develop-post-merge cache key); the
-        # restore-keys prefix always falls back to the most recently cached
-        # develop count.
+        # failure, it's the normal "no exact baseline yet" state that the delta
+        # guard below fails open on. The key is the PR event's actual develop
+        # base SHA; a prefix restore would compare the PR against an unrelated
+        # develop tip when merges or baseline jobs complete out of order.
         uses: actions/cache/restore@v4
         with:
           path: fast-lane-count.txt
-          key: fast-lane-count-develop-${{ github.sha }}
-          restore-keys: |
-            fast-lane-count-develop-
+          key: fast-lane-count-develop-${{ github.event.pull_request.base.sha }}
 
       - name: Fast lane ceiling delta vs develop
         # Additive to guard-timing-policy above, never a replacement: that
@@ -418,12 +415,12 @@ jobs:
           failed=0
           for id in $ids; do
             outcome=$(jq -r --arg id "$id" '.[$id].outcome' "$RUNNER_TEMP/steps_context.json")
-            if [ "$outcome" = "failure" ]; then
-              echo "| $id | ❌ failure |" >> "$GITHUB_STEP_SUMMARY"
-              echo "FAILED: $id"
-              failed=1
+            if [ "$outcome" = "success" ]; then
+              echo "| $id | ✅ success |" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "| $id | ✅ $outcome |" >> "$GITHUB_STEP_SUMMARY"
+              echo "| $id | ⚠️ $outcome |" >> "$GITHUB_STEP_SUMMARY"
+              echo "FAILED: $id ($outcome)"
+              failed=1
             fi
           done
 

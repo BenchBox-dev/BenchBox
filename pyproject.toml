@@ -135,7 +135,7 @@ all = [
     "azure-storage-file-datalake>=12.14.0",  # For Microsoft Fabric OneLake
     "pyathena>=3.0.0",  # For AWS Athena
     "boto3>=1.20.0",
-    "cloudpathlib>=0.15.0",
+    "cloudpathlib[azure,gs,s3]>=0.15.0",
     "pandas>=2.0.0",  # For TPC-DI benchmark
     "chdb>=0.10.0; sys_platform != 'win32'",   # For ClickHouse local mode (not available on Windows)
     "deltalake>=1.2.1",  # For Delta Lake table format
@@ -160,9 +160,11 @@ cloud = [
     "trino>=0.328.0",
     "pyathena>=3.0.0",  # For AWS Athena
     "boto3>=1.20.0",
-    "cloudpathlib>=0.15.0",
+    "cloudpathlib[azure,gs,s3]>=0.15.0",
 ]
-cloudstorage = ["cloudpathlib>=0.15.0"]
+cloudstorage = [
+    "cloudpathlib[azure,gs,s3]>=0.15.0",
+]
 
 # Individual platforms (for minimal installations)
 duckdb = ["duckdb>=1.0.0,<2.0.0"]
@@ -184,7 +186,7 @@ redshift = [
     "boto3>=1.20.0",
     "cloudpathlib>=0.15.0",
 ]
-snowflake = ["snowflake-connector-python>=3.0.0", "cloudpathlib>=0.15.0"]
+snowflake = ["snowflake-connector-python>=3.0.0", "cloudpathlib[azure,gs,s3]>=0.15.0"]
 trino = ["trino>=0.328.0", "cloudpathlib>=0.15.0"]
 presto = ["presto-python-client>=0.8.4", "cloudpathlib>=0.15.0"]
 postgresql = ["psycopg[binary]>=3.1"]

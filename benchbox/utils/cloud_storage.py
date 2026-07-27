@@ -386,11 +386,13 @@ class DatabricksVolumeAdapter:
 #   @%table/sub/path             table stage
 #   @stage/sub/path              named stage
 #   @db.schema.stage/sub/path    qualified named stage
-# Identifiers are unquoted (letter/underscore lead) or double-quoted.
+# Identifiers are unquoted (letter/underscore lead) or double-quoted. Snowflake
+# escapes a double quote inside a quoted identifier by doubling it.
 # The stage and sub-path groups make this regex the single source of truth for
 # both matching and splitting, so a quoted stage name containing '/' can never
 # be mis-split by a separate parser.
-_STAGE_IDENTIFIER = r'(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_$]*)'
+_QUOTED_STAGE_IDENTIFIER = r'"(?:[^"]|"")+"'
+_STAGE_IDENTIFIER = rf"(?:{_QUOTED_STAGE_IDENTIFIER}|[A-Za-z_][A-Za-z0-9_$]*)"
 _SNOWFLAKE_STAGE_RE = re.compile(
     rf"^@(?P<stage>~|%{_STAGE_IDENTIFIER}|{_STAGE_IDENTIFIER}(?:\.{_STAGE_IDENTIFIER}){{0,2}})"
     rf"(?:/(?P<sub_path>.*))?$"
@@ -428,6 +430,35 @@ def is_snowflake_stage_path(path: Union[str, Path]) -> bool:
         True if path is a Snowflake user, table, named or qualified-named stage
     """
     return _match_snowflake_stage(path) is not None
+
+
+def snowflake_stage_mode_error(path: Union[str, Path], *, table_mode: str = "native") -> str | None:
+    """Return a load-mode error for a Snowflake stage used as `staging_root`.
+
+    Native loads currently PUT to each table's own `@%TABLE` stage and only
+    retain the documented user-stage form (`@~`) as a valid remote output
+    namespace. External-table setup interpolates `staging_root` as a URI in
+    `CREATE STAGE ... URL=` and therefore cannot accept any `@...` stage
+    reference.
+    """
+    match = _match_snowflake_stage(path)
+    if match is None:
+        return None
+
+    if str(table_mode).lower() == "external":
+        return (
+            "Snowflake external table mode requires a cloud URI for staging_root "
+            "(for example s3://bucket/path, gs://bucket/path, or azure://container/path); "
+            "Snowflake stage references such as @~/... are not valid CREATE STAGE URLs."
+        )
+
+    if match.group("stage") != "~":
+        return (
+            "Snowflake native loads do not reuse named or table stage references as staging_root; "
+            "use the documented user stage @~/... or a cloud URI for external mode."
+        )
+
+    return None
 
 
 def is_cloud_path(path: Union[str, Path]) -> bool:
@@ -536,6 +567,24 @@ def _normalize_cloud_scheme(path: str) -> str:
     if separator and scheme.lower() in _CLOUD_SCHEME_ALIASES:
         return f"{_CLOUD_SCHEME_ALIASES[scheme.lower()]}://{rest}"
     return path
+
+
+def _build_cloud_path_for_validation(path: str, provider: str, cloud_path_cls: Any) -> Any:
+    """Build a provider path with explicit credentials when aliases need them."""
+    normalized = _normalize_cloud_scheme(path)
+    if provider.lower() not in {"az", "azure"}:
+        return cloud_path_cls(normalized)
+
+    from azure.core.credentials import AzureNamedKeyCredential
+    from cloudpathlib import AzureBlobClient
+
+    account_name = os.environ["AZURE_STORAGE_ACCOUNT_NAME"]
+    account_key = os.environ["AZURE_STORAGE_ACCOUNT_KEY"]
+    client = AzureBlobClient(
+        account_url=f"https://{account_name}.blob.core.windows.net",
+        credential=AzureNamedKeyCredential(account_name, account_key),
+    )
+    return cloud_path_cls(normalized, client=client)
 
 
 def is_adls_path(path: Union[str, Path]) -> bool:
@@ -855,7 +904,7 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
     # Try to create a cloud path to test credentials. Scheme aliases are
     # normalised first for the same reason as in create_path_handler.
     try:
-        cloud_path = cloud_path_cls(_normalize_cloud_scheme(str(path)))
+        cloud_path = _build_cloud_path_for_validation(str(path), provider, cloud_path_cls)
         # Test basic operations
         _ = cloud_path.exists()
         return {
@@ -864,14 +913,14 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
             "error": None,
             "env_vars": expected_vars,
         }
-    except missing_credentials_error as e:
-        return {
-            "valid": False,
-            "provider": provider,
-            "error": f"Credential validation failed: {e}",
-            "env_vars": expected_vars,
-        }
     except Exception as e:
+        if missing_credentials_error is not Exception and isinstance(e, missing_credentials_error):
+            return {
+                "valid": False,
+                "provider": provider,
+                "error": f"Credential validation failed: {e}",
+                "env_vars": expected_vars,
+            }
         return {
             "valid": False,
             "provider": provider,

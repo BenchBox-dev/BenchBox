@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     )
 
 from ..core.exceptions import ConfigurationError
-from ..utils.cloud_storage import get_cloud_path_info
+from ..utils.cloud_storage import get_cloud_path_info, snowflake_stage_mode_error
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.config_utils import make_registered_platform_config_builder
@@ -115,10 +115,14 @@ class SnowflakeAdapter(PlatformAdapter):
         # staging_root is passed by orchestrator when using CloudStagingPath
         # For now, we log it but continue using internal stages (which work with local files)
         self.staging_root = config.get("staging_root")
+        self.table_mode = str(config.get("table_mode") or "native").lower()
         self.iceberg_external_volume = config.get("iceberg_external_volume")
         self.iceberg_catalog = config.get("iceberg_catalog") or "SNOWFLAKE"
         self.delta_table_format = config.get("delta_table_format") or "DELTA"
         if self.staging_root:
+            stage_error = snowflake_stage_mode_error(self.staging_root, table_mode=self.table_mode)
+            if stage_error:
+                raise ValueError(stage_error)
             path_info = get_cloud_path_info(self.staging_root)
             self.logger.info(
                 f"staging_root configured for Snowflake external mode ({path_info['provider']}://{path_info['bucket']})"
@@ -838,6 +842,9 @@ class SnowflakeAdapter(PlatformAdapter):
                 "Snowflake external mode requires --platform-option staging_root=<cloud-uri> "
                 "(for example s3://bucket/path, gs://bucket/path, or azure://container/path)."
             )
+        stage_error = snowflake_stage_mode_error(self.staging_root, table_mode="external")
+        if stage_error:
+            raise ValueError(stage_error)
 
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path

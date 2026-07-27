@@ -509,9 +509,12 @@ export function addNullableSentinelClause(
   nullSentinels: readonly string[],
   clauses: string[],
   params: unknown[],
+  includeNullSentinelsInConcrete = false,
 ) {
   if (values.length === 0) return;
-  const concreteValues = values.filter((value) => !nullSentinels.includes(value));
+  const concreteValues = includeNullSentinelsInConcrete
+    ? values
+    : values.filter((value) => !nullSentinels.includes(value));
   const subclauses: string[] = [];
   if (concreteValues.length > 0) {
     subclauses.push(`${column} IN (${concreteValues.map(() => "?").join(", ")})`);

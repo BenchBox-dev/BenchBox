@@ -135,18 +135,15 @@ describe("buildWhereClause - tuning_mode not-recorded/untuned sentinels", () => 
 });
 
 describe("buildWhereClause - physical_rendering_id unknown sentinel", () => {
-  it("matches NULL physical_rendering_id rows for the unknown bucket", () => {
-    // Regression (PR #1289 review follow-up): the `unknown` option is produced
-    // by buildFacetCountQuery's `CASE WHEN <col> IS NULL THEN 'unknown'`, but the
-    // filter sent it through a plain IN (...) predicate, so selecting the
-    // advertised bucket returned zero rows instead of the NULL rows.
+  it("matches literal and NULL physical_rendering_id rows for the unknown bucket", () => {
+    // The `unknown` option is produced for NULL rows, but a real bundle may
+    // also record the literal string. Keep both rows selectable.
     const filters: QueryFilterState = { ...EMPTY_FILTERS, physicalRenderingIds: ["unknown"] };
 
     const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
 
-    expect(sql).toContain("(physical_rendering_id IS NULL)");
-    expect(sql).not.toContain("physical_rendering_id IN (?)");
-    expect(params).toEqual([]);
+    expect(sql).toContain("(physical_rendering_id IN (?) OR physical_rendering_id IS NULL)");
+    expect(params).toEqual(["unknown"]);
   });
 
   it("combines a real rendering id with the unknown sentinel via OR", () => {
@@ -157,8 +154,8 @@ describe("buildWhereClause - physical_rendering_id unknown sentinel", () => {
 
     const { sql, params } = buildSelectQuery(filters, ["result_id"], DEFAULT_SORT, 10);
 
-    expect(sql).toContain("(physical_rendering_id IN (?) OR physical_rendering_id IS NULL)");
-    expect(params).toEqual(["databricks_liquid_auto"]);
+    expect(sql).toContain("(physical_rendering_id IN (?, ?) OR physical_rendering_id IS NULL)");
+    expect(params).toEqual(["databricks_liquid_auto", "unknown"]);
   });
 
   it("still emits a plain IN predicate when no unknown bucket is selected", () => {

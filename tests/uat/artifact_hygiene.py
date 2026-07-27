@@ -12,7 +12,8 @@ output-root propagation fix (PR #780) means external-root runs should never
 write into the local ``benchmark_runs/`` again; these helpers detect and
 report loudly if that invariant is ever broken.
 
-The guardrails are *report-only*. They snapshot ``cwd/benchmark_runs`` before
+The guardrails are *report-only*. They snapshot the worktree-local
+``benchmark_runs`` before
 a run and assert it did not grow afterwards. They never delete or move
 artifacts — surfacing the unexpected local path (and the external root that
 should have received the writes) is the entire job.
@@ -32,7 +33,7 @@ LOCAL_RUNS_DIRNAME = str(DEFAULT_BENCHMARK_RUNS_ROOT)
 
 
 class LocalArtifactGrowthError(AssertionError):
-    """Raised when ``cwd/benchmark_runs`` grows during an external-root run."""
+    """Raised when the worktree-local ``benchmark_runs`` grows."""
 
 
 def dir_size_bytes(path: Path) -> int:
@@ -52,10 +53,15 @@ def dir_size_bytes(path: Path) -> int:
     return total
 
 
+def _guard_base(cwd: Path | str | None = None) -> Path:
+    """Return the actual worktree root for a guard started from any subdirectory."""
+    base = Path(cwd).resolve() if cwd is not None else Path.cwd().resolve()
+    return find_work_tree_root(base) or base
+
+
 def local_runs_root(cwd: Path | str | None = None) -> Path:
     """Return the worktree-local ``benchmark_runs/`` root for ``cwd``."""
-    base = Path(cwd) if cwd is not None else Path.cwd()
-    return base / LOCAL_RUNS_DIRNAME
+    return _guard_base(cwd) / LOCAL_RUNS_DIRNAME
 
 
 def _normalize(path: str | Path) -> Path:
@@ -81,7 +87,7 @@ def configured_external_root(
     cwd: Path | str | None = None,
     output: str | Path | None = None,
 ) -> Path | None:
-    """Resolve a configured output root iff it points *outside* ``cwd``.
+    """Resolve a configured output root iff it points *outside* the worktree.
 
     An external root is "configured" when ``--output`` (``output``) is given
     or ``BENCHBOX_OUTPUT_DIR`` is set to a non-empty value. When neither is
@@ -89,12 +95,12 @@ def configured_external_root(
     enclosing work tree's parent it is normally external too, so plain runs
     are covered by the same guardrail rather than being exempt from it.
 
-    The guardrail only applies when the resolved root lies outside the current
-    working directory; a root inside the worktree returns ``None`` so genuinely
-    local runs are never blocked.
+    The guardrail only applies when the resolved root lies outside the actual
+    worktree, even when UAT was launched from a nested directory. A root inside
+    the worktree returns ``None`` so genuinely local runs are never blocked.
     """
     env_map = os.environ if env is None else env
-    base = Path(cwd).resolve() if cwd is not None else Path.cwd().resolve()
+    base = _guard_base(cwd)
 
     candidate: Path | None = None
     if output is not None and str(output).strip():

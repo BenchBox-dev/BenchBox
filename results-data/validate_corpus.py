@@ -14,6 +14,7 @@ bundles = [
     and not path.name.endswith(".manifest.json")
     and not path.name.endswith(".plans.json")
     and not path.name.endswith(".tuning.json")
+    and not path.name.endswith(".applied.json")
 ]
 print(f"Found {len(bundles)} bundles")
 

@@ -69,6 +69,27 @@ class TestSnowflakeAdapter:
             adapter = SnowflakeAdapter(account="test_account", username="test_user", password="test_pass")
             assert adapter.supports_external_tables is True
 
+    def test_named_stage_is_rejected_as_native_staging_root(self):
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            with pytest.raises(ValueError, match="named or table stage"):
+                SnowflakeAdapter(
+                    account="test_account",
+                    username="test_user",
+                    password="test_pass",
+                    staging_root="@my_stage/data",
+                )
+
+    def test_stage_reference_is_rejected_for_external_table_mode(self):
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            with pytest.raises(ValueError, match="requires a cloud URI"):
+                SnowflakeAdapter(
+                    account="test_account",
+                    username="test_user",
+                    password="test_pass",
+                    staging_root="@~/benchbox",
+                    table_mode="external",
+                )
+
     def test_initialization_missing_driver(self):
         """Test initialization when Snowflake dependencies are missing."""
         with (

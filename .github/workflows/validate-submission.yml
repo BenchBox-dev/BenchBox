@@ -117,6 +117,7 @@ jobs:
           CHANGED=$(git diff --name-only --diff-filter=ACMR ${{ github.event.pull_request.base.sha }}...HEAD -- 'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
             | grep -v '\.plans\.json$' \
             | grep -v '\.tuning\.json$' \
+            | grep -v '\.applied\.json$' \
             | grep -v 'corpus-inventory\.json$' \
             | grep -v '\.manifest\.json$' \
             | grep -v 'submission-manifest\.json$' \

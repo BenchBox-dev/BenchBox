@@ -116,8 +116,14 @@ class FastLaneCollectError(RuntimeError):
     green tree as several FAST_LANE_VIOLATIONs.
     """
 
+    def __init__(self, message: str, *, violations: list[str] | None = None) -> None:
+        super().__init__(message)
+        self.violations = list(violations or [])
 
-def _collect_environment_error(markexpr: str, returncode: int, output: str) -> FastLaneCollectError:
+
+def _collect_environment_error(
+    markexpr: str, returncode: int, output: str, *, violations: list[str] | None = None
+) -> FastLaneCollectError:
     """Build an actionable error for a collect run that produced no count."""
     tail = "\n".join(line for line in output.strip().splitlines()[-5:])
     return FastLaneCollectError(
@@ -126,7 +132,8 @@ def _collect_environment_error(markexpr: str, returncode: int, output: str) -> F
         "This usually means pytest or benchbox is not importable in that "
         "environment - run the check from the project environment, e.g. "
         "`uv run -- python _project/scripts/timing_policy_check.py --strict`. "
-        f"Last output lines:\n{tail}"
+        f"Last output lines:\n{tail}",
+        violations=violations,
     )
 
 
@@ -214,10 +221,10 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str
         rc, output = _run_pytest_collect(repo_root, f"fast and {expr}")
         print(f"Fast lane intersection '{expr}' exit code: {rc}")
         if rc not in (0, 5):
-            raise _collect_environment_error(f"fast and {expr}", rc, output)
+            raise _collect_environment_error(f"fast and {expr}", rc, output, violations=violations)
         count = _parse_collect_count(output)
         if count is None:
-            raise _collect_environment_error(f"fast and {expr}", rc, output)
+            raise _collect_environment_error(f"fast and {expr}", rc, output, violations=violations)
         print(f"Fast lane intersection '{expr}' count: {count}")
         if count != 0:
             violations.append(f"fast lane unexpectedly includes {count} test(s) matching 'fast and {expr}'")
@@ -231,8 +238,8 @@ def _emit_fast_count(repo_root: Path) -> int:
     Used by develop-post-merge.yml to persist a baseline count for the PR
     lane's --delta-check (see below) to diff against. Deliberately minimal
     output (bare integer, nothing else on stdout) so a workflow step can
-    redirect stdout straight into a cache-backed file. On a parse failure,
-    prints a message to stderr and returns nonzero -- the *workflow* step
+    redirect stdout straight into a cache-backed file. On a collection failure
+    or parse failure, prints a message to stderr and returns nonzero -- the *workflow* step
     that calls this is responsible for never failing the post-merge job
     itself (guarded with `|| true`/a fallback there), not this function.
     """
@@ -241,7 +248,7 @@ def _emit_fast_count(repo_root: Path) -> int:
         print(f"FAST_LANE_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}", file=sys.stderr)
         return 1
     count = _parse_collect_count(output)
-    if count is None:
+    if rc != 0 or count is None:
         print(f"FAST_LANE_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}", file=sys.stderr)
         return 1
     print(count)
@@ -268,15 +275,18 @@ def _delta_check(repo_root: Path, develop_count_file: Path) -> int:
 
     rc, output = _run_pytest_collect(repo_root, "fast")
     if rc not in (0, 5):
-        # Still non-blocking (the absolute ceiling is enforced separately), but
-        # name the real cause: the collect failed, which has nothing to do with
-        # whether a develop baseline exists.
-        print(f"DELTA_CHECK_SKIPPED ({_collect_environment_error('fast', rc, output)})")
-        return 0
+        print(
+            f"DELTA_CHECK_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}",
+            file=sys.stderr,
+        )
+        return 1
     pr_count = _parse_collect_count(output)
     if pr_count is None:
-        print(f"DELTA_CHECK_SKIPPED ({_collect_environment_error('fast', rc, output)})")
-        return 0
+        print(
+            f"DELTA_CHECK_ENVIRONMENT_ERROR: {_collect_environment_error('fast', rc, output)}",
+            file=sys.stderr,
+        )
+        return 1
 
     delta = pr_count - develop_count
     print(f"Fast lane delta vs develop: pr={pr_count} develop={develop_count} delta={delta:+d}")
@@ -292,8 +302,7 @@ def _delta_check(repo_root: Path, develop_count_file: Path) -> int:
             f"FAST_LANE_DELTA_VIOLATION: this PR adds {delta} fast tests over develop's baseline "
             f"of {develop_count} (limit +{FAST_LANE_DELTA_FAIL_THRESHOLD} per PR). Mark new/converted "
             "tests medium instead of fast (pytestmark = [pytest.mark.unit, pytest.mark.medium]), split "
-            "the change across PRs, or -- if the addition is genuinely warranted -- bump the ceiling "
-            f"per the +500 quantum convention in {CEILING_LOG_PATH} and note the justification there."
+            "the change across PRs. A ceiling bump does not waive this per-PR delta guard."
         )
         return 1
 
@@ -425,6 +434,10 @@ def main() -> int:
             # Not a policy violation: the lane was never measured. Reported
             # separately so a broken environment cannot masquerade as a set of
             # fast-lane breaches.
+            fast_lane_violations = exc.violations
+            print(f"Fast lane policy violations: {len(fast_lane_violations)}")
+            for violation in fast_lane_violations:
+                print(f"FAST_LANE_VIOLATION: {violation}")
             print(f"FAST_LANE_ENVIRONMENT_ERROR: {exc}", file=sys.stderr)
             fast_lane_environment_error = True
         else:

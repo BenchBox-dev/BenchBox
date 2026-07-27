@@ -357,7 +357,7 @@ all = [
     { name = "chdb", marker = "sys_platform != 'win32'" },
     { name = "clickhouse-connect" },
     { name = "clickhouse-driver" },
-    { name = "cloudpathlib" },
+    { name = "cloudpathlib", extra = ["azure", "gs", "s3"] },
     { name = "dask", extra = ["distributed"] },
     { name = "databricks-connect", version = "16.1.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "databricks-connect", version = "18.1.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -409,7 +409,7 @@ clickhouse-server = [
 ]
 cloud = [
     { name = "boto3" },
-    { name = "cloudpathlib" },
+    { name = "cloudpathlib", extra = ["azure", "gs", "s3"] },
     { name = "databricks-sdk" },
     { name = "databricks-sql-connector" },
     { name = "firebolt-sdk" },
@@ -459,7 +459,7 @@ cloud-spark-snowflake = [
     { name = "snowflake-snowpark-python" },
 ]
 cloudstorage = [
-    { name = "cloudpathlib" },
+    { name = "cloudpathlib", extra = ["azure", "gs", "s3"] },
 ]
 dask = [
     { name = "dask", extra = ["distributed"] },
@@ -604,7 +604,7 @@ singlestore = [
     { name = "singlestoredb" },
 ]
 snowflake = [
-    { name = "cloudpathlib" },
+    { name = "cloudpathlib", extra = ["azure", "gs", "s3"] },
     { name = "snowflake-connector-python" },
 ]
 spark = [
@@ -708,17 +708,17 @@ requires-dist = [
     { name = "clickhouse-driver", marker = "extra == 'all'", specifier = ">=0.2.0" },
     { name = "clickhouse-driver", marker = "extra == 'clickhouse'", specifier = ">=0.2.0" },
     { name = "clickhouse-driver", marker = "extra == 'clickhouse-server'", specifier = ">=0.2.0" },
-    { name = "cloudpathlib", marker = "extra == 'all'", specifier = ">=0.15.0" },
+    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'all'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'bigquery'", specifier = ">=0.15.0" },
-    { name = "cloudpathlib", marker = "extra == 'cloud'", specifier = ">=0.15.0" },
+    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'cloud'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'cloud-spark'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'cloud-spark-databricks'", specifier = ">=0.15.0" },
-    { name = "cloudpathlib", marker = "extra == 'cloudstorage'", specifier = ">=0.15.0" },
+    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'cloudstorage'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'databricks'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'firebolt'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'presto'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'redshift'", specifier = ">=0.15.0" },
-    { name = "cloudpathlib", marker = "extra == 'snowflake'", specifier = ">=0.15.0" },
+    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'snowflake'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'trino'", specifier = ">=0.15.0" },
     { name = "dask", extras = ["distributed"], marker = "extra == 'all'", specifier = ">=2024.1.0" },
     { name = "dask", extras = ["distributed"], marker = "extra == 'dask'", specifier = ">=2024.1.0" },

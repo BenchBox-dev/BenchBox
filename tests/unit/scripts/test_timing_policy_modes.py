@@ -78,6 +78,18 @@ def test_emit_fast_count_deselected_suffix_still_parses(
     assert out.strip() == "25543"
 
 
+def test_emit_fast_count_failed_collection_does_not_persist_a_partial_count(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("43/43 tests collected", rc=1))
+
+    rc = mod._emit_fast_count(Path("/nonexistent"))
+    err = capsys.readouterr().err
+
+    assert rc == 1
+    assert "FAST_LANE_ENVIRONMENT_ERROR" in err
+
+
 def test_emit_fast_count_unparseable_output_fails_closed(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ) -> None:
@@ -124,16 +136,30 @@ def test_delta_check_skips_when_baseline_file_unreadable(tmp_path: Path, capsys:
     assert "DELTA_CHECK_SKIPPED" in out
 
 
-def test_delta_check_skips_when_pr_count_unparseable(
+def test_delta_check_fails_when_pr_count_unparseable(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
     baseline = tmp_path / "develop-count.txt"
     baseline.write_text("25000", encoding="utf-8")
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("pytest crashed, no collect line"))
     rc = mod._delta_check(Path("/nonexistent"), baseline)
-    out = capsys.readouterr().out
-    assert rc == 0
-    assert "DELTA_CHECK_SKIPPED" in out
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert "DELTA_CHECK_ENVIRONMENT_ERROR" in err
+
+
+def test_delta_check_fails_when_pr_collection_returns_a_count_with_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    baseline = tmp_path / "develop-count.txt"
+    baseline.write_text("25000", encoding="utf-8")
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("25100/26000 tests collected", rc=1))
+
+    rc = mod._delta_check(Path("/nonexistent"), baseline)
+    err = capsys.readouterr().err
+
+    assert rc == 1
+    assert "DELTA_CHECK_ENVIRONMENT_ERROR" in err
 
 
 def test_delta_check_does_not_parse_error_exit_as_empty_collection(
@@ -144,10 +170,10 @@ def test_delta_check_does_not_parse_error_exit_as_empty_collection(
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("no tests collected (1 error)", rc=2))
 
     rc = mod._delta_check(Path("/nonexistent"), baseline)
-    out = capsys.readouterr().out
-    assert rc == 0
-    assert "exit 2" in out
-    assert "delta=" not in out
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert "DELTA_CHECK_ENVIRONMENT_ERROR" in err
+    assert "exit 2" in err
 
 
 # ------------------------------------------------------------------ #
@@ -289,6 +315,25 @@ def test_check_fast_lane_policy_still_reports_a_real_breach(monkeypatch: pytest.
     assert any("exceeds limit 10" in v for v in violations), violations
 
 
+def test_check_fast_lane_policy_preserves_breaches_before_intersection_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A later collect failure must not erase violations found by fast collect."""
+    outputs = iter(
+        [
+            (0, "25810/28000 tests collected"),
+            (1, "pytest crashed before reporting a collect count"),
+        ]
+    )
+    monkeypatch.setattr(mod, "_run_pytest_collect", lambda _root, _expr: next(outputs))
+    policy = {"enabled": True, "max_fast_tests": 10, "forbidden_marker_expressions": ["stress"]}
+
+    with pytest.raises(mod.FastLaneCollectError) as excinfo:
+        mod._check_fast_lane_policy(Path("/nonexistent"), policy)  # type: ignore[arg-type]
+
+    assert any("exceeds limit 10" in v for v in excinfo.value.violations)
+
+
 def test_delta_check_names_the_collect_failure_not_a_missing_baseline(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
@@ -298,9 +343,9 @@ def test_delta_check_names_the_collect_failure_not_a_missing_baseline(
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("pytest crashed, no collect line", rc=1))
 
     rc = mod._delta_check(Path("/nonexistent"), baseline)
-    out = capsys.readouterr().out
+    err = capsys.readouterr().err
 
-    assert rc == 0  # still non-blocking; the absolute ceiling is enforced elsewhere
-    assert "DELTA_CHECK_SKIPPED" in out
-    assert "could not run pytest --collect-only" in out
-    assert "no develop baseline available" not in out
+    assert rc == 1
+    assert "DELTA_CHECK_ENVIRONMENT_ERROR" in err
+    assert "could not run pytest --collect-only" in err
+    assert "no develop baseline available" not in err
