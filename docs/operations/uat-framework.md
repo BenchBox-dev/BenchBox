@@ -79,12 +79,15 @@ but never delete or move artifacts.
 * The UAT runner (`tests/uat/runner.py`) snapshots `cwd/benchmark_runs` before
   each external-root cell and fails loudly if it grows, naming both the
   unexpected local path and the configured external root.
-* `make uat-artifact-hygiene` audits the live worktree (no-op only when the
-  resolved root is inside it) and is wired into `make pr-preflight`. A run
-  whose root really is worktree-local is never blocked.
+* `make uat-artifact-hygiene` audits the live worktree and is wired into `make
+  pr-preflight`. It is a no-op when the resolved root is inside the worktree,
+  or when the run starts outside a Git work tree with no external root
+  configured (the cwd-local default is preserved). A run whose root really is
+  worktree-local is never blocked.
 
   ```bash
-  # Audit the current worktree (skips silently with no external root):
+  # Audit the current worktree (also a no-op outside a Git worktree with no
+  # external root configured):
   make uat-artifact-hygiene
   # Or target an explicit root / raise the byte budget:
   make uat-artifact-hygiene OUTPUT=~/Developer/benchmark_runs THRESHOLD_BYTES=0

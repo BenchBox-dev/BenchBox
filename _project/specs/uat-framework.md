@@ -514,7 +514,7 @@ Args below are the real Makefile signatures (`Makefile` targets `uat-*`);
 | `make uat-sweep` | `CONFIG=` `[DRY_RUN=1]` | Full sweep: walks `phases:` list. (W9) |
 | `python -m tests.uat._cli preflight` | `--config <path>` | Advisory disk-budget estimate plus current preflight status. |
 | `make uat-stress` | `[PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]` | Canned preset for framework-owned stress-test use. (W9) |
-| `make uat-artifact-hygiene` | `[OUTPUT=<root>] [THRESHOLD_BYTES=N]` | Local-artifact hygiene guard: applies whenever the resolved output root is outside the worktree (the default `../benchmark_runs` included), no-op only when it is inside; report-only. Wired into `make pr-preflight`. |
+| `make uat-artifact-hygiene` | `[OUTPUT=<root>] [THRESHOLD_BYTES=N]` | Local-artifact hygiene guard: applies whenever the resolved output root is outside the worktree (the default `../benchmark_runs` included); no-op when it is inside or when run outside a Git worktree with no external root configured; report-only. Wired into `make pr-preflight`. |
 | `make uat-bring-up` | `PLATFORM=` `[TIMEOUT_S=300] [DRY_RUN=1] [BENCHMARK_RUNS_DIR=]` | Bring up one Docker-managed platform in isolation and probe health (measure-then-set `docker_start_timeout_s`). |
 | `make uat-prepull` | `PLATFORM=` `[PREPULL_TIMEOUT_S=900] [DRY_RUN=1]` | Pull/build a platform's compose images ahead of a sweep (no health probe); shares `uat-bring-up`'s platform validation. |
 | `make uat-docker-cleanup` | `[ENGINE=docker\|container] [MODE=owned\|images\|max] [APPLY=1] [PREFIX=benchbox-uat]` | Interrupted-run recovery: inventories (default) or removes (`APPLY=1`) UAT-owned compose resources. |

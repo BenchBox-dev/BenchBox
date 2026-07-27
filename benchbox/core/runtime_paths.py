@@ -44,6 +44,15 @@ def _read_env_path(env: Mapping[str, str] | None, key: str) -> Path | None:
     return _normalize_path(stripped)
 
 
+def default_benchmark_runs_root(start: Path | None = None) -> Path:
+    """Return the worktree-sibling default, or a cwd-local root outside Git."""
+    origin = Path.cwd() if start is None else Path(start).resolve()
+    for candidate in (origin, *origin.parents):
+        if (candidate / ".git").exists():
+            return candidate.parent / DEFAULT_BENCHMARK_RUNS_ROOT
+    return origin / DEFAULT_BENCHMARK_RUNS_ROOT
+
+
 def resolve_benchmark_runs_root(
     explicit_root: str | Path | None = None,
     *,
@@ -58,7 +67,7 @@ def resolve_benchmark_runs_root(
     if env_root is not None:
         return env_root
 
-    return DEFAULT_BENCHMARK_RUNS_ROOT
+    return default_benchmark_runs_root()
 
 
 def resolve_results_dir(

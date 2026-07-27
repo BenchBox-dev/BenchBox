@@ -30,12 +30,11 @@ export default defineConfig({
   outputDir: "./test-results",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
-  // 2 CI retries (up from 1): the Chromium full-suite blocking gate runs 2
-  // parallel workers, and concurrent DuckDB-WASM cold-start occasionally
-  // exceeds even the extended data-load wait on back-to-back attempts. The
-  // failing spec varies run-to-run (genuinely flaky, not a deterministic
-  // break), so a third attempt clears the timing tail. A real regression still
-  // fails all three attempts. See docs/operations/browser-ci.md.
+  // 2 CI retries (up from 1): the generic CI config allows 2 workers, but the
+  // required test:e2e:chromium command overrides both Playwright invocations
+  // to --workers=1. The third attempt absorbs a serial DuckDB-WASM cold-start
+  // tail; a real regression still fails all three attempts. See
+  // docs/operations/browser-ci.md.
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI

@@ -93,6 +93,17 @@ def test_emit_fast_count_unparseable_output_fails_closed(
     assert sys.executable in err
 
 
+def test_emit_fast_count_rejects_error_exit_even_with_no_tests_text(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("no tests collected (1 error)", rc=2))
+
+    rc = mod._emit_fast_count(Path("/nonexistent"))
+    err = capsys.readouterr().err
+    assert rc == 1
+    assert "exit 2" in err
+
+
 # ------------------------------------------------------------------ #
 # --delta-check: baseline-file availability                            #
 # ------------------------------------------------------------------ #
@@ -125,6 +136,20 @@ def test_delta_check_skips_when_pr_count_unparseable(
     assert "DELTA_CHECK_SKIPPED" in out
 
 
+def test_delta_check_does_not_parse_error_exit_as_empty_collection(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    baseline = tmp_path / "develop-count.txt"
+    baseline.write_text("25000", encoding="utf-8")
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("no tests collected (1 error)", rc=2))
+
+    rc = mod._delta_check(Path("/nonexistent"), baseline)
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "exit 2" in out
+    assert "delta=" not in out
+
+
 # ------------------------------------------------------------------ #
 # --delta-check: threshold behavior (fail > 150, warn > 75, else clean) #
 # ------------------------------------------------------------------ #
@@ -139,6 +164,21 @@ def test_delta_check_fails_over_150(
     assert rc == 1
     assert "FAST_LANE_DELTA_VIOLATION" in out
     assert "delta=+151" in out
+
+
+def test_delta_check_accepts_a_justified_ceiling_bump(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    baseline = tmp_path / "develop-count.txt"
+    baseline.write_text("25000", encoding="utf-8")
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("25151/40000 tests collected"))
+    monkeypatch.setattr(mod, "_has_justified_ceiling_bump", lambda _repo_root: True)
+
+    rc = mod._delta_check(Path("/nonexistent"), baseline)
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "FAST_LANE_DELTA_BUMP_AUTHORIZED" in out
+    assert "FAST_LANE_DELTA_VIOLATION" not in out
 
 
 def test_delta_check_warns_over_75_but_exits_0(
@@ -230,6 +270,13 @@ def test_check_fast_lane_policy_raises_when_collect_cannot_run(monkeypatch: pyte
     message = str(excinfo.value)
     assert "could not run pytest --collect-only" in message
     assert sys.executable in message
+
+
+def test_check_fast_lane_policy_rejects_error_exit_with_no_tests_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("no tests collected (1 error)", rc=2))
+
+    with pytest.raises(mod.FastLaneCollectError, match="exit 2"):
+        mod._check_fast_lane_policy(Path("/nonexistent"), {"enabled": True, "max_fast_tests": 10000})
 
 
 def test_check_fast_lane_policy_still_reports_a_real_breach(monkeypatch: pytest.MonkeyPatch) -> None:

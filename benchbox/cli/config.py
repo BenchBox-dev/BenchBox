@@ -850,7 +850,8 @@ class DirectoryManager:
 
         When ``base_dir`` is omitted, the root is resolved via
         :func:`resolve_benchmark_runs_dir`, which honors
-        ``BENCHBOX_OUTPUT_DIR`` and falls back to ``Path.cwd() / "benchmark_runs"``.
+        ``BENCHBOX_OUTPUT_DIR`` and falls back to a worktree-sibling
+        ``benchmark_runs`` root (or a cwd-local root outside Git).
         """
         from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 

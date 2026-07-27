@@ -91,7 +91,7 @@ These variables override the corresponding settings in the configuration file (e
 | `BENCHBOX_VERBOSE` | `execution.verbose` | boolean | `true` | Enable verbose output (`true`/`1`/`yes`/`on`) |
 | `BENCHBOX_MAX_WORKERS` | `execution.max_workers` | integer | `4` | Maximum parallel worker threads |
 | `BENCHBOX_TUNING_CONFIG` | `tuning.default_config_file` | string | - | Path to tuning configuration file. Used when `--tuning tuned` resolves with no explicit file (see [Tuning Commands](tuning.md)) |
-| `BENCHBOX_OUTPUT_DIR` | `output.directory` | string | `./benchmark_runs/results` | Output directory for result files |
+| `BENCHBOX_OUTPUT_DIR` | runtime path resolver | string | worktree-anchored `benchmark_runs` root | Runtime output root override; it is not exposed as `load_config().output.directory` |
 | `BENCHBOX_MEMORY_LIMIT_GB` | `execution.memory_limit_gb` | integer | `0` (auto) | Memory limit in GB; `0` means no limit |
 
 **Boolean parsing:** `true`, `1`, `yes`, `on` (case-insensitive) are treated as true.
@@ -259,7 +259,7 @@ Result output and export settings.
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `formats` | list | `[json, console]` | Output format list |
-| `directory` | string | `./benchmark_runs/results` | Results directory |
+| `directory` | string | runtime-resolved | Results directory; resolved from the runtime output root rather than a legacy config key |
 | `timestamp_format` | string | `%Y%m%d_%H%M%S` | Timestamp format for result filenames |
 | `submit_to_service` | boolean | `false` | Legacy placeholder; use `benchbox submit --service` for hosted upload |
 | `service_url` | string | `https://api.benchbox.dev/v1` | Default hosted results service URL placeholder |

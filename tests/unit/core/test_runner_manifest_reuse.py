@@ -10,6 +10,7 @@ import pytest
 
 from benchbox.core.runner.runner import _ensure_data_generated
 from benchbox.core.schemas import BenchmarkConfig
+from benchbox.utils.cloud_storage import CloudStagingPath
 
 pytestmark = [
     pytest.mark.unit,
@@ -397,6 +398,26 @@ def test_table_name_directory_collision_invalidates_manifest(tmp_path: Path, ben
     result = _ensure_data_generated(dummy, benchmark_config)
 
     assert result is True, "Table-name directory collision should trigger regeneration"
+    dummy.generate_data.assert_called_once()
+
+
+def test_cloud_staging_path_checks_local_directory_collisions(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """Cloud staging keeps the local collision guard while carrying its remote target."""
+    _write_manifest(tmp_path, table_names=["customer"])
+    stale_dir = tmp_path / "customer"
+    stale_dir.mkdir()
+    (stale_dir / "metadata.json").write_text("stale")
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = CloudStagingPath(tmp_path, "abfss://c@a.dfs.core.windows.net/benchbox")
+            self.tables = None
+            self.generate_data = Mock()
+
+    dummy = DummyBenchmark()
+    result = _ensure_data_generated(dummy, benchmark_config)
+
+    assert result is True
     dummy.generate_data.assert_called_once()
 
 

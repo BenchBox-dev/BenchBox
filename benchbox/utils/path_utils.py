@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 
 from benchbox.core.runtime_paths import (
-    DEFAULT_BENCHMARK_RUNS_ROOT,
+    default_benchmark_runs_root as _default_benchmark_runs_root,
     resolve_benchmark_runs_root,
 )
 from benchbox.utils.scale_factor import format_scale_factor
@@ -64,10 +64,7 @@ def default_benchmark_runs_root(start: Path | None = None) -> Path:
     root, then ``BENCHBOX_OUTPUT_DIR``, then this) want
     :func:`resolve_benchmark_runs_dir` instead.
     """
-    origin = Path.cwd() if start is None else Path(start).resolve()
-    work_tree_root = find_work_tree_root(origin)
-    base = work_tree_root.parent if work_tree_root is not None else origin
-    return base / DEFAULT_BENCHMARK_RUNS_ROOT
+    return _default_benchmark_runs_root(start)
 
 
 def resolve_benchmark_runs_dir() -> Path:
@@ -84,10 +81,7 @@ def resolve_benchmark_runs_dir() -> Path:
     Outside a Git work tree — the installed-package case — the historical
     :func:`Path.cwd` anchor is kept unchanged.
     """
-    root = resolve_benchmark_runs_root(env=os.environ)
-    if root == DEFAULT_BENCHMARK_RUNS_ROOT:
-        return default_benchmark_runs_root()
-    return root
+    return resolve_benchmark_runs_root(env=os.environ)
 
 
 def get_benchmark_runs_datagen_path(

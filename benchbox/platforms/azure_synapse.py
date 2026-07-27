@@ -94,7 +94,16 @@ class AzureSynapseAdapter(PlatformAdapter):
             # the literal accepted "abfs" (which the classifier never produced)
             # while rejecting the documented "azure://" form.
             if cloud_provider_family(staging_root) == "azure":
-                self.storage_account = path_info.get("account") or self._extract_storage_account(staging_root)
+                self.storage_account = (
+                    config.get("storage_account")
+                    or path_info.get("account")
+                    or self._extract_storage_account(staging_root)
+                )
+                if not self.storage_account:
+                    raise ValueError(
+                        "Azure Synapse staging_root must include a storage account "
+                        "or provide the storage_account option"
+                    )
                 self.container = path_info["bucket"]
                 self.storage_path = path_info["path"].strip("/") if path_info["path"] else "benchbox-data"
                 self.logger.info(

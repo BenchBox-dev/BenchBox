@@ -155,7 +155,7 @@ class DatabricksPath:
         """
         return self._path.joinpath(*other)
 
-    def stat(self, *, follow_symlinks: bool = True):
+    def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
         """Stat the local path."""
         return self._path.stat(follow_symlinks=follow_symlinks)
 
@@ -278,7 +278,7 @@ class CloudStagingPath:
         """
         return self._path.joinpath(*other)
 
-    def stat(self, *, follow_symlinks: bool = True):
+    def stat(self, *, follow_symlinks: bool = True) -> os.stat_result:
         """Stat the local path."""
         return self._path.stat(follow_symlinks=follow_symlinks)
 
@@ -760,17 +760,19 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
             "env_vars": ["DATABRICKS_HOST", "DATABRICKS_HTTP_PATH", "DATABRICKS_TOKEN"],
         }
 
-    if not is_cloud_path(path):
-        return {"valid": True, "provider": "local", "error": None, "env_vars": []}
-
-    cloud_path_cls, missing_credentials_error = _load_cloudpathlib()
-    if cloud_path_cls is None:
+    # Snowflake stage references are validated by the Snowflake adapter.
+    # cloudpathlib cannot open schemeless ``@...`` references, so loading it
+    # here would turn a valid stage into a prefix validation failure.
+    if is_snowflake_stage_path(path):
         return {
-            "valid": False,
-            "provider": "unknown",
-            "error": "cloudpathlib not installed",
+            "valid": True,
+            "provider": "snowflake_stage",
+            "error": None,
             "env_vars": [],
         }
+
+    if not is_cloud_path(path):
+        return {"valid": True, "provider": "local", "error": None, "env_vars": []}
 
     parsed = urlparse(str(path))
     provider = parsed.scheme
@@ -781,6 +783,34 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
     # its `azure://` alias was checked.
     scheme_entry = _SCHEME_BY_NAME.get(provider.lower())
     expected_vars = list(scheme_entry.env_vars) if scheme_entry else []
+
+    # ADLS URIs carry the account in their authority and are staged locally;
+    # cloudpathlib cannot represent that form. Check credentials without
+    # importing cloudpathlib so minimal Synapse installations remain usable.
+    if is_adls_path(path):
+        missing_vars = [var for var in expected_vars if not os.getenv(var)]
+        if missing_vars:
+            return {
+                "valid": False,
+                "provider": provider,
+                "error": f"Missing environment variables: {', '.join(missing_vars)}",
+                "env_vars": expected_vars,
+            }
+        return {
+            "valid": True,
+            "provider": provider,
+            "error": None,
+            "env_vars": expected_vars,
+        }
+
+    cloud_path_cls, missing_credentials_error = _load_cloudpathlib()
+    if cloud_path_cls is None:
+        return {
+            "valid": False,
+            "provider": "unknown",
+            "error": "cloudpathlib not installed",
+            "env_vars": [],
+        }
 
     # For S3, check multiple credential sources (not just env vars)
     if provider == "s3":
@@ -821,18 +851,6 @@ def validate_cloud_credentials(path: Union[str, Path]) -> dict[str, Any]:
                 "error": f"Missing environment variables: {', '.join(missing_vars)}",
                 "env_vars": expected_vars,
             }
-
-    # abfss:// cannot be opened by cloudpathlib at all (the account lives in the
-    # authority), so probing it here would surface a prefix error dressed up as
-    # a credential failure. The env-var check above is the validation we can do;
-    # the Azure adapter validates the rest.
-    if is_adls_path(path):
-        return {
-            "valid": True,
-            "provider": provider,
-            "error": None,
-            "env_vars": expected_vars,
-        }
 
     # Try to create a cloud path to test credentials. Scheme aliases are
     # normalised first for the same reason as in create_path_handler.

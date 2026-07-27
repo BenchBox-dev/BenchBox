@@ -1826,11 +1826,22 @@ EVIDENCE_PIN_RE = re.compile(r"verified on|@ [0-9a-f]{7,}|\bPASS\b", re.IGNORECA
 # the exit code cannot encode -- unless the command asserts on output itself.
 # Such a rung can never pass, however correct the implementation is.
 _EXPECTED_NEGATES_OUTPUT_RE = re.compile(
-    r"\bnot\s+['\"]|rather than|instead of|must not|does not (print|contain|report)|no longer (print|report)s?\b",
+    r"\bnot\s+['\"]|must not\s+(?:print|contain|report|emit|include|output|show)|"
+    r"(?:does not|doesn't)\s+(?:print|contain|report|emit|include|output|show)|"
+    r"no longer\s+(?:print|contain|report|emit|include|output|show)s?\b",
     re.IGNORECASE,
 )
 # Constructs that turn output into an exit status, or compose an assertion.
-_COMMAND_ASSERTS_ON_OUTPUT_RE = re.compile(r"grep|rg\b|test\s|\[\s|&&|\|\||^\s*!|assert|--check|jq\b", re.IGNORECASE)
+_COMMAND_ASSERTS_ON_OUTPUT_RE = re.compile(
+    r"(?:^|[\s|;&])(?:grep|rg)\b|test\s|\[\s|&&|\|\||^\s*!|\bassert\b|--check\b",
+    re.IGNORECASE,
+)
+_JQ_EXIT_STATUS_RE = re.compile(r"(?:^|[|;&]\s*)jq\b[^|;&\n]*?(?:--exit-status\b|-e(?:\s|$))", re.IGNORECASE)
+
+
+def _command_asserts_on_output(command: str) -> bool:
+    """Return whether a verification command makes output affect its exit status."""
+    return bool(_COMMAND_ASSERTS_ON_OUTPUT_RE.search(command) or _JQ_EXIT_STATUS_RE.search(command))
 
 
 def _unsatisfiable_verifications(item: dict) -> list[int]:
@@ -1841,7 +1852,7 @@ def _unsatisfiable_verifications(item: dict) -> list[int]:
         expected = ver.get("expected") or ""
         if not command:
             continue
-        if _EXPECTED_NEGATES_OUTPUT_RE.search(expected) and not _COMMAND_ASSERTS_ON_OUTPUT_RE.search(command):
+        if _EXPECTED_NEGATES_OUTPUT_RE.search(expected) and not _command_asserts_on_output(command):
             offenders.append(ver["seq"])
     return offenders
 

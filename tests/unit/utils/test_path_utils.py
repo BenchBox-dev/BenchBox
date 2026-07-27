@@ -545,6 +545,14 @@ class TestWorkTreeAnchoredDefault:
 
         assert resolve_benchmark_runs_dir() == Path("local_runs")
 
+    def test_explicit_benchmark_runs_env_is_not_inferred_as_absent(self, tmp_path, monkeypatch):
+        """An explicit value equal to the old default remains a caller override."""
+        work_tree = self._make_work_tree(tmp_path / "checkout", linked=False)
+        monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", "benchmark_runs")
+        monkeypatch.chdir(work_tree)
+
+        assert resolve_benchmark_runs_dir() == Path("benchmark_runs")
+
     def test_env_var_tilde_still_expands_inside_a_work_tree(self, tmp_path, monkeypatch):
         """``~`` expansion is unaffected by the work-tree anchor."""
         work_tree = self._make_work_tree(tmp_path / "checkout", linked=False)

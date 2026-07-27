@@ -22,6 +22,7 @@ from benchbox.utils.cloud_storage import (
     get_cloud_path_info,
     is_cloud_path,
     is_snowflake_stage_path,
+    validate_cloud_credentials,
 )
 
 pytestmark = [
@@ -183,6 +184,17 @@ class TestStagePathHandler:
         monkeypatch.setattr(cs, "_load_cloudpathlib", _fail)
         handler = cs.create_path_handler("@~/benchbox")
         assert isinstance(handler, CloudStagingPath)
+
+    def test_stage_credential_validation_does_not_require_cloudpathlib(self, monkeypatch):
+        """Credential validation follows the adapter-owned stage path too."""
+        import benchbox.utils.cloud_storage as cs
+
+        monkeypatch.setattr(cs, "_load_cloudpathlib", lambda: (_ for _ in ()).throw(AssertionError("must stay lazy")))
+
+        result = validate_cloud_credentials("@~/benchbox")
+
+        assert result["valid"] is True
+        assert result["provider"] == "snowflake_stage"
 
     def test_local_paths_still_return_plain_paths(self):
         """Genuine local paths are untouched by the stage branch."""

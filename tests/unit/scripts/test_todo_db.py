@@ -755,6 +755,36 @@ class TestUnsatisfiableVerificationLint:
         """Composing the assertion into the command is the fix, not a finding."""
         assert not self._lint(conn, command, "reports the error, not 'policy violations'")
 
+    def test_does_not_treat_setup_prose_as_an_absent_output_assertion(self, conn):
+        """Phrases such as 'instead of failing setup' describe exit status, not output."""
+        assert not self._lint(
+            conn,
+            "uv run -- python scripts/check_setup.py",
+            "completes instead of failing setup",
+        )
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "producer | jq '.forbidden == null'",
+            "producer | jq --arg expected null '.forbidden == $expected'",
+        ],
+    )
+    def test_flags_jq_without_exit_status_for_absent_output(self, conn, command):
+        """Bare jq reports a result but still exits zero for false/null output."""
+        assert self._lint(conn, command, "does not contain 'forbidden'")
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "producer | jq -e '.forbidden == null'",
+            "producer | jq --exit-status '.forbidden == null'",
+        ],
+    )
+    def test_does_not_flag_jq_with_exit_status_for_absent_output(self, conn, command):
+        """jq's exit-status modes make the output assertion gradeable."""
+        assert not self._lint(conn, command, "does not contain 'forbidden'")
+
     @pytest.mark.parametrize(
         "expected",
         ["All tests pass", "Exit code 0", "No errors", "Adapter lifecycle tests pass."],

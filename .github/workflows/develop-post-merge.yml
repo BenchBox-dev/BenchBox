@@ -18,6 +18,12 @@ concurrency:
 
 jobs:
   lint:
+    # Baseline cache writes must follow develop history order. A SHA-specific
+    # workflow-level group does not serialize two pushes, so an older run can
+    # save after a newer run and win the restore-prefix lookup.
+    concurrency:
+      group: develop-post-merge-lint-${{ github.ref }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
