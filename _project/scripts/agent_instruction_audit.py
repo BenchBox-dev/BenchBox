@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CORPUS = ROOT / "_project/evals/agent-instructions/scenarios.json"
 ADAPTERS = ("CLAUDE.md", "GEMINI.md", "ANTIGRAVITY.md")
 ACTIVE_TEXT = ("AGENTS.md", *ADAPTERS, ".claude/commands/pr.md", "docs/development/agent-review-protocol.md")
+CANONICAL_REVIEW_SKILL = ".claude/skills/SHARED/review-protocol/SKILL.md"
 REQUIRED_POLICY_IDS = {
     "AUTH-PROVENANCE-001",
     "COMMIT-IDENTITY-001",
@@ -24,6 +25,14 @@ REQUIRED_POLICY_IDS = {
     "REVIEW-L2-001",
     "REVIEW-CAPTURE-001",
     "REVIEW-PARITY-001",
+}
+REVIEW_POLICY_IDS = {policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id.startswith("REVIEW-")}
+CANONICAL_REVIEW_ANCHORS = {
+    "REVIEW-AUTH-001": ("read-only plus local capture", "Commit any file.", "Push to a remote.", "Open PRs"),
+    "REVIEW-DEFECT-001": ("it is a defect", "do not belong in blind-spots"),
+    "REVIEW-L2-001": ("framework gaps", "not the instance-level defects already found"),
+    "REVIEW-CAPTURE-001": ("Projects provide storage locations/specs", "protocol governs behavior"),
+    "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "canonical skill wins"),
 }
 AUTHORITY_CLASSES = {"task", "repository", "mechanical", "recommendation"}
 AGENT_NAMES = {"chatgpt", "claude", "codex", "gemini", "openai"}
@@ -48,6 +57,40 @@ def collect_metrics(project: Path) -> Metrics:
         agents_lines=len(texts["AGENTS.md"].splitlines()),
         adapter_bytes={name: len(texts[name].encode()) for name in ADAPTERS},
     )
+
+
+def _policy_section(text: str, policy_id: str) -> str:
+    marker = f"[{policy_id}]"
+    if marker not in text:
+        return ""
+    section = text.split(marker, 1)[1]
+    return section.split("\n## ", 1)[0]
+
+
+def audit_review_policy(project: Path) -> list[str]:
+    errors: list[str] = []
+    agents = _read(project, "AGENTS.md")
+    protocol = _read(project, "docs/development/agent-review-protocol.md")
+    canonical_review = _read(project, CANONICAL_REVIEW_SKILL)
+    policy_text = agents + "\n" + protocol
+
+    missing_ids = sorted(policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id not in policy_text)
+    if missing_ids:
+        errors.append(f"missing active policy IDs: {', '.join(missing_ids)}")
+    if "docs/development/agent-review-protocol.md" not in agents:
+        errors.append("AGENTS.md does not select the active project review binding")
+
+    missing_canonical_ids = sorted(
+        policy_id for policy_id in REVIEW_POLICY_IDS if f"[{policy_id}]" not in canonical_review
+    )
+    if missing_canonical_ids:
+        errors.append(f"canonical review skill misses policy IDs: {', '.join(missing_canonical_ids)}")
+    for policy_id, anchors in CANONICAL_REVIEW_ANCHORS.items():
+        section = _policy_section(canonical_review, policy_id)
+        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        if section and missing_anchors:
+            errors.append(f"canonical {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
+    return errors
 
 
 def _resolved_git_identity(project: Path, role: str) -> tuple[str, str]:
@@ -129,14 +172,8 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
         if needle.casefold() in settings_text.casefold():
             errors.append(f"{label} pattern remains in project settings: {needle}")
 
-    agents = _read(project, "AGENTS.md")
-    protocol = _read(project, "docs/development/agent-review-protocol.md")
-    policy_text = agents + "\n" + protocol
-    missing_ids = sorted(policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id not in policy_text)
-    if missing_ids:
-        errors.append(f"missing active policy IDs: {', '.join(missing_ids)}")
-    if "docs/development/agent-review-protocol.md" not in agents:
-        errors.append("AGENTS.md does not select the active project review binding")
+    policy_text = _read(project, "AGENTS.md") + "\n" + _read(project, "docs/development/agent-review-protocol.md")
+    errors.extend(audit_review_policy(project))
 
     scenarios = corpus["scenarios"]
     covered_authorities = {scenario.get("authority") for scenario in scenarios}

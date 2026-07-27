@@ -31,12 +31,13 @@ def _load_audit():
 
 agent_instruction_audit = _load_audit()
 ACTIVE_TEXT = agent_instruction_audit.ACTIVE_TEXT
+CANONICAL_REVIEW_SKILL = agent_instruction_audit.CANONICAL_REVIEW_SKILL
 audit = agent_instruction_audit.audit
 audit_git_identity = agent_instruction_audit.audit_git_identity
 
 
 def _candidate(tmp_path: Path) -> Path:
-    for relative in (*ACTIVE_TEXT, ".claude/settings.json"):
+    for relative in (*ACTIVE_TEXT, CANONICAL_REVIEW_SKILL, ".claude/settings.json"):
         source = ROOT / relative
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -90,6 +91,22 @@ def test_missing_authority_scenario_fails(tmp_path: Path) -> None:
     corpus["scenarios"] = [item for item in CORPUS["scenarios"] if item["authority"] != "mechanical"]
     _, errors = audit(project, corpus)
     assert any("misses authority classes: mechanical" in error for error in errors)
+
+
+def test_canonical_review_policy_semantic_drift_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    canonical = project / CANONICAL_REVIEW_SKILL
+    canonical.write_text(canonical.read_text().replace("read-only plus local capture", "may modify reviewed code"))
+    _, errors = audit(project, CORPUS)
+    assert any("canonical REVIEW-AUTH-001 semantics drifted" in error for error in errors)
+
+
+def test_missing_canonical_review_policy_id_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    canonical = project / CANONICAL_REVIEW_SKILL
+    canonical.write_text(canonical.read_text().replace("[REVIEW-L2-001]", "[REMOVED-L2-ID]"))
+    _, errors = audit(project, CORPUS)
+    assert any("canonical review skill misses policy IDs: REVIEW-L2-001" in error for error in errors)
 
 
 def _git_configured_repo(tmp_path: Path, name: str, email: str) -> Path:
