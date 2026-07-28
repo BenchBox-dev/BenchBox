@@ -109,27 +109,36 @@ jobs:
             scale_factor: "0.1"
             extras: polars
 
-    # Skip matrix entries that don't match the requested benchmark (when provided).
-    if: >
-      github.event.inputs.benchmark == '' ||
-      github.event.inputs.benchmark == matrix.benchmark
+    # Skip matrix entries that don't match the requested benchmark (when
+    # provided). This CANNOT be a job-level `if`: the matrix context is not
+    # available there (the job `if` is evaluated before the matrix expands), and
+    # referencing it made the whole workflow fail to start — GitHub recorded a
+    # failed run with zero jobs on every push. `env` at job level *can* read
+    # matrix, so the condition is computed once here and each step guards on it.
+    env:
+      SELECTED: ${{ github.event.inputs.benchmark == '' || github.event.inputs.benchmark == matrix.benchmark }}
 
     steps:
       - name: Checkout code
+        if: env.SELECTED == 'true'
         uses: actions/checkout@v4
 
       - name: Set up Python
+        if: env.SELECTED == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install uv
+        if: env.SELECTED == 'true'
         uses: astral-sh/setup-uv@v4
 
       - name: Install BenchBox
+        if: env.SELECTED == 'true'
         run: uv sync --extra ${{ matrix.extras }}
 
       - name: Run benchmark
+        if: env.SELECTED == 'true'
         env:
           CLICKHOUSE_CLOUD_HOST: ${{ secrets.CLICKHOUSE_CLOUD_HOST }}
           CLICKHOUSE_CLOUD_PASSWORD: ${{ secrets.CLICKHOUSE_CLOUD_PASSWORD }}
@@ -142,6 +151,7 @@ jobs:
             --compression zstd:9
 
       - name: Locate result bundle
+        if: env.SELECTED == 'true'
         id: locate
         shell: bash
         run: |
@@ -159,6 +169,7 @@ jobs:
           echo "Found result bundle: $RESULT"
 
       - name: Stage bundle under results-data/
+        if: env.SELECTED == 'true'
         shell: bash
         env:
           RESULT_FILE: ${{ steps.locate.outputs.result_file }}
@@ -177,6 +188,7 @@ jobs:
         id: stage
 
       - name: Upload bundle artifact
+        if: env.SELECTED == 'true'
         uses: actions/upload-artifact@v4
         with:
           # Artifact name must be unique per matrix entry.
