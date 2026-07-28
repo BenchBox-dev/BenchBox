@@ -1433,6 +1433,12 @@ def promote_deferral(
     priority: str = "medium",
     worktree: str | None = None,
     description: str | None = None,
+    category: str | None = None,
+    approach: str | None = None,
+    scope: list[tuple[str, str]] | None = None,
+    verifications: list[dict[str, str]] | None = None,
+    preserves: list[str] | None = None,
+    work: list[dict[str, Any]] | None = None,
 ) -> None:
     # One transaction end to end: the gate read, the item creation, and the
     # resolution update. Split phases let two actors promote one deferral
@@ -1456,6 +1462,18 @@ def promote_deferral(
                 f"Promoted from deferral #{deferral_id} of {parent['id']}.\n"
                 f"Deferred: {row['summary']}\nReason deferred: {row['reason']}"
             ),
+            # Guardrails are accepted here so a promoted item is not born
+            # without scope, a ladder or work units. They are create-time only
+            # in this wrapper, so an item that misses them cannot be repaired
+            # here at all -- `update` is a standalone-only verb (todo-db >= 0.3)
+            # and deliberately not a wrapper handler -- and `check-scope`
+            # passes trivially in the meantime, which is worse than failing.
+            category=category,
+            approach=approach,
+            scope=scope,
+            verifications=verifications,
+            preserves=preserves,
+            work=work,
             _in_txn=True,
         )
         resolved = conn.execute(
@@ -2468,6 +2486,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--priority", default="medium", choices=PRIORITIES)
     p.add_argument("--worktree")
     p.add_argument("--description")
+    p.add_argument("--category")
+    p.add_argument("--approach")
+    p.add_argument("--only-modify", action="append", default=[], metavar="GLOB")
+    p.add_argument("--do-not-modify", action="append", default=[], metavar="GLOB")
+    p.add_argument("--preserve", action="append", default=[], metavar="BEHAVIOR")
+    p.add_argument("--verify", action="append", default=[], metavar="DESC[::COMMAND[::EXPECTED]]")
+    p.add_argument("--work", action="append", default=[], metavar="WID:SUMMARY[:needs=w1,w2]")
+
     p = sub.add_parser("dismiss", help="dismiss a deferral with a reason")
     p.add_argument("deferral_id", type=int)
     p.add_argument("--reason", required=True)
@@ -2791,6 +2817,13 @@ def _cmd_promote(conn, actor, args):
         priority=args.priority,
         worktree=args.worktree,
         description=args.description,
+        category=args.category,
+        approach=args.approach,
+        scope=([("only_modify", g) for g in args.only_modify] + [("do_not_modify", g) for g in args.do_not_modify])
+        or None,
+        verifications=_parse_verify_flag(args.verify) if args.verify else None,
+        preserves=args.preserve or None,
+        work=_parse_work_flag(args.work) if args.work else None,
     )
     print(f"deferral #{args.deferral_id} promoted to {args.to_item}")
     return 0

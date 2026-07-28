@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 import textwrap
 from pathlib import Path
@@ -811,3 +812,35 @@ class TestUnsatisfiableVerificationLint:
             verifications=[{"description": "fast tests", "command": "true", "expected": "All tests pass"}],
         )
         assert todo_db.lint_item(conn, "sample-item") == []
+
+
+class TestPromoteCarriesGuardrails:
+    """Promoted items must not be born without scope, ladder or work units."""
+
+    def _defer(self, conn):
+        _mk(conn)
+        return todo_db.defer_work(conn, "tester", "sample-item", summary="found a thing", reason="out of scope here")
+
+    def test_promote_accepts_scope_and_verifications(self, conn):
+        deferral_id = self._defer(conn)
+        todo_db.promote_deferral(
+            conn,
+            "tester",
+            deferral_id,
+            new_item_id="promoted-with-guardrails",
+            scope=[("only_modify", "benchbox/utils/*")],
+            verifications=[{"description": "fast tests", "command": "true", "expected": "exit 0"}],
+            preserves=["nothing else changes"],
+        )
+        item = todo_db.get_item(conn, "promoted-with-guardrails")
+        assert item["scope"] == [{"kind": "only_modify", "path_glob": "benchbox/utils/*"}]
+        assert [v["description"] for v in item["verifications"]] == ["fast tests"]
+        assert item["preserves"] == ["nothing else changes"]
+
+    def test_promote_without_guardrails_still_works(self, conn):
+        """Backwards compatible: the flags are optional."""
+        deferral_id = self._defer(conn)
+        todo_db.promote_deferral(conn, "tester", deferral_id, new_item_id="promoted-bare")
+        item = todo_db.get_item(conn, "promoted-bare")
+        assert item["scope"] == []
+        assert item["verifications"] == []
