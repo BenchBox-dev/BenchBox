@@ -31,10 +31,14 @@ Execute the following in order, stopping on the first failure:
    one of those, stop and tell the user to switch to a feature branch (offer
    `make worktree-claim BRANCH=<name>`).
 
-3. **If there are uncommitted changes**, create a single conventional commit
-   (`feat:`/`fix:`/`docs:`/`test:`/`chore:`/`ci:`/`refactor:` prefix) summarizing
-   them. Stage explicitly by path — never `git add -A`. Include the standard
-   `Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>` trailer.
+3. **If there are authorized uncommitted changes**, inspect the diff and refuse
+   to sweep unrelated or ambiguous files into the commit. Stage each authorized
+   path explicitly — never `git add -A` — and create a conventional commit
+   (`feat:`/`fix:`/`docs:`/`test:`/`chore:`/`ci:`/`refactor:` prefix). Run
+   `make agent-identity-check`: repository-local values override the user's
+   global identity but may be stale. Reject agent/service identities unless the
+   user explicitly requested that exact identity for this task. Add a co-author
+   trailer only when explicitly requested.
    If pre-commit hooks rewrite files, re-stage and commit again (do NOT use
    `--amend`; create a new commit).
 

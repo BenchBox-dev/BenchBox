@@ -25,6 +25,19 @@ Use only when a calling skill authorizes a write-shaped commit.
 
 ## Rules
 
+- **[COMMIT-IDENTITY-001] Resolve and validate human identity.** Inspect the
+  effective `user.name` and `user.email` with their config origins before the
+  first commit. A repository-local value overrides the user's global identity;
+  do not assume that makes it intentional. Reject known agent/service identities
+  (for example Claude, Codex, Gemini, ChatGPT, or their vendor noreply addresses)
+  unless the current authorized task explicitly names that exact identity.
+  Otherwise use the user's effective human author and committer identity. Do not
+  pass `--author` or set `GIT_AUTHOR_*` / `GIT_COMMITTER_*` merely to work around
+  a stale config. A task-local override applies only to that task; never convert
+  it into standing repository or skill policy.
+- After committing, verify the resulting author and committer with
+  `git show -s --format=fuller HEAD` when identity was explicitly overridden or
+  identity is part of the acceptance criteria.
 - Never `git add -A`.
 - Commit only authorized/session-modified files.
 - Use Conventional Commits.
