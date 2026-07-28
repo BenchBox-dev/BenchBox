@@ -37,6 +37,7 @@ CANONICAL_REVIEW_ANCHORS = {
 AUTHORITY_CLASSES = {"task", "repository", "mechanical", "recommendation"}
 EVALUATION_ACTIONS = {
     "commit_with_human_identity",
+    "commit_with_requested_identity",
     "review_only",
     "stop_publication",
     "continue_locally",
