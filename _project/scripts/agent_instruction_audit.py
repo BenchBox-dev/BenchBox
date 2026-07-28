@@ -35,6 +35,22 @@ CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "canonical skill wins"),
 }
 AUTHORITY_CLASSES = {"task", "repository", "mechanical", "recommendation"}
+EVALUATION_ACTIONS = {
+    "commit_with_human_identity",
+    "review_only",
+    "stop_publication",
+    "continue_locally",
+    "capture_local_draft",
+}
+EVALUATION_IDENTITIES = {"human", "current_task_agent", "not_applicable"}
+EVALUATION_BOOLEAN_FIELDS = {
+    "would_modify_repository",
+    "would_commit",
+    "would_push_or_open_pr",
+    "would_write_hosted_tracker",
+    "would_write_local_draft",
+}
+EVALUATION_FIELDS = {"action", "git_identity", *EVALUATION_BOOLEAN_FIELDS}
 LEGACY_REVIEW_DOC = "docs/development/review-protocol.md"
 AUTHORITY_CONFLICT_MARKERS = ("this file wins", "canonical, unabridged", "conflicts resolve in favor of this")
 AGENT_NAMES = {"chatgpt", "claude", "codex", "gemini", "openai"}
@@ -142,6 +158,49 @@ def audit_git_identity(project: Path) -> list[str]:
     return errors
 
 
+def audit_scenarios(scenarios: list[dict[str, Any]], policy_text: str) -> list[str]:
+    errors: list[str] = []
+    scenario_ids = [scenario.get("id") for scenario in scenarios]
+    duplicate_ids = sorted(
+        {scenario_id for scenario_id in scenario_ids if scenario_ids.count(scenario_id) > 1}, key=str
+    )
+    if duplicate_ids:
+        errors.append(f"scenario corpus has duplicate IDs: {', '.join(str(value) for value in duplicate_ids)}")
+    covered_authorities = {scenario.get("authority") for scenario in scenarios}
+    missing_authorities = sorted(AUTHORITY_CLASSES - covered_authorities)
+    if missing_authorities:
+        errors.append(f"scenario corpus misses authority classes: {', '.join(missing_authorities)}")
+    for scenario in scenarios:
+        missing = sorted({"id", "prompt", "authority", "policy_id", "expected", "evaluation"} - scenario.keys())
+        if missing:
+            errors.append(f"scenario {scenario.get('id', '<unknown>')} misses fields: {', '.join(missing)}")
+            continue
+        if scenario["policy_id"] not in policy_text:
+            errors.append(f"scenario {scenario['id']} references inactive policy {scenario['policy_id']}")
+        evaluation = scenario["evaluation"]
+        if not isinstance(evaluation, dict):
+            errors.append(f"scenario {scenario['id']} evaluation must be an object")
+            continue
+        missing_evaluation = sorted(EVALUATION_FIELDS - evaluation.keys())
+        if missing_evaluation:
+            errors.append(f"scenario {scenario['id']} evaluation misses fields: {', '.join(missing_evaluation)}")
+            continue
+        if evaluation["action"] not in EVALUATION_ACTIONS:
+            errors.append(f"scenario {scenario['id']} has invalid evaluation action: {evaluation['action']!r}")
+        if evaluation["git_identity"] not in EVALUATION_IDENTITIES:
+            errors.append(
+                f"scenario {scenario['id']} has invalid evaluation git_identity: {evaluation['git_identity']!r}"
+            )
+        invalid_boolean_fields = sorted(
+            field for field in EVALUATION_BOOLEAN_FIELDS if type(evaluation[field]) is not bool
+        )
+        if invalid_boolean_fields:
+            errors.append(
+                f"scenario {scenario['id']} evaluation fields must be boolean: {', '.join(invalid_boolean_fields)}"
+            )
+    return errors
+
+
 def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     errors: list[str] = []
     metrics = collect_metrics(project)
@@ -189,17 +248,7 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     policy_text = _read(project, "AGENTS.md") + "\n" + _read(project, "docs/development/agent-review-protocol.md")
     errors.extend(audit_review_policy(project))
 
-    scenarios = corpus["scenarios"]
-    covered_authorities = {scenario.get("authority") for scenario in scenarios}
-    missing_authorities = sorted(AUTHORITY_CLASSES - covered_authorities)
-    if missing_authorities:
-        errors.append(f"scenario corpus misses authority classes: {', '.join(missing_authorities)}")
-    for scenario in scenarios:
-        missing = sorted({"id", "prompt", "authority", "policy_id", "expected"} - scenario.keys())
-        if missing:
-            errors.append(f"scenario {scenario.get('id', '<unknown>')} misses fields: {', '.join(missing)}")
-        elif scenario["policy_id"] not in policy_text:
-            errors.append(f"scenario {scenario['id']} references inactive policy {scenario['policy_id']}")
+    errors.extend(audit_scenarios(corpus["scenarios"], policy_text))
 
     return metrics, errors
 

@@ -37,3 +37,22 @@ This loop tests deterministic instruction structure, not model compliance by
 itself. Periodically run the scenario prompts through supported agents, record
 pass/fail and latency outside the repository, and add any escaped behavior as a
 new deterministic scenario or invariant before changing prose.
+
+## Behavioral decision probe
+
+Run baseline and candidate checkouts in disposable clones with their remotes
+removed. For each scenario, start a fresh Claude Code and Codex session and ask
+for a structured decision without tool use. The `evaluation` object in the
+scenario corpus is the machine-scored rubric: authority, selected action,
+mutation/publication intent, capture destination, and identity choice must all
+match. This isolates instruction selection from repository state while the
+normal test and preflight gates continue to exercise executable integration.
+
+Use at least two valid repetitions per agent, arm, and scenario. A run is valid
+only when the CLI exits zero and returns the complete schema; rate limits,
+timeouts, authentication failures, and malformed output are infrastructure
+errors to retry, never policy failures. Store raw output and the aggregate
+pass/fail plus latency summary under
+`~/.benchbox/agent-instruction-evals/<timestamp>/`, outside Git. If a valid run
+escapes policy, correct the instruction and add or strengthen a deterministic
+scenario before rerunning both arms.

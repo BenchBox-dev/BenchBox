@@ -93,6 +93,43 @@ def test_missing_authority_scenario_fails(tmp_path: Path) -> None:
     assert any("misses authority classes: mechanical" in error for error in errors)
 
 
+def test_duplicate_scenario_id_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    corpus = json.loads(json.dumps(CORPUS))
+    corpus["scenarios"].append(dict(corpus["scenarios"][0]))
+    _, errors = audit(project, corpus)
+    assert any("duplicate IDs: task-specific-identity" in error for error in errors)
+
+
+def test_missing_evaluation_field_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    corpus = json.loads(json.dumps(CORPUS))
+    del corpus["scenarios"][0]["evaluation"]["would_commit"]
+    _, errors = audit(project, corpus)
+    assert any("evaluation misses fields: would_commit" in error for error in errors)
+
+
+def test_non_object_evaluation_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    corpus = json.loads(json.dumps(CORPUS))
+    corpus["scenarios"][0]["evaluation"] = "commit"
+    _, errors = audit(project, corpus)
+    assert any("evaluation must be an object" in error for error in errors)
+
+
+def test_invalid_evaluation_values_fail(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    corpus = json.loads(json.dumps(CORPUS))
+    evaluation = corpus["scenarios"][0]["evaluation"]
+    evaluation["action"] = "invent_policy"
+    evaluation["git_identity"] = "claude"
+    evaluation["would_commit"] = "yes"
+    _, errors = audit(project, corpus)
+    assert any("invalid evaluation action: 'invent_policy'" in error for error in errors)
+    assert any("invalid evaluation git_identity: 'claude'" in error for error in errors)
+    assert any("evaluation fields must be boolean: would_commit" in error for error in errors)
+
+
 def test_superseded_review_doc_claiming_authority_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     legacy = project / "docs/development/review-protocol.md"
