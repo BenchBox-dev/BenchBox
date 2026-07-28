@@ -1,13 +1,15 @@
-# Review Protocol
+# Review Protocol (historical)
 
-> Canonical, unabridged form. The synced `SHARED/review-protocol` skill is
-> the compressed agent-loaded mirror — keep both in lockstep when editing.
+> **Historical, non-authoritative.** The active behavioral authority is
+> `docs/development/agent-review-protocol.md` (stable `REVIEW-*` policy IDs,
+> bound to the canonical `SHARED/review-protocol` skill). This unabridged
+> text is retained only as rationale; where it disagrees with the active
+> authority, the active authority wins. Do not bind new commands, skills,
+> or tests to this file.
 
 The contract for review-shaped actions: code reviews, audits, research,
 compare, to-spec, security reviews, and any L2 blind-spot audit performed
-within them. Wrappers (skills, slash commands, AGENTS.md, CLAUDE.md, and
-GEMINI.md files) reference this file rather than restating its rules. **If
-a wrapper appears to conflict with this file, this file wins.**
+within them.
 
 ---
 
@@ -33,9 +35,6 @@ including landing the capture files themselves to `develop` - requires
 the user to authorize remediation in a separate turn. "Authorization"
 means a direct user instruction in *this* conversation, not an inference
 from a previous standing rule or an earlier turn's blanket approval.
-
-This rule fires *before* any "auto-commit" or "file-first capture"
-mandate elsewhere. Conflicts resolve in favor of this section.
 
 ---
 
@@ -150,7 +149,7 @@ A project that adopts this protocol provides:
 - A sweep workflow (e.g., `make blind-spots-{list,report,sweep}`).
 
 See the project's agent instructions and the blind-spot directory's
-`README.md` for project-specific bindings. **This file governs
-*behavior*; the project README governs *storage*.** The two should
-never restate each other; if you find duplicated rules, the
-behavior-side belongs here.
+`README.md` for project-specific bindings. Behavior is governed by
+`docs/development/agent-review-protocol.md`; the project README governs
+*storage*. The two should never restate each other; duplicated behavior
+rules belong in the active authority, not here.

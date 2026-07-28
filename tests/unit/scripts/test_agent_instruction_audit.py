@@ -93,6 +93,38 @@ def test_missing_authority_scenario_fails(tmp_path: Path) -> None:
     assert any("misses authority classes: mechanical" in error for error in errors)
 
 
+def test_superseded_review_doc_claiming_authority_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    legacy = project / "docs/development/review-protocol.md"
+    legacy.write_text(
+        "# Review Protocol\n\n> Canonical, unabridged form.\n\nIf a wrapper conflicts with this file, this file wins.\n"
+    )
+    _, errors = audit(project, CORPUS)
+    assert any("lacks a leading non-authoritative banner" in error for error in errors)
+    assert any("still claims authority: 'this file wins'" in error for error in errors)
+    assert any("still claims authority: 'canonical, unabridged'" in error for error in errors)
+
+
+def test_superseded_review_doc_with_banner_passes(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    legacy = project / "docs/development/review-protocol.md"
+    legacy.write_text(
+        "# Review Protocol (historical)\n\n"
+        "> Historical, non-authoritative. The active behavioral authority is\n"
+        "> docs/development/agent-review-protocol.md.\n\nRetained rationale.\n"
+    )
+    _, errors = audit(project, CORPUS)
+    assert errors == []
+
+
+def test_command_bound_to_superseded_review_doc_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    command = project / ".claude/commands/pr.md"
+    command.write_text(command.read_text() + "\nFollow docs/development/review-protocol.md exactly.\n")
+    _, errors = audit(project, CORPUS)
+    assert any("binds to the superseded docs/development/review-protocol.md" in error for error in errors)
+
+
 def test_canonical_review_policy_semantic_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     canonical = project / CANONICAL_REVIEW_SKILL

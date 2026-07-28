@@ -46,8 +46,10 @@ the design does not silently contradict a settled decision:
    **finding draft files** are a permitted local write: they carry no
    cross-session consistency contract and are landed later through the
    separately authorized `todo finding sync` step, never queued into the primary.
-2. **`docs/development/review-protocol.md` §4** (and its `SHARED/review-protocol`
-   skill mirror) name the append-only draft file under
+2. **`docs/development/agent-review-protocol.md` `[REVIEW-CAPTURE-001]`**
+   (with its `SHARED/review-protocol` skill mirror; unabridged rationale in
+   the historical `docs/development/review-protocol.md` §4) names the
+   append-only draft file under
    `~/.benchbox/finding-drafts/` as the **sole** in-review finding write.
    Writing a finding straight into the hosted DB during a review is *landing*
    (§1) and is forbidden without a separate authorized turn; `todo finding

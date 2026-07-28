@@ -1,9 +1,10 @@
 # Agent review protocol
 
 This is the active BenchBox binding for the canonical generated
-`SHARED/review-protocol` skill. It supersedes
-`docs/development/review-protocol.md`, retained temporarily as historical
-documentation. Stable IDs make the contract mechanically auditable.
+`SHARED/review-protocol` skill — the single behavioral authority for
+review-shaped work. It supersedes `docs/development/review-protocol.md`,
+retained only as non-authoritative historical rationale. Stable IDs make
+the contract mechanically auditable.
 
 ## Authority boundary
 

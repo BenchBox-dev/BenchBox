@@ -35,6 +35,8 @@ CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "canonical skill wins"),
 }
 AUTHORITY_CLASSES = {"task", "repository", "mechanical", "recommendation"}
+LEGACY_REVIEW_DOC = "docs/development/review-protocol.md"
+AUTHORITY_CONFLICT_MARKERS = ("this file wins", "canonical, unabridged", "conflicts resolve in favor of this")
 AGENT_NAMES = {"chatgpt", "claude", "codex", "gemini", "openai"}
 AGENT_EMAILS = {"noreply@anthropic.com", "noreply@openai.com"}
 
@@ -90,6 +92,16 @@ def audit_review_policy(project: Path) -> list[str]:
         missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
         if section and missing_anchors:
             errors.append(f"canonical {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
+
+    legacy_path = project / LEGACY_REVIEW_DOC
+    if legacy_path.exists():
+        legacy = legacy_path.read_text(encoding="utf-8")
+        head = "\n".join(legacy.splitlines()[:10]).casefold()
+        if "non-authoritative" not in head:
+            errors.append(f"superseded {LEGACY_REVIEW_DOC} lacks a leading non-authoritative banner")
+        for marker in AUTHORITY_CONFLICT_MARKERS:
+            if marker in legacy.casefold():
+                errors.append(f"superseded {LEGACY_REVIEW_DOC} still claims authority: {marker!r}")
     return errors
 
 
@@ -153,6 +165,8 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     command_text = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted((project / ".claude/commands").glob("*.md"))
     )
+    if LEGACY_REVIEW_DOC in command_text:
+        errors.append(f"a .claude/commands surface binds to the superseded {LEGACY_REVIEW_DOC}")
     settings = json.loads(_read(project, ".claude/settings.json"))
     if settings.get("hooks"):
         errors.append(".claude/settings.json contains executable hooks; use explicit gates")

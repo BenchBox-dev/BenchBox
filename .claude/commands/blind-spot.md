@@ -11,10 +11,11 @@ description: Capture a blind-spot audit finding as a draft in ~/.benchbox/findin
 
 ## Your task
 
-Follow `docs/development/review-protocol.md` exactly. Apply Section 2
-(defect gate) **before** anything else. If the gate triggers, refuse
-to file and offer the user the TODO / inline-fix / escalation menu
-described in the review protocol. If the gate passes:
+Follow `docs/development/agent-review-protocol.md` exactly. Apply the
+defect gate `[REVIEW-DEFECT-001]` **before** anything else: a finding that
+materially affects correctness, performance, or security is a defect, not a
+blind spot. If the gate triggers, refuse to file and offer the user the
+TODO / inline-fix / escalation menu instead. If the gate passes:
 
 1. **Pick the slug.** Derive a 3–6 word kebab-case slug capturing the
    *class*, not the *instance*. Example: "react keys collide on
@@ -24,8 +25,9 @@ described in the review protocol. If the gate passes:
 2. **Compose the path** `~/.benchbox/finding-drafts/YYYY-MM-DD-HHMMSS-<slug>.md`
    using the timestamp from the Context block above (run
    `mkdir -p ~/.benchbox/finding-drafts` first). Drafts live outside every
-   worktree — capture needs no credentials and no network, and per review
-   protocol §4 the draft file is the *sole* in-review write for a finding.
+   worktree — capture needs no credentials and no network, and per
+   `[REVIEW-CAPTURE-001]` the draft file is the *sole* in-review write for a
+   finding.
    Filename stem must equal the `id` field in the frontmatter. If the path
    collides, append `-2`, `-3`, … before `.md`.
 
@@ -45,11 +47,12 @@ described in the review protocol. If the gate passes:
 5. **Report** with `Recorded: ~/.benchbox/finding-drafts/<filename>.md` and
    a quote of the body. **Stop there** — do not commit, do not push, do not
    run `make pr-open`, and do not write the finding into the tracker database.
-   Per review protocol §4 the draft file is local-only; syncing it into the
-   tracker (`todo finding sync`) is a separate, user-authorized landing step.
+   Per `[REVIEW-CAPTURE-001]` the draft file is local-only; syncing it into
+   the tracker (`todo finding sync`) is a separate, user-authorized landing
+   step.
 
 ## Notes
 
-Behavior is governed by `docs/development/review-protocol.md`.
+Behavior is governed by `docs/development/agent-review-protocol.md`.
 Storage is governed by `_project/blind-spots/README.md`. Don't restate
 either here.
