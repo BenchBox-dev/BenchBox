@@ -49,6 +49,9 @@ scenario corpus is the machine-scored rubric: authority, selected action,
 mutation/publication intent, capture destination, and identity choice must all
 match. This isolates instruction selection from repository state while the
 normal test and preflight gates continue to exercise executable integration.
+The reported stable policy ID is diagnostic only: the deterministic audit owns
+ID existence and semantic-anchor integrity, while the behavioral probe scores
+the decision rather than exact label recall.
 
 For scoring, `authority` is the source whose instruction determines the final
 action after conflicts are resolved. For example, repository identity policy
