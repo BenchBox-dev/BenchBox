@@ -1,12 +1,15 @@
 version: 1
 sources:
-  - name: personal
-    type: local
-    path: ~/.skill-sync/skills
+  - name: canonical
+    type: git
+    url: https://github.com/joeharris76/skill-sync-skills.git
+    ref: c52db1dcfebc76283046c7eaa5794aaaca25cff2
+    subdir: skills
 skills:
   - blog
   - code
   - test
+  - docs
   - todo
   - todo-db
   - benchbox
