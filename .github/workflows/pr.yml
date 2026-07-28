@@ -370,7 +370,7 @@ jobs:
         # stale snapshot. Switch to `npx -y skill-sync@<ver>` once published.
         id: guard-skill-sync-verify
         continue-on-error: true
-        run: npx -y github:joeharris76/skill-sync#1780825 verify --project .
+        run: npx -y github:joeharris76/skill-sync#7e8926ae3ee03c8b0cc7c0fab498e5ed1917638b verify --project .
 
       - name: Untracked skill-mirror drift guard (cloud parity)
         # The codex/gemini/antigravity mirrors and the curated-out `blog` skill are

@@ -118,8 +118,11 @@ def audit_review_policy(project: Path) -> list[str]:
             errors.append(f"canonical {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
     for policy_id, anchors in PROJECT_REVIEW_ANCHORS.items():
         section = _policy_section(protocol, policy_id)
+        if not section:
+            errors.append(f"project review binding misses policy ID: {policy_id}")
+            continue
         missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
-        if section and missing_anchors:
+        if missing_anchors:
             errors.append(f"project {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
 
     legacy_path = project / LEGACY_REVIEW_DOC
