@@ -2524,6 +2524,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--run", type=int, metavar="SEQ")
 
     p = sub.add_parser("lint", help="mechanical quality checks")
+    p.add_argument(
+        "--include-done",
+        action="store_true",
+        help="lint every item including done/dropped (audit mode; implies --all)",
+    )
     p.add_argument("id", nargs="?")
     p.add_argument("--all", action="store_true")
 
@@ -2925,11 +2930,19 @@ def _cmd_verify(conn, actor, args):
 
 
 def _cmd_lint(conn, actor, args):
-    targets = (
-        [row["id"] for row in conn.execute("SELECT id FROM items WHERE state IN ('planning','active') ORDER BY id")]
-        if args.all
-        else [args.id]
-    )
+    # --all lints the open backlog, which is what a triage pass wants. An audit
+    # of *authored quality* needs the finished ones too: a rung whose command
+    # can never express its expectation is invisible to --all once the item is
+    # done, and that is exactly where such rungs accumulate -- every offender
+    # found in the 2026-07-26 sweep sat on a done item.
+    # getattr: programmatic callers construct a minimal namespace, so a new
+    # optional flag must not become a required attribute.
+    include_done = getattr(args, "include_done", False)
+    if args.all or include_done:
+        states = "('planning','active','done','dropped')" if include_done else "('planning','active')"
+        targets = [row["id"] for row in conn.execute(f"SELECT id FROM items WHERE state IN {states} ORDER BY id")]
+    else:
+        targets = [args.id]
     if targets == [None]:
         raise TodoError("lint requires an item id or --all")
     total = 0
