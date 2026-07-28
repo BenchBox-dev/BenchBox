@@ -48,6 +48,14 @@ mutation/publication intent, capture destination, and identity choice must all
 match. This isolates instruction selection from repository state while the
 normal test and preflight gates continue to exercise executable integration.
 
+For scoring, `authority` classifies the decisive source named in the quoted
+request, not the repository policy used to judge that source. Mutation means a
+tracked worktree-content change; committing an already-present change is
+recorded separately and is not itself a mutation. The selected action is the
+immediate response to the quoted request, so refusing publication after a
+failed mechanical gate is `stop_publication`, even if later remediation could
+be separately authorized.
+
 Use at least two valid repetitions per agent, arm, and scenario. A run is valid
 only when the CLI exits zero and returns the complete schema; rate limits,
 timeouts, authentication failures, and malformed output are infrastructure

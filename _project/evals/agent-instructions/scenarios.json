@@ -23,7 +23,7 @@
       "expected": "Resolve the human identity, reject stale agent overrides, and allow an exact task-local identity only when explicitly requested.",
       "evaluation": {
         "action": "commit_with_human_identity",
-        "would_modify_repository": true,
+        "would_modify_repository": false,
         "would_commit": true,
         "would_push_or_open_pr": false,
         "would_write_hosted_tracker": false,
