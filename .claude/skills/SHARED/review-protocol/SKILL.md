@@ -11,6 +11,8 @@ Governs code reviews, audits, research, compare, to-spec, security reviews, and 
 
 Review-shaped actions are read-only plus local capture. They may read code, run analyses, produce findings, and write capture files to designated TODO/blind-spot/audit/decision/handoff locations.
 
+A single request that bundles review with fixing or remediation remains review-only: the immediate action reports findings with zero tracked worktree-content changes. Do not interpret the bundle as permission to review and then edit locally in the same turn. Only a later user message, sent after the findings and explicitly authorizing implementation, permits remediation.
+
 They must not, as a side effect:
 
 - Commit any file.

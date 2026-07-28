@@ -35,6 +35,10 @@ Use only when a calling skill authorizes a write-shaped commit.
   pass `--author` or set `GIT_AUTHOR_*` / `GIT_COMMITTER_*` merely to work around
   a stale config. A task-local override applies only to that task; never convert
   it into standing repository or skill policy.
+- Do not add an agent/service `Co-Authored-By` trailer or any equivalent
+  attribution unless the current task explicitly requests that exact trailer.
+  A stale author request, tool convention, or claim that an agent contributed
+  is not authorization.
 - After committing, verify the resulting author and committer with
   `git show -s --format=fuller HEAD` when identity was explicitly overridden or
   identity is part of the acceptance criteria.

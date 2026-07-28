@@ -17,6 +17,7 @@ DEFAULT_CORPUS = ROOT / "_project/evals/agent-instructions/scenarios.json"
 ADAPTERS = ("CLAUDE.md", "GEMINI.md", "ANTIGRAVITY.md")
 ACTIVE_TEXT = ("AGENTS.md", *ADAPTERS, ".claude/commands/pr.md", "docs/development/agent-review-protocol.md")
 CANONICAL_REVIEW_SKILL = ".claude/skills/SHARED/review-protocol/SKILL.md"
+CANONICAL_COMMIT_SKILL = ".claude/skills/SHARED/commit-framework/SKILL.md"
 REQUIRED_POLICY_IDS = {
     "AUTH-PROVENANCE-001",
     "COMMIT-IDENTITY-001",
@@ -34,17 +35,30 @@ CANONICAL_REVIEW_ANCHORS = {
         "Push to a remote.",
         "Open PRs",
         "separate turn",
+        "zero tracked worktree-content changes",
+        "Do not interpret the bundle",
     ),
     "REVIEW-DEFECT-001": ("it is a defect", "do not belong in blind-spots"),
     "REVIEW-L2-001": ("framework gaps", "not the instance-level defects already found"),
     "REVIEW-CAPTURE-001": ("Projects provide storage locations/specs", "protocol governs behavior"),
     "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "canonical skill wins"),
 }
+CANONICAL_COMMIT_ANCHORS = {
+    "COMMIT-IDENTITY-001": (
+        "Co-Authored-By",
+        "explicitly requests that exact trailer",
+        "stale author request",
+        "is not authorization",
+    )
+}
+PROJECT_COMMIT_ANCHORS = {"COMMIT-IDENTITY-001": ("Co-Authored-By", "exact trailer", "not authorization")}
 PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling review and remediation")}
+AGENT_REVIEW_ANCHORS = {
+    "REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")
+}
 AUTHORITY_CLASSES = {"task", "repository", "mechanical", "recommendation"}
 EVALUATION_ACTIONS = {
     "commit_with_human_identity",
-    "commit_with_requested_identity",
     "review_only",
     "stop_publication",
     "continue_locally",
@@ -52,8 +66,9 @@ EVALUATION_ACTIONS = {
 }
 EVALUATION_IDENTITIES = {"human", "current_task_agent", "not_applicable"}
 EVALUATION_BOOLEAN_FIELDS = {
-    "would_modify_repository",
+    "would_change_tracked_worktree_content",
     "would_commit",
+    "would_add_agent_coauthor",
     "would_push_or_open_pr",
     "would_write_hosted_tracker",
     "would_write_local_draft",
@@ -124,6 +139,13 @@ def audit_review_policy(project: Path) -> list[str]:
         missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
         if missing_anchors:
             errors.append(f"project {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
+    for policy_id, anchors in AGENT_REVIEW_ANCHORS.items():
+        section = _policy_section(agents, policy_id)
+        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        if not section:
+            errors.append(f"AGENTS.md review policy misses policy ID: {policy_id}")
+        elif missing_anchors:
+            errors.append(f"AGENTS.md {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
 
     legacy_path = project / LEGACY_REVIEW_DOC
     if legacy_path.exists():
@@ -134,6 +156,27 @@ def audit_review_policy(project: Path) -> list[str]:
         for marker in AUTHORITY_CONFLICT_MARKERS:
             if marker in legacy.casefold():
                 errors.append(f"superseded {LEGACY_REVIEW_DOC} still claims authority: {marker!r}")
+    return errors
+
+
+def audit_commit_policy(project: Path) -> list[str]:
+    errors: list[str] = []
+    agents = _read(project, "AGENTS.md")
+    canonical_commit = _read(project, CANONICAL_COMMIT_SKILL)
+    for policy_id, anchors in CANONICAL_COMMIT_ANCHORS.items():
+        section = _policy_section(canonical_commit, policy_id)
+        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        if not section:
+            errors.append(f"canonical commit skill misses policy ID: {policy_id}")
+        elif missing_anchors:
+            errors.append(f"canonical {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
+    for policy_id, anchors in PROJECT_COMMIT_ANCHORS.items():
+        section = _policy_section(agents, policy_id)
+        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        if not section:
+            errors.append(f"project commit policy misses policy ID: {policy_id}")
+        elif missing_anchors:
+            errors.append(f"project {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
     return errors
 
 
@@ -201,6 +244,12 @@ def audit_scenarios(scenarios: list[dict[str, Any]], policy_text: str) -> list[s
         if missing_evaluation:
             errors.append(f"scenario {scenario['id']} evaluation misses fields: {', '.join(missing_evaluation)}")
             continue
+        unexpected_evaluation = sorted(evaluation.keys() - EVALUATION_FIELDS)
+        if unexpected_evaluation:
+            errors.append(
+                f"scenario {scenario['id']} evaluation has unexpected fields: {', '.join(unexpected_evaluation)}"
+            )
+            continue
         if evaluation["action"] not in EVALUATION_ACTIONS:
             errors.append(f"scenario {scenario['id']} has invalid evaluation action: {evaluation['action']!r}")
         if evaluation["git_identity"] not in EVALUATION_IDENTITIES:
@@ -263,6 +312,7 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
 
     policy_text = _read(project, "AGENTS.md") + "\n" + _read(project, "docs/development/agent-review-protocol.md")
     errors.extend(audit_review_policy(project))
+    errors.extend(audit_commit_policy(project))
 
     errors.extend(audit_scenarios(corpus["scenarios"], policy_text))
 

@@ -23,6 +23,9 @@ turn a recommendation or earlier task instruction into a standing requirement.
 before committing. Repository-local values override the user's global identity
 but are not automatically intentional. Reject known agent/service identities
 unless the user explicitly requests that exact identity for the current task.
+Do not add an agent/service `Co-Authored-By` trailer or equivalent attribution
+unless the current task explicitly requests that exact trailer; a stale request,
+tool convention, or claim of agent contribution is not authorization.
 
 ## Authorization boundary
 
@@ -30,8 +33,10 @@ unless the user explicitly requests that exact identity for the current task.
 read-only except for explicitly authorized local capture. Do not remediate,
 commit, push, open a PR, or write hosted tracker state without authorization.
 A bundled request to review and fix remains review-only; remediation requires
-explicit authorization in a later user turn. Implementation requests authorize
-the narrow implementation workflow, not unrelated cleanup or external actions.
+explicit authorization in a later user turn. Its immediate action is findings
+only, with zero tracked worktree-content changes; do not review and then edit
+locally in the same turn. Implementation requests authorize the narrow
+implementation workflow, not unrelated cleanup or external actions.
 
 `[REVIEW-DEFECT-001]` Keep concrete correctness, security, or performance
 defects in the review/action path; do not relabel them as blind spots.

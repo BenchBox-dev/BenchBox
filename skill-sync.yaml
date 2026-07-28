@@ -3,7 +3,7 @@ sources:
   - name: canonical
     type: git
     url: https://github.com/joeharris76/skill-sync-skills.git
-    ref: c52db1dcfebc76283046c7eaa5794aaaca25cff2
+    ref: b98bf27413ee122f47c515d4d685965ce5df7df7
     subdir: skills
 skills:
   - blog
