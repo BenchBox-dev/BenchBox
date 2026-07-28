@@ -32,12 +32,13 @@ def _load_audit():
 agent_instruction_audit = _load_audit()
 ACTIVE_TEXT = agent_instruction_audit.ACTIVE_TEXT
 CANONICAL_REVIEW_SKILL = agent_instruction_audit.CANONICAL_REVIEW_SKILL
+CANONICAL_COMMIT_SKILL = agent_instruction_audit.CANONICAL_COMMIT_SKILL
 audit = agent_instruction_audit.audit
 audit_git_identity = agent_instruction_audit.audit_git_identity
 
 
 def _candidate(tmp_path: Path) -> Path:
-    for relative in (*ACTIVE_TEXT, CANONICAL_REVIEW_SKILL, ".claude/settings.json"):
+    for relative in (*ACTIVE_TEXT, CANONICAL_REVIEW_SKILL, CANONICAL_COMMIT_SKILL, ".claude/settings.json"):
         source = ROOT / relative
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -73,6 +74,22 @@ def test_imposed_identity_fails(tmp_path: Path) -> None:
     command.write_text(command.read_text() + "\nCo-Authored-By: Claude <noreply@example.com>\n")
     _, errors = audit(project, CORPUS)
     assert any("imposed Claude co-author" in error for error in errors)
+
+
+def test_canonical_commit_coauthor_consent_drift_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    canonical = project / CANONICAL_COMMIT_SKILL
+    canonical.write_text(canonical.read_text().replace("stale author request", "earlier context"))
+    _, errors = audit(project, CORPUS)
+    assert any("canonical COMMIT-IDENTITY-001 semantics drifted" in error for error in errors)
+
+
+def test_project_commit_coauthor_consent_drift_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("not authorization", "may be sufficient"))
+    _, errors = audit(project, CORPUS)
+    assert any("project COMMIT-IDENTITY-001 semantics drifted" in error for error in errors)
 
 
 def test_executable_hook_fails(tmp_path: Path) -> None:
@@ -115,6 +132,14 @@ def test_non_object_evaluation_fails(tmp_path: Path) -> None:
     corpus["scenarios"][0]["evaluation"] = "commit"
     _, errors = audit(project, corpus)
     assert any("evaluation must be an object" in error for error in errors)
+
+
+def test_unexpected_evaluation_field_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    corpus = json.loads(json.dumps(CORPUS))
+    corpus["scenarios"][0]["evaluation"]["would_modify_repository"] = False
+    _, errors = audit(project, corpus)
+    assert any("evaluation has unexpected fields: would_modify_repository" in error for error in errors)
 
 
 def test_invalid_evaluation_values_fail(tmp_path: Path) -> None:
@@ -176,6 +201,14 @@ def test_project_review_policy_separate_turn_drift_fails(tmp_path: Path) -> None
     protocol.write_text(protocol.read_text().replace("in a\n  later user turn", "separately"))
     _, errors = audit(project, CORPUS)
     assert any("project REVIEW-AUTH-001 semantics drifted" in error for error in errors)
+
+
+def test_agents_bundled_review_zero_mutation_drift_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace("zero tracked worktree-content changes", "some local changes"))
+    _, errors = audit(project, CORPUS)
+    assert any("AGENTS.md REVIEW-AUTH-001 semantics drifted" in error for error in errors)
 
 
 def test_project_review_policy_id_missing_fails(tmp_path: Path) -> None:
