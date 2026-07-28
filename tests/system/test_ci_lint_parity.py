@@ -51,6 +51,7 @@ LINT_JOB_ID = "code-lint"
 # would let a newly added guard silently escape aggregation.
 GUARD_ID_PREFIX = "guard-"
 AGGREGATOR_STEP_NAME = "lint-guard-summary"
+SKILL_SYNC_SHA = "7e8926ae3ee03c8b0cc7c0fab498e5ed1917638b"
 
 # Steps whose `run:` command is a setup/install action, not a guard -- they
 # have no failure-condition semantics of their own and ci-lint doesn't need
@@ -63,15 +64,13 @@ SETUP_STEP_NAMES = {"Install dependencies"}
 # rot into cover for a guard that quietly stopped existing.
 EXCLUDED_STEPS: dict[str, str] = {
     "skill-sync tracked snapshot verify (cloud/CI integrity gate)": (
-        "Pinned `npx -y github:joeharris76/skill-sync#<sha> verify` needs "
-        "network access to fetch the pinned skill-sync commit from GitHub. "
-        "Tested in a local/sandboxed dev shell with npx installed: the "
-        "command hangs with no route (no DNS/proxy support for the npm "
-        "registry or git-over-https fetch npx uses for a `github:` spec). "
-        "A `command -v npx && npx ... || echo notice` guard would either "
-        "hang the same way, or -- if given a short timeout -- silently "
+        "The full-SHA actions/checkout plus `npm ci` verifier needs network "
+        "access to fetch both the pinned skill-sync commit and its npm "
+        "dependencies. Tested in a local/sandboxed dev shell: the equivalent "
+        "command hangs with no configured DNS/proxy route. A conditional "
+        "network probe would either hang the same way or silently "
         "swallow a REAL local verify failure on machines that do have "
-        "working npx+network, which is exactly the anti-pattern this test "
+        "working GitHub+registry network, which is exactly the anti-pattern this test "
         "exists to prevent (weakening a CI guard to make it pass locally). "
         "CI's runner has network, so the gate stays fully enforced there; "
         "it is simply not runnable as a blocking local gate. See "
@@ -220,6 +219,27 @@ def test_excluded_steps_still_exist() -> None:
         "EXCLUDED_STEPS references pr.yml `lint`-job step name(s) that no "
         f"longer exist (renamed or removed) -- update the exclusion: {stale}"
     )
+
+
+def test_skill_sync_cloud_verifier_uses_immutable_checkout() -> None:
+    steps = _load_lint_job_steps()
+    checkout = next(step for step in steps if step.get("name") == "Checkout pinned skill-sync verifier")
+    assert checkout["uses"] == "actions/checkout@v4"
+    assert checkout["with"] == {
+        "repository": "joeharris76/skill-sync",
+        "ref": SKILL_SYNC_SHA,
+        "path": ".ci-tools/skill-sync",
+        "persist-credentials": False,
+    }
+
+    verify = next(
+        step for step in steps if step.get("name") == "skill-sync tracked snapshot verify (cloud/CI integrity gate)"
+    )
+    assert verify["working-directory"] == ".ci-tools/skill-sync"
+    assert verify["run"].splitlines() == [
+        "npm ci --no-audit",
+        "node dist/cli/index.js verify --project ../..",
+    ]
 
 
 def test_guard_steps_follow_naming_convention() -> None:

@@ -20,7 +20,7 @@ guard nobody runs anywhere).
 Command-level, not name-level, matters here: a local target can share a
 step's name while running different logic. `skill-sync-check` in `ci-lint`
 (`node skill-sync doctor`) is not the same command as CI's pinned
-`npx -y github:joeharris76/skill-sync#<sha> verify` step -- treating the
+full-SHA skill-sync checkout plus `npm ci` and `verify` step -- treating the
 name match as parity would hide that the local run isn't actually checking
 what CI checks.
 
@@ -113,21 +113,22 @@ weaken the CI guard itself so a lossier local equivalent can "pass."
 
 ## Documented exceptions
 
-### skill-sync `npx` verify
+### Pinned skill-sync checkout verify
 
 The `lint` job's "skill-sync tracked snapshot verify (cloud/CI integrity
-gate)" step runs a pinned `npx -y github:joeharris76/skill-sync#<sha>
-verify --project .`. This needs network access to fetch the pinned commit
-from GitHub over the npm/git-over-https path `npx` uses for a `github:`
-spec.
+gate)" uses `actions/checkout` at a full skill-sync commit SHA, runs
+`npm ci` in that isolated tool checkout, then runs its built verifier against
+the BenchBox root. This needs network access to fetch the pinned commit and
+its npm dependencies. The explicit checkout avoids npm's unreliable
+GitFetcher packaging path while retaining immutable source provenance.
 
-This was tested directly in a local/sandboxed dev shell with `npx`
-installed: the command hangs with no route (no DNS/proxy path configured
-for the npm registry or a git-over-https fetch). Two options were
+This was tested directly in a local/sandboxed dev shell: the equivalent flow
+hangs with no route (no DNS/proxy path configured for GitHub or the npm
+registry). Two options were
 considered:
 
-- **Guard it with `command -v npx && npx ... || echo notice`.** Rejected:
-  on a machine where `npx` *is* installed and network *is* reachable, this
+- **Guard it with a network probe and print a notice.** Rejected:
+  on a machine where Git/npm tooling and network are available, this
   swallows a real local verify failure and prints a "skipped" notice
   instead -- silently weakening the guard, which is the exact anti-pattern
   this parity invariant exists to prevent elsewhere.
