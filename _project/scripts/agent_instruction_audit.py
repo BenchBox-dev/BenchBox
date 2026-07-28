@@ -28,12 +28,19 @@ REQUIRED_POLICY_IDS = {
 }
 REVIEW_POLICY_IDS = {policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id.startswith("REVIEW-")}
 CANONICAL_REVIEW_ANCHORS = {
-    "REVIEW-AUTH-001": ("read-only plus local capture", "Commit any file.", "Push to a remote.", "Open PRs"),
+    "REVIEW-AUTH-001": (
+        "read-only plus local capture",
+        "Commit any file.",
+        "Push to a remote.",
+        "Open PRs",
+        "separate turn",
+    ),
     "REVIEW-DEFECT-001": ("it is a defect", "do not belong in blind-spots"),
     "REVIEW-L2-001": ("framework gaps", "not the instance-level defects already found"),
     "REVIEW-CAPTURE-001": ("Projects provide storage locations/specs", "protocol governs behavior"),
     "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "canonical skill wins"),
 }
+PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling review and remediation")}
 AUTHORITY_CLASSES = {"task", "repository", "mechanical", "recommendation"}
 EVALUATION_ACTIONS = {
     "commit_with_human_identity",
@@ -109,6 +116,11 @@ def audit_review_policy(project: Path) -> list[str]:
         missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
         if section and missing_anchors:
             errors.append(f"canonical {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
+    for policy_id, anchors in PROJECT_REVIEW_ANCHORS.items():
+        section = _policy_section(protocol, policy_id)
+        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        if section and missing_anchors:
+            errors.append(f"project {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
 
     legacy_path = project / LEGACY_REVIEW_DOC
     if legacy_path.exists():

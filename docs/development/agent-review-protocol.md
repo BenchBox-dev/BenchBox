@@ -10,7 +10,8 @@ the contract mechanically auditable.
 
 - `[REVIEW-AUTH-001]`: review-shaped work is read-only. Local capture is the
   only exception explicitly described below. Remediation, hosted writes,
-  commits, pushes, PRs, and auto-merge require separate authorization.
+  commits, pushes, PRs, and auto-merge require explicit authorization in a
+  later user turn; bundling review and remediation does not satisfy that gate.
 - `[AUTH-PROVENANCE-001]`: label consequential instructions as task authority,
   repository policy, mechanical constraint, or recommendation. A prior task's
   requested author identity is not repository policy.

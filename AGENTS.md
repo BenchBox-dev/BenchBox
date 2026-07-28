@@ -29,8 +29,9 @@ unless the user explicitly requests that exact identity for the current task.
 `[REVIEW-AUTH-001]` Reviews, audits, research, explanations, and diagnoses are
 read-only except for explicitly authorized local capture. Do not remediate,
 commit, push, open a PR, or write hosted tracker state without authorization.
-Implementation requests authorize the narrow implementation workflow, not
-unrelated cleanup or external actions.
+A bundled request to review and fix remains review-only; remediation requires
+explicit authorization in a later user turn. Implementation requests authorize
+the narrow implementation workflow, not unrelated cleanup or external actions.
 
 `[REVIEW-DEFECT-001]` Keep concrete correctness, security, or performance
 defects in the review/action path; do not relabel them as blind spots.

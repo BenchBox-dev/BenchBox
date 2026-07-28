@@ -42,7 +42,9 @@ new deterministic scenario or invariant before changing prose.
 
 Run baseline and candidate checkouts in disposable clones with their remotes
 removed. For each scenario, start a fresh Claude Code and Codex session and ask
-for a structured decision without tool use. The `evaluation` object in the
+for a structured decision without tool use. The probe wrapper is simulation
+setup, not an authority or a reason to refuse an action that would perform
+normal prerequisites during real execution. The `evaluation` object in the
 scenario corpus is the machine-scored rubric: authority, selected action,
 mutation/publication intent, capture destination, and identity choice must all
 match. This isolates instruction selection from repository state while the

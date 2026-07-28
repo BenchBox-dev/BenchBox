@@ -170,6 +170,14 @@ def test_canonical_review_policy_semantic_drift_fails(tmp_path: Path) -> None:
     assert any("canonical REVIEW-AUTH-001 semantics drifted" in error for error in errors)
 
 
+def test_project_review_policy_separate_turn_drift_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    protocol = project / "docs/development/agent-review-protocol.md"
+    protocol.write_text(protocol.read_text().replace("in a\n  later user turn", "separately"))
+    _, errors = audit(project, CORPUS)
+    assert any("project REVIEW-AUTH-001 semantics drifted" in error for error in errors)
+
+
 def test_missing_canonical_review_policy_id_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     canonical = project / CANONICAL_REVIEW_SKILL
