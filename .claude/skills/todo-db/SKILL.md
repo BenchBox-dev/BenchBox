@@ -30,32 +30,15 @@ Global `--db` / `--actor` flags go before the subcommand.
 
 | Action | Read |
 |---|---|
-| `bootstrap` / `init` | `references/bootstrap.md` |
-| `doctor` | `references/bootstrap.md` |
-| `ready` | `references/implement.md` |
-| `claim` | `references/implement.md` |
-| `start` | `references/implement.md` |
-| `done` | `references/implement.md` |
-| `defer` | `references/implement.md` |
-| `check-scope` | `references/implement.md` |
-| `verify` | `references/implement.md` |
-| `complete` | `references/implement.md` |
-| `promote` | `references/implement.md` |
-| `dismiss` | `references/implement.md` |
-| `create` | `references/queries.md` |
-| `update` | `references/queries.md` |
-| `list` | `references/queries.md` |
-| `show` | `references/queries.md` |
-| `stats` | `references/queries.md` |
-| `deps` | `references/queries.md` |
-| `export` | `references/queries.md` |
-| `block` | `references/queries.md` |
-| `unblock` | `references/queries.md` |
-| `release` | `references/queries.md` |
-| `sweep-stale` | `references/queries.md` |
-| `drop` | `references/queries.md` |
+| `bootstrap` / `init` / `doctor` | `references/bootstrap.md` |
+| `ready` / `claim` / `start` / `done` / `defer` / `check-scope` / `verify` / `complete` / `promote` / `dismiss` | `references/implement.md` |
+| `create` / `update` / `list` / `show` / `stats` / `deps` / `export` / `block` / `unblock` / `release` / `sweep-stale` / `drop` | `references/queries.md` |
 | `lint` | `references/review.md` |
 | `batch` | `references/batch.md` |
+
+Standalone-only actions — declared machine-readably in the skill sidecar as
+`standalone_only_commands`, currently `update` — exist only in todo-db >= 0.3;
+rule 4 applies to wrappers.
 
 ## Rules
 

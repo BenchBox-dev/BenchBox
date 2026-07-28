@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 pytestmark = [
     pytest.mark.unit,
@@ -38,6 +39,20 @@ def _read_skill_package() -> str:
     """Read the routed skill contract: the thin wrapper plus its references."""
     reference_paths = sorted((SKILL_PATH.parent / "references").glob("*.md"))
     return "\n".join(path.read_text(encoding="utf-8") for path in (SKILL_PATH, *reference_paths))
+
+
+def _declared_standalone_only() -> set[str]:
+    """Commands the skill declares as standalone todo-db only (never wrapper)."""
+    meta = yaml.safe_load((SKILL_PATH.parent / "skill.yaml").read_text(encoding="utf-8")) or {}
+    declared = meta.get("standalone_only_commands") or {}
+    assert isinstance(declared, dict), "standalone_only_commands must map command -> minimum version"
+    return set(declared)
+
+
+def _unknown_commands(text: str, declared: set[str]) -> set[str]:
+    """Referenced `todo <cmd>` forms that are neither wrapper handlers nor declared."""
+    referenced = set(re.findall(r"`todo ([a-z][a-z-]*)", text))
+    return referenced - set(todo_db._HANDLERS) - declared
 
 
 def _load_script():
@@ -127,12 +142,44 @@ class TestSkillThinness:
             "rules belong in the CLI/DB, not the skill"
         )
 
-    def test_skill_references_only_real_commands(self):
+    def test_skill_references_only_real_or_declared_commands(self):
         text = _read_skill_package()
         referenced = set(re.findall(r"`todo ([a-z][a-z-]*)", text))
         assert referenced, "skill package must reference `todo <command>` forms"
-        unknown = referenced - set(todo_db._HANDLERS)
-        assert not unknown, f"skill package references commands the CLI does not have: {sorted(unknown)}"
+        unknown = _unknown_commands(text, _declared_standalone_only())
+        assert not unknown, (
+            "skill package references commands that are neither wrapper handlers "
+            f"nor declared standalone-only: {sorted(unknown)}"
+        )
+
+    def test_declared_standalone_commands_are_not_wrapper_handlers(self):
+        # Declaring a wrapper-supported verb standalone-only would mask drift
+        # in either direction; the sets must stay disjoint.
+        overlap = _declared_standalone_only() & set(todo_db._HANDLERS)
+        assert not overlap, f"standalone_only_commands overlaps wrapper handlers: {sorted(overlap)}"
+
+    def test_undeclared_unsupported_command_is_flagged(self):
+        # Without a declaration the boundary must trip — the declaration is the
+        # only sanctioned way to document a wrapper-unsupported verb.
+        assert _unknown_commands("run `todo frobnicate` then stop", set()) == {"frobnicate"}
+        assert _unknown_commands("`todo update <id>` corrects items", set()) == {"update"}
+
+    def test_standalone_only_commands_never_presented_as_wrapper_invocations(self):
+        # A declared verb must never appear as a project-wrapper invocation and
+        # every documented use must carry standalone gating language nearby.
+        text = _read_skill_package()
+        for command in sorted(_declared_standalone_only()):
+            assert not re.search(rf"_project/scripts/todo\s+{command}\b", text), (
+                f"standalone-only `{command}` shown as a project-wrapper invocation"
+            )
+            lines = text.splitlines()
+            hits = [index for index, line in enumerate(lines) if f"`todo {command}" in line]
+            assert hits, f"declared standalone-only `{command}` is never documented"
+            for index in hits:
+                window = " ".join(lines[max(0, index - 3) : index + 4]).casefold()
+                assert "standalone" in window, (
+                    f"`todo {command}` reference at package line {index + 1} lacks standalone gating language"
+                )
 
     def test_skill_covers_required_workflow(self):
         text = _read_skill_package()

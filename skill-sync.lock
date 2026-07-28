@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lockedAt": "2026-07-27T17:04:14.998Z",
+  "lockedAt": "2026-07-28T13:14:27.304Z",
   "skills": {
     "blog": {
       "source": {
@@ -474,7 +474,7 @@
         "type": "local",
         "name": "personal",
         "path": "~/.skill-sync/skills/todo-db",
-        "fetchedAt": "2026-07-27T17:04:14.924Z"
+        "fetchedAt": "2026-07-28T13:14:27.219Z"
       },
       "installMode": "mirror",
       "files": {
@@ -491,20 +491,20 @@
           "size": 724
         },
         "references/queries.md": {
-          "sha256": "ea547469c5235d947968ebd9827212761491bf865d30c65e8f7a63e5ffeb460b",
-          "size": 1029
+          "sha256": "01c5148027786407db44217d055d1551479eed925b53750bb97ed29f00277eeb",
+          "size": 1187
         },
         "references/review.md": {
           "sha256": "716b75c1d896f01219d0d10a00192732d61f471d7f1ea5cbdb837f0a22339013",
           "size": 318
         },
         "SKILL.md": {
-          "sha256": "03d6d2babaff44c9814b3992912a0384cda6bb765b8ffd7a1e51145e62f06453",
-          "size": 3151
+          "sha256": "27968ecb235dc38a08c0e3c57bae0aecc59db9bae18f340766fee369805b6195",
+          "size": 2731
         },
         "skill.yaml": {
-          "sha256": "cb55ea0e50a1a1953101e929d49242dfc439d242f76933e95c0c58da177c9827",
-          "size": 272
+          "sha256": "fa88ff2e982370807916731064d93e278e7ad93f320fe8bcacf1c078ab2b093f",
+          "size": 532
         }
       }
     }

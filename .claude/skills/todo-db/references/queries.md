@@ -3,7 +3,9 @@
 - Create: `todo create --title ... --worktree ... --priority ...`, or
   `--from -` with JSON. Code items need scope, must-preserve, anti-pattern,
   and verification guardrails.
-- Update (todo-db >= 0.3.0): `todo update <id>` corrects items after
+- Update — standalone-only (todo-db >= 0.3.0; legacy project wrappers do not
+  implement it, so SKILL.md rule 4 applies — report the gap and stop rather
+  than invoking the wrapper): `todo update <id>` corrects items after
   creation — `--title/--description/--priority/--worktree`, `--add-work`,
   `--edit-work` (pending units only; done units carry evidence and are
   immutable), `--add-verify`, `--drop-verify SEQ --reason ...`. Every update
