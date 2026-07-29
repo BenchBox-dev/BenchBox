@@ -30,19 +30,21 @@ export default defineConfig({
   outputDir: "./test-results",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
-  // 2 CI retries (up from 1): the generic CI config allows 2 workers, but the
-  // required test:e2e:chromium command overrides both Playwright invocations
-  // to --workers=1. The third attempt absorbs a serial DuckDB-WASM cold-start
-  // tail; a real regression still fails all three attempts. See
-  // docs/operations/browser-ci.md.
+  // 2 CI retries. What makes a retry work is that it re-navigates, not that it
+  // grants more time: the live flake is a cold-snapshot zero-row race, not slow
+  // cold-start (see the 2026-07-29 correction in docs/operations/browser-ci.md).
+  // e2e/support/fixtures.ts now re-navigates within a data wait, so these
+  // retries are the backstop for waits that are still single-shot.
   retries: process.env.CI ? 2 : 0,
+  // Note: the required test:e2e:chromium command overrides this to --workers=1
+  // for both of its Playwright invocations, so the blocking gate is serial.
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI
     ? [["github"], ["html", { outputFolder: "playwright-report", open: "never" }]]
     : [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
-  // 90s per-test cap (up from 60s) so a single ~45s data-load wait plus the
-  // rest of a flow does not collide with the global timeout under a slow
-  // DuckDB-WASM cold-start. Happy-path tests still finish in a few seconds.
+  // 90s per-test cap. A single data wait costs ~46s worst case (three attempts
+  // plus two bounded re-navigations); specs that chain several data waits are
+  // the reason this stays well above that. Happy-path tests finish in seconds.
   timeout: 90_000,
   expect: { timeout: 10_000 },
 
