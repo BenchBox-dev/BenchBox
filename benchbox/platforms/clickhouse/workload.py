@@ -65,12 +65,14 @@ class ClickHouseWorkloadMixin:
                     nullable_columns=nullable_columns,
                 )
                 connection.execute(optimized)
-                # Fold a tuned MergeTree ORDER BY into the applied ledger. The
-                # tuned sort key is rendered into the CREATE TABLE executed here
-                # on the raw connection (outside the tuning RecordingConnection),
-                # so without this it never enters the ledger and the run cannot
-                # reach applied_verified even though system.tables.sorting_key
-                # carries the key.
+                # Record a tuned MergeTree CREATE TABLE into the applied ledger
+                # here, immediately after it executes. The tuned keys are
+                # rendered into the CREATE TABLE executed on the raw connection
+                # (outside the tuning RecordingConnection), so without this it
+                # never enters the ledger and the run cannot reach
+                # applied_verified even though system.tables.sorting_key carries
+                # the key. Recording at execute time also keeps the
+                # order-sensitive applied_ledger_hash in true chronology.
                 self._record_tuned_sort_key_op(statement, optimized, table_name, table_tunings)
                 self.logger.debug(f"Executed schema statement: {optimized[:100]}...")
 
@@ -187,19 +189,32 @@ class ClickHouseWorkloadMixin:
         table_name: str | None,
         table_tunings: dict[str, Any] | None,
     ) -> None:
-        """Record a tuned MergeTree ORDER BY as a post-load layout op.
+        """Record a tuned MergeTree CREATE TABLE into the applied ledger.
 
-        ``_fold_layout_operations_into_ledger`` folds this into the applied
-        ledger as a ``PHASE_DDL`` statement, so the introspection receipt can
-        corroborate the recorded ``CREATE TABLE ... ORDER BY (cols)`` against the
-        catalog ``system.tables.sorting_key`` and upgrade the run to
-        ``applied_verified``.
+        The introspection receipt corroborates the recorded key clauses against
+        ``system.tables`` -- ``ORDER BY (cols)`` against ``sorting_key`` and
+        ``PARTITION BY (expr)`` against ``partition_key`` -- and upgrades the run
+        to ``applied_verified`` only when every one of them corroborates.
 
-        Only the *tuned* sort key is recorded. The engine-mandatory baseline
-        ``ORDER BY`` (primary-key derived or ``tuple()``) is not tuning and stays
-        out of the ledger, matching the tuned-branch condition in
-        ``_optimize_table_definition`` (rendered only when the source statement
-        carried no ``ORDER BY`` and the tuned generator produced a ``sort_by``).
+        Recorded straight onto ``self._applied_tuning_ledger`` at
+        ``connection.execute`` time rather than queued on
+        ``_applied_layout_operations``: that queue is folded only after data
+        validation, which would place this ``CREATE TABLE`` *after* the
+        ``OPTIMIZE TABLE`` statements the recording connection captures during
+        load, and the order-sensitive ``applied_ledger_hash`` would then attest
+        an impossible chronology.
+
+        Recorded when the tuned generator produced EITHER a sort key or a
+        partition key. A partition-only tuned table must be recorded too: left
+        out, its unapplied partition key is never corroborated, and another
+        table's sort key could carry the whole run to ``applied_verified``.
+        A table with no tuned clause at all stays out of the ledger entirely --
+        its engine-mandatory ``ORDER BY`` (primary-key derived or ``tuple()``)
+        is not tuning, and corroborating it against nothing would be an unearned
+        upgrade. When only the partition is tuned, the baseline ``ORDER BY``
+        rides along in the recorded statement and is corroborated as a plain
+        catalog fact; it cannot mint verification on its own because the tuned
+        partition key must corroborate as well.
         Never breaks a run: any failure degrades to a debug log.
         """
         try:
@@ -208,25 +223,32 @@ class ClickHouseWorkloadMixin:
             if "ORDER BY" in original_statement.upper():
                 return  # pre-existing ORDER BY was not overridden by tuning
             tuning_clauses = self._resolve_tuned_ddl_clauses(original_statement, table_tunings)
-            if tuning_clauses is None or not tuning_clauses.sort_by:
+            if tuning_clauses is None:
+                return
+            tuned_sort = bool(tuning_clauses.sort_by)
+            tuned_partition = bool(tuning_clauses.partition_by)
+            if not (tuned_sort or tuned_partition):
+                return
+            ledger = getattr(self, "_applied_tuning_ledger", None)
+            if ledger is None:
+                self.logger.debug("clickhouse tuned key ledger record skipped: no applied-tuning ledger on adapter")
                 return
             from benchbox.core.tuning.applied_ledger import PHASE_DDL
 
-            ops = getattr(self, "_applied_layout_operations", None)
-            if ops is None:
-                ops = []
-                self._applied_layout_operations = ops
-            ops.append(
-                {
-                    "statement": executed_statement,
-                    "phase": PHASE_DDL,
-                    "status": "applied",
-                    "mechanism": "sort_key",
-                    "table": table_name,
-                }
+            if tuned_sort and tuned_partition:
+                mechanism = "table_keys"
+            elif tuned_sort:
+                mechanism = "sort_key"
+            else:
+                mechanism = "partition_key"
+            ledger.record(
+                executed_statement,
+                PHASE_DDL,
+                mechanism=mechanism,
+                table=table_name,
             )
         except Exception as exc:  # capture must never break a run
-            self.logger.debug("clickhouse tuned sort-key ledger fold degraded: %s", exc)
+            self.logger.debug("clickhouse tuned key ledger record degraded: %s", exc)
 
     @staticmethod
     def _extract_table_name(statement: str) -> str | None:
