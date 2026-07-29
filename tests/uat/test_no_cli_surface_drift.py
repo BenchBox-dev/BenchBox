@@ -13,6 +13,12 @@ pytestmark = pytest.mark.fast
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_INTERNAL_CLI_FILES = {
+    # cli-package-shadows-main-submodule-with-function: package-level lazy
+    # resolution now preserves ``main`` as a submodule instead of caching the
+    # entrypoint function under the same name. The console script still points
+    # at benchbox.cli.app:main, so this changes import behavior, not Click's
+    # command surface.
+    "benchbox/cli/__init__.py",
     # relocate-cli-hook-registries: these two are now thin back-compat
     # re-export shims; the real registries live in benchbox/core/hooks/
     # (outside the CLI surface this guard protects).
@@ -191,6 +197,23 @@ def submit(
 """
     assert not _cli_surface_changed(
         "benchbox/cli/commands/submit.py",
+        base_source=base_source,
+        current_source=current_source,
+    )
+
+
+def test_cli_surface_guard_allows_package_init_lazy_body_changes():
+    base_source = """def __getattr__(name):
+    if name == "main":
+        return entrypoint
+"""
+    current_source = """def __getattr__(name):
+    return import_module(f"benchbox.cli.{name}")
+"""
+
+    assert "benchbox/cli/__init__.py" in ALLOWED_INTERNAL_CLI_FILES
+    assert not _cli_surface_changed(
+        "benchbox/cli/__init__.py",
         base_source=base_source,
         current_source=current_source,
     )
