@@ -24,6 +24,13 @@ _SECRET_KEY_PARTS = tuple(
         "token",
         "secret",
         "access_key",
+        # Normalizes to "keyid", which "access_key" does not cover: an
+        # ``accessKeyId`` matched only because it also contains "accesskey", so
+        # the shorter provider-prefixed spellings (``s3_key_id``, ``kms_key_id``)
+        # were exported verbatim. Matches only key-id-shaped names - ordinary
+        # data-modelling keys (sort_key, partition_key, primary_key) do not
+        # contain "keyid" and keep exporting their real values.
+        "key_id",
         "private_key",
         "session_token",
         "connection_string",

@@ -137,6 +137,77 @@ def test_sanitize_redacts_camelcase_secret_values() -> None:
     assert sanitized["warehouse"] == "WH"
 
 
+@pytest.mark.parametrize(
+    "key",
+    [
+        # Provider-prefixed key-id spellings. `accessKeyId` already matched
+        # because it contains "accesskey"; these do not, so they exported
+        # verbatim until "key_id" joined _SECRET_KEY_PARTS.
+        "s3_key_id",
+        "kms_key_id",
+        "KmsKeyId",
+        "kmsKeyId",
+        "key_id",
+        "keyId",
+    ],
+)
+def test_provider_prefixed_key_id_keys_are_redacted(key: str) -> None:
+    """Regression: a *_key_id option reached exported result metadata in clear.
+
+    Found by the credential-egress sweep on the DuckLake ATTACH leak (#1333):
+    `--platform-option s3_key_id=AKIA...` was published as-is because the
+    matcher only knew "access_key".
+    """
+    from benchbox.core.results.platform_options import is_secret_option_key
+
+    assert is_secret_option_key(key), f"{key!r} should be classified as a secret key"
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        # Data-modelling and tuning option names that merely contain "key".
+        # The "keyid" part must not swallow these - over-redaction would strip
+        # real, useful provenance out of published results.
+        "sort_key",
+        "sortKey",
+        "partition_key",
+        "primary_key",
+        "clustering_key",
+        "distkey",
+        "distribution_key",
+        "warehouse",
+        "memory_limit",
+    ],
+)
+def test_non_credential_key_names_are_not_redacted(key: str) -> None:
+    from benchbox.core.results.platform_options import is_secret_option_key
+
+    assert not is_secret_option_key(key), f"{key!r} must keep exporting its real value"
+
+
+def test_sanitize_redacts_key_id_end_to_end_without_touching_sort_keys() -> None:
+    """End-to-end companion: the sanitized payload hides key material and keeps
+    the tuning options a reader needs to interpret the run."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options(
+        {
+            "s3_key_id": "AKIAIOSFODNN7EXAMPLE",
+            "kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/abcd",
+            "s3_secret": "raw-secret",
+            "sort_key": "l_shipdate",
+            "partition_key": "l_orderkey",
+        }
+    )
+
+    assert sanitized["s3_key_id"] == REDACTED_VALUE
+    assert sanitized["kms_key_id"] == REDACTED_VALUE
+    assert sanitized["s3_secret"] == REDACTED_VALUE
+    assert sanitized["sort_key"] == "l_shipdate"
+    assert sanitized["partition_key"] == "l_orderkey"
+
+
 def test_lifecycle_run_config_persists_sanitized_platform_options_with_provenance() -> None:
     benchmark_config = BenchmarkConfig(
         name="tpch",
