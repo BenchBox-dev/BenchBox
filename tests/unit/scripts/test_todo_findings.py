@@ -15,6 +15,7 @@ sibling ``test_todo_db*`` suites, so it stays out of the fast-lane budget.
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -170,8 +171,11 @@ class TestFindingsNonClaimable:
         _mk_finding(conn)
         _mk_finding(conn, finding_id="2026-01-02-030406-another-class")
         after = todo_db.stats(conn)
-        # Adding findings must not move any items-domain count.
-        assert after == before
+        # Adding findings must not move any ITEMS-DOMAIN count; phase 4 adds an
+        # additive findings_by_disposition key that DOES reflect them.
+        items_domain = ("items_by_state", "open_by_priority", "open_by_worktree", "deferrals_by_resolution", "claimed")
+        assert {k: after[k] for k in items_domain} == {k: before[k] for k in items_domain}
+        assert after["findings_by_disposition"] == {"open": 2}
 
     def test_findings_do_not_appear_in_items_table(self, conn):
         _mk_finding(conn)
@@ -414,3 +418,137 @@ class TestFindingListOrdering:
         ids = [f["id"] for f in todo_findings.list_findings(conn)]
         # both open -> ordered by created_at/id, so the earlier id sorts first
         assert ids == ["2026-01-02-030405-first-class", "2026-01-02-030406-second-class"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: surfacing -- the ready/stats banner + additive stats key.
+#
+# The banner must never perturb the machine-readable STDOUT of ready/stats
+# (automation parses it): it renders to stderr, is suppressed at zero-state, and
+# piggybacks a single cheap aggregate on the existing connection (no extra hosted
+# round-trip). ``findings_by_disposition`` is an additive stats key.
+
+
+class _CountingConn:
+    """Proxy that records every SQL string executed, delegating to a real conn.
+
+    sqlite3.Connection is a C type whose ``execute`` cannot be monkeypatched, so
+    the banner's statement count is asserted through this thin proxy instead."""
+
+    def __init__(self, real):
+        self._real = real
+        self.executed: list[str] = []
+
+    def execute(self, sql, *args, **kwargs):
+        self.executed.append(sql)
+        return self._real.execute(sql, *args, **kwargs)
+
+
+class TestSurfacingBanner:
+    def test_banner_none_at_zero_state(self, conn, tmp_path):
+        # No findings and an empty drafts dir -> nothing to surface.
+        assert todo_findings.surfacing_banner(conn, drafts_dir=tmp_path / "nope") is None
+
+    def test_banner_counts_open_findings_and_unsynced_drafts(self, conn, tmp_path):
+        _mk_finding(conn)  # open
+        _mk_finding(conn, finding_id="2026-01-02-030406-b-class", disposition="dismissed", disposition_reason="no")
+        drafts = tmp_path / "drafts"
+        drafts.mkdir()
+        (drafts / "2026-01-02-030407-draft-class.md").write_text("draft", encoding="utf-8")
+        (drafts / "README.md").write_text("skip me", encoding="utf-8")  # README excluded
+        banner = todo_findings.surfacing_banner(conn, drafts_dir=drafts)
+        assert banner is not None
+        assert "1 open finding(s)" in banner  # 'dismissed' is not 'open'
+        assert "1 unsynced draft(s)" in banner  # README.md not counted
+        assert "todo finding candidates" in banner
+
+    def test_banner_open_findings_only(self, conn, tmp_path):
+        _mk_finding(conn)
+        banner = todo_findings.surfacing_banner(conn, drafts_dir=tmp_path / "empty")
+        assert "1 open finding(s)" in banner
+        assert "draft" not in banner
+
+    def test_banner_unsynced_drafts_only(self, conn, tmp_path):
+        drafts = tmp_path / "drafts"
+        drafts.mkdir()
+        (drafts / "2026-01-02-030407-draft-class.md").write_text("draft", encoding="utf-8")
+        banner = todo_findings.surfacing_banner(conn, drafts_dir=drafts)
+        assert "1 unsynced draft(s)" in banner
+        assert "open finding" not in banner
+
+    def test_banner_uses_single_findings_query(self, conn):
+        # "No extra hosted round-trip": the open-findings count is ONE aggregate,
+        # not a per-row scan, so it stays O(1) statements as findings accumulate.
+        _mk_finding(conn)
+        _mk_finding(conn, finding_id="2026-01-02-030406-b-class")
+        spy = _CountingConn(conn)
+        assert todo_findings.open_findings_count(spy) == 2
+        assert len([s for s in spy.executed if "FROM findings" in s]) == 1
+
+    def test_banner_opens_no_new_connection(self, conn, monkeypatch):
+        # "No extra hosted round-trip": the banner reuses the caller's connection
+        # (a new hosted connect would be an extra round-trip).
+        _mk_finding(conn)
+        monkeypatch.setattr(todo_db, "connect", lambda *a, **k: pytest.fail("banner must not open a new connection"))
+        assert todo_findings.surfacing_banner(conn, drafts_dir=Path("/nonexistent-drafts")) is not None
+
+    def test_banner_ready_on_stderr_not_stdout(self, conn, capsys, monkeypatch):
+        _mk_item(conn, item_id="ready-item")  # a ready planning item -> stdout content
+        monkeypatch.setattr(todo_findings, "surfacing_banner", lambda c: "→ SENTINEL-banner")
+        todo_db._cmd_ready(conn, "tester", SimpleNamespace())
+        captured = capsys.readouterr()
+        assert "ready-item" in captured.out  # items on stdout
+        assert "SENTINEL-banner" not in captured.out  # banner NEVER on stdout
+        assert "SENTINEL-banner" in captured.err  # banner on stderr
+
+    def test_banner_stats_on_stderr_not_stdout(self, conn, capsys, monkeypatch):
+        monkeypatch.setattr(todo_findings, "surfacing_banner", lambda c: "→ SENTINEL-banner")
+        todo_db._cmd_stats(conn, "tester", SimpleNamespace())
+        captured = capsys.readouterr()
+        json.loads(captured.out)  # stdout stays valid JSON, banner absent
+        assert "SENTINEL-banner" not in captured.out
+        assert "SENTINEL-banner" in captured.err
+
+    def test_banner_never_breaks_ready_when_hint_fails(self, conn, capsys, monkeypatch):
+        # A hint must never break the core command: a failing banner is swallowed
+        # AFTER the stdout contract is met, ready still returns 0.
+        _mk_item(conn, item_id="ready-item")
+        monkeypatch.setattr(todo_findings, "surfacing_banner", lambda c: (_ for _ in ()).throw(RuntimeError("boom")))
+        assert todo_db._cmd_ready(conn, "tester", SimpleNamespace()) == 0
+        assert "ready-item" in capsys.readouterr().out
+
+
+class TestFindingsStats:
+    def test_findings_stats_shape(self, conn):
+        _mk_finding(conn)  # open
+        _mk_finding(conn, finding_id="2026-01-02-030406-b-class", disposition="dismissed", disposition_reason="x")
+        s = todo_db.stats(conn)
+        assert s["findings_by_disposition"] == {"open": 1, "dismissed": 1}
+        # Existing items-domain keys are untouched (additive-only change).
+        for key in ("items_by_state", "open_by_priority", "open_by_worktree", "deferrals_by_resolution", "claimed"):
+            assert key in s
+
+    def test_findings_stats_empty_when_no_findings(self, conn):
+        assert todo_db.stats(conn)["findings_by_disposition"] == {}
+
+
+class TestSurfacingFlow:
+    def test_surfacing_flow_ready_shows_findings_when_present(self, conn, capsys, tmp_path, monkeypatch):
+        # Documented-flow encounter: an agent following the planning flow runs
+        # `ready`; when an untriaged finding exists it is surfaced (on stderr).
+        monkeypatch.setattr(todo_findings, "DEFAULT_DRAFTS_DIR", str(tmp_path / "no-drafts"))
+        _mk_item(conn, item_id="ready-item")
+        _mk_finding(conn)  # one open finding
+        todo_db._cmd_ready(conn, "tester", SimpleNamespace())
+        captured = capsys.readouterr()
+        assert "ready-item" in captured.out
+        assert "1 open finding(s)" in captured.err
+        assert "todo finding candidates" in captured.err
+
+    def test_surfacing_flow_silent_when_nothing_untriaged(self, conn, capsys, tmp_path, monkeypatch):
+        monkeypatch.setattr(todo_findings, "DEFAULT_DRAFTS_DIR", str(tmp_path / "no-drafts"))
+        _mk_item(conn, item_id="ready-item")
+        todo_db._cmd_ready(conn, "tester", SimpleNamespace())
+        captured = capsys.readouterr()
+        assert "ready-item" in captured.out
+        assert "finding" not in captured.err  # zero-state: no banner

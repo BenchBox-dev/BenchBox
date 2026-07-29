@@ -34,7 +34,13 @@ Global `--db` / `--actor` flags go before the subcommand.
 | `ready` / `claim` / `start` / `done` / `defer` / `check-scope` / `verify` / `complete` / `promote` / `dismiss` | `references/implement.md` |
 | `create` / `update` / `list` / `show` / `stats` / `deps` / `export` / `block` / `unblock` / `release` / `sweep-stale` / `drop` | `references/queries.md` |
 | `lint` | `references/review.md` |
+| `finding candidates` / `finding triage` / `finding sync` / `finding promote` | `references/implement.md` |
 | `batch` | `references/batch.md` |
+
+`ready` and `stats` print a one-line stderr banner when untriaged findings exist
+(open findings or unsynced drafts); run `todo finding candidates` to triage them.
+The banner is stderr-only and suppressed at zero, so it never perturbs the
+machine-readable stdout those commands emit.
 
 Standalone-only actions — declared machine-readably in the skill sidecar as
 `standalone_only_commands`, currently `update` — exist only in todo-db >= 0.3;

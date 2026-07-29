@@ -533,16 +533,16 @@
       "installMode": "mirror",
       "files": {
         "references/batch.md": {
-          "sha256": "dc29f1de1ee519229b0fc7a6c572d072b23d6c9af61f67af997451f69b50e8f0",
-          "size": 7148
+          "sha256": "4776c543bc4d561b474c1756f0eeb070be5ae1abc2289036324685e6d581cc19",
+          "size": 7342
         },
         "references/bootstrap.md": {
           "sha256": "32e63add6eeb9a867e21c35edf6860fd11723815efd79df10b082ee5b0197ac9",
           "size": 3691
         },
         "references/implement.md": {
-          "sha256": "bb2d86fc5851b133972e436905af70930c856d807aa279c9937ca850359b6874",
-          "size": 724
+          "sha256": "419ded392de794af2585e6e62ead71c0f2d2fbd82c3af5ce566fe9ae1e1bcb7b",
+          "size": 947
         },
         "references/queries.md": {
           "sha256": "01c5148027786407db44217d055d1551479eed925b53750bb97ed29f00277eeb",
@@ -553,8 +553,8 @@
           "size": 318
         },
         "SKILL.md": {
-          "sha256": "27968ecb235dc38a08c0e3c57bae0aecc59db9bae18f340766fee369805b6195",
-          "size": 2731
+          "sha256": "88b37f7ebeacb92b38b12defaf3d2a52dfd82bc9b91423e459aeef9b84465b72",
+          "size": 3124
         },
         "skill.yaml": {
           "sha256": "fa88ff2e982370807916731064d93e278e7ad93f320fe8bcacf1c078ab2b093f",

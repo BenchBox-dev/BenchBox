@@ -2,7 +2,10 @@
 
 1. `todo ready` picks the top ready item; `todo claim <id>` prints the work
    order: scope, must-preserves, anti-patterns, verification ladder, ready
-   units, and deferrals. Treat it as the whole briefing.
+   units, and deferrals. Treat it as the whole briefing. If `ready` prints an
+   untriaged-findings banner on stderr, run `todo finding candidates` and
+   `todo finding triage <id> ...` to dispose of them (a review blind spot, not
+   a claimable item) before picking up new work.
 2. Per unit, optionally `todo start <id> <wid>`, implement, then
    `todo done <id> <wid> --evidence "<command run / commit / PR>"`.
 3. Defer skipped work immediately with `todo defer <id> --summary "..."

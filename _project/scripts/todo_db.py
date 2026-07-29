@@ -1761,6 +1761,9 @@ def stats(conn: sqlite3.Connection) -> dict[str, Any]:
         ),
         "deferrals_by_resolution": counts("SELECT resolution, count(*) FROM deferrals GROUP BY resolution"),
         "claimed": counts("SELECT claimed_by, count(*) FROM items WHERE claimed_by IS NOT NULL GROUP BY claimed_by"),
+        # Additive findings-domain key (phase 4). Present but empty when there are
+        # no findings; existing items-domain keys above are untouched.
+        "findings_by_disposition": todo_findings.findings_by_disposition(conn),
     }
 
 
@@ -2888,15 +2891,29 @@ def _cmd_list(conn, actor, args):
     return 0
 
 
+def _emit_findings_banner(conn) -> None:
+    """Print the untriaged-findings hint to stderr, never stdout. Best-effort: a
+    hint must never break ``ready``/``stats`` core output, so any failure here
+    (e.g. a transient read error) is swallowed after the stdout contract is met."""
+    try:
+        banner = todo_findings.surfacing_banner(conn)
+    except Exception:
+        return
+    if banner:
+        print(banner, file=sys.stderr)
+
+
 def _cmd_ready(conn, actor, args):
     for item in ready_items(conn, actor):
         claim_note = " (claimed by you)" if item["claimed_by"] == actor else ""
         print(f"{item['id']:55s} {item['priority']:12s} {item['worktree']}{claim_note}")
+    _emit_findings_banner(conn)
     return 0
 
 
 def _cmd_stats(conn, actor, args):
     print(json.dumps(stats(conn), indent=2, sort_keys=True))
+    _emit_findings_banner(conn)
     return 0
 
 

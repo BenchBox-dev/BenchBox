@@ -77,6 +77,9 @@ or `/loop` may wrap the action, but the ledger + DB remain the source of truth.
 Loop until every item is `done` or `blocked`:
 
 1. Re-read the ledger; refresh readiness with `todo ready` and `todo deps`.
+   `ready`/`stats` also surface untriaged findings on stderr; run
+   `todo finding candidates` to triage them (they are review blind spots, not
+   batch items, and never enter the ready queue).
 2. Classify each non-terminal item (`ready` is derived, not stored):
    - `ready`: batch-local `pending`, every in-batch dep `done` (its PR merged
      into the integration branch — unless a stacked-branch exception is
