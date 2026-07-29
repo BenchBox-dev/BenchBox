@@ -300,6 +300,38 @@ def _tuning_validation_status(data: dict[str, Any]) -> str | None:
     return str(val) if val else None
 
 
+def _applied_receipt(bundle_path: Path) -> str | None:
+    """Ingest the per-statement introspection receipt from the applied companion.
+
+    The ``{stem}.applied.json`` companion sits next to the bundle (published
+    alongside it by ``benchbox.validation.bundle``). Its ``receipt`` sub-object
+    is the post-load introspection receipt that earns the ``applied_verified``
+    state: platform, corroboration verdict, summary, and one entry per applied
+    statement. It is taken **verbatim** and re-serialized canonically
+    (``sort_keys``, compact separators) so the stored string is deterministic;
+    nothing here is recomputed or derived, and the explorer renders it read-only.
+
+    ``None`` whenever the receipt is not available -- companion absent (the
+    common case: introspection did not run, or a legacy bundle), unreadable,
+    malformed JSON, not a JSON object, or carrying no ``receipt`` key. A broken
+    companion must never fail the build, so every failure degrades to ``None``.
+    """
+    companion = bundle_path.with_name(f"{bundle_path.stem}.applied.json")
+    try:
+        payload = json.loads(companion.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    receipt = payload.get("receipt")
+    if receipt is None:
+        return None
+    try:
+        return json.dumps(receipt, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return None
+
+
 def _tuning_policy_generation(data: dict[str, Any]) -> str | None:
     """Ingest the ADR-3 explicit tuning-policy generation marker from the bundle.
 
@@ -1007,6 +1039,7 @@ class BundleTransformer:
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
             tuning_validation_status=_tuning_validation_status(bundle_data),
+            applied_receipt=_applied_receipt(bundle_path),
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
@@ -1093,6 +1126,7 @@ class BundleTransformer:
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
             tuning_validation_status=_tuning_validation_status(bundle_data),
+            applied_receipt=_applied_receipt(bundle_path),
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),

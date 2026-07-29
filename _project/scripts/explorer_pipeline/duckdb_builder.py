@@ -407,6 +407,12 @@ class DuckDBSnapshotBuilder:
                 -- legacy bundles; distinct from the run/query validation_status
                 -- column below.
                 tuning_validation_status VARCHAR,
+                -- ADR-1 per-statement introspection receipt, stored verbatim
+                -- as a canonical JSON string (the {stem}.applied.json
+                -- companion's "receipt" sub-object). NULL when no receipt was
+                -- published. Opaque read-only payload: never parsed, joined
+                -- on, or re-derived anywhere downstream.
+                applied_receipt      VARCHAR,
                 -- ADR-3 seam: explicit tuning-policy generation marker
                 -- (display-only, never a join/dedup key). NULL for legacy
                 -- bundles, treated downstream as the "pre-seam" generation.
@@ -478,6 +484,7 @@ class DuckDBSnapshotBuilder:
                 r.requested_config_hash,
                 r.applied_ledger_hash,
                 r.tuning_validation_status,
+                r.applied_receipt,
                 r.tuning_policy_generation,
                 r.test_type,
                 r.validation_status,
@@ -806,6 +813,7 @@ class DuckDBSnapshotBuilder:
                     entry.requested_config_hash,
                     entry.applied_ledger_hash,
                     entry.tuning_validation_status,
+                    entry.applied_receipt,
                     entry.tuning_policy_generation,
                     entry.test_type,
                     entry.validation_status,

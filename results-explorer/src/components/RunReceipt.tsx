@@ -109,8 +109,19 @@ export function RunReceipt({
         // was corroborated by the post-load introspection receipt; the other
         // states are the honest execution-derived ledger statuses. Missing
         // (behind the disclosure) for legacy bundles predating the ledger.
+        // The per-statement applied receipt drills down beneath the badge when
+        // the run published one. Its verdicts are rendered verbatim - the
+        // explorer never recomputes a verdict or a corroboration decision -
+        // and the drill-down is absent entirely when there is no readable
+        // receipt, leaving this row exactly as it renders today.
         detail.tuning_validation_status
-          ? recordedRow("Tuning verification", <TuningVerificationBadge status={detail.tuning_validation_status} />)
+          ? recordedRow(
+              "Tuning verification",
+              <>
+                <TuningVerificationBadge status={detail.tuning_validation_status} />
+                <AppliedReceiptDrilldown raw={detail.applied_receipt} />
+              </>,
+            )
           : missingRow("Tuning verification"),
       ],
     },
@@ -251,6 +262,136 @@ function ReceiptSection({
         </p>
       )}
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ADR-1 applied-tuning receipt drill-down
+//
+// `detail.applied_receipt` is the `receipt` sub-object of the run's
+// `{stem}.applied.json` companion, carried through the pipeline as an opaque
+// JSON string (see explorer_pipeline/transformer.py::_applied_receipt). It is
+// parsed here for display only: every verdict shown is the one the platform
+// recorded at introspection time. Nothing is recomputed, and no corroboration
+// decision is made in the browser.
+// ---------------------------------------------------------------------------
+
+interface AppliedReceiptEntry {
+  statement?: unknown;
+  phase?: unknown;
+  verdict?: unknown;
+  kind?: unknown;
+  table?: unknown;
+  expected_columns?: unknown;
+  observed_columns?: unknown;
+  diff?: unknown;
+  reason?: unknown;
+}
+
+/**
+ * Best-effort parse of the receipt's `entries` list.
+ *
+ * Returns an empty array for every degraded shape - absent, empty, unparsable,
+ * not an object, or no `entries` array - so the caller renders no drill-down
+ * and no error. A published receipt must never be able to break the receipt
+ * panel, so this never throws.
+ */
+function parseAppliedReceiptEntries(raw: string | null | undefined): AppliedReceiptEntry[] {
+  if (typeof raw !== "string" || raw.trim() === "") return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+  const entries = (parsed as { entries?: unknown }).entries;
+  if (!Array.isArray(entries)) return [];
+  return entries.filter(
+    (entry): entry is AppliedReceiptEntry =>
+      entry !== null && typeof entry === "object" && !Array.isArray(entry),
+  );
+}
+
+/**
+ * Render a recorded receipt value as text without inventing one. Returns null
+ * for anything the receipt did not record, so the field is simply omitted.
+ */
+function receiptText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string") return value.trim() === "" ? null : value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    const parts = value.map(receiptText).filter((part): part is string => part !== null);
+    return parts.length === 0 ? null : parts.join(", ");
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
+function AppliedReceiptDrilldown({ raw }: { raw?: string | null }) {
+  const entries = parseAppliedReceiptEntries(raw);
+  if (entries.length === 0) return null;
+
+  return (
+    <details class="mt-2" data-testid="applied-receipt-drilldown">
+      <summary class="cursor-pointer select-none text-xs text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]">
+        Statement receipt ({entries.length})
+      </summary>
+      <ul class="mt-2 list-none space-y-2 p-0">
+        {entries.map((entry, index) => (
+          <li
+            // Receipt entries have no stable identity of their own; index is
+            // the honest key for a fixed, render-once verbatim list.
+            key={index}
+            class="border-t border-[var(--bb-data-border)] pt-2"
+            data-testid="applied-receipt-entry"
+          >
+            <AppliedReceiptEntryBody entry={entry} />
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function AppliedReceiptEntryBody({ entry }: { entry: AppliedReceiptEntry }) {
+  const verdict = receiptText(entry.verdict);
+  const statement = receiptText(entry.statement);
+  const fields: { label: string; value: string }[] = [
+    { label: "Kind", value: receiptText(entry.kind) },
+    { label: "Phase", value: receiptText(entry.phase) },
+    { label: "Table", value: receiptText(entry.table) },
+    { label: "Expected columns", value: receiptText(entry.expected_columns) },
+    { label: "Observed columns", value: receiptText(entry.observed_columns) },
+    { label: "Diff", value: receiptText(entry.diff) },
+    { label: "Reason", value: receiptText(entry.reason) },
+  ].filter((field): field is { label: string; value: string } => field.value !== null);
+
+  return (
+    <>
+      {verdict !== null && (
+        <p class="text-xs font-semibold text-[var(--bb-data-fg-primary)]">{verdict}</p>
+      )}
+      {statement !== null && (
+        <code class="mt-1 block break-words font-mono text-xs text-[var(--bb-data-fg-muted)]">
+          {statement}
+        </code>
+      )}
+      {fields.length > 0 && (
+        <dl class="mt-1 grid grid-cols-[minmax(6rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1">
+          {fields.map((field) => (
+            <div key={field.label} class="contents">
+              <dt class="text-xs text-[var(--bb-data-fg-muted)]">{field.label}</dt>
+              <dd class="min-w-0 break-words text-xs text-[var(--bb-data-fg-primary)]">{field.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </>
   );
 }
 

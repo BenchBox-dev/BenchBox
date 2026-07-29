@@ -106,6 +106,11 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   // genuinely has zero mechanisms (recorded-empty, a real comparable
   // value); a non-empty string is the comma-joined mechanism list.
   physical_mechanisms?: string | null;
+  // ADR-1 per-statement introspection receipt (see applied_receipt in
+  // DetailResult): an opaque JSON string carried verbatim from the pipeline.
+  // Detail-only - the list projection never selects it. Optional so fixtures
+  // and SQL paths predating this column default to undefined.
+  applied_receipt?: string | null;
 }
 
 export interface QueryDisplayTimingRow {
@@ -369,6 +374,9 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "requested_config_hash",
   "applied_ledger_hash",
   "tuning_validation_status",
+  // ADR-1 per-statement introspection receipt, detail-only (the list
+  // projection above deliberately omits this potentially large JSON blob).
+  "applied_receipt",
   "tuning_policy_generation",
   "test_type",
   "validation_status",
@@ -657,6 +665,7 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     requested_config_hash: wide.requested_config_hash ?? null,
     applied_ledger_hash: wide.applied_ledger_hash ?? null,
     tuning_validation_status: wide.tuning_validation_status ?? null,
+    applied_receipt: wide.applied_receipt ?? null,
     tuning_policy_generation: wide.tuning_policy_generation ?? null,
     test_type: wide.test_type,
     validation_status: wide.validation_status,

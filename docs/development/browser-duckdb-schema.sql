@@ -83,6 +83,11 @@ CREATE TABLE IF NOT EXISTS results (
     -- / applied_verified / failed). NULL for legacy bundles; distinct from the
     -- run/query validation_status column below.
     tuning_validation_status VARCHAR,
+    -- ADR-1 per-statement introspection receipt, carried verbatim from the
+    -- run's `{stem}.applied.json` companion as an opaque JSON string and
+    -- rendered read-only by the RunReceipt drill-down. NULL when the run
+    -- published no receipt (introspection did not run, or a legacy bundle).
+    applied_receipt      VARCHAR,
     -- ADR-3 seam: explicit tuning-policy generation marker (display-only,
     -- never a join/dedup key). NULL for legacy bundles, treated downstream as
     -- the "pre-seam" generation.
@@ -194,6 +199,7 @@ SELECT
     r.requested_config_hash,
     r.applied_ledger_hash,
     r.tuning_validation_status,
+    r.applied_receipt,
     r.tuning_policy_generation,
     r.test_type,
     r.validation_status,

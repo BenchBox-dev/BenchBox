@@ -383,3 +383,134 @@ describe("RunReceipt", () => {
     expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// ADR-1 applied-tuning receipt drill-down
+//
+// `applied_receipt` carries the `{stem}.applied.json` companion's `receipt`
+// sub-object verbatim. The drill-down displays what the platform recorded; it
+// never recomputes a verdict or a corroboration decision. Every degraded shape
+// must leave the existing verified-state row exactly as it renders today.
+// ---------------------------------------------------------------------------
+
+const APPLIED_RECEIPT = JSON.stringify({
+  platform: "duckdb",
+  corroborated: true,
+  summary: { corroborated: 1, divergent: 1 },
+  entries: [
+    {
+      statement: "CREATE INDEX idx_l_shipdate ON lineitem(l_shipdate)",
+      phase: "post_load",
+      verdict: "corroborated",
+      kind: "index",
+      table: "lineitem",
+      expected_columns: ["l_shipdate"],
+      observed_columns: ["l_shipdate"],
+      diff: null,
+      reason: null,
+    },
+    {
+      statement: "CREATE INDEX idx_o_orderdate ON orders(o_orderdate)",
+      phase: "post_load",
+      verdict: "divergent",
+      kind: "index",
+      table: "orders",
+      expected_columns: ["o_orderdate"],
+      observed_columns: ["o_custkey"],
+      diff: "column mismatch",
+      reason: "catalog reports a different index definition",
+    },
+  ],
+});
+
+function expectVerifiedRowIntact() {
+  const receipt = screen.getByRole("region", { name: "Run receipt" });
+  expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
+  expect(within(receipt).getByText("Verified")).toBeTruthy();
+  return receipt;
+}
+
+describe("RunReceipt applied-tuning receipt drill-down", () => {
+  it("renders one collapsed drill-down entry per receipt entry, verbatim", () => {
+    render(<RunReceipt detail={makeDetail({ applied_receipt: APPLIED_RECEIPT })} />);
+
+    const receipt = expectVerifiedRowIntact();
+    const drilldown = within(receipt).getByTestId("applied-receipt-drilldown");
+    // Native <details>: collapsed by default, so the summary is the only
+    // thing competing for space in the receipt grid.
+    expect((drilldown as HTMLDetailsElement).open).toBe(false);
+    expect(within(drilldown).getByText(/Statement receipt \(2\)/)).toBeTruthy();
+
+    const entries = within(drilldown).getAllByTestId("applied-receipt-entry");
+    expect(entries.length).toBe(2);
+    const [corroborated, divergent] = entries as [HTMLElement, HTMLElement];
+
+    // Verdicts are shown as recorded - never recomputed from the columns.
+    expect(within(corroborated).getByText("corroborated")).toBeTruthy();
+    expect(within(corroborated).getByText(/CREATE INDEX idx_l_shipdate/)).toBeTruthy();
+    expect(within(corroborated).getByText("lineitem")).toBeTruthy();
+
+    expect(within(divergent).getByText("divergent")).toBeTruthy();
+    expect(within(divergent).getByText("Expected columns")).toBeTruthy();
+    expect(within(divergent).getByText("o_orderdate")).toBeTruthy();
+    expect(within(divergent).getByText("Observed columns")).toBeTruthy();
+    expect(within(divergent).getByText("o_custkey")).toBeTruthy();
+    expect(within(divergent).getByText("column mismatch")).toBeTruthy();
+    expect(within(divergent).getByText("catalog reports a different index definition")).toBeTruthy();
+  });
+
+  it("omits fields the receipt did not record rather than inventing them", () => {
+    const sparse = JSON.stringify({ entries: [{ verdict: "corroborated" }] });
+    render(<RunReceipt detail={makeDetail({ applied_receipt: sparse })} />);
+
+    const drilldown = screen.getByTestId("applied-receipt-drilldown");
+    expect(within(drilldown).getByText("corroborated")).toBeTruthy();
+    expect(within(drilldown).queryByText("Expected columns")).toBeNull();
+    expect(within(drilldown).queryByText("Reason")).toBeNull();
+    expect(within(drilldown).queryByText("Table")).toBeNull();
+  });
+
+  it.each([
+    ["absent (undefined)", undefined],
+    ["explicitly null", null],
+    ["an empty string", ""],
+    ["unparsable JSON", '{"entries": ['],
+    ["valid JSON that is not an object", "[1, 2, 3]"],
+    ["a receipt with no entries key", JSON.stringify({ platform: "duckdb", corroborated: true })],
+    ["a receipt with an empty entries list", JSON.stringify({ platform: "duckdb", entries: [] })],
+    ["a receipt whose entries are not objects", JSON.stringify({ entries: ["nope", 7, null] })],
+  ])("renders no drill-down and no error when applied_receipt is %s", (_label, raw) => {
+    render(<RunReceipt detail={makeDetail({ applied_receipt: raw as string | null | undefined })} />);
+
+    // The verified-state row and badge render exactly as they do without a receipt.
+    const receipt = expectVerifiedRowIntact();
+    expect(within(receipt).queryByTestId("applied-receipt-drilldown")).toBeNull();
+    expect(within(receipt).queryByTestId("applied-receipt-entry")).toBeNull();
+    expect(within(receipt).queryByText(/Statement receipt/)).toBeNull();
+  });
+
+  it("leaves a self-attested run's badge untouched when a receipt is present", () => {
+    render(
+      <RunReceipt
+        detail={makeDetail({ tuning_validation_status: "applied_unverified", applied_receipt: APPLIED_RECEIPT })}
+      />,
+    );
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    // The drill-down never upgrades the badge - corroboration is not decided here.
+    expect(within(receipt).getByText("Applied (self-attested)")).toBeTruthy();
+    expect(within(receipt).queryByText("Verified")).toBeNull();
+    expect(within(receipt).getByTestId("applied-receipt-drilldown")).toBeTruthy();
+  });
+
+  it("keeps the legacy not-recorded row unchanged when no verified-state exists", () => {
+    render(<RunReceipt detail={makeDetail({ tuning_validation_status: null, applied_receipt: APPLIED_RECEIPT })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).queryByText("Tuning verification")).toBeNull();
+    expect(within(receipt).queryByTestId("applied-receipt-drilldown")).toBeNull();
+    fireEvent.click(within(receipt).getByRole("button", { name: /Show missing metadata/ }));
+    expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
+    expect(within(receipt).getAllByText("Not recorded").length).toBeGreaterThan(0);
+  });
+});

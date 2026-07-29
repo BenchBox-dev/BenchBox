@@ -1107,3 +1107,127 @@ class TestQueryTimingExtendedFields:
         assert detail.queries[0].run_type is None
         assert detail.queries[0].iter is None
         assert detail.queries[0].stream is None
+
+
+class TestAppliedReceiptCompanion:
+    """ADR-1 per-statement introspection receipt ingestion.
+
+    The receipt lives in the ``{stem}.applied.json`` companion next to the
+    bundle. The transformer stores its ``receipt`` sub-object verbatim as a
+    canonical JSON string and degrades to ``None`` for every unusable shape --
+    a broken companion must never fail the build.
+    """
+
+    RECEIPT: dict = {
+        "platform": "duckdb",
+        "corroborated": True,
+        "summary": {"corroborated": 1, "total": 1},
+        "entries": [
+            {
+                "statement": "CREATE INDEX idx_l_shipdate ON lineitem(l_shipdate)",
+                "phase": "post_load",
+                "verdict": "corroborated",
+                "kind": "index",
+                "table": "lineitem",
+                "expected_columns": ["l_shipdate"],
+                "observed_columns": ["l_shipdate"],
+                "diff": None,
+                "reason": None,
+            }
+        ],
+        "observed": [{"name": "idx_l_shipdate"}],
+        "error": None,
+    }
+
+    def _bundle_with_companion(self, tmp_path: Path, companion_text: str | None) -> Path:
+        bundle = tmp_path / "receipted.json"
+        bundle.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        if companion_text is not None:
+            bundle.with_name("receipted.applied.json").write_text(companion_text, encoding="utf-8")
+        return bundle
+
+    def test_receipt_ingested_verbatim_onto_entry_and_detail(self, tmp_path: Path) -> None:
+        """The companion's ``receipt`` sub-object is stored as-is -- no verdict,
+        corroboration decision, or summary is recomputed here."""
+        payload = {
+            "status": "applied_verified",
+            "applied_ledger_hash": "a" * 64,
+            "statements": [{"statement": "CREATE INDEX ...", "status": "applied"}],
+            "receipt": self.RECEIPT,
+        }
+        bundle = self._bundle_with_companion(tmp_path, json.dumps(payload))
+
+        transformer = BundleTransformer()
+        entry_receipt = transformer.to_manifest_entry(bundle).applied_receipt
+        detail_receipt = transformer.to_detail_result(bundle, result_id="r").applied_receipt
+
+        assert entry_receipt is not None
+        assert entry_receipt == detail_receipt
+        # Round-trips to exactly the receipt the companion recorded.
+        assert json.loads(entry_receipt) == self.RECEIPT
+
+    def test_receipt_serialization_is_canonical_and_deterministic(self, tmp_path: Path) -> None:
+        """Key order in the companion must not change the stored string."""
+        shuffled = {"entries": [], "corroborated": False, "platform": "duckdb"}
+        ordered = {"corroborated": False, "entries": [], "platform": "duckdb"}
+        first = self._bundle_with_companion(tmp_path, json.dumps({"receipt": shuffled}))
+        transformer = BundleTransformer()
+        stored_first = transformer.to_detail_result(first, result_id="r").applied_receipt
+
+        second_dir = tmp_path / "second"
+        second_dir.mkdir()
+        second = self._bundle_with_companion(second_dir, json.dumps({"receipt": ordered}))
+        stored_second = transformer.to_detail_result(second, result_id="r").applied_receipt
+
+        assert stored_first == stored_second
+        assert stored_first == '{"corroborated":false,"entries":[],"platform":"duckdb"}'
+
+    def test_missing_companion_yields_none(self, tmp_path: Path) -> None:
+        """The common case: no introspection ran, so no companion exists."""
+        bundle = self._bundle_with_companion(tmp_path, None)
+
+        transformer = BundleTransformer()
+        assert transformer.to_manifest_entry(bundle).applied_receipt is None
+        assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
+
+    def test_malformed_companion_json_degrades_to_none_without_raising(self, tmp_path: Path) -> None:
+        """A truncated/corrupt companion must not fail the build."""
+        bundle = self._bundle_with_companion(tmp_path, '{"receipt": {"entries": [')
+
+        transformer = BundleTransformer()
+        assert transformer.to_manifest_entry(bundle).applied_receipt is None
+        assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
+
+    def test_companion_without_receipt_key_yields_none(self, tmp_path: Path) -> None:
+        """``receipt`` is optional -- it exists only when introspection ran."""
+        payload = {
+            "status": "applied_unverified",
+            "applied_ledger_hash": "b" * 64,
+            "statements": [{"statement": "CREATE INDEX ...", "status": "applied"}],
+            "dropped": [],
+        }
+        bundle = self._bundle_with_companion(tmp_path, json.dumps(payload))
+
+        transformer = BundleTransformer()
+        assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
+
+    def test_null_receipt_yields_none(self, tmp_path: Path) -> None:
+        bundle = self._bundle_with_companion(tmp_path, json.dumps({"receipt": None}))
+
+        transformer = BundleTransformer()
+        assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
+
+    def test_non_object_companion_payload_yields_none(self, tmp_path: Path) -> None:
+        """A JSON document that is valid but not an object is still unusable."""
+        bundle = self._bundle_with_companion(tmp_path, json.dumps(["not", "a", "payload"]))
+
+        transformer = BundleTransformer()
+        assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
+
+    def test_unreadable_companion_degrades_to_none(self, tmp_path: Path) -> None:
+        """A directory where the companion should be: an OSError, not a crash."""
+        bundle = self._bundle_with_companion(tmp_path, None)
+        bundle.with_name("receipted.applied.json").mkdir()
+
+        transformer = BundleTransformer()
+        assert transformer.to_detail_result(bundle, result_id="r").applied_receipt is None
