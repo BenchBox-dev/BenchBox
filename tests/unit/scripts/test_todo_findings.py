@@ -771,3 +771,97 @@ class TestShowRendersEvidenceNote:
     def test_json_payload_is_unchanged_and_already_included_the_note(self, conn):
         finding = self._finding_with_evidence(conn, [{"path": "p.py", "pattern": None, "note": "why p matters"}])
         assert finding["evidence"][0]["note"] == "why p matters"
+
+
+class TestSyncFullPayloadComparison:
+    """`_finding_matches` compared only `_CONTENT_FIELDS`, so an evidence-only draft
+    edit was marked `.synced` and lost while `sync` printed success."""
+
+    def _write(self, directory: Path, stem: str, *, evidence_block: str = "", extra_front: str = ""):
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            f"{extra_front}{evidence_block}"
+            "---\n\n"
+            "# A sample class\n\n"
+            "## Finding\nthe review never checks axis Y\n\n"
+            "## Why this matters\naxis Y is a whole dimension\n\n"
+            "## Suggested next steps\n- [ ] add a gate for axis Y\n",
+            encoding="utf-8",
+        )
+        return directory / f"{stem}.md"
+
+    def test_evidence_only_edit_is_persisted_not_silently_synced(self, conn, tmp_path):
+        stem = "2026-01-02-030405-evidence-edited"
+        path = self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n    note: first\n")
+        assert todo_findings.sync_drafts(conn, "tester", tmp_path)["synced"] == [stem]
+
+        # Edit only the evidence, then re-sync from the same drafts directory.
+        path.with_name(path.name + ".synced").rename(path)
+        self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n    note: SECOND\n  - path: b.py\n")
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        assert result["updated"] == [stem]
+        assert result["conflicts"] == []
+        stored = todo_findings.get_finding(conn, stem)["evidence"]
+        assert [(row["path"], row["note"]) for row in stored] == [("a.py", "SECOND"), ("b.py", None)]
+
+    def test_evidence_reconcile_is_recorded_in_finding_events(self, conn, tmp_path):
+        stem = "2026-01-02-030405-evidence-audited"
+        path = self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+        path.with_name(path.name + ".synced").rename(path)
+        self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n  - path: b.py\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        actions = [event["action"] for event in todo_findings.get_finding(conn, stem)["events"]]
+        assert "resync_evidence" in actions
+        detail = json.loads(
+            next(
+                e["detail"] for e in todo_findings.get_finding(conn, stem)["events"] if e["action"] == "resync_evidence"
+            )
+        )
+        assert detail == {"rows_before": 1, "rows_after": 2}
+
+    def test_unchanged_draft_is_still_skipped_and_marked_synced(self, conn, tmp_path):
+        stem = "2026-01-02-030405-unchanged-record"
+        path = self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n    note: same\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+        path.with_name(path.name + ".synced").rename(path)
+
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["skipped"] == [stem]
+        assert result["updated"] == []
+        assert path.with_name(path.name + ".synced").exists()
+
+    def test_prose_difference_is_still_a_loud_conflict(self, conn, tmp_path):
+        stem = "2026-01-02-030405-prose-changed"
+        path = self._write(tmp_path, stem)
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+        path.with_name(path.name + ".synced").rename(path)
+        path.write_text(path.read_text(encoding="utf-8").replace("axis Y", "axis Z"), encoding="utf-8")
+
+        with pytest.raises(todo_db.TodoError, match="sync conflict"):
+            todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+    def test_triage_judgement_survives_a_resync(self, conn, tmp_path):
+        # The draft predates triage and carries no urgency; reconciling judgement
+        # fields "from the draft" would wipe what triage recorded.
+        stem = "2026-01-02-030405-triaged-record"
+        path = self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+        with todo_db._write_txn(conn):
+            conn.execute("UPDATE findings SET urgency = 'high', breadth = 'wide' WHERE id = ?", (stem,))
+
+        path.with_name(path.name + ".synced").rename(path)
+        self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n  - path: b.py\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        stored = todo_findings.get_finding(conn, stem)
+        assert (stored["urgency"], stored["breadth"]) == ("high", "wide")
+        assert len(stored["evidence"]) == 2

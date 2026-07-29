@@ -489,6 +489,76 @@ def _finding_matches(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
     return True
 
 
+# Evidence-row fields compared to decide whether a re-parsed draft's evidence
+# differs from what is stored. Order is significant: the draft's list order is
+# the record, and `get_finding` reads evidence back `ORDER BY id`.
+_EVIDENCE_FIELDS = ("path", "pattern", "line_start", "line_end", "note")
+
+# Judgement fields are deliberately ABSENT from every comparison below. They are
+# DB-owned once `todo finding triage` sets them, and a draft file captured before
+# triage carries them as null -- reconciling them "from the draft" would silently
+# wipe the triage judgement on every re-sync.
+_DB_OWNED_FIELDS = ("urgency", "breadth", "confidence", "reconsider_after", "disposition_reason")
+
+
+def _normalize_evidence(entries: Any) -> list[tuple[Any, ...]]:
+    """Evidence entries as an ordered list of comparable tuples.
+
+    Normalizes the two shapes that must compare equal: parsed-draft mappings
+    (which omit absent keys) and stored rows (which carry explicit NULLs).
+    """
+    normalized: list[tuple[Any, ...]] = []
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        normalized.append(tuple(entry.get(name) if entry.get(name) != "" else None for name in _EVIDENCE_FIELDS))
+    return normalized
+
+
+def _evidence_differs(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
+    return _normalize_evidence(existing.get("evidence")) != _normalize_evidence(fields.get("evidence"))
+
+
+def _reconcile_evidence(conn: Any, actor: str, finding_id: str, fields: dict[str, Any]) -> None:
+    """Replace a finding's evidence rows with the draft's, in ONE write txn.
+
+    The draft file is authoritative for capture-owned payload, so an evidence-only
+    edit is persisted rather than silently marked synced (which lost the edit) or
+    reported as a content conflict (which the prose did not justify). The
+    before/after is recorded in ``finding_events``, so the audit trail carries the
+    change instead of the row quietly differing from its draft.
+    """
+    before = _normalize_evidence(get_finding(conn, finding_id).get("evidence"))
+    after = _normalize_evidence(fields.get("evidence"))
+    with todo_db._write_txn(conn):
+        conn.execute("DELETE FROM finding_evidence WHERE finding_id = ?", (finding_id,))
+        for entry in fields.get("evidence") or []:
+            if not isinstance(entry, dict):
+                raise todo_db.TodoError(f"finding {finding_id!r} evidence entry must be a mapping, got {entry!r}")
+            path = entry.get("path")
+            if not (isinstance(path, str) and path.strip()):
+                raise todo_db.TodoError(f"finding {finding_id!r} evidence entry needs a non-empty path")
+            conn.execute(
+                "INSERT INTO finding_evidence (finding_id, path, pattern, line_start, line_end, note)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    finding_id,
+                    path,
+                    entry.get("pattern"),
+                    entry.get("line_start"),
+                    entry.get("line_end"),
+                    entry.get("note"),
+                ),
+            )
+        log_finding_event(
+            conn,
+            actor,
+            finding_id,
+            "resync_evidence",
+            {"rows_before": len(before), "rows_after": len(after)},
+        )
+
+
 def _set_disposition(conn: Any, actor: str, finding_id: str, new: str, reason: str | None) -> None:
     """Apply a legal disposition transition with a conditional UPDATE (the same
     defense-in-depth as claim_item), INSIDE a caller-held write transaction."""
@@ -547,8 +617,16 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
     """Insert-if-absent every draft under ``drafts_dir`` by filename-stem id.
 
     Idempotent: an identical already-landed finding is skipped (and its draft
-    marked synced). Same-id/different-content is a loud error naming the id --
+    marked synced). Same-id/different *prose* is a loud error naming the id --
     never a merge (silent data loss in an audit-trail domain).
+
+    Capture-owned payload the prose comparison does not cover -- today the
+    evidence rows -- is reconciled IN PLACE from the draft and recorded in
+    ``finding_events``. Comparing only the prose fields meant an evidence-only
+    edit was marked ``.synced`` and lost with `sync` reporting success. Judgement
+    fields (urgency/breadth/confidence/reconsider_after) are excluded from every
+    comparison: they are DB-owned once triage sets them, so reconciling them from
+    a pre-triage draft would wipe the judgement.
 
     A draft carrying validator-accepted content with no column in the current
     schema is still inserted, but is deliberately NOT marked ``.synced``: it stays
@@ -557,7 +635,14 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
     one copy of the un-landed prose behind a rename.
     """
     drafts_dir = Path(drafts_dir).expanduser()
-    result: dict[str, Any] = {"synced": [], "skipped": [], "conflicts": [], "pruned": 0, "unmapped": {}}
+    result: dict[str, Any] = {
+        "synced": [],
+        "updated": [],
+        "skipped": [],
+        "conflicts": [],
+        "pruned": 0,
+        "unmapped": {},
+    }
     if not drafts_dir.is_dir():
         return result
     for path in sorted(drafts_dir.glob("*.md")):
@@ -572,12 +657,19 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
             result["unmapped"][fields["id"]] = unmapped
         existing = get_finding(conn, fields["id"])
         if existing is not None:
-            if _finding_matches(existing, fields):
-                result["skipped"].append(fields["id"])
-                if not lossy:
-                    _mark_synced(path)
-            else:
+            if not _finding_matches(existing, fields):
+                # Prose disagreement is still a loud conflict, never a merge.
                 result["conflicts"].append(fields["id"])
+                continue
+            if _evidence_differs(existing, fields):
+                # Capture-owned payload the old comparison ignored entirely: the
+                # draft used to be marked .synced and the edit lost silently.
+                _reconcile_evidence(conn, actor, fields["id"], fields)
+                result["updated"].append(fields["id"])
+            else:
+                result["skipped"].append(fields["id"])
+            if not lossy:
+                _mark_synced(path)
             continue
         with todo_db._write_txn(conn):
             insert_finding(conn, actor, fields)
@@ -955,7 +1047,8 @@ def dispatch_finding(conn: Any, actor: str, args: argparse.Namespace) -> int:
     if command == "sync":
         result = sync_drafts(conn, actor, args.drafts_dir)
         print(
-            f"synced {len(result['synced'])}, skipped {len(result['skipped'])} (already landed),"
+            f"synced {len(result['synced'])}, updated {len(result['updated'])} (evidence reconciled),"
+            f" skipped {len(result['skipped'])} (already landed),"
             f" pruned {result['pruned']} old .synced draft(s)"
         )
         _warn_unmapped(result.get("unmapped") or {})
