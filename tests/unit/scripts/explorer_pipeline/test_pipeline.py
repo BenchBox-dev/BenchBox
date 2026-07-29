@@ -17,6 +17,7 @@ from _project.scripts.explorer_pipeline.pipeline import (
     _build_short_ids,
 )
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -393,6 +394,96 @@ class TestExplorerPipelineRun:
         ExplorerPipeline().run(tmp_path / "data", output)
 
         # Only the real bundle, not the sidecar
+        assert len(_duckdb_results(output)) == 1
+
+    def test_applied_companion_excluded_from_bundle_discovery(self, tmp_path: Path) -> None:
+        """Regression: `<stem>.applied.json` is a companion, never a bundle.
+
+        ``bundle_publisher`` copies every entry of ``COMPANION_SUFFIXES`` next
+        to the published bundle, so an ``.applied.json`` sits in the bundles
+        dir for every tuned run. Discovery previously excluded only the
+        plans/tuning companions, so the applied ledger was picked up and
+        transformed as if it were a result bundle.
+        """
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle_path = bundles_dir / "real_bundle.json"
+        bundle_path.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        bundle_path.with_name("real_bundle.applied.json").write_text(
+            json.dumps(
+                {
+                    "status": "applied_verified",
+                    "applied_ledger_hash": "a" * 64,
+                    "statements": [{"statement": "CREATE INDEX ...", "status": "applied"}],
+                    "receipt": {"platform": "duckdb", "corroborated": True, "entries": []},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        # Only the real bundle, not the applied-ledger companion.
+        assert len(_duckdb_results(output)) == 1
+
+    def test_applied_receipt_reaches_results_table_and_detail_view(self, tmp_path: Path) -> None:
+        """End-to-end: the companion's receipt lands in DuckDB verbatim.
+
+        Pins the DDL / positional-INSERT / ``result_detail_metrics`` projection
+        alignment for the ``applied_receipt`` column -- a mismatch there would
+        silently store the receipt in the wrong column.
+        """
+        receipt = {
+            "platform": "duckdb",
+            "corroborated": True,
+            "entries": [{"statement": "CREATE INDEX ...", "verdict": "corroborated", "table": "lineitem"}],
+        }
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle_path = bundles_dir / "receipted.json"
+        bundle_path.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        bundle_path.with_name("receipted.applied.json").write_text(
+            json.dumps({"status": "applied_verified", "receipt": receipt}), encoding="utf-8"
+        )
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        rows = _duckdb_results(output)
+        assert len(rows) == 1
+        assert json.loads(rows[0]["applied_receipt"]) == receipt
+
+        with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
+            projected = con.execute("SELECT applied_receipt FROM result_detail_metrics").fetchall()
+        assert json.loads(projected[0][0]) == receipt
+
+    def test_applied_receipt_null_when_no_companion(self, tmp_path: Path) -> None:
+        """A run with no receipt stores SQL NULL, not an empty string."""
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        (bundles_dir / "plain.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        assert _duckdb_results(output)[0]["applied_receipt"] is None
+
+    def test_discovery_excludes_every_canonical_companion_suffix(self, tmp_path: Path) -> None:
+        """Pin discovery against the canonical companion tuple.
+
+        A newly added companion kind must not silently start being transformed
+        as a bundle -- that is exactly how ``.applied.json`` slipped through.
+        """
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        (bundles_dir / "real_bundle.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        for suffix in COMPANION_SUFFIXES:
+            (bundles_dir / f"real_bundle{suffix}").write_text("{}", encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
         assert len(_duckdb_results(output)) == 1
 
     def test_mixed_bundles_with_and_without_sidecar(self, tmp_path: Path) -> None:

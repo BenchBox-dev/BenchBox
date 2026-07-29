@@ -168,6 +168,13 @@ class ManifestEntry(BaseModel):
     # predating the applied ledger (treated downstream as "unknown"). Distinct
     # from the run/query validation_status field.
     tuning_validation_status: str | None = None
+    # ADR-1 per-statement introspection receipt, read verbatim from the
+    # {stem}.applied.json companion's "receipt" sub-object and stored as a
+    # canonical JSON string (sort_keys, compact separators). Null when the
+    # companion is absent/unreadable/malformed or carries no receipt -- a
+    # broken companion never fails the build. Never recomputed or re-derived:
+    # the explorer renders the verdicts as recorded. Display-only.
+    applied_receipt: str | None = None
     # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
     # from platform.tuning (never derived from benchbox_version). Null for
     # legacy bundles predating the field (treated downstream as "pre-seam").
@@ -391,6 +398,13 @@ class DetailResult(BaseModel):
     # predating the applied ledger (treated downstream as "unknown"). Distinct
     # from the run/query validation_status field.
     tuning_validation_status: str | None = None
+    # ADR-1 per-statement introspection receipt, read verbatim from the
+    # {stem}.applied.json companion's "receipt" sub-object and stored as a
+    # canonical JSON string (sort_keys, compact separators). Null when the
+    # companion is absent/unreadable/malformed or carries no receipt -- a
+    # broken companion never fails the build. Never recomputed or re-derived:
+    # the explorer renders the verdicts as recorded. Display-only.
+    applied_receipt: str | None = None
     # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
     # from platform.tuning (never derived from benchbox_version). Null for
     # legacy bundles predating the field (treated downstream as "pre-seam").
