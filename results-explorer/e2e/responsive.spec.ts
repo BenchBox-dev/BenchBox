@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { waitForDataLoaded, waitForShell } from "./support/fixtures";
+import { waitForDataElement, waitForDataLoaded, waitForShell } from "./support/fixtures";
 
 const SHORT_DUCKDB = "ba6a8c83";
 const SHORT_DATAFUSION = "5e6c5eba";
@@ -140,8 +140,10 @@ test.describe("responsive explorer assertions", () => {
     await page.goto("/results/tpch/?sf=0.01&phase=standard");
     await waitForDataLoaded(page, /TPC-H Results/i);
 
+    // The route heading above is shell-rendered, so wait on the heatmap
+    // itself: it is data-bound and absent when the snapshot answers cold.
     const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
-    await expect(heatmap).toBeVisible();
+    await waitForDataElement(page, heatmap);
     await heatmap.evaluate((container) => {
       const tbody = container.querySelector("tbody");
       if (!tbody) throw new Error("missing query heatmap body");

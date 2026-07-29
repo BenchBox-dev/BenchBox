@@ -11,7 +11,7 @@ and anyone triaging a red or advisory browser-lane check on a PR.
 
 | Browser  | Job name                          | Scope                | Gate       | Status as of 2026-07-23 |
 |----------|------------------------------------|-----------------------|------------|--------------------------|
-| Chromium | `Chromium (full suite, blocking)` | Full `e2e/` suite      | Blocking   | Cold-start flake mitigated 2026-07-25 (see below) |
+| Chromium | `Chromium (full suite, blocking)` | Full `e2e/` suite      | Blocking   | Zero-row snapshot race mitigated 2026-07-29 (see correction below) |
 | Firefox  | `Firefox (@smoke, non-blocking)`  | `@smoke`-tagged subset | Advisory   | Green in recent history |
 | WebKit   | `WebKit (@smoke, non-blocking)`   | `@smoke`-tagged subset | Advisory   | Fixed 2026-07-23 (see below) - was deterministically red on PRs #1264 and #1270 |
 
@@ -41,6 +41,8 @@ below, not a functional break in the PR under test. The required
 `test:e2e:chromium` command runs both Playwright invocations with
 `--workers=1`, so the live cause is serial DuckDB-WASM cold-start exceeding
 the 30s `waitForDataLoaded` budget, not concurrent-worker contention.
+(Superseded - see the 2026-07-29 correction below. It is not a cold-start
+latency problem at all.)
 
 Mitigation (harness-only, no `results-explorer/src/**` change; the blocking
 command remains serial):
@@ -53,6 +55,69 @@ command remains serial):
 - CI `retries` 1 -> 2 so a spec slow on both its first attempts gets a third.
   A real regression still fails all three attempts (deterministic), so this
   does not mask functional breaks.
+
+### Correction (2026-07-29): it was never a latency problem
+
+The diagnosis above is wrong, and the timeout widening it prescribes cannot
+work. Measured locally on an idle machine, serial (`--workers=1`), with the
+45s budget in place:
+
+- Every flaky spec burned the **entire** 45s and the element never appeared.
+  A budget that is never nearly met is not a budget problem.
+- The suite's own performance spec puts DuckDB-WASM cold init at
+  **P50 564ms / P95 978ms**, and leaderboard data after init at P50 6ms. A
+  healthy load finishes ~45x inside the old 30s budget.
+- In `compare-entrypoints` the route heading rendered while the result rows
+  stayed empty; in `responsive` and `index-sort-headers` the same, the heatmap
+  and grid rows never arriving after the heading was visible.
+
+The live cause is a **cold-snapshot zero-row race**: the first keyed query
+against a not-yet-queryable DuckDB-WASM snapshot answers with zero rows, the
+view renders its empty state, and it never re-queries. No single-shot budget
+can ever succeed against that; only a fresh navigation can, which is exactly
+why CI (`retries: 2`) stayed green while the same specs still failed locally
+(`retries: 0`).
+
+A second, compounding harness bug: `waitForDataLoaded(page, /TPC-H Results/)`
+waits on a **shell-rendered route heading**, not on data. It returns happily
+while the snapshot is still empty, so every row-bound assertion after it races
+the snapshot with only the 10s default `expect` timeout.
+
+Current mitigation (`e2e/support/fixtures.ts`):
+
+- Data waits run up to three attempts (10s + 8s + 8s, plus two re-navigations
+  bounded at 10s each: ~46s worst case, about the 45s it replaces) and
+  **re-navigate to the entry URL between attempts**, which is the only action
+  that clears the race. Attempts are deliberately shorter than the single 45s
+  budget: a healthy load finishes in ~1s, so a racing wait now costs ~10s
+  before it re-navigates rather than burning 45s. That matters because several
+  specs chain multiple data waits inside one 90s per-test cap.
+- Re-navigation is skipped if the page has left the URL the wait began on, so
+  a wait placed after a click cannot rewind the page under the test.
+- `waitForResultRows(page, scope, minimum)` gates on real `tbody
+  tr[data-testid]` rows **within the table under test**, instead of trusting a
+  shell heading.
+
+**This is mitigation, not a fix, and it costs one class of coverage.** A
+regression that breaks only the *first* load — every user's first visit renders
+the empty state, a reload fixes it — now passes on attempt 2, so a wait that
+re-navigates **cannot** catch first-load-only correctness. That is the same
+defect class being worked around here, which is exactly where regression
+pressure is highest. A regression that survives a reload still fails every
+attempt.
+
+To keep that coverage somewhere, `e2e/failures/platform-index-cold-load.spec.ts`
+deliberately does **not** use the re-navigating helpers: it is the dedicated
+cold-load regression guard (the pass-1 bug it pins surfaced as *partial* rows,
+1 of 5, which a `count > 0` check would have passed). Leave its single-shot
+waits and exact row counts alone — if it flakes, that is signal, not noise.
+
+The root cause is in `results-explorer/src/**` (gate the first keyed query on a
+queryable snapshot, or re-query when it returns zero rows), tracked as
+`explorer-cold-snapshot-zero-row-race-20260729`; the e2e suite is not permitted
+to change `src/**`. Until that lands, expect residual flake at any data-bound
+assertion that still waits single-shot, and treat the coverage gap above as
+live.
 
 ## Triage rule
 

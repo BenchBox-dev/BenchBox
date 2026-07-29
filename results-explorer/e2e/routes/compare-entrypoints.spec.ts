@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { waitForDataElement, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const DUCKDB = {
   id: "tpch-duckdb-sf0.01-20260403-010ee756",
@@ -22,6 +22,10 @@ test.describe("compare entrypoint happy paths", () => {
     await page.goto("/results/tpch/");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
+    // The heading renders from the shell, so it can be visible while the
+    // keyed row query has answered with zero rows. Wait on a row itself
+    // before interacting with it.
+    await waitForDataElement(page, page.getByTestId(DUCKDB.id));
 
     await checkRow(page.getByTestId(DUCKDB.id));
     await checkRow(page.getByTestId(DATAFUSION.id));

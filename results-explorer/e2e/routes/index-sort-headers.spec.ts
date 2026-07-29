@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { waitForDataLoaded, waitForResultRows, waitForShell } from "../support/fixtures";
 
 function sortableHeader(scope: Locator, label: RegExp): Locator {
   return scope.locator("th[aria-sort]").filter({ hasText: label }).first();
@@ -66,6 +66,9 @@ test.describe("Index sortable headers", () => {
     await waitForDataLoaded(page, /TPC-H Results/);
 
     const grid = page.getByRole("grid", { name: /tpch SF0\.01 standard results/i });
+    // The heading is shell-rendered; gate on real rows in the grid under test
+    // before reading row order.
+    await waitForResultRows(page, grid, 3);
     const rows = grid.locator("tbody tr[data-testid]");
     await expect.poll(() => rows.count()).toBeGreaterThanOrEqual(3);
 

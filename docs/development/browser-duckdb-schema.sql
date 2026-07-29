@@ -74,6 +74,19 @@ CREATE TABLE IF NOT EXISTS results (
     execution_mode       VARCHAR,
     tuning_mode          VARCHAR,
     tuning_hash          VARCHAR,
+    -- ADR-1 bundle-emitted tuning identities (display-only, never a join/dedup
+    -- key): canonical requested-config hash and the physical applied-ledger
+    -- hash. NULL for legacy bundles.
+    requested_config_hash VARCHAR,
+    applied_ledger_hash   VARCHAR,
+    -- ADR-1 tuning verified-state (not_applicable / noop / applied_unverified
+    -- / applied_verified / failed). NULL for legacy bundles; distinct from the
+    -- run/query validation_status column below.
+    tuning_validation_status VARCHAR,
+    -- ADR-3 seam: explicit tuning-policy generation marker (display-only,
+    -- never a join/dedup key). NULL for legacy bundles, treated downstream as
+    -- the "pre-seam" generation.
+    tuning_policy_generation VARCHAR,
     test_type            VARCHAR,
     validation_status    VARCHAR,
     cost_usd             DOUBLE,
@@ -99,7 +112,13 @@ CREATE TABLE IF NOT EXISTS results (
     has_plans            BOOLEAN  NOT NULL,
     plans_published      BOOLEAN  NOT NULL,
     has_tuning           BOOLEAN  NOT NULL,
-    bundle_download_url  VARCHAR  NOT NULL
+    bundle_download_url  VARCHAR  NOT NULL,
+    -- ADR-2 section 3: platform-rendered physical tuning mechanisms
+    -- (comma-joined, sorted) and, for platforms that expose one, the physical
+    -- rendering strategy id. NULL when the bundle never recorded a logical
+    -- tuning profile.
+    physical_mechanisms   VARCHAR,
+    physical_rendering_id VARCHAR
 );
 
 -- ---------------------------------------------------------------------------
@@ -172,6 +191,10 @@ SELECT
     r.execution_mode,
     r.tuning_mode,
     r.tuning_hash,
+    r.requested_config_hash,
+    r.applied_ledger_hash,
+    r.tuning_validation_status,
+    r.tuning_policy_generation,
     r.test_type,
     r.validation_status,
     r.cost_usd,
@@ -197,6 +220,8 @@ SELECT
     r.plans_published,
     r.has_tuning,
     r.bundle_download_url,
+    r.physical_mechanisms,
+    r.physical_rendering_id,
     e.os,
     e.arch,
     e.cpu_count,
