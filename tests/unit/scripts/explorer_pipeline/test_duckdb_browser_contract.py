@@ -977,3 +977,82 @@ class TestBenchmarkRankingSpeedupParity:
             ).fetchone()
         assert rows is not None
         assert rows[0] == pytest.approx(1.0, abs=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Documentation drift: browser-duckdb-schema.sql vs the schema actually built
+# ---------------------------------------------------------------------------
+
+
+def _doc_block_columns(text: str, start: str, end: str, prefix: str = "") -> list[str]:
+    """Column names between two markers in the schema doc, in declaration order.
+
+    Comment and blank lines are skipped. ``prefix`` selects the qualified
+    projections of a view body (``r.`` for the results side of a join).
+    """
+    body = text.split(start, 1)[1].split(end, 1)[0]
+    columns: list[str] = []
+    for line in body.splitlines():
+        stripped = line.strip().rstrip(",")
+        if not stripped or stripped.startswith("--"):
+            continue
+        if prefix:
+            if not stripped.startswith(prefix):
+                continue
+            columns.append(stripped[len(prefix) :])
+            continue
+        token = stripped.split()[0]
+        if token.upper() in {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK"}:
+            continue
+        columns.append(token)
+    return columns
+
+
+class TestSchemaDocMatchesBuiltSchema:
+    """`docs/development/browser-duckdb-schema.sql` documents the browser store.
+
+    It is prose, not executed, so nothing forced it to keep up: it silently
+    fell six columns behind the builder (the ADR-1 tuning identities and
+    verified-state, the ADR-3 policy-generation marker, and the ADR-2 physical
+    columns) across four read-model versions. These compare the doc against the
+    schema `build_full()` actually produces, so the next column that lands
+    without a doc update fails here instead of drifting for another four.
+
+    `duckdb_builder.py` is the source of truth; fix the doc, never the builder.
+    """
+
+    DOC_PATH = Path(__file__).resolve().parents[4] / "docs" / "development" / "browser-duckdb-schema.sql"
+
+    def _doc_text(self) -> str:
+        return self.DOC_PATH.read_text(encoding="utf-8")
+
+    def test_doc_exists(self) -> None:
+        assert self.DOC_PATH.is_file(), f"schema doc not found at {self.DOC_PATH}"
+
+    def test_results_table_columns_match(self, db_path: Path) -> None:
+        documented = _doc_block_columns(self._doc_text(), "CREATE TABLE IF NOT EXISTS results (", "\n);")
+        with _connect(db_path) as con:
+            actual = [row[0] for row in con.execute("DESCRIBE results").fetchall()]
+        assert documented == actual, (
+            "browser-duckdb-schema.sql `results` is out of sync with duckdb_builder.py.\n"
+            f"  undocumented columns: {[c for c in actual if c not in documented]}\n"
+            f"  documented but absent: {[c for c in documented if c not in actual]}\n"
+            "  (order matters: the doc mirrors the builder's declaration order)"
+        )
+
+    def test_result_detail_metrics_view_columns_match(self, db_path: Path) -> None:
+        documented = _doc_block_columns(
+            self._doc_text(),
+            "CREATE VIEW IF NOT EXISTS result_detail_metrics AS",
+            "FROM results r",
+            prefix="r.",
+        )
+        with _connect(db_path) as con:
+            view_columns = [row[0] for row in con.execute("DESCRIBE result_detail_metrics").fetchall()]
+            results_columns = {row[0] for row in con.execute("DESCRIBE results").fetchall()}
+        actual = [column for column in view_columns if column in results_columns]
+        assert documented == actual, (
+            "browser-duckdb-schema.sql `result_detail_metrics` is out of sync with duckdb_builder.py.\n"
+            f"  undocumented projections: {[c for c in actual if c not in documented]}\n"
+            f"  documented but absent: {[c for c in documented if c not in actual]}"
+        )
