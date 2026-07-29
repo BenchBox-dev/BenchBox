@@ -118,6 +118,78 @@ so the `SCHEMA_VERSION` 2 → 3 migration is accepted against the live
 > until it runs, every collaborator's CLI is inert against the live DB. Land
 > the code and run the hosted migration together.
 
+## Legacy field mapping (schema v4)
+
+Phase 3 shipped a home for the fields `todo finding create` writes, not for
+every field `validate_blind_spot.py` *accepts*. The gap is not theoretical:
+measured over the live 65-record corpus (2026-07-29), **65 of 65** records lose
+content when pushed through `parse_draft` — `related_paths` (170 path entries),
+`suggested_sweep` (11,559 chars), `todo_id` (36 records; no column existed), and
+8 stray `## ` sections (5,779 chars, including seven "why the review missed it"
+meta-analysis sections). `sync` reported success throughout. Because phase 5
+pushes the whole corpus through this parser and phase 6 then deletes the tracked
+originals, the mapping below is a **precondition of phase 5**, and
+`SCHEMA_VERSION` 3 → 4 adds the missing homes.
+
+Every field the validator accepts, and every body section it permits, has
+exactly one home. This table is the parity gate's reference: an entry with no
+home is a bug in this table, not a licensed omission.
+
+| Capture field | v4 home | Notes |
+| --- | --- | --- |
+| `id` | `findings.id` | = filename stem, regex-enforced |
+| `date` | `findings.date` | |
+| `status` | `findings.disposition` | via `STATUS_TO_DISPOSITION` |
+| `finding_kind` | `findings.finding_kind` | |
+| `review_context` | `findings.review_context` | |
+| `observed_sha` | `findings.observed_sha` | provenance, not a lookup key |
+| `urgency`, `breadth`, `confidence` | same-named nullable columns | set at triage |
+| `evidence[]` | `finding_evidence` rows | one row per entry, insertion-ordered |
+| `related_paths[]` | **`findings.related_paths`** (new) | JSON array TEXT; `NULL` when absent |
+| `suggested_sweep` | **`findings.suggested_sweep`** (new) | TEXT, one line (validator-enforced) |
+| `todo_id` | **`finding_links` row** (new mapping) | kind by status — see below |
+| `# <title>` | `findings.title` | |
+| `## Finding` | `findings.finding_text` | verbatim |
+| `## Why this matters` | `findings.why_matters` | verbatim |
+| `## Suggested next steps` | `findings.next_steps` | verbatim |
+| `## Triage log` | `finding_events` rows | one row per line, `action='imported_triage_log'` |
+| any other `## ` section | **`finding_sections`** (new table) | `(finding_id, position, heading, text)` |
+
+`findings.reconsider_after`, `disposition_reason`, `created_at` and
+`imported_from` are DB-side only — they have no capture-format counterpart and
+are therefore outside the parity gate.
+
+**Why explicit columns and not evidence rows.** `related_paths` and
+`suggested_sweep` must *not* be folded into `finding_evidence`: a
+`related_paths`-derived row and a genuine `evidence` entry are
+indistinguishable on the way back out (both are a bare `path` with no
+`pattern`), so the round-trip is lossy without a discriminator column. Explicit
+columns make the round-trip exact and keep the parity gate's promise of
+*field-level* preservation, which free text cannot satisfy. `finding_sections`
+is a table rather than four more columns because it subsumes the problem class —
+any future heading lands losslessly without a further migration.
+
+**`todo_id` → link kind.** The 36 records split by `status`, and the kind must
+follow, because a `promoted-to` edge asserts the finding's disposition is
+`promoted`:
+
+| `status` | Records | Link kind | Rationale |
+| --- | --- | --- | --- |
+| `merged-to-todo` | 32 | `promoted-to` | disposition maps to `promoted`; the edge is accurate |
+| `actioned` | 4 | `resolved-by` | disposition is `actioned`; `promoted-to` would misstate history and break the promote invariant |
+
+Both kinds are already in the `finding_links.kind` CHECK, so this mapping needs
+**no table rebuild**. A new kind would force one, which is why none is added.
+
+**Parity criterion (falsifiable).** For every record in the import set, a
+round-trip through the importer and back out of the DB reproduces: every
+accepted frontmatter key with its value and, for lists, its order; every body
+section's text byte-for-byte under its original heading; and each `## Triage
+log` line as one `finding_events` row. The check is mechanical — the phase-5
+parity report emits a per-record field diff plus counts of **unmapped keys** and
+**unmapped sections**, and both counts must be zero. A record whose key has no
+row in the table above fails the gate.
+
 ## CLI (phase 3)
 
 `todo finding create | list | show | candidates | dismiss | triage | link |
@@ -191,10 +263,21 @@ written, since triage history is free-text `## Triage log` prose):
   `finding_events` row, `action = 'imported_triage_log'`, prose intact.
 - **Status map**: `open→open`, `actionable→actionable`, `actioned→actioned`,
   `dismissed→dismissed`, `merged-to-todo→promoted`.
-- **Dangling `todo_id` policy**: drop semantics reserve ids forever and
-  YAML-era ids may not exist, so resolve each `todo_id` against the live DB;
-  danglers import as `finding_links(kind='promoted-to', target_item=NULL)` plus
-  a note, and the parity report counts them explicitly.
+- **Field-level parity**: every accepted frontmatter key and every `## `
+  section round-trips per [Legacy field mapping](#legacy-field-mapping-schema-v4),
+  with zero unmapped keys and zero unmapped sections. This makes v4 a hard
+  precondition of this phase.
+- **`todo_id` policy**: resolve each `todo_id` against the live DB and map it to
+  a `finding_links` row whose kind follows the record's `status` (see the
+  mapping section). `finding_links.target_item` is a real FK, so a `todo_id`
+  naming a missing item **fails the insert** — the pre-flight is mandatory and
+  missing targets are **reported, not silently skipped**.
+  Drop semantics reserve ids forever and YAML-era ids may not exist, so
+  danglers remain possible in principle: they import as
+  `finding_links(target_item=NULL)` plus a note, and the parity report counts
+  them explicitly. **Measured 2026-07-29: zero danglers** — all 19 unique
+  `todo_id` values across the 36 records resolve to live items, so the counter
+  is expected to read zero and a non-zero count means the corpus changed.
 
 Process: dry-run into a scratch DB first, produce a machine-checkable parity
 report (all-records-imported count, per-record field diff, dangling-link
