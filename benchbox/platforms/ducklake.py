@@ -48,6 +48,47 @@ _VALID_CATALOGS: tuple[str, ...] = ("duckdb", "sqlite", "postgres")
 # accumulate anonymous secrets.
 _S3_SECRET_NAME = "benchbox_ducklake_s3"
 
+_REDACTED = "****"
+
+# Backstop for credential material we did NOT emit verbatim: a driver error can
+# echo the libpq connstring back in a re-encoded form (extra quoting layers,
+# normalized whitespace), so an exact-value replace alone is not sufficient.
+# Bounded by the NEXT libpq `keyword=` token rather than by whitespace, because
+# a quoted password may legally contain spaces and quotes; `password` is emitted
+# before `port` (see _build_postgres_connstring), so a trailing keyword is the
+# usual terminator and only a same-line tail is lost when it is not.
+_PASSWORD_COMPONENT_RE = re.compile(r"(password\s*=\s*).*?(?=\s+\w+\s*=|$)", flags=re.IGNORECASE | re.MULTILINE)
+# Matches the `SECRET '<value>'` clause of CREATE SECRET; the secret NAME is an
+# unquoted identifier, so only the quoted key material is caught here.
+_S3_SECRET_CLAUSE_RE = re.compile(r"(\bSECRET\s+)'(?:[^']|'')*'", flags=re.IGNORECASE)
+
+
+def _redact_secrets(message: str, *secrets: str | None) -> str:
+    """Strip credential material out of a DuckLake adapter error/log message.
+
+    Two layers, because neither alone is complete:
+
+    1. Exact replacement of every secret value we hold, in each encoding this
+       adapter can emit it in - raw, libpq-quoted, and libpq-quoted-then-SQL-
+       escaped (the form that reaches DuckDB inside the ATTACH literal).
+    2. Pattern redaction of `password=...` / `SECRET '...'` for anything the
+       driver re-encoded on its way back out.
+    """
+    redacted: str = message
+    encodings: set[str] = set()
+    for secret in secrets:
+        if not secret:
+            continue
+        quoted = _libpq_quote_value(secret)
+        encodings.update({secret, quoted, escape_sql_string_literal(quoted), escape_sql_string_literal(secret)})
+    # Longest first: a shorter encoding is often a substring of a longer one,
+    # and replacing it first would leave the remainder of the longer form intact.
+    longest_first: list[str] = sorted(encodings, key=len, reverse=True)
+    for encoding in longest_first:
+        redacted = redacted.replace(encoding, _REDACTED)
+    redacted = _PASSWORD_COMPONENT_RE.sub(rf"\1{_REDACTED}", redacted)
+    return _S3_SECRET_CLAUSE_RE.sub(rf"\1{_REDACTED}", redacted)
+
 
 def _libpq_quote_value(value: str) -> str:
     """Quote/escape one libpq ``keyword=value`` component for a connection string.
@@ -688,7 +729,15 @@ class DuckLakeAdapter(DuckDBAdapter):
                         "Failed to create the DuckDB S3 secret for DuckLake DATA_PATH "
                         f"(provider={'explicit key/secret' if using_explicit_creds else 'credential_chain'}). "
                         f"Underlying error type: {type(secret_exc).__name__}."
-                        + ("" if using_explicit_creds else f" Underlying error: {secret_exc}")
+                        + (
+                            ""
+                            if using_explicit_creds
+                            # credential_chain mode holds no explicit key material,
+                            # but the error text still passes through the redactor
+                            # so ambient credentials echoed by httpfs cannot ride
+                            # out on this branch either.
+                            else f" Underlying error: {_redact_secrets(str(secret_exc))}"
+                        )
                     ) from None
 
             attach_target = self._build_catalog_attach_target()
@@ -700,13 +749,22 @@ class DuckLakeAdapter(DuckDBAdapter):
                 setup_conn.close()
             except Exception:
                 logger.debug("Failed to close base connection after DuckLake ATTACH failure", exc_info=True)
+            # A failed postgres ATTACH echoes the whole libpq connstring -
+            # password included - back through the driver error, so the
+            # underlying message is redacted before it is composed in. The
+            # chained cause carries the same unredacted text into any traceback,
+            # so it is suppressed whenever this adapter holds secret material;
+            # runs without credentials (duckdb/sqlite catalogs, credential_chain
+            # S3) keep the full chain for debuggability.
+            holds_secret_material = bool(self.pg_password or self.s3_secret or self.s3_key_id)
+            underlying = _redact_secrets(str(e), self.pg_password, self.s3_secret, self.s3_key_id)
             raise RuntimeError(
                 "Failed to initialize the DuckLake catalog (INSTALL/LOAD/ATTACH "
                 f"'ducklake' extension, catalog={self.catalog}). DuckLake requires "
                 f"DuckDB >= 1.3; detected DuckDB version: {live_version or 'unknown'}. "
                 f"metadata_path={self.metadata_path if self.catalog != 'postgres' else '(postgres catalog - N/A)'}, "
-                f"data_path={self.data_path}. Underlying error: {e}"
-            ) from e
+                f"data_path={self.data_path}. Underlying error: {underlying}"
+            ) from (None if holds_secret_material else e)
 
         # Wrap so that framework seams calling connection.cursor() (e.g.
         # phase_tracking._validate_data_integrity's accessibility probe) get a

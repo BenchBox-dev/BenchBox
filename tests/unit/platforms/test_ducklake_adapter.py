@@ -17,6 +17,7 @@ from benchbox.platforms.ducklake import (
     _duckdb_version_supports_ducklake,
     _libpq_quote_value,
     _parse_duckdb_major_minor,
+    _redact_secrets,
 )
 
 pytestmark = [
@@ -468,6 +469,183 @@ class TestDuckLakePostgresAttachInjection:
         # Outer SQL layer only doubles single quotes; balance still holds.
         assert literal.startswith("'") and literal.endswith("'")
         assert "'" not in literal[1:-1].replace("''", "")
+
+
+class TestDuckLakeCredentialRedaction:
+    """Regression: no credential material may reach a DuckLake ATTACH-failure.
+
+    The postgres catalog embeds the libpq connstring (password included) in the
+    ATTACH literal, so a driver error that echoes the failing statement carries
+    the password with it. These tests pin the redaction at both egress points:
+    the raised message AND the chained ``__cause__`` a traceback would print.
+    """
+
+    SENTINEL = "s3nt1nel-pg-passw0rd"
+
+    def _failing_adapter(self, tmp_path, monkeypatch, error_message, **kwargs):
+        """Adapter whose ATTACH fails with ``error_message`` (no live DuckDB).
+
+        Mirrors test_cloud_data_path_skips_local_mkdir_on_connect's stub: the
+        base DuckDBAdapter.create_connection() is replaced so the fast lane
+        stays hermetic, and the stub raises on ATTACH the way a real postgres
+        connection failure does - by quoting the statement back at us.
+        """
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=kwargs.pop("data_path", str(tmp_path / "data")),
+            **kwargs,
+        )
+
+        class _StubSetupConn:
+            def execute(self, sql):
+                if sql.startswith("ATTACH"):
+                    raise RuntimeError(error_message(sql))
+                return self
+
+            def close(self):
+                pass
+
+        monkeypatch.setattr(DuckDBAdapter, "create_connection", lambda self, **_: _StubSetupConn())
+        return adapter
+
+    @pytest.mark.parametrize(
+        "password",
+        [
+            "s3nt1nel-pg-passw0rd",
+            # Quoting-sensitive shapes: these reach DuckDB libpq-quoted and then
+            # SQL-escaped, so an exact-value replace of the raw form alone would
+            # miss them.
+            "pass word with spaces",
+            "pass'word",
+            "a\\b'c",
+        ],
+    )
+    def test_postgres_attach_failure_never_leaks_the_password(self, tmp_path, monkeypatch, password):
+        # The driver echoes the failing statement - the classic leak path.
+        adapter = self._failing_adapter(
+            tmp_path,
+            monkeypatch,
+            lambda sql: f"Connection Error: could not connect: {sql} port=5432: FATAL: password authentication failed",
+            catalog="postgres",
+            pg_database="benchdb",
+            pg_user="alice",
+            pg_password=password,
+        )
+
+        with pytest.raises(RuntimeError) as excinfo:
+            adapter.create_connection()
+
+        message = str(excinfo.value)
+        assert password not in message
+        # Every encoding this adapter can emit the password in is gone too.
+        libpq_quoted = _libpq_quote_value(password)
+        assert libpq_quoted not in message
+        assert escape_sql_string_literal(libpq_quoted) not in message
+        # The chained cause would re-print the unredacted driver text in a
+        # traceback, so it must be suppressed for a credential-bearing run.
+        assert excinfo.value.__cause__ is None
+        # Redacted, not merely truncated: the useful context survives.
+        assert "Failed to initialize the DuckLake catalog" in message
+        assert "catalog=postgres" in message
+
+    def test_postgres_attach_failure_keeps_non_secret_context(self, tmp_path, monkeypatch):
+        adapter = self._failing_adapter(
+            tmp_path,
+            monkeypatch,
+            lambda sql: "Connection Error: connection to server at 'db.example.com' failed: refused",
+            catalog="postgres",
+            pg_database="benchdb",
+            pg_user="alice",
+            pg_password=self.SENTINEL,
+        )
+
+        with pytest.raises(RuntimeError) as excinfo:
+            adapter.create_connection()
+
+        message = str(excinfo.value)
+        assert self.SENTINEL not in message
+        # A driver error carrying no credential material is passed through
+        # intact - redaction must not swallow the diagnosis.
+        assert "connection to server at 'db.example.com' failed: refused" in message
+
+    def test_non_postgres_attach_failure_keeps_paths_and_cause(self, tmp_path, monkeypatch):
+        # Must-preserve: duckdb/sqlite catalogs hold no credentials, so they
+        # keep both the metadata_path/data_path context and the chained cause.
+        adapter = self._failing_adapter(
+            tmp_path,
+            monkeypatch,
+            lambda sql: "IO Error: catalog file is locked",
+        )
+
+        with pytest.raises(RuntimeError) as excinfo:
+            adapter.create_connection()
+
+        message = str(excinfo.value)
+        assert "catalog.ducklake" in message
+        assert str(tmp_path / "data") in message
+        assert "IO Error: catalog file is locked" in message
+        assert isinstance(excinfo.value.__cause__, RuntimeError)
+
+    def test_s3_secret_never_leaks_through_attach_failure(self, tmp_path, monkeypatch):
+        # w3 sweep: explicit S3 key material takes the same egress path.
+        adapter = self._failing_adapter(
+            tmp_path,
+            monkeypatch,
+            lambda sql: "IO Error: HTTP 403 using SECRET 'top-s3cret-key' for bucket",
+            data_path="s3://my-bucket/bench/",
+            s3_key_id="AKIAEXAMPLE",
+            s3_secret="top-s3cret-key",
+        )
+
+        with pytest.raises(RuntimeError) as excinfo:
+            adapter.create_connection()
+
+        message = str(excinfo.value)
+        assert "top-s3cret-key" not in message
+        assert "AKIAEXAMPLE" not in message
+        assert excinfo.value.__cause__ is None
+
+
+class TestRedactSecretsHelper:
+    """Unit coverage for the redaction primitive itself (w1/w3)."""
+
+    def test_redacts_every_encoding_of_a_supplied_secret(self):
+        secret = "pass word'x"
+        quoted = _libpq_quote_value(secret)
+        message = f"raw={secret} quoted={quoted} sql={escape_sql_string_literal(quoted)}"
+        redacted = _redact_secrets(message, secret)
+        assert secret not in redacted
+        assert quoted not in redacted
+
+    def test_redacts_password_component_without_knowing_the_value(self):
+        # Backstop layer: the driver re-encoded the value, so no exact match
+        # is available - the `password=` component is still cut out, and the
+        # following libpq keyword bounds the redaction.
+        message = "dbname=benchdb host=db user=alice password=hunter2 port=5432: FATAL"
+        redacted = _redact_secrets(message)
+        assert "hunter2" not in redacted
+        assert "port=5432" in redacted
+        assert "dbname=benchdb" in redacted
+
+    def test_redacts_quoted_password_containing_spaces(self):
+        message = "dbname=benchdb password='hunter 2 with spaces' port=5432"
+        redacted = _redact_secrets(message)
+        assert "hunter" not in redacted
+        assert "port=5432" in redacted
+
+    def test_redacts_secret_clause(self):
+        message = "CREATE OR REPLACE SECRET benchbox_ducklake_s3 (TYPE s3, KEY_ID 'AKIA', SECRET 'topsecret')"
+        redacted = _redact_secrets(message)
+        assert "topsecret" not in redacted
+        # The secret NAME is an unquoted identifier and is not credential
+        # material - it stays, so the message still says what failed.
+        assert "benchbox_ducklake_s3" in redacted
+
+    def test_leaves_credential_free_messages_untouched(self):
+        message = "IO Error: catalog file is locked"
+        assert _redact_secrets(message, None) == message
 
 
 class TestDuckLakeFromConfigCatalogOptions:
