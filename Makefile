@@ -937,9 +937,14 @@ security-audit:
 	@echo "✅ Security audit passed"
 
 # Spellcheck - exact match for docs.yml spellcheck job
+# node_modules is gitignored and only exists once someone runs the
+# results-explorer npm install, so leaving it unskipped made this gate pass in
+# CI (which never installs it) and fail locally on vendored typos - inverting
+# what a preflight is for. Keep any future vendored/generated tree out the same
+# way; do NOT skip a directory that holds tracked content.
 spellcheck:
 	@echo "Running spellcheck..."
-	uvx codespell --ignore-words=.codespell-ignore.txt --skip="*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv"
+	uvx codespell --ignore-words=.codespell-ignore.txt --skip="*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv,node_modules"
 	@echo "✅ Spellcheck passed"
 
 # Linkcheck - exact match for docs.yml linkcheck job
