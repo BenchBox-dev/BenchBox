@@ -13,11 +13,14 @@ DDL text.
 
 ClickHouse applies ``ORDER BY`` / ``PARTITION BY`` at ``CREATE TABLE`` time in
 the schema phase, which is not wrapped by the tuning recording connection. A
-*tuned* sort key is therefore folded into the applied ledger explicitly by
-``create_schema`` (``_record_tuned_sort_key_op`` records the executed
-``CREATE TABLE ... ORDER BY (cols)`` as a ``PHASE_DDL`` statement), so this
+*tuned* ``CREATE TABLE`` is therefore recorded into the applied ledger
+explicitly by ``create_schema`` (``_record_tuned_sort_key_op`` records the
+executed statement as a ``PHASE_DDL`` statement at execute time), so this
 introspector's ``sorting_key`` read can corroborate that recorded intent and
-earn ``applied_verified``. The *engine-mandatory baseline* ``ORDER BY``
+earn ``applied_verified``. When the tuned DDL also rendered a ``PARTITION BY``,
+the ``partition_key`` read must corroborate too -- both clauses are classified
+independently, so an unapplied partition key keeps the run unverified. The
+*engine-mandatory baseline* ``ORDER BY``
 (primary-key derived or ``tuple()``) is not tuning and is deliberately NOT
 recorded -- a MergeTree table's ``sorting_key`` is always present, so
 corroborating it against nothing would be an unearned upgrade. The ledger's

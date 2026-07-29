@@ -259,3 +259,91 @@ class TestPayloadAndProtocol:
                 return IntrospectedState(platform="x")
 
         assert isinstance(_Impl(), Introspector)
+
+
+class TestMultiClauseCreateTable:
+    """A CREATE TABLE can apply two key layouts at once (ClickHouse MergeTree).
+    Each clause is classified independently, so each must corroborate on its
+    own -- corroborating the first while ignoring the second would let a run
+    reach applied_verified with a key that never applied (#1275 review).
+    """
+
+    _DDL = "CREATE TABLE lineitem (a Int64) ENGINE = MergeTree() PARTITION BY (toYYYYMM(d)) ORDER BY (a, b)"
+
+    def _ledger(self) -> AppliedTuningLedger:
+        ledger = AppliedTuningLedger()
+        ledger.record(self._DDL, PHASE_DDL, table="lineitem")
+        return ledger
+
+    def _state(self, *, sort_cols=("a", "b"), partition_cols=("toyyyymm(d)",)) -> IntrospectedState:
+        objects = []
+        if sort_cols:
+            objects.append(IntrospectedObject(kind=KIND_SORT_KEY, table="lineitem", columns=sort_cols))
+        if partition_cols:
+            objects.append(IntrospectedObject(kind=KIND_PARTITION_KEY, table="lineitem", columns=partition_cols))
+        return IntrospectedState(platform="clickhouse", objects=objects)
+
+    def test_both_clauses_yield_separate_entries(self):
+        receipt = corroborate(self._ledger(), self._state())
+        kinds = [e.kind for e in receipt.entries]
+        assert kinds == [KIND_SORT_KEY, KIND_PARTITION_KEY]
+        assert receipt.summary["verifiable_total"] == 2
+        assert receipt.corroborated is True
+
+    def test_uncorroborated_partition_blocks_upgrade(self):
+        receipt = corroborate(self._ledger(), self._state(partition_cols=("wrong",)))
+        assert receipt.corroborated is False
+        verdicts = {e.kind: e.verdict for e in receipt.entries}
+        assert verdicts[KIND_SORT_KEY] == CORROBORATED
+        assert verdicts[KIND_PARTITION_KEY] == MISMATCH
+
+    def test_absent_partition_blocks_upgrade(self):
+        receipt = corroborate(self._ledger(), self._state(partition_cols=()))
+        assert receipt.corroborated is False
+        assert {e.kind: e.verdict for e in receipt.entries}[KIND_PARTITION_KEY] == ABSENT
+
+    def test_expression_clause_keeps_its_closing_paren(self):
+        receipt = corroborate(self._ledger(), self._state())
+        partition = next(e for e in receipt.entries if e.kind == KIND_PARTITION_KEY)
+        assert partition.expected_columns == ("toyyyymm(d)",)
+
+    def test_degraded_state_marks_every_clause_unverifiable(self):
+        degraded = IntrospectedState(platform="clickhouse", error="catalog read failed")
+        receipt = corroborate(self._ledger(), degraded)
+        assert receipt.corroborated is False
+        assert [e.verdict for e in receipt.entries] == [UNVERIFIABLE, UNVERIFIABLE]
+
+
+class TestUnparsableKeyClauseFailsClosed:
+    """A key clause we can see but cannot parse must block the upgrade, never
+    silently vanish while a sibling clause corroborates.
+    """
+
+    def _corroborate(self, ddl: str) -> object:
+        ledger = AppliedTuningLedger()
+        ledger.record(ddl, PHASE_DDL, table="t")
+        state = IntrospectedState(
+            platform="clickhouse",
+            objects=[
+                IntrospectedObject(kind=KIND_SORT_KEY, table="t", columns=("a",)),
+                IntrospectedObject(kind=KIND_PARTITION_KEY, table="t", columns=("d",)),
+            ],
+        )
+        return corroborate(ledger, state)
+
+    def test_unparenthesized_partition_clause_blocks(self):
+        receipt = self._corroborate("CREATE TABLE t (a Int64) PARTITION BY toYYYYMM(d) ORDER BY (a)")
+        assert receipt.corroborated is False
+        assert [e.verdict for e in receipt.entries] == [UNVERIFIABLE]
+
+    def test_double_nested_expression_blocks(self):
+        receipt = self._corroborate("CREATE TABLE t (a Int64) PARTITION BY (toYYYYMM(toDate(d))) ORDER BY (a)")
+        assert receipt.corroborated is False
+        assert [e.verdict for e in receipt.entries] == [UNVERIFIABLE]
+
+    def test_order_by_tuple_is_an_explicit_no_sort_key_not_a_dropped_clause(self):
+        # MergeTree's "no sort key" form carries no columns to corroborate; the
+        # tuned PARTITION BY alongside it must still be checked.
+        receipt = self._corroborate("CREATE TABLE t (a Int64) PARTITION BY (d) ORDER BY tuple()")
+        assert [e.kind for e in receipt.entries] == [KIND_PARTITION_KEY]
+        assert receipt.corroborated is True

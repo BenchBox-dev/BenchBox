@@ -228,8 +228,20 @@ _CREATE_INDEX_RE = re.compile(
     r"(?P<name>[^\s(]+)\s+on\s+(?P<table>[^\s(]+)\s*\((?P<cols>[^)]*)\)",
     re.IGNORECASE | re.DOTALL,
 )
-_ORDER_BY_RE = re.compile(r"\border\s+by\s*\((?P<cols>[^)]*)\)", re.IGNORECASE | re.DOTALL)
-_PARTITION_BY_RE = re.compile(r"\bpartition\s+by\s*\((?P<cols>[^)]*)\)", re.IGNORECASE | re.DOTALL)
+# Key clauses may hold function expressions -- ClickHouse renders a date
+# partition as ``PARTITION BY (toYYYYMM(l_shipdate))``. Allow one level of
+# nested parens so the captured list is not truncated at the inner ``)``,
+# which would make every expression key mismatch its own catalog fact.
+_KEY_CLAUSE_COLUMNS = r"(?P<cols>(?:[^()]|\([^()]*\))*)"
+_ORDER_BY_RE = re.compile(rf"\border\s+by\s*\({_KEY_CLAUSE_COLUMNS}\)", re.IGNORECASE | re.DOTALL)
+_PARTITION_BY_RE = re.compile(rf"\bpartition\s+by\s*\({_KEY_CLAUSE_COLUMNS}\)", re.IGNORECASE | re.DOTALL)
+# Bare keyword probes: used to fail closed when a key clause is visibly present
+# but its column list did not parse (see _classify).
+_ORDER_BY_KEYWORD_RE = re.compile(r"\border\s+by\b", re.IGNORECASE)
+_PARTITION_BY_KEYWORD_RE = re.compile(r"\bpartition\s+by\b", re.IGNORECASE)
+# ``ORDER BY tuple()`` is MergeTree's explicit "no sort key" form, not an
+# unparsed clause -- it carries no columns to corroborate.
+_ORDER_BY_NOOP_RE = re.compile(r"\border\s+by\s+tuple\s*\(\s*\)", re.IGNORECASE)
 _CREATE_TABLE_RE = re.compile(
     r"^\s*create\s+(?:or\s+replace\s+)?table\s+(?:if\s+not\s+exists\s+)?(?P<table>[^\s(]+)",
     re.IGNORECASE,
@@ -308,51 +320,65 @@ def ledger_tables(ledger: AppliedTuningLedger) -> set[str]:
     return tables
 
 
-def _classify(statement: AppliedStatement) -> tuple[str, _Intent | None]:
-    """Classify one executed statement into a verdict-class and optional intent.
+def _classify(statement: AppliedStatement) -> tuple[str, list[_Intent]]:
+    """Classify one executed statement into a verdict-class and its intents.
 
-    Returns ``(class, intent)`` where ``class`` is one of ``"verifiable"``,
+    Returns ``(class, intents)`` where ``class`` is one of ``"verifiable"``,
     ``TRANSIENT``, ``MAINTENANCE`` or ``UNVERIFIABLE``. Session-phase statements
     and SET/PRAGMA are transient; OPTIMIZE/VACUUM are maintenance; a recognized
     ddl-shape (CREATE INDEX / CREATE TABLE ORDER BY|PARTITION BY) yields a
     verifiable intent; anything else in a ddl/post_load phase is unverifiable
     (blocks the upgrade -- we do not guess an unknown statement into verified).
+
+    A ``CREATE TABLE`` carrying BOTH an ``ORDER BY`` and a ``PARTITION BY``
+    yields one intent per clause, so each must corroborate independently. One
+    statement can physically apply two distinct key layouts (ClickHouse
+    MergeTree does exactly this), and corroborating only the first would let a
+    run reach ``applied_verified`` while the other key silently never applied.
     """
     text = str(statement.statement or "").strip()
     lowered = text.lower()
 
     if statement.phase == PHASE_SESSION or lowered.startswith(_TRANSIENT_PREFIXES):
-        return TRANSIENT, None
+        return TRANSIENT, []
     if lowered.startswith(_MAINTENANCE_PREFIXES):
-        return MAINTENANCE, None
+        return MAINTENANCE, []
 
     m = _CREATE_INDEX_RE.match(text)
     if m:
-        return "verifiable", _Intent(
-            kind=KIND_INDEX,
-            table=normalize_identifier(m.group("table")),
-            columns=normalize_columns(m.group("cols")),
-            name=normalize_identifier(m.group("name")),
-        )
+        return "verifiable", [
+            _Intent(
+                kind=KIND_INDEX,
+                table=normalize_identifier(m.group("table")),
+                columns=normalize_columns(m.group("cols")),
+                name=normalize_identifier(m.group("name")),
+            )
+        ]
 
     ct = _CREATE_TABLE_RE.match(text)
     if ct:
         table = normalize_identifier(ct.group("table"))
+        intents: list[_Intent] = []
         order = _ORDER_BY_RE.search(text)
         if order:
-            return "verifiable", _Intent(
-                kind=KIND_SORT_KEY, table=table, columns=normalize_columns(order.group("cols"))
-            )
+            intents.append(_Intent(kind=KIND_SORT_KEY, table=table, columns=normalize_columns(order.group("cols"))))
         part = _PARTITION_BY_RE.search(text)
         if part:
-            return "verifiable", _Intent(
-                kind=KIND_PARTITION_KEY, table=table, columns=normalize_columns(part.group("cols"))
-            )
+            intents.append(_Intent(kind=KIND_PARTITION_KEY, table=table, columns=normalize_columns(part.group("cols"))))
+        # Fail closed: a key clause we can SEE but could not parse must block the
+        # upgrade rather than silently vanish while a sibling clause corroborates.
+        # Dropping it would recreate exactly the hole this classifier closes.
+        if order is None and _ORDER_BY_KEYWORD_RE.search(text) and not _ORDER_BY_NOOP_RE.search(text):
+            return UNVERIFIABLE, []
+        if part is None and _PARTITION_BY_KEYWORD_RE.search(text):
+            return UNVERIFIABLE, []
+        if intents:
+            return "verifiable", intents
         # A plain CREATE TABLE with no recognized key clause is not a tuning
         # footprint we can corroborate -> unverifiable (conservative).
-        return UNVERIFIABLE, None
+        return UNVERIFIABLE, []
 
-    return UNVERIFIABLE, None
+    return UNVERIFIABLE, []
 
 
 # ---------------------------------------------------------------------------
@@ -413,7 +439,7 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
 
     entries: list[ReceiptEntry] = []
     for stmt in ledger.executed_statements:
-        klass, intent = _classify(stmt)
+        klass, intents = _classify(stmt)
 
         if klass == TRANSIENT:
             entries.append(
@@ -436,7 +462,7 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
                 )
             )
             continue
-        if klass == UNVERIFIABLE or intent is None:
+        if klass == UNVERIFIABLE or not intents:
             entries.append(
                 ReceiptEntry(
                     statement=stmt.statement,
@@ -448,41 +474,44 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
             )
             continue
 
-        # Verifiable intent. If introspection degraded we cannot confirm it.
-        if state_error is not None or introspected_state is None:
-            entries.append(
-                ReceiptEntry(
-                    statement=stmt.statement,
-                    phase=stmt.phase,
-                    verdict=UNVERIFIABLE,
-                    kind=intent.kind,
-                    table=intent.table,
-                    name=intent.name,
-                    expected_columns=intent.columns,
-                    reason=f"introspection degraded: {state_error}",
+        # One entry per verifiable intent: a statement that applies two key
+        # layouts must have BOTH corroborated to count toward the upgrade.
+        for intent in intents:
+            # If introspection degraded we cannot confirm the intent.
+            if state_error is not None or introspected_state is None:
+                entries.append(
+                    ReceiptEntry(
+                        statement=stmt.statement,
+                        phase=stmt.phase,
+                        verdict=UNVERIFIABLE,
+                        kind=intent.kind,
+                        table=intent.table,
+                        name=intent.name,
+                        expected_columns=intent.columns,
+                        reason=f"introspection degraded: {state_error}",
+                    )
                 )
-            )
-            continue
+                continue
 
-        verdict, fact = _match_object(intent, introspected_state)
-        entry = ReceiptEntry(
-            statement=stmt.statement,
-            phase=stmt.phase,
-            verdict=verdict,
-            kind=intent.kind,
-            table=intent.table,
-            name=intent.name,
-            expected_columns=intent.columns,
-        )
-        if fact is not None:
-            entry.observed_columns = fact.columns
-            entry.evidence = dict(fact.evidence) if fact.evidence else None
-        if verdict == MISMATCH:
-            observed = fact.columns if fact is not None else ()
-            entry.diff = _short_diff(intent.columns, observed)
-        elif verdict == ABSENT:
-            entry.reason = f"no {intent.kind} on {intent.table} found in catalog"
-        entries.append(entry)
+            verdict, fact = _match_object(intent, introspected_state)
+            entry = ReceiptEntry(
+                statement=stmt.statement,
+                phase=stmt.phase,
+                verdict=verdict,
+                kind=intent.kind,
+                table=intent.table,
+                name=intent.name,
+                expected_columns=intent.columns,
+            )
+            if fact is not None:
+                entry.observed_columns = fact.columns
+                entry.evidence = dict(fact.evidence) if fact.evidence else None
+            if verdict == MISMATCH:
+                observed = fact.columns if fact is not None else ()
+                entry.diff = _short_diff(intent.columns, observed)
+            elif verdict == ABSENT:
+                entry.reason = f"no {intent.kind} on {intent.table} found in catalog"
+            entries.append(entry)
 
     verifiable = [e for e in entries if e.verdict in _VERIFIABLE_VERDICTS]
     corroborated = bool(verifiable) and all(e.verdict == CORROBORATED for e in verifiable)

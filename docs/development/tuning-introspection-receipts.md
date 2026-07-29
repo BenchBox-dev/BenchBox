@@ -49,6 +49,12 @@ platform-agnostic; the per-platform catalog *reads* live in the
 | session-phase statement (any)                | session        | `transient`   | transient SET -- noted, **non-blocking** (documented default below)                | no                   |
 | anything else                                | ddl/post_load  | `unverifiable`| no corroboration rule -- **blocks** the upgrade (conservative: stay unverified)    | n/a (blocks)         |
 
+A `CREATE TABLE` carrying **both** an `ORDER BY` and a `PARTITION BY` (the
+ClickHouse MergeTree shape) classifies as both `sort_key` and `partition_key`
+and emits one receipt entry per clause, so each key must corroborate on its
+own. Corroborating only the first clause would let a run reach
+`applied_verified` while the other configured key never applied.
+
 **Verdicts** (per statement): `corroborated`, `absent` (expected object not
 in catalog), `mismatch` (object present, columns differ -- carries a short
 diff), plus the non-blocking notes `transient` / `maintenance` and the
@@ -102,16 +108,18 @@ catalog exists.
   ledger's tables. Returns `sort_key` / `partition_key` facts as receipt
   **evidence**.
 
-  Limitation (documented, follow-up): ClickHouse applies `ORDER BY` /
-  `PARTITION BY` at `CREATE TABLE` time in the *schema* phase, which is not
-  wrapped by the tuning recording connection, so those column-bearing DDLs
-  never enter the applied ledger. The ledger's ClickHouse tuning entries are
-  `OPTIMIZE TABLE` (maintenance, `non-blocking`) and session SETs. The
-  introspector therefore surfaces the physical keys as evidence but does
-  **not** mint `applied_verified` from a MergeTree table's always-present
-  `sorting_key` (that would be a trivially-true, unearned upgrade). Making
-  ClickHouse verification-eligible requires routing the schema `ORDER BY` /
-  `PARTITION BY` DDL through a recording connection -- out of scope here.
+  ClickHouse applies `ORDER BY` / `PARTITION BY` at `CREATE TABLE` time in the
+  *schema* phase, which is not wrapped by the tuning recording connection, so
+  `create_schema` records the executed statement onto the ledger itself
+  (`_record_tuned_sort_key_op`, at `connection.execute` time so the
+  order-sensitive `applied_ledger_hash` keeps true chronology). Only a table
+  carrying a *tuned* clause is recorded: a MergeTree table's `sorting_key` is
+  always present, so corroborating an untuned table's engine-mandatory
+  `ORDER BY` would be a trivially-true, unearned upgrade. A table tuned with a
+  partition key only is recorded too -- omitting it would leave an unapplied
+  partition uncorroborated while a sibling table's sort key carried the run to
+  `applied_verified`. The ledger's other ClickHouse entries stay
+  `OPTIMIZE TABLE` (maintenance, `non-blocking`) and session SETs.
 
 ## Wiring
 

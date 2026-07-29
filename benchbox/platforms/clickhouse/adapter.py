@@ -138,10 +138,11 @@ class ClickHouseAdapter(
         """Read ``system.tables`` keys to corroborate the applied ledger.
 
         Surfaces ClickHouse ``sorting_key`` / ``partition_key`` as receipt
-        evidence (see ``benchbox.platforms.clickhouse.introspection``). Note the
-        documented limitation: ClickHouse's key-bearing DDL runs at
-        ``CREATE TABLE`` time outside the tuning ledger, so this reports the
-        physical keys but does not, on its own, mint ``applied_verified``.
+        evidence (see ``benchbox.platforms.clickhouse.introspection``).
+        ClickHouse's key-bearing DDL runs at ``CREATE TABLE`` time outside the
+        recording connection, so ``create_schema`` records the tuned statement
+        onto the ledger itself; every tuned clause it carries must corroborate
+        here before the run reaches ``applied_verified``.
         """
         from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
 
