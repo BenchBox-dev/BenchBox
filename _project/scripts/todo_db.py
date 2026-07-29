@@ -2518,6 +2518,11 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("check-scope", help="git diff --name-only vs scope rules")
     p.add_argument("id")
     p.add_argument("--base", help="diff BASE...HEAD instead of the working tree")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit non-zero when the item has no scope rules (nothing was checked)",
+    )
 
     p = sub.add_parser("verify", help="list or run verification steps")
     p.add_argument("id")
@@ -2903,6 +2908,16 @@ def _cmd_stats(conn, actor, args):
 def _cmd_check_scope(conn, actor, args):
     item = get_item(conn, args.id)
     files = changed_files(args.base)
+
+    # An item with no scope rules has nothing to violate, so check_paths()
+    # returns clean and the command used to print "scope OK" -- announcing a
+    # passed check while performing none. Every item promoted before the
+    # guardrail flags existed has empty scope, so this reported OK on diffs it
+    # had never looked at. Say what actually happened instead.
+    if not item["scope"]:
+        print(f"SCOPE_UNCHECKED: no scope rules on {args.id!r}; {len(files)} changed file(s) were not checked")
+        return 1 if getattr(args, "strict", False) else 0
+
     violations = check_paths(files, item["scope"])
     for violation in violations:
         print(violation)
