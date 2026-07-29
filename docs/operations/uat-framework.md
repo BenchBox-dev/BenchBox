@@ -67,11 +67,13 @@ where a corpus sweep launched from a pool worktree with
 under the worktree-local `benchmark_runs/datagen/`.
 
 Since the default root became the work tree's sibling (`../benchmark_runs`),
-"outside the worktree" is the **ordinary** case, not only the configured one:
-a plain `benchbox run` with no `--output` and no `BENCHBOX_OUTPUT_DIR` is
-covered too. The guard steps aside only when the resolved root is *inside* the
-worktree, or when the run starts outside a Git work tree (where the historical
-cwd-anchored default applies and any growth is local by definition).
+"outside the worktree" is the **ordinary** case. The UAT runner and the
+`make uat-artifact-hygiene`/`make pr-preflight` gates audit that case; a plain
+`benchbox run` itself only resolves its output root and does not snapshot or
+fail on worktree-local growth. The guard steps aside only when the resolved
+root is *inside* the worktree, or when the run starts outside a Git work tree
+(where the historical cwd-anchored default applies and any growth is local by
+definition).
 
 The guardrails are **report-only** — they detect and name the offending paths
 but never delete or move artifacts.

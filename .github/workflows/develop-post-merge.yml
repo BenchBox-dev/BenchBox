@@ -227,7 +227,7 @@ jobs:
     # between (see the TODO description for the #1093/#1095/#1100 incident
     # this closes half of).
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 

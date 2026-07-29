@@ -42,7 +42,7 @@ JOB_IF_ALLOWED_CONTEXTS = frozenset({"github", "needs", "vars", "inputs"})
 # guard cannot trip over a function name or a bare identifier.
 JOB_IF_FORBIDDEN_CONTEXTS = frozenset({"matrix", "strategy", "env", "steps", "job", "runner", "secrets"})
 
-_CONTEXT_RE = re.compile(r"\b([a-z]+)\s*\.", re.ASCII)
+_CONTEXT_RE = re.compile(r"\b([a-z]+)\s*(?:\.|\[)", re.ASCII)
 
 
 def _workflow_files() -> list[Path]:
@@ -104,6 +104,7 @@ class TestGuardDetectsTheRegression:
         "expression",
         [
             "matrix.os == 'ubuntu-latest'",
+            "matrix['os'] == 'ubuntu-latest'",
             "env.SELECTED == 'true'",
             "steps.filter.outputs.skip != 'true'",
             "runner.os == 'Linux'",

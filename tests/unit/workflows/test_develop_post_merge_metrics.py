@@ -95,6 +95,15 @@ def test_lint_baseline_cache_writes_are_serialized() -> None:
     assert "cancel-in-progress: false" in workflow
 
 
+def test_medium_test_timeout_matches_the_pre_merge_lane() -> None:
+    pre_merge = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    post_merge = yaml.safe_load(
+        (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    )
+
+    assert pre_merge["jobs"]["medium-test"]["timeout-minutes"] == post_merge["jobs"]["medium-test"]["timeout-minutes"]
+
+
 def test_explorer_tokens_failure_counted_in_red_at() -> None:
     # Mirror of test_failed_post_merge_jobs_use_earliest_completion_timestamp
     # but with an `explorer-tokens` failure as the earliest. Locks in the

@@ -14,7 +14,7 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any, List, NamedTuple, Protocol, Union, runtime_checkable
+from typing import Any, Iterator, List, NamedTuple, Protocol, Union, runtime_checkable
 from urllib.parse import urlparse
 
 from benchbox.utils.dependencies import get_install_command, get_package_install_message
@@ -121,6 +121,10 @@ class DatabricksPath:
     def glob(self, pattern: str):
         """Glob for files matching pattern."""
         return self._path.glob(pattern)
+
+    def rglob(self, pattern: str) -> Iterator[Path]:
+        """Recursively glob files matching pattern in the local staging path."""
+        return self._path.rglob(pattern)
 
     @property
     def name(self) -> str:
@@ -247,6 +251,10 @@ class CloudStagingPath:
     def glob(self, pattern: str):
         """Glob for files matching pattern."""
         return self._path.glob(pattern)
+
+    def rglob(self, pattern: str) -> Iterator[Path]:
+        """Recursively glob files matching pattern in the local staging path."""
+        return self._path.rglob(pattern)
 
     @property
     def name(self) -> str:
