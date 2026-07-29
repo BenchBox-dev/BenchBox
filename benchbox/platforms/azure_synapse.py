@@ -95,9 +95,9 @@ class AzureSynapseAdapter(PlatformAdapter):
             # while rejecting the documented "azure://" form.
             if cloud_provider_family(staging_root) == "azure":
                 self.storage_account = (
-                    config.get("storage_account")
-                    or path_info.get("account")
+                    path_info.get("account")
                     or self._extract_storage_account(staging_root)
+                    or config.get("storage_account")
                 )
                 if not self.storage_account:
                     raise ValueError(

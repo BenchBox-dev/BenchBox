@@ -464,6 +464,7 @@ class TestSurfacingBanner:
         assert banner is not None
         assert "1 open finding(s)" in banner  # 'dismissed' is not 'open'
         assert "1 unsynced draft(s)" in banner  # README.md not counted
+        assert "todo finding list --disposition open" in banner
         assert "todo finding candidates" in banner
 
     def test_banner_open_findings_only(self, conn, tmp_path):
@@ -471,6 +472,8 @@ class TestSurfacingBanner:
         banner = todo_findings.surfacing_banner(conn, drafts_dir=tmp_path / "empty")
         assert "1 open finding(s)" in banner
         assert "draft" not in banner
+        assert "todo finding list --disposition open" in banner
+        assert "todo finding candidates" not in banner
 
     def test_banner_unsynced_drafts_only(self, conn, tmp_path):
         drafts = tmp_path / "drafts"
@@ -540,7 +543,7 @@ class TestSurfacingBanner:
         # The hint degrades to readable ASCII rather than vanishing or crashing.
         emitted = buffer.getvalue().decode("ascii")
         assert "open finding(s)" in emitted
-        assert "todo finding candidates" in emitted
+        assert "todo finding list --disposition open" in emitted
         assert "-> " in emitted  # transliterated, not "?"-replaced
         # ...and the degraded path still never touches stdout.
         assert "finding" not in capfd.readouterr().out
@@ -593,7 +596,7 @@ class TestSurfacingFlow:
         captured = capsys.readouterr()
         assert "ready-item" in captured.out
         assert "1 open finding(s)" in captured.err
-        assert "todo finding candidates" in captured.err
+        assert "todo finding list --disposition open" in captured.err
 
     def test_surfacing_flow_silent_when_nothing_untriaged(self, conn, capsys, tmp_path, monkeypatch):
         monkeypatch.setattr(todo_findings, "DEFAULT_DRAFTS_DIR", str(tmp_path / "no-drafts"))

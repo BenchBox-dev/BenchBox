@@ -114,7 +114,7 @@ jobs:
         run: |
           # Find new/modified bundle JSONs in this PR (exclude companions and metadata files).
           # Use the base SHA directly rather than a ref name for reliability.
-          CHANGED=$(git diff --name-only --diff-filter=ACMR ${{ github.event.pull_request.base.sha }}...HEAD -- 'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
+          CHANGED=$(git diff --no-renames --name-only --diff-filter=ACMR ${{ github.event.pull_request.base.sha }}...HEAD -- 'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
             | grep -v '\.plans\.json$' \
             | grep -v '\.tuning\.json$' \
             | grep -v '\.applied\.json$' \
@@ -132,7 +132,7 @@ jobs:
           # Include deletions (D): removing a manifest while leaving its paired
           # bundle is a contract change that must still trip validation and the
           # corpus inventory drift check, so a manifest removal cannot bypass it.
-          CHANGED_MANIFESTS=$(git diff --name-only --diff-filter=ACMRD \
+          CHANGED_MANIFESTS=$(git diff --no-renames --name-only --diff-filter=ACMRD \
             ${{ github.event.pull_request.base.sha }}...HEAD -- \
             'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
             | grep '\.manifest\.json$' \
@@ -157,7 +157,7 @@ jobs:
           # Derive the paired primary bundle so validate_submission.py checks the
           # edited companion hash against the manifest. Include deletions: a
           # removed companion is still a contract change while its bundle exists.
-          CHANGED_APPLIED=$(git diff --name-only --diff-filter=ACMRD \
+          CHANGED_APPLIED=$(git diff --no-renames --name-only --diff-filter=ACMRD \
             ${{ github.event.pull_request.base.sha }}...HEAD -- \
             'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
             | grep '\.applied\.json$' \

@@ -81,6 +81,7 @@ from benchbox.utils.verbosity import VerbositySettings
 
 logger = logging.getLogger(__name__)
 DATA_ORGANIZATION_ENV = "BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON"
+_GUIDED_CREDENTIAL_PLATFORMS = frozenset({"athena", "bigquery", "databricks", "motherduck", "redshift", "snowflake"})
 
 # Benchmark name aliases - maps common variations to canonical names
 BENCHMARK_ALIASES: dict[str, str] = {
@@ -2221,16 +2222,21 @@ def _interactive_cloud_setup_if_needed(s: types.SimpleNamespace) -> None:
     if not stages_remotely and not _run_requires_platform_credentials(s):
         return
 
-    credentials_ok = check_and_setup_platform_credentials(
-        platform=s.database_config.type,
-        console_obj=console,
-        interactive=not s.non_interactive,
-    )
+    if s.database_config.type.casefold() in _GUIDED_CREDENTIAL_PLATFORMS:
+        credentials_ok = check_and_setup_platform_credentials(
+            platform=s.database_config.type,
+            console_obj=console,
+            interactive=not s.non_interactive,
+        )
 
-    if not credentials_ok:
-        console.print(f"\n[red]❌ Cannot proceed without {s.database_config.type.upper()} credentials[/red]")
-        console.print(f"\n[dim]To configure later: benchbox setup --platform {s.database_config.type}[/dim]")
-        ctx.exit(1)
+        if not credentials_ok:
+            console.print(f"\n[red]❌ Cannot proceed without {s.database_config.type.upper()} credentials[/red]")
+            console.print(f"\n[dim]To configure later: benchbox setup --platform {s.database_config.type}[/dim]")
+            ctx.exit(1)
+    elif not stages_remotely:
+        # Server platforms validate credentials from their connection options;
+        # they do not have a CredentialManager setup flow.
+        return
 
     if not stages_remotely or s.output:
         return

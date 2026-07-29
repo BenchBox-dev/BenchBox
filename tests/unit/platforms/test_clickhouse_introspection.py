@@ -61,6 +61,12 @@ class TestClickHouseIntrospector:
         assert kinds[KIND_SORT_KEY].columns == ("l_orderkey", "l_linenumber")
         assert kinds[KIND_PARTITION_KEY].table == "lineitem"
 
+    def test_canonicalizes_tuple_valued_partition_key(self):
+        rows = [("lineitem", "l_orderkey", "tuple(region, shard)")]
+        state = ClickHouseTuningIntrospector().introspect(_FakeCHConnection(rows), _optimize_ledger())
+        partition = next(obj for obj in state.objects if obj.kind == KIND_PARTITION_KEY)
+        assert partition.columns == ("region", "shard")
+
     def test_query_uses_structured_catalog_not_show_create(self):
         conn = _FakeCHConnection([("lineitem", "l_orderkey", "")])
         ClickHouseTuningIntrospector().introspect(conn, _optimize_ledger())
