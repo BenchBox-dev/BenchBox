@@ -1,16 +1,16 @@
 {
   "version": 1,
-  "lockedAt": "2026-07-28T18:14:03.945Z",
+  "lockedAt": "2026-07-29T11:48:57.836Z",
   "skills": {
     "blog": {
       "source": {
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:51.941Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:46.755Z"
       },
       "installMode": "mirror",
       "files": {
@@ -61,10 +61,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:52.571Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:47.365Z"
       },
       "installMode": "mirror",
       "files": {
@@ -111,10 +111,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:53.239Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:48.044Z"
       },
       "installMode": "mirror",
       "files": {
@@ -157,10 +157,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:54.536Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:49.301Z"
       },
       "installMode": "mirror",
       "files": {
@@ -187,10 +187,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:55.812Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:50.607Z"
       },
       "installMode": "mirror",
       "files": {
@@ -245,10 +245,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:56.680Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:51.234Z"
       },
       "installMode": "mirror",
       "files": {
@@ -267,10 +267,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:57.338Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:51.835Z"
       },
       "installMode": "mirror",
       "files": {
@@ -289,10 +289,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:57.990Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:52.442Z"
       },
       "installMode": "mirror",
       "files": {
@@ -311,10 +311,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:58.651Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:53.032Z"
       },
       "installMode": "mirror",
       "files": {
@@ -333,10 +333,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:59.328Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:53.616Z"
       },
       "installMode": "mirror",
       "files": {
@@ -355,10 +355,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:14:03.208Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:57.115Z"
       },
       "installMode": "mirror",
       "files": {
@@ -389,10 +389,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:59.955Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:54.194Z"
       },
       "installMode": "mirror",
       "files": {
@@ -411,10 +411,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:14:00.598Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:54.765Z"
       },
       "installMode": "mirror",
       "files": {
@@ -433,10 +433,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:14:01.248Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:55.360Z"
       },
       "installMode": "mirror",
       "files": {
@@ -455,10 +455,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:14:02.542Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:56.549Z"
       },
       "installMode": "mirror",
       "files": {
@@ -481,10 +481,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:14:03.870Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:57.698Z"
       },
       "installMode": "mirror",
       "files": {
@@ -503,10 +503,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:14:01.893Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:55.952Z"
       },
       "installMode": "mirror",
       "files": {
@@ -525,10 +525,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:55.164Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:50.011Z"
       },
       "installMode": "mirror",
       "files": {
@@ -567,10 +567,10 @@
         "type": "git",
         "name": "canonical",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "b98bf27413ee122f47c515d4d685965ce5df7df7",
+        "ref": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
         "subdir": "skills",
-        "revision": "b98bf27413ee122f47c515d4d685965ce5df7df7",
-        "fetchedAt": "2026-07-28T18:13:53.902Z"
+        "revision": "a48d0c02884f032b075f5968ab23e1261cf23dbc",
+        "fetchedAt": "2026-07-29T11:48:48.712Z"
       },
       "installMode": "mirror",
       "files": {
