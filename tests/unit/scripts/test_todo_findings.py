@@ -509,6 +509,25 @@ class TestSurfacingBanner:
         assert "SENTINEL-banner" not in captured.out
         assert "SENTINEL-banner" in captured.err
 
+    def test_banner_survives_ascii_only_stderr(self, conn, monkeypatch, capfd):
+        # The banner carries non-ASCII (→ / —). On a byte-oriented stderr (C
+        # locale, or a POSIX pipe under LC_ALL=C) the *write* raises
+        # UnicodeEncodeError -- which must not escape and break `ready`.
+        import io
+
+        _mk_item(conn, item_id="ready-item")
+        _mk_finding(conn)
+        monkeypatch.setattr(todo_findings, "DEFAULT_DRAFTS_DIR", "/nonexistent-drafts")
+        buffer = io.BytesIO()
+        ascii_stderr = io.TextIOWrapper(buffer, encoding="ascii", errors="strict")
+        monkeypatch.setattr(todo_db.sys, "stderr", ascii_stderr)
+        assert todo_db._cmd_ready(conn, "tester", SimpleNamespace()) == 0
+        ascii_stderr.flush()
+        # The hint degrades to ASCII rather than vanishing or crashing.
+        emitted = buffer.getvalue().decode("ascii")
+        assert "open finding(s)" in emitted
+        assert "todo finding candidates" in emitted
+
     def test_banner_never_breaks_ready_when_hint_fails(self, conn, capsys, monkeypatch):
         # A hint must never break the core command: a failing banner is swallowed
         # AFTER the stdout contract is met, ready still returns 0.

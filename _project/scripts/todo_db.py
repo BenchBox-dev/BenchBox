@@ -2893,14 +2893,24 @@ def _cmd_list(conn, actor, args):
 
 def _emit_findings_banner(conn) -> None:
     """Print the untriaged-findings hint to stderr, never stdout. Best-effort: a
-    hint must never break ``ready``/``stats`` core output, so any failure here
-    (e.g. a transient read error) is swallowed after the stdout contract is met."""
+    hint must never break ``ready``/``stats`` core output, so any failure here is
+    swallowed after the stdout contract is met.
+
+    The *print* is inside the guard too, not just the query: the banner carries
+    non-ASCII (``→``/``—``), so a byte-oriented stderr (C locale, or a POSIX pipe
+    under LC_ALL=C) raises UnicodeEncodeError on write. Degrade to an ASCII
+    transliteration before giving up, so the hint survives such a stream instead
+    of vanishing."""
     try:
         banner = todo_findings.surfacing_banner(conn)
+        if not banner:
+            return
+        try:
+            print(banner, file=sys.stderr)
+        except UnicodeEncodeError:
+            print(banner.encode("ascii", "replace").decode("ascii"), file=sys.stderr)
     except Exception:
         return
-    if banner:
-        print(banner, file=sys.stderr)
 
 
 def _cmd_ready(conn, actor, args):
