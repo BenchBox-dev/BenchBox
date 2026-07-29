@@ -12,6 +12,17 @@ import pytest
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.fast,
+    pytest.mark.skipif(
+        os.name == "nt",
+        reason=(
+            "POSIX-only by construction. The test shims `git` with an extensionless "
+            "`#!/bin/sh` script placed first on PATH, but Windows resolves `git.exe`/`git.cmd` "
+            "and never runs an extensionless file, so the shim is bypassed; it then drives the "
+            "recipe's INT trap with `kill -INT $PPID`, which has no Windows equivalent. On the "
+            "2026-07-29 nightly this surfaced as `assert 0 != 0` — the real git ran, the claim "
+            "succeeded cleanly, and there was no interrupt to trap."
+        ),
+    ),
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
