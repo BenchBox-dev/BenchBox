@@ -52,7 +52,11 @@ def _declared_standalone_only() -> set[str]:
 def _unknown_commands(text: str, declared: set[str]) -> set[str]:
     """Referenced `todo <cmd>` forms that are neither wrapper handlers nor declared."""
     referenced = set(re.findall(r"`todo ([a-z][a-z-]*)", text))
-    return referenced - set(todo_db._HANDLERS) - declared
+    # `finding` is a real top-level command dispatched via _dispatch's special
+    # branch (not _HANDLERS) to keep the todo_db<->todo_findings import cycle
+    # load-order-independent -- see _dispatch's comment.
+    real = set(todo_db._HANDLERS) | {"finding"}
+    return referenced - real - declared
 
 
 def _load_script():

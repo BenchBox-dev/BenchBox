@@ -15,6 +15,7 @@ sibling ``test_todo_db*`` suites, so it stays out of the fast-lane budget.
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -170,8 +171,15 @@ class TestFindingsNonClaimable:
         _mk_finding(conn)
         _mk_finding(conn, finding_id="2026-01-02-030406-another-class")
         after = todo_db.stats(conn)
-        # Adding findings must not move any items-domain count.
-        assert after == before
+        # Adding findings must not move ANY items-domain count. Compare every key
+        # except the additive findings one (rather than a hardcoded allowlist), so
+        # a future stats key that wrongly reflects findings is still caught.
+
+        def items_domain(snapshot):
+            return {k: v for k, v in snapshot.items() if k != "findings_by_disposition"}
+
+        assert items_domain(after) == items_domain(before)
+        assert after["findings_by_disposition"] == {"open": 2}
 
     def test_findings_do_not_appear_in_items_table(self, conn):
         _mk_finding(conn)
@@ -414,3 +422,183 @@ class TestFindingListOrdering:
         ids = [f["id"] for f in todo_findings.list_findings(conn)]
         # both open -> ordered by created_at/id, so the earlier id sorts first
         assert ids == ["2026-01-02-030405-first-class", "2026-01-02-030406-second-class"]
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: surfacing -- the ready/stats banner + additive stats key.
+#
+# The banner must never perturb the machine-readable STDOUT of ready/stats
+# (automation parses it): it renders to stderr, is suppressed at zero-state, and
+# piggybacks a single cheap aggregate on the existing connection (no extra hosted
+# round-trip). ``findings_by_disposition`` is an additive stats key.
+
+
+class _CountingConn:
+    """Proxy that records every SQL string executed, delegating to a real conn.
+
+    sqlite3.Connection is a C type whose ``execute`` cannot be monkeypatched, so
+    the banner's statement count is asserted through this thin proxy instead."""
+
+    def __init__(self, real):
+        self._real = real
+        self.executed: list[str] = []
+
+    def execute(self, sql, *args, **kwargs):
+        self.executed.append(sql)
+        return self._real.execute(sql, *args, **kwargs)
+
+
+class TestSurfacingBanner:
+    def test_banner_none_at_zero_state(self, conn, tmp_path):
+        # No findings and an empty drafts dir -> nothing to surface.
+        assert todo_findings.surfacing_banner(conn, drafts_dir=tmp_path / "nope") is None
+
+    def test_banner_counts_open_findings_and_unsynced_drafts(self, conn, tmp_path):
+        _mk_finding(conn)  # open
+        _mk_finding(conn, finding_id="2026-01-02-030406-b-class", disposition="dismissed", disposition_reason="no")
+        drafts = tmp_path / "drafts"
+        drafts.mkdir()
+        (drafts / "2026-01-02-030407-draft-class.md").write_text("draft", encoding="utf-8")
+        (drafts / "README.md").write_text("skip me", encoding="utf-8")  # README excluded
+        banner = todo_findings.surfacing_banner(conn, drafts_dir=drafts)
+        assert banner is not None
+        assert "1 open finding(s)" in banner  # 'dismissed' is not 'open'
+        assert "1 unsynced draft(s)" in banner  # README.md not counted
+        assert "todo finding candidates" in banner
+
+    def test_banner_open_findings_only(self, conn, tmp_path):
+        _mk_finding(conn)
+        banner = todo_findings.surfacing_banner(conn, drafts_dir=tmp_path / "empty")
+        assert "1 open finding(s)" in banner
+        assert "draft" not in banner
+
+    def test_banner_unsynced_drafts_only(self, conn, tmp_path):
+        drafts = tmp_path / "drafts"
+        drafts.mkdir()
+        (drafts / "2026-01-02-030407-draft-class.md").write_text("draft", encoding="utf-8")
+        banner = todo_findings.surfacing_banner(conn, drafts_dir=drafts)
+        assert "1 unsynced draft(s)" in banner
+        assert "open finding" not in banner
+
+    @pytest.mark.parametrize("command", ["ready", "stats"])
+    def test_command_issues_at_most_one_findings_query(self, conn, capsys, monkeypatch, command):
+        # "No extra hosted round-trip", pinned at the COMMAND level -- spying on
+        # the helper alone is true by construction (one function, one statement)
+        # and so can never regress. `stats` must reuse the disposition breakdown
+        # it already computed instead of a second open-count aggregate.
+        _mk_finding(conn)
+        _mk_finding(conn, finding_id="2026-01-02-030406-b-class")
+        monkeypatch.setattr(todo_findings, "DEFAULT_DRAFTS_DIR", "/nonexistent-drafts")
+        spy = _CountingConn(conn)
+        handler = {"ready": todo_db._cmd_ready, "stats": todo_db._cmd_stats}[command]
+        assert handler(spy, "tester", SimpleNamespace()) == 0
+        findings_queries = [s for s in spy.executed if "FROM findings" in s]
+        assert len(findings_queries) == 1, f"{command} issued {len(findings_queries)}: {findings_queries}"
+        assert "2 open finding(s)" in capsys.readouterr().err
+
+    def test_banner_opens_no_new_connection(self, conn, monkeypatch):
+        # "No extra hosted round-trip": the banner reuses the caller's connection.
+        # Block EVERY connect entry point -- a regression would realistically open
+        # a hosted connection, not the local one.
+        _mk_finding(conn)
+        for entry in ("connect", "connect_backend", "connect_hosted", "_hosted_read_connect", "_hosted_raw_connect"):
+            if hasattr(todo_db, entry):
+                monkeypatch.setattr(todo_db, entry, lambda *a, _e=entry, **k: pytest.fail(f"banner must not call {_e}"))
+        assert todo_findings.surfacing_banner(conn, drafts_dir=Path("/nonexistent-drafts")) is not None
+
+    def test_banner_ready_on_stderr_not_stdout(self, conn, capsys, monkeypatch):
+        _mk_item(conn, item_id="ready-item")  # a ready planning item -> stdout content
+        monkeypatch.setattr(todo_findings, "surfacing_banner", lambda c, **kw: "→ SENTINEL-banner")
+        todo_db._cmd_ready(conn, "tester", SimpleNamespace())
+        captured = capsys.readouterr()
+        assert "ready-item" in captured.out  # items on stdout
+        assert "SENTINEL-banner" not in captured.out  # banner NEVER on stdout
+        assert "SENTINEL-banner" in captured.err  # banner on stderr
+
+    def test_banner_stats_on_stderr_not_stdout(self, conn, capsys, monkeypatch):
+        monkeypatch.setattr(todo_findings, "surfacing_banner", lambda c, **kw: "→ SENTINEL-banner")
+        todo_db._cmd_stats(conn, "tester", SimpleNamespace())
+        captured = capsys.readouterr()
+        json.loads(captured.out)  # stdout stays valid JSON, banner absent
+        assert "SENTINEL-banner" not in captured.out
+        assert "SENTINEL-banner" in captured.err
+
+    def test_banner_survives_ascii_only_stderr(self, conn, monkeypatch, capfd):
+        # The banner carries non-ASCII (→ / —). On a byte-oriented stderr (C
+        # locale, or a POSIX pipe under LC_ALL=C) the *write* raises
+        # UnicodeEncodeError -- which must not escape and break `ready`.
+        import io
+
+        _mk_item(conn, item_id="ready-item")
+        _mk_finding(conn)
+        monkeypatch.setattr(todo_findings, "DEFAULT_DRAFTS_DIR", "/nonexistent-drafts")
+        buffer = io.BytesIO()
+        ascii_stderr = io.TextIOWrapper(buffer, encoding="ascii", errors="strict")
+        monkeypatch.setattr(todo_db.sys, "stderr", ascii_stderr)
+        assert todo_db._cmd_ready(conn, "tester", SimpleNamespace()) == 0
+        ascii_stderr.flush()
+        # The hint degrades to readable ASCII rather than vanishing or crashing.
+        emitted = buffer.getvalue().decode("ascii")
+        assert "open finding(s)" in emitted
+        assert "todo finding candidates" in emitted
+        assert "-> " in emitted  # transliterated, not "?"-replaced
+        # ...and the degraded path still never touches stdout.
+        assert "finding" not in capfd.readouterr().out
+
+    def test_banner_bails_out_when_stderr_is_closed(self, conn, capsys, monkeypatch):
+        # With fd 2 closed CPython sets sys.stderr to None, and print(file=None)
+        # falls back to STDOUT -- which would put the hint in the machine-readable
+        # stream (and break `stats` JSON). Bail out instead.
+        _mk_item(conn, item_id="ready-item")
+        _mk_finding(conn)
+        monkeypatch.setattr(todo_db.sys, "stderr", None)
+        assert todo_db._cmd_ready(conn, "tester", SimpleNamespace()) == 0
+        out = capsys.readouterr().out
+        assert "ready-item" in out
+        assert "finding" not in out
+
+    def test_banner_never_breaks_ready_when_hint_fails(self, conn, capsys, monkeypatch):
+        # A hint must never break the core command: a failing banner is swallowed
+        # AFTER the stdout contract is met, ready still returns 0.
+        _mk_item(conn, item_id="ready-item")
+        monkeypatch.setattr(
+            todo_findings, "surfacing_banner", lambda c, **kw: (_ for _ in ()).throw(RuntimeError("boom"))
+        )
+        assert todo_db._cmd_ready(conn, "tester", SimpleNamespace()) == 0
+        assert "ready-item" in capsys.readouterr().out
+
+
+class TestFindingsStats:
+    def test_findings_stats_shape(self, conn):
+        _mk_finding(conn)  # open
+        _mk_finding(conn, finding_id="2026-01-02-030406-b-class", disposition="dismissed", disposition_reason="x")
+        s = todo_db.stats(conn)
+        assert s["findings_by_disposition"] == {"open": 1, "dismissed": 1}
+        # Existing items-domain keys are untouched (additive-only change).
+        for key in ("items_by_state", "open_by_priority", "open_by_worktree", "deferrals_by_resolution", "claimed"):
+            assert key in s
+
+    def test_findings_stats_empty_when_no_findings(self, conn):
+        assert todo_db.stats(conn)["findings_by_disposition"] == {}
+
+
+class TestSurfacingFlow:
+    def test_surfacing_flow_ready_shows_findings_when_present(self, conn, capsys, tmp_path, monkeypatch):
+        # Documented-flow encounter: an agent following the planning flow runs
+        # `ready`; when an untriaged finding exists it is surfaced (on stderr).
+        monkeypatch.setattr(todo_findings, "DEFAULT_DRAFTS_DIR", str(tmp_path / "no-drafts"))
+        _mk_item(conn, item_id="ready-item")
+        _mk_finding(conn)  # one open finding
+        todo_db._cmd_ready(conn, "tester", SimpleNamespace())
+        captured = capsys.readouterr()
+        assert "ready-item" in captured.out
+        assert "1 open finding(s)" in captured.err
+        assert "todo finding candidates" in captured.err
+
+    def test_surfacing_flow_silent_when_nothing_untriaged(self, conn, capsys, tmp_path, monkeypatch):
+        monkeypatch.setattr(todo_findings, "DEFAULT_DRAFTS_DIR", str(tmp_path / "no-drafts"))
+        _mk_item(conn, item_id="ready-item")
+        todo_db._cmd_ready(conn, "tester", SimpleNamespace())
+        captured = capsys.readouterr()
+        assert "ready-item" in captured.out
+        assert "finding" not in captured.err  # zero-state: no banner

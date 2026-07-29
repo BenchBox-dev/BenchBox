@@ -1761,6 +1761,9 @@ def stats(conn: sqlite3.Connection) -> dict[str, Any]:
         ),
         "deferrals_by_resolution": counts("SELECT resolution, count(*) FROM deferrals GROUP BY resolution"),
         "claimed": counts("SELECT claimed_by, count(*) FROM items WHERE claimed_by IS NOT NULL GROUP BY claimed_by"),
+        # Additive findings-domain key (phase 4). Present but empty when there are
+        # no findings; existing items-domain keys above are untouched.
+        "findings_by_disposition": todo_findings.findings_by_disposition(conn),
     }
 
 
@@ -2893,15 +2896,56 @@ def _cmd_list(conn, actor, args):
     return 0
 
 
+_BANNER_ASCII = {ord("→"): "->", ord("—"): "--"}
+
+
+def _emit_findings_banner(conn, open_count: int | None = None) -> None:
+    """Print the untriaged-findings hint to stderr, never stdout. Best-effort: a
+    hint must never break ``ready``/``stats`` core output, so any failure here is
+    swallowed after the stdout contract is met.
+
+    ``open_count`` lets a caller that already counted findings (``stats``) pass
+    the number through instead of paying a second aggregate.
+
+    Two stderr hazards are handled explicitly, because the guard alone cannot:
+
+    * ``sys.stderr is None`` -- when fd 2 is closed (``2>&-``) CPython sets it to
+      None and ``print(..., file=None)`` falls back to *stdout*, which would put
+      the hint in the machine-readable stream. Bail out instead.
+    * a strict non-UTF-8 stream -- the banner carries ``->``/``--`` as ``→``/``—``.
+      CPython's default stderr uses ``errors='backslashreplace'`` and C locales
+      get coerced to UTF-8 (PEP 538), so this needs an explicitly strict stream
+      (``PYTHONIOENCODING=ascii:strict``, or a ``reconfigure``d stderr) to bite --
+      uncommon, but cheap to survive: fall back to an ASCII transliteration
+      rather than losing the hint."""
+    if sys.stderr is None:
+        return
+    try:
+        banner = todo_findings.surfacing_banner(conn, open_count=open_count)
+        if not banner:
+            return
+        try:
+            print(banner, file=sys.stderr)
+        except UnicodeEncodeError:
+            print(banner.translate(_BANNER_ASCII), file=sys.stderr)
+    except Exception:
+        return
+
+
 def _cmd_ready(conn, actor, args):
     for item in ready_items(conn, actor):
         claim_note = " (claimed by you)" if item["claimed_by"] == actor else ""
         print(f"{item['id']:55s} {item['priority']:12s} {item['worktree']}{claim_note}")
+    _emit_findings_banner(conn)
     return 0
 
 
 def _cmd_stats(conn, actor, args):
-    print(json.dumps(stats(conn), indent=2, sort_keys=True))
+    computed = stats(conn)
+    print(json.dumps(computed, indent=2, sort_keys=True))
+    # Reuse the disposition breakdown already computed above rather than issuing
+    # a second `count(*) WHERE disposition='open'` for the banner.
+    _emit_findings_banner(conn, open_count=computed["findings_by_disposition"].get("open", 0))
     return 0
 
 
