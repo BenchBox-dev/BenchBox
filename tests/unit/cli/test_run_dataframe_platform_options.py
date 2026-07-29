@@ -31,14 +31,6 @@ from benchbox.core.schemas import DatabaseConfig
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
-# `benchbox.cli` lazily caches the *function* ``main`` into its globals, which
-# shadows the same-named submodule.  Python >= 3.11 resolves a patch target via
-# ``pkgutil.resolve_name`` (imports the dotted path, so the module wins), but
-# 3.10 walks it with ``getattr`` and lands on the function:
-#     AttributeError: <function main ...> does not have the attribute 'get_config_manager'
-# Resolve the module once, up front, and patch through it instead of by string.
-_main_module = _sys.modules["benchbox.cli.main"]
-
 # Import for its spec-registration side effects so the registry is populated
 # regardless of test collection order.
 import benchbox.cli.platform_defaults  # noqa: E402,F401
@@ -148,7 +140,7 @@ class TestDataFrameOptionReachesConfig:
             patch.object(_run_module, "BenchmarkManager", return_value=mock_bench_manager),
             patch.object(_run_module, "BenchmarkOrchestrator", return_value=mock_orchestrator),
             patch.object(_run_module, "SystemProfiler") as mock_profiler_cls,
-            patch.object(_main_module, "get_config_manager") as mock_cfg,
+            patch("benchbox.cli.main.get_config_manager") as mock_cfg,
             patch.object(_run_module, "_execute_orchestrated_run", return_value=mock_result),
             patch.object(_run_module, "_export_orchestrated_result", return_value={"json": "/tmp/t.json"}),
             patch.object(_run_module, "_render_post_run_charts"),
