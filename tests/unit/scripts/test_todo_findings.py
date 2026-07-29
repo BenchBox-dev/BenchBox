@@ -605,3 +605,354 @@ class TestSurfacingFlow:
         captured = capsys.readouterr()
         assert "ready-item" in captured.out
         assert "finding" not in captured.err  # zero-state: no banner
+
+
+# ---------------------------------------------------------------------------
+# Parser-completeness guard (findings-parser-completeness-guard)
+#
+# The root cause of the silent-loss class: `validate_blind_spot.py` decides what a
+# draft may contain, `parse_draft` decides what reaches the DB, and nothing
+# compared the two. Measured over the live 65-record corpus (2026-07-29), 65 of 65
+# records lost content while `sync` printed "synced 1".
+#
+# Every expectation below is derived from the validator's OWN constants. A
+# hand-copied field list would drift exactly the way parse_draft drifted, which is
+# the defect under test.
+
+vbs = importlib.import_module("validate_blind_spot")
+
+
+class TestParserCompletenessGuard:
+    def test_every_accepted_frontmatter_key_has_a_declared_home(self):
+        declared = set(todo_findings.FRONTMATTER_HOMES) | set(todo_findings.FRONTMATTER_HOMES_PENDING_V4)
+        undeclared = vbs.ALLOWED_FIELDS - declared
+        assert not undeclared, (
+            f"validator accepts {sorted(undeclared)} with no entry in FRONTMATTER_HOMES or "
+            "FRONTMATTER_HOMES_PENDING_V4 -- add a home, or name it pending with its v4 target. "
+            "An undeclared field is silently dropped at sync time."
+        )
+
+    def test_no_declared_home_for_a_field_the_validator_rejects(self):
+        # The other direction: a home for a field the validator will never accept is
+        # dead weight that misleads the next reader about what can arrive.
+        declared = set(todo_findings.FRONTMATTER_HOMES) | set(todo_findings.FRONTMATTER_HOMES_PENDING_V4)
+        assert not (declared - vbs.ALLOWED_FIELDS)
+
+    def test_pending_set_is_exactly_the_known_v3_gap(self):
+        # Pins the measured gap so v4 must EMPTY this set deliberately rather than
+        # a future field quietly joining it.
+        assert set(todo_findings.FRONTMATTER_HOMES_PENDING_V4) == {
+            "related_paths",
+            "suggested_sweep",
+            "todo_id",
+        }
+
+    def test_declared_section_homes_cover_the_required_headings(self):
+        required = {heading.removeprefix("## ") for heading in vbs.REQUIRED_BODY_HEADINGS}
+        assert required <= set(todo_findings.SECTION_HOMES)
+
+    def test_guard_fails_closed_on_a_new_validator_field(self, monkeypatch):
+        # Proves the guard actually fails rather than merely passing today: add a
+        # field to the validator's accepted set and the completeness check must break.
+        monkeypatch.setattr(vbs, "ALLOWED_FIELDS", vbs.ALLOWED_FIELDS | {"newly_added_field"})
+        declared = set(todo_findings.FRONTMATTER_HOMES) | set(todo_findings.FRONTMATTER_HOMES_PENDING_V4)
+        assert vbs.ALLOWED_FIELDS - declared == {"newly_added_field"}
+
+
+class TestUnmappedContentIsReported:
+    def test_parse_draft_reports_unmapped_frontmatter_and_sections(self, tmp_path):
+        stem = "2026-01-02-030405-legacy-shaped-record"
+        (tmp_path / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            "related_paths:\n  - benchbox/core/thing.py\n"
+            "suggested_sweep: rg -n 'thing' benchbox/\n"
+            "---\n\n"
+            "# A legacy-shaped record\n\n"
+            "## Finding\nthe review never checks axis Y\n\n"
+            "## Why this matters\naxis Y is a whole dimension\n\n"
+            "## Suggested next steps\n- [ ] add a gate\n\n"
+            "## Why the five-axis review missed it\nthe rubric had no axis for it\n",
+            encoding="utf-8",
+        )
+        fields = todo_findings.parse_draft(tmp_path / f"{stem}.md")
+        assert fields["unmapped"]["frontmatter"] == ["related_paths", "suggested_sweep"]
+        assert fields["unmapped"]["sections"] == ["Why the five-axis review missed it"]
+
+    def test_clean_draft_reports_nothing_unmapped(self, tmp_path):
+        path = _draft(tmp_path / "d", "2026-01-02-030405-a-clean-record")
+        fields = todo_findings.parse_draft(path)
+        assert fields["unmapped"] == {"frontmatter": [], "sections": []}
+
+    def test_empty_optional_keys_are_not_reported_as_loss(self, tmp_path):
+        # A key present but null carries nothing, so reporting it would be noise.
+        stem = "2026-01-02-030405-null-optionals"
+        (tmp_path / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            "related_paths:\n"
+            "suggested_sweep:\n"
+            "todo_id:\n"
+            "---\n\n"
+            "# Null optionals\n\n"
+            "## Finding\nf\n\n## Why this matters\nw\n\n## Suggested next steps\n- [ ] s\n",
+            encoding="utf-8",
+        )
+        fields = todo_findings.parse_draft(tmp_path / f"{stem}.md")
+        assert fields["unmapped"] == {"frontmatter": [], "sections": []}
+
+    def test_sync_warns_and_leaves_a_lossy_draft_unsynced(self, conn, tmp_path, capsys):
+        stem = "2026-01-02-030405-lossy-record"
+        (tmp_path / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            "suggested_sweep: rg -n 'thing' benchbox/\n"
+            "---\n\n"
+            "# Lossy record\n\n"
+            "## Finding\nf\n\n## Why this matters\nw\n\n## Suggested next steps\n- [ ] s\n",
+            encoding="utf-8",
+        )
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["synced"] == [stem]
+        assert result["unmapped"][stem]["frontmatter"] == ["suggested_sweep"]
+        # The row landed, but the file stays visible: it holds the only copy of the
+        # prose that did not land, so hiding it behind a .synced rename would be the
+        # silent loss this guard exists to stop.
+        assert (tmp_path / f"{stem}.md").exists()
+        assert not (tmp_path / f"{stem}.md.synced").exists()
+        assert todo_findings.count_unsynced_drafts(tmp_path) == 1
+        todo_findings._warn_unmapped(result["unmapped"])
+        assert "did NOT land" in capsys.readouterr().err
+
+    def test_sync_marks_a_clean_draft_synced_as_before(self, conn, tmp_path):
+        path = _draft(tmp_path / "d", "2026-01-02-030405-a-clean-record")
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["synced"] == ["2026-01-02-030405-a-clean-record"]
+        assert result["unmapped"] == {}
+        assert not path.exists()
+        assert path.with_name(path.name + ".synced").exists()
+
+
+class TestShowRendersEvidenceNote:
+    """`show --json` always carried evidence `note`; the human rendering dropped it,
+    so the default `todo finding show` hid the reviewer's reason for each row."""
+
+    def _finding_with_evidence(self, conn, evidence):
+        fid = _mk_finding(conn, evidence=evidence)
+        return todo_findings.get_finding(conn, fid)
+
+    def test_note_reaches_human_output(self, conn, capsys):
+        finding = self._finding_with_evidence(
+            conn, [{"path": "benchbox/core/thing.py", "pattern": "def thing", "note": "only the SQL path is guarded"}]
+        )
+        todo_findings._print_finding(finding)
+        out = capsys.readouterr().out
+        assert "evidence: benchbox/core/thing.py def thing" in out
+        assert "note: only the SQL path is guarded" in out
+
+    def test_note_less_evidence_row_renders_as_before(self, conn, capsys):
+        finding = self._finding_with_evidence(conn, [{"path": "benchbox/core/thing.py", "pattern": "def thing"}])
+        todo_findings._print_finding(finding)
+        lines = [line for line in capsys.readouterr().out.splitlines() if "thing.py" in line or "note:" in line]
+        assert lines == ["evidence: benchbox/core/thing.py def thing"]
+
+    def test_json_payload_is_unchanged_and_already_included_the_note(self, conn):
+        finding = self._finding_with_evidence(conn, [{"path": "p.py", "pattern": None, "note": "why p matters"}])
+        assert finding["evidence"][0]["note"] == "why p matters"
+
+
+class TestSyncFullPayloadComparison:
+    """`_finding_matches` compared only `_CONTENT_FIELDS`, so an evidence-only draft
+    edit was marked `.synced` and lost while `sync` printed success."""
+
+    def _write(self, directory: Path, stem: str, *, evidence_block: str = "", extra_front: str = ""):
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            f"{extra_front}{evidence_block}"
+            "---\n\n"
+            "# A sample class\n\n"
+            "## Finding\nthe review never checks axis Y\n\n"
+            "## Why this matters\naxis Y is a whole dimension\n\n"
+            "## Suggested next steps\n- [ ] add a gate for axis Y\n",
+            encoding="utf-8",
+        )
+        return directory / f"{stem}.md"
+
+    def test_evidence_only_edit_is_persisted_not_silently_synced(self, conn, tmp_path):
+        stem = "2026-01-02-030405-evidence-edited"
+        path = self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n    note: first\n")
+        assert todo_findings.sync_drafts(conn, "tester", tmp_path)["synced"] == [stem]
+
+        # Edit only the evidence, then re-sync from the same drafts directory.
+        path.with_name(path.name + ".synced").rename(path)
+        self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n    note: SECOND\n  - path: b.py\n")
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        assert result["updated"] == [stem]
+        assert result["conflicts"] == []
+        stored = todo_findings.get_finding(conn, stem)["evidence"]
+        assert [(row["path"], row["note"]) for row in stored] == [("a.py", "SECOND"), ("b.py", None)]
+
+    def test_evidence_reconcile_is_recorded_in_finding_events(self, conn, tmp_path):
+        stem = "2026-01-02-030405-evidence-audited"
+        path = self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+        path.with_name(path.name + ".synced").rename(path)
+        self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n  - path: b.py\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        actions = [event["action"] for event in todo_findings.get_finding(conn, stem)["events"]]
+        assert "resync_evidence" in actions
+        detail = json.loads(
+            next(
+                e["detail"] for e in todo_findings.get_finding(conn, stem)["events"] if e["action"] == "resync_evidence"
+            )
+        )
+        assert detail == {"rows_before": 1, "rows_after": 2}
+
+    def test_unchanged_draft_is_still_skipped_and_marked_synced(self, conn, tmp_path):
+        stem = "2026-01-02-030405-unchanged-record"
+        path = self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n    note: same\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+        path.with_name(path.name + ".synced").rename(path)
+
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["skipped"] == [stem]
+        assert result["updated"] == []
+        assert path.with_name(path.name + ".synced").exists()
+
+    def test_prose_difference_is_still_a_loud_conflict(self, conn, tmp_path):
+        stem = "2026-01-02-030405-prose-changed"
+        path = self._write(tmp_path, stem)
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+        path.with_name(path.name + ".synced").rename(path)
+        path.write_text(path.read_text(encoding="utf-8").replace("axis Y", "axis Z"), encoding="utf-8")
+
+        with pytest.raises(todo_db.TodoError, match="sync conflict"):
+            todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+    def test_triage_judgement_survives_a_resync(self, conn, tmp_path):
+        # The draft predates triage and carries no urgency; reconciling judgement
+        # fields "from the draft" would wipe what triage recorded.
+        stem = "2026-01-02-030405-triaged-record"
+        path = self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+        with todo_db._write_txn(conn):
+            conn.execute("UPDATE findings SET urgency = 'high', breadth = 'wide' WHERE id = ?", (stem,))
+
+        path.with_name(path.name + ".synced").rename(path)
+        self._write(tmp_path, stem, evidence_block="evidence:\n  - path: a.py\n  - path: b.py\n")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        stored = todo_findings.get_finding(conn, stem)
+        assert (stored["urgency"], stored["breadth"]) == ("high", "wide")
+        assert len(stored["evidence"]) == 2
+
+
+class TestDraftsDirBridge:
+    """BenchBox binds drafts to ~/.benchbox/finding-drafts/ while the standalone
+    todo-db defaults to ~/.todo-db/finding-drafts/<project-id>/. The divergence is
+    silent — `sync` reports "synced 0" and the banner counts zero while a real draft
+    sits stranded — so one env var has to bind every surface."""
+
+    def test_env_var_wins_over_the_benchbox_default(self, monkeypatch, tmp_path):
+        monkeypatch.setenv(todo_findings.DRAFTS_DIR_ENV, str(tmp_path / "pinned"))
+        assert todo_findings.resolve_drafts_dir() == str(tmp_path / "pinned")
+
+    def test_falls_back_to_the_benchbox_default_when_unset(self, monkeypatch):
+        monkeypatch.delenv(todo_findings.DRAFTS_DIR_ENV, raising=False)
+        assert todo_findings.resolve_drafts_dir() == todo_findings.DEFAULT_DRAFTS_DIR
+
+    def test_empty_env_var_is_ignored(self, monkeypatch):
+        # An exported-but-empty var must not resolve drafts to the process cwd.
+        monkeypatch.setenv(todo_findings.DRAFTS_DIR_ENV, "")
+        assert todo_findings.resolve_drafts_dir() == todo_findings.DEFAULT_DRAFTS_DIR
+
+    def test_a_stranded_draft_becomes_visible_to_the_pinned_dir(self, monkeypatch, tmp_path):
+        # The item's own scenario: a real draft in the bound directory must be
+        # counted, not silently missed.
+        drafts = tmp_path / "benchbox-drafts"
+        _draft(drafts / "d", "2026-07-24-150447-guards-only-cover-configured-root")
+        monkeypatch.setenv(todo_findings.DRAFTS_DIR_ENV, str(drafts))
+        assert todo_findings.count_unsynced_drafts() == 1
+
+    def test_banner_follows_the_pinned_dir(self, conn, monkeypatch, tmp_path):
+        drafts = tmp_path / "pinned-drafts"
+        _draft(drafts / "d", "2026-07-24-150447-guards-only-cover-configured-root")
+        monkeypatch.setenv(todo_findings.DRAFTS_DIR_ENV, str(drafts))
+        banner = todo_findings.surfacing_banner(conn)
+        assert banner is not None
+        assert "1 unsynced draft(s)" in banner
+
+
+class TestEvidenceReconcileIsNotDestructive:
+    """A draft with no `evidence:` key makes no assertion about evidence. Treating
+    that as an empty list would delete rows curated at triage or hand-mapped during
+    an import — the live record 2026-07-18-190500-evidence-tree-sha-provenance-mismatch
+    has exactly that shape: no key in the file, three rows in the DB."""
+
+    def test_absent_evidence_key_never_deletes_stored_rows(self, conn, tmp_path):
+        stem = "2026-01-02-030405-hand-mapped-record"
+        fid = _mk_finding(
+            conn,
+            finding_id=stem,
+            title="A sample class",
+            review_context="ultrareview X",
+            why_matters="axis Y is a whole dimension",
+            evidence=[{"path": "a.py", "note": "hand-mapped from related_paths"}],
+        )
+        # A draft file that carries no `evidence:` key at all.
+        _draft(tmp_path / "d", stem)
+
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["updated"] == []
+        assert result["skipped"] == [fid]
+        stored = todo_findings.get_finding(conn, fid)["evidence"]
+        assert [(row["path"], row["note"]) for row in stored] == [("a.py", "hand-mapped from related_paths")]
+
+    def test_explicitly_empty_evidence_list_does_clear_stored_rows(self, conn, tmp_path):
+        # An explicit `evidence: []` IS an assertion, so it is honoured.
+        stem = "2026-01-02-030405-explicitly-cleared"
+        _mk_finding(
+            conn,
+            finding_id=stem,
+            review_context="ultrareview X",
+            why_matters="axis Y is a whole dimension",
+            evidence=[{"path": "a.py"}],
+        )
+        (tmp_path / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            "evidence: []\n"
+            "---\n\n"
+            "# A sample blind-spot class\n\n"
+            "## Finding\nthe review never checks axis Y\n\n"
+            "## Why this matters\naxis Y is a whole dimension\n\n"
+            "## Suggested next steps\n- [ ] add a gate for axis Y\n",
+            encoding="utf-8",
+        )
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["updated"] == [stem]
+        assert todo_findings.get_finding(conn, stem)["evidence"] == []

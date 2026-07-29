@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -153,6 +154,79 @@ DEFAULT_DRAFTS_DIR = vbs.DEFAULT_DRAFTS_DIR
 SYNCED_SUFFIX = ".synced"
 SYNCED_PRUNE_DAYS = 30
 
+# Bridge to the standalone todo-db drafts convention. BenchBox binds drafts to
+# ~/.benchbox/finding-drafts/ while the standalone CLI defaults to
+# ~/.todo-db/finding-drafts/<project-id>/. Those diverge silently, not loudly:
+# at cutover `sync` reports "synced 0" and the banner counts zero unsynced
+# drafts while a real draft sits stranded in the BenchBox directory. Honouring
+# one env var in BOTH tools means the bound directory can be pinned once and
+# every surface -- create, candidates, sync, and the planning banner -- agrees.
+# The frontmatter schemas are already compatible; only the location diverged.
+DRAFTS_DIR_ENV = "TODO_DB_FINDING_DRAFTS_DIR"
+
+
+def resolve_drafts_dir() -> str:
+    """The drafts directory every findings surface should use.
+
+    ``TODO_DB_FINDING_DRAFTS_DIR`` wins when set and non-empty, so the same pin
+    works before and after the standalone cutover; otherwise the BenchBox default.
+    Reads the module global as its fallback (not a bound copy) so tests that
+    override ``DEFAULT_DRAFTS_DIR`` keep working.
+    """
+    return os.environ.get(DRAFTS_DIR_ENV) or DEFAULT_DRAFTS_DIR
+
+
+# ---------------------------------------------------------------------------
+# Parser-completeness contract
+#
+# `validate_blind_spot.py` decides what a draft may CONTAIN; `parse_draft` below
+# decides what actually reaches the DB. Those two sets drifted silently: the
+# validator accepts 13 frontmatter keys and `_split_body` parses EVERY `## `
+# section, but parse_draft read 5 keys plus `evidence` and only 4 sections --
+# and `sync` still printed "synced 1". Measured over the live 65-record corpus
+# (2026-07-29): 65 of 65 records lost content this way.
+#
+# These maps make the contract explicit and TOTAL, so a NEW validator field
+# fails the guard test immediately instead of vanishing at sync time. The guard
+# in tests/unit/scripts/test_todo_findings.py derives its expectation from
+# `vbs.ALLOWED_FIELDS` itself -- never a hand-copied list, which would drift the
+# same way parse_draft already drifted.
+
+# Frontmatter keys parse_draft lands today, and where each one goes.
+FRONTMATTER_HOMES = {
+    "id": "findings.id",
+    "date": "findings.date",
+    "status": "findings.disposition",
+    "finding_kind": "findings.finding_kind",
+    "review_context": "findings.review_context",
+    "observed_sha": "findings.observed_sha",
+    "urgency": "findings.urgency",
+    "breadth": "findings.breadth",
+    "confidence": "findings.confidence",
+    "evidence": "finding_evidence rows",
+}
+
+# Validator-accepted keys with NO home in schema v3. Every entry is a named,
+# measured loss -- never a licensed omission -- and names the v4 home that will
+# take it (see "Legacy field mapping (schema v4)" in
+# _project/specs/findings-domain.md). The v4 migration empties this map; it must
+# never be used to silence a newly added field.
+FRONTMATTER_HOMES_PENDING_V4 = {
+    "related_paths": "findings.related_paths (v4 column)",
+    "suggested_sweep": "findings.suggested_sweep (v4 column)",
+    "todo_id": "finding_links row, kind by status (v4 mapping)",
+}
+
+# Body sections parse_draft lands today. Any OTHER `## ` heading has no v3 home
+# and is reported as unmapped until the v4 `finding_sections` table exists.
+SECTION_HOMES = {
+    "Finding": "findings.finding_text",
+    "Why this matters": "findings.why_matters",
+    "Suggested next steps": "findings.next_steps",
+    "Triage log": "finding_events rows",
+}
+PENDING_SECTION_HOME_V4 = "finding_sections table (v4)"
+
 # YYYY-MM-DD-HHMMSS-<kebab-slug> (matches the phase-1 validator's FILENAME_RE).
 FINDING_ID_RE = vbs.FILENAME_RE
 
@@ -263,8 +337,34 @@ def parse_draft(path: Path) -> dict[str, Any]:
         "breadth": _str_or_none(data.get("breadth")),
         "confidence": _str_or_none(data.get("confidence")),
         "evidence": list(data.get("evidence") or []),
+        # Whether the draft ASSERTS an evidence list at all. An absent key means
+        # "no assertion", which is not the same as "no evidence": stored rows may
+        # have been curated at triage (or hand-mapped during an import) and must
+        # not be deleted just because the capture file never mentioned them.
+        "evidence_declared": "evidence" in data,
         "triage_log": triage_log,
+        # Content the validator accepted but that has no v3 column. Reported, not
+        # dropped: silent loss here is what made `sync` print "synced 1" over 65
+        # records that each lost content. v4 empties both lists.
+        "unmapped": unmapped_content(data, sections),
     }
+
+
+def unmapped_content(data: dict[str, Any], sections: dict[str, str]) -> dict[str, list[str]]:
+    """Validator-accepted content with no home in the current schema.
+
+    Returns ``{"frontmatter": [...], "sections": [...]}`` naming keys and `## `
+    headings that carry a value but that ``parse_draft`` cannot land. Empty lists
+    mean the draft round-trips completely. Keys present but null/empty are NOT
+    reported -- there is nothing to lose.
+    """
+    frontmatter = [
+        key for key in sorted(FRONTMATTER_HOMES_PENDING_V4) if key in data and data[key] not in (None, "", [], {})
+    ]
+    unmapped_sections = [
+        heading for heading in sorted(sections) if heading not in SECTION_HOMES and sections[heading].strip()
+    ]
+    return {"frontmatter": frontmatter, "sections": unmapped_sections}
 
 
 # ---------------------------------------------------------------------------
@@ -417,6 +517,88 @@ def _finding_matches(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
     return True
 
 
+# Evidence-row fields compared to decide whether a re-parsed draft's evidence
+# differs from what is stored. Order is significant: the draft's list order is
+# the record, and `get_finding` reads evidence back `ORDER BY id`.
+_EVIDENCE_FIELDS = ("path", "pattern", "line_start", "line_end", "note")
+
+# Judgement fields are deliberately ABSENT from every comparison below. They are
+# DB-owned once `todo finding triage` sets them, and a draft file captured before
+# triage carries them as null -- reconciling them "from the draft" would silently
+# wipe the triage judgement on every re-sync.
+_DB_OWNED_FIELDS = ("urgency", "breadth", "confidence", "reconsider_after", "disposition_reason")
+
+
+def _normalize_evidence(entries: Any) -> list[tuple[Any, ...]]:
+    """Evidence entries as an ordered list of comparable tuples.
+
+    Normalizes the two shapes that must compare equal: parsed-draft mappings
+    (which omit absent keys) and stored rows (which carry explicit NULLs).
+    """
+    normalized: list[tuple[Any, ...]] = []
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        normalized.append(tuple(entry.get(name) if entry.get(name) != "" else None for name in _EVIDENCE_FIELDS))
+    return normalized
+
+
+def _evidence_differs(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
+    """Whether a re-parsed draft's evidence disagrees with what is stored.
+
+    A draft that declares no ``evidence:`` key makes no assertion, so it never
+    counts as a difference. Treating an absent key as an empty list would let a
+    re-sync DELETE evidence rows the draft never knew about -- exactly the case of
+    a legacy record whose rows were hand-mapped at import time.
+    """
+    if not fields.get("evidence_declared"):
+        return False
+    return _normalize_evidence(existing.get("evidence")) != _normalize_evidence(fields.get("evidence"))
+
+
+def _reconcile_evidence(conn: Any, actor: str, existing: dict[str, Any], fields: dict[str, Any]) -> None:
+    """Replace a finding's evidence rows with the draft's, in ONE write txn.
+
+    The draft file is authoritative for capture-owned payload, so an evidence-only
+    edit is persisted rather than silently marked synced (which lost the edit) or
+    reported as a content conflict (which the prose did not justify). The
+    before/after is recorded in ``finding_events``, so the audit trail carries the
+    change instead of the row quietly differing from its draft. ``existing`` is the
+    row the caller already fetched -- re-reading it here would cost an extra hosted
+    round-trip for no new information.
+    """
+    finding_id = str(existing["id"])
+    before = _normalize_evidence(existing.get("evidence"))
+    after = _normalize_evidence(fields.get("evidence"))
+    with todo_db._write_txn(conn):
+        conn.execute("DELETE FROM finding_evidence WHERE finding_id = ?", (finding_id,))
+        for entry in fields.get("evidence") or []:
+            if not isinstance(entry, dict):
+                raise todo_db.TodoError(f"finding {finding_id!r} evidence entry must be a mapping, got {entry!r}")
+            path = entry.get("path")
+            if not (isinstance(path, str) and path.strip()):
+                raise todo_db.TodoError(f"finding {finding_id!r} evidence entry needs a non-empty path")
+            conn.execute(
+                "INSERT INTO finding_evidence (finding_id, path, pattern, line_start, line_end, note)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    finding_id,
+                    path,
+                    entry.get("pattern"),
+                    entry.get("line_start"),
+                    entry.get("line_end"),
+                    entry.get("note"),
+                ),
+            )
+        log_finding_event(
+            conn,
+            actor,
+            finding_id,
+            "resync_evidence",
+            {"rows_before": len(before), "rows_after": len(after)},
+        )
+
+
 def _set_disposition(conn: Any, actor: str, finding_id: str, new: str, reason: str | None) -> None:
     """Apply a legal disposition transition with a conditional UPDATE (the same
     defense-in-depth as claim_item), INSIDE a caller-held write transaction."""
@@ -475,28 +657,64 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
     """Insert-if-absent every draft under ``drafts_dir`` by filename-stem id.
 
     Idempotent: an identical already-landed finding is skipped (and its draft
-    marked synced). Same-id/different-content is a loud error naming the id --
+    marked synced). Same-id/different *prose* is a loud error naming the id --
     never a merge (silent data loss in an audit-trail domain).
+
+    Capture-owned payload the prose comparison does not cover -- today the
+    evidence rows -- is reconciled IN PLACE from the draft and recorded in
+    ``finding_events``. Comparing only the prose fields meant an evidence-only
+    edit was marked ``.synced`` and lost with `sync` reporting success. Judgement
+    fields (urgency/breadth/confidence/reconsider_after) are excluded from every
+    comparison: they are DB-owned once triage sets them, so reconciling them from
+    a pre-triage draft would wipe the judgement.
+
+    A draft carrying validator-accepted content with no column in the current
+    schema is still inserted, but is deliberately NOT marked ``.synced``: it stays
+    in the unsynced glob so the planning banner keeps surfacing it and the file
+    survives until v4 gives that content a home. Marking it synced would hide the
+    one copy of the un-landed prose behind a rename.
     """
     drafts_dir = Path(drafts_dir).expanduser()
-    result: dict[str, Any] = {"synced": [], "skipped": [], "conflicts": [], "pruned": 0}
+    result: dict[str, Any] = {
+        "synced": [],
+        "updated": [],
+        "skipped": [],
+        "conflicts": [],
+        "pruned": 0,
+        "unmapped": {},
+    }
     if not drafts_dir.is_dir():
         return result
     for path in sorted(drafts_dir.glob("*.md")):
         if path.name == "README.md":
             continue
         fields = parse_draft(path)
+        unmapped = fields.get("unmapped") or {}
+        lossy = bool(unmapped.get("frontmatter") or unmapped.get("sections"))
+        if lossy:
+            # Surfaced, never swallowed: the caller warns. Until v4 lands there is
+            # nowhere to put this content, so the only honest option is to say so.
+            result["unmapped"][fields["id"]] = unmapped
         existing = get_finding(conn, fields["id"])
         if existing is not None:
-            if _finding_matches(existing, fields):
-                result["skipped"].append(fields["id"])
-                _mark_synced(path)
-            else:
+            if not _finding_matches(existing, fields):
+                # Prose disagreement is still a loud conflict, never a merge.
                 result["conflicts"].append(fields["id"])
+                continue
+            if _evidence_differs(existing, fields):
+                # Capture-owned payload the old comparison ignored entirely: the
+                # draft used to be marked .synced and the edit lost silently.
+                _reconcile_evidence(conn, actor, existing, fields)
+                result["updated"].append(fields["id"])
+            else:
+                result["skipped"].append(fields["id"])
+            if not lossy:
+                _mark_synced(path)
             continue
         with todo_db._write_txn(conn):
             insert_finding(conn, actor, fields)
-        _mark_synced(path)
+        if not lossy:
+            _mark_synced(path)
         result["synced"].append(fields["id"])
     result["pruned"] = _prune_synced(drafts_dir)
     if result["conflicts"]:
@@ -508,13 +726,13 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
     return result
 
 
-def count_unsynced_drafts(drafts_dir: str | Path = DEFAULT_DRAFTS_DIR) -> int:
+def count_unsynced_drafts(drafts_dir: str | Path | None = None) -> int:
     """Local directory glob of unsynced drafts -- no credentials, no network.
 
     A draft is 'unsynced' until ``sync`` renames it to ``*.md.synced``; this is
     the count the phase-4 ``todo ready`` / ``todo stats`` banner shows.
     """
-    directory = Path(drafts_dir).expanduser()
+    directory = Path(drafts_dir if drafts_dir is not None else resolve_drafts_dir()).expanduser()
     if not directory.is_dir():
         return 0
     return sum(1 for p in directory.glob("*.md") if p.name != "README.md")
@@ -550,7 +768,7 @@ def surfacing_banner(conn, drafts_dir: str | Path | None = None, open_count: int
     aggregate entirely.
     """
     if drafts_dir is None:
-        drafts_dir = DEFAULT_DRAFTS_DIR
+        drafts_dir = resolve_drafts_dir()
     if open_count is None:
         open_count = open_findings_count(conn)
     draft_count = count_unsynced_drafts(drafts_dir)
@@ -785,10 +1003,10 @@ def add_finding_subparsers(parser: argparse.ArgumentParser) -> None:
     p.add_argument("--why", help="## Why this matters body text")
     p.add_argument("--next-steps", dest="next_steps", help="## Suggested next steps body text")
     p.add_argument("--observed-sha", help="provenance SHA (not a lookup key)")
-    p.add_argument("--drafts-dir", default=DEFAULT_DRAFTS_DIR)
+    p.add_argument("--drafts-dir", default=resolve_drafts_dir())
 
     p = sub.add_parser("candidates", help="list unsynced drafts (local glob, zero-credential)")
-    p.add_argument("--drafts-dir", default=DEFAULT_DRAFTS_DIR)
+    p.add_argument("--drafts-dir", default=resolve_drafts_dir())
 
     p = sub.add_parser("list", help="list findings")
     p.add_argument("--disposition", choices=DISPOSITIONS)
@@ -799,7 +1017,7 @@ def add_finding_subparsers(parser: argparse.ArgumentParser) -> None:
     p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("sync", help="land drafts into the tracker (authorized landing step)")
-    p.add_argument("--drafts-dir", default=DEFAULT_DRAFTS_DIR)
+    p.add_argument("--drafts-dir", default=resolve_drafts_dir())
 
     p = sub.add_parser("dismiss", help="dismiss a finding with a reason")
     p.add_argument("id")
@@ -869,9 +1087,11 @@ def dispatch_finding(conn: Any, actor: str, args: argparse.Namespace) -> int:
     if command == "sync":
         result = sync_drafts(conn, actor, args.drafts_dir)
         print(
-            f"synced {len(result['synced'])}, skipped {len(result['skipped'])} (already landed),"
+            f"synced {len(result['synced'])}, updated {len(result['updated'])} (evidence reconciled),"
+            f" skipped {len(result['skipped'])} (already landed),"
             f" pruned {result['pruned']} old .synced draft(s)"
         )
+        _warn_unmapped(result.get("unmapped") or {})
         return 0
     if command == "dismiss":
         with todo_db._write_txn(conn):
@@ -933,6 +1153,30 @@ def _cmd_triage(conn: Any, actor: str, args: argparse.Namespace) -> int:
     return 0
 
 
+def _warn_unmapped(unmapped: dict[str, dict[str, list[str]]]) -> None:
+    """Warn on stderr about validator-accepted content with no column yet.
+
+    Stderr, so the stdout summary line stays machine-readable. Naming the ids and
+    the exact keys/headings turns what used to be a silent "synced 1" into a
+    reviewable statement of what did NOT land.
+    """
+    if not unmapped:
+        return
+    print(
+        f"warning: {len(unmapped)} draft(s) carry content with no column in schema "
+        f"{todo_db.SCHEMA_VERSION} -- it did NOT land:",
+        file=todo_db.sys.stderr,
+    )
+    for finding_id, detail in sorted(unmapped.items()):
+        lost = [*detail.get("frontmatter", []), *(f"## {h}" for h in detail.get("sections", []))]
+        print(f"  {finding_id}: {', '.join(lost)}", file=todo_db.sys.stderr)
+    print(
+        "  These drafts were left unsynced on purpose so the file survives until "
+        "schema v4 lands a home (see _project/specs/findings-domain.md).",
+        file=todo_db.sys.stderr,
+    )
+
+
 def _print_finding(finding: dict[str, Any]) -> None:
     print(f"== {finding['id']} [{finding['disposition']}] {finding['title']}")
     print(f"kind={finding['finding_kind']} date={finding['date']} review={finding['review_context']}")
@@ -954,6 +1198,11 @@ def _print_finding(finding: dict[str, Any]) -> None:
             if evidence.get("line_end"):
                 loc += f"-{evidence['line_end']}"
         print(f"evidence: {evidence['path']}{loc} {evidence.get('pattern') or ''}".rstrip())
+        if evidence.get("note"):
+            # The note is where the reviewer said WHY the path is evidence, so
+            # hiding it from the default `show` withheld the reason for the row.
+            # Indented continuation, so a long note never crowds the locator.
+            print(f"    note: {evidence['note']}")
     for link in finding.get("links", []):
         target = link.get("target_item") or link.get("target_finding") or "(dangling)"
         print(f"link: {link['kind']} -> {target}")
