@@ -32,6 +32,7 @@ def test_main_attribute_resolves_to_submodule_before_explicit_import() -> None:
                 "import benchbox.cli; import types; "
                 "target = getattr(benchbox.cli, 'main'); "
                 "assert isinstance(target, types.ModuleType), type(target); "
+                "assert callable(target); "
                 "assert hasattr(target, 'get_config_manager')"
             ),
         ],
@@ -41,6 +42,17 @@ def test_main_attribute_resolves_to_submodule_before_explicit_import() -> None:
     )
 
     assert result.returncode == 0, result.stderr
+
+
+def test_calling_main_module_delegates_to_lazy_entrypoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Calling the compatibility module should resolve and invoke its lazy main export."""
+    main_module = importlib.import_module("benchbox.cli.main")
+    calls: list[str] = []
+    monkeypatch.setattr(main_module, "main", lambda: calls.append("main"), raising=False)
+
+    main_module()
+
+    assert calls == ["main"]
 
 
 def test_importing_conversion_submodule_does_not_import_lifecycle_runner(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import importlib
+import sys
+from types import ModuleType
 from typing import Any
 
 _EXPORTS = {
@@ -66,6 +68,16 @@ def get_config_manager() -> Any:
     if config_manager is None:
         config_manager = __getattr__("ConfigManager")
     return config_manager()
+
+
+class _CallableMainModule(ModuleType):
+    """Preserve the historic callable package export while remaining a module."""
+
+    def __call__(self) -> None:
+        self.main()
+
+
+sys.modules[__name__].__class__ = _CallableMainModule
 
 
 if __name__ == "__main__":
