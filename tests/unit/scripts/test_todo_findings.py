@@ -651,14 +651,14 @@ class TestParserCompletenessGuard:
         declared = set(todo_findings.FRONTMATTER_HOMES) | set(todo_findings.FRONTMATTER_HOMES_PENDING_V4)
         assert not (declared - vbs.ALLOWED_FIELDS)
 
-    def test_pending_set_is_exactly_the_known_v3_gap(self):
-        # Pins the measured gap so v4 must EMPTY this set deliberately rather than
-        # a future field quietly joining it.
-        assert set(todo_findings.FRONTMATTER_HOMES_PENDING_V4) == {
-            "related_paths",
-            "suggested_sweep",
-            "todo_id",
-        }
+    def test_pending_set_is_empty_at_v4(self):
+        # v4 landed a real home for every accepted key. The map stays in the code so
+        # a future field must be given a home or named here; it must not silently
+        # refill, which would reopen the loss this domain was built to close.
+        assert todo_findings.FRONTMATTER_HOMES_PENDING_V4 == {}
+
+    def test_every_accepted_key_has_a_real_home_not_a_pending_one(self):
+        assert set(todo_findings.FRONTMATTER_HOMES) == set(vbs.ALLOWED_FIELDS)
 
     def test_declared_section_homes_cover_the_required_headings(self):
         required = {heading.removeprefix("## ") for heading in vbs.REQUIRED_BODY_HEADINGS}
@@ -673,7 +673,7 @@ class TestParserCompletenessGuard:
 
 
 class TestUnmappedContentIsReported:
-    def test_parse_draft_reports_unmapped_frontmatter_and_sections(self, tmp_path):
+    def test_legacy_shaped_record_lands_completely_at_v4(self, tmp_path):
         stem = "2026-01-02-030405-legacy-shaped-record"
         (tmp_path / f"{stem}.md").write_text(
             "---\n"
@@ -693,8 +693,17 @@ class TestUnmappedContentIsReported:
             encoding="utf-8",
         )
         fields = todo_findings.parse_draft(tmp_path / f"{stem}.md")
-        assert fields["unmapped"]["frontmatter"] == ["related_paths", "suggested_sweep"]
-        assert fields["unmapped"]["sections"] == ["Why the five-axis review missed it"]
+        # Nothing is unmapped any more; every field has a column or a row.
+        assert fields["unmapped"] == {"frontmatter": [], "sections": []}
+        assert json.loads(fields["related_paths"]) == ["benchbox/core/thing.py"]
+        assert fields["suggested_sweep"] == "rg -n 'thing' benchbox/"
+        assert fields["sections"] == [
+            {
+                "position": 0,
+                "heading": "Why the five-axis review missed it",
+                "text": "the rubric had no axis for it",
+            }
+        ]
 
     def test_clean_draft_reports_nothing_unmapped(self, tmp_path):
         path = _draft(tmp_path / "d", "2026-01-02-030405-a-clean-record")
@@ -722,7 +731,7 @@ class TestUnmappedContentIsReported:
         fields = todo_findings.parse_draft(tmp_path / f"{stem}.md")
         assert fields["unmapped"] == {"frontmatter": [], "sections": []}
 
-    def test_sync_warns_and_leaves_a_lossy_draft_unsynced(self, conn, tmp_path, capsys):
+    def test_sync_lands_a_legacy_record_and_marks_it_synced_at_v4(self, conn, tmp_path, capsys):
         stem = "2026-01-02-030405-lossy-record"
         (tmp_path / f"{stem}.md").write_text(
             "---\n"
@@ -739,15 +748,21 @@ class TestUnmappedContentIsReported:
         )
         result = todo_findings.sync_drafts(conn, "tester", tmp_path)
         assert result["synced"] == [stem]
-        assert result["unmapped"][stem]["frontmatter"] == ["suggested_sweep"]
-        # The row landed, but the file stays visible: it holds the only copy of the
-        # prose that did not land, so hiding it behind a .synced rename would be the
-        # silent loss this guard exists to stop.
-        assert (tmp_path / f"{stem}.md").exists()
-        assert not (tmp_path / f"{stem}.md.synced").exists()
-        assert todo_findings.count_unsynced_drafts(tmp_path) == 1
-        todo_findings._warn_unmapped(result["unmapped"])
-        assert "did NOT land" in capsys.readouterr().err
+        # Nothing lossy at v4, so the draft is marked synced as normal.
+        assert result["unmapped"] == {}
+        assert not (tmp_path / f"{stem}.md").exists()
+        assert (tmp_path / f"{stem}.md.synced").exists()
+        assert todo_findings.count_unsynced_drafts(tmp_path) == 0
+        stored = todo_findings.get_finding(conn, stem)
+        assert stored["suggested_sweep"] == "rg -n 'thing' benchbox/"
+
+    def test_warn_unmapped_still_reports_when_something_has_no_home(self, capsys):
+        # The reporting path must keep working for a FUTURE field with no column;
+        # v4 emptied the pending set but did not remove the safety net.
+        todo_findings._warn_unmapped({"2026-01-02-030405-x": {"frontmatter": ["future_field"], "sections": []}})
+        err = capsys.readouterr().err
+        assert "did NOT land" in err
+        assert "future_field" in err
 
     def test_sync_marks_a_clean_draft_synced_as_before(self, conn, tmp_path):
         path = _draft(tmp_path / "d", "2026-01-02-030405-a-clean-record")
@@ -1113,3 +1128,86 @@ class TestV4MigrationEquivalence:
             with todo_db._write_txn(conn):
                 for table in reversed(todo_db.TRANSFER_TABLES):
                     conn.execute(f"DELETE FROM {table}")
+
+
+class TestLegacyTodoIdLinkMapping:
+    """`todo_id` maps to a finding_links row whose KIND follows the record's status.
+    A `promoted-to` edge asserts disposition 'promoted', so the 4 corpus records that
+    are `actioned` with a todo_id must use `resolved-by` instead."""
+
+    def _draft_with_todo_id(self, directory: Path, stem: str, *, status: str, todo_id: str):
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            f"status: {status}\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            f"todo_id: {todo_id}\n"
+            "---\n\n"
+            "# A sample class\n\n"
+            "## Finding\nf\n\n## Why this matters\nw\n\n## Suggested next steps\n- [ ] s\n\n"
+            "## Triage log\n- merged\n",
+            encoding="utf-8",
+        )
+
+    def test_merged_to_todo_becomes_promoted_to(self, conn, tmp_path):
+        todo_db.create_item(
+            conn,
+            "t",
+            item_id="the-target",
+            title="A real item",
+            worktree="main",
+            priority="medium",
+            description="a description long enough for the CHECK",
+        )
+        stem = "2026-01-02-030405-merged-record"
+        self._draft_with_todo_id(tmp_path, stem, status="merged-to-todo", todo_id="the-target")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        finding = todo_findings.get_finding(conn, stem)
+        assert finding["disposition"] == "promoted"
+        assert finding["links"] == [
+            {
+                "kind": "promoted-to",
+                "target_item": "the-target",
+                "target_finding": None,
+                "note": "imported from todo_id: the-target",
+            }
+        ]
+
+    def test_actioned_becomes_resolved_by_not_promoted_to(self, conn, tmp_path):
+        todo_db.create_item(
+            conn,
+            "t",
+            item_id="the-target",
+            title="A real item",
+            worktree="main",
+            priority="medium",
+            description="a description long enough for the CHECK",
+        )
+        stem = "2026-01-02-030405-actioned-record"
+        self._draft_with_todo_id(tmp_path, stem, status="actioned", todo_id="the-target")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        finding = todo_findings.get_finding(conn, stem)
+        assert finding["disposition"] == "actioned"
+        assert [link["kind"] for link in finding["links"]] == ["resolved-by"]
+
+    def test_unresolvable_todo_id_keeps_the_id_in_the_note_and_does_not_abort(self, conn, tmp_path):
+        stem = "2026-01-02-030405-dangling-record"
+        self._draft_with_todo_id(tmp_path, stem, status="merged-to-todo", todo_id="never-existed")
+        # Must not raise: a bare insert against the DEFERRABLE FK would fail the whole
+        # transaction at COMMIT without naming the offending record.
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        link = todo_findings.get_finding(conn, stem)["links"][0]
+        assert link["target_item"] is None
+        assert "never-existed" in link["note"]
+        assert "no such item" in link["note"]
+
+    def test_no_todo_id_creates_no_link(self, conn, tmp_path):
+        path = _draft(tmp_path / "d", "2026-01-02-030405-no-todo-id")
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert todo_findings.get_finding(conn, path.stem)["links"] == []

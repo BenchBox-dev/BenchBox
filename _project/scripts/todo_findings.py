@@ -348,28 +348,26 @@ FRONTMATTER_HOMES = {
     "breadth": "findings.breadth",
     "confidence": "findings.confidence",
     "evidence": "finding_evidence rows",
+    "related_paths": "findings.related_paths (JSON array)",
+    "suggested_sweep": "findings.suggested_sweep",
+    "todo_id": "finding_links row, kind by status",
 }
 
-# Validator-accepted keys with NO home in schema v3. Every entry is a named,
-# measured loss -- never a licensed omission -- and names the v4 home that will
-# take it (see "Legacy field mapping (schema v4)" in
-# _project/specs/findings-domain.md). The v4 migration empties this map; it must
-# never be used to silence a newly added field.
-FRONTMATTER_HOMES_PENDING_V4 = {
-    "related_paths": "findings.related_paths (v4 column)",
-    "suggested_sweep": "findings.suggested_sweep (v4 column)",
-    "todo_id": "finding_links row, kind by status (v4 mapping)",
-}
+# Validator-accepted keys with no column yet. EMPTY as of schema v4, which landed
+# a home for every key the validator accepts. It stays here deliberately: the
+# guard test requires every accepted key to appear in one map or the other, so a
+# newly added field must be given a home or named here, never silently dropped.
+FRONTMATTER_HOMES_PENDING_V4: dict[str, str] = {}
 
-# Body sections parse_draft lands today. Any OTHER `## ` heading has no v3 home
-# and is reported as unmapped until the v4 `finding_sections` table exists.
+# Body sections parse_draft lands today. Any OTHER `## ` heading is preserved
+# verbatim in the v4 `finding_sections` table, in document order.
 SECTION_HOMES = {
     "Finding": "findings.finding_text",
     "Why this matters": "findings.why_matters",
     "Suggested next steps": "findings.next_steps",
     "Triage log": "finding_events rows",
 }
-PENDING_SECTION_HOME_V4 = "finding_sections table (v4)"
+EXTRA_SECTION_HOME = "finding_sections rows"
 
 # YYYY-MM-DD-HHMMSS-<kebab-slug> (matches the phase-1 validator's FILENAME_RE).
 FINDING_ID_RE = vbs.FILENAME_RE
@@ -487,11 +485,46 @@ def parse_draft(path: Path) -> dict[str, Any]:
         # not be deleted just because the capture file never mentioned them.
         "evidence_declared": "evidence" in data,
         "triage_log": triage_log,
-        # Content the validator accepted but that has no v3 column. Reported, not
-        # dropped: silent loss here is what made `sync` print "synced 1" over 65
-        # records that each lost content. v4 empties both lists.
+        # v4 homes. related_paths is a JSON array so list ORDER (part of the
+        # record) survives, and an absent key stays NULL rather than becoming
+        # "[]" -- a record that never had the key stays distinguishable from one
+        # that had an empty list.
+        "related_paths": _json_list_or_none(data.get("related_paths")),
+        "suggested_sweep": _str_or_none(data.get("suggested_sweep")),
+        "todo_id": _str_or_none(data.get("todo_id")),
+        # Legacy todo_id -> link kind, by status. A `promoted-to` edge asserts the
+        # finding is `promoted`, so an `actioned` record must not use it.
+        "todo_link_kind": ("promoted-to" if disposition == "promoted" else "resolved-by"),
+        "sections": _extra_sections(sections),
+        # Validator-accepted content with no column. Empty as of v4; kept so a
+        # future field with no home is reported rather than dropped silently --
+        # silent loss is what made `sync` print "synced 1" over 65 lossy records.
         "unmapped": unmapped_content(data, sections),
     }
+
+
+def _json_list_or_none(value: Any) -> str | None:
+    """A frontmatter list as a JSON array string, preserving order; None if absent."""
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        return json.dumps([str(value)])
+    return json.dumps([str(item) for item in value])
+
+
+def _extra_sections(sections: dict[str, str]) -> list[dict[str, Any]]:
+    """Body sections with no dedicated column, in DOCUMENT order.
+
+    ``_split_body`` returns an insertion-ordered dict, so enumerating it preserves
+    the order the headings appeared in. Blank sections are dropped: there is no
+    content to preserve, and a row would imply there was.
+    """
+    extra: list[dict[str, Any]] = []
+    for heading, text in sections.items():
+        if heading in SECTION_HOMES or not text.strip():
+            continue
+        extra.append({"position": len(extra), "heading": heading, "text": text})
+    return extra
 
 
 def unmapped_content(data: dict[str, Any], sections: dict[str, str]) -> dict[str, list[str]]:
@@ -505,10 +538,11 @@ def unmapped_content(data: dict[str, Any], sections: dict[str, str]) -> dict[str
     frontmatter = [
         key for key in sorted(FRONTMATTER_HOMES_PENDING_V4) if key in data and data[key] not in (None, "", [], {})
     ]
-    unmapped_sections = [
-        heading for heading in sorted(sections) if heading not in SECTION_HOMES and sections[heading].strip()
-    ]
-    return {"frontmatter": frontmatter, "sections": unmapped_sections}
+    # Sections outside SECTION_HOMES now land in finding_sections, so they are no
+    # longer unmapped. Kept as an explicit empty list rather than removed: the
+    # shape is part of sync's report, and a future heading class with no home
+    # would repopulate it.
+    return {"frontmatter": frontmatter, "sections": []}
 
 
 # ---------------------------------------------------------------------------
@@ -532,6 +566,8 @@ _FINDING_COLUMNS = (
     "reconsider_after",
     "created_at",
     "imported_from",
+    "related_paths",
+    "suggested_sweep",
 )
 
 # Fields compared to decide same-id-different-content on sync. Excludes
@@ -580,6 +616,13 @@ def get_finding(conn: Any, finding_id: str) -> dict[str, Any] | None:
         dict(r)
         for r in conn.execute(
             "SELECT kind, target_item, target_finding, note FROM finding_links WHERE finding_id = ? ORDER BY id",
+            (finding_id,),
+        )
+    ]
+    finding["sections"] = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT position, heading, text FROM finding_sections WHERE finding_id = ? ORDER BY position",
             (finding_id,),
         )
     ]
@@ -647,8 +690,44 @@ def insert_finding(conn: Any, actor: str, fields: dict[str, Any], *, imported_fr
                 entry.get("note"),
             ),
         )
+    for section in fields.get("sections") or []:
+        conn.execute(
+            "INSERT INTO finding_sections (finding_id, position, heading, text) VALUES (?, ?, ?, ?)",
+            (finding_id, section["position"], section["heading"], section["text"]),
+        )
+    _insert_legacy_todo_link(conn, finding_id, fields)
     log_finding_event(
         conn, actor, finding_id, "sync" if imported_from is None else "import", {"disposition": disposition}
+    )
+
+
+def _insert_legacy_todo_link(conn: Any, finding_id: str, fields: dict[str, Any]) -> None:
+    """Land a legacy ``todo_id`` as a ``finding_links`` row.
+
+    Kind follows the record's status (see the v4 mapping in
+    _project/specs/findings-domain.md): 'promoted-to' for a promoted finding,
+    'resolved-by' for one that was merely actioned -- a 'promoted-to' edge asserts
+    disposition 'promoted', so using it for an actioned record would misstate the
+    history and break the promote invariant.
+
+    A target that does not resolve is recorded with ``target_item = NULL`` and the
+    original id preserved in the note, then surfaced by the caller. Reported, never
+    silently skipped: the FK is DEFERRABLE, so a bare insert would otherwise fail
+    the whole transaction at COMMIT with no indication of which record was at fault.
+    """
+    todo_id = fields.get("todo_id")
+    if not todo_id:
+        return
+    kind = fields.get("todo_link_kind") or "resolved-by"
+    resolved = conn.execute("SELECT 1 FROM items WHERE id = ?", (todo_id,)).fetchone() is not None
+    conn.execute(
+        "INSERT INTO finding_links (finding_id, kind, target_item, note) VALUES (?, ?, ?, ?)",
+        (
+            finding_id,
+            kind,
+            todo_id if resolved else None,
+            f"imported from todo_id: {todo_id}" + ("" if resolved else " (no such item at import time)"),
+        ),
     )
 
 
@@ -1335,6 +1414,19 @@ def _print_finding(finding: dict[str, Any]) -> None:
     print(finding["why_matters"])
     print("-- Suggested next steps")
     print(finding["next_steps"])
+    for section in finding.get("sections", []):
+        # Verbatim, under the original heading: these carry the "why the review
+        # missed it" meta-analysis the corpus exists for.
+        print(f"-- {section['heading']}")
+        print(section["text"])
+    if finding.get("related_paths"):
+        try:
+            paths = json.loads(finding["related_paths"])
+        except (TypeError, ValueError):  # pragma: no cover - stored by us as JSON
+            paths = [finding["related_paths"]]
+        print("related paths: " + ", ".join(str(path) for path in paths))
+    if finding.get("suggested_sweep"):
+        print(f"suggested sweep: {finding['suggested_sweep']}")
     for evidence in finding.get("evidence", []):
         loc = ""
         if evidence.get("line_start"):
