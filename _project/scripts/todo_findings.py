@@ -153,6 +153,57 @@ DEFAULT_DRAFTS_DIR = vbs.DEFAULT_DRAFTS_DIR
 SYNCED_SUFFIX = ".synced"
 SYNCED_PRUNE_DAYS = 30
 
+# ---------------------------------------------------------------------------
+# Parser-completeness contract
+#
+# `validate_blind_spot.py` decides what a draft may CONTAIN; `parse_draft` below
+# decides what actually reaches the DB. Those two sets drifted silently: the
+# validator accepts 13 frontmatter keys and `_split_body` parses EVERY `## `
+# section, but parse_draft read 5 keys plus `evidence` and only 4 sections --
+# and `sync` still printed "synced 1". Measured over the live 65-record corpus
+# (2026-07-29): 65 of 65 records lost content this way.
+#
+# These maps make the contract explicit and TOTAL, so a NEW validator field
+# fails the guard test immediately instead of vanishing at sync time. The guard
+# in tests/unit/scripts/test_todo_findings.py derives its expectation from
+# `vbs.ALLOWED_FIELDS` itself -- never a hand-copied list, which would drift the
+# same way parse_draft already drifted.
+
+# Frontmatter keys parse_draft lands today, and where each one goes.
+FRONTMATTER_HOMES = {
+    "id": "findings.id",
+    "date": "findings.date",
+    "status": "findings.disposition",
+    "finding_kind": "findings.finding_kind",
+    "review_context": "findings.review_context",
+    "observed_sha": "findings.observed_sha",
+    "urgency": "findings.urgency",
+    "breadth": "findings.breadth",
+    "confidence": "findings.confidence",
+    "evidence": "finding_evidence rows",
+}
+
+# Validator-accepted keys with NO home in schema v3. Every entry is a named,
+# measured loss -- never a licensed omission -- and names the v4 home that will
+# take it (see "Legacy field mapping (schema v4)" in
+# _project/specs/findings-domain.md). The v4 migration empties this map; it must
+# never be used to silence a newly added field.
+FRONTMATTER_HOMES_PENDING_V4 = {
+    "related_paths": "findings.related_paths (v4 column)",
+    "suggested_sweep": "findings.suggested_sweep (v4 column)",
+    "todo_id": "finding_links row, kind by status (v4 mapping)",
+}
+
+# Body sections parse_draft lands today. Any OTHER `## ` heading has no v3 home
+# and is reported as unmapped until the v4 `finding_sections` table exists.
+SECTION_HOMES = {
+    "Finding": "findings.finding_text",
+    "Why this matters": "findings.why_matters",
+    "Suggested next steps": "findings.next_steps",
+    "Triage log": "finding_events rows",
+}
+PENDING_SECTION_HOME_V4 = "finding_sections table (v4)"
+
 # YYYY-MM-DD-HHMMSS-<kebab-slug> (matches the phase-1 validator's FILENAME_RE).
 FINDING_ID_RE = vbs.FILENAME_RE
 
@@ -264,7 +315,28 @@ def parse_draft(path: Path) -> dict[str, Any]:
         "confidence": _str_or_none(data.get("confidence")),
         "evidence": list(data.get("evidence") or []),
         "triage_log": triage_log,
+        # Content the validator accepted but that has no v3 column. Reported, not
+        # dropped: silent loss here is what made `sync` print "synced 1" over 65
+        # records that each lost content. v4 empties both lists.
+        "unmapped": unmapped_content(data, sections),
     }
+
+
+def unmapped_content(data: dict[str, Any], sections: dict[str, str]) -> dict[str, list[str]]:
+    """Validator-accepted content with no home in the current schema.
+
+    Returns ``{"frontmatter": [...], "sections": [...]}`` naming keys and `## `
+    headings that carry a value but that ``parse_draft`` cannot land. Empty lists
+    mean the draft round-trips completely. Keys present but null/empty are NOT
+    reported -- there is nothing to lose.
+    """
+    frontmatter = [
+        key for key in sorted(FRONTMATTER_HOMES_PENDING_V4) if key in data and data[key] not in (None, "", [], {})
+    ]
+    unmapped_sections = [
+        heading for heading in sorted(sections) if heading not in SECTION_HOMES and sections[heading].strip()
+    ]
+    return {"frontmatter": frontmatter, "sections": unmapped_sections}
 
 
 # ---------------------------------------------------------------------------
@@ -477,26 +549,40 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
     Idempotent: an identical already-landed finding is skipped (and its draft
     marked synced). Same-id/different-content is a loud error naming the id --
     never a merge (silent data loss in an audit-trail domain).
+
+    A draft carrying validator-accepted content with no column in the current
+    schema is still inserted, but is deliberately NOT marked ``.synced``: it stays
+    in the unsynced glob so the planning banner keeps surfacing it and the file
+    survives until v4 gives that content a home. Marking it synced would hide the
+    one copy of the un-landed prose behind a rename.
     """
     drafts_dir = Path(drafts_dir).expanduser()
-    result: dict[str, Any] = {"synced": [], "skipped": [], "conflicts": [], "pruned": 0}
+    result: dict[str, Any] = {"synced": [], "skipped": [], "conflicts": [], "pruned": 0, "unmapped": {}}
     if not drafts_dir.is_dir():
         return result
     for path in sorted(drafts_dir.glob("*.md")):
         if path.name == "README.md":
             continue
         fields = parse_draft(path)
+        unmapped = fields.get("unmapped") or {}
+        lossy = bool(unmapped.get("frontmatter") or unmapped.get("sections"))
+        if lossy:
+            # Surfaced, never swallowed: the caller warns. Until v4 lands there is
+            # nowhere to put this content, so the only honest option is to say so.
+            result["unmapped"][fields["id"]] = unmapped
         existing = get_finding(conn, fields["id"])
         if existing is not None:
             if _finding_matches(existing, fields):
                 result["skipped"].append(fields["id"])
-                _mark_synced(path)
+                if not lossy:
+                    _mark_synced(path)
             else:
                 result["conflicts"].append(fields["id"])
             continue
         with todo_db._write_txn(conn):
             insert_finding(conn, actor, fields)
-        _mark_synced(path)
+        if not lossy:
+            _mark_synced(path)
         result["synced"].append(fields["id"])
     result["pruned"] = _prune_synced(drafts_dir)
     if result["conflicts"]:
@@ -872,6 +958,7 @@ def dispatch_finding(conn: Any, actor: str, args: argparse.Namespace) -> int:
             f"synced {len(result['synced'])}, skipped {len(result['skipped'])} (already landed),"
             f" pruned {result['pruned']} old .synced draft(s)"
         )
+        _warn_unmapped(result.get("unmapped") or {})
         return 0
     if command == "dismiss":
         with todo_db._write_txn(conn):
@@ -931,6 +1018,30 @@ def _cmd_triage(conn: Any, actor: str, args: argparse.Namespace) -> int:
             _set_disposition(conn, actor, args.id, args.disposition, args.reason)
     print(f"{args.id} triaged")
     return 0
+
+
+def _warn_unmapped(unmapped: dict[str, dict[str, list[str]]]) -> None:
+    """Warn on stderr about validator-accepted content with no column yet.
+
+    Stderr, so the stdout summary line stays machine-readable. Naming the ids and
+    the exact keys/headings turns what used to be a silent "synced 1" into a
+    reviewable statement of what did NOT land.
+    """
+    if not unmapped:
+        return
+    print(
+        f"warning: {len(unmapped)} draft(s) carry content with no column in schema "
+        f"{todo_db.SCHEMA_VERSION} -- it did NOT land:",
+        file=todo_db.sys.stderr,
+    )
+    for finding_id, detail in sorted(unmapped.items()):
+        lost = [*detail.get("frontmatter", []), *(f"## {h}" for h in detail.get("sections", []))]
+        print(f"  {finding_id}: {', '.join(lost)}", file=todo_db.sys.stderr)
+    print(
+        "  These drafts were left unsynced on purpose so the file survives until "
+        "schema v4 lands a home (see _project/specs/findings-domain.md).",
+        file=todo_db.sys.stderr,
+    )
 
 
 def _print_finding(finding: dict[str, Any]) -> None:

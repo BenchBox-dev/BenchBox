@@ -605,3 +605,141 @@ class TestSurfacingFlow:
         captured = capsys.readouterr()
         assert "ready-item" in captured.out
         assert "finding" not in captured.err  # zero-state: no banner
+
+
+# ---------------------------------------------------------------------------
+# Parser-completeness guard (findings-parser-completeness-guard)
+#
+# The root cause of the silent-loss class: `validate_blind_spot.py` decides what a
+# draft may contain, `parse_draft` decides what reaches the DB, and nothing
+# compared the two. Measured over the live 65-record corpus (2026-07-29), 65 of 65
+# records lost content while `sync` printed "synced 1".
+#
+# Every expectation below is derived from the validator's OWN constants. A
+# hand-copied field list would drift exactly the way parse_draft drifted, which is
+# the defect under test.
+
+vbs = importlib.import_module("validate_blind_spot")
+
+
+class TestParserCompletenessGuard:
+    def test_every_accepted_frontmatter_key_has_a_declared_home(self):
+        declared = set(todo_findings.FRONTMATTER_HOMES) | set(todo_findings.FRONTMATTER_HOMES_PENDING_V4)
+        undeclared = vbs.ALLOWED_FIELDS - declared
+        assert not undeclared, (
+            f"validator accepts {sorted(undeclared)} with no entry in FRONTMATTER_HOMES or "
+            "FRONTMATTER_HOMES_PENDING_V4 -- add a home, or name it pending with its v4 target. "
+            "An undeclared field is silently dropped at sync time."
+        )
+
+    def test_no_declared_home_for_a_field_the_validator_rejects(self):
+        # The other direction: a home for a field the validator will never accept is
+        # dead weight that misleads the next reader about what can arrive.
+        declared = set(todo_findings.FRONTMATTER_HOMES) | set(todo_findings.FRONTMATTER_HOMES_PENDING_V4)
+        assert not (declared - vbs.ALLOWED_FIELDS)
+
+    def test_pending_set_is_exactly_the_known_v3_gap(self):
+        # Pins the measured gap so v4 must EMPTY this set deliberately rather than
+        # a future field quietly joining it.
+        assert set(todo_findings.FRONTMATTER_HOMES_PENDING_V4) == {
+            "related_paths",
+            "suggested_sweep",
+            "todo_id",
+        }
+
+    def test_declared_section_homes_cover_the_required_headings(self):
+        required = {heading.removeprefix("## ") for heading in vbs.REQUIRED_BODY_HEADINGS}
+        assert required <= set(todo_findings.SECTION_HOMES)
+
+    def test_guard_fails_closed_on_a_new_validator_field(self, monkeypatch):
+        # Proves the guard actually fails rather than merely passing today: add a
+        # field to the validator's accepted set and the completeness check must break.
+        monkeypatch.setattr(vbs, "ALLOWED_FIELDS", vbs.ALLOWED_FIELDS | {"newly_added_field"})
+        declared = set(todo_findings.FRONTMATTER_HOMES) | set(todo_findings.FRONTMATTER_HOMES_PENDING_V4)
+        assert vbs.ALLOWED_FIELDS - declared == {"newly_added_field"}
+
+
+class TestUnmappedContentIsReported:
+    def test_parse_draft_reports_unmapped_frontmatter_and_sections(self, tmp_path):
+        stem = "2026-01-02-030405-legacy-shaped-record"
+        (tmp_path / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            "related_paths:\n  - benchbox/core/thing.py\n"
+            "suggested_sweep: rg -n 'thing' benchbox/\n"
+            "---\n\n"
+            "# A legacy-shaped record\n\n"
+            "## Finding\nthe review never checks axis Y\n\n"
+            "## Why this matters\naxis Y is a whole dimension\n\n"
+            "## Suggested next steps\n- [ ] add a gate\n\n"
+            "## Why the five-axis review missed it\nthe rubric had no axis for it\n",
+            encoding="utf-8",
+        )
+        fields = todo_findings.parse_draft(tmp_path / f"{stem}.md")
+        assert fields["unmapped"]["frontmatter"] == ["related_paths", "suggested_sweep"]
+        assert fields["unmapped"]["sections"] == ["Why the five-axis review missed it"]
+
+    def test_clean_draft_reports_nothing_unmapped(self, tmp_path):
+        path = _draft(tmp_path / "d", "2026-01-02-030405-a-clean-record")
+        fields = todo_findings.parse_draft(path)
+        assert fields["unmapped"] == {"frontmatter": [], "sections": []}
+
+    def test_empty_optional_keys_are_not_reported_as_loss(self, tmp_path):
+        # A key present but null carries nothing, so reporting it would be noise.
+        stem = "2026-01-02-030405-null-optionals"
+        (tmp_path / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            "related_paths:\n"
+            "suggested_sweep:\n"
+            "todo_id:\n"
+            "---\n\n"
+            "# Null optionals\n\n"
+            "## Finding\nf\n\n## Why this matters\nw\n\n## Suggested next steps\n- [ ] s\n",
+            encoding="utf-8",
+        )
+        fields = todo_findings.parse_draft(tmp_path / f"{stem}.md")
+        assert fields["unmapped"] == {"frontmatter": [], "sections": []}
+
+    def test_sync_warns_and_leaves_a_lossy_draft_unsynced(self, conn, tmp_path, capsys):
+        stem = "2026-01-02-030405-lossy-record"
+        (tmp_path / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            "suggested_sweep: rg -n 'thing' benchbox/\n"
+            "---\n\n"
+            "# Lossy record\n\n"
+            "## Finding\nf\n\n## Why this matters\nw\n\n## Suggested next steps\n- [ ] s\n",
+            encoding="utf-8",
+        )
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["synced"] == [stem]
+        assert result["unmapped"][stem]["frontmatter"] == ["suggested_sweep"]
+        # The row landed, but the file stays visible: it holds the only copy of the
+        # prose that did not land, so hiding it behind a .synced rename would be the
+        # silent loss this guard exists to stop.
+        assert (tmp_path / f"{stem}.md").exists()
+        assert not (tmp_path / f"{stem}.md.synced").exists()
+        assert todo_findings.count_unsynced_drafts(tmp_path) == 1
+        todo_findings._warn_unmapped(result["unmapped"])
+        assert "did NOT land" in capsys.readouterr().err
+
+    def test_sync_marks_a_clean_draft_synced_as_before(self, conn, tmp_path):
+        path = _draft(tmp_path / "d", "2026-01-02-030405-a-clean-record")
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["synced"] == ["2026-01-02-030405-a-clean-record"]
+        assert result["unmapped"] == {}
+        assert not path.exists()
+        assert path.with_name(path.name + ".synced").exists()
