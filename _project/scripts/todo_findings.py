@@ -556,16 +556,19 @@ def _evidence_differs(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
     return _normalize_evidence(existing.get("evidence")) != _normalize_evidence(fields.get("evidence"))
 
 
-def _reconcile_evidence(conn: Any, actor: str, finding_id: str, fields: dict[str, Any]) -> None:
+def _reconcile_evidence(conn: Any, actor: str, existing: dict[str, Any], fields: dict[str, Any]) -> None:
     """Replace a finding's evidence rows with the draft's, in ONE write txn.
 
     The draft file is authoritative for capture-owned payload, so an evidence-only
     edit is persisted rather than silently marked synced (which lost the edit) or
     reported as a content conflict (which the prose did not justify). The
     before/after is recorded in ``finding_events``, so the audit trail carries the
-    change instead of the row quietly differing from its draft.
+    change instead of the row quietly differing from its draft. ``existing`` is the
+    row the caller already fetched -- re-reading it here would cost an extra hosted
+    round-trip for no new information.
     """
-    before = _normalize_evidence(get_finding(conn, finding_id).get("evidence"))
+    finding_id = str(existing["id"])
+    before = _normalize_evidence(existing.get("evidence"))
     after = _normalize_evidence(fields.get("evidence"))
     with todo_db._write_txn(conn):
         conn.execute("DELETE FROM finding_evidence WHERE finding_id = ?", (finding_id,))
@@ -701,7 +704,7 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
             if _evidence_differs(existing, fields):
                 # Capture-owned payload the old comparison ignored entirely: the
                 # draft used to be marked .synced and the edit lost silently.
-                _reconcile_evidence(conn, actor, fields["id"], fields)
+                _reconcile_evidence(conn, actor, existing, fields)
                 result["updated"].append(fields["id"])
             else:
                 result["skipped"].append(fields["id"])
