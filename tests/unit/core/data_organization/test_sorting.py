@@ -162,6 +162,18 @@ def _write_tbl_clean(path: Path, rows: list[tuple[object, ...]]) -> None:
             f.write("|".join(str(v) for v in row) + "\n")
 
 
+def _write_tbl_crlf(path: Path, rows: list[tuple[object, ...]]) -> None:
+    """Write trailing-delimiter TBL rows with explicit CRLF line endings.
+
+    The other helpers open in text mode, so they emit the platform's native
+    line ending - LF on macOS/Linux, CRLF on Windows. These bytes are written
+    explicitly so the CRLF framing is exercised on every platform rather than
+    only on the Windows nightly leg.
+    """
+    payload = b"".join(("|".join(str(v) for v in row) + "|\r\n").encode("utf-8") for row in rows)
+    path.write_bytes(payload)
+
+
 class TestSortedParquetWriterSingleColumn:
     def test_single_column_sorting_writes_sorted_parquet(self, tmp_path: Path):
         source = tmp_path / "lineitem.tbl"
@@ -219,6 +231,50 @@ class TestSortedParquetWriterSingleColumn:
         assert table.column_names == ["id", "l_shipdate"]
         assert table.column("l_shipdate").to_pylist() == [date(1992, 1, 2), date(1996, 5, 17), date(1998, 3, 1)]
         assert table.column("id").to_pylist() == [1, 2, 3]
+
+    def test_reads_trailing_delimiter_tbl_with_crlf_line_endings(self, tmp_path: Path):
+        """Trailing-delimiter framing must be detected under CRLF line endings.
+
+        The framing probe used to read the file's last two bytes and look for
+        b"|\\n", which a CRLF file never matches - its tail is b"|\\r\\n". The
+        reader then omitted the synthetic trailing column and PyArrow failed
+        with "Expected N columns, got N+1". This only reproduced on the Windows
+        nightly leg, where the test helpers emit CRLF natively."""
+        source = tmp_path / "lineitem.tbl"
+        _write_tbl_crlf(
+            source,
+            [
+                (3, "1998-03-01"),
+                (1, "1992-01-02"),
+                (2, "1996-05-17"),
+            ],
+        )
+        schema_registry = {"lineitem": {"columns": [{"name": "id"}, {"name": "l_shipdate"}]}}
+        config = DataOrganizationConfig(sort_columns=[SortColumn(name="l_shipdate")], compression="none")
+        writer = SortedParquetWriter(config=config, schema_registry=schema_registry)
+
+        output = writer.write_sorted_parquet("lineitem", [source], tmp_path)
+
+        table = pq.read_table(output)
+        assert table.column_names == ["id", "l_shipdate"]
+        assert table.column("l_shipdate").to_pylist() == [date(1992, 1, 2), date(1996, 5, 17), date(1998, 3, 1)]
+        assert table.column("id").to_pylist() == [1, 2, 3]
+
+    def test_crlf_source_still_reports_unknown_sort_column(self, tmp_path: Path):
+        """Column validation must outrank a framing misread on CRLF input.
+
+        _read_tbl_files() runs before _sort_table(), so a framing misread threw
+        ArrowInvalid before the sort-column check could raise ValueError. That
+        is what made the "unknown column" assertions fail on Windows - the
+        error message never drifted, the exception type did."""
+        source = tmp_path / "orders.tbl"
+        _write_tbl_crlf(source, [(1, "2024-01-01")])
+        schema_registry = {"orders": {"columns": [{"name": "o_orderkey"}, {"name": "o_orderdate"}]}}
+        config = DataOrganizationConfig(sort_columns=[SortColumn(name="missing_col")], compression="none")
+        writer = SortedParquetWriter(config=config, schema_registry=schema_registry)
+
+        with pytest.raises(ValueError, match="Sort column 'missing_col' not found"):
+            writer.write_sorted_parquet("orders", [source], tmp_path)
 
 
 class TestSortedParquetWriterMultiColumn:
