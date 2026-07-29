@@ -246,20 +246,114 @@ def test_export_writes_lossless_envelope_and_legacy_views(monkeypatch: pytest.Mo
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
     output_dir = tmp_path / "snapshot"
 
-    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "export", "--out", str(output_dir)]) == 0
+    lossless_dir = tmp_path / "lossless"
 
-    lossless = json.loads((output_dir / "todo-db.json").read_text(encoding="utf-8"))
-    assert lossless["metadata"] == envelope["metadata"]
-    assert lossless["events"] == envelope["events"]
+    assert (
+        compat.main(
+            [
+                "--db",
+                str(tmp_path / "todo.sqlite"),
+                "export",
+                "--out",
+                str(output_dir),
+                "--lossless-out",
+                str(lossless_dir),
+            ]
+        )
+        == 0
+    )
+
+    # The lossless envelope is the recovery artifact -- complete, and OUTSIDE the
+    # committed snapshot directory.
+    lossless = json.loads((lossless_dir / "todo-db.json").read_text(encoding="utf-8"))
+    assert lossless == envelope
+    assert not (output_dir / "todo-db.json").exists()
     item = json.loads((output_dir / "items.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert item["work"][0]["wid"] == "w0"
     assert "sample-item" in (output_dir / "index.md").read_text(encoding="utf-8")
+    # events.jsonl comes from THIS envelope (one read snapshot), not a stale
+    # leftover from a separate main-path export.
+    events = [json.loads(line) for line in (output_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert events == envelope["events"]
+
+
+def test_export_lossless_envelope_defaults_outside_the_committed_snapshot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Without --lossless-out the envelope must STILL not land in --out: the
+    # workflow's `git add "${EXPORT_DIR}"` would otherwise commit it.
+    envelope = _envelope()
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        Path(argv[argv.index("--output") + 1]).write_text(json.dumps(envelope), encoding="utf-8")
+        return CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    output_dir = tmp_path / "snapshot"
+
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "export", "--out", str(output_dir)]) == 0
+
+    assert not (output_dir / "todo-db.json").exists()
+    assert (output_dir.parent / f"{output_dir.name}-lossless" / "todo-db.json").exists()
+
+
+def test_export_never_commits_findings_domain_prose(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The guard: findings review prose must never reach the committed snapshot.
+
+    Mirrors the phase-2 allowlist pin for the standalone path -- a findings table
+    in the envelope may travel in the lossless recovery artifact, never in --out.
+    """
+    envelope = _envelope()
+    prose = "SENTINEL-findings-review-prose"
+    envelope["tables"]["findings"] = [
+        {
+            "id": "2026-01-02-030405-a-class",
+            "title": f"{prose}-title",
+            "finding_text": f"{prose}-finding",
+            "why_matters": f"{prose}-why",
+            "disposition": "open",
+        }
+    ]
+    envelope["tables"]["finding_evidence"] = [{"finding_id": "2026-01-02-030405-a-class", "path": "x.py"}]
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        Path(argv[argv.index("--output") + 1]).write_text(json.dumps(envelope), encoding="utf-8")
+        return CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    output_dir = tmp_path / "snapshot"
+    lossless_dir = tmp_path / "lossless"
+
+    assert (
+        compat.main(
+            [
+                "--db",
+                str(tmp_path / "todo.sqlite"),
+                "export",
+                "--out",
+                str(output_dir),
+                "--lossless-out",
+                str(lossless_dir),
+            ]
+        )
+        == 0
+    )
+
+    for path in sorted(output_dir.rglob("*")):
+        if path.is_file():
+            assert prose not in path.read_text(encoding="utf-8"), f"findings prose leaked into {path.name}"
+            assert "finding_evidence" not in path.read_text(encoding="utf-8")
+    # ...but the recovery artifact is still lossless.
+    assert prose in (lossless_dir / "todo-db.json").read_text(encoding="utf-8")
 
 
 def test_export_views_are_byte_identical_to_legacy_format(tmp_path: Path) -> None:
     envelope = _envelope()
     envelope["tables"]["items"][0]["title"] = "Café | table"
-    compat._write_legacy_export(tmp_path, envelope)
+    compat._write_legacy_export(tmp_path / "out", envelope, tmp_path / "lossless")
+    tmp_path = tmp_path / "out"
     item = compat._item_rows(envelope)[0]
     assert (tmp_path / "items.jsonl").read_text(encoding="utf-8") == json.dumps(item, sort_keys=True) + "\n"
     assert "| sample-item | planning | high | benchbox | Café | table |" in (tmp_path / "index.md").read_text(

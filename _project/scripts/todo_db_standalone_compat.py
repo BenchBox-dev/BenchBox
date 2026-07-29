@@ -237,24 +237,49 @@ def _atomic_write(path: Path, content: str) -> None:
     temporary.replace(path)
 
 
-def _write_legacy_export(output_dir: Path, envelope: dict[str, Any]) -> tuple[Path, Path, Path]:
+def _write_legacy_export(
+    output_dir: Path, envelope: dict[str, Any], lossless_dir: Path | None = None
+) -> tuple[Path, Path, Path, Path]:
+    """Write the committed items-domain views, plus the lossless envelope.
+
+    ``output_dir`` receives ONLY the items-domain views -- ``items.jsonl``,
+    ``events.jsonl``, ``index.md`` -- because it is the version-controlled export
+    snapshot. The lossless ``todo-db.json`` (every table, including the findings
+    domain whose review prose is deliberately not version-controlled) goes to
+    ``lossless_dir``, which defaults to a sibling *outside* ``output_dir`` so the
+    workflow's `git add` can never stage it. It remains the complete recovery
+    artifact the restore round-trip replays.
+
+    ``events.jsonl`` is derived from THIS envelope, not left over from a separate
+    main-path export: both committed views therefore come from one read snapshot,
+    so an item can never be missing the event that created it.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
-    lossless_path = output_dir / "todo-db.json"
+    lossless_dir = lossless_dir if lossless_dir is not None else output_dir.parent / f"{output_dir.name}-lossless"
+    lossless_dir.mkdir(parents=True, exist_ok=True)
+    lossless_path = lossless_dir / "todo-db.json"
     items_path = output_dir / "items.jsonl"
+    events_path = output_dir / "events.jsonl"
     index_path = output_dir / "index.md"
     items = _item_rows(envelope)
     _atomic_write(lossless_path, _canonical_json(envelope))
     _atomic_write(items_path, "".join(_canonical_json(item) for item in items))
+    events = sorted((dict(row) for row in envelope.get("events") or []), key=lambda row: row["seq"])
+    _atomic_write(events_path, "".join(_canonical_json(event) for event in events))
     lines = ["# TODO export", "", "| id | state | priority | worktree | title |", "|---|---|---|---|---|"]
     for item in items:
         lines.append(f"| {item['id']} | {item['state']} | {item['priority']} | {item['worktree']} | {item['title']} |")
     _atomic_write(index_path, "\n".join(lines) + "\n")
-    return lossless_path, items_path, index_path
+    return lossless_path, items_path, events_path, index_path
 
 
 def _export(argv: list[str], cwd: Path) -> int:
     out_dir, without_out = _option_value(argv, "--out")
+    # The lossless envelope is written outside --out (the committed snapshot);
+    # --lossless-out relocates it, e.g. to a CI artifact staging directory.
+    lossless_out, without_out = _option_value(without_out, "--lossless-out")
     output_dir = Path(out_dir).expanduser() if out_dir else cwd / ".todo-db" / "export"
+    lossless_dir = Path(lossless_out).expanduser() if lossless_out else None
     with tempfile.TemporaryDirectory(prefix="benchbox-todo-db-export-") as temporary:
         standalone_output = Path(temporary) / "todo-db.json"
         located = _command_index(without_out)
@@ -273,8 +298,8 @@ def _export(argv: list[str], cwd: Path) -> int:
         if result.returncode:
             return result.returncode
         envelope = json.loads(standalone_output.read_text(encoding="utf-8"))
-        lossless, items, index = _write_legacy_export(output_dir, envelope)
-        print(f"wrote {items} and {index} (lossless envelope: {lossless})")
+        lossless, items, events, index = _write_legacy_export(output_dir, envelope, lossless_dir)
+        print(f"wrote {items}, {events} and {index} (lossless envelope: {lossless})")
         return 0
 
 
