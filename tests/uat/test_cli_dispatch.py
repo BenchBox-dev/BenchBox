@@ -4,15 +4,29 @@ from __future__ import annotations
 
 import json
 import subprocess
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from tests.uat import _cli
 from tests.uat.config import validate_config
 
 pytestmark = pytest.mark.fast
+
+
+def _write_uat_config(path: Path, payload: dict) -> None:
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def test_write_uat_config_round_trips_windows_paths(tmp_path: Path) -> None:
+    config_path = tmp_path / "uat.yaml"
+    windows_path = str(PureWindowsPath("C:/Users/runneradmin/uat/{name}-{date}"))
+
+    _write_uat_config(config_path, {"name": "windows-path", "output": {"logs_dir_template": windows_path}})
+
+    assert yaml.safe_load(config_path.read_text(encoding="utf-8"))["output"]["logs_dir_template"] == windows_path
 
 
 def test_main_routes_subcommand(monkeypatch):
@@ -126,25 +140,24 @@ def test_main_preflight_returns_2_when_preflight_aborts(tmp_path, monkeypatch, c
 
 def test_execute_and_sweep_use_same_preflight_kwargs(tmp_path, monkeypatch):
     config_path = tmp_path / "uat.yaml"
-    config_path.write_text(
-        "\n".join(
-            [
-                'name: "preflight-kwargs"',
-                "phases: [preflight, execute]",
-                "platforms:",
-                '  include: ["postgresql"]',
-                "preflight:",
-                "  free_space_min_gib: 12.5",
-                f'  free_space_path: "{tmp_path / "free-space"}"',
-                "  docker_required: true",
-                "  noisy_neighbor_warn_load: 3.5",
-                "  local_platforms_check: true",
-                "output:",
-                f'  benchmark_runs_dir_template: "{tmp_path / "runs"}"',
-                f'  logs_dir_template: "{tmp_path / "logs" / "{name}-{date}"}"',
-            ]
-        ),
-        encoding="utf-8",
+    _write_uat_config(
+        config_path,
+        {
+            "name": "preflight-kwargs",
+            "phases": ["preflight", "execute"],
+            "platforms": {"include": ["postgresql"]},
+            "preflight": {
+                "free_space_min_gib": 12.5,
+                "free_space_path": str(tmp_path / "free-space"),
+                "docker_required": True,
+                "noisy_neighbor_warn_load": 3.5,
+                "local_platforms_check": True,
+            },
+            "output": {
+                "benchmark_runs_dir_template": str(tmp_path / "runs"),
+                "logs_dir_template": str(tmp_path / "logs" / "{name}-{date}"),
+            },
+        },
     )
     calls: list[dict[str, object]] = []
 
@@ -325,23 +338,16 @@ def test_make_uat_bring_up_unknown_platform_still_fails_clearly():
 
 def test_execute_main_reads_cleanup_config_for_standalone_path(tmp_path, monkeypatch, capsys):
     config_path = tmp_path / "uat.yaml"
-    config_path.write_text(
-        "\n".join(
-            [
-                'name: "managed-cli"',
-                "phases: [execute]",
-                "platforms:",
-                '  include: ["clickhouse-server"]',
-                "benchmarks:",
-                '  include: ["tpch"]',
-                "scales:",
-                "  rungs: [0.01]",
-                "cleanup:",
-                "  docker_manage_platforms: true",
-                '  docker_platform_switch: "volumes"',
-            ]
-        ),
-        encoding="utf-8",
+    _write_uat_config(
+        config_path,
+        {
+            "name": "managed-cli",
+            "phases": ["execute"],
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        },
     )
     captured: dict[str, object] = {}
 
@@ -409,24 +415,17 @@ def test_uat_execute_and_execute_only_sweep_produce_identical_cells_jsonl(tmp_pa
     monkeypatch.setattr("tests.uat.phases.execute.run_cell", fake_run_cell)
 
     config_path = tmp_path / "uat.yaml"
-    config_path.write_text(
-        "\n".join(
-            [
-                'name: "parity-smoke"',
-                "phases: [execute]",
-                "platforms:",
-                '  include: ["duckdb"]',
-                "benchmarks:",
-                '  include: ["tpch"]',
-                "scales:",
-                "  rungs: [0.01]",
-                "preflight:",
-                "  free_space_min_gib: 0",
-                "output:",
-                f'  logs_dir_template: "{tmp_path / "execute-run"}"',
-            ]
-        ),
-        encoding="utf-8",
+    _write_uat_config(
+        config_path,
+        {
+            "name": "parity-smoke",
+            "phases": ["execute"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "preflight": {"free_space_min_gib": 0},
+            "output": {"logs_dir_template": str(tmp_path / "execute-run")},
+        },
     )
 
     rc = _cli.main(["execute", "--config", str(config_path)])
@@ -455,23 +454,17 @@ def test_execute_main_reports_success_for_dry_run_config(tmp_path, monkeypatch, 
     even though the (no-op) phase loop succeeded.
     """
     config_path = tmp_path / "uat.yaml"
-    config_path.write_text(
-        "\n".join(
-            [
-                'name: "dry-run-smoke"',
-                "dry_run: true",
-                "phases: [execute]",
-                "platforms:",
-                '  include: ["duckdb"]',
-                "benchmarks:",
-                '  include: ["tpch"]',
-                "scales:",
-                "  rungs: [0.01]",
-                "output:",
-                f'  logs_dir_template: "{tmp_path / "dry-run-execute"}"',
-            ]
-        ),
-        encoding="utf-8",
+    _write_uat_config(
+        config_path,
+        {
+            "name": "dry-run-smoke",
+            "dry_run": True,
+            "phases": ["execute"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "output": {"logs_dir_template": str(tmp_path / "dry-run-execute")},
+        },
     )
 
     def fail_run_execute(config, **kwargs):
