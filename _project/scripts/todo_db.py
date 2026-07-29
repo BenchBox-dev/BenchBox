@@ -73,11 +73,15 @@ if _self_module is not None:
 # touches todo_db. See todo_findings.py's header.
 import todo_findings  # noqa: E402
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
-# Applied in order by `todo migrate`; each version's statements are additive.
-# v3 lands the findings domain; its DDL comes from todo_findings so the fresh
-# schema (SCHEMA_SQL) and the migration delta are ONE source and cannot drift.
+# Applied in order by `todo migrate`. v3 lands the findings domain; v4 adds the
+# lossless homes for legacy capture fields and makes finding_links.target_item
+# DEFERRABLE. Both deltas come from todo_findings, and each version's delta is
+# FROZEN once released -- v3's statements must keep producing exactly v3 so a v2
+# database can still climb through it. That a migrated database ends up identical
+# to a fresh one is pinned by a test rather than by sharing one DDL string, since
+# ALTER-based deltas can never be literally the same text as the CREATEs.
 MIGRATIONS: dict[int, list[str]] = {
     2: [
         "ALTER TABLE work_units ADD COLUMN started_at TEXT",
@@ -85,6 +89,7 @@ MIGRATIONS: dict[int, list[str]] = {
         "ALTER TABLE work_units ADD COLUMN started_branch TEXT",
     ],
     3: todo_findings.finding_schema_statements(),
+    4: todo_findings.finding_migration_v4_statements(),
 }
 
 PRIORITIES = ("critical", "high", "medium-high", "medium", "low")
@@ -223,8 +228,9 @@ CREATE INDEX idx_deferrals_open ON deferrals(from_item, resolution);
 """
 
 # The full current schema = core (items domain) + findings domain (phase 3). A
-# fresh bootstrap runs this; an existing v2 DB reaches the same schema through
-# MIGRATIONS[3], which applies todo_findings.FINDINGS_SCHEMA_SQL verbatim.
+# fresh bootstrap runs this; an existing older DB reaches the same schema by
+# climbing MIGRATIONS (v3 lands the findings tables, v4 the lossless columns,
+# finding_sections, and the DEFERRABLE link FK).
 SCHEMA_SQL = _CORE_SCHEMA_SQL + todo_findings.FINDINGS_SCHEMA_SQL
 
 

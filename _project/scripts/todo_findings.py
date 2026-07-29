@@ -46,7 +46,16 @@ import validate_blind_spot as vbs  # sibling; no todo_db dependency, so cycle-fr
 # domain "Export boundary"), and the phase-2 pinning test fails closed on any
 # ``finding%`` table by construction.
 
-FINDINGS_SCHEMA_SQL = """
+# ---------------------------------------------------------------------------
+# Frozen v3 findings DDL -- HISTORY, never edit.
+#
+# This is the exact delta MIGRATIONS[3] applied. A v2 database still reaches v3
+# through it before MIGRATIONS[4] brings it to the current shape, so changing it
+# would rewrite history and make the two paths disagree. Current-shape DDL is
+# FINDINGS_SCHEMA_SQL below; that "a migrated DB equals a fresh DB" is pinned by
+# a test, which is a stronger guarantee than sharing one string could be.
+
+FINDINGS_SCHEMA_V3_SQL = """
 CREATE TABLE findings (
   id                 TEXT PRIMARY KEY CHECK (length(id) BETWEEN 3 AND 200),
   date               TEXT NOT NULL,
@@ -103,16 +112,151 @@ CREATE INDEX idx_findings_disposition ON findings(disposition);
 CREATE INDEX idx_finding_events_finding ON finding_events(finding_id, seq);
 """
 
+# ---------------------------------------------------------------------------
+# Current (v4) findings DDL, used for fresh databases via todo_db.SCHEMA_SQL.
+#
+# v4 adds the lossless homes for legacy capture fields (see "Legacy field
+# mapping (schema v4)" in _project/specs/findings-domain.md) and makes
+# finding_links.target_item DEFERRABLE.
+#
+# Why DEFERRABLE INITIALLY DEFERRED: a hosted `--replace` reload DELETEs every
+# items-domain table and reinserts it inside ONE transaction. findings tables are
+# deliberately absent from TRANSFER_TABLES, so with an immediate FK the DELETE
+# aborts ("FOREIGN KEY constraint failed") even though the very same transaction
+# restores the item -- a false failure that made the reload unusable. Deferring
+# the check to COMMIT lets the legitimate delete-then-reinsert succeed with the
+# promote link intact, while a genuine dangler is still refused at COMMIT.
+# ON DELETE SET NULL was rejected: it nulls target_item even when the item IS
+# restored, destroying promote provenance on every reload.
+
+FINDINGS_SCHEMA_SQL = """
+CREATE TABLE findings (
+  id                 TEXT PRIMARY KEY CHECK (length(id) BETWEEN 3 AND 200),
+  date               TEXT NOT NULL,
+  finding_kind       TEXT NOT NULL,
+  review_context     TEXT NOT NULL,
+  observed_sha       TEXT,
+  title              TEXT NOT NULL,
+  finding_text       TEXT NOT NULL,
+  why_matters        TEXT NOT NULL,
+  next_steps         TEXT NOT NULL,
+  disposition        TEXT NOT NULL DEFAULT 'open' CHECK (disposition IN
+                       ('open','actionable','actioned','dismissed','promoted')),
+  disposition_reason TEXT,
+  urgency            TEXT,
+  breadth            TEXT,
+  confidence         TEXT,
+  reconsider_after   TEXT,
+  created_at         TEXT NOT NULL,
+  imported_from      TEXT,
+  related_paths      TEXT,
+  suggested_sweep    TEXT,
+  CHECK (disposition NOT IN ('actionable','dismissed')
+         OR (disposition_reason IS NOT NULL AND length(disposition_reason) > 0))
+);
+
+CREATE TABLE finding_evidence (
+  id         INTEGER PRIMARY KEY,
+  finding_id TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  path       TEXT NOT NULL,
+  pattern    TEXT,
+  line_start INTEGER,
+  line_end   INTEGER,
+  note       TEXT
+);
+
+CREATE TABLE finding_links (
+  id             INTEGER PRIMARY KEY,
+  finding_id     TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  kind           TEXT NOT NULL CHECK (kind IN
+                   ('promoted-to','informs','resolved-by','related-finding','duplicate-of')),
+  target_item    TEXT REFERENCES items(id) DEFERRABLE INITIALLY DEFERRED,
+  target_finding TEXT REFERENCES findings(id),
+  note           TEXT
+);
+
+CREATE TABLE finding_events (
+  seq        INTEGER PRIMARY KEY,
+  at         TEXT NOT NULL,
+  actor      TEXT NOT NULL,
+  finding_id TEXT REFERENCES findings(id),
+  action     TEXT NOT NULL,
+  detail     TEXT
+);
+
+CREATE TABLE finding_sections (
+  id         INTEGER PRIMARY KEY,
+  finding_id TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  position   INTEGER NOT NULL,
+  heading    TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  UNIQUE (finding_id, position)
+);
+
+CREATE INDEX idx_findings_disposition ON findings(disposition);
+CREATE INDEX idx_finding_events_finding ON finding_events(finding_id, seq);
+CREATE INDEX idx_finding_sections_finding ON finding_sections(finding_id, position);
+"""
+
+
+# The v3 -> v4 delta applied by todo_db.MIGRATIONS[4] to an existing v3 database.
+# SQLite cannot ALTER a foreign key, so finding_links is rebuilt: create, copy,
+# drop, rename. Nothing references finding_links, so the drop is safe. No SQL
+# comments here -- _split_ddl splits on ";" and a comment-only fragment would
+# become a bogus statement.
+FINDINGS_MIGRATION_V4_SQL = """
+ALTER TABLE findings ADD COLUMN related_paths TEXT;
+ALTER TABLE findings ADD COLUMN suggested_sweep TEXT;
+
+CREATE TABLE finding_sections (
+  id         INTEGER PRIMARY KEY,
+  finding_id TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  position   INTEGER NOT NULL,
+  heading    TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  UNIQUE (finding_id, position)
+);
+
+CREATE INDEX idx_finding_sections_finding ON finding_sections(finding_id, position);
+
+CREATE TABLE finding_links_v4 (
+  id             INTEGER PRIMARY KEY,
+  finding_id     TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  kind           TEXT NOT NULL CHECK (kind IN
+                   ('promoted-to','informs','resolved-by','related-finding','duplicate-of')),
+  target_item    TEXT REFERENCES items(id) DEFERRABLE INITIALLY DEFERRED,
+  target_finding TEXT REFERENCES findings(id),
+  note           TEXT
+);
+
+INSERT INTO finding_links_v4 (id, finding_id, kind, target_item, target_finding, note)
+  SELECT id, finding_id, kind, target_item, target_finding, note FROM finding_links;
+
+DROP TABLE finding_links;
+
+ALTER TABLE finding_links_v4 RENAME TO finding_links;
+"""
+
+
+def _split_ddl(sql: str) -> list[str]:
+    """Semicolon-split our own controlled DDL. No string literal contains a ";"."""
+    return [statement.strip() for statement in sql.split(";") if statement.strip()]
+
 
 def finding_schema_statements() -> list[str]:
-    """The v3 migration delta: each CREATE statement, semicolon-split.
+    """The v3 migration delta (``todo_db.MIGRATIONS[3]``): frozen history.
 
-    Shared verbatim by ``todo_db.SCHEMA_SQL`` (fresh DBs) and
-    ``todo_db.MIGRATIONS[3]`` (existing v2 DBs) so the two representations of the
-    findings schema can never drift. FINDINGS_SCHEMA_SQL is our own controlled
-    DDL: no string literal contains a ``;``.
+    Derived from FINDINGS_SCHEMA_V3_SQL, NOT from the current-shape
+    FINDINGS_SCHEMA_SQL: a v2 database must reach exactly v3 here and then be
+    carried to the current shape by MIGRATIONS[4]. Deriving this from the current
+    DDL would create v4 tables at v3 and then collide with the v4 ALTERs.
     """
-    return [statement.strip() for statement in FINDINGS_SCHEMA_SQL.split(";") if statement.strip()]
+    return _split_ddl(FINDINGS_SCHEMA_V3_SQL)
+
+
+def finding_migration_v4_statements() -> list[str]:
+    """The v3 -> v4 delta (``todo_db.MIGRATIONS[4]``)."""
+    return _split_ddl(FINDINGS_MIGRATION_V4_SQL)
 
 
 import todo_db  # noqa: E402  (cycle-break: import must follow FINDINGS_SCHEMA_SQL; see note above)

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import sqlite3
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -107,10 +108,22 @@ def _draft(path: Path, stem: str, *, status="open", finding="the review never ch
 
 
 class TestFindingsSchema:
-    def test_v3_tables_and_version(self, conn):
+    def test_findings_tables_and_current_version(self, conn):
         tables = {row["name"] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        assert {"findings", "finding_evidence", "finding_links", "finding_events"} <= tables
-        assert conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()["value"] == "3"
+        assert {
+            "findings",
+            "finding_evidence",
+            "finding_links",
+            "finding_events",
+            "finding_sections",
+        } <= tables
+        assert conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()["value"] == str(
+            todo_db.SCHEMA_VERSION
+        )
+
+    def test_v4_columns_present(self, conn):
+        cols = {row["name"] for row in conn.execute("PRAGMA table_info(findings)")}
+        assert {"related_paths", "suggested_sweep"} <= cols
 
     def test_disposition_check_rejects_unknown(self, conn):
         with pytest.raises(todo_db.sqlite3.IntegrityError):
@@ -956,3 +969,147 @@ class TestEvidenceReconcileIsNotDestructive:
         result = todo_findings.sync_drafts(conn, "tester", tmp_path)
         assert result["updated"] == [stem]
         assert todo_findings.get_finding(conn, stem)["evidence"] == []
+
+
+class TestV4MigrationEquivalence:
+    """v4's delta is ALTER/CREATE/rebuild statements, so it can never be the same
+    text as the fresh CREATEs. The property that actually matters — a migrated
+    database is indistinguishable from a fresh one — is therefore pinned here
+    rather than by sharing one DDL string."""
+
+    @staticmethod
+    def _schema(conn):
+        """Normalized sqlite_master rows.
+
+        Whitespace is collapsed, and `CREATE TABLE "x"` is normalized to
+        `CREATE TABLE x`: SQLite always quotes the new name in
+        `ALTER TABLE ... RENAME TO`, so the rebuilt finding_links carries quotes a
+        freshly created one does not. That is a documented SQLite formatting
+        artifact of the rebuild, not a schema difference -- every column, type,
+        constraint, and FK clause still has to match exactly.
+        """
+        rows = []
+        for row in conn.execute("SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"):
+            sql = " ".join((row["sql"] or "").split())
+            sql = sql.replace(f'CREATE TABLE "{row["name"]}"', f"CREATE TABLE {row['name']}", 1)
+            rows.append((row["type"], row["name"], sql))
+        return sorted(rows)
+
+    def test_migrated_v3_schema_equals_fresh_v4(self, tmp_path):
+        fresh = todo_db.connect(tmp_path / "fresh.sqlite")
+
+        # Build a v3 database the way the released v3 CLI did, then migrate it.
+        migrated_path = tmp_path / "migrated.sqlite"
+        raw = sqlite3.connect(migrated_path)
+        raw.executescript(todo_db._CORE_SCHEMA_SQL)
+        for statement in todo_findings.finding_schema_statements():
+            raw.execute(statement)
+        raw.execute("INSERT INTO meta (key, value) VALUES ('schema_version', '3')")
+        raw.commit()
+        raw.close()
+
+        assert todo_db.migrate_db(migrated_path) == [4]
+        migrated = todo_db.connect(migrated_path)
+        assert self._schema(migrated) == self._schema(fresh)
+
+    def test_migration_preserves_existing_findings_rows_and_links(self, tmp_path):
+        migrated_path = tmp_path / "withdata.sqlite"
+        raw = sqlite3.connect(migrated_path)
+        raw.executescript(todo_db._CORE_SCHEMA_SQL)
+        for statement in todo_findings.finding_schema_statements():
+            raw.execute(statement)
+        raw.execute("INSERT INTO meta (key, value) VALUES ('schema_version', '3')")
+        raw.commit()
+        raw.close()
+
+        conn = sqlite3.connect(migrated_path)
+        conn.execute(
+            "INSERT INTO items (id, title, worktree, priority, state, description, created_at) VALUES (?,?,?,?,?,?,?)",
+            (
+                "kept-item",
+                "A kept item",
+                "main",
+                "medium",
+                "planning",
+                "a description long enough",
+                "2026-01-02T00:00:00Z",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO findings (id, date, finding_kind, review_context, title, finding_text,"
+            " why_matters, next_steps, disposition, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (
+                "2026-01-02-030405-kept",
+                "2026-01-02",
+                "framework-gap",
+                "rc",
+                "T",
+                "f",
+                "w",
+                "n",
+                "promoted",
+                "2026-01-02T00:00:00Z",
+            ),
+        )
+        conn.execute(
+            "INSERT INTO finding_links (finding_id, kind, target_item, note) VALUES (?,?,?,?)",
+            ("2026-01-02-030405-kept", "promoted-to", "kept-item", "promoted by tester"),
+        )
+        conn.execute(
+            "INSERT INTO finding_evidence (finding_id, path, note) VALUES (?,?,?)",
+            ("2026-01-02-030405-kept", "a.py", "kept note"),
+        )
+        conn.commit()
+        conn.close()
+
+        assert todo_db.migrate_db(migrated_path) == [4]
+        conn = todo_db.connect(migrated_path)
+        finding = todo_findings.get_finding(conn, "2026-01-02-030405-kept")
+        assert finding["disposition"] == "promoted"
+        assert finding["links"] == [
+            {"kind": "promoted-to", "target_item": "kept-item", "target_finding": None, "note": "promoted by tester"}
+        ]
+        assert [(row["path"], row["note"]) for row in finding["evidence"]] == [("a.py", "kept note")]
+        # New columns exist and default to NULL for pre-v4 rows.
+        assert (finding["related_paths"], finding["suggested_sweep"]) == (None, None)
+
+    def test_replace_style_reload_no_longer_aborts_and_keeps_the_link(self, tmp_path):
+        # The w1 defect, as a regression test: DELETE every items-domain table and
+        # reinsert inside one transaction, with foreign_keys ON.
+        conn = todo_db.connect(tmp_path / "reload.sqlite")
+        todo_db.create_item(
+            conn,
+            "t",
+            item_id="target-item",
+            title="A real item",
+            worktree="main",
+            priority="medium",
+            description="a description long enough for the CHECK",
+        )
+        fid = _mk_finding(conn)
+        todo_findings.promote_finding(conn, "t", fid, new_item_id="promoted-item")
+        assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+
+        rows = {t: [tuple(r) for r in conn.execute(f"SELECT * FROM {t}")] for t in todo_db.TRANSFER_TABLES}
+        with todo_db._write_txn(conn):
+            for table in reversed(todo_db.TRANSFER_TABLES):
+                conn.execute(f"DELETE FROM {table}")
+            for table in todo_db.TRANSFER_TABLES:
+                if not rows[table]:
+                    continue
+                width = len(rows[table][0])
+                placeholders = ", ".join("?" for _ in range(width))
+                for row in rows[table]:
+                    conn.execute(f"INSERT INTO {table} VALUES ({placeholders})", row)
+
+        link = todo_findings.get_finding(conn, fid)["links"][0]
+        assert link["target_item"] == "promoted-item"
+
+    def test_a_genuine_dangler_is_still_refused_at_commit(self, tmp_path):
+        conn = todo_db.connect(tmp_path / "dangle.sqlite")
+        fid = _mk_finding(conn)
+        todo_findings.promote_finding(conn, "t", fid, new_item_id="promoted-item")
+        with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+            with todo_db._write_txn(conn):
+                for table in reversed(todo_db.TRANSFER_TABLES):
+                    conn.execute(f"DELETE FROM {table}")
