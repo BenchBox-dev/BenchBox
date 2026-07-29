@@ -844,3 +844,62 @@ class TestPromoteCarriesGuardrails:
         item = todo_db.get_item(conn, "promoted-bare")
         assert item["scope"] == []
         assert item["verifications"] == []
+
+
+class TestCheckScopeReportsWhatItActuallyChecked:
+    """`check-scope` must not claim a pass it never performed.
+
+    An item with no scope rules has nothing to violate, so `check_paths()`
+    returned clean and the command printed "scope OK" over a diff it had never
+    looked at. Every item promoted before the guardrail flags existed has
+    empty scope, so this was the common case, not an edge case.
+    """
+
+    def _run(self, conn, monkeypatch, item_id, files, strict=False):
+        monkeypatch.setattr(todo_db, "changed_files", lambda base: files)
+        return todo_db._cmd_check_scope(conn, "tester", SimpleNamespace(id=item_id, base=None, strict=strict))
+
+    def test_no_rules_reports_unchecked_not_ok(self, conn, monkeypatch, capsys):
+        """The headline: no rules must never render as OK."""
+        _mk(conn)
+        rc = self._run(conn, monkeypatch, "sample-item", ["benchbox/anything.py", "docs/x.md"])
+        out = capsys.readouterr().out
+        assert "SCOPE_UNCHECKED" in out
+        assert "scope OK" not in out
+        assert "2 changed file(s) were not checked" in out
+        assert rc == 0  # default stays non-blocking for existing callers
+
+    def test_no_rules_under_strict_exits_non_zero(self, conn, monkeypatch, capsys):
+        """Opt-in gate for callers that want an unchecked item to fail."""
+        _mk(conn)
+        assert self._run(conn, monkeypatch, "sample-item", ["benchbox/x.py"], strict=True) == 1
+        assert "SCOPE_UNCHECKED" in capsys.readouterr().out
+
+    def test_strict_is_optional_for_programmatic_callers(self, conn, monkeypatch, capsys):
+        """A namespace without --strict must not raise (getattr, not attribute)."""
+        _mk(conn)
+        monkeypatch.setattr(todo_db, "changed_files", lambda base: ["a.py"])
+        assert todo_db._cmd_check_scope(conn, "tester", SimpleNamespace(id="sample-item", base=None)) == 0
+
+    def test_scoped_item_compliant_still_reports_ok(self, conn, monkeypatch, capsys):
+        """Must-preserve: an item WITH rules keeps its pass behaviour."""
+        _mk(conn, scope=[("only_modify", "benchbox/core/*")])
+        rc = self._run(conn, monkeypatch, "sample-item", ["benchbox/core/thing.py"])
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "scope OK (1 changed file(s))" in out
+        assert "SCOPE_UNCHECKED" not in out
+
+    def test_scoped_item_violation_still_fails(self, conn, monkeypatch, capsys):
+        """Must-preserve: violations keep exit 1 and their message."""
+        _mk(conn, scope=[("only_modify", "benchbox/core/*")])
+        rc = self._run(conn, monkeypatch, "sample-item", ["benchbox/cli/other.py"])
+        out = capsys.readouterr().out
+        assert rc == 1
+        assert "benchbox/cli/other.py" in out
+        assert "SCOPE_UNCHECKED" not in out
+
+    def test_scoped_item_violation_under_strict_is_unchanged(self, conn, monkeypatch):
+        """--strict only affects the no-rules case."""
+        _mk(conn, scope=[("only_modify", "benchbox/core/*")])
+        assert self._run(conn, monkeypatch, "sample-item", ["benchbox/cli/x.py"], strict=True) == 1
