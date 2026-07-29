@@ -12,6 +12,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql"
       ]
@@ -22,14 +24,16 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "separate-handwritten",
-      "independence_rationale": "Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators.",
+      "independence": "self-referential",
+      "independence_rationale": "Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored.",
       "oracles": [
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
       "scale": "SF=0.1",
       "strength": "value-level",
+      "surface_provenance": "separate-handwritten",
+      "surface_provenance_rationale": "Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators.",
       "surfaces": [
         "sql",
         "dataframe"
@@ -41,14 +45,16 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "mixed-provenance",
-      "independence_rationale": "Most ClickBench DataFrame cells are generated from shared compact specs, with a small set of bespoke implementations; read as mixed provenance, not fully independent implementations.",
+      "independence": "self-referential",
+      "independence_rationale": "Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored.",
       "oracles": [
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
       "scale": "SF=0.1",
       "strength": "value-level",
+      "surface_provenance": "mixed-provenance",
+      "surface_provenance_rationale": "Most ClickBench DataFrame cells are generated from shared compact specs, with a small set of bespoke implementations; read as mixed provenance, not fully independent implementations.",
       "surfaces": [
         "sql",
         "dataframe"
@@ -60,14 +66,16 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "separate-handwritten",
-      "independence_rationale": "Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators.",
+      "independence": "self-referential",
+      "independence_rationale": "Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored.",
       "oracles": [
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
       "scale": "SF=0.1",
       "strength": "value-level",
+      "surface_provenance": "separate-handwritten",
+      "surface_provenance_rationale": "Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators.",
       "surfaces": [
         "sql",
         "dataframe"
@@ -85,6 +93,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -102,6 +112,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -113,14 +125,16 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "separate-handwritten",
-      "independence_rationale": "H2O-DB expression and pandas DataFrame implementations are separately handwritten for each query.",
+      "independence": "self-referential",
+      "independence_rationale": "Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored.",
       "oracles": [
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
       "scale": "SF=0.01",
       "strength": "value-level",
+      "surface_provenance": "separate-handwritten",
+      "surface_provenance_rationale": "H2O-DB expression and pandas DataFrame implementations are separately handwritten for each query.",
       "surfaces": [
         "sql",
         "dataframe"
@@ -138,6 +152,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -149,14 +165,16 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "shared-spec",
-      "independence_rationale": "Both DataFrame families are generated through shared JoinOrder translation helpers, so the gate primarily catches SQL-vs-generated-DataFrame transcription drift.",
+      "independence": "self-referential",
+      "independence_rationale": "Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored.",
       "oracles": [
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
       "scale": "SF=0.1",
       "strength": "value-level",
+      "surface_provenance": "shared-spec",
+      "surface_provenance_rationale": "Both DataFrame families are generated through shared JoinOrder translation helpers, so the gate primarily catches SQL-vs-generated-DataFrame transcription drift.",
       "surfaces": [
         "sql",
         "dataframe"
@@ -174,6 +192,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -191,6 +211,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -202,14 +224,16 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "mixed-provenance",
-      "independence_rationale": "Read Primitives combines explicit family implementations with factory-built/query-catalog implementations, so provenance is mixed rather than wholly independent.",
+      "independence": "self-referential",
+      "independence_rationale": "Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored.",
       "oracles": [
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
       "scale": "SF=0.05",
       "strength": "value-level",
+      "surface_provenance": "mixed-provenance",
+      "surface_provenance_rationale": "Read Primitives combines explicit family implementations with factory-built/query-catalog implementations, so provenance is mixed rather than wholly independent.",
       "surfaces": [
         "sql",
         "dataframe"
@@ -221,14 +245,16 @@
       "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
-      "independence": "shared-spec",
-      "independence_rationale": "Both DataFrame backends are generated from compact SSB query metadata; the independent signal is SQL text versus the shared generated DataFrame spec.",
+      "independence": "self-referential",
+      "independence_rationale": "Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored.",
       "oracles": [
         "cross-surface"
       ],
       "primary_oracle": "cross-surface",
       "scale": "SF=0.1",
       "strength": "value-level",
+      "surface_provenance": "shared-spec",
+      "surface_provenance_rationale": "Both DataFrame backends are generated from compact SSB query metadata; the independent signal is SQL text versus the shared generated DataFrame spec.",
       "surfaces": [
         "sql",
         "dataframe"
@@ -246,6 +272,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -265,6 +293,8 @@
       "primary_oracle": "expected-results",
       "scale": "SF=1",
       "strength": "cardinality-only",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -282,6 +312,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -294,13 +326,15 @@
       "dual_surface": true,
       "guarded": true,
       "independence": "self-referential",
-      "independence_rationale": "Reference is a shared/generated surface or frozen benchbox snapshot, not an external authority.",
+      "independence_rationale": "Reference is a frozen benchbox snapshot, not an external authority.",
       "oracles": [
         "expected-results"
       ],
       "primary_oracle": "expected-results",
       "scale": "SF=1",
       "strength": "value+cardinality",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -318,6 +352,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -330,7 +366,7 @@
       "dual_surface": true,
       "guarded": true,
       "independence": "self-referential",
-      "independence_rationale": "Reference is a shared/generated surface or frozen benchbox snapshot, not an external authority.",
+      "independence_rationale": "Reference is another benchbox surface of the same benchmark family, not an external authority.",
       "oracles": [
         "variant-equivalence",
         "cross-surface-variant"
@@ -338,6 +374,8 @@
       "primary_oracle": "variant-equivalence",
       "scale": "SF=0.1",
       "strength": "value-level",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -355,6 +393,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -372,6 +412,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"
@@ -389,6 +431,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql"
       ]
@@ -405,6 +449,8 @@
       "primary_oracle": "NONE",
       "scale": "\u2014",
       "strength": "\u2014",
+      "surface_provenance": "\u2014",
+      "surface_provenance_rationale": "\u2014",
       "surfaces": [
         "sql",
         "dataframe"

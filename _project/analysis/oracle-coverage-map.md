@@ -1,6 +1,6 @@
 <!-- PROVENANCE
-generated: 2026-06-28
-content-revision: sha256:edf87a710c067205
+generated: 2026-07-29
+content-revision: sha256:2a84af0397babc60
 This header is drift-IGNORED by `--check` (see _strip_provenance). content-revision
 is a hash of the generated body (markdown + json), NOT a git SHA: a PR-branch SHA is
 orphaned by squash-merge, so to verify this artifact, regenerate it with
@@ -17,33 +17,35 @@ does this). Do not rely on this header for diffs.
 
 **Strength + scale disclosure:** a guarded cell is not a uniform guarantee. The **Strength** column says what the oracle proves — `value-level` (full result values compared) vs `cardinality-only` (row counts only) vs `value+cardinality` (both) — and the **Scale** column says at which scale it actually holds. Both are derived from live sources (the provider's stored answers/digests and the equivalence gate's bounded scale), not hand-labelled. No expected-results oracle exists above SF=1 (the loader raises for other scales), so `tpch`/`tpcds` values are unguarded above SF=1 — the tpch **Strength** cell states this inline so the row is self-contained.
 
-**Reference-independence disclosure:** the **Independence** column says how independent the oracle reference is from the implementation under test — orthogonal to Strength (a `value-level` oracle can still be weak). For cross-surface gates it is per-gate surface provenance from the live `CrossSurfaceGate` metadata: `shared-spec` means DataFrame backends are generated/maintained from one shared spec, `mixed-provenance` means some cells are shared/generated and some bespoke, and `separate-handwritten` means the DataFrame families are separately written implementations. For expected-results oracles, `self-referential` is a frozen benchbox snapshot and `semi-independent` is external TPC authority on cardinality only. The **Independence rationale** column gives the per-row reason.
+**Reference-independence disclosure:** the **Independence** column answers one question — is the oracle's reference an authority *outside* benchbox? It is orthogonal to Strength (a `value-level` oracle can still be weak). `semi-independent` means an external authority is consulted for part of the claim only: the published TPC answer sets pin `tpcds` row counts, never its values. `self-referential` means benchbox is compared against benchbox — either two of its own surfaces (every cross-surface and variant gate) or a frozen snapshot of its own past output (the `tpch` value digests). A self-referential oracle catches drift and regressions; it cannot catch a mistake both sides share. The **Independence rationale** column gives the per-row reason.
 
-| Benchmark | Surfaces | Oracle | Strength | Scale | Independence | Independence rationale | Enforced | Notes |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ai_primitives | sql | NONE | — | — | — | — | — | single-surface → needs fallback oracle (w2) |
-| amplab | sql+dataframe | cross-surface | value-level | SF=0.1 | separate-handwritten | Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators. | enforced (CI-blocking) | cross-surface |
-| clickbench | sql+dataframe | cross-surface | value-level | SF=0.1 | mixed-provenance | Most ClickBench DataFrame cells are generated from shared compact specs, with a small set of bespoke implementations; read as mixed provenance, not fully independent implementations. | enforced (CI-blocking) | cross-surface |
-| coffeeshop | sql+dataframe | cross-surface | value-level | SF=0.1 | separate-handwritten | Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators. | enforced (CI-blocking) | cross-surface |
-| datavault | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| flightdata | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| h2odb | sql+dataframe | cross-surface | value-level | SF=0.01 | separate-handwritten | H2O-DB expression and pandas DataFrame implementations are separately handwritten for each query. | enforced (CI-blocking) | cross-surface |
-| joinorder | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| joinorder_synthetic | sql+dataframe | cross-surface | value-level | SF=0.1 | shared-spec | Both DataFrame families are generated through shared JoinOrder translation helpers, so the gate primarily catches SQL-vs-generated-DataFrame transcription drift. | enforced (CI-blocking) | cross-surface |
-| metadata_primitives | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| nyctaxi | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| read_primitives | sql+dataframe | cross-surface | value-level | SF=0.05 | mixed-provenance | Read Primitives combines explicit family implementations with factory-built/query-catalog implementations, so provenance is mixed rather than wholly independent. | enforced (CI-blocking) | cross-surface |
-| ssb | sql+dataframe | cross-surface | value-level | SF=0.1 | shared-spec | Both DataFrame backends are generated from compact SSB query metadata; the independent signal is SQL text versus the shared generated DataFrame spec. | enforced (CI-blocking) | cross-surface |
-| tpcdi | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| tpcds | sql+dataframe | expected-results | cardinality-only | SF=1 | semi-independent | External TPC answer sets provide row-count authority only; result values are not checked. | — | expected-results |
-| tpcds_obt | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| tpch | sql+dataframe | expected-results | value+cardinality (SF=1 only; values UNGUARDED above SF=1) | SF=1 | self-referential | Reference is a shared/generated surface or frozen benchbox snapshot, not an external authority. | — | expected-results |
-| tpch_skew | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| tpchavoc | sql+dataframe | variant-equivalence | value-level | SF=0.1 | self-referential | Reference is a shared/generated surface or frozen benchbox snapshot, not an external authority. | — | variant-equivalence, cross-surface-variant |
-| transaction_primitives | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| tsbs_devops | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
-| vector_search | sql | NONE | — | — | — | — | — | single-surface → needs fallback oracle (w2) |
-| write_primitives | sql+dataframe | NONE | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+**Surface-provenance disclosure:** the **Surface provenance** column is a SEPARATE axis that grades, for a cross-surface gate, how far apart the two compared surfaces were *authored*: `shared-spec` (both DataFrame backends generated/maintained from one shared spec), `mixed-provenance` (some cells shared/generated, some bespoke), or `separate-handwritten` (the DataFrame families are separately written implementations). It is read per-gate from the live `CrossSurfaceGate` metadata and is `—` for every non-cross-surface row, where the axis does not apply. Read it as *how much internal signal the gate carries* — separately handwritten surfaces catch more than two surfaces generated from one spec — and **not** as independence: a `separate-handwritten` gate is still benchbox checking its own DataFrame code against its own SQL, which is why its Independence stays `self-referential`. The **Provenance rationale** column gives the per-gate reason.
+
+| Benchmark | Surfaces | Oracle | Strength | Scale | Independence | Independence rationale | Surface provenance | Provenance rationale | Enforced | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ai_primitives | sql | NONE | — | — | — | — | — | — | — | single-surface → needs fallback oracle (w2) |
+| amplab | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | separate-handwritten | Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators. | enforced (CI-blocking) | cross-surface |
+| clickbench | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | mixed-provenance | Most ClickBench DataFrame cells are generated from shared compact specs, with a small set of bespoke implementations; read as mixed provenance, not fully independent implementations. | enforced (CI-blocking) | cross-surface |
+| coffeeshop | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | separate-handwritten | Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators. | enforced (CI-blocking) | cross-surface |
+| datavault | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| flightdata | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| h2odb | sql+dataframe | cross-surface | value-level | SF=0.01 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | separate-handwritten | H2O-DB expression and pandas DataFrame implementations are separately handwritten for each query. | enforced (CI-blocking) | cross-surface |
+| joinorder | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| joinorder_synthetic | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | shared-spec | Both DataFrame families are generated through shared JoinOrder translation helpers, so the gate primarily catches SQL-vs-generated-DataFrame transcription drift. | enforced (CI-blocking) | cross-surface |
+| metadata_primitives | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| nyctaxi | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| read_primitives | sql+dataframe | cross-surface | value-level | SF=0.05 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | mixed-provenance | Read Primitives combines explicit family implementations with factory-built/query-catalog implementations, so provenance is mixed rather than wholly independent. | enforced (CI-blocking) | cross-surface |
+| ssb | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | shared-spec | Both DataFrame backends are generated from compact SSB query metadata; the independent signal is SQL text versus the shared generated DataFrame spec. | enforced (CI-blocking) | cross-surface |
+| tpcdi | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tpcds | sql+dataframe | expected-results | cardinality-only | SF=1 | semi-independent | External TPC answer sets provide row-count authority only; result values are not checked. | — | — | — | expected-results |
+| tpcds_obt | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tpch | sql+dataframe | expected-results | value+cardinality (SF=1 only; values UNGUARDED above SF=1) | SF=1 | self-referential | Reference is a frozen benchbox snapshot, not an external authority. | — | — | — | expected-results |
+| tpch_skew | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tpchavoc | sql+dataframe | variant-equivalence | value-level | SF=0.1 | self-referential | Reference is another benchbox surface of the same benchmark family, not an external authority. | — | — | — | variant-equivalence, cross-surface-variant |
+| transaction_primitives | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| tsbs_devops | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| vector_search | sql | NONE | — | — | — | — | — | — | — | single-surface → needs fallback oracle (w2) |
+| write_primitives | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
 
 ## UNGUARDED benchmarks
 

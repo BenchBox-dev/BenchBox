@@ -27,16 +27,18 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from _project.scripts.generate_oracle_coverage_map import (  # noqa: E402
-    INDEPENDENCE_MIXED,
     INDEPENDENCE_NONE,
     INDEPENDENCE_SELF,
     INDEPENDENCE_SEMI,
-    INDEPENDENCE_SEPARATE,
-    INDEPENDENCE_SHARED_SPEC,
     ORACLE_CROSS_SURFACE,
+    ORACLE_CROSS_SURFACE_VARIANT,
     ORACLE_EXPECTED_RESULTS,
     ORACLE_NONE,
     ORACLE_VARIANT_EQUIVALENCE,
+    PROVENANCE_MIXED,
+    PROVENANCE_NONE,
+    PROVENANCE_SEPARATE,
+    PROVENANCE_SHARED_SPEC,
     STRENGTH_CARDINALITY,
     STRENGTH_NONE,
     STRENGTH_VALUE,
@@ -45,6 +47,7 @@ from _project.scripts.generate_oracle_coverage_map import (  # noqa: E402
     check_artifacts,
     oracle_reference_independence,
     oracle_strength_and_scale,
+    oracle_surface_provenance,
     render_markdown,
 )
 
@@ -197,10 +200,10 @@ def test_independence_column_present(rows):
 def test_known_oracle_independence_truth(rows):
     """Pin the TRUTH of reference-independence for known oracles (classifier-truth, w4).
 
-    Orthogonal to Strength: a `value-level` oracle can be independent or
-    self-referential. This pins what each known oracle's reference ACTUALLY is, so a
-    future change that mislabels independence fails here even if the artifact is
-    internally consistent.
+    Orthogonal to Strength AND to Surface-provenance: this column answers only "is the
+    reference an authority OUTSIDE benchbox?". This pins what each known oracle's
+    reference ACTUALLY is, so a future change that mislabels independence fails here
+    even if the artifact is internally consistent.
     """
     by_id = {r["benchmark"]: r for r in rows}
 
@@ -210,18 +213,130 @@ def test_known_oracle_independence_truth(rows):
     # tpcds is cardinality-only: row counts come from the published TPC answer sets
     # (an authority on cardinality), values unchecked -> semi-independent.
     assert by_id["tpcds"]["independence"] == INDEPENDENCE_SEMI
-    # cross-surface gates now disclose surface provenance, not one coarse label.
-    for benchmark in ("ssb", "joinorder_synthetic"):
-        assert by_id[benchmark]["independence"] == INDEPENDENCE_SHARED_SPEC
-    for benchmark in ("clickbench", "read_primitives"):
-        assert by_id[benchmark]["independence"] == INDEPENDENCE_MIXED
-    for benchmark in ("amplab", "coffeeshop", "h2odb"):
-        assert by_id[benchmark]["independence"] == INDEPENDENCE_SEPARATE
-    assert "separately handwritten" in by_id["coffeeshop"]["independence_rationale"]
+
+    # Every cross-surface gate compares benchbox SQL against benchbox DataFrame code,
+    # so NO authoring provenance -- not even `separate-handwritten` -- makes the
+    # reference external. This is the conflation the split exists to prevent.
+    for benchmark in ("ssb", "joinorder_synthetic", "clickbench", "read_primitives", "amplab", "coffeeshop", "h2odb"):
+        assert by_id[benchmark]["independence"] == INDEPENDENCE_SELF, (
+            f"{benchmark} cross-surface reference is benchbox's own DataFrame code, not an external authority"
+        )
 
     # TPC-Havoc variant gates still compare against their own canonical/variant
     # surfaces rather than an external authority.
     assert by_id["tpchavoc"]["independence"] == INDEPENDENCE_SELF
+
+    # No provenance label may leak into the Independence column (the pre-split bug).
+    provenance_labels = {PROVENANCE_SHARED_SPEC, PROVENANCE_MIXED, PROVENANCE_SEPARATE}
+    leaked = {r["benchmark"] for r in rows if r["independence"] in provenance_labels}
+    assert not leaked, f"surface-provenance labels leaked into the Independence column: {sorted(leaked)}"
+
+
+# --- Surface-provenance axis (oracle-coverage-map-independence-provenance-split) ---
+
+
+def test_surface_provenance_column_present(rows):
+    """Every row carries the provenance fields; only cross-surface rows disclose a label."""
+    for r in rows:
+        assert "surface_provenance" in r and r["surface_provenance"], f"{r['benchmark']} missing surface_provenance"
+        assert "surface_provenance_rationale" in r and r["surface_provenance_rationale"], (
+            f"{r['benchmark']} missing surface_provenance_rationale"
+        )
+        # The axis only applies to cross-surface gates; everything else reports `—`.
+        if r["primary_oracle"] != ORACLE_CROSS_SURFACE:
+            assert r["surface_provenance"] == PROVENANCE_NONE, (
+                f"{r['benchmark']} is not cross-surface but discloses provenance={r['surface_provenance']}"
+            )
+            assert r["surface_provenance_rationale"] == PROVENANCE_NONE, (
+                f"{r['benchmark']} is not cross-surface but carries a provenance rationale"
+            )
+
+
+def test_known_surface_provenance_truth(rows):
+    """Pin the TRUTH of surface provenance per gate (classifier-truth, w4).
+
+    The labels that used to sit in the Independence column now live here, and this
+    pins which gate has which, so a mislabel fails even when the artifact is
+    internally consistent.
+    """
+    by_id = {r["benchmark"]: r for r in rows}
+
+    for benchmark in ("ssb", "joinorder_synthetic"):
+        assert by_id[benchmark]["surface_provenance"] == PROVENANCE_SHARED_SPEC
+    for benchmark in ("clickbench", "read_primitives"):
+        assert by_id[benchmark]["surface_provenance"] == PROVENANCE_MIXED
+    for benchmark in ("amplab", "coffeeshop", "h2odb"):
+        assert by_id[benchmark]["surface_provenance"] == PROVENANCE_SEPARATE
+    assert "separately handwritten" in by_id["coffeeshop"]["surface_provenance_rationale"]
+
+
+def test_surface_provenance_is_read_live_from_gate_metadata(rows):
+    """Provenance must equal the live per-gate metadata, never a hand-kept table.
+
+    Re-registering a gate with different provenance must reclassify the row, so assert
+    against ``CrossSurfaceGate.surface_independence`` itself rather than a copy, and
+    pin the generator's label vocabulary to the live constants so the two cannot drift.
+    """
+    from benchbox.core.equivalence.cross_surface import (
+        GATES,
+        STAGED_GATES,
+        SURFACE_INDEPENDENCE_MIXED,
+        SURFACE_INDEPENDENCE_SEPARATE,
+        SURFACE_INDEPENDENCE_SHARED_SPEC,
+    )
+
+    assert PROVENANCE_SHARED_SPEC == SURFACE_INDEPENDENCE_SHARED_SPEC
+    assert PROVENANCE_MIXED == SURFACE_INDEPENDENCE_MIXED
+    assert PROVENANCE_SEPARATE == SURFACE_INDEPENDENCE_SEPARATE
+
+    by_id = {r["benchmark"]: r for r in rows}
+    for benchmark_id, gate in {**GATES, **STAGED_GATES}.items():
+        assert by_id[benchmark_id]["surface_provenance"] == gate.surface_independence, (
+            f"{benchmark_id} provenance is not read live from CrossSurfaceGate metadata"
+        )
+        assert by_id[benchmark_id]["surface_provenance_rationale"] == gate.surface_independence_rationale
+
+
+def test_provenance_never_changes_independence(rows):
+    """The two axes are INDEPENDENT columns: provenance must not move independence.
+
+    Gates that span the whole provenance range (`shared-spec` through
+    `separate-handwritten`) must all read `self-referential`, and the pure classifiers
+    must agree -- `oracle_reference_independence` takes no benchmark id at all, so a
+    per-gate provenance value has no path back into the independence label.
+    """
+    by_id = {r["benchmark"]: r for r in rows}
+    spread = {by_id[b]["surface_provenance"] for b in ("ssb", "clickbench", "coffeeshop")}
+    assert spread == {PROVENANCE_SHARED_SPEC, PROVENANCE_MIXED, PROVENANCE_SEPARATE}
+    assert {by_id[b]["independence"] for b in ("ssb", "clickbench", "coffeeshop")} == {INDEPENDENCE_SELF}
+
+    assert oracle_reference_independence(ORACLE_CROSS_SURFACE, STRENGTH_VALUE) == INDEPENDENCE_SELF
+    assert oracle_reference_independence(ORACLE_VARIANT_EQUIVALENCE, STRENGTH_VALUE) == INDEPENDENCE_SELF
+    assert oracle_reference_independence(ORACLE_CROSS_SURFACE_VARIANT, STRENGTH_VALUE) == INDEPENDENCE_SELF
+    # A variant gate has no cross-surface gate entry, so it discloses no provenance.
+    assert oracle_surface_provenance(ORACLE_VARIANT_EQUIVALENCE, "tpchavoc") == (PROVENANCE_NONE, PROVENANCE_NONE)
+    assert oracle_surface_provenance(ORACLE_CROSS_SURFACE, "coffeeshop")[0] == PROVENANCE_SEPARATE
+
+
+def test_markdown_renders_independence_and_provenance_as_distinct_columns(rows):
+    """The map must show two separate columns, and the prose must keep them apart."""
+    markdown = render_markdown(rows)
+    header = next(line for line in markdown.splitlines() if line.startswith("| Benchmark |"))
+    columns = [c.strip() for c in header.strip().strip("|").split("|")]
+    assert "Independence" in columns
+    assert "Surface provenance" in columns
+    assert columns.index("Independence") != columns.index("Surface provenance")
+
+    # A separately-handwritten gate: provenance in its own cell, independence still self.
+    coffeeshop = next(line for line in markdown.splitlines() if line.startswith("| coffeeshop |"))
+    cells = [c.strip() for c in coffeeshop.strip().strip("|").split("|")]
+    assert cells[columns.index("Independence")] == INDEPENDENCE_SELF
+    assert cells[columns.index("Surface provenance")] == PROVENANCE_SEPARATE
+
+    # The prose must explicitly warn that provenance is not independence, or the
+    # reader re-makes exactly the conflation this split removed.
+    assert "Surface-provenance disclosure:" in markdown
+    assert "not** as independence" in markdown
 
 
 def test_independence_is_derived_from_value_digest_signal(monkeypatch):
@@ -247,11 +362,9 @@ def test_independence_is_derived_from_value_digest_signal(monkeypatch):
     assert flipped_off["tpch"]["strength"] == STRENGTH_CARDINALITY
     assert flipped_off["tpch"]["independence"] == INDEPENDENCE_SEMI
 
-    # And the pure classifier agrees (orthogonal to the cross-surface KIND). A
-    # cross-surface row needs benchmark metadata to refine beyond the conservative
-    # fallback; variant gates remain self-referential.
+    # And the pure classifier agrees (orthogonal to the cross-surface KIND): both gate
+    # kinds compare benchbox against benchbox, so both stay self-referential.
     assert oracle_reference_independence(ORACLE_CROSS_SURFACE, STRENGTH_VALUE) == INDEPENDENCE_SELF
-    assert oracle_reference_independence(ORACLE_CROSS_SURFACE, STRENGTH_VALUE, "coffeeshop") == INDEPENDENCE_SEPARATE
     assert oracle_reference_independence(ORACLE_VARIANT_EQUIVALENCE, STRENGTH_VALUE) == INDEPENDENCE_SELF
 
 
