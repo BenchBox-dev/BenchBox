@@ -120,6 +120,10 @@ so the `SCHEMA_VERSION` 2 → 3 migration is accepted against the live
 
 ## Legacy field mapping (schema v4)
 
+Status: **landed** (`SCHEMA_VERSION` 4). The hosted production migration is a
+separate authorized step — see the v3 → v4 runbook in
+`docs/operations/todo-db-benchbox-extraction.md`.
+
 Phase 3 shipped a home for the fields `todo finding create` writes, not for
 every field `validate_blind_spot.py` *accepts*. The gap is not theoretical:
 measured over the live 65-record corpus (2026-07-29), **65 of 65** records lose
@@ -179,7 +183,14 @@ follow, because a `promoted-to` edge asserts the finding's disposition is
 | `actioned` | 4 | `resolved-by` | disposition is `actioned`; `promoted-to` would misstate history and break the promote invariant |
 
 Both kinds are already in the `finding_links.kind` CHECK, so this mapping needs
-**no table rebuild**. A new kind would force one, which is why none is added.
+**no `kind` rebuild**. A new kind would force one, which is why none is added.
+(`finding_links` *is* rebuilt in v4, but for FK delete-safety — `target_item`
+becomes `DEFERRABLE INITIALLY DEFERRED` — not for `kind`.)
+
+A `todo_id` that does not resolve keeps its id in the link note and is reported,
+never silently skipped. Legacy records must therefore be imported against a
+**restored snapshot**: against an empty database every `todo_id` looks dangling
+(36 false positives over the current corpus).
 
 **Parity criterion (falsifiable).** For every record in the import set, a
 round-trip through the importer and back out of the DB reproduces: every
