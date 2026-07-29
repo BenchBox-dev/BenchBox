@@ -100,7 +100,9 @@ def test_cli_package_lazy_getattr_supports_main_submodules_and_missing_attr(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     main = cli_pkg.__getattr__("main")
+    assert isinstance(main, ModuleType)
     assert callable(main)
+    assert hasattr(main, "get_config_manager")
 
     commands_module = ModuleType("benchbox.cli.commands")
 

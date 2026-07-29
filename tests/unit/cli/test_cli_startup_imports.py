@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import subprocess
 import sys
 
 import pytest
@@ -19,6 +20,39 @@ def _clear_modules(monkeypatch: pytest.MonkeyPatch, *prefixes: str) -> None:
     for module_name in list(sys.modules):
         if any(module_name == prefix or module_name.startswith(f"{prefix}.") for prefix in prefixes):
             monkeypatch.delitem(sys.modules, module_name, raising=False)
+
+
+def test_main_attribute_resolves_to_submodule_before_explicit_import() -> None:
+    """Attribute-first resolution must not shadow the main submodule with its function."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import benchbox.cli; import types; "
+                "target = getattr(benchbox.cli, 'main'); "
+                "assert isinstance(target, types.ModuleType), type(target); "
+                "assert callable(target); "
+                "assert hasattr(target, 'get_config_manager')"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_calling_main_module_delegates_to_lazy_entrypoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Calling the compatibility module should resolve and invoke its lazy main export."""
+    main_module = importlib.import_module("benchbox.cli.main")
+    calls: list[str] = []
+    monkeypatch.setattr(main_module, "main", lambda: calls.append("main"), raising=False)
+
+    main_module()
+
+    assert calls == ["main"]
 
 
 def test_importing_conversion_submodule_does_not_import_lifecycle_runner(monkeypatch: pytest.MonkeyPatch) -> None:
