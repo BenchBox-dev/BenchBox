@@ -139,6 +139,18 @@ class TestAdlsPathsStageLocally:
         create_path_handler("abfss://c@a.dfs.core.windows.net/p")
         assert list(tmp_path.iterdir()) == []
 
+    def test_cloud_staging_path_delegates_recursive_glob(self, tmp_path):
+        """Recursive callers must see files below the local staging root."""
+        stage = tmp_path / "stage"
+        nested = stage / "nested"
+        nested.mkdir(parents=True)
+        expected = nested / "result.json"
+        expected.write_text("{}", encoding="utf-8")
+
+        handler = CloudStagingPath(stage, "s3://bucket/results")
+
+        assert list(handler.rglob("*.json")) == [expected]
+
 
 class TestCredentialValidationHandlesAliases:
     """validate_cloud_credentials builds a CloudPath too — same alias trap.
