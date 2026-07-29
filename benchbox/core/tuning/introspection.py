@@ -272,8 +272,10 @@ def normalize_columns(raw: Any) -> tuple[str, ...]:
     """Normalize a comma-separated column list (or a bracketed catalog list).
 
     Accepts ``"a, b"``, ``"[a, b]"`` (DuckDB ``expressions``), or an already
-    split iterable. Returns a case-folded, order-preserving tuple with empty
-    entries dropped.
+    split iterable. ClickHouse may represent a multi-column partition key as
+    ``tuple(a, b)``; its outer function wrapper is catalog syntax rather than
+    a column name and is removed before splitting. Returns a case-folded,
+    order-preserving tuple with empty entries dropped.
     """
     if raw is None:
         return ()
@@ -283,6 +285,8 @@ def normalize_columns(raw: Any) -> tuple[str, ...]:
         text = str(raw).strip()
         if text.startswith("[") and text.endswith("]"):
             text = text[1:-1]
+        elif text[:6].casefold() == "tuple(" and text.endswith(")"):
+            text = text[6:-1].strip()
         items = text.split(",") if text else []
     normalized = [normalize_identifier(item) for item in items]
     return tuple(col for col in normalized if col)

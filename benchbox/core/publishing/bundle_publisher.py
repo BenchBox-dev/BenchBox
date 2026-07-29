@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -325,10 +326,15 @@ def _copy_to_adls(files: list[Path], destination: str) -> None:
     except ImportError as exc:
         raise RuntimeError("ADLS publishing requires azure-identity and azure-storage-file-datalake") from exc
 
-    service = DataLakeServiceClient(
-        account_url=f"https://{account_host}",
-        credential=DefaultAzureCredential(),
-    )
+    account_name = os.environ.get("AZURE_STORAGE_ACCOUNT_NAME")
+    account_key = os.environ.get("AZURE_STORAGE_ACCOUNT_KEY")
+    if account_name and account_key:
+        from azure.core.credentials import AzureNamedKeyCredential
+
+        credential = AzureNamedKeyCredential(account_name, account_key)
+    else:
+        credential = DefaultAzureCredential()
+    service = DataLakeServiceClient(account_url=f"https://{account_host}", credential=credential)
     filesystem = service.get_file_system_client(container)
     for file in files:
         remote_path = "/".join(part for part in (prefix, file.name) if part)

@@ -561,7 +561,12 @@ def surfacing_banner(conn, drafts_dir: str | Path | None = None, open_count: int
         parts.append(f"{open_count} open finding(s)")
     if draft_count:
         parts.append(f"{draft_count} unsynced draft(s)")
-    return f"→ {', '.join(parts)} awaiting triage — see: todo finding candidates"
+    destinations = []
+    if open_count:
+        destinations.append("todo finding list --disposition open")
+    if draft_count:
+        destinations.append("todo finding candidates")
+    return f"→ {', '.join(parts)} awaiting triage — see: {'; '.join(destinations)}"
 
 
 # ---------------------------------------------------------------------------

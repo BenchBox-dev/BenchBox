@@ -1209,6 +1209,16 @@ class TestSynapseStagingRootAcceptsEveryAzureSpelling:
         assert adapter.container == "container"
         assert adapter.storage_account == (storage_account or "account")
 
+    def test_adls_uri_account_takes_precedence_over_explicit_account(self, synapse_stubs):
+        adapter = AzureSynapseAdapter(
+            server="myworkspace.sql.azuresynapse.net",
+            username="admin",
+            password="secret",
+            staging_root="abfss://container@uri-account.dfs.core.windows.net/benchbox",
+            storage_account="explicit-account",
+        )
+        assert adapter.storage_account == "uri-account"
+
     def test_blob_staging_root_requires_account_or_explicit_option(self, synapse_stubs):
         with pytest.raises(ValueError, match="must include a storage account"):
             AzureSynapseAdapter(

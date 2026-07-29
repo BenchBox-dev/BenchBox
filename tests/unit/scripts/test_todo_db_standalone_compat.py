@@ -298,6 +298,22 @@ def test_export_lossless_envelope_defaults_outside_the_committed_snapshot(
     assert (output_dir.parent / f"{output_dir.name}-lossless" / "todo-db.json").exists()
 
 
+def test_export_rerun_removes_legacy_in_tree_envelope(tmp_path: Path) -> None:
+    output_dir = tmp_path / "snapshot"
+    lossless_dir = tmp_path / "lossless"
+    envelope = _envelope()
+    compat._write_legacy_export(output_dir, envelope, lossless_dir)
+
+    legacy_envelope = output_dir / "todo-db.json"
+    legacy_envelope.write_text('{"legacy": true}\n', encoding="utf-8")
+    updated = {**envelope, "metadata": {"rerun": True}}
+
+    compat._write_legacy_export(output_dir, updated, lossless_dir)
+
+    assert not legacy_envelope.exists()
+    assert json.loads((lossless_dir / "todo-db.json").read_text(encoding="utf-8")) == updated
+
+
 def test_export_never_commits_findings_domain_prose(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """The guard: findings review prose must never reach the committed snapshot.
 

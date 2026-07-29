@@ -550,6 +550,10 @@ class TestDuckLakeCredentialRedaction:
         assert "Failed to initialize the DuckLake catalog" in message
         assert "catalog=postgres" in message
 
+    def test_redaction_handles_keyword_shaped_text_inside_quoted_password(self):
+        message = r"""Connection Error: password="abc key=value tail\'xyz" port=5432"""
+        assert _redact_secrets(message) == "Connection Error: password=**** port=5432"
+
     def test_postgres_attach_failure_keeps_non_secret_context(self, tmp_path, monkeypatch):
         adapter = self._failing_adapter(
             tmp_path,

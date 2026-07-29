@@ -257,6 +257,11 @@ def _write_legacy_export(
     output_dir.mkdir(parents=True, exist_ok=True)
     lossless_dir = lossless_dir if lossless_dir is not None else output_dir.parent / f"{output_dir.name}-lossless"
     lossless_dir.mkdir(parents=True, exist_ok=True)
+    legacy_envelope = output_dir / "todo-db.json"
+    if legacy_envelope.exists() or legacy_envelope.is_symlink():
+        if not legacy_envelope.is_file() and not legacy_envelope.is_symlink():
+            raise ValueError(f"legacy export path is not a file: {legacy_envelope}")
+        legacy_envelope.unlink()
     lossless_path = lossless_dir / "todo-db.json"
     items_path = output_dir / "items.jsonl"
     events_path = output_dir / "events.jsonl"

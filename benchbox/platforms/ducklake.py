@@ -53,11 +53,11 @@ _REDACTED = "****"
 # Backstop for credential material we did NOT emit verbatim: a driver error can
 # echo the libpq connstring back in a re-encoded form (extra quoting layers,
 # normalized whitespace), so an exact-value replace alone is not sufficient.
-# Bounded by the NEXT libpq `keyword=` token rather than by whitespace, because
-# a quoted password may legally contain spaces and quotes; `password` is emitted
-# before `port` (see _build_postgres_connstring), so a trailing keyword is the
-# usual terminator and only a same-line tail is lost when it is not.
-_PASSWORD_COMPONENT_RE = re.compile(r"(password\s*=\s*).*?(?=\s+\w+\s*=|$)", flags=re.IGNORECASE | re.MULTILINE)
+# Bounded by the known trailing libpq `port=` component rather than any
+# `keyword=` token: a quoted password may legally contain keyword-shaped text.
+# `password` is emitted before `port` (see _build_postgres_connstring), and the
+# end-of-line fallback covers driver messages that omit the port.
+_PASSWORD_COMPONENT_RE = re.compile(r"(password\s*=\s*).*?(?=\s+port\s*=|$)", flags=re.IGNORECASE | re.MULTILINE)
 # Matches the `SECRET '<value>'` clause of CREATE SECRET; the secret NAME is an
 # unquoted identifier, so only the quoted key material is caught here.
 _S3_SECRET_CLAUSE_RE = re.compile(r"(\bSECRET\s+)'(?:[^']|'')*'", flags=re.IGNORECASE)

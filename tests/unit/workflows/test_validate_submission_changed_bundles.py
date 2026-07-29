@@ -77,3 +77,39 @@ def test_applied_companion_derivation_is_deletion_aware() -> None:
     assert "CHANGED_APPLIED" in script
     assert 'bundle="${applied%.applied.json}.json"' in script
     assert 'git cat-file -e "HEAD:${bundle}"' in script
+
+
+def test_applied_companion_rename_discovers_the_source_primary_bundle(tmp_path: Path) -> None:
+    """A companion rename must validate the source primary bundle still in HEAD."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    primary = tmp_path / "results-data" / "bundles" / "result.json"
+    primary.parent.mkdir(parents=True)
+    primary.write_text("{}\n", encoding="utf-8")
+    applied = primary.with_name("result.applied.json")
+    applied.write_text('{"status": "passed"}\n', encoding="utf-8")
+    _git(tmp_path, "add", str(primary.relative_to(tmp_path)), str(applied.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    renamed = applied.with_name("renamed.applied.json")
+    applied.rename(renamed)
+    _git(tmp_path, "add", "-u", str(applied.relative_to(tmp_path)))
+    _git(tmp_path, "add", str(renamed.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "rename-applied")
+
+    env = os.environ.copy()
+    env["BASE_SHA"] = base_sha
+    result = subprocess.run(
+        ["bash", "-c", _changed_bundle_discovery_script()],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines() == ["results-data/bundles/result.json"]
