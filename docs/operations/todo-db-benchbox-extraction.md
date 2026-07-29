@@ -254,3 +254,43 @@ The maintainer approved the recommended decisions on 2026-07-21:
 These decisions authorize the operational work but do not themselves publish
 the package, reserve PyPI, provision or rotate credentials, or cut over a
 consumer. Those actions remain gated by the operational and adoption TODOs.
+
+## Hosted schema migration (v3 -> v4)
+
+The CLI refuses any database whose `schema_version` is below its own
+`SCHEMA_VERSION`, and migrations never auto-apply. Landing v4 code therefore
+makes every collaborator's CLI inert against the live v3 database until the
+hosted migration runs: **land the code and run `todo migrate` together.**
+
+Rehearse first on a scratch database, never against production:
+
+```bash
+turso db create benchbox-todo-v4-rehearsal
+```
+
+Use a **dedicated** `TODO_DB_REPLICA` per database — reusing the default replica
+across two databases silently mixes snapshots, producing stale reads and failed
+writes. Seed at v3, run the new CLI's `migrate`, then verify tables and row
+counts and exercise every findings write path before destroying the scratch
+database.
+
+What v4 changes:
+
+| Change | Note |
+| --- | --- |
+| `findings.related_paths` | additive column, NULL pre-v4 |
+| `findings.suggested_sweep` | additive column, NULL pre-v4 |
+| `finding_sections` | new table, `ON DELETE CASCADE` |
+| `finding_links` rebuilt | `target_item` now deferrable |
+
+The `finding_links` rebuild is the only non-additive step. It exists because a
+hosted `--replace` reload DELETEs every items-domain table and reinserts it in one
+transaction while findings tables stay out of `TRANSFER_TABLES`: with an immediate
+FK the DELETE aborts even though the same transaction restores the item, and with
+`foreign_keys` OFF it leaves a stale link. Deferring the check to COMMIT fixes both
+without `ON DELETE SET NULL`, which would destroy promote provenance on every
+reload.
+
+Importing legacy records requires a **restored snapshot**, not an empty scratch
+database: `todo_id` targets resolve against `items`, so an empty database reports
+every legacy link as dangling (36 false positives over the current corpus).

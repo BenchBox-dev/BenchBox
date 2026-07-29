@@ -46,7 +46,16 @@ import validate_blind_spot as vbs  # sibling; no todo_db dependency, so cycle-fr
 # domain "Export boundary"), and the phase-2 pinning test fails closed on any
 # ``finding%`` table by construction.
 
-FINDINGS_SCHEMA_SQL = """
+# ---------------------------------------------------------------------------
+# Frozen v3 findings DDL -- HISTORY, never edit.
+#
+# This is the exact delta MIGRATIONS[3] applied. A v2 database still reaches v3
+# through it before MIGRATIONS[4] brings it to the current shape, so changing it
+# would rewrite history and make the two paths disagree. Current-shape DDL is
+# FINDINGS_SCHEMA_SQL below; that "a migrated DB equals a fresh DB" is pinned by
+# a test, which is a stronger guarantee than sharing one string could be.
+
+FINDINGS_SCHEMA_V3_SQL = """
 CREATE TABLE findings (
   id                 TEXT PRIMARY KEY CHECK (length(id) BETWEEN 3 AND 200),
   date               TEXT NOT NULL,
@@ -103,16 +112,151 @@ CREATE INDEX idx_findings_disposition ON findings(disposition);
 CREATE INDEX idx_finding_events_finding ON finding_events(finding_id, seq);
 """
 
+# ---------------------------------------------------------------------------
+# Current (v4) findings DDL, used for fresh databases via todo_db.SCHEMA_SQL.
+#
+# v4 adds the lossless homes for legacy capture fields (see "Legacy field
+# mapping (schema v4)" in _project/specs/findings-domain.md) and makes
+# finding_links.target_item DEFERRABLE.
+#
+# Why DEFERRABLE INITIALLY DEFERRED: a hosted `--replace` reload DELETEs every
+# items-domain table and reinserts it inside ONE transaction. findings tables are
+# deliberately absent from TRANSFER_TABLES, so with an immediate FK the DELETE
+# aborts ("FOREIGN KEY constraint failed") even though the very same transaction
+# restores the item -- a false failure that made the reload unusable. Deferring
+# the check to COMMIT lets the legitimate delete-then-reinsert succeed with the
+# promote link intact, while a genuine dangler is still refused at COMMIT.
+# ON DELETE SET NULL was rejected: it nulls target_item even when the item IS
+# restored, destroying promote provenance on every reload.
+
+FINDINGS_SCHEMA_SQL = """
+CREATE TABLE findings (
+  id                 TEXT PRIMARY KEY CHECK (length(id) BETWEEN 3 AND 200),
+  date               TEXT NOT NULL,
+  finding_kind       TEXT NOT NULL,
+  review_context     TEXT NOT NULL,
+  observed_sha       TEXT,
+  title              TEXT NOT NULL,
+  finding_text       TEXT NOT NULL,
+  why_matters        TEXT NOT NULL,
+  next_steps         TEXT NOT NULL,
+  disposition        TEXT NOT NULL DEFAULT 'open' CHECK (disposition IN
+                       ('open','actionable','actioned','dismissed','promoted')),
+  disposition_reason TEXT,
+  urgency            TEXT,
+  breadth            TEXT,
+  confidence         TEXT,
+  reconsider_after   TEXT,
+  created_at         TEXT NOT NULL,
+  imported_from      TEXT,
+  related_paths      TEXT,
+  suggested_sweep    TEXT,
+  CHECK (disposition NOT IN ('actionable','dismissed')
+         OR (disposition_reason IS NOT NULL AND length(disposition_reason) > 0))
+);
+
+CREATE TABLE finding_evidence (
+  id         INTEGER PRIMARY KEY,
+  finding_id TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  path       TEXT NOT NULL,
+  pattern    TEXT,
+  line_start INTEGER,
+  line_end   INTEGER,
+  note       TEXT
+);
+
+CREATE TABLE finding_links (
+  id             INTEGER PRIMARY KEY,
+  finding_id     TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  kind           TEXT NOT NULL CHECK (kind IN
+                   ('promoted-to','informs','resolved-by','related-finding','duplicate-of')),
+  target_item    TEXT REFERENCES items(id) DEFERRABLE INITIALLY DEFERRED,
+  target_finding TEXT REFERENCES findings(id),
+  note           TEXT
+);
+
+CREATE TABLE finding_events (
+  seq        INTEGER PRIMARY KEY,
+  at         TEXT NOT NULL,
+  actor      TEXT NOT NULL,
+  finding_id TEXT REFERENCES findings(id),
+  action     TEXT NOT NULL,
+  detail     TEXT
+);
+
+CREATE TABLE finding_sections (
+  id         INTEGER PRIMARY KEY,
+  finding_id TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  position   INTEGER NOT NULL,
+  heading    TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  UNIQUE (finding_id, position)
+);
+
+CREATE INDEX idx_findings_disposition ON findings(disposition);
+CREATE INDEX idx_finding_events_finding ON finding_events(finding_id, seq);
+CREATE INDEX idx_finding_sections_finding ON finding_sections(finding_id, position);
+"""
+
+
+# The v3 -> v4 delta applied by todo_db.MIGRATIONS[4] to an existing v3 database.
+# SQLite cannot ALTER a foreign key, so finding_links is rebuilt: create, copy,
+# drop, rename. Nothing references finding_links, so the drop is safe. No SQL
+# comments here -- _split_ddl splits on ";" and a comment-only fragment would
+# become a bogus statement.
+FINDINGS_MIGRATION_V4_SQL = """
+ALTER TABLE findings ADD COLUMN related_paths TEXT;
+ALTER TABLE findings ADD COLUMN suggested_sweep TEXT;
+
+CREATE TABLE finding_sections (
+  id         INTEGER PRIMARY KEY,
+  finding_id TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  position   INTEGER NOT NULL,
+  heading    TEXT NOT NULL,
+  text       TEXT NOT NULL,
+  UNIQUE (finding_id, position)
+);
+
+CREATE INDEX idx_finding_sections_finding ON finding_sections(finding_id, position);
+
+CREATE TABLE finding_links_v4 (
+  id             INTEGER PRIMARY KEY,
+  finding_id     TEXT NOT NULL REFERENCES findings(id) ON DELETE CASCADE,
+  kind           TEXT NOT NULL CHECK (kind IN
+                   ('promoted-to','informs','resolved-by','related-finding','duplicate-of')),
+  target_item    TEXT REFERENCES items(id) DEFERRABLE INITIALLY DEFERRED,
+  target_finding TEXT REFERENCES findings(id),
+  note           TEXT
+);
+
+INSERT INTO finding_links_v4 (id, finding_id, kind, target_item, target_finding, note)
+  SELECT id, finding_id, kind, target_item, target_finding, note FROM finding_links;
+
+DROP TABLE finding_links;
+
+ALTER TABLE finding_links_v4 RENAME TO finding_links;
+"""
+
+
+def _split_ddl(sql: str) -> list[str]:
+    """Semicolon-split our own controlled DDL. No string literal contains a ";"."""
+    return [statement.strip() for statement in sql.split(";") if statement.strip()]
+
 
 def finding_schema_statements() -> list[str]:
-    """The v3 migration delta: each CREATE statement, semicolon-split.
+    """The v3 migration delta (``todo_db.MIGRATIONS[3]``): frozen history.
 
-    Shared verbatim by ``todo_db.SCHEMA_SQL`` (fresh DBs) and
-    ``todo_db.MIGRATIONS[3]`` (existing v2 DBs) so the two representations of the
-    findings schema can never drift. FINDINGS_SCHEMA_SQL is our own controlled
-    DDL: no string literal contains a ``;``.
+    Derived from FINDINGS_SCHEMA_V3_SQL, NOT from the current-shape
+    FINDINGS_SCHEMA_SQL: a v2 database must reach exactly v3 here and then be
+    carried to the current shape by MIGRATIONS[4]. Deriving this from the current
+    DDL would create v4 tables at v3 and then collide with the v4 ALTERs.
     """
-    return [statement.strip() for statement in FINDINGS_SCHEMA_SQL.split(";") if statement.strip()]
+    return _split_ddl(FINDINGS_SCHEMA_V3_SQL)
+
+
+def finding_migration_v4_statements() -> list[str]:
+    """The v3 -> v4 delta (``todo_db.MIGRATIONS[4]``)."""
+    return _split_ddl(FINDINGS_MIGRATION_V4_SQL)
 
 
 import todo_db  # noqa: E402  (cycle-break: import must follow FINDINGS_SCHEMA_SQL; see note above)
@@ -204,28 +348,26 @@ FRONTMATTER_HOMES = {
     "breadth": "findings.breadth",
     "confidence": "findings.confidence",
     "evidence": "finding_evidence rows",
+    "related_paths": "findings.related_paths (JSON array)",
+    "suggested_sweep": "findings.suggested_sweep",
+    "todo_id": "finding_links row, kind by status",
 }
 
-# Validator-accepted keys with NO home in schema v3. Every entry is a named,
-# measured loss -- never a licensed omission -- and names the v4 home that will
-# take it (see "Legacy field mapping (schema v4)" in
-# _project/specs/findings-domain.md). The v4 migration empties this map; it must
-# never be used to silence a newly added field.
-FRONTMATTER_HOMES_PENDING_V4 = {
-    "related_paths": "findings.related_paths (v4 column)",
-    "suggested_sweep": "findings.suggested_sweep (v4 column)",
-    "todo_id": "finding_links row, kind by status (v4 mapping)",
-}
+# Validator-accepted keys with no column yet. EMPTY as of schema v4, which landed
+# a home for every key the validator accepts. It stays here deliberately: the
+# guard test requires every accepted key to appear in one map or the other, so a
+# newly added field must be given a home or named here, never silently dropped.
+FRONTMATTER_HOMES_PENDING_V4: dict[str, str] = {}
 
-# Body sections parse_draft lands today. Any OTHER `## ` heading has no v3 home
-# and is reported as unmapped until the v4 `finding_sections` table exists.
+# Body sections parse_draft lands today. Any OTHER `## ` heading is preserved
+# verbatim in the v4 `finding_sections` table, in document order.
 SECTION_HOMES = {
     "Finding": "findings.finding_text",
     "Why this matters": "findings.why_matters",
     "Suggested next steps": "findings.next_steps",
     "Triage log": "finding_events rows",
 }
-PENDING_SECTION_HOME_V4 = "finding_sections table (v4)"
+EXTRA_SECTION_HOME = "finding_sections rows"
 
 # YYYY-MM-DD-HHMMSS-<kebab-slug> (matches the phase-1 validator's FILENAME_RE).
 FINDING_ID_RE = vbs.FILENAME_RE
@@ -343,11 +485,46 @@ def parse_draft(path: Path) -> dict[str, Any]:
         # not be deleted just because the capture file never mentioned them.
         "evidence_declared": "evidence" in data,
         "triage_log": triage_log,
-        # Content the validator accepted but that has no v3 column. Reported, not
-        # dropped: silent loss here is what made `sync` print "synced 1" over 65
-        # records that each lost content. v4 empties both lists.
+        # v4 homes. related_paths is a JSON array so list ORDER (part of the
+        # record) survives, and an absent key stays NULL rather than becoming
+        # "[]" -- a record that never had the key stays distinguishable from one
+        # that had an empty list.
+        "related_paths": _json_list_or_none(data.get("related_paths")),
+        "suggested_sweep": _str_or_none(data.get("suggested_sweep")),
+        "todo_id": _str_or_none(data.get("todo_id")),
+        # Legacy todo_id -> link kind, by status. A `promoted-to` edge asserts the
+        # finding is `promoted`, so an `actioned` record must not use it.
+        "todo_link_kind": ("promoted-to" if disposition == "promoted" else "resolved-by"),
+        "sections": _extra_sections(sections),
+        # Validator-accepted content with no column. Empty as of v4; kept so a
+        # future field with no home is reported rather than dropped silently --
+        # silent loss is what made `sync` print "synced 1" over 65 lossy records.
         "unmapped": unmapped_content(data, sections),
     }
+
+
+def _json_list_or_none(value: Any) -> str | None:
+    """A frontmatter list as a JSON array string, preserving order; None if absent."""
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        return json.dumps([str(value)])
+    return json.dumps([str(item) for item in value])
+
+
+def _extra_sections(sections: dict[str, str]) -> list[dict[str, Any]]:
+    """Body sections with no dedicated column, in DOCUMENT order.
+
+    ``_split_body`` returns an insertion-ordered dict, so enumerating it preserves
+    the order the headings appeared in. Blank sections are dropped: there is no
+    content to preserve, and a row would imply there was.
+    """
+    extra: list[dict[str, Any]] = []
+    for heading, text in sections.items():
+        if heading in SECTION_HOMES or not text.strip():
+            continue
+        extra.append({"position": len(extra), "heading": heading, "text": text})
+    return extra
 
 
 def unmapped_content(data: dict[str, Any], sections: dict[str, str]) -> dict[str, list[str]]:
@@ -361,10 +538,11 @@ def unmapped_content(data: dict[str, Any], sections: dict[str, str]) -> dict[str
     frontmatter = [
         key for key in sorted(FRONTMATTER_HOMES_PENDING_V4) if key in data and data[key] not in (None, "", [], {})
     ]
-    unmapped_sections = [
-        heading for heading in sorted(sections) if heading not in SECTION_HOMES and sections[heading].strip()
-    ]
-    return {"frontmatter": frontmatter, "sections": unmapped_sections}
+    # Sections outside SECTION_HOMES now land in finding_sections, so they are no
+    # longer unmapped. Kept as an explicit empty list rather than removed: the
+    # shape is part of sync's report, and a future heading class with no home
+    # would repopulate it.
+    return {"frontmatter": frontmatter, "sections": []}
 
 
 # ---------------------------------------------------------------------------
@@ -388,6 +566,8 @@ _FINDING_COLUMNS = (
     "reconsider_after",
     "created_at",
     "imported_from",
+    "related_paths",
+    "suggested_sweep",
 )
 
 # Fields compared to decide same-id-different-content on sync. Excludes
@@ -436,6 +616,13 @@ def get_finding(conn: Any, finding_id: str) -> dict[str, Any] | None:
         dict(r)
         for r in conn.execute(
             "SELECT kind, target_item, target_finding, note FROM finding_links WHERE finding_id = ? ORDER BY id",
+            (finding_id,),
+        )
+    ]
+    finding["sections"] = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT position, heading, text FROM finding_sections WHERE finding_id = ? ORDER BY position",
             (finding_id,),
         )
     ]
@@ -503,8 +690,44 @@ def insert_finding(conn: Any, actor: str, fields: dict[str, Any], *, imported_fr
                 entry.get("note"),
             ),
         )
+    for section in fields.get("sections") or []:
+        conn.execute(
+            "INSERT INTO finding_sections (finding_id, position, heading, text) VALUES (?, ?, ?, ?)",
+            (finding_id, section["position"], section["heading"], section["text"]),
+        )
+    _insert_legacy_todo_link(conn, finding_id, fields)
     log_finding_event(
         conn, actor, finding_id, "sync" if imported_from is None else "import", {"disposition": disposition}
+    )
+
+
+def _insert_legacy_todo_link(conn: Any, finding_id: str, fields: dict[str, Any]) -> None:
+    """Land a legacy ``todo_id`` as a ``finding_links`` row.
+
+    Kind follows the record's status (see the v4 mapping in
+    _project/specs/findings-domain.md): 'promoted-to' for a promoted finding,
+    'resolved-by' for one that was merely actioned -- a 'promoted-to' edge asserts
+    disposition 'promoted', so using it for an actioned record would misstate the
+    history and break the promote invariant.
+
+    A target that does not resolve is recorded with ``target_item = NULL`` and the
+    original id preserved in the note, then surfaced by the caller. Reported, never
+    silently skipped: the FK is DEFERRABLE, so a bare insert would otherwise fail
+    the whole transaction at COMMIT with no indication of which record was at fault.
+    """
+    todo_id = fields.get("todo_id")
+    if not todo_id:
+        return
+    kind = fields.get("todo_link_kind") or "resolved-by"
+    resolved = conn.execute("SELECT 1 FROM items WHERE id = ?", (todo_id,)).fetchone() is not None
+    conn.execute(
+        "INSERT INTO finding_links (finding_id, kind, target_item, note) VALUES (?, ?, ?, ?)",
+        (
+            finding_id,
+            kind,
+            todo_id if resolved else None,
+            f"imported from todo_id: {todo_id}" + ("" if resolved else " (no such item at import time)"),
+        ),
     )
 
 
@@ -1191,6 +1414,19 @@ def _print_finding(finding: dict[str, Any]) -> None:
     print(finding["why_matters"])
     print("-- Suggested next steps")
     print(finding["next_steps"])
+    for section in finding.get("sections", []):
+        # Verbatim, under the original heading: these carry the "why the review
+        # missed it" meta-analysis the corpus exists for.
+        print(f"-- {section['heading']}")
+        print(section["text"])
+    if finding.get("related_paths"):
+        try:
+            paths = json.loads(finding["related_paths"])
+        except (TypeError, ValueError):  # pragma: no cover - stored by us as JSON
+            paths = [finding["related_paths"]]
+        print("related paths: " + ", ".join(str(path) for path in paths))
+    if finding.get("suggested_sweep"):
+        print(f"suggested sweep: {finding['suggested_sweep']}")
     for evidence in finding.get("evidence", []):
         loc = ""
         if evidence.get("line_start"):

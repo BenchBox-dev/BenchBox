@@ -1031,13 +1031,17 @@ class TestHostedMigrate:
             todo_db.connect_backend(HOSTED_URL)
         # ... and migrate must fix it in place, applying every pending version
         applied = todo_db.migrate_backend(HOSTED_URL)
-        assert applied == [2, 3]
+        assert applied == [2, 3, 4]
         conn = todo_db.connect_backend(HOSTED_URL)
         cols = [row[1] for row in conn.execute("PRAGMA table_info(work_units)").fetchall()]
         assert "started_at" in cols
         # v3 findings tables landed too.
         tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         assert "findings" in tables
+        # v4 landed too: the lossless columns and the sections table.
+        assert "finding_sections" in tables
+        finding_cols = [row[1] for row in conn.execute("PRAGMA table_info(findings)").fetchall()]
+        assert {"related_paths", "suggested_sweep"} <= set(finding_cols)
 
 
 # ---------------------------------------------------------------------------
