@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -152,6 +153,28 @@ STATUS_TO_DISPOSITION = {
 DEFAULT_DRAFTS_DIR = vbs.DEFAULT_DRAFTS_DIR
 SYNCED_SUFFIX = ".synced"
 SYNCED_PRUNE_DAYS = 30
+
+# Bridge to the standalone todo-db drafts convention. BenchBox binds drafts to
+# ~/.benchbox/finding-drafts/ while the standalone CLI defaults to
+# ~/.todo-db/finding-drafts/<project-id>/. Those diverge silently, not loudly:
+# at cutover `sync` reports "synced 0" and the banner counts zero unsynced
+# drafts while a real draft sits stranded in the BenchBox directory. Honouring
+# one env var in BOTH tools means the bound directory can be pinned once and
+# every surface -- create, candidates, sync, and the planning banner -- agrees.
+# The frontmatter schemas are already compatible; only the location diverged.
+DRAFTS_DIR_ENV = "TODO_DB_FINDING_DRAFTS_DIR"
+
+
+def resolve_drafts_dir() -> str:
+    """The drafts directory every findings surface should use.
+
+    ``TODO_DB_FINDING_DRAFTS_DIR`` wins when set and non-empty, so the same pin
+    works before and after the standalone cutover; otherwise the BenchBox default.
+    Reads the module global as its fallback (not a bound copy) so tests that
+    override ``DEFAULT_DRAFTS_DIR`` keep working.
+    """
+    return os.environ.get(DRAFTS_DIR_ENV) or DEFAULT_DRAFTS_DIR
+
 
 # ---------------------------------------------------------------------------
 # Parser-completeness contract
@@ -686,13 +709,13 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
     return result
 
 
-def count_unsynced_drafts(drafts_dir: str | Path = DEFAULT_DRAFTS_DIR) -> int:
+def count_unsynced_drafts(drafts_dir: str | Path | None = None) -> int:
     """Local directory glob of unsynced drafts -- no credentials, no network.
 
     A draft is 'unsynced' until ``sync`` renames it to ``*.md.synced``; this is
     the count the phase-4 ``todo ready`` / ``todo stats`` banner shows.
     """
-    directory = Path(drafts_dir).expanduser()
+    directory = Path(drafts_dir if drafts_dir is not None else resolve_drafts_dir()).expanduser()
     if not directory.is_dir():
         return 0
     return sum(1 for p in directory.glob("*.md") if p.name != "README.md")
@@ -728,7 +751,7 @@ def surfacing_banner(conn, drafts_dir: str | Path | None = None, open_count: int
     aggregate entirely.
     """
     if drafts_dir is None:
-        drafts_dir = DEFAULT_DRAFTS_DIR
+        drafts_dir = resolve_drafts_dir()
     if open_count is None:
         open_count = open_findings_count(conn)
     draft_count = count_unsynced_drafts(drafts_dir)
@@ -963,10 +986,10 @@ def add_finding_subparsers(parser: argparse.ArgumentParser) -> None:
     p.add_argument("--why", help="## Why this matters body text")
     p.add_argument("--next-steps", dest="next_steps", help="## Suggested next steps body text")
     p.add_argument("--observed-sha", help="provenance SHA (not a lookup key)")
-    p.add_argument("--drafts-dir", default=DEFAULT_DRAFTS_DIR)
+    p.add_argument("--drafts-dir", default=resolve_drafts_dir())
 
     p = sub.add_parser("candidates", help="list unsynced drafts (local glob, zero-credential)")
-    p.add_argument("--drafts-dir", default=DEFAULT_DRAFTS_DIR)
+    p.add_argument("--drafts-dir", default=resolve_drafts_dir())
 
     p = sub.add_parser("list", help="list findings")
     p.add_argument("--disposition", choices=DISPOSITIONS)
@@ -977,7 +1000,7 @@ def add_finding_subparsers(parser: argparse.ArgumentParser) -> None:
     p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("sync", help="land drafts into the tracker (authorized landing step)")
-    p.add_argument("--drafts-dir", default=DEFAULT_DRAFTS_DIR)
+    p.add_argument("--drafts-dir", default=resolve_drafts_dir())
 
     p = sub.add_parser("dismiss", help="dismiss a finding with a reason")
     p.add_argument("id")

@@ -865,3 +865,39 @@ class TestSyncFullPayloadComparison:
         stored = todo_findings.get_finding(conn, stem)
         assert (stored["urgency"], stored["breadth"]) == ("high", "wide")
         assert len(stored["evidence"]) == 2
+
+
+class TestDraftsDirBridge:
+    """BenchBox binds drafts to ~/.benchbox/finding-drafts/ while the standalone
+    todo-db defaults to ~/.todo-db/finding-drafts/<project-id>/. The divergence is
+    silent — `sync` reports "synced 0" and the banner counts zero while a real draft
+    sits stranded — so one env var has to bind every surface."""
+
+    def test_env_var_wins_over_the_benchbox_default(self, monkeypatch, tmp_path):
+        monkeypatch.setenv(todo_findings.DRAFTS_DIR_ENV, str(tmp_path / "pinned"))
+        assert todo_findings.resolve_drafts_dir() == str(tmp_path / "pinned")
+
+    def test_falls_back_to_the_benchbox_default_when_unset(self, monkeypatch):
+        monkeypatch.delenv(todo_findings.DRAFTS_DIR_ENV, raising=False)
+        assert todo_findings.resolve_drafts_dir() == todo_findings.DEFAULT_DRAFTS_DIR
+
+    def test_empty_env_var_is_ignored(self, monkeypatch):
+        # An exported-but-empty var must not resolve drafts to the process cwd.
+        monkeypatch.setenv(todo_findings.DRAFTS_DIR_ENV, "")
+        assert todo_findings.resolve_drafts_dir() == todo_findings.DEFAULT_DRAFTS_DIR
+
+    def test_a_stranded_draft_becomes_visible_to_the_pinned_dir(self, monkeypatch, tmp_path):
+        # The item's own scenario: a real draft in the bound directory must be
+        # counted, not silently missed.
+        drafts = tmp_path / "benchbox-drafts"
+        _draft(drafts / "d", "2026-07-24-150447-guards-only-cover-configured-root")
+        monkeypatch.setenv(todo_findings.DRAFTS_DIR_ENV, str(drafts))
+        assert todo_findings.count_unsynced_drafts() == 1
+
+    def test_banner_follows_the_pinned_dir(self, conn, monkeypatch, tmp_path):
+        drafts = tmp_path / "pinned-drafts"
+        _draft(drafts / "d", "2026-07-24-150447-guards-only-cover-configured-root")
+        monkeypatch.setenv(todo_findings.DRAFTS_DIR_ENV, str(drafts))
+        banner = todo_findings.surfacing_banner(conn)
+        assert banner is not None
+        assert "1 unsynced draft(s)" in banner
