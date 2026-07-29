@@ -743,3 +743,31 @@ class TestUnmappedContentIsReported:
         assert result["unmapped"] == {}
         assert not path.exists()
         assert path.with_name(path.name + ".synced").exists()
+
+
+class TestShowRendersEvidenceNote:
+    """`show --json` always carried evidence `note`; the human rendering dropped it,
+    so the default `todo finding show` hid the reviewer's reason for each row."""
+
+    def _finding_with_evidence(self, conn, evidence):
+        fid = _mk_finding(conn, evidence=evidence)
+        return todo_findings.get_finding(conn, fid)
+
+    def test_note_reaches_human_output(self, conn, capsys):
+        finding = self._finding_with_evidence(
+            conn, [{"path": "benchbox/core/thing.py", "pattern": "def thing", "note": "only the SQL path is guarded"}]
+        )
+        todo_findings._print_finding(finding)
+        out = capsys.readouterr().out
+        assert "evidence: benchbox/core/thing.py def thing" in out
+        assert "note: only the SQL path is guarded" in out
+
+    def test_note_less_evidence_row_renders_as_before(self, conn, capsys):
+        finding = self._finding_with_evidence(conn, [{"path": "benchbox/core/thing.py", "pattern": "def thing"}])
+        todo_findings._print_finding(finding)
+        lines = [line for line in capsys.readouterr().out.splitlines() if "thing.py" in line or "note:" in line]
+        assert lines == ["evidence: benchbox/core/thing.py def thing"]
+
+    def test_json_payload_is_unchanged_and_already_included_the_note(self, conn):
+        finding = self._finding_with_evidence(conn, [{"path": "p.py", "pattern": None, "note": "why p matters"}])
+        assert finding["evidence"][0]["note"] == "why p matters"

@@ -1065,6 +1065,11 @@ def _print_finding(finding: dict[str, Any]) -> None:
             if evidence.get("line_end"):
                 loc += f"-{evidence['line_end']}"
         print(f"evidence: {evidence['path']}{loc} {evidence.get('pattern') or ''}".rstrip())
+        if evidence.get("note"):
+            # The note is where the reviewer said WHY the path is evidence, so
+            # hiding it from the default `show` withheld the reason for the row.
+            # Indented continuation, so a long note never crowds the locator.
+            print(f"    note: {evidence['note']}")
     for link in finding.get("links", []):
         target = link.get("target_item") or link.get("target_finding") or "(dangling)"
         print(f"link: {link['kind']} -> {target}")
