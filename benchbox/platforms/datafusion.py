@@ -33,7 +33,12 @@ except ImportError:
 from benchbox.core.dataframe.schema_utils import extract_schema_columns
 from benchbox.core.errors import PlanCaptureError
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
-from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
+from benchbox.platforms.base.data_loading import (
+    NO_BENCHMARK,
+    DataSource,
+    normalize_table_paths,
+    resolve_csv_dialect,
+)
 from benchbox.platforms.base.no_constraint_mixin import NoConstraintEnforcementMixin
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import (
@@ -753,9 +758,10 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         for table_name, file_paths in data_source.tables.items():
             table_start = mono_time()
 
-            # Ensure file_paths is a list
-            if not isinstance(file_paths, list):
-                file_paths = [file_paths]
+            # Normalize to a list of Paths. Generator-supplied `tables` values may be
+            # plain strings (fresh generate -> load in the same run), while the manifest
+            # source yields Paths, so downstream Path-only calls need the coercion here.
+            file_paths = normalize_table_paths(file_paths)
 
             # Normalize table name to lowercase
             table_name_lower = table_name.lower()
