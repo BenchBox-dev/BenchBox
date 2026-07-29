@@ -901,3 +901,58 @@ class TestDraftsDirBridge:
         banner = todo_findings.surfacing_banner(conn)
         assert banner is not None
         assert "1 unsynced draft(s)" in banner
+
+
+class TestEvidenceReconcileIsNotDestructive:
+    """A draft with no `evidence:` key makes no assertion about evidence. Treating
+    that as an empty list would delete rows curated at triage or hand-mapped during
+    an import — the live record 2026-07-18-190500-evidence-tree-sha-provenance-mismatch
+    has exactly that shape: no key in the file, three rows in the DB."""
+
+    def test_absent_evidence_key_never_deletes_stored_rows(self, conn, tmp_path):
+        stem = "2026-01-02-030405-hand-mapped-record"
+        fid = _mk_finding(
+            conn,
+            finding_id=stem,
+            title="A sample class",
+            review_context="ultrareview X",
+            why_matters="axis Y is a whole dimension",
+            evidence=[{"path": "a.py", "note": "hand-mapped from related_paths"}],
+        )
+        # A draft file that carries no `evidence:` key at all.
+        _draft(tmp_path / "d", stem)
+
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["updated"] == []
+        assert result["skipped"] == [fid]
+        stored = todo_findings.get_finding(conn, fid)["evidence"]
+        assert [(row["path"], row["note"]) for row in stored] == [("a.py", "hand-mapped from related_paths")]
+
+    def test_explicitly_empty_evidence_list_does_clear_stored_rows(self, conn, tmp_path):
+        # An explicit `evidence: []` IS an assertion, so it is honoured.
+        stem = "2026-01-02-030405-explicitly-cleared"
+        _mk_finding(
+            conn,
+            finding_id=stem,
+            review_context="ultrareview X",
+            why_matters="axis Y is a whole dimension",
+            evidence=[{"path": "a.py"}],
+        )
+        (tmp_path / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            "evidence: []\n"
+            "---\n\n"
+            "# A sample blind-spot class\n\n"
+            "## Finding\nthe review never checks axis Y\n\n"
+            "## Why this matters\naxis Y is a whole dimension\n\n"
+            "## Suggested next steps\n- [ ] add a gate for axis Y\n",
+            encoding="utf-8",
+        )
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["updated"] == [stem]
+        assert todo_findings.get_finding(conn, stem)["evidence"] == []

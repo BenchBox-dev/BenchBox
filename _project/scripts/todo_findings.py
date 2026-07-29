@@ -337,6 +337,11 @@ def parse_draft(path: Path) -> dict[str, Any]:
         "breadth": _str_or_none(data.get("breadth")),
         "confidence": _str_or_none(data.get("confidence")),
         "evidence": list(data.get("evidence") or []),
+        # Whether the draft ASSERTS an evidence list at all. An absent key means
+        # "no assertion", which is not the same as "no evidence": stored rows may
+        # have been curated at triage (or hand-mapped during an import) and must
+        # not be deleted just because the capture file never mentioned them.
+        "evidence_declared": "evidence" in data,
         "triage_log": triage_log,
         # Content the validator accepted but that has no v3 column. Reported, not
         # dropped: silent loss here is what made `sync` print "synced 1" over 65
@@ -539,6 +544,15 @@ def _normalize_evidence(entries: Any) -> list[tuple[Any, ...]]:
 
 
 def _evidence_differs(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
+    """Whether a re-parsed draft's evidence disagrees with what is stored.
+
+    A draft that declares no ``evidence:`` key makes no assertion, so it never
+    counts as a difference. Treating an absent key as an empty list would let a
+    re-sync DELETE evidence rows the draft never knew about -- exactly the case of
+    a legacy record whose rows were hand-mapped at import time.
+    """
+    if not fields.get("evidence_declared"):
+        return False
     return _normalize_evidence(existing.get("evidence")) != _normalize_evidence(fields.get("evidence"))
 
 
