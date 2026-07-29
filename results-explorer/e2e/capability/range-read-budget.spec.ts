@@ -47,6 +47,12 @@ test.describe("RG-2 range-read budget", () => {
   // RG-2 target and re-enables automatically once the runtime starts
   // issuing range reads. Tracked as
   // `enable-duckdb-wasm-http-range-reads-for-registered-urls`.
+  //
+  // When re-enabling: this counts bytes across ONE cold load, but
+  // `waitForDataLoaded` may re-navigate to clear the zero-row snapshot race
+  // (see docs/operations/browser-ci.md), and a second load would double-count
+  // against the budget. Reset the counter after the wait, or wait without
+  // re-navigation here.
   test.skip("a cold explorer load transfers <=10% of the snapshot via 206 ranged GETs", async ({
     page,
     request,

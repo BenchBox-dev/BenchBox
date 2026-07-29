@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForShell } from "../support/fixtures";
+import { waitForDataElement, waitForShell } from "../support/fixtures";
 
 const TPCH_TUNED_ID = "tpch-duckdb-sf0.01-20260403-a5eff54e";
 
@@ -35,9 +35,10 @@ test.describe("ResultDetail failure paths", () => {
     await waitForShell(page);
     // Wait for the detail to render so the Tuning Config section is in
     // the DOM. The tuned fixture is the only bundle with has_tuning=true.
-    await expect(page.getByRole("heading", { name: /TPC-H\s+-\s+DuckDB/ })).toBeVisible({
-      timeout: 45_000,
-    });
+    // Routed through the shared helper so the cold-snapshot zero-row race
+    // is retried by re-navigation; the sidecar route below is installed
+    // afterwards and so is unaffected by those retries.
+    await waitForDataElement(page, page.getByRole("heading", { name: /TPC-H\s+-\s+DuckDB/ }));
 
     // Route the sidecar request to a 500 before the user expands the
     // collapsed Tuning Config panel.
