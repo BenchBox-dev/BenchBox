@@ -536,7 +536,7 @@ def findings_by_disposition(conn) -> dict[str, int]:
     return {row[0]: row[1] for row in conn.execute("SELECT disposition, count(*) FROM findings GROUP BY disposition")}
 
 
-def surfacing_banner(conn, drafts_dir: str | Path | None = None) -> str | None:
+def surfacing_banner(conn, drafts_dir: str | Path | None = None, open_count: int | None = None) -> str | None:
     """A one-line hint for ``ready``/``stats`` pointing at untriaged findings.
 
     Returns ``None`` when there is nothing to surface (no open findings and no
@@ -546,10 +546,13 @@ def surfacing_banner(conn, drafts_dir: str | Path | None = None) -> str | None:
 
     ``drafts_dir`` defaults to ``DEFAULT_DRAFTS_DIR`` resolved at call time (not
     bound at definition), so the default remains overridable for tests.
+    ``open_count`` lets a caller that already has the number (``stats``) skip the
+    aggregate entirely.
     """
     if drafts_dir is None:
         drafts_dir = DEFAULT_DRAFTS_DIR
-    open_count = open_findings_count(conn)
+    if open_count is None:
+        open_count = open_findings_count(conn)
     draft_count = count_unsynced_drafts(drafts_dir)
     if not open_count and not draft_count:
         return None

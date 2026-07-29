@@ -2891,24 +2891,38 @@ def _cmd_list(conn, actor, args):
     return 0
 
 
-def _emit_findings_banner(conn) -> None:
+_BANNER_ASCII = {ord("→"): "->", ord("—"): "--"}
+
+
+def _emit_findings_banner(conn, open_count: int | None = None) -> None:
     """Print the untriaged-findings hint to stderr, never stdout. Best-effort: a
     hint must never break ``ready``/``stats`` core output, so any failure here is
     swallowed after the stdout contract is met.
 
-    The *print* is inside the guard too, not just the query: the banner carries
-    non-ASCII (``→``/``—``), so a byte-oriented stderr (C locale, or a POSIX pipe
-    under LC_ALL=C) raises UnicodeEncodeError on write. Degrade to an ASCII
-    transliteration before giving up, so the hint survives such a stream instead
-    of vanishing."""
+    ``open_count`` lets a caller that already counted findings (``stats``) pass
+    the number through instead of paying a second aggregate.
+
+    Two stderr hazards are handled explicitly, because the guard alone cannot:
+
+    * ``sys.stderr is None`` -- when fd 2 is closed (``2>&-``) CPython sets it to
+      None and ``print(..., file=None)`` falls back to *stdout*, which would put
+      the hint in the machine-readable stream. Bail out instead.
+    * a strict non-UTF-8 stream -- the banner carries ``->``/``--`` as ``→``/``—``.
+      CPython's default stderr uses ``errors='backslashreplace'`` and C locales
+      get coerced to UTF-8 (PEP 538), so this needs an explicitly strict stream
+      (``PYTHONIOENCODING=ascii:strict``, or a ``reconfigure``d stderr) to bite --
+      uncommon, but cheap to survive: fall back to an ASCII transliteration
+      rather than losing the hint."""
+    if sys.stderr is None:
+        return
     try:
-        banner = todo_findings.surfacing_banner(conn)
+        banner = todo_findings.surfacing_banner(conn, open_count=open_count)
         if not banner:
             return
         try:
             print(banner, file=sys.stderr)
         except UnicodeEncodeError:
-            print(banner.encode("ascii", "replace").decode("ascii"), file=sys.stderr)
+            print(banner.translate(_BANNER_ASCII), file=sys.stderr)
     except Exception:
         return
 
@@ -2922,8 +2936,11 @@ def _cmd_ready(conn, actor, args):
 
 
 def _cmd_stats(conn, actor, args):
-    print(json.dumps(stats(conn), indent=2, sort_keys=True))
-    _emit_findings_banner(conn)
+    computed = stats(conn)
+    print(json.dumps(computed, indent=2, sort_keys=True))
+    # Reuse the disposition breakdown already computed above rather than issuing
+    # a second `count(*) WHERE disposition='open'` for the banner.
+    _emit_findings_banner(conn, open_count=computed["findings_by_disposition"].get("open", 0))
     return 0
 
 
