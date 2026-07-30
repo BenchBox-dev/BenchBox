@@ -127,7 +127,10 @@ def test_kill_process_group_uses_killpg_when_available(monkeypatch):
     def fake_killpg(pid, sig):
         calls.append((pid, sig))
 
-    monkeypatch.setattr(timeouts.os, "killpg", fake_killpg)
+    # raising=False so this also runs on win32, where os.killpg does not exist:
+    # injecting it makes the hasattr guard take the POSIX branch, which is exactly
+    # the ladder under test. A skipif here would drop that coverage instead.
+    monkeypatch.setattr(timeouts.os, "killpg", fake_killpg, raising=False)
     mock_proc = Mock(pid=999)
 
     timeouts._kill_process_group(mock_proc)

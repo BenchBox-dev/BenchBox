@@ -46,7 +46,8 @@ _FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "query_plans"
 
 
 def _load(name: str) -> str:
-    return (_FIXTURES / name).read_text()
+    # Explicit encoding: the default is locale-dependent (cp1252 on Windows).
+    return (_FIXTURES / name).read_text(encoding="utf-8")
 
 
 def _op(op_type: LogicalOperatorType, children=None) -> LogicalOperator:

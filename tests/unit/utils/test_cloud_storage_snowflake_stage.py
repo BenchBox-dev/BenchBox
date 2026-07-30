@@ -12,7 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import os
 import tempfile
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 import pytest
 
@@ -90,6 +90,22 @@ class TestIsSnowflakeStagePath:
         assert is_snowflake_stage_path(Path("@~/benchbox"))
         assert not is_snowflake_stage_path(None)
         assert not is_snowflake_stage_path(123)
+
+    def test_windows_flavoured_path_object_still_classifies_as_a_stage(self):
+        """A Path carrying backslash separators is still a stage reference.
+
+        ``str(WindowsPath("@~/benchbox"))`` is ``"@~\\benchbox"``, and the stage
+        grammar requires ``/`` after the stage token, so on Windows this predicate
+        silently returned False for a valid user-stage reference. PureWindowsPath
+        reproduces it on any platform, so the regression is not Windows-only-visible.
+        """
+        assert is_snowflake_stage_path(PureWindowsPath("@~/benchbox"))
+        assert is_snowflake_stage_path(PureWindowsPath("@my_stage/sub/dir"))
+
+    def test_windows_flavoured_local_path_is_not_a_stage(self):
+        """The separator normalization must not sweep ordinary local paths in."""
+        assert not is_snowflake_stage_path(PureWindowsPath(r"C:\data\benchbox"))
+        assert not is_snowflake_stage_path(PureWindowsPath(r"C:\data\@notastage"))
 
 
 class TestStageClassification:

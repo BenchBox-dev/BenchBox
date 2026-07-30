@@ -34,7 +34,9 @@ def is_development_install() -> bool:
     if (project_root / "pyproject.toml").exists():
         # Verify it's actually the benchbox project
         try:
-            content = (project_root / "pyproject.toml").read_text()
+            # pyproject.toml is UTF-8 by specification (PEP 518); the read_text
+            # default is locale-dependent and cp1252 on Windows.
+            content = (project_root / "pyproject.toml").read_text(encoding="utf-8")
             if 'name = "benchbox"' in content:
                 return True
         except Exception:

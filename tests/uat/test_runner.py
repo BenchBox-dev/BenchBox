@@ -117,8 +117,11 @@ def test_run_cell_writes_log_and_returns_result(tmp_path: Path):
     assert result.result_path is not None
     assert str(result.result_path).endswith("duckdb_tpch_smoke.json")
     assert result.log_path.exists()
-    log_text = result.log_path.read_text()
-    assert "benchmark_runs/results/" in log_text
+    log_text = result.log_path.read_text(encoding="utf-8")
+    # Derive the expectation from the same path the stub echoed: str(Path) uses the
+    # platform separator, so a hardcoded "benchmark_runs/results/" fails on Windows
+    # ("benchmark_runs\\results\\"). Asserting the directory is at least as strong.
+    assert str(result_path.parent) in log_text
 
 
 def test_run_cell_sets_benchbox_output_dir_for_subprocess(tmp_path: Path):

@@ -128,7 +128,9 @@ class TestNoCategoryGatesRemainOnTheRunPath:
     @pytest.mark.parametrize("source", RUN_PATH_SOURCES, ids=lambda p: p.name)
     def test_run_path_never_calls_requires_cloud_storage_directly(self, source):
         """Every gate in these modules uses the deployment-aware variant."""
-        tree = ast.parse(source.read_text())
+        # Explicit encoding: the default is locale-dependent and cp1252 on Windows,
+        # where non-ASCII bytes in our own sources raise UnicodeDecodeError.
+        tree = ast.parse(source.read_text(encoding="utf-8"))
         offenders = [
             node.lineno
             for node in ast.walk(tree)
