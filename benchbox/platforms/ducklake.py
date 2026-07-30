@@ -563,16 +563,14 @@ class DuckLakeAdapter(DuckDBAdapter):
           data loading are skipped and queries run against the existing catalog.
           Pass ``--force`` to wipe the catalog + data dir for a clean rebuild.
 
-        Known limitation (postgres catalog): this reuse/force detection is keyed
-        off the local ``metadata_path`` file, which only exists for the
-        duckdb/sqlite catalog backends. For ``catalog == "postgres"`` the
-        catalog metadata lives entirely server-side, so this always takes the
-        "does not exist yet" branch (fresh-run assumption) regardless of
-        whether the target PostgreSQL database already has DuckLake tables in
-        it, and ``--force`` does not clear a postgres-backed catalog. Re-running
-        against a populated PostgreSQL catalog can therefore hit "table already
-        exists" from the inherited plain ``CREATE TABLE``; use a fresh/dedicated
-        ``pg_database`` per run until this gets proper remote-catalog detection.
+        Postgres catalog: this hook runs BEFORE any connection exists and keys
+        off the local ``metadata_path`` file, which a server-side catalog never
+        has - so it can only ever take the "does not exist yet" branch here.
+        Reuse/force for ``catalog == "postgres"`` is therefore resolved after
+        the ATTACH instead, in ``_resolve_postgres_catalog_reuse()``, which
+        inspects the attached catalog itself; the framework reads
+        ``database_was_reused`` after ``create_connection()`` returns, so
+        deciding it there is equivalent for the runner.
         """
         if self.dry_run:
             # Never mutate on-disk artifacts during a dry run.
@@ -603,10 +601,10 @@ class DuckLakeAdapter(DuckDBAdapter):
 
         Removes the DuckDB-file/sqlite catalog metadata file (and any sidecar
         files DuckDB writes next to it, e.g. a ``.wal``) and recursively clears
-        the Parquet ``DATA_PATH`` directory when it is local. Cloud (e.g. s3://)
-        DATA_PATH is left untouched - clearing a bucket prefix is out of scope
-        here; see ``create_connection()``'s S3 secret handling for the cloud
-        DATA_PATH path.
+        the Parquet ``DATA_PATH`` directory when it is local. A cloud (e.g.
+        ``s3://``) DATA_PATH is deliberately left in place and warned about
+        instead - see the inline note below for why deleting an object-store
+        prefix is not equivalent to clearing a local run directory.
         """
         # Remove the catalog metadata file plus any sidecars sharing its name
         # prefix (e.g. "<catalog>.ducklake.wal"). Only reachable when
@@ -620,9 +618,106 @@ class DuckLakeAdapter(DuckDBAdapter):
                 except OSError as exc:
                     logger.debug("Could not remove DuckLake catalog file %s: %s", sidecar, exc)
 
-        # Recursively clear the Parquet data directory contents (local only).
-        if not self._data_path_is_cloud and self.data_path.exists():
-            shutil.rmtree(self.data_path, ignore_errors=True)
+        self._clear_data_path_for_force()
+
+    def _clear_data_path_for_force(self) -> None:
+        """Apply ``--force``'s DATA_PATH policy: clear it locally, warn in cloud.
+
+        Shared by both reset paths so ``--force`` means the same thing whichever
+        catalog backend detected the rebuild - the local duckdb/sqlite check in
+        ``handle_existing_database``, and the post-ATTACH postgres check in
+        ``_resolve_postgres_catalog_reuse``. Keeping the policy in one place is
+        the point: a postgres catalog with a local data_path used to drop its
+        tables and then silently leave the superseded Parquet on disk, which is
+        not what ``--force`` does for every other backend.
+        """
+        if not self._data_path_is_cloud:
+            if self.data_path.exists():
+                shutil.rmtree(self.data_path, ignore_errors=True)
+            # Recreate immediately: the postgres path calls this AFTER the
+            # ATTACH, and DuckLake writes into an existing directory.
+            self.data_path.mkdir(parents=True, exist_ok=True)
+            return
+
+        # Cloud DATA_PATH: the catalog is gone but its Parquet is not (w7).
+        # Deliberately not deleted here - recursively deleting an object-store
+        # prefix is destructive, unlike removing a local run directory, and the
+        # configured prefix may be shared or hold data this run did not write.
+        # The rebuilt catalog references only newly-written files, so results
+        # stay correct; what is left behind is unreferenced storage and cost,
+        # which the operator must be told about rather than left to discover.
+        logger.warning(
+            "DuckLake --force rebuilt the catalog but did NOT clear the cloud DATA_PATH %s. "
+            "Parquet written by previous runs is now unreferenced by the new catalog: it does not "
+            "affect this run's results, but it keeps accruing storage cost until you remove the "
+            "prefix yourself (e.g. `aws s3 rm --recursive %s`).",
+            self.data_path,
+            self.data_path,
+        )
+        self.log_verbose(
+            f"Force recreate left the cloud DATA_PATH {self.data_path} untouched - "
+            "superseded Parquet from earlier runs remains and must be cleared manually."
+        )
+
+    def _existing_lake_tables(self, setup_conn: Any) -> list[str]:
+        """Names of user tables already present in the ATTACHed ``lake`` catalog.
+
+        ``duckdb_tables()`` reports every catalog the session can see, so the
+        result is filtered to ``lake`` - the base memory/file catalog of the
+        shell connection is not part of DuckLake's persistence unit.
+        """
+        rows = setup_conn.execute(
+            "SELECT table_name FROM duckdb_tables() WHERE database_name = 'lake' ORDER BY table_name"
+        ).fetchall()
+        return [row[0] for row in rows]
+
+    def _resolve_postgres_catalog_reuse(self, setup_conn: Any) -> None:
+        """Apply reuse/force semantics to a server-side (postgres) catalog.
+
+        Mirrors handle_existing_database()'s contract for the local backends:
+
+        - tables present + force_recreate: drop them so the run rebuilds from
+          scratch (database_was_reused=False);
+        - tables present, no force: reuse (database_was_reused=True), which
+          routes the runner down the reused-database path and skips the
+          inherited plain ``CREATE TABLE`` that would otherwise raise
+          "table already exists" on every rerun;
+        - no tables: leave the fresh-run assumption untouched.
+
+        Dropping through the attached catalog is what makes ``--force`` real for
+        postgres; it removes the DuckLake table entries server-side. Superseded
+        Parquet in DATA_PATH is not reclaimed here - see _reset_ducklake_catalog
+        for the same caveat on cloud storage.
+        """
+        if self.dry_run:
+            self.log_verbose("DuckLake postgres catalog reuse detection skipped (dry run mode)")
+            return
+
+        existing = self._existing_lake_tables(setup_conn)
+        if not existing:
+            self.log_very_verbose("DuckLake postgres catalog holds no tables yet - treating as a fresh run")
+            return
+
+        if self.force_recreate:
+            self.log_verbose(
+                f"Force recreate enabled - dropping {len(existing)} table(s) from the DuckLake "
+                f"postgres catalog: {', '.join(existing)}"
+            )
+            for table in existing:
+                setup_conn.execute(f'DROP TABLE IF EXISTS lake.main."{table}"')
+            # Dropping the catalog entries is only half of --force: the Parquet
+            # those tables were written from is still in DATA_PATH, and every
+            # other backend clears it. Verified live against PostgreSQL 18 -
+            # without this, a postgres catalog left the superseded files on disk.
+            self._clear_data_path_for_force()
+            self.database_was_reused = False
+            return
+
+        self.log_verbose(
+            f"Existing DuckLake postgres catalog found ({len(existing)} table(s)) - reusing it "
+            "(pass --force for a clean rebuild)"
+        )
+        self.database_was_reused = True
 
     def create_connection(self, **connection_config) -> Any:
         """Create a DuckDB connection and attach the DuckLake catalog.
@@ -744,6 +839,15 @@ class DuckLakeAdapter(DuckDBAdapter):
             escaped_attach_target = escape_sql_string_literal(attach_target)
             setup_conn.execute(f"ATTACH 'ducklake:{escaped_attach_target}' AS lake (DATA_PATH '{escaped_data_path}')")
             setup_conn.execute("USE lake")
+            # Postgres catalog reuse/force can only be resolved HERE. The
+            # inherited pre-connection hook keys off a local metadata_path file,
+            # which a server-side catalog never has, so it always assumed a
+            # fresh run (w6). The attached catalog is the only view of what the
+            # PostgreSQL database actually holds, and the framework reads
+            # database_was_reused after create_connection() returns, so
+            # resolving it post-ATTACH is both possible and effective.
+            if self.catalog == "postgres":
+                self._resolve_postgres_catalog_reuse(setup_conn)
         except Exception as e:
             try:
                 setup_conn.close()

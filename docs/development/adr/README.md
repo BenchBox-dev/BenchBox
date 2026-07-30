@@ -7,3 +7,4 @@ Architecture Decision Records
 - [ADR: DuckDB datasketches extension — vendoring vs HLL fallback](adr-duckdb-datasketches-vendoring.md)
 - [ADR: Move Explorer Publishing Out of the BenchBox CLI](adr-explorer-cli-surface.md)
 - [ADR: published-results as a Slim Corpus-Only Branch](adr-published-results-slim-corpus-branch.md)
+- [ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias](adr-ducklake-maturity-and-publishability.md)

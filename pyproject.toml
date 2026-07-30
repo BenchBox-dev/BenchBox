@@ -168,6 +168,13 @@ cloudstorage = [
 
 # Individual platforms (for minimal installations)
 duckdb = ["duckdb>=1.0.0,<2.0.0"]
+# DuckLake needs a HIGHER duckdb floor than the duckdb extra: the `ducklake`
+# extension does not exist before DuckDB 1.3, and the adapter enforces that at
+# connection time. The general floor stays >=1.0 because browser-generated
+# results.duckdb files use the v1.0.0 on-disk format, so only this extra raises
+# it - `uv add 'benchbox[ducklake]'` then resolves a runtime that can actually
+# load the extension instead of failing at the first ATTACH.
+ducklake = ["duckdb>=1.3.0,<2.0.0"]
 clickhouse = ["clickhouse-driver>=0.2.0"]  # TCP binary protocol (clickhouse-server)
 clickhouse-server = ["clickhouse-driver>=0.2.0"]  # Canonical extra for clickhouse-server platform
 clickhouse-cloud = ["clickhouse-connect>=0.10.0"]  # HTTP protocol (ClickHouse Cloud)

@@ -130,11 +130,30 @@ benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
 
 ### Clean Rebuild
 
-Without `--force`, an existing catalog at `metadata_path` is reused: schema creation and data loading are skipped and queries run directly against the already-populated catalog.
+Without `--force`, an existing catalog is reused: schema creation and data loading are skipped and queries run directly against the already-populated catalog. For `catalog=duckdb`/`sqlite` this is detected from the `metadata_path` file; for `catalog=postgres` the catalog lives server-side, so it is detected after the `ATTACH` by inspecting the attached catalog itself.
 
 ```bash
 # Wipe the existing catalog metadata file and Parquet data, then rebuild
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 --force
+```
+
+What `--force` clears depends on where the catalog and the data live:
+
+| Location | Cleared by `--force`? |
+|---|---|
+| `catalog=duckdb` / `sqlite` metadata file (+ sidecars) | Yes - deleted |
+| `catalog=postgres` catalog tables | Yes - dropped server-side |
+| Local `data_path` directory | Yes - cleared recursively |
+| Cloud `data_path` (`s3://...`) | **No** - see below |
+
+```{warning}
+`--force` never deletes objects from a cloud `DATA_PATH`. Recursively deleting an
+object-store prefix is destructive in a way that clearing a local run directory is
+not, and the configured prefix may hold data this run did not write. The rebuilt
+catalog references only newly-written files, so **results stay correct** - but the
+Parquet from earlier runs is left unreferenced and keeps accruing storage cost. The
+adapter logs a warning naming the prefix; clear it yourself, e.g.
+`aws s3 rm --recursive s3://bucket/prefix/`.
 ```
 
 ## Python API
@@ -200,6 +219,24 @@ parent = PlatformRegistry.get_inherited_platform("ducklake")
 - You are on a DuckDB runtime older than 1.3
 - You want the most stable, non-experimental local platform
 
+### Interpreting DuckLake numbers: no compaction is performed
+
+BenchBox never invokes DuckLake's maintenance operations (compaction /
+`ducklake_merge_adjacent_files`, inlining). DuckLake writes a new Parquet file
+per insert transaction — five separate `INSERT`s produce five files — and
+nothing merges them afterwards.
+
+**The resulting bias runs against DuckLake:** queries scan more, smaller files
+than a compacted production deployment would, so BenchBox's DuckLake timings are
+a floor rather than a ceiling. How much this matters depends on the load path —
+bulk loading via few large inserts produces few large files and little bias,
+while row-wise loading produces many small ones.
+
+Treat a DuckLake-vs-other-engine gap accordingly, and do not read it as the
+best DuckLake can do. See
+[ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias](../development/adr/adr-ducklake-maturity-and-publishability.md)
+for why this is documented rather than instrumented.
+
 ## Troubleshooting
 
 ### DuckDB Version Too Old
@@ -234,7 +271,7 @@ For `catalog=postgres`, `--force` only clears local artifacts and does **not** r
 ... database "ducklake_catalog" does not exist ...
 ```
 
-**Solution:** DuckLake's `postgres` catalog `ATTACH` does not run `CREATE DATABASE` - create the target database on the PostgreSQL server first (e.g. `createdb ducklake_catalog`), then re-run with `--platform-option pg_database=ducklake_catalog`. Because reuse/force detection for this backend is keyed off a local file that does not exist for a remote catalog, re-running against an already-populated PostgreSQL catalog can raise "table already exists" - use a fresh or dedicated `pg_database` per run until this gets proper remote-catalog reuse detection.
+**Solution:** DuckLake's `postgres` catalog `ATTACH` does not run `CREATE DATABASE` - create the target database on the PostgreSQL server first (e.g. `createdb ducklake_catalog`), then re-run with `--platform-option pg_database=ducklake_catalog`. Re-running against an already-populated PostgreSQL catalog is supported: the adapter inspects the attached catalog after `ATTACH`, reuses it by default, and drops its tables when `--force` is passed.
 
 ## Related Documentation
 

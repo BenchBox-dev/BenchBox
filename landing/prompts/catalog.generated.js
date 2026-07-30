@@ -457,7 +457,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "self-hosted"
       ],
       "id": "ducklake",
-      "install_command": "uv add duckdb",
+      "install_command": "uv add 'benchbox[ducklake]'",
       "interfaces": [
         "sql"
       ],

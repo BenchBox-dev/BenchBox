@@ -32,8 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   apply Databricks Liquid Clustering for more representative runs.
 - **DuckLake platform** - Run benchmarks against DuckLake (DuckDB lakehouse
   format: Parquet table data + SQL-database catalog metadata) via
-  `--platform ducklake`. DuckDB-file catalog + local Parquet storage; requires
-  DuckDB >= 1.3. Experimental.
+  `--platform ducklake`. The catalog backend (`--platform-option
+  catalog=duckdb|sqlite|postgres`) and the Parquet `data_path` (local or
+  `s3://`) are independent, so any combination works, including a self-hosted
+  PostgreSQL catalog with S3 storage. Existing catalogs are reused across runs
+  and `--force` rebuilds them; requires DuckDB >= 1.3, installable as
+  `benchbox[ducklake]`. Experimental.
 
 ### Added
 

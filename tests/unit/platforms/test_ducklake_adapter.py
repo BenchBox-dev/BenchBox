@@ -7,6 +7,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from benchbox.core.config_inheritance import resolve_dialect_for_query_translation
@@ -733,6 +735,209 @@ class TestDuckLakeFromConfigCatalogOptions:
         config = {"benchmark": "tpch", "scale_factor": 0.01, "output_dir": str(tmp_path)}
         adapter = DuckLakeAdapter.from_config(config)
         assert adapter.force_recreate is False
+
+
+class TestDuckLakePostgresCatalogReuse:
+    """Reuse/force for a server-side catalog, resolved post-ATTACH (w6).
+
+    The inherited pre-connection hook keys off a local metadata_path file that a
+    postgres catalog never has, so before this every rerun looked like a fresh
+    run: the runner then issued the inherited plain CREATE TABLE against an
+    already-populated catalog and crashed with "table already exists", and
+    --force silently did nothing server-side.
+    """
+
+    class _StubConn:
+        """Minimal setup-connection stub recording the SQL it is given."""
+
+        def __init__(self, tables: list[str]):
+            self._tables = tables
+            self.executed: list[str] = []
+
+        def execute(self, sql):
+            self.executed.append(sql)
+            return self
+
+        def fetchall(self):
+            return [(name,) for name in self._tables]
+
+    def _adapter(self, tmp_path, **kwargs):
+        return DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+            catalog="postgres",
+            pg_database="benchdb",
+            **kwargs,
+        )
+
+    def test_populated_catalog_without_force_is_reused(self, tmp_path):
+        adapter = self._adapter(tmp_path)
+        conn = self._StubConn(["lineitem", "orders"])
+
+        adapter._resolve_postgres_catalog_reuse(conn)
+
+        # Reuse routes the runner past schema creation + data loading, which is
+        # exactly what stops the rerun crash.
+        assert adapter.database_was_reused is True
+        assert not any(sql.startswith("DROP TABLE") for sql in conn.executed)
+
+    def test_populated_catalog_with_force_is_dropped_server_side(self, tmp_path):
+        adapter = self._adapter(tmp_path, force_recreate=True)
+        conn = self._StubConn(["lineitem", "orders"])
+
+        adapter._resolve_postgres_catalog_reuse(conn)
+
+        assert adapter.database_was_reused is False
+        dropped = [sql for sql in conn.executed if sql.startswith("DROP TABLE")]
+        assert dropped == [
+            'DROP TABLE IF EXISTS lake.main."lineitem"',
+            'DROP TABLE IF EXISTS lake.main."orders"',
+        ]
+
+    def test_force_also_clears_the_local_data_path(self, tmp_path):
+        # Regression (found by running w1 against live PostgreSQL 18): dropping
+        # the catalog entries is only half of --force. Before this, a postgres
+        # catalog with a local data_path dropped its tables and then left the
+        # superseded Parquet on disk, while every other backend cleared it -
+        # the same flag meaning two different things by catalog backend.
+        data_path = tmp_path / "data"
+        data_path.mkdir(parents=True)
+        (data_path / "part-0.parquet").write_text("superseded")
+        adapter = self._adapter(tmp_path, force_recreate=True)
+        adapter.data_path = data_path
+
+        adapter._resolve_postgres_catalog_reuse(self._StubConn(["lineitem"]))
+
+        assert list(data_path.rglob("*.parquet")) == []
+        # Still a usable directory: this runs AFTER the ATTACH, and DuckLake
+        # writes into an existing DATA_PATH.
+        assert data_path.is_dir()
+
+    def test_force_on_cloud_data_path_does_not_delete_but_warns(self, tmp_path, caplog):
+        adapter = self._adapter(tmp_path, force_recreate=True)
+        adapter.data_path = "s3://my-bucket/bench/"
+        adapter._data_path_is_cloud = True
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
+            adapter._resolve_postgres_catalog_reuse(self._StubConn(["lineitem"]))
+
+        assert "did NOT clear the cloud DATA_PATH" in caplog.text
+
+    def test_empty_catalog_leaves_the_fresh_run_assumption(self, tmp_path):
+        adapter = self._adapter(tmp_path)
+        conn = self._StubConn([])
+
+        adapter._resolve_postgres_catalog_reuse(conn)
+
+        assert adapter.database_was_reused is False
+        assert not any(sql.startswith("DROP TABLE") for sql in conn.executed)
+
+    def test_dry_run_never_drops_anything(self, tmp_path):
+        adapter = self._adapter(tmp_path, force_recreate=True)
+        adapter.dry_run = True
+        conn = self._StubConn(["lineitem"])
+
+        adapter._resolve_postgres_catalog_reuse(conn)
+
+        assert conn.executed == []
+
+    def test_table_listing_is_scoped_to_the_lake_catalog(self, tmp_path):
+        # duckdb_tables() spans every attached catalog; the base memory/file
+        # catalog of the shell connection is not part of DuckLake's persistence
+        # unit, so an unscoped query would misread it as a populated catalog.
+        adapter = self._adapter(tmp_path)
+        conn = self._StubConn(["lineitem"])
+
+        adapter._existing_lake_tables(conn)
+
+        assert "duckdb_tables()" in conn.executed[0]
+        assert "database_name = 'lake'" in conn.executed[0]
+
+    def _connect_with_stub(self, adapter, monkeypatch, tables):
+        """Drive create_connection() against a stubbed DuckDB, returning the stub.
+
+        Without this the resolver could be unit-tested green while nothing
+        actually called it from create_connection() - deleting the call site
+        would go unnoticed.
+        """
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        outer = self
+
+        class _StubSetupConn(outer._StubConn):
+            def cursor(self):
+                return self
+
+            def close(self):
+                pass
+
+        stub = _StubSetupConn(tables)
+        monkeypatch.setattr(DuckDBAdapter, "create_connection", lambda self, **_: stub)
+        adapter.create_connection()
+        return stub
+
+    def test_create_connection_wires_the_resolver_for_postgres(self, tmp_path, monkeypatch):
+        adapter = self._adapter(tmp_path)
+        self._connect_with_stub(adapter, monkeypatch, ["lineitem"])
+
+        assert adapter.database_was_reused is True
+
+    def test_create_connection_does_not_resolve_for_local_catalogs(self, tmp_path, monkeypatch):
+        # duckdb/sqlite catalogs keep the pre-connection metadata_path check, so
+        # the post-ATTACH resolver must not second-guess it. The stub reports a
+        # populated catalog; a duckdb-backed adapter must ignore that.
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+        )
+        stub = self._connect_with_stub(adapter, monkeypatch, ["lineitem"])
+
+        assert adapter.database_was_reused is False
+        assert not any("duckdb_tables()" in sql for sql in stub.executed)
+
+
+class TestDuckLakeForceWithCloudDataPath:
+    """--force must not silently leave orphaned Parquet behind (w7)."""
+
+    def test_force_warns_that_the_cloud_prefix_was_not_cleared(self, tmp_path, caplog):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="s3://my-bucket/bench/",
+            force_recreate=True,
+        )
+        adapter.metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        adapter.metadata_path.write_text("")
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
+            adapter._reset_ducklake_catalog()
+
+        # The catalog itself is still reset...
+        assert not adapter.metadata_path.exists()
+        # ...but the operator is told the bucket prefix was left alone, because
+        # unreferenced Parquet keeps costing money until someone removes it.
+        assert "did NOT clear the cloud DATA_PATH" in caplog.text
+        assert "s3://my-bucket/bench/" in caplog.text
+
+    def test_local_data_path_is_cleared_and_does_not_warn(self, tmp_path, caplog):
+        data_path = tmp_path / "data"
+        data_path.mkdir(parents=True)
+        (data_path / "part-0.parquet").write_text("stale")
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(data_path),
+            force_recreate=True,
+        )
+        adapter.metadata_path.write_text("")
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
+            adapter._reset_ducklake_catalog()
+
+        # Contents gone, directory retained: the postgres path shares this
+        # helper and runs after the ATTACH, where DuckLake needs a writable
+        # DATA_PATH to still exist.
+        assert list(data_path.rglob("*.parquet")) == []
+        assert data_path.is_dir()
+        assert "did NOT clear" not in caplog.text
 
 
 class TestDuckLakeS3Routing:
