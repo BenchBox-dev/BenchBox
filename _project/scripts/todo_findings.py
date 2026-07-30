@@ -25,6 +25,7 @@ credentialed landing step (review-protocol §4).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -949,6 +950,153 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
     return result
 
 
+# ---------------------------------------------------------------------------
+# Corpus import (phase 5)
+#
+# Deliberately NOT sync_drafts: that path renames each landed file to `*.synced`,
+# and phase 5 must leave the tracked `_project/blind-spots/*.md` records untouched
+# (the freeze window is both the requirement-2 proof and the rollback path -- phase
+# 6 deletes, after its own gates). This importer only READS the corpus.
+#
+# Triage-log prose imports as ONE finding_events row per line, verbatim. Parsing it
+# into structured disposition events was rejected as unfalsifiable: either trivial
+# (a blob) or unachievable (prose parsing), and structured guesses corrupt an audit
+# trail.
+
+IMPORTED_TRIAGE_ACTION = "imported_triage_log"
+
+
+def _triage_log_lines(triage_log: str) -> list[str]:
+    """Non-empty triage-log lines, verbatim and in order."""
+    return [line.rstrip() for line in triage_log.splitlines() if line.strip()]
+
+
+def import_corpus(
+    conn: Any,
+    actor: str,
+    corpus_dir: str | Path,
+    *,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """Import legacy records into the findings tables. Reads only; never writes files.
+
+    Idempotent by filename-stem id: an already-imported record is reported as
+    ``skipped``, so a re-run after a partial import is safe. ``dry_run`` parses and
+    reports without touching the database at all.
+    """
+    corpus = Path(corpus_dir).expanduser()
+    result: dict[str, Any] = {
+        "imported": [],
+        "skipped": [],
+        "failed": [],
+        "triage_events": 0,
+        "danglers": [],
+        "records": {},
+    }
+    for path in sorted(corpus.glob("*.md")):
+        if path.name == "README.md":
+            continue
+        try:
+            fields = parse_draft(path)
+        except todo_db.TodoError as exc:
+            result["failed"].append({"file": path.name, "error": str(exc)})
+            continue
+        finding_id = fields["id"]
+        result["records"][finding_id] = fields
+        lines = _triage_log_lines(fields.get("triage_log") or "")
+        if fields.get("todo_id"):
+            resolved = conn.execute("SELECT 1 FROM items WHERE id = ?", (fields["todo_id"],)).fetchone() is not None
+            if not resolved:
+                result["danglers"].append({"finding": finding_id, "todo_id": fields["todo_id"]})
+        if get_finding(conn, finding_id) is not None:
+            result["skipped"].append(finding_id)
+            continue
+        if dry_run:
+            result["imported"].append(finding_id)
+            result["triage_events"] += len(lines)
+            continue
+        with todo_db._write_txn(conn):
+            insert_finding(conn, actor, fields, imported_from=str(path))
+            for line in lines:
+                log_finding_event(conn, actor, finding_id, IMPORTED_TRIAGE_ACTION, {"line": line})
+        result["imported"].append(finding_id)
+        result["triage_events"] += len(lines)
+    return result
+
+
+def parity_report(conn: Any, corpus_dir: str | Path, imported: dict[str, Any]) -> dict[str, Any]:
+    """Machine-checkable parity of the corpus against what is stored.
+
+    Falsifiable by construction: every check names the record and field it failed
+    on, and ``ok`` is true only when every list below is empty.
+    """
+    corpus = Path(corpus_dir).expanduser()
+    files = [p for p in sorted(corpus.glob("*.md")) if p.name != "README.md"]
+    report: dict[str, Any] = {
+        "corpus_records": len(files),
+        "stored_records": 0,
+        "body_diffs": [],
+        "frontmatter_diffs": [],
+        "section_diffs": [],
+        "triage_log_diffs": [],
+        "danglers": imported.get("danglers", []),
+        "failed_parses": imported.get("failed", []),
+    }
+    for path in files:
+        fields = imported["records"].get(path.stem)
+        if fields is None:
+            report["frontmatter_diffs"].append({"record": path.stem, "field": "<unparsed>"})
+            continue
+        stored = get_finding(conn, path.stem)
+        if stored is None:
+            report["frontmatter_diffs"].append({"record": path.stem, "field": "<absent from DB>"})
+            continue
+        report["stored_records"] += 1
+        # Verbatim body columns, hash-compared.
+        for column in ("title", "finding_text", "why_matters", "next_steps"):
+            want, got = fields.get(column) or "", stored.get(column) or ""
+            if hashlib.sha256(want.encode()).hexdigest() != hashlib.sha256(got.encode()).hexdigest():
+                report["body_diffs"].append({"record": path.stem, "field": column})
+        # Every frontmatter-derived column.
+        for column in (
+            "date",
+            "finding_kind",
+            "review_context",
+            "observed_sha",
+            "disposition",
+            "related_paths",
+            "suggested_sweep",
+            "urgency",
+            "breadth",
+            "confidence",
+        ):
+            if (fields.get(column) or None) != (stored.get(column) or None):
+                report["frontmatter_diffs"].append({"record": path.stem, "field": column})
+        # Extra sections, verbatim and in order.
+        want_sections = [(s["position"], s["heading"], s["text"]) for s in fields.get("sections") or []]
+        got_sections = [(s["position"], s["heading"], s["text"]) for s in stored.get("sections") or []]
+        if want_sections != got_sections:
+            report["section_diffs"].append(
+                {"record": path.stem, "expected": len(want_sections), "stored": len(got_sections)}
+            )
+        # One imported_triage_log event per non-empty line.
+        want_lines = _triage_log_lines(fields.get("triage_log") or "")
+        got_lines = [e for e in stored.get("events") or [] if e.get("action") == IMPORTED_TRIAGE_ACTION]
+        if len(want_lines) != len(got_lines):
+            report["triage_log_diffs"].append(
+                {"record": path.stem, "expected_lines": len(want_lines), "stored_events": len(got_lines)}
+            )
+    report["ok"] = (
+        report["corpus_records"] == report["stored_records"]
+        and not report["body_diffs"]
+        and not report["frontmatter_diffs"]
+        and not report["section_diffs"]
+        and not report["triage_log_diffs"]
+        and not report["failed_parses"]
+    )
+    return report
+
+
 def count_unsynced_drafts(drafts_dir: str | Path | None = None) -> int:
     """Local directory glob of unsynced drafts -- no credentials, no network.
 
@@ -1264,6 +1412,11 @@ def add_finding_subparsers(parser: argparse.ArgumentParser) -> None:
     p.add_argument("--to-finding", dest="to_finding")
     p.add_argument("--note")
 
+    p = sub.add_parser("import", help="import the legacy corpus into the findings tables (phase 5)")
+    p.add_argument("--corpus", default="_project/blind-spots", help="corpus directory (read-only)")
+    p.add_argument("--dry-run", action="store_true", dest="dry_run", help="parse and report; touch no rows")
+    p.add_argument("--report", action="store_true", help="print the machine-checkable parity report as JSON")
+
     p = sub.add_parser("promote", help="promote a finding to a planning item (atomic)")
     p.add_argument("id")
     p.add_argument("--to-item", dest="to_item", required=True)
@@ -1335,6 +1488,8 @@ def dispatch_finding(conn: Any, actor: str, args: argparse.Namespace) -> int:
         )
         print(f"linked {args.id} [{args.kind}]")
         return 0
+    if command == "import":
+        return _cmd_import(conn, actor, args)
     if command == "promote":
         promote_finding(
             conn,
@@ -1349,6 +1504,37 @@ def dispatch_finding(conn: Any, actor: str, args: argparse.Namespace) -> int:
         print(f"finding {args.id} promoted to {args.to_item}")
         return 0
     raise todo_db.TodoError(f"unknown finding subcommand {command!r}")  # pragma: no cover
+
+
+def _cmd_import(conn: Any, actor: str, args: argparse.Namespace) -> int:
+    """Import (or dry-run) the legacy corpus and optionally print the parity report.
+
+    Exit 1 when parity fails, so the rung is self-asserting: a report with any diff
+    must not read as success.
+    """
+    result = import_corpus(conn, actor, args.corpus, dry_run=args.dry_run)
+    mode = "dry-run" if args.dry_run else "imported"
+    print(
+        f"{mode}: {len(result['imported'])} record(s), skipped {len(result['skipped'])} (already present),"
+        f" failed {len(result['failed'])}, triage-log events {result['triage_events']},"
+        f" dangling todo_id {len(result['danglers'])}"
+    )
+    if args.dry_run:
+        # Nothing was written, so a stored-vs-file comparison would be vacuous.
+        # Report coverage and parse health only; w3 runs the real check in a scratch DB.
+        for failure in result["failed"]:
+            print(f"  FAILED {failure['file']}: {failure['error']}", file=todo_db.sys.stderr)
+        for dangler in result["danglers"]:
+            print(f"  dangling todo_id {dangler['todo_id']} on {dangler['finding']}", file=todo_db.sys.stderr)
+        return 1 if result["failed"] else 0
+    report = parity_report(conn, args.corpus, result)
+    if args.report:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    if not report["ok"]:
+        print("PARITY FAILED", file=todo_db.sys.stderr)
+        return 1
+    print(f"parity OK: {report['stored_records']}/{report['corpus_records']} records, zero diffs")
+    return 0
 
 
 def _cmd_triage(conn: Any, actor: str, args: argparse.Namespace) -> int:

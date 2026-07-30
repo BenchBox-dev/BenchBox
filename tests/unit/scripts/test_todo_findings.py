@@ -1211,3 +1211,138 @@ class TestLegacyTodoIdLinkMapping:
         path = _draft(tmp_path / "d", "2026-01-02-030405-no-todo-id")
         todo_findings.sync_drafts(conn, "tester", tmp_path)
         assert todo_findings.get_finding(conn, path.stem)["links"] == []
+
+
+class TestFindingImportParity:
+    """Phase-5 importer. Named so the work order's rung
+    (`pytest -k 'finding_import or parity'`) selects it."""
+
+    def _record(self, directory: Path, stem: str, *, triage_lines=(), todo_id=None, extra_section=None):
+        directory.mkdir(parents=True, exist_ok=True)
+        front = [
+            "---",
+            f"id: {stem}",
+            "date: 2026-01-02",
+            f"status: {'merged-to-todo' if todo_id else 'open'}",
+            "finding_kind: framework-gap",
+            'review_context: "ultrareview X"',
+            "related_paths:",
+            "  - benchbox/core/a.py",
+            "suggested_sweep: rg -n 'a' benchbox/",
+        ]
+        if todo_id:
+            front.append(f"todo_id: {todo_id}")
+        front.append("---")
+        body = [
+            "",
+            "# A sample class",
+            "",
+            "## Finding",
+            "the review never checks axis Y",
+            "",
+            "## Why this matters",
+            "axis Y is a whole dimension",
+            "",
+            "## Suggested next steps",
+            "- [ ] add a gate",
+        ]
+        if extra_section:
+            body += ["", f"## {extra_section[0]}", extra_section[1]]
+        if triage_lines:
+            body += ["", "## Triage log"] + list(triage_lines)
+        (directory / f"{stem}.md").write_text("\n".join(front + body) + "\n", encoding="utf-8")
+        return directory / f"{stem}.md"
+
+    def test_import_never_renames_or_deletes_corpus_files(self, conn, tmp_path):
+        # The freeze window is the rollback path: phase 5 must not touch the files.
+        # sync_drafts renames to *.synced, which is exactly why import is separate.
+        path = self._record(tmp_path, "2026-01-02-030405-frozen-record")
+        before = sorted(p.name for p in tmp_path.iterdir())
+        todo_findings.import_corpus(conn, "importer", tmp_path)
+        assert sorted(p.name for p in tmp_path.iterdir()) == before
+        assert path.exists()
+        assert not list(tmp_path.glob("*.synced"))
+
+    def test_triage_log_imports_one_verbatim_event_per_line(self, conn, tmp_path):
+        lines = ["- 2026-01-02 raised in review", "- 2026-01-03 merged to some-item"]
+        self._record(tmp_path, "2026-01-02-030405-triaged-record", triage_lines=lines)
+        result = todo_findings.import_corpus(conn, "importer", tmp_path)
+        assert result["triage_events"] == 2
+
+        events = [
+            e
+            for e in todo_findings.get_finding(conn, "2026-01-02-030405-triaged-record")["events"]
+            if e["action"] == todo_findings.IMPORTED_TRIAGE_ACTION
+        ]
+        assert [json.loads(e["detail"])["line"] for e in events] == lines
+
+    def test_import_is_idempotent_by_record_id(self, conn, tmp_path):
+        self._record(tmp_path, "2026-01-02-030405-twice-record", triage_lines=["- once"])
+        first = todo_findings.import_corpus(conn, "importer", tmp_path)
+        second = todo_findings.import_corpus(conn, "importer", tmp_path)
+        assert first["imported"] == ["2026-01-02-030405-twice-record"]
+        assert second["imported"] == []
+        assert second["skipped"] == ["2026-01-02-030405-twice-record"]
+        # No duplicated triage events on the re-run.
+        events = [
+            e
+            for e in todo_findings.get_finding(conn, "2026-01-02-030405-twice-record")["events"]
+            if e["action"] == todo_findings.IMPORTED_TRIAGE_ACTION
+        ]
+        assert len(events) == 1
+
+    def test_import_records_provenance(self, conn, tmp_path):
+        path = self._record(tmp_path, "2026-01-02-030405-provenance-record")
+        todo_findings.import_corpus(conn, "importer", tmp_path)
+        stored = todo_findings.get_finding(conn, "2026-01-02-030405-provenance-record")
+        assert stored["imported_from"] == str(path)
+
+    def test_dry_run_writes_nothing(self, conn, tmp_path):
+        self._record(tmp_path, "2026-01-02-030405-dryrun-record", triage_lines=["- x"])
+        result = todo_findings.import_corpus(conn, "importer", tmp_path, dry_run=True)
+        assert result["imported"] == ["2026-01-02-030405-dryrun-record"]
+        assert todo_findings.get_finding(conn, "2026-01-02-030405-dryrun-record") is None
+        assert conn.execute("SELECT count(*) FROM findings").fetchone()[0] == 0
+
+    def test_parity_report_is_clean_on_a_faithful_import(self, conn, tmp_path):
+        self._record(
+            tmp_path,
+            "2026-01-02-030405-parity-record",
+            triage_lines=["- a", "- b"],
+            extra_section=("Why the five-axis review missed it", "no axis for it"),
+        )
+        result = todo_findings.import_corpus(conn, "importer", tmp_path)
+        report = todo_findings.parity_report(conn, tmp_path, result)
+        assert report["ok"] is True
+        assert (report["corpus_records"], report["stored_records"]) == (1, 1)
+
+    def test_parity_report_fails_closed_when_a_section_is_lost(self, conn, tmp_path):
+        self._record(
+            tmp_path,
+            "2026-01-02-030405-lossy-parity",
+            extra_section=("Why it didn't get caught earlier", "the rubric had no axis"),
+        )
+        result = todo_findings.import_corpus(conn, "importer", tmp_path)
+        # Simulate a lossy importer by removing the stored section behind its back.
+        with todo_db._write_txn(conn):
+            conn.execute("DELETE FROM finding_sections WHERE finding_id = ?", ("2026-01-02-030405-lossy-parity",))
+        report = todo_findings.parity_report(conn, tmp_path, result)
+        assert report["ok"] is False
+        assert report["section_diffs"]
+
+    def test_parity_report_fails_closed_when_a_triage_line_is_lost(self, conn, tmp_path):
+        self._record(tmp_path, "2026-01-02-030405-lossy-triage", triage_lines=["- a", "- b", "- c"])
+        result = todo_findings.import_corpus(conn, "importer", tmp_path)
+        with todo_db._write_txn(conn):
+            conn.execute(
+                "DELETE FROM finding_events WHERE finding_id = ? AND action = ?",
+                ("2026-01-02-030405-lossy-triage", todo_findings.IMPORTED_TRIAGE_ACTION),
+            )
+        report = todo_findings.parity_report(conn, tmp_path, result)
+        assert report["ok"] is False
+        assert report["triage_log_diffs"][0]["expected_lines"] == 3
+
+    def test_dangling_todo_id_is_reported_not_silently_skipped(self, conn, tmp_path):
+        self._record(tmp_path, "2026-01-02-030405-dangling-import", todo_id="no-such-item")
+        result = todo_findings.import_corpus(conn, "importer", tmp_path)
+        assert result["danglers"] == [{"finding": "2026-01-02-030405-dangling-import", "todo_id": "no-such-item"}]
