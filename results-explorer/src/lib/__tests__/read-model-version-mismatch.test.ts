@@ -12,7 +12,13 @@ import {
 } from "@/db";
 
 interface QueryResult {
-  toArray(): { toJSON(): { read_model_version?: number } }[];
+  // Readiness probes read `result_id` / `n` off the row directly; the version
+  // guard reads `read_model_version` via toJSON().
+  toArray(): {
+    result_id?: string;
+    n?: number;
+    toJSON(): { read_model_version?: number; result_id?: string };
+  }[];
 }
 
 interface FakeConn {
@@ -151,10 +157,17 @@ describe("read-model version guard", () => {
             ],
           };
         }
+        // Readiness now also runs a completeness probe (COUNT(*) vs the
+        // materialized column) and a keyed probe (ORDER BY result_id DESC,
+        // then WHERE result_id = ...), so answer both shapes consistently.
+        if (/COUNT\(\*\)/i.test(sql)) {
+          return { toArray: () => [{ n: 1, toJSON: () => ({}) }] };
+        }
         return {
           toArray: () => [
             {
-              toJSON: () => ({}),
+              result_id: "r1",
+              toJSON: () => ({ result_id: "r1" }),
             },
           ],
         };
