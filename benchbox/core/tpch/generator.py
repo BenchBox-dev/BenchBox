@@ -55,14 +55,21 @@ def _has_trailing_delimiter(path: Path) -> bool:
     dbgen row framing is decided at compile time (EOL_HANDLING), so every row
     in a file shares the same framing; inspecting the file tail is sufficient
     to classify the whole file.
+
+    The line terminator is an independent variable: a file produced on Windows
+    ends ``|\r\n``, not ``|\n``. Strip the terminator before looking for the
+    delimiter rather than matching one spelling of it, or a CRLF file reads as
+    already-clean and is never normalized.
     """
     size = path.stat().st_size
     if size == 0:
         return False
+    # 3 bytes covers the longest terminator ("|\r\n"); the clamped seek handles
+    # files shorter than that.
     with path.open("rb") as handle:
-        handle.seek(max(0, size - 2))
+        handle.seek(max(0, size - 3))
         tail = handle.read()
-    return tail.endswith((b"|\n", b"|"))
+    return tail.rstrip(b"\r\n").endswith(b"|")
 
 
 def normalize_tbl_trailing_delimiters(path: Path) -> bool:
@@ -105,19 +112,27 @@ def normalize_tbl_trailing_delimiters(path: Path) -> bool:
                 if not chunk:
                     break
                 data = carry + chunk
-                # Hold back a chunk-final "|": it may be followed by "\n" in
-                # the next chunk and must be stripped together with it.
+                # Hold back a chunk-final "|" or "|\r": the terminator may
+                # continue into the next chunk and must be stripped together
+                # with the delimiter. Two bytes are needed because a chunk
+                # boundary can fall inside "|\r\n".
                 if data.endswith(b"|"):
                     carry = b"|"
                     data = data[:-1]
+                elif data.endswith(b"|\r"):
+                    carry = b"|\r"
+                    data = data[:-2]
                 else:
                     carry = b""
-                # "\n" only occurs at row boundaries, so "|\n" is always the
-                # trailing delimiter; str.replace removes exactly one "|" per
-                # newline and never touches interior empty fields.
-                dst.write(data.replace(b"|\n", b"\n"))
-            # A held-back "|" at EOF means the final row is unterminated but
-            # still carries the trailing delimiter; drop it.
+                # A newline only occurs at a row boundary, so "|" immediately
+                # before one is always the trailing delimiter. Both terminators
+                # are handled: replacing exactly one "|" per row never touches
+                # interior empty fields, and the line ending is preserved as-is.
+                dst.write(data.replace(b"|\r\n", b"\r\n").replace(b"|\n", b"\n"))
+            # A held-back delimiter at EOF means the final row is unterminated
+            # but still carries it; drop the "|" and keep any terminator bytes.
+            if carry == b"|\r":
+                dst.write(b"\r")
         with contextlib.suppress(OSError):
             shutil.copystat(path, tmp_path)
         os.replace(tmp_path, path)
