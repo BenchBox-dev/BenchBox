@@ -864,6 +864,7 @@ def bulk_transfer(
     require_empty: bool = False,
     post=None,
     batch_size: int = 400,
+    tables: tuple[str, ...] | None = None,
 ) -> dict[str, int]:
     """Copy all tracker rows from a staged local database to the primary,
     atomically, in one baton-chained transaction.
@@ -876,12 +877,18 @@ def bulk_transfer(
     `require_empty` guard runs inside the same BEGIN IMMEDIATE transaction,
     so no other writer can populate the target between check and transfer.
     """
+    # `tables` lets a caller move a DIFFERENT table set over the same pipeline --
+    # the findings domain uses it for the phase-5 import. It deliberately does NOT
+    # widen TRANSFER_TABLES or EXPORT_TABLE_ALLOWLIST: the committed export stays
+    # items-domain only, and the phase-2 pinning test still fails closed on any
+    # `finding%` table. Insert order must respect foreign keys; DELETE runs reversed.
+    transfer_tables = TRANSFER_TABLES if tables is None else tuple(tables)
     stmts: list[tuple[str, list[Any]]] = []
     if replace:
-        for table in reversed(TRANSFER_TABLES):
+        for table in reversed(transfer_tables):
             stmts.append((f"DELETE FROM {table}", []))
     rows_total = 0
-    for table in TRANSFER_TABLES:
+    for table in transfer_tables:
         columns = [row["name"] for row in staging.execute(f"PRAGMA table_info({table})")]
         insert = f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})"
         for row in staging.execute(f"SELECT {', '.join(columns)} FROM {table}"):
@@ -897,7 +904,7 @@ def bulk_transfer(
             pass
 
     try:
-        total_sql = "SELECT " + " + ".join(f"(SELECT count(*) FROM {table})" for table in TRANSFER_TABLES)
+        total_sql = "SELECT " + " + ".join(f"(SELECT count(*) FROM {table})" for table in transfer_tables)
         guard = _pipeline_execute(
             url,
             token,

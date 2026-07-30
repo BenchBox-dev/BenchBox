@@ -965,6 +965,18 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
 
 IMPORTED_TRIAGE_ACTION = "imported_triage_log"
 
+# Findings tables in FK-safe insert order, for the bulk (Hrana pipeline) import
+# path. Passed explicitly to todo_db.bulk_transfer(tables=...) -- these are NOT
+# added to TRANSFER_TABLES or EXPORT_TABLE_ALLOWLIST, so the committed export stays
+# items-domain only and the phase-2 pinning test keeps failing closed.
+FINDINGS_TRANSFER_TABLES = (
+    "findings",
+    "finding_evidence",
+    "finding_links",
+    "finding_sections",
+    "finding_events",
+)
+
 
 def _triage_log_lines(triage_log: str) -> list[str]:
     """Non-empty triage-log lines, verbatim and in order."""
@@ -1022,6 +1034,77 @@ def import_corpus(
         result["imported"].append(finding_id)
         result["triage_events"] += len(lines)
     return result
+
+
+def stage_corpus_import(staging_path: Path, items_source: Path, corpus_dir: str | Path, actor: str) -> dict[str, Any]:
+    """Build a v4 staging database holding ONLY this import's findings rows.
+
+    ``items_source`` seeds the items domain so legacy ``todo_id`` values resolve --
+    against an empty database every one of them reads as a false dangler. The
+    staged items are never transferred: the caller moves
+    ``FINDINGS_TRANSFER_TABLES`` only, so production's items domain is untouched.
+    """
+    todo_db.connect(staging_path).close()
+    raw = todo_db.sqlite3.connect(staging_path)
+    try:
+        raw.execute("ATTACH DATABASE ? AS src", (str(items_source),))
+        raw.execute("INSERT INTO items SELECT * FROM src.items")
+        raw.commit()
+    finally:
+        raw.close()
+    conn = todo_db.connect(staging_path)
+    try:
+        return import_corpus(conn, actor, corpus_dir)
+    finally:
+        conn.close()
+
+
+# Autoincrement primary keys per findings table, for the bulk-import offset below.
+_FINDINGS_PK = {
+    "finding_evidence": "id",
+    "finding_links": "id",
+    "finding_sections": "id",
+    "finding_events": "seq",
+}
+
+
+def offset_staging_pks(staging_path: Path, target_max: dict[str, int]) -> dict[str, int]:
+    """Shift staged autoincrement PKs above the target's existing maxima.
+
+    ``bulk_transfer`` copies every column verbatim, primary keys included, so
+    staging rows numbered from 1 collide with whatever the target already holds --
+    production had ``finding_events.seq = 1`` from an earlier sync, which would have
+    aborted the whole transfer. Rewriting the staged ids (highest first, so the
+    UPDATE never collides with itself) keeps the transfer a plain INSERT while
+    preserving row ORDER, which is what ``finding_events`` actually depends on.
+
+    Returns the offset applied per table.
+    """
+    applied: dict[str, int] = {}
+    conn = todo_db.sqlite3.connect(staging_path)
+    try:
+        for table, pk in _FINDINGS_PK.items():
+            offset = int(target_max.get(table) or 0)
+            if offset <= 0:
+                continue
+            rows = conn.execute(f"SELECT {pk} FROM {table} ORDER BY {pk} DESC").fetchall()
+            for (value,) in rows:
+                conn.execute(f"UPDATE {table} SET {pk} = ? WHERE {pk} = ?", (value + offset, value))
+            if rows:
+                applied[table] = offset
+        conn.commit()
+    finally:
+        conn.close()
+    return applied
+
+
+def target_findings_maxima(conn: Any) -> dict[str, int]:
+    """Current maximum autoincrement PK per findings table on a target database."""
+    maxima: dict[str, int] = {}
+    for table, pk in _FINDINGS_PK.items():
+        row = conn.execute(f"SELECT coalesce(max({pk}), 0) FROM {table}").fetchone()
+        maxima[table] = int(row[0])
+    return maxima
 
 
 def parity_report(conn: Any, corpus_dir: str | Path, imported: dict[str, Any]) -> dict[str, Any]:

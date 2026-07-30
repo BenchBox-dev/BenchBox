@@ -1346,3 +1346,73 @@ class TestFindingImportParity:
         self._record(tmp_path, "2026-01-02-030405-dangling-import", todo_id="no-such-item")
         result = todo_findings.import_corpus(conn, "importer", tmp_path)
         assert result["danglers"] == [{"finding": "2026-01-02-030405-dangling-import", "todo_id": "no-such-item"}]
+
+
+class TestBulkImportKeepsTheExportBoundaryClosed:
+    """The phase-5 import moves findings over the same Hrana pipeline as import-yaml,
+    via an explicit table list. That must NOT widen what gets committed to Git."""
+
+    def test_findings_transfer_set_is_disjoint_from_the_export_allowlist(self):
+        assert not (set(todo_findings.FINDINGS_TRANSFER_TABLES) & todo_db.EXPORT_TABLE_ALLOWLIST)
+
+    def test_findings_tables_are_still_absent_from_transfer_tables(self):
+        # TRANSFER_TABLES drives backup/restore AND the --replace delete loop; adding
+        # findings there would put review prose in the committed snapshot's scope.
+        assert not [t for t in todo_db.TRANSFER_TABLES if t.startswith("finding")]
+
+    def test_bulk_transfer_defaults_to_the_items_domain(self):
+        import inspect
+
+        signature = inspect.signature(todo_db.bulk_transfer)
+        assert signature.parameters["tables"].default is None
+
+    def test_findings_transfer_order_puts_parents_first(self):
+        order = todo_findings.FINDINGS_TRANSFER_TABLES
+        assert order[0] == "findings"
+        for child in ("finding_evidence", "finding_links", "finding_sections", "finding_events"):
+            assert order.index("findings") < order.index(child)
+
+
+class TestBulkImportPkOffset:
+    """bulk_transfer copies primary keys verbatim, so staged rows numbered from 1
+    collide with whatever the target already holds. Production really did have
+    finding_events.seq=1 from an earlier sync, which would have aborted the transfer."""
+
+    def _staged(self, tmp_path, n=3):
+        path = tmp_path / "staging.sqlite"
+        conn = todo_db.connect(path)
+        fid = _mk_finding(conn, evidence=[{"path": "a.py"}])
+        with todo_db._write_txn(conn):
+            for i in range(n):
+                todo_findings.log_finding_event(conn, "t", fid, "imported_triage_log", {"line": f"- {i}"})
+        conn.close()
+        return path
+
+    def test_offset_shifts_ids_above_the_target_maximum(self, tmp_path):
+        path = self._staged(tmp_path)
+        before = todo_db.sqlite3.connect(path).execute("SELECT min(seq), max(seq) FROM finding_events").fetchone()
+        applied = todo_findings.offset_staging_pks(path, {"finding_events": 100, "finding_evidence": 5})
+        after = todo_db.sqlite3.connect(path).execute("SELECT min(seq), max(seq) FROM finding_events").fetchone()
+        assert applied["finding_events"] == 100
+        assert after == (before[0] + 100, before[1] + 100)
+
+    def test_offset_preserves_row_order(self, tmp_path):
+        # finding_events is an append-only audit trail: order is the meaning.
+        path = self._staged(tmp_path, n=5)
+        conn = todo_db.sqlite3.connect(path)
+        before = [r[0] for r in conn.execute("SELECT detail FROM finding_events ORDER BY seq")]
+        conn.close()
+        todo_findings.offset_staging_pks(path, {"finding_events": 50})
+        conn = todo_db.sqlite3.connect(path)
+        after = [r[0] for r in conn.execute("SELECT detail FROM finding_events ORDER BY seq")]
+        conn.close()
+        assert after == before
+
+    def test_zero_offset_is_a_no_op(self, tmp_path):
+        path = self._staged(tmp_path)
+        assert todo_findings.offset_staging_pks(path, {"finding_events": 0}) == {}
+
+    def test_target_maxima_reads_every_findings_table(self, conn):
+        maxima = todo_findings.target_findings_maxima(conn)
+        assert set(maxima) == {"finding_evidence", "finding_links", "finding_sections", "finding_events"}
+        assert all(v == 0 for v in maxima.values())
