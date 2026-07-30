@@ -37,6 +37,12 @@ const SNAPSHOT_READY_ATTEMPTS = 8;
 const SNAPSHOT_READY_DELAY_MS = 100;
 const QUERY_RETRY_ATTEMPTS = 3;
 const QUERY_RETRY_DELAY_MS = 100;
+// How long after the snapshot is attached an EMPTY result is treated as a cold
+// read worth re-issuing rather than the truth. Cold init measures P95 ~1s, so
+// this is generous; outside it, empty returns immediately.
+const COLD_SNAPSHOT_EMPTY_RETRY_WINDOW_MS = 15_000;
+// Set when the snapshot is attached and validated; 0 until then.
+let snapshotReadyAt = 0;
 let initError: Error | null = null;
 
 type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
@@ -196,6 +202,89 @@ function throwReadModelVersionError(found: number): never {
   );
 }
 
+function quoteSqlLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/**
+ * Probe that a KEYED lookup works, not just an unkeyed scan.
+ *
+ * The `LIMIT 1` scans above prove a table is attached and has at least one
+ * reachable row. They do NOT prove the snapshot is fully readable: on a cold
+ * HTTP-backed `results.duckdb` those scans are satisfied by the first row group
+ * while `WHERE result_id = ?` for a row further into the file still returns
+ * zero. `queryRows` does not swallow that — it is a genuine empty read — so the
+ * detail page renders "No result found" for a real id, and index surfaces
+ * render a heading with missing rows. That is the flake the e2e suite kept
+ * hitting (see docs/operations/browser-ci.md, 2026-07-29 correction).
+ *
+ * `ORDER BY result_id DESC LIMIT 1` forces the whole `result_id` column to be
+ * materialized, so the id we probe with is deliberately NOT the one the cheap
+ * scans already reached. `result_detail_metrics` is a LEFT JOIN projection over
+ * `results`, so every id in `results` must resolve there — an empty answer
+ * means the snapshot is still incomplete, never that the row legitimately
+ * does not exist.
+ */
+/**
+ * Every snapshot table must be FULLY readable before the snapshot is exposed.
+ *
+ * Narrowing this list does not work: each time it covered only the tables one
+ * failing surface read, the race simply moved to the next surface. A single-id
+ * keyed probe left Compare failing on `short_ids`; adding `short_ids` left it
+ * failing on the per-query evidence tables. The per-query tables are also the
+ * largest, so they are the most likely to be partially readable, not the least.
+ *
+ * Optional tables are included for free: an empty table has COUNT(*) 0 and
+ * materializes 0 rows, so it agrees trivially.
+ */
+const SNAPSHOT_COMPLETENESS_TABLES = SNAPSHOT_READY_SCANS.map((scan) => scan.label);
+
+/**
+ * Probe that every row is readable, not merely the first one.
+ *
+ * `COUNT(*)` is answered from the file's metadata without reading row groups,
+ * so it reports the TRUE total even while the data pages are still arriving.
+ * Materializing the `result_id` column forces those pages to be read. When the
+ * two disagree the snapshot is only partially readable — the state in which a
+ * keyed lookup for a row in a not-yet-readable group returns zero rows.
+ *
+ * This is what a single keyed probe cannot catch: proving one id resolves says
+ * nothing about the other ids a page will ask for. Compare in particular reads
+ * several specific ids at once, and kept failing under a single-id probe.
+ */
+async function probeSnapshotCompleteness(conn: DuckDBConnection): Promise<string | null> {
+  for (const table of SNAPSHOT_COMPLETENESS_TABLES) {
+    const countRows = (await conn.query(`SELECT COUNT(*) AS n FROM bench.${table}`)).toArray() as Array<{
+      n?: unknown;
+    }>;
+    const expected = Number(countRows[0]?.n ?? 0);
+    if (!Number.isFinite(expected)) continue;
+    const materialized = (await conn.query(`SELECT result_id FROM bench.${table}`)).toArray().length;
+    if (materialized !== expected) {
+      return `${table} materialized ${materialized} of ${expected} row(s)`;
+    }
+  }
+  return null;
+}
+
+async function probeKeyedLookup(conn: DuckDBConnection): Promise<string | null> {
+  const idRows = (
+    await conn.query("SELECT result_id FROM bench.results ORDER BY result_id DESC LIMIT 1")
+  ).toArray() as Array<{ result_id?: unknown }>;
+  const probeId = idRows[0]?.result_id;
+  if (typeof probeId !== "string" || probeId === "") return "results returned no probe id";
+
+  const keyed = (
+    await conn.query(
+      `SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ${quoteSqlLiteral(probeId)} LIMIT 1`,
+    )
+  ).toArray();
+  if (keyed.length === 0) {
+    return `keyed lookup for ${probeId} returned no rows from result_detail_metrics`;
+  }
+  return null;
+}
+
 async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= SNAPSHOT_READY_ATTEMPTS; attempt += 1) {
@@ -212,10 +301,15 @@ async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
       const emptyRequired = requiredCounts
         .filter(([, rowCount]) => rowCount === 0)
         .map(([label]) => label);
-      if (emptyRequired.length === 0) return;
-      lastError = new Error(
-        `DuckDB snapshot readiness returned empty required scan(s): ${emptyRequired.join(", ")}`,
-      );
+      if (emptyRequired.length === 0) {
+        const failure = (await probeSnapshotCompleteness(conn)) ?? (await probeKeyedLookup(conn));
+        if (failure === null) return;
+        lastError = new Error(`DuckDB snapshot readiness: ${failure}`);
+      } else {
+        lastError = new Error(
+          `DuckDB snapshot readiness returned empty required scan(s): ${emptyRequired.join(", ")}`,
+        );
+      }
     } catch (error: unknown) {
       lastError = error;
       if (!isTransientDuckDbSnapshotError(error)) throw error;
@@ -282,6 +376,7 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
     }
 
     dbInstance = db;
+    snapshotReadyAt = Date.now();
     markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.DB_INIT_READY, { once: true });
     measureExplorerPerformance(
       EXPLORER_PERFORMANCE_MEASURES.DB_INIT,
@@ -311,7 +406,13 @@ export async function queryRows<T>(
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= QUERY_RETRY_ATTEMPTS; attempt += 1) {
     try {
-      return await queryRowsOnce<T>(sql, params);
+      const rows = await queryRowsOnce<T>(sql, params);
+      if (rows.length > 0 || !isColdEmptyRead(attempt)) return rows;
+      // Empty, and the snapshot is still warming: re-read rather than let a
+      // cold zero-row answer reach the UI as "no such result". See
+      // shouldRetryColdEmptyRead.
+      await sleep(QUERY_RETRY_DELAY_MS * attempt);
+      continue;
     } catch (error: unknown) {
       lastError = error;
       if (!isTransientDuckDbSnapshotError(error) || attempt === QUERY_RETRY_ATTEMPTS) {
@@ -320,7 +421,46 @@ export async function queryRows<T>(
       await sleep(QUERY_RETRY_DELAY_MS * attempt);
     }
   }
-  throw lastError instanceof Error ? lastError : new Error("DuckDB query failed");
+  if (lastError !== null) {
+    throw lastError instanceof Error ? lastError : new Error("DuckDB query failed");
+  }
+  // Every attempt returned empty inside the warm-up window: the result really
+  // is empty (a filtered query, or an id that does not exist).
+  return [];
+}
+
+/**
+ * Whether an empty result should be re-read rather than believed.
+ *
+ * A cold HTTP-backed snapshot answers a keyed lookup with ZERO ROWS — not an
+ * error — while the row group holding that key is still unreadable. `queryRows`
+ * does not swallow errors, so nothing else catches this: the detail page
+ * renders "No result found" for a real id and index surfaces render a heading
+ * with missing rows.
+ *
+ * Gating a readiness probe on it is not enough. Three progressively stricter
+ * gates were measured (keyed probe, then per-table completeness, then
+ * completeness across every table) and each time the race simply moved to
+ * whichever surface read a range the gate had not forced. Readability is not
+ * monotonic per query, so the retry has to live where the read happens.
+ *
+ * Bounded to a short window after init, because that is the only time the
+ * snapshot is cold. Outside it an empty answer returns immediately, so a
+ * genuinely missing id stays fast. Retrying can never invent a row: an empty
+ * result that is really empty stays empty and is returned as such.
+ */
+export function shouldRetryColdEmptyRead(
+  attempt: number,
+  now: number,
+  readyAt: number,
+): boolean {
+  if (attempt >= QUERY_RETRY_ATTEMPTS) return false;
+  if (readyAt === 0) return false;
+  return now - readyAt <= COLD_SNAPSHOT_EMPTY_RETRY_WINDOW_MS;
+}
+
+function isColdEmptyRead(attempt: number): boolean {
+  return shouldRetryColdEmptyRead(attempt, Date.now(), snapshotReadyAt);
 }
 
 async function queryRowsOnce<T>(
