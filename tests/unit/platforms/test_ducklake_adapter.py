@@ -794,6 +794,35 @@ class TestDuckLakePostgresCatalogReuse:
             'DROP TABLE IF EXISTS lake.main."orders"',
         ]
 
+    def test_force_also_clears_the_local_data_path(self, tmp_path):
+        # Regression (found by running w1 against live PostgreSQL 18): dropping
+        # the catalog entries is only half of --force. Before this, a postgres
+        # catalog with a local data_path dropped its tables and then left the
+        # superseded Parquet on disk, while every other backend cleared it -
+        # the same flag meaning two different things by catalog backend.
+        data_path = tmp_path / "data"
+        data_path.mkdir(parents=True)
+        (data_path / "part-0.parquet").write_text("superseded")
+        adapter = self._adapter(tmp_path, force_recreate=True)
+        adapter.data_path = data_path
+
+        adapter._resolve_postgres_catalog_reuse(self._StubConn(["lineitem"]))
+
+        assert list(data_path.rglob("*.parquet")) == []
+        # Still a usable directory: this runs AFTER the ATTACH, and DuckLake
+        # writes into an existing DATA_PATH.
+        assert data_path.is_dir()
+
+    def test_force_on_cloud_data_path_does_not_delete_but_warns(self, tmp_path, caplog):
+        adapter = self._adapter(tmp_path, force_recreate=True)
+        adapter.data_path = "s3://my-bucket/bench/"
+        adapter._data_path_is_cloud = True
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
+            adapter._resolve_postgres_catalog_reuse(self._StubConn(["lineitem"]))
+
+        assert "did NOT clear the cloud DATA_PATH" in caplog.text
+
     def test_empty_catalog_leaves_the_fresh_run_assumption(self, tmp_path):
         adapter = self._adapter(tmp_path)
         conn = self._StubConn([])
@@ -903,7 +932,11 @@ class TestDuckLakeForceWithCloudDataPath:
         with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
             adapter._reset_ducklake_catalog()
 
-        assert not data_path.exists()
+        # Contents gone, directory retained: the postgres path shares this
+        # helper and runs after the ATTACH, where DuckLake needs a writable
+        # DATA_PATH to still exist.
+        assert list(data_path.rglob("*.parquet")) == []
+        assert data_path.is_dir()
         assert "did NOT clear" not in caplog.text
 
 

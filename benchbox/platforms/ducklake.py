@@ -618,10 +618,25 @@ class DuckLakeAdapter(DuckDBAdapter):
                 except OSError as exc:
                     logger.debug("Could not remove DuckLake catalog file %s: %s", sidecar, exc)
 
-        # Recursively clear the Parquet data directory contents (local only).
+        self._clear_data_path_for_force()
+
+    def _clear_data_path_for_force(self) -> None:
+        """Apply ``--force``'s DATA_PATH policy: clear it locally, warn in cloud.
+
+        Shared by both reset paths so ``--force`` means the same thing whichever
+        catalog backend detected the rebuild - the local duckdb/sqlite check in
+        ``handle_existing_database``, and the post-ATTACH postgres check in
+        ``_resolve_postgres_catalog_reuse``. Keeping the policy in one place is
+        the point: a postgres catalog with a local data_path used to drop its
+        tables and then silently leave the superseded Parquet on disk, which is
+        not what ``--force`` does for every other backend.
+        """
         if not self._data_path_is_cloud:
             if self.data_path.exists():
                 shutil.rmtree(self.data_path, ignore_errors=True)
+            # Recreate immediately: the postgres path calls this AFTER the
+            # ATTACH, and DuckLake writes into an existing directory.
+            self.data_path.mkdir(parents=True, exist_ok=True)
             return
 
         # Cloud DATA_PATH: the catalog is gone but its Parquet is not (w7).
@@ -690,6 +705,11 @@ class DuckLakeAdapter(DuckDBAdapter):
             )
             for table in existing:
                 setup_conn.execute(f'DROP TABLE IF EXISTS lake.main."{table}"')
+            # Dropping the catalog entries is only half of --force: the Parquet
+            # those tables were written from is still in DATA_PATH, and every
+            # other backend clears it. Verified live against PostgreSQL 18 -
+            # without this, a postgres catalog left the superseded files on disk.
+            self._clear_data_path_for_force()
             self.database_was_reused = False
             return
 
