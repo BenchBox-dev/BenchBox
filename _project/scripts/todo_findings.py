@@ -29,6 +29,8 @@ import hashlib
 import json
 import os
 import re
+import shutil
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -1499,6 +1501,16 @@ def add_finding_subparsers(parser: argparse.ArgumentParser) -> None:
     p.add_argument("--corpus", default="_project/blind-spots", help="corpus directory (read-only)")
     p.add_argument("--dry-run", action="store_true", dest="dry_run", help="parse and report; touch no rows")
     p.add_argument("--report", action="store_true", help="print the machine-checkable parity report as JSON")
+    p.add_argument(
+        "--bulk",
+        action="store_true",
+        help="hosted only: stage locally, then move findings tables over the Hrana pipeline",
+    )
+    p.add_argument(
+        "--confirm-target",
+        dest="confirm_target",
+        help="REQUIRED with --bulk against a hosted backend: the database name you intend to write to",
+    )
 
     p = sub.add_parser("promote", help="promote a finding to a planning item (atomic)")
     p.add_argument("id")
@@ -1595,6 +1607,8 @@ def _cmd_import(conn: Any, actor: str, args: argparse.Namespace) -> int:
     Exit 1 when parity fails, so the rung is self-asserting: a report with any diff
     must not read as success.
     """
+    if getattr(args, "bulk", False) and not args.dry_run:
+        return _cmd_import_bulk(conn, actor, args)
     result = import_corpus(conn, actor, args.corpus, dry_run=args.dry_run)
     mode = "dry-run" if args.dry_run else "imported"
     print(
@@ -1615,6 +1629,87 @@ def _cmd_import(conn: Any, actor: str, args: argparse.Namespace) -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
     if not report["ok"]:
         print("PARITY FAILED", file=todo_db.sys.stderr)
+        return 1
+    print(f"parity OK: {report['stored_records']}/{report['corpus_records']} records, zero diffs")
+    return 0
+
+
+def hosted_db_name(url: str) -> str:
+    """The database name inside a libsql/https URL, for target confirmation.
+
+    ``libsql://benchbox-todo-joeharris76.aws-us-east-1.turso.io`` -> ``benchbox-todo``.
+    The org suffix is stripped so the operator confirms the *database*, not the host.
+    """
+    host = url.split("://", 1)[-1].split("/", 1)[0]
+    label = host.split(".", 1)[0]
+    # Turso hostnames are <db>-<org>; drop the trailing -<org> component.
+    return label.rsplit("-", 1)[0] if "-" in label else label
+
+
+def _cmd_import_bulk(conn: Any, actor: str, args: argparse.Namespace) -> int:
+    """Stage the corpus locally, move ONLY the findings tables to a hosted primary
+    over the Hrana pipeline, then re-run parity against that primary.
+
+    Refuses by default: writing to a hosted tracker requires naming it with
+    ``--confirm-target``, so a stray ``--bulk`` cannot import into the shared
+    database. Row-by-row against the primary is ~0.15 s/statement, which is the only
+    reason this path exists.
+    """
+    backend = todo_db.resolve_backend(getattr(args, "db", None))
+    if not isinstance(backend, str):
+        raise todo_db.TodoError("--bulk applies to a hosted backend; a local database imports directly")
+    target = hosted_db_name(backend)
+    if args.confirm_target != target:
+        raise todo_db.TodoError(
+            f"--bulk against a hosted tracker requires --confirm-target {target!r} (got {args.confirm_target!r}); "
+            "this guard exists so a stray run cannot write to the shared database"
+        )
+    token = os.environ.get("TODO_DB_AUTH_TOKEN") or ""
+    if not token:
+        raise todo_db.TodoError("hosted bulk import needs TODO_DB_AUTH_TOKEN")
+
+    # The staged items domain only exists so legacy todo_id values resolve; it is
+    # never transferred, so production's items domain is untouched.
+    items_source = Path(todo_db.hosted_replica_path())
+    if not items_source.exists():
+        raise todo_db.TodoError(
+            f"no local replica at {items_source}; run a read command first so legacy todo_id values can resolve"
+        )
+
+    maxima = target_findings_maxima(conn)
+    tmpdir = tempfile.mkdtemp(prefix="findings-import-")
+    try:
+        staging = Path(tmpdir) / "staging.sqlite"
+        staged = stage_corpus_import(staging, items_source, args.corpus, actor)
+        if staged["failed"]:
+            for failure in staged["failed"]:
+                print(f"  FAILED {failure['file']}: {failure['error']}", file=todo_db.sys.stderr)
+            raise todo_db.TodoError(f"{len(staged['failed'])} record(s) failed to parse; nothing was transferred")
+        if not staged["imported"]:
+            print("nothing to import: every record is already present")
+            return 0
+        # bulk_transfer copies primary keys verbatim, so staged ids must clear the
+        # target's maxima or the first colliding row aborts the whole transfer.
+        applied = offset_staging_pks(staging, maxima)
+        raw = todo_db.sqlite3.connect(staging)
+        raw.row_factory = todo_db.sqlite3.Row
+        try:
+            moved = todo_db.bulk_transfer(raw, backend, token, require_empty=False, tables=FINDINGS_TRANSFER_TABLES)
+        finally:
+            raw.close()
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    print(
+        f"bulk-imported {len(staged['imported'])} record(s) into {target}:"
+        f" {moved['rows']} row(s) in {moved['batches']} batch(es);"
+        f" skipped {len(staged['skipped'])} already present; pk offsets {applied or 'none'}"
+    )
+    report = parity_report(conn, args.corpus, staged)
+    if args.report:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    if not report["ok"]:
+        print("PARITY FAILED after transfer", file=todo_db.sys.stderr)
         return 1
     print(f"parity OK: {report['stored_records']}/{report['corpus_records']} records, zero diffs")
     return 0

@@ -1416,3 +1416,68 @@ class TestBulkImportPkOffset:
         maxima = todo_findings.target_findings_maxima(conn)
         assert set(maxima) == {"finding_evidence", "finding_links", "finding_sections", "finding_events"}
         assert all(v == 0 for v in maxima.values())
+
+
+class TestBulkImportTargetGuard:
+    """`--bulk` writes to a shared production tracker, so it refuses by default: the
+    operator must name the database. A stray `--bulk` must not import into prod."""
+
+    HOSTED = "libsql://benchbox-todo-joeharris76.aws-us-east-1.turso.io"
+
+    def _args(self, **over):
+        base = {
+            "finding_command": "import",
+            "corpus": "_project/blind-spots",
+            "dry_run": False,
+            "report": False,
+            "bulk": True,
+            "confirm_target": None,
+            "db": self.HOSTED,
+        }
+        base.update(over)
+        return SimpleNamespace(**base)
+
+    def test_hosted_db_name_strips_the_org_suffix(self):
+        assert todo_findings.hosted_db_name(self.HOSTED) == "benchbox-todo"
+        assert todo_findings.hosted_db_name("libsql://bb-todo-p5-rehearsal-joeharris76.aws.turso.io") == (
+            "bb-todo-p5-rehearsal"
+        )
+
+    def test_bulk_without_confirm_target_refuses(self, conn, monkeypatch):
+        monkeypatch.setattr(todo_db, "resolve_backend", lambda _db: self.HOSTED)
+        with pytest.raises(todo_db.TodoError, match="requires --confirm-target 'benchbox-todo'"):
+            todo_findings._cmd_import_bulk(conn, "tester", self._args())
+
+    def test_bulk_with_a_mismatched_confirm_target_refuses(self, conn, monkeypatch):
+        monkeypatch.setattr(todo_db, "resolve_backend", lambda _db: self.HOSTED)
+        with pytest.raises(todo_db.TodoError, match="requires --confirm-target"):
+            todo_findings._cmd_import_bulk(conn, "tester", self._args(confirm_target="some-other-db"))
+
+    def test_bulk_against_a_local_database_is_rejected(self, conn, monkeypatch, tmp_path):
+        monkeypatch.setattr(todo_db, "resolve_backend", lambda _db: tmp_path / "local.sqlite")
+        with pytest.raises(todo_db.TodoError, match="applies to a hosted backend"):
+            todo_findings._cmd_import_bulk(conn, "tester", self._args(confirm_target="whatever"))
+
+    def test_bulk_needs_a_token(self, conn, monkeypatch):
+        monkeypatch.setattr(todo_db, "resolve_backend", lambda _db: self.HOSTED)
+        monkeypatch.delenv("TODO_DB_AUTH_TOKEN", raising=False)
+        with pytest.raises(todo_db.TodoError, match="TODO_DB_AUTH_TOKEN"):
+            todo_findings._cmd_import_bulk(conn, "tester", self._args(confirm_target="benchbox-todo"))
+
+    def test_bulk_needs_a_replica_for_todo_id_resolution(self, conn, monkeypatch, tmp_path):
+        # Without the items snapshot every legacy todo_id would read as a dangler, so
+        # the command refuses rather than importing a corpus full of false positives.
+        monkeypatch.setattr(todo_db, "resolve_backend", lambda _db: self.HOSTED)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "t")
+        monkeypatch.setattr(todo_db, "hosted_replica_path", lambda: tmp_path / "absent" / "replica.db")
+        with pytest.raises(todo_db.TodoError, match="no local replica"):
+            todo_findings._cmd_import_bulk(conn, "tester", self._args(confirm_target="benchbox-todo"))
+
+    def test_dry_run_never_takes_the_bulk_path(self, conn, tmp_path, monkeypatch):
+        # --dry-run --bulk must stay a read-only parse, not a transfer.
+        def _boom(*a, **k):
+            raise AssertionError("bulk path must not run under --dry-run")
+
+        monkeypatch.setattr(todo_findings, "_cmd_import_bulk", _boom)
+        args = self._args(dry_run=True, corpus=str(tmp_path))
+        assert todo_findings._cmd_import(conn, "tester", args) == 0
