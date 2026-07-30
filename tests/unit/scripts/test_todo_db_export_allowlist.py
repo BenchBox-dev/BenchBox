@@ -174,3 +174,89 @@ class TestEventsRoundTrip:
         assert len(rows) == db_count
         assert {"action", "actor", "at", "item_id", "seq"} <= set(rows[0].keys())
         assert any(row["action"] == "create" for row in rows)
+
+
+class TestMigrationSnapshotScope:
+    """The snapshot is a BACKUP artifact, scoped separately from the export."""
+
+    def test_snapshot_scope_is_transfer_tables_plus_meta(self):
+        # Scoped to the backup/restore set, NOT to the committed-export
+        # allowlist. The two hold the same names today, but deriving the
+        # snapshot from the allowlist would mean narrowing what may be
+        # committed silently narrows what a migration carries.
+        assert frozenset(todo_db.TRANSFER_TABLES) | {"meta"} == todo_db.SNAPSHOT_TABLES
+
+    def test_snapshot_matches_what_restore_legacy_requires(self):
+        # build_snapshot refuses to run when these diverge; pin it here too so
+        # the divergence is named in a unit test rather than only at runtime.
+        assert todo_db.SNAPSHOT_TABLES == todo_db.RESTORE_LEGACY_REQUIRED_TABLES
+
+    def test_snapshot_excludes_findings_tables(self):
+        leaks = sorted(t for t in todo_db.SNAPSHOT_TABLES if t.startswith("finding"))
+        assert leaks == [], f"findings prose must not reach a migration snapshot: {leaks}"
+
+
+class TestMigrationSnapshotShape:
+    def test_snapshot_covers_every_required_table(self, conn):
+        _mk(conn, item_id="snapshot-item")
+        snapshot = todo_db.build_snapshot(conn)
+        missing = sorted(todo_db.RESTORE_LEGACY_REQUIRED_TABLES - snapshot.keys())
+        assert missing == [], f"restore-legacy would reject this snapshot: missing {missing}"
+
+    def test_items_are_normalized_not_nested(self, conn):
+        # The committed export nests child rows inside each item; restore_legacy
+        # strips exactly those keys and looks for sibling tables instead. A
+        # snapshot carrying nested items is structurally invalid input.
+        _mk(conn, item_id="snapshot-item")
+        snapshot = todo_db.build_snapshot(conn)
+        nested = {"work", "deps", "scope", "verifications", "preserves", "anti_patterns", "prior_art", "deferrals"}
+        leaked = sorted({key for item in snapshot["items"] for key in nested & set(item)})
+        assert leaked == [], f"items must be raw rows, not the export's nested shape: {leaked}"
+
+    def test_child_rows_travel_in_their_own_tables(self, conn):
+        _mk(conn, item_id="snapshot-item", scope=[("only_modify", "src/**")])
+        snapshot = todo_db.build_snapshot(conn)
+        assert snapshot["scope_rules"], "scope rules must survive as their own table"
+        assert all(row["item_id"] == "snapshot-item" for row in snapshot["scope_rules"])
+
+    def test_snapshot_is_deterministic(self, conn):
+        _mk(conn, item_id="b-item")
+        _mk(conn, item_id="a-item")
+        assert todo_db.build_snapshot(conn) == todo_db.build_snapshot(conn)
+
+
+class TestMigrationSnapshotStaysOutOfGit:
+    """A snapshot carries every deferral and event body; it must not reach Git."""
+
+    def test_refuses_a_destination_inside_a_work_tree(self, conn, tmp_path):
+        work_tree = tmp_path / "checkout"
+        (work_tree / ".git").mkdir(parents=True)
+        with pytest.raises(SystemExit, match="refusing to write a tracker snapshot"):
+            todo_db.write_snapshot(conn, work_tree / "snapshot.json")
+        assert not (work_tree / "snapshot.json").exists()
+
+    def test_refuses_a_nested_destination_inside_a_work_tree(self, conn, tmp_path):
+        work_tree = tmp_path / "checkout"
+        (work_tree / ".git").mkdir(parents=True)
+        nested = work_tree / "_project" / "scripts"
+        nested.mkdir(parents=True)
+        with pytest.raises(SystemExit, match="refusing to write a tracker snapshot"):
+            todo_db.write_snapshot(conn, nested / "snapshot.json")
+
+    def test_refuses_inside_a_linked_worktree_where_dot_git_is_a_file(self, conn, tmp_path):
+        # Pool worktrees (BenchBox.pool-NN) carry a `.git` FILE, not a directory,
+        # and are separate roots from the main clone -- a main-root check lets
+        # them through, which is exactly where agents do their work.
+        work_tree = tmp_path / "pool-01"
+        work_tree.mkdir()
+        (work_tree / ".git").write_text("gitdir: /elsewhere/.git/worktrees/pool-01\n", encoding="utf-8")
+        with pytest.raises(SystemExit, match="refusing to write a tracker snapshot"):
+            todo_db.write_snapshot(conn, work_tree / "snapshot.json")
+
+    def test_writes_outside_any_work_tree(self, conn, tmp_path):
+        _mk(conn, item_id="snapshot-item")
+        target = tmp_path / "backups" / "snapshot.json"
+        written = todo_db.write_snapshot(conn, target)
+        assert written.exists()
+        payload = json.loads(written.read_text(encoding="utf-8"))
+        assert payload.keys() >= todo_db.RESTORE_LEGACY_REQUIRED_TABLES
