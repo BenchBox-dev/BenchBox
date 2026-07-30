@@ -2012,6 +2012,123 @@ def export_events(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         return _export_events_unlocked(conn)
 
 
+# The tables todo-db's `restore-legacy` importer requires in a snapshot
+# (todo_db/database.py::restore_legacy). Stated explicitly so the tie to the
+# committed-export allowlist is checkable rather than incidental.
+RESTORE_LEGACY_REQUIRED_TABLES = frozenset(
+    {
+        "items",
+        "events",
+        "work_units",
+        "work_needs",
+        "item_deps",
+        "scope_rules",
+        "verifications",
+        "preserves",
+        "anti_patterns",
+        "prior_art",
+        "deferrals",
+        "meta",
+    }
+)
+
+# A migration snapshot is a BACKUP artifact, so it is scoped to the full
+# backup/restore set (TRANSFER_TABLES) plus `meta` for schema provenance -- NOT
+# to EXPORT_TABLE_ALLOWLIST. The two happen to hold the same names today, but
+# they answer different questions: the allowlist is "what may be committed to
+# Git", deliberately maintained as an independent literal so the committed
+# surface never widens by accident. Deriving a migration snapshot from it would
+# invert that: legitimately narrowing what gets committed would silently narrow
+# what a migration carries, which is precisely the kind of silent data loss this
+# snapshot exists to avoid. Findings tables stay out because TRANSFER_TABLES
+# excludes them, and restore-legacy would discard them regardless.
+SNAPSHOT_TABLES = frozenset(TRANSFER_TABLES) | {"meta"}
+
+
+def _snapshot_order_by(conn: sqlite3.Connection, table: str) -> str:
+    """ORDER BY the table's primary key so a snapshot is reproducible."""
+    pk = [row["name"] for row in conn.execute(f"PRAGMA table_info({table})") if row["pk"]]
+    return f" ORDER BY {', '.join(pk)}" if pk else ""
+
+
+def build_snapshot(conn: sqlite3.Connection) -> dict[str, list[dict[str, Any]]]:
+    """Raw per-table dump for todo-db's `restore-legacy` importer.
+
+    This is a different SHAPE from the committed export, not a reformatting of
+    it. ``write_export`` denormalizes: child rows are nested inside each item in
+    items.jsonl. ``restore_legacy`` wants the opposite -- normalized tables it
+    can load directly -- and explicitly strips the nested keys, so the committed
+    export is structurally invalid as importer input.
+
+    Note what this does NOT carry: the findings domain. ``restore_legacy``
+    ignores tables outside its required set, so findings rows would be dropped
+    on restore whether or not they appear here. Including them would leak review
+    prose for no benefit, so they are excluded.
+    """
+    # Fail closed. If the backup scope gains a table that restore-legacy does
+    # not know about, that importer would silently DROP it on restore. Refusing
+    # to build the snapshot surfaces the lossiness now, while it is still a
+    # migration-planning problem, rather than after a cutover.
+    if SNAPSHOT_TABLES != RESTORE_LEGACY_REQUIRED_TABLES:
+        only_here = sorted(SNAPSHOT_TABLES - RESTORE_LEGACY_REQUIRED_TABLES)
+        only_there = sorted(RESTORE_LEGACY_REQUIRED_TABLES - SNAPSHOT_TABLES)
+        raise RuntimeError(
+            "snapshot scope and restore-legacy's required tables have diverged; "
+            "a migration would lose data.\n"
+            f"  in the backup scope but not restorable: {only_here}\n"
+            f"  required by restore-legacy but not dumped: {only_there}\n"
+            "Reconcile RESTORE_LEGACY_REQUIRED_TABLES with the importer before migrating."
+        )
+    # One read snapshot across every table. Two independent SELECTs with a
+    # concurrent write between them would produce a bundle that no point in
+    # time ever had -- e.g. a scope_rules row referencing an absent item.
+    with _read_txn(conn):
+        return {
+            # Table names come from a module constant, never from input.
+            table: [dict(row) for row in conn.execute(f"SELECT * FROM {table}{_snapshot_order_by(conn, table)}")]
+            for table in sorted(SNAPSHOT_TABLES)
+        }
+
+
+def _enclosing_work_tree(path: Path) -> Path | None:
+    """The Git work tree containing ``path``, if any.
+
+    Deliberately NOT ``git_main_root()``: agents work in pool worktrees
+    (BenchBox.pool-NN), which are separate roots, so a main-root check passes a
+    destination straight into a checkout. Walk instead, and accept ``.git`` as
+    either a directory (clone) or a file (linked worktree).
+    """
+    probe = path if path.is_dir() else path.parent
+    while True:
+        if (probe / ".git").exists():
+            return probe
+        if probe == probe.parent:
+            return None
+        probe = probe.parent
+
+
+def write_snapshot(conn: sqlite3.Connection, path: Path) -> Path:
+    """Write a migration snapshot, refusing to place it inside the repo.
+
+    A snapshot is a full tracker dump including every deferral and event body.
+    PR #1327 established that such payloads stay out of Git; the committed
+    export is the curated artifact. Rather than trust the caller to remember,
+    refuse a destination inside the work tree.
+    """
+    resolved = path.expanduser().resolve()
+    if _enclosing_work_tree(resolved) is not None:
+        raise SystemExit(
+            f"refusing to write a tracker snapshot inside a Git work tree ({resolved}).\n"
+            "Snapshots carry every deferral and event body and must not reach Git; "
+            "write it outside the checkout, e.g. ~/todo-db-backups/."
+        )
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    with open(resolved, "w", encoding="utf-8") as handle:
+        json.dump(build_snapshot(conn), handle, sort_keys=True, indent=2)
+        handle.write("\n")
+    return resolved
+
+
 def write_export(conn: sqlite3.Connection, out_dir: Path) -> tuple[Path, Path, Path]:
     # Fail closed: the exporter's own coverage (item-nested tables + events)
     # must equal the committed-snapshot allowlist. If a future change teaches
@@ -2563,7 +2680,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("value", nargs="?")
 
     p = sub.add_parser("export", help="deterministic JSONL + markdown index")
-    p.add_argument("--out", default=None)
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--out", default=None)
+    g.add_argument(
+        "--snapshot",
+        default=None,
+        metavar="FILE",
+        help=(
+            "instead of the committed export, write a single-JSON raw table dump for "
+            "todo-db's restore-legacy importer. Must be outside the repository."
+        ),
+    )
 
     pf = sub.add_parser("finding", help="findings domain: capture, sync, triage, promote")
     todo_findings.add_finding_subparsers(pf)
@@ -3034,6 +3161,10 @@ def _cmd_sweep_stale(conn, actor, args):
 
 
 def _cmd_export(conn, actor, args):
+    if args.snapshot:
+        path = write_snapshot(conn, Path(args.snapshot))
+        print(f"wrote {path}")
+        return 0
     out_dir = Path(args.out) if args.out else git_main_root() / ".todo-db" / "export"
     jsonl_path, events_path, index_path = write_export(conn, out_dir)
     print(f"wrote {jsonl_path}, {events_path} and {index_path}")
