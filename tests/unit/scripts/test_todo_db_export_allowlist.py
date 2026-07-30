@@ -179,21 +179,34 @@ class TestEventsRoundTrip:
 class TestMigrationSnapshotScope:
     """The snapshot is a BACKUP artifact, scoped separately from the export."""
 
-    def test_snapshot_scope_is_transfer_tables_plus_meta(self):
+    def test_snapshot_scope_is_backup_scope_plus_meta_plus_findings(self):
         # Scoped to the backup/restore set, NOT to the committed-export
-        # allowlist. The two hold the same names today, but deriving the
-        # snapshot from the allowlist would mean narrowing what may be
-        # committed silently narrows what a migration carries.
-        assert frozenset(todo_db.TRANSFER_TABLES) | {"meta"} == todo_db.SNAPSHOT_TABLES
+        # allowlist. The two overlap, but deriving the snapshot from the
+        # allowlist would mean narrowing what may be committed silently narrows
+        # what a migration carries.
+        expected = frozenset(todo_db.TRANSFER_TABLES) | {"meta"} | todo_db.RESTORE_LEGACY_OPTIONAL_TABLES
+        assert expected == todo_db.SNAPSHOT_TABLES
 
-    def test_snapshot_matches_what_restore_legacy_requires(self):
-        # build_snapshot refuses to run when these diverge; pin it here too so
-        # the divergence is named in a unit test rather than only at runtime.
-        assert todo_db.SNAPSHOT_TABLES == todo_db.RESTORE_LEGACY_REQUIRED_TABLES
+    def test_snapshot_satisfies_the_importer_contract_in_both_directions(self):
+        # restore-legacy requires its 12 tables and REJECTS anything outside
+        # required|optional, so the snapshot must be a superset of one and a
+        # subset of the other. build_snapshot enforces this at runtime; pin it
+        # here so a divergence is named by a unit test rather than a cutover.
+        assert todo_db.RESTORE_LEGACY_REQUIRED_TABLES <= todo_db.SNAPSHOT_TABLES
+        rejected = (
+            todo_db.SNAPSHOT_TABLES - todo_db.RESTORE_LEGACY_REQUIRED_TABLES - todo_db.RESTORE_LEGACY_OPTIONAL_TABLES
+        )
+        assert rejected == set(), f"importer would reject: {sorted(rejected)}"
 
-    def test_snapshot_excludes_findings_tables(self):
-        leaks = sorted(t for t in todo_db.SNAPSHOT_TABLES if t.startswith("finding"))
-        assert leaks == [], f"findings prose must not reach a migration snapshot: {leaks}"
+    def test_snapshot_includes_findings_tables(self):
+        # Deliberately inverted from the original assertion. Findings were
+        # excluded while restore-legacy discarded unknown tables -- shipping
+        # prose that would be thrown away only risked leaking it. That importer
+        # now loads findings, so excluding them here would make the migration
+        # silently lossy instead. Safe because write_snapshot refuses any
+        # destination inside a Git work tree.
+        expected = {"findings", "finding_evidence", "finding_links", "finding_events", "finding_sections"}
+        assert expected <= todo_db.SNAPSHOT_TABLES
 
 
 class TestMigrationSnapshotShape:
@@ -260,3 +273,57 @@ class TestMigrationSnapshotStaysOutOfGit:
         assert written.exists()
         payload = json.loads(written.read_text(encoding="utf-8"))
         assert payload.keys() >= todo_db.RESTORE_LEGACY_REQUIRED_TABLES
+
+
+class TestSnapshotCarriesFindingsButExportDoesNot:
+    """Two boundaries that must not drift into each other.
+
+    The committed export is findings-free on purpose: review prose is not
+    version-controlled. A migration snapshot is the opposite — it must carry
+    findings or the migration silently drops them — and that is safe only
+    because write_snapshot refuses any destination inside a Git work tree.
+    """
+
+    def test_committed_export_allowlist_stays_findings_free(self):
+        leaks = sorted(t for t in todo_db.EXPORT_TABLE_ALLOWLIST if t.startswith("finding"))
+        assert leaks == [], f"findings must never reach the committed export: {leaks}"
+
+    def test_a_finding_reaches_the_snapshot_but_not_the_committed_export(self, conn, tmp_path):
+        _mk(conn, item_id="real-item")
+        sentinel = "SNAPSHOT-ONLY-finding-prose"
+        fid = "2026-01-01-000000-snapshot-class"
+        conn.execute(
+            "INSERT INTO findings (id, date, finding_kind, review_context, title,"
+            " finding_text, why_matters, next_steps, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                fid,
+                "2026-01-01",
+                "framework-gap",
+                "ctx",
+                f"{sentinel}-title",
+                f"{sentinel}-finding",
+                "why",
+                "next",
+                "2026-01-01T00:00:00Z",
+            ),
+        )
+        conn.commit()
+
+        snapshot = todo_db.build_snapshot(conn)
+        assert [row["id"] for row in snapshot["findings"]] == [fid]
+        assert sentinel in json.dumps(snapshot)
+
+        out_dir = tmp_path / "export"
+        todo_db.write_export(conn, out_dir)
+        for produced in sorted(out_dir.iterdir()):
+            assert sentinel not in produced.read_text(encoding="utf-8"), (
+                f"findings prose leaked into the committed export file {produced.name}"
+            )
+
+    def test_build_snapshot_refuses_a_scope_the_importer_would_reject(self, conn, monkeypatch):
+        # Fail closed: a table the importer neither requires nor accepts must
+        # stop the snapshot being built, not be discovered during a cutover.
+        monkeypatch.setattr(todo_db, "SNAPSHOT_TABLES", todo_db.SNAPSHOT_TABLES | {"some_future_table"})
+        with pytest.raises(RuntimeError, match="importer would reject"):
+            todo_db.build_snapshot(conn)
