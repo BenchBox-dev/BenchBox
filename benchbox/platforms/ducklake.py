@@ -48,6 +48,12 @@ _VALID_CATALOGS: tuple[str, ...] = ("duckdb", "sqlite", "postgres")
 # accumulate anonymous secrets.
 _S3_SECRET_NAME = "benchbox_ducklake_s3"
 
+# Connection credentials that must never reach exported result metadata.
+# get_platform_info() already omits these, but the normalized metadata is also
+# built from the unfiltered constructor config, where only pg_password happens
+# to match the shared secret-key matcher - pg_user does not.
+_CREDENTIAL_CONFIG_KEYS = frozenset({"pg_user", "pg_password", "s3_key_id", "s3_secret"})
+
 _REDACTED = "****"
 
 # Backstop for credential material we did NOT emit verbatim: a driver error can
@@ -966,6 +972,49 @@ class DuckLakeAdapter(DuckDBAdapter):
     # against the current catalog/schema search path, i.e. `lake.main`, not
     # the base `main` catalog of the underlying :memory:/file connection.
     # Adding an override here would be redundant with inherited behavior.
+
+    def get_normalized_result_metadata(
+        self,
+        *,
+        connection: Any = None,
+        platform_info: Any = None,
+    ) -> dict[str, Any]:
+        """Record which DuckLake deployment produced this result.
+
+        ADR "DuckLake Maturity, Publishability, Review Path, and Compaction
+        Bias" (decision w12) makes remote-backed DuckLake results publishable
+        and ranking-eligible ON CONDITION that each run records its backing, so
+        a DuckLake-on-S3 number - which partly measures object-store latency -
+        is never silently compared against DuckLake-on-local-disk as though
+        they were the same system. Both axes go into ``platform_storage``,
+        which the generic builder leaves empty for this platform.
+
+        This also scrubs ``pg_user``/``pg_password`` out of the raw config
+        block. ``get_platform_info()`` already omits them deliberately, but the
+        normalized metadata is built from ``adapter.platform_config`` as well,
+        which is the unfiltered constructor config: ``pg_password`` happens to
+        be caught by the shared secret-key matcher and ``pg_user`` is not, so
+        the username was reaching exported results.
+        """
+        metadata = super().get_normalized_result_metadata(connection=connection, platform_info=platform_info)
+
+        storage = dict(metadata.get("platform_storage") or {})
+        storage.update(
+            {
+                "catalog_backend": self.catalog,
+                "data_path_is_cloud": self._data_path_is_cloud,
+                "storage_location": "cloud_object_store" if self._data_path_is_cloud else "local_filesystem",
+            }
+        )
+        metadata["platform_storage"] = storage
+
+        raw_config = metadata.get("platform_raw_config")
+        if isinstance(raw_config, dict):
+            metadata["platform_raw_config"] = {
+                key: value for key, value in raw_config.items() if key not in _CREDENTIAL_CONFIG_KEYS
+            }
+
+        return metadata
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get DuckLake platform information."""
