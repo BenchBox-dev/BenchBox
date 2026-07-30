@@ -733,10 +733,16 @@ class TestDuckDBAdapter:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
-            # Create a dummy sharded zstd file name; actual contents won't be read because
-            # connection is mocked and we only validate SQL generation and handler selection
+            # The DuckDB connection is mocked, but the contents ARE read: the
+            # loader probes the first line for a trailing delimiter to decide
+            # parser arity. This previously wrote plain text under a .zst name
+            # and only passed because the probe swallowed the decompression
+            # failure and guessed "no trailing delimiter". That swallow is gone,
+            # so the fixture has to be genuinely compressed.
+            import zstandard
+
             fpath = tmp / "customer.tbl.1.zst"
-            fpath.write_text("1|foo|\n2|bar|\n")  # content won't matter for mocked connection
+            fpath.write_bytes(zstandard.ZstdCompressor().compress(b"1|foo|\n2|bar|\n"))
 
             mock_benchmark.tables = {"customer": str(fpath)}
             mock_benchmark.get_table_loading_order.return_value = ["customer"]
