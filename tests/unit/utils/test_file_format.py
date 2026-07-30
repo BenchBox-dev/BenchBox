@@ -634,3 +634,46 @@ class TestHasTrailingDelimiterFraming:
         path = tmp_path / "region.tbl"
         path.write_bytes(b"\r\n\r\n0|AFRICA|comment|\r\n")
         assert has_trailing_delimiter(path, "|", ["r_regionkey", "r_name", "r_comment"]) is True
+
+
+class TestHasTrailingDelimiterSurfacesReadFailures:
+    """A file we cannot read is not a file without a trailing delimiter.
+
+    The probe used to wrap everything in ``except Exception: return False``, so
+    a missing file or a permission error became a confident "no trailing
+    delimiter". For a file that does carry one, the caller then omitted the
+    synthetic column and PyArrow failed downstream with a column-count mismatch
+    naming neither the real cause nor the file. All eleven call sites pass a
+    path they are about to load, so the original error is strictly more useful.
+    """
+
+    def test_missing_file_raises_rather_than_reporting_clean(self, tmp_path):
+        with pytest.raises(OSError):
+            has_trailing_delimiter(tmp_path / "does-not-exist.tbl", "|", ["a", "b"])
+
+    def test_unreadable_file_raises_rather_than_reporting_clean(self, tmp_path):
+        path = tmp_path / "locked.tbl"
+        path.write_bytes(b"1|x|\n")
+        path.chmod(0o000)
+        try:
+            with pytest.raises(OSError):
+                has_trailing_delimiter(path, "|", ["a", "b"])
+        finally:
+            path.chmod(0o644)
+
+    def test_a_directory_in_place_of_a_file_raises(self, tmp_path):
+        target = tmp_path / "a_directory.tbl"
+        target.mkdir()
+        with pytest.raises(OSError):
+            has_trailing_delimiter(target, "|", ["a", "b"])
+
+    def test_an_empty_file_still_answers_false(self, tmp_path):
+        # The one legitimate False: nothing to classify, not a failure to read.
+        path = tmp_path / "empty.tbl"
+        path.write_bytes(b"")
+        assert has_trailing_delimiter(path, "|", ["a", "b"]) is False
+
+    def test_a_blank_line_only_file_still_answers_false(self, tmp_path):
+        path = tmp_path / "blank.tbl"
+        path.write_bytes(b"\n\r\n   \n")
+        assert has_trailing_delimiter(path, "|", ["a", "b"]) is False
