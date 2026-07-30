@@ -17,6 +17,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -777,8 +779,9 @@ class TestReleaseInfrastructure:
         # Make collapses `$$` to a literal `$` in recipes before the shell ever sees it;
         # emulate that here since this test runs the extracted text via bash directly.
         shell_pipeline = pipeline_without_version_grep.replace("$$", "$")
-        result = subprocess.run(
-            ["bash", "-c", shell_pipeline],
+        skip_without_posix_shell()
+        result = run_posix_shell(
+            shell_pipeline,
             input=sample_input,
             capture_output=True,
             text=True,
