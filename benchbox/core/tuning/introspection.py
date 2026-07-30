@@ -67,6 +67,9 @@ _VERIFIABLE_VERDICTS = frozenset({CORROBORATED, ABSENT, MISMATCH, UNVERIFIABLE})
 KIND_INDEX = "index"
 KIND_SORT_KEY = "sort_key"
 KIND_PARTITION_KEY = "partition_key"
+#: Snowflake/BigQuery-style clustering key, applied by ``CLUSTER BY`` either on
+#: ``CREATE TABLE`` or by a post-load ``ALTER TABLE``.
+KIND_CLUSTER_KEY = "cluster_key"
 
 _DDL_PHASES = frozenset({PHASE_DDL, PHASE_POST_LOAD})
 
@@ -247,6 +250,16 @@ _CREATE_TABLE_RE = re.compile(
     re.IGNORECASE,
 )
 _OPTIMIZE_RE = re.compile(r"^\s*optimize\s+table\s+(?P<table>[^\s;]+)", re.IGNORECASE)
+_CLUSTER_BY_RE = re.compile(rf"\bcluster\s+by\s*\({_KEY_CLAUSE_COLUMNS}\)", re.IGNORECASE | re.DOTALL)
+_CLUSTER_BY_KEYWORD_RE = re.compile(r"\bcluster\s+by\b", re.IGNORECASE)
+# Snowflake applies a clustering key post-load: ``ALTER TABLE T CLUSTER BY (a, b)``.
+_ALTER_TABLE_RE = re.compile(r"^\s*alter\s+table\s+(?P<table>[^\s(]+)", re.IGNORECASE)
+# ``ALTER TABLE T RECLUSTER`` (and the RESUME/SUSPEND forms that toggle
+# Snowflake's automatic reclustering service) reorganize existing data. They
+# have no distinct catalog footprint of their own -- the clustering KEY is what
+# CLUSTERING_KEY reports -- so they are maintenance, exactly like OPTIMIZE:
+# recorded and noted, but they neither earn nor block verification.
+_RECLUSTER_RE = re.compile(r"^\s*alter\s+table\s+\S+\s+(?:(?:resume|suspend)\s+)?recluster\b", re.IGNORECASE)
 # Recognized transient (session/config) and maintenance prefixes.
 _TRANSIENT_PREFIXES = ("set ", "pragma ", "set\t", "pragma\t", "reset ", "use ")
 _MAINTENANCE_PREFIXES = ("optimize ", "vacuum", "analyze", "compact ")
@@ -369,10 +382,17 @@ def _classify(statement: AppliedStatement) -> tuple[str, list[_Intent]]:
         part = _PARTITION_BY_RE.search(text)
         if part:
             intents.append(_Intent(kind=KIND_PARTITION_KEY, table=table, columns=normalize_columns(part.group("cols"))))
+        cluster = _CLUSTER_BY_RE.search(text)
+        if cluster:
+            intents.append(
+                _Intent(kind=KIND_CLUSTER_KEY, table=table, columns=normalize_columns(cluster.group("cols")))
+            )
         # Fail closed: a key clause we can SEE but could not parse must block the
         # upgrade rather than silently vanish while a sibling clause corroborates.
         # Dropping it would recreate exactly the hole this classifier closes.
         if order is None and _ORDER_BY_KEYWORD_RE.search(text) and not _ORDER_BY_NOOP_RE.search(text):
+            return UNVERIFIABLE, []
+        if cluster is None and _CLUSTER_BY_KEYWORD_RE.search(text):
             return UNVERIFIABLE, []
         if part is None and _PARTITION_BY_KEYWORD_RE.search(text):
             return UNVERIFIABLE, []
@@ -380,6 +400,22 @@ def _classify(statement: AppliedStatement) -> tuple[str, list[_Intent]]:
             return "verifiable", intents
         # A plain CREATE TABLE with no recognized key clause is not a tuning
         # footprint we can corroborate -> unverifiable (conservative).
+        return UNVERIFIABLE, []
+
+    # Snowflake applies its clustering key after load, so the tuning footprint
+    # arrives as ALTER TABLE rather than CREATE TABLE.
+    at = _ALTER_TABLE_RE.match(text)
+    if at:
+        if _RECLUSTER_RE.match(text):
+            return MAINTENANCE, []
+        table = normalize_identifier(at.group("table"))
+        cluster = _CLUSTER_BY_RE.search(text)
+        if cluster:
+            return "verifiable", [
+                _Intent(kind=KIND_CLUSTER_KEY, table=table, columns=normalize_columns(cluster.group("cols")))
+            ]
+        # Any other ALTER TABLE (including a CLUSTER BY we could not parse) has
+        # no corroboration rule and must keep blocking the upgrade.
         return UNVERIFIABLE, []
 
     return UNVERIFIABLE, []
@@ -541,6 +577,7 @@ __all__ = [
     "IntrospectedState",
     "IntrospectionReceipt",
     "KIND_INDEX",
+    "KIND_CLUSTER_KEY",
     "KIND_PARTITION_KEY",
     "KIND_SORT_KEY",
     "MAINTENANCE",

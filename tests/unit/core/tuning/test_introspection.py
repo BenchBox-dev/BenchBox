@@ -28,6 +28,7 @@ from benchbox.core.tuning.applied_ledger import (
 from benchbox.core.tuning.introspection import (
     ABSENT,
     CORROBORATED,
+    KIND_CLUSTER_KEY,
     KIND_INDEX,
     KIND_PARTITION_KEY,
     KIND_SORT_KEY,
@@ -347,3 +348,61 @@ class TestUnparsableKeyClauseFailsClosed:
         receipt = self._corroborate("CREATE TABLE t (a Int64) PARTITION BY (d) ORDER BY tuple()")
         assert [e.kind for e in receipt.entries] == [KIND_PARTITION_KEY]
         assert receipt.corroborated is True
+
+
+class TestClusterKeyClassification:
+    """Snowflake applies its clustering key AFTER load, so the tuning footprint
+    arrives as ``ALTER TABLE ... CLUSTER BY``. Before this rule existed every
+    such statement classified ``unverifiable`` and BLOCKED the upgrade, so a
+    tuned Snowflake run could never reach applied_verified.
+    """
+
+    def _ledger(self, statement: str) -> AppliedTuningLedger:
+        ledger = AppliedTuningLedger()
+        ledger.record(statement, PHASE_DDL, table="lineitem")
+        return ledger
+
+    def _state(self, columns=("a", "b")) -> IntrospectedState:
+        return IntrospectedState(
+            platform="snowflake",
+            objects=[IntrospectedObject(kind=KIND_CLUSTER_KEY, table="lineitem", columns=columns)],
+        )
+
+    def test_alter_table_cluster_by_is_corroboratable(self):
+        receipt = corroborate(self._ledger("ALTER TABLE lineitem CLUSTER BY (a, b)"), self._state())
+        assert [(e.kind, e.verdict) for e in receipt.entries] == [(KIND_CLUSTER_KEY, CORROBORATED)]
+        assert receipt.corroborated is True
+
+    def test_create_table_cluster_by_is_corroboratable(self):
+        receipt = corroborate(self._ledger("CREATE TABLE lineitem (a INT, b INT) CLUSTER BY (a, b)"), self._state())
+        assert [(e.kind, e.verdict) for e in receipt.entries] == [(KIND_CLUSTER_KEY, CORROBORATED)]
+
+    def test_mismatched_cluster_key_blocks(self):
+        receipt = corroborate(self._ledger("ALTER TABLE lineitem CLUSTER BY (a, b)"), self._state(columns=("a",)))
+        assert receipt.entries[0].verdict == MISMATCH
+        assert receipt.corroborated is False
+
+    @pytest.mark.parametrize(
+        "statement",
+        [
+            "ALTER TABLE lineitem RECLUSTER",
+            "ALTER TABLE lineitem RESUME RECLUSTER",
+            "ALTER TABLE lineitem SUSPEND RECLUSTER",
+        ],
+    )
+    def test_recluster_is_maintenance_not_blocking(self, statement):
+        # Reorganizes existing data; the KEY is what the catalog reports, so
+        # these neither earn nor block verification (same class as OPTIMIZE).
+        receipt = corroborate(self._ledger(statement), self._state())
+        assert receipt.entries[0].verdict == MAINTENANCE
+        assert receipt.summary["verifiable_total"] == 0
+
+    def test_unparsable_cluster_clause_fails_closed(self):
+        # Visible CLUSTER BY we cannot parse must keep blocking, never vanish.
+        receipt = corroborate(self._ledger("ALTER TABLE lineitem CLUSTER BY a, b"), self._state())
+        assert receipt.entries[0].verdict == UNVERIFIABLE
+        assert receipt.corroborated is False
+
+    def test_other_alter_table_still_blocks(self):
+        receipt = corroborate(self._ledger("ALTER TABLE lineitem ADD COLUMN c INT"), self._state())
+        assert receipt.entries[0].verdict == UNVERIFIABLE
