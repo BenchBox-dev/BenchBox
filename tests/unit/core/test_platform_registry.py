@@ -362,8 +362,8 @@ class TestPlatformRegistry:
         assert sum(summary["support_status"].values()) == len(metadata)
         assert summary["support_status"] == {
             "stable": 5,
-            "beta": 27,
-            "experimental": 18,
+            "beta": 28,
+            "experimental": 17,
             "repo_only": 0,
             "deprecated": 1,
             "document_only": 0,

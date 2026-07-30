@@ -2,13 +2,13 @@
 
 # DuckLake Platform
 
-```{tags} intermediate, guide, ducklake, sql-platform, experimental
+```{tags} intermediate, guide, ducklake, sql-platform, beta
 ```
 
 DuckLake is an open lakehouse table format shipped as a DuckDB extension: table **data** is stored as Parquet files, while table **metadata** (the catalog) lives in a SQL database. BenchBox runs DuckLake through the same DuckDB engine used by the `duckdb` platform, inheriting DuckDB's SQL dialect and benchmark compatibility unchanged.
 
 ```{warning}
-The DuckLake platform is **experimental**. The DuckDB-file catalog combined with local Parquet storage is the best-tested path. SQLite/PostgreSQL catalogs and S3-backed `DATA_PATH` are now supported (experimental) - see [Catalog Backends](#catalog-backends) below.
+The DuckLake platform is **beta** (promoted from experimental on 2026-07-30). All four combinations of catalog backend and storage location have been validated with a TPC-H SF=1 run through the correctness gate - see [Catalog Backends](#catalog-backends) below and the [maturity ADR](../development/adr/adr-ducklake-maturity-and-publishability.md) for what promotion required.
 ```
 
 ## Features
@@ -204,7 +204,7 @@ parent = PlatformRegistry.get_inherited_platform("ducklake")
 | Catalog | Separate SQL-database metadata file | Embedded in the database file |
 | Deployment | Local (default), self-hosted PostgreSQL catalog, or S3-backed storage - see [Catalog Backends](#catalog-backends) | Local embedded |
 | Requirements | DuckDB >= 1.3 + `ducklake` extension | DuckDB (any supported version) |
-| Support status | Experimental | Stable |
+| Support status | Beta | Stable |
 | Best For | Evaluating lakehouse table-format overhead on DuckDB | General local benchmarking |
 
 ## When to Use DuckLake
@@ -217,7 +217,7 @@ parent = PlatformRegistry.get_inherited_platform("ducklake")
 **Use DuckDB instead when:**
 - You do not need a separate catalog/data-file split
 - You are on a DuckDB runtime older than 1.3
-- You want the most stable, non-experimental local platform
+- You want the most stable, generally-available local platform
 
 ### Interpreting DuckLake numbers: no compaction is performed
 

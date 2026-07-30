@@ -1248,8 +1248,13 @@ class TestDuckLakeRegistration:
         available = PlatformRegistry.get_available_platforms()
         assert "ducklake" in available
 
-    def test_support_status_is_experimental(self):
-        assert PlatformRegistry.get_platform_support_status("ducklake") == "experimental"
+    def test_support_status_is_beta(self):
+        # Promoted from experimental on 2026-07-30 once every criterion in
+        # docs/development/adr/adr-ducklake-maturity-and-publishability.md
+        # (decision w11) was met - including TPC-H SF=1 validated on all four
+        # deployment modes. Do not relax this to experimental to make a change
+        # pass; the ADR records what promotion required.
+        assert PlatformRegistry.get_platform_support_status("ducklake") == "beta"
 
     def test_adapter_class_resolves(self):
         adapter_class = PlatformRegistry.get_adapter_class("ducklake")
