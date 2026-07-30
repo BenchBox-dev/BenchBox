@@ -2040,9 +2040,23 @@ RESTORE_LEGACY_REQUIRED_TABLES = frozenset(
 # surface never widens by accident. Deriving a migration snapshot from it would
 # invert that: legitimately narrowing what gets committed would silently narrow
 # what a migration carries, which is precisely the kind of silent data loss this
-# snapshot exists to avoid. Findings tables stay out because TRANSFER_TABLES
-# excludes them, and restore-legacy would discard them regardless.
-SNAPSHOT_TABLES = frozenset(TRANSFER_TABLES) | {"meta"}
+# snapshot exists to avoid.
+#
+# Findings ARE carried, as of todo-db PR #1. They were excluded before only
+# because restore-legacy discarded unknown tables, so shipping review prose
+# would have leaked it for nothing. That importer now loads the findings domain
+# and rejects anything it does not recognise, so omitting them here would make
+# the migration silently lossy instead.
+RESTORE_LEGACY_OPTIONAL_TABLES = frozenset(
+    {
+        "findings",
+        "finding_evidence",
+        "finding_links",
+        "finding_events",
+        "finding_sections",
+    }
+)
+SNAPSHOT_TABLES = frozenset(TRANSFER_TABLES) | {"meta"} | RESTORE_LEGACY_OPTIONAL_TABLES
 
 
 def _snapshot_order_by(conn: sqlite3.Connection, table: str) -> str:
@@ -2060,24 +2074,25 @@ def build_snapshot(conn: sqlite3.Connection) -> dict[str, list[dict[str, Any]]]:
     can load directly -- and explicitly strips the nested keys, so the committed
     export is structurally invalid as importer input.
 
-    Note what this does NOT carry: the findings domain. ``restore_legacy``
-    ignores tables outside its required set, so findings rows would be dropped
-    on restore whether or not they appear here. Including them would leak review
-    prose for no benefit, so they are excluded.
+    Carries the findings domain as well as the tracker tables. It is safe to
+    include review prose here precisely because a snapshot is never committed:
+    ``write_snapshot`` refuses any destination inside a Git work tree. The
+    committed export remains findings-free via a separate allowlist.
     """
-    # Fail closed. If the backup scope gains a table that restore-legacy does
-    # not know about, that importer would silently DROP it on restore. Refusing
-    # to build the snapshot surfaces the lossiness now, while it is still a
-    # migration-planning problem, rather than after a cutover.
-    if SNAPSHOT_TABLES != RESTORE_LEGACY_REQUIRED_TABLES:
-        only_here = sorted(SNAPSHOT_TABLES - RESTORE_LEGACY_REQUIRED_TABLES)
-        only_there = sorted(RESTORE_LEGACY_REQUIRED_TABLES - SNAPSHOT_TABLES)
+    # Fail closed against the importer's contract, which is: every required
+    # table must be present, and nothing outside required|optional may be --
+    # todo-db rejects unrecognised tables rather than ignoring them. Checking
+    # both directions here turns a future mismatch into a build-time error
+    # instead of a failed or silently lossy cutover.
+    missing = sorted(RESTORE_LEGACY_REQUIRED_TABLES - SNAPSHOT_TABLES)
+    unacceptable = sorted(SNAPSHOT_TABLES - RESTORE_LEGACY_REQUIRED_TABLES - RESTORE_LEGACY_OPTIONAL_TABLES)
+    if missing or unacceptable:
         raise RuntimeError(
-            "snapshot scope and restore-legacy's required tables have diverged; "
-            "a migration would lose data.\n"
-            f"  in the backup scope but not restorable: {only_here}\n"
-            f"  required by restore-legacy but not dumped: {only_there}\n"
-            "Reconcile RESTORE_LEGACY_REQUIRED_TABLES with the importer before migrating."
+            "snapshot scope disagrees with restore-legacy's contract; a migration "
+            "would fail or lose data.\n"
+            f"  required by restore-legacy but not dumped: {missing}\n"
+            f"  dumped but the importer would reject: {unacceptable}\n"
+            "Reconcile RESTORE_LEGACY_REQUIRED_TABLES / RESTORE_LEGACY_OPTIONAL_TABLES with the importer."
         )
     # One read snapshot across every table. Two independent SELECTs with a
     # concurrent write between them would produce a bundle that no point in
