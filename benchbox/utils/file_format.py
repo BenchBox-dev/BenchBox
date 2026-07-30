@@ -445,7 +445,23 @@ def has_trailing_delimiter(
 
 
 def _check_first_nonempty_line(path: Path, checker, CompressionError, CompressionManager) -> bool:
-    """Read the first non-empty line from a (possibly compressed) file and apply checker."""
+    r"""Read the first non-empty line from a (possibly compressed) file and apply checker.
+
+    TEXT MODE IS REQUIRED, not incidental. Both reads below open ``"rt"``, so
+    universal newlines translate ``\r\n`` to ``\n`` before the checker sees the
+    line -- and every checker in ``has_trailing_delimiter`` strips only ``\n``.
+    A file written on Windows ends ``|\r\n``, so switching either read to binary
+    for throughput would leave a stray ``\r``: the field-count checker would see
+    an extra field, the ends-with checker would stop matching, and on bytes
+    ``rstrip("\n")`` raises outright -- which the blanket ``except`` below turns
+    into a confident "no trailing delimiter". That is the exact Windows
+    misdetection PR #1332 fixed, and it would come back silently across all ten
+    platform callers.
+
+    Pinned by ``tests/unit/utils/test_file_format.py::
+    TestHasTrailingDelimiterFraming``, which asserts all four
+    framing/terminator combinations.
+    """
     compression_type = detect_compression(path)
     try:
         if compression_type:
