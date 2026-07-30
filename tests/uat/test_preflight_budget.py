@@ -97,8 +97,12 @@ def test_estimate_largest_scale_peak_disk_uses_largest_configured_scale(tmp_path
 
 def test_disk_headroom_gate_reports_short_root(tmp_path: Path):
     budget = DiskBudget(cells=1, est_peak_gib=10.0, est_steady_gib=8.0, unknown_cells=())
+    # Render the expectation from the same Path the formatter receives: str(Path) uses
+    # the platform separator, so a hardcoded "/tmp" fails on Windows ("\tmp") while
+    # asserting nothing extra. Mirrors the idiom already used in test_preflight.py.
+    tmp_root = Path("/tmp")
     roots = (
-        DiskRootFreeSpace("tmp", Path("/tmp"), 4.0),
+        DiskRootFreeSpace("tmp", tmp_root, 4.0),
         DiskRootFreeSpace("output", tmp_path, 20.0),
     )
 
@@ -107,4 +111,4 @@ def test_disk_headroom_gate_reports_short_root(tmp_path: Path):
     assert check.required_gib == pytest.approx(10.0)
     assert len(check.shortfalls) == 1
     assert check.shortfalls[0].label == "tmp"
-    assert "tmp /tmp: 4.0 GiB free < 10.0 GiB required" in format_disk_headroom_failure(check)
+    assert f"tmp {tmp_root}: 4.0 GiB free < 10.0 GiB required" in format_disk_headroom_failure(check)

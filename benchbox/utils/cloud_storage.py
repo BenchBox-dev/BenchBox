@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any, Iterator, List, NamedTuple, Protocol, Union, runtime_checkable
 from urllib.parse import urlparse
 
@@ -413,8 +413,17 @@ def _match_snowflake_stage(path: Union[str, Path]) -> Union[re.Match, None]:
     Shared by the predicate and by :func:`get_cloud_path_info` so the grammar
     and the stage/sub-path split can never drift apart.
     """
-    if isinstance(path, Path):
-        path = str(path)
+    # PurePath, not Path: this must also cover the pure flavours (PureWindowsPath),
+    # which are not Path subclasses and previously fell through to the non-str
+    # rejection below.
+    if isinstance(path, PurePath):
+        # A stage reference is Snowflake URI grammar, not a local filesystem path, so
+        # it is always "/"-separated. str(WindowsPath("@~/data")) is "@~\\data", which
+        # the grammar rejects because it requires "/" after the stage token -- so a
+        # Path-typed stage silently failed to classify on Windows. Normalize it to
+        # behave like its string form everywhere. Non-stage inputs are unaffected:
+        # they do not start with "@" and never matched either way.
+        path = str(path).replace("\\", "/")
 
     if not isinstance(path, str):
         return None

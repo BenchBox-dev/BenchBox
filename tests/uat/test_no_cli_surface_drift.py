@@ -248,7 +248,8 @@ def _source_at_ref(ref: str, path: str) -> str:
 
 def _source_at_worktree(path: str) -> str:
     try:
-        return (REPO_ROOT / path).read_text()
+        # Explicit encoding: the default is locale-dependent (cp1252 on Windows).
+        return (REPO_ROOT / path).read_text(encoding="utf-8")
     except FileNotFoundError:
         return ""
 

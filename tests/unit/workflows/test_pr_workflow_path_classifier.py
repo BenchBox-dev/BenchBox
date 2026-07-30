@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -57,6 +59,9 @@ def _ci_required_result_script() -> str:
 
 
 def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess[str]:
+    # Only the shell-executing tests in this module skip; the YAML/regex ones
+    # alongside them need no shell and must keep running everywhere.
+    skip_without_posix_shell()
     env = {
         **os.environ,
         "CI_PATHS_RESULT": "success",
@@ -76,8 +81,8 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "SAFE_CONTENT_ONLY": "true",
         **env_overrides,
     }
-    return subprocess.run(
-        ["bash", "-c", _ci_required_result_script()],
+    return run_posix_shell(
+        _ci_required_result_script(),
         check=False,
         capture_output=True,
         env=env,

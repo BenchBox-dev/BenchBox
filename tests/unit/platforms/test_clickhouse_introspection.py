@@ -26,7 +26,12 @@ from benchbox.core.tuning.introspection import KIND_PARTITION_KEY, KIND_SORT_KEY
 from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
 from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+    # Constructs local-mode adapters; chDB has no Windows wheels. See the fixture.
+    pytest.mark.usefixtures("chdb_probe_satisfied"),
+]
 
 
 class _FakeCHConnection:

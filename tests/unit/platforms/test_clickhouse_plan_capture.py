@@ -13,10 +13,13 @@ from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanPars
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
+    # Constructs local-mode adapters; chDB has no Windows wheels. See the fixture.
+    pytest.mark.usefixtures("chdb_probe_satisfied"),
 ]
 
 _FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "query_plans"
-_PLAN_TEXT = (_FIXTURES / "clickhouse_explain_plan_sample.txt").read_text()
+# Explicit encoding: the default is locale-dependent (cp1252 on Windows).
+_PLAN_TEXT = (_FIXTURES / "clickhouse_explain_plan_sample.txt").read_text(encoding="utf-8")
 
 
 class _FakeConn:

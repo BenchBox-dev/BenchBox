@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
+
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -55,10 +57,11 @@ def test_applied_only_change_discovers_paired_primary_bundle(tmp_path: Path) -> 
     _git(tmp_path, "add", str(applied.relative_to(tmp_path)))
     _git(tmp_path, "commit", "--quiet", "-m", "applied")
 
+    skip_without_posix_shell()
     env = os.environ.copy()
     env["BASE_SHA"] = base_sha
-    result = subprocess.run(
-        ["bash", "-c", _changed_bundle_discovery_script()],
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
         cwd=tmp_path,
         check=False,
         capture_output=True,
@@ -100,10 +103,11 @@ def test_applied_companion_rename_discovers_the_source_primary_bundle(tmp_path: 
     _git(tmp_path, "add", str(renamed.relative_to(tmp_path)))
     _git(tmp_path, "commit", "--quiet", "-m", "rename-applied")
 
+    skip_without_posix_shell()
     env = os.environ.copy()
     env["BASE_SHA"] = base_sha
-    result = subprocess.run(
-        ["bash", "-c", _changed_bundle_discovery_script()],
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
         cwd=tmp_path,
         check=False,
         capture_output=True,

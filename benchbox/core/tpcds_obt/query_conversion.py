@@ -158,7 +158,9 @@ class TemplateLoader:
         if not self.path.exists():
             raise FileNotFoundError(f"Template for query {query_id} not found at {self.path}")
 
-        self.raw_text = self.path.read_text()
+        # Explicit encoding: the read_text default is locale-dependent (cp1252 on
+        # Windows), which mis-decodes any non-ASCII byte in a query file.
+        self.raw_text = self.path.read_text(encoding="utf-8")
         self.definitions: dict[str, str] = {}
         self.body_sql: str = ""
         self.parameters: dict[str, TemplateParameter] = {}
