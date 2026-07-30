@@ -921,6 +921,39 @@ class TestDuckLakePostgresCatalogReuse:
         assert adapter.database_was_reused is False
         assert not any(sql.startswith("DROP TABLE") for sql in conn.executed)
 
+    def test_stale_local_metadata_file_does_not_mark_a_postgres_run_reused(self, tmp_path):
+        """A leftover .ducklake file must not stand in for a server-side catalog.
+
+        Regression found by the first TPC-H SF=1 postgres run: metadata_path is
+        always computed to a default even for catalog=postgres, so a file left
+        by an earlier duckdb-catalog run at the same benchmark/scale made
+        handle_existing_database() report the database as reused. The runner
+        then skipped schema creation and data loading and failed validation
+        against an empty PostgreSQL catalog - "Empty tables detected: region,
+        nation, supplier, ...".
+        """
+        adapter = self._adapter(tmp_path)
+        adapter.metadata_path.parent.mkdir(parents=True, exist_ok=True)
+        adapter.metadata_path.write_text("stale catalog from a duckdb-backed run")
+
+        adapter.handle_existing_database()
+
+        assert adapter.database_was_reused is False
+        # ...and the stale file is left alone: it is not this backend's to delete.
+        assert adapter.metadata_path.exists()
+
+    def test_local_catalog_still_decides_reuse_from_metadata_path(self, tmp_path):
+        # Must-preserve: duckdb/sqlite keep the pre-connection behaviour.
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+        )
+        adapter.metadata_path.write_text("existing catalog")
+
+        adapter.handle_existing_database()
+
+        assert adapter.database_was_reused is True
+
     def test_dry_run_never_drops_anything(self, tmp_path):
         adapter = self._adapter(tmp_path, force_recreate=True)
         adapter.dry_run = True
