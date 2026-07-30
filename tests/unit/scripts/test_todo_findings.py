@@ -1651,3 +1651,63 @@ class TestReconcileNeverWipesUndeclaredEvidence:
         assert json.loads(stored["related_paths"]) == ["benchbox/core/new.py"]
         # The curated evidence row survives: the draft never asserted an evidence list.
         assert [(r["path"], r["note"]) for r in stored["evidence"]] == [("curated.py", "added at triage")]
+
+
+class TestBulkImportSyncsBeforeParity:
+    """The bulk transfer writes to the PRIMARY while the command's connection reads a
+    local embedded replica opened beforehand. Without an explicit sync, parity sees
+    none of the new rows and reports a false PARITY FAILED on a correct import — which
+    is exactly what the first production run printed."""
+
+    def test_replica_is_synced_before_the_parity_comparison(self, tmp_path, monkeypatch):
+        calls = []
+
+        class _Conn:
+            """Stands in for a hosted connection whose reads are stale until sync()."""
+
+            def sync(self):
+                calls.append("sync")
+
+            def execute(self, *_a, **_k):
+                calls.append("read")
+
+                class _Cur:
+                    def fetchone(self):
+                        return (0,)
+
+                    def __iter__(self):
+                        return iter(())
+
+                return _Cur()
+
+        monkeypatch.setattr(todo_db, "resolve_backend", lambda _db: "libsql://benchbox-todo-org.turso.io")
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "t")
+        replica = tmp_path / "replica.db"
+        replica.write_bytes(b"")
+        monkeypatch.setattr(todo_db, "hosted_replica_path", lambda: replica)
+        monkeypatch.setattr(todo_findings, "target_findings_maxima", lambda _c: {})
+        monkeypatch.setattr(
+            todo_findings,
+            "stage_corpus_import",
+            lambda *_a, **_k: {"imported": ["x"], "skipped": [], "failed": [], "records": {}, "danglers": []},
+        )
+        monkeypatch.setattr(todo_findings, "offset_staging_pks", lambda *_a, **_k: {})
+        monkeypatch.setattr(todo_db, "bulk_transfer", lambda *_a, **_k: {"rows": 1, "batches": 1})
+        monkeypatch.setattr(todo_db.sqlite3, "connect", lambda *_a, **_k: SimpleNamespace(close=lambda: None))
+        monkeypatch.setattr(
+            todo_findings,
+            "parity_report",
+            lambda *_a, **_k: {"ok": True, "stored_records": 1, "corpus_records": 1},
+        )
+
+        args = SimpleNamespace(
+            finding_command="import",
+            corpus=str(tmp_path),
+            dry_run=False,
+            report=False,
+            bulk=True,
+            confirm_target="benchbox-todo",
+            db=None,
+        )
+        assert todo_findings._cmd_import_bulk(_Conn(), "tester", args) == 0
+        assert "sync" in calls, "parity must not be computed against an unsynced replica"
