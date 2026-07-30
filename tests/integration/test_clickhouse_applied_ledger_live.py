@@ -1,0 +1,140 @@
+"""Applied-ledger corroboration against a REAL ClickHouse engine.
+
+The unit suite (``tests/unit/platforms/test_clickhouse_introspection.py``)
+proves the corroboration logic against a fake ``system.tables`` connection. That
+cannot catch a wrong assumption about what ClickHouse actually PUTS in
+``system.tables`` -- and one of the #1331 fixes turns entirely on that: the
+clause regex must capture ``toYYYYMM(l_shipdate)`` including its closing paren,
+or every date-partitioned table mismatches its own catalog fact.
+
+That failure mode is invisible. It fails CLOSED: nothing errors, runs simply
+never reach ``applied_verified``. So it needs a live engine, which is what these
+tests use -- chDB is ClickHouse embedded in-process, and ``system.tables`` is
+the same catalog a server exposes.
+
+Scope: this exercises the schema/introspection/corroboration path, not data
+loading, and chDB is not a ClickHouse *server*. A full server run against a
+loaded corpus remains the wider check.
+
+Copyright 2026 Joe Harris / BenchBox Project
+
+Licensed under the MIT License. See LICENSE file in the project root for details.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from benchbox.core.tuning.applied_ledger import (
+    APPLIED_UNVERIFIED,
+    APPLIED_VERIFIED,
+    PHASE_DDL,
+    AppliedTuningLedger,
+)
+from benchbox.core.tuning.interface import TableTuning, TuningColumn, UnifiedTuningConfiguration
+from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
+from benchbox.platforms.clickhouse.client import ClickHouseLocalClient
+
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.fast,
+]
+
+chdb = pytest.importorskip("chdb", exc_type=ImportError)
+
+SOURCE_DDL = "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER, l_shipdate DATE)"
+TUNED_PARTITION_CLAUSE = " PARTITION BY (toYYYYMM(l_shipdate))"
+
+
+def _tuned_adapter() -> ClickHouseAdapter:
+    adapter = ClickHouseAdapter()
+    adapter.tuning_enabled = True
+    adapter._applied_tuning_ledger = AppliedTuningLedger()
+    adapter._applied_layout_operations = []
+    return adapter
+
+
+def _combined_tunings() -> dict:
+    config = UnifiedTuningConfiguration()
+    config.table_tunings["LINEITEM"] = TableTuning(
+        table_name="LINEITEM",
+        sorting=[
+            TuningColumn(name="l_orderkey", type="INTEGER", order=1),
+            TuningColumn(name="l_linenumber", type="INTEGER", order=2),
+        ],
+        partitioning=[TuningColumn(name="l_shipdate", type="DATE", order=1)],
+    )
+    return config.table_tunings
+
+
+@pytest.fixture
+def connection():
+    conn = ClickHouseLocalClient()
+    conn.execute("DROP TABLE IF EXISTS lineitem")
+    yield conn
+    conn.execute("DROP TABLE IF EXISTS lineitem")
+
+
+def _run(connection, *, apply_partition: bool) -> tuple[str, dict[str, str]]:
+    """Execute the tuned DDL for real, then corroborate the live catalog."""
+    adapter = _tuned_adapter()
+    tunings = _combined_tunings()
+    optimized = adapter._optimize_table_definition(SOURCE_DDL, tunings, nullable_columns=set())
+
+    executed = optimized if apply_partition else optimized.replace(TUNED_PARTITION_CLAUSE, "")
+    connection.execute(executed)
+    # The ledger always records the tuned INTENT; corroboration decides whether
+    # the engine actually honoured it.
+    adapter._record_tuned_sort_key_op(SOURCE_DDL, optimized, "lineitem", tunings)
+
+    status, receipt = adapter._corroborate_applied_ledger(connection, APPLIED_UNVERIFIED)
+    verdicts = {entry["kind"]: entry["verdict"] for entry in receipt["entries"] if entry.get("kind")}
+    return status, verdicts
+
+
+class TestAppliedLedgerAgainstLiveClickHouse:
+    def test_catalog_reports_the_partition_expression_with_its_closing_paren(self, connection):
+        # Pins the assumption the clause regex depends on. If ClickHouse ever
+        # reported a bare column here, the regex fix would be over-built; if the
+        # regex regressed to stopping at the inner paren, expected and observed
+        # would disagree and nothing else would tell us.
+        adapter = _tuned_adapter()
+        optimized = adapter._optimize_table_definition(SOURCE_DDL, _combined_tunings(), nullable_columns=set())
+        connection.execute(optimized)
+
+        rows = list(
+            connection.execute("SELECT name, sorting_key, partition_key FROM system.tables WHERE name = 'lineitem'")
+        )
+        assert rows, "live ClickHouse reported no lineitem row in system.tables"
+        _, sorting_key, partition_key = rows[0][0], rows[0][1], rows[0][2]
+        assert partition_key == "toYYYYMM(l_shipdate)"
+        assert sorting_key == "l_orderkey, l_linenumber"
+
+    def test_date_partitioned_table_earns_verification(self, connection):
+        # The fail-closed case: an expression partition key must corroborate.
+        status, verdicts = _run(connection, apply_partition=True)
+        assert status == APPLIED_VERIFIED
+        assert verdicts["sort_key"] == "corroborated"
+        assert verdicts["partition_key"] == "corroborated"
+
+    def test_unapplied_partition_key_blocks_verification(self, connection):
+        # The over-certification case: sort key corroborates, partition does
+        # not, and the run must NOT reach applied_verified on the sort key alone.
+        status, verdicts = _run(connection, apply_partition=False)
+        assert status == APPLIED_UNVERIFIED
+        assert verdicts["sort_key"] == "corroborated"
+        assert verdicts["partition_key"] in {"absent", "mismatch"}
+
+    def test_ledger_orders_create_table_before_optimize(self, connection):
+        adapter = _tuned_adapter()
+        tunings = _combined_tunings()
+        optimized = adapter._optimize_table_definition(SOURCE_DDL, tunings, nullable_columns=set())
+
+        connection.execute(optimized)
+        adapter._record_tuned_sort_key_op(SOURCE_DDL, optimized, "lineitem", tunings)
+        connection.execute("OPTIMIZE TABLE lineitem FINAL")
+        adapter._applied_tuning_ledger.record("OPTIMIZE TABLE lineitem FINAL", PHASE_DDL)
+        adapter._fold_layout_operations_into_ledger()
+
+        order = [s.statement.split()[0].upper() for s in adapter._applied_tuning_ledger.executed_statements]
+        assert order == ["CREATE", "OPTIMIZE"]
