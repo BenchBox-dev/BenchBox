@@ -90,6 +90,71 @@ def _redact_secrets(message: str, *secrets: str | None) -> str:
     return _S3_SECRET_CLAUSE_RE.sub(rf"\1{_REDACTED}", redacted)
 
 
+# Deployment modes are a naming of the two independent axes (catalog backend x
+# storage location) registered in platform_registry.py. The mapping is declared
+# here so the adapter can honour a mode instead of accepting and ignoring it;
+# `None` on an axis means the mode says nothing about it.
+_DEPLOYMENT_MODE_AXES: dict[str, tuple[str | None, bool | None]] = {
+    # mode: (catalog backend, data_path is cloud)
+    "local": ("duckdb", False),
+    "local_catalog_s3": ("duckdb", True),
+    "postgres_catalog": ("postgres", False),
+    "postgres_catalog_s3": ("postgres", True),
+}
+
+
+def _resolve_catalog_with_deployment_mode(deployment_mode: Any, catalog: Any) -> Any:
+    """Fill in the catalog axis from *deployment_mode* when it was not given.
+
+    An explicit ``catalog`` always wins - it is the more specific statement - but
+    a contradiction is logged rather than passing silently, because the caller
+    asked for two different things and only one of them can happen.
+    """
+    axes = _DEPLOYMENT_MODE_AXES.get(str(deployment_mode or "").strip().lower())
+    if axes is None:
+        return catalog
+    mode_catalog, _ = axes
+    if mode_catalog is None:
+        return catalog
+    if catalog is None:
+        return mode_catalog
+    if str(catalog).strip().lower() != mode_catalog:
+        logger.warning(
+            "DuckLake deployment mode %r implies catalog=%s, but catalog=%s was requested explicitly; "
+            "using the explicit catalog=%s.",
+            deployment_mode,
+            mode_catalog,
+            catalog,
+            catalog,
+        )
+    return catalog
+
+
+def _warn_if_deployment_mode_contradicts_storage(deployment_mode: Any, data_path: Any) -> None:
+    """Warn when *deployment_mode* names a storage axis the data_path does not match.
+
+    Unlike the catalog axis this cannot be defaulted: an ``s3://`` mode needs a
+    bucket, and inventing one would be worse than saying nothing. So the
+    mismatch is reported and the supplied ``data_path`` is used as-is.
+    """
+    axes = _DEPLOYMENT_MODE_AXES.get(str(deployment_mode or "").strip().lower())
+    if axes is None or data_path is None:
+        return
+    _, mode_is_cloud = axes
+    if mode_is_cloud is None:
+        return
+    actual_is_cloud = is_cloud_path(str(data_path))
+    if actual_is_cloud is not mode_is_cloud:
+        expected = "a cloud (s3://) data_path" if mode_is_cloud else "a local data_path"
+        logger.warning(
+            "DuckLake deployment mode %r implies %s, but data_path=%s was given; using it as-is. "
+            "Pass a matching --platform-option data_path to run the deployment you selected.",
+            deployment_mode,
+            expected,
+            data_path,
+        )
+
+
 def _libpq_quote_value(value: str) -> str:
     """Quote/escape one libpq ``keyword=value`` component for a connection string.
 
@@ -359,6 +424,18 @@ class DuckLakeAdapter(DuckDBAdapter):
         # --platform-option catalog=... form, matching the metadata_path/
         # data_path precedence above.
         catalog = config.get("ducklake_catalog") or _resolve_option("catalog")
+
+        # A deployment mode names a point on the two axes (catalog backend x
+        # storage location). It used to be accepted and then dropped on the
+        # floor: `--platform ducklake:postgres_catalog_s3` ran a local
+        # DuckDB-file catalog on local disk, so the caller got something other
+        # than what they selected. The mode now fills in an axis the caller
+        # left unspecified. Explicit options stay authoritative - a
+        # contradiction warns rather than being overridden, because whoever
+        # typed `--platform-option catalog=...` said the more specific thing.
+        catalog = _resolve_catalog_with_deployment_mode(config.get("deployment_mode"), catalog)
+        _warn_if_deployment_mode_contradicts_storage(config.get("deployment_mode"), data_path)
+
         if catalog is not None:
             adapter_config["catalog"] = catalog
 

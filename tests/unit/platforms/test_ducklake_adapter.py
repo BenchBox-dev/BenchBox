@@ -654,6 +654,94 @@ class TestRedactSecretsHelper:
         assert _redact_secrets(message, None) == message
 
 
+class TestDuckLakeDeploymentModeIsApplied:
+    """A selected deployment mode must actually select something.
+
+    Regression: adapter_factory resolved `--platform ducklake:<mode>` and passed
+    config["deployment_mode"], but the adapter never read it - so
+    `ducklake:postgres_catalog_s3` silently ran a local DuckDB-file catalog on
+    local disk. The caller got a different deployment than the one they named.
+    """
+
+    def _from_config(self, tmp_path, **extra):
+        config = {"benchmark": "tpch", "scale_factor": 0.01, "output_dir": str(tmp_path)}
+        config.update(extra)
+        return DuckLakeAdapter.from_config(config)
+
+    @pytest.mark.parametrize(
+        "mode,expected_catalog",
+        [
+            ("local", "duckdb"),
+            ("local_catalog_s3", "duckdb"),
+            ("postgres_catalog", "postgres"),
+            ("postgres_catalog_s3", "postgres"),
+        ],
+    )
+    def test_mode_supplies_the_catalog_axis(self, tmp_path, mode, expected_catalog):
+        assert self._from_config(tmp_path, deployment_mode=mode).catalog == expected_catalog
+
+    def test_no_deployment_mode_leaves_behaviour_unchanged(self, tmp_path):
+        # Must-preserve: runs that pass no mode keep working exactly as today.
+        assert self._from_config(tmp_path).catalog == "duckdb"
+
+    def test_explicit_catalog_option_beats_the_mode(self, tmp_path, caplog):
+        # Must-preserve: explicit --platform-option stays authoritative. The
+        # contradiction is warned, not silently resolved either way.
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
+            adapter = self._from_config(tmp_path, deployment_mode="postgres_catalog", options={"catalog": "sqlite"})
+
+        assert adapter.catalog == "sqlite"
+        assert "implies catalog=postgres" in caplog.text
+        assert "using the explicit catalog=sqlite" in caplog.text
+
+    def test_s3_mode_with_a_local_data_path_warns_and_uses_the_given_path(self, tmp_path, caplog):
+        # The storage axis cannot be defaulted - an s3:// mode needs a bucket
+        # and inventing one would be worse than saying nothing.
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
+            adapter = self._from_config(tmp_path, deployment_mode="postgres_catalog_s3")
+
+        assert adapter._data_path_is_cloud is False
+        assert "implies a cloud (s3://) data_path" in caplog.text
+
+    def test_local_mode_with_an_s3_data_path_warns(self, tmp_path, caplog):
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
+            adapter = self._from_config(
+                tmp_path, deployment_mode="postgres_catalog", options={"data_path": "s3://bucket/x"}
+            )
+
+        assert adapter._data_path_is_cloud is True
+        assert "implies a local data_path" in caplog.text
+
+    def test_matching_mode_and_options_produce_no_warning(self, tmp_path, caplog):
+        with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
+            adapter = self._from_config(
+                tmp_path,
+                deployment_mode="postgres_catalog_s3",
+                options={"catalog": "postgres", "data_path": "s3://bucket/x"},
+            )
+
+        assert adapter.catalog == "postgres"
+        assert adapter._data_path_is_cloud is True
+        assert "implies" not in caplog.text
+
+    def test_unknown_mode_is_ignored_rather_than_crashing(self, tmp_path):
+        # adapter_factory validates modes against the registry, so an unknown
+        # one should not reach here - but a stray value must not break a run.
+        assert self._from_config(tmp_path, deployment_mode="not-a-mode").catalog == "duckdb"
+
+    def test_every_registered_mode_is_mapped(self):
+        # Guard against the registry and the adapter drifting apart: a mode
+        # added to platform_registry.py without an axis mapping here would
+        # silently go back to selecting nothing.
+        from benchbox.core.platform_registry import PlatformRegistry
+        from benchbox.platforms.ducklake import _DEPLOYMENT_MODE_AXES
+
+        registered = set(PlatformRegistry.get_available_deployment_modes("ducklake"))
+        assert registered == set(_DEPLOYMENT_MODE_AXES), (
+            "ducklake deployment modes in the registry and _DEPLOYMENT_MODE_AXES have drifted"
+        )
+
+
 class TestDuckLakeFromConfigCatalogOptions:
     """Test from_config() resolves catalog/pg_*/s3_* from both config shapes (w1-w3).
 
