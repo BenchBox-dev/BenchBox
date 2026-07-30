@@ -9,6 +9,32 @@ Accepted (2026-07-30). Resolves work units w11-w14 of the
 `ducklake-post-merge-review-followups` tracker item. Each decision below is
 independently reversible and states what evidence would reverse it.
 
+**Updated 2026-07-30: DuckLake is now `beta`.** Every w11 criterion is met -
+criterion 3 was satisfied by TPC-H SF=1 runs on all four deployment modes, each
+passing data validation. `support_status` was flipped in
+`platform_registry.py` accordingly. Measured Power@Size, and the run-to-run
+reproducibility that decision w12 asked to revisit once scale runs existed:
+
+| deployment mode | Power@Size (mean) | CV | runs |
+|---|---|---|---|
+| `local` | 89,717 | 12.9% | 5 |
+| `local_catalog_s3` | 74,760 | 2.2% | 3 |
+| `postgres_catalog` | 77,919 | 8.7% | 3 |
+| `postgres_catalog_s3` | 64,955 | 5.1% | 5 |
+
+**Decision w12 is confirmed, not revised.** It said remote-backed results would
+warrant demotion only if they proved *materially irreproducible* rather than
+merely slower. They did not: the remote-backed modes were the more consistent
+ones, and `local` showed the widest spread of all.
+
+That local spread is a caveat about the measurement, not a finding about
+DuckLake. It is bimodal - ~98k on the first run, ~77k on later repeats - which
+is a systematic first-run-versus-later split rather than random variance, and
+almost certainly host contention from concurrent work on the measuring machine.
+**Re-measure on a quiet host before treating these CVs as authoritative.** They
+are strong enough to refute "remote-backed is irreproducible" and not strong
+enough to publish as reproducibility characteristics.
+
 ## Date
 
 2026-07-30

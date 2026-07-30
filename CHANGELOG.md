@@ -37,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `s3://`) are independent, so any combination works, including a self-hosted
   PostgreSQL catalog with S3 storage. Existing catalogs are reused across runs
   and `--force` rebuilds them; requires DuckDB >= 1.3, installable as
-  `benchbox[ducklake]`. Experimental.
+  `benchbox[ducklake]`. Beta.
 
 ### Added
 

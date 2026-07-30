@@ -46,7 +46,7 @@ Registry-backed count claims are checked by unit tests so README and platform do
 
 <!-- benchbox-registry-counts:start -->
 
-- Platform registry: **51** metadata entries; **46** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=27, experimental=18, deprecated=1.
+- Platform registry: **51** metadata entries; **46** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=28, experimental=17, deprecated=1.
 - Benchmark registry: **23** metadata entries; **22** public discovery entries.
 
 <!-- benchbox-registry-counts:end -->
