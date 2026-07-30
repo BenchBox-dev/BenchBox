@@ -41,6 +41,7 @@ from __future__ import annotations
 import json
 import os
 import uuid
+import warnings
 from functools import cache
 from pathlib import Path
 
@@ -79,6 +80,14 @@ pytestmark = [
 # deferring the probe there means an excluded/deselected run never pays for it.
 
 
+# Why a failed probe must be loud: @cache means the FIRST probe outcome decides
+# every later skip in the session, so one transient network error silently
+# disables this entire module - and a silent skip reads exactly like a pass in
+# CI output. The reason is recorded here and re-surfaced in every skip message
+# it causes, and warned once so it appears in pytest's warnings summary.
+_PROBE_FAILURES: dict[str, str] = {}
+
+
 @cache
 def _probe_extension(name: str) -> bool:
     """Return True if the named DuckDB extension can be INSTALL/LOAD'd here."""
@@ -90,7 +99,15 @@ def _probe_extension(name: str) -> bool:
             return True
         finally:
             conn.close()
-    except Exception:
+    except Exception as exc:
+        reason = f"{type(exc).__name__}: {exc}"
+        _PROBE_FAILURES[name] = reason
+        warnings.warn(
+            f"DuckDB extension probe failed for {name!r} ({reason}). This result is cached for the "
+            f"whole session, so every DuckLake test depending on {name!r} will now skip. If this was "
+            "a transient extension-repository/network failure, re-run rather than trusting the skips.",
+            stacklevel=2,
+        )
         return False
 
 
@@ -98,7 +115,8 @@ def _skip_unless_extensions(*names: str) -> None:
     """Skip the calling test unless every named DuckDB extension is available."""
     missing = [name for name in names if not _probe_extension(name)]
     if missing:
-        pytest.skip(f"DuckDB extension(s) not available: {', '.join(missing)}")
+        detail = ", ".join(f"{name} [{_PROBE_FAILURES.get(name, 'reason not recorded')}]" for name in missing)
+        pytest.skip(f"DuckDB extension(s) not available: {detail}")
 
 
 # =============================================================================
@@ -106,15 +124,22 @@ def _skip_unless_extensions(*names: str) -> None:
 # =============================================================================
 
 
-@pytest.mark.live_integration
 class TestDuckLakeLiveConnection:
     """End-to-end tests exercising a real INSTALL/LOAD/ATTACH of the ducklake extension.
 
-    Marked live_integration (deselected from the default/fast lane) because
-    they perform a real, potentially-networked INSTALL ducklake; they also skip
-    entirely when the extension cannot be installed/loaded (checked in
-    setup_method, not a collection-time skipif - see the probe docstring
-    above for why).
+    Deliberately NOT live_integration. In this repo that marker means "needs a
+    live external service" and every tree-wide lane deselects it, so carrying it
+    here left the core in-process adapter behaviour - cursor catalog scoping,
+    ATTACH, reuse - running in no CI lane at all. These tests need nothing but a
+    real DuckDB and the ducklake extension, exactly like
+    TestDuckLakeSqliteCatalogLive below, which never carried the marker. They
+    inherit the module's [integration, slow], which the non-fast lanes do run,
+    and still skip cleanly when the extension cannot be installed/loaded
+    (checked in setup_method, not a collection-time skipif - see the probe
+    docstring above for why).
+
+    The genuinely service-dependent classes (Postgres catalog, S3 data_path)
+    keep live_integration.
     """
 
     def setup_method(self) -> None:

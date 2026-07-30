@@ -524,6 +524,21 @@ jobs:
             tests/integration/test_tpcds_power_test.py \
             -m "slow" -n 0 -k "test_execute_one_query_drains_raw_cursor_before_commit" --tb=short -q
 
+      - name: Run DuckLake in-process adapter integration tests
+        run: |
+          # ducklake-post-merge-review-followups w3: this module is
+          # [integration, slow], so no PR-lane marker expression selects it -
+          # core adapter behaviour (cursor catalog scoping, ATTACH, catalog
+          # reuse, sqlite catalog end-to-end) was gated only by the release-time
+          # non-fast lane. The service-dependent Postgres/S3 classes keep
+          # live_integration and are excluded here; what remains needs nothing
+          # but a real DuckDB, and skips cleanly - loudly, via the probe's
+          # warning - when the ducklake extension cannot be installed.
+          # Bounded: one file, 7 tests at SF=0.01.
+          uv run -- python -m pytest \
+            tests/integration/test_ducklake_integration.py \
+            -m "slow and not live_integration" -n 0 --tb=short -q
+
       - name: Run promoted DuckDB FK tuning load-ordering reproducers
         run: |
           # tuning-fk-load-ordering-fix-20260716: TPCHBenchmark.get_table_loading_order

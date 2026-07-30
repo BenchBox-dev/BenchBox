@@ -21,6 +21,37 @@ _FAST_MEDIUM_DECORATOR_RE = re.compile(r"(?m)^\s*@pytest\.mark\.(fast|medium)\b"
 _SPEED_MARKERS = {"fast", "medium", "slow"}
 _SCOPE_MARKERS = {"unit", "integration", "performance"}
 _E2E_QUICK_INCOMPATIBLE = {"stress", "resource_heavy", "live_integration"}
+# Marker expressions of the lanes that run over the whole tree (or all of
+# tests/integration), i.e. the ones a module gets selected by without anyone
+# naming it. Path-scoped one-off steps are handled separately by
+# _explicitly_invoked_test_paths(). Sources: Makefile test-* targets and the
+# pytest invocations in .github/workflows/{test,nightly,pr,release-canary,
+# validate-release-pr}.yml.
+_TREE_WIDE_LANES = (
+    "fast and not (slow or stress or resource_heavy or live_integration)",
+    "integration and not live_integration and not stress",
+    "integration and not (slow or stress or resource_heavy or live_integration)",
+    "(slow or resource_heavy) and not (stress or live_integration)",
+    "slow and not (stress or live_integration)",
+    "medium and not (slow or stress or resource_heavy or live_integration)",
+    "platform_smoke or (integration and fast)",
+)
+_WORKFLOW_TEST_PATH_RE = re.compile(r"tests/[\w/]+/test_\w+\.py")
+# Declaring one of these at MODULE level says "this whole module is opt-in and
+# runs outside the automatic lanes" (credentialed cloud suites, stress runs).
+_OPT_IN_LANE_MARKERS = {"live_integration", "stress"}
+# Test classes that carry live_integration INSIDE a module that presents itself
+# as lane-run. Each genuinely needs an external service, so no lane can run it;
+# each is listed deliberately, because the same shape with a service-FREE class
+# is how DuckLake's core adapter coverage silently ran nowhere (w3/w4). Adding
+# an entry is the reviewed way to say "this really does need live infra".
+_SERVICE_DEPENDENT_CLASSES = {
+    "tests/integration/test_ducklake_integration.py::TestDuckLakePostgresCatalogLive": "needs a live PostgreSQL server",
+    "tests/integration/test_ducklake_integration.py::TestDuckLakeS3DataPathLive": "needs a real S3 bucket + AWS creds",
+    "tests/integration/test_todo_db_hosted_live.py::TestHostedLiveLifecycle": "needs the hosted Turso tracker DB",
+    "tests/integration/test_throughput_session_isolation.py"
+    "::TestPostgreSQLIndependentConnectionIsolatesSessions": "needs a live PostgreSQL server on :5432",
+}
 _PERSISTENT_DATABASE_FIXTURES = {
     "basic_test_db",
     "tpch_test_db",
@@ -229,6 +260,118 @@ def test_starrocks_resource_heavy_smoke_stays_in_integration_smoke_lane():
 
     assert path.exists()
     assert "platform_smoke" in _top_level_marker_names(path)
+
+
+def _selects(expression: str, markers: set[str]) -> bool:
+    """Evaluate a pytest ``-m`` expression against one test's marker set.
+
+    pytest marker expressions are Python boolean expressions over marker names,
+    so evaluating them with every present marker bound to True and every absent
+    one defaulting to False reproduces the selection exactly - without shelling
+    out to a collection run per lane per module (minutes, not milliseconds).
+    """
+
+    class _MarkerNamespace(dict):
+        def __missing__(self, key: str) -> bool:
+            return False
+
+    return bool(eval(expression, {"__builtins__": {}}, _MarkerNamespace.fromkeys(markers, True)))  # noqa: S307
+
+
+def _explicitly_invoked_test_paths() -> set[str]:
+    """Test paths named directly in a workflow's pytest invocation.
+
+    The escape hatch for a module no tree-wide lane selects is a dedicated step
+    that names the file (see pr.yml's promoted-reproducer steps). Those count as
+    covered, so scan for them rather than reporting a false positive.
+    """
+    paths: set[str] = set()
+    for workflow in sorted((_REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+        for match in _WORKFLOW_TEST_PATH_RE.finditer(workflow.read_text(encoding="utf-8")):
+            paths.add(match.group(0))
+    return paths
+
+
+def test_every_integration_module_is_selected_by_at_least_one_lane():
+    """A module no lane selects is dead coverage that still reads as green.
+
+    ducklake-post-merge-review-followups w4: test_ducklake_integration.py
+    declared ``[integration, slow]`` at module level - i.e. an ordinary non-fast
+    integration module - while carrying ``live_integration`` on most of its
+    classes. Every tree-wide lane deselects live_integration, so 8 of its 9
+    tests were selected by nothing at all: the file existed, passed locally, and
+    gated nothing in CI.
+
+    That mismatch is the signature this checks for. A module that declares an
+    opt-in marker at MODULE level (``live_integration`` for credentialed cloud
+    suites, ``stress``) is deliberately out of the automatic lanes and exempt;
+    the bug is a module that presents as lane-run while no lane runs it.
+    """
+    uncovered: list[str] = []
+    explicit_paths = _explicitly_invoked_test_paths()
+
+    for path in _iter_test_modules():
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        if not rel.startswith("tests/integration/"):
+            continue
+        # Declared opt-in at module level: intentional, runs via a dedicated
+        # credentialed/manual workflow rather than a tree-wide lane.
+        if _top_level_marker_names(path) & _OPT_IN_LANE_MARKERS:
+            continue
+        # Named directly by a workflow step - the sanctioned escape hatch.
+        if rel in explicit_paths:
+            continue
+        marker_sets = [markers for _name, markers in _iter_test_marker_sets(path)]
+        if not marker_sets:
+            continue
+        if not any(_selects(expression, markers) for expression in _TREE_WIDE_LANES for markers in marker_sets):
+            uncovered.append(rel)
+
+    assert uncovered == [], (
+        "integration modules that present as lane-run but are selected by no configured lane and "
+        f"named by no workflow step: {uncovered}. Either give the service-free tests a marker a real "
+        "lane runs, declare the opt-in marker at module level if the whole module needs live infra, "
+        "or add an explicit pytest step naming the file (see pr.yml's promoted-reproducer steps)."
+    )
+
+
+def test_opt_in_markers_below_module_level_are_declared_service_dependent():
+    """Catch the DuckLake shape: a lane-run module hiding uncovered classes.
+
+    A per-module coverage check cannot see this - one lane-selected test in the
+    module makes the whole file look covered no matter how many of its classes
+    run nowhere. test_ducklake_integration.py had exactly that: its sqlite class
+    was lane-selected while TestDuckLakeLiveConnection, which needs no external
+    service at all, sat behind live_integration and ran in no lane.
+
+    So every live_integration class inside a module that does NOT declare the
+    marker at module level must be justified in _SERVICE_DEPENDENT_CLASSES.
+    Drop the marker (and gain lane coverage) or record why the service is real.
+    """
+    undeclared: list[str] = []
+
+    for path in _iter_test_modules():
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        if not rel.startswith("tests/integration/"):
+            continue
+        if _top_level_marker_names(path) & _OPT_IN_LANE_MARKERS:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef) or not (node.name.startswith("Test") or node.name.endswith("Tests")):
+                continue
+            class_markers = _decorator_marker_names(node) | _pytestmark_assignment_names(node.body)
+            if not (class_markers & _OPT_IN_LANE_MARKERS):
+                continue
+            if f"{rel}::{node.name}" not in _SERVICE_DEPENDENT_CLASSES:
+                undeclared.append(f"{rel}::{node.name}")
+
+    assert undeclared == [], (
+        f"opt-in marker below module level, not declared service-dependent: {undeclared}. No lane "
+        "selects these, so they gate nothing. If the class needs no external service, drop the "
+        "marker so a real lane runs it; if it does, add it to _SERVICE_DEPENDENT_CLASSES with the "
+        "service it requires."
+    )
 
 
 def test_e2e_quick_does_not_select_opt_in_heavy_tests():
