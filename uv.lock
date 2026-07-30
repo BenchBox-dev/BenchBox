@@ -546,6 +546,9 @@ doris = [
 duckdb = [
     { name = "duckdb" },
 ]
+ducklake = [
+    { name = "duckdb" },
+]
 explorer = [
     { name = "duckdb" },
 ]
@@ -708,18 +711,18 @@ requires-dist = [
     { name = "clickhouse-driver", marker = "extra == 'all'", specifier = ">=0.2.0" },
     { name = "clickhouse-driver", marker = "extra == 'clickhouse'", specifier = ">=0.2.0" },
     { name = "clickhouse-driver", marker = "extra == 'clickhouse-server'", specifier = ">=0.2.0" },
-    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'all'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'bigquery'", specifier = ">=0.15.0" },
-    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'cloud'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'cloud-spark'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'cloud-spark-databricks'", specifier = ">=0.15.0" },
-    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'cloudstorage'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'databricks'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'firebolt'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'presto'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'redshift'", specifier = ">=0.15.0" },
-    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'snowflake'", specifier = ">=0.15.0" },
     { name = "cloudpathlib", marker = "extra == 'trino'", specifier = ">=0.15.0" },
+    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'all'", specifier = ">=0.15.0" },
+    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'cloud'", specifier = ">=0.15.0" },
+    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'cloudstorage'", specifier = ">=0.15.0" },
+    { name = "cloudpathlib", extras = ["azure", "gs", "s3"], marker = "extra == 'snowflake'", specifier = ">=0.15.0" },
     { name = "dask", extras = ["distributed"], marker = "extra == 'all'", specifier = ">=2024.1.0" },
     { name = "dask", extras = ["distributed"], marker = "extra == 'dask'", specifier = ">=2024.1.0" },
     { name = "dask", extras = ["distributed"], marker = "extra == 'dataframe-all'", specifier = ">=2024.1.0" },
@@ -749,6 +752,7 @@ requires-dist = [
     { name = "duckdb", marker = "extra == 'all'", specifier = ">=1.0.0,<2.0.0" },
     { name = "duckdb", marker = "extra == 'dev'", specifier = ">=1.0.0,<2.0.0" },
     { name = "duckdb", marker = "extra == 'duckdb'", specifier = ">=1.0.0,<2.0.0" },
+    { name = "duckdb", marker = "extra == 'ducklake'", specifier = ">=1.3.0,<2.0.0" },
     { name = "duckdb", marker = "extra == 'explorer'", specifier = ">=1.0.0,<2.0.0" },
     { name = "firebolt-sdk", marker = "extra == 'all'", specifier = ">=1.18.0" },
     { name = "firebolt-sdk", marker = "extra == 'cloud'", specifier = ">=1.18.0" },
@@ -866,7 +870,7 @@ requires-dist = [
     { name = "vortex-data", marker = "extra == 'table-formats'", specifier = ">=0.29.0" },
     { name = "zstandard", specifier = ">=0.20.0" },
 ]
-provides-extras = ["dev", "docs", "viz", "explorer", "all", "cloud", "cloudstorage", "duckdb", "clickhouse", "clickhouse-server", "clickhouse-cloud", "databricks", "bigquery", "redshift", "snowflake", "trino", "presto", "postgresql", "questdb", "synapse", "fabric", "athena", "datafusion", "firebolt", "databend", "doris", "influxdb", "starrocks", "singlestore", "tpcdi", "clickhouse-local", "table-formats", "ai-primitives", "pandas", "dataframe-pandas", "modin", "dataframe-modin", "dask", "dataframe-dask", "cudf", "dataframe-cudf", "polars", "dataframe-polars", "pyspark", "lakesail", "velox", "dataframe-pyspark", "dataframe-datafusion", "dataframe-pandas-family", "dataframe-expression-family", "dataframe-all", "quick-start", "cloud-spark-aws", "cloud-spark-gcp", "cloud-spark-azure", "cloud-spark-snowflake", "cloud-spark-databricks", "cloud-spark", "mcp", "spark"]
+provides-extras = ["dev", "docs", "viz", "explorer", "all", "cloud", "cloudstorage", "duckdb", "ducklake", "clickhouse", "clickhouse-server", "clickhouse-cloud", "databricks", "bigquery", "redshift", "snowflake", "trino", "presto", "postgresql", "questdb", "synapse", "fabric", "athena", "datafusion", "firebolt", "databend", "doris", "influxdb", "starrocks", "singlestore", "tpcdi", "clickhouse-local", "table-formats", "ai-primitives", "pandas", "dataframe-pandas", "modin", "dataframe-modin", "dask", "dataframe-dask", "cudf", "dataframe-cudf", "polars", "dataframe-polars", "pyspark", "lakesail", "velox", "dataframe-pyspark", "dataframe-datafusion", "dataframe-pandas-family", "dataframe-expression-family", "dataframe-all", "quick-start", "cloud-spark-aws", "cloud-spark-gcp", "cloud-spark-azure", "cloud-spark-snowflake", "cloud-spark-databricks", "cloud-spark", "mcp", "spark"]
 
 [package.metadata.requires-dev]
 dev = [

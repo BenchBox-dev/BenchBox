@@ -219,6 +219,24 @@ parent = PlatformRegistry.get_inherited_platform("ducklake")
 - You are on a DuckDB runtime older than 1.3
 - You want the most stable, non-experimental local platform
 
+### Interpreting DuckLake numbers: no compaction is performed
+
+BenchBox never invokes DuckLake's maintenance operations (compaction /
+`ducklake_merge_adjacent_files`, inlining). DuckLake writes a new Parquet file
+per insert transaction — five separate `INSERT`s produce five files — and
+nothing merges them afterwards.
+
+**The resulting bias runs against DuckLake:** queries scan more, smaller files
+than a compacted production deployment would, so BenchBox's DuckLake timings are
+a floor rather than a ceiling. How much this matters depends on the load path —
+bulk loading via few large inserts produces few large files and little bias,
+while row-wise loading produces many small ones.
+
+Treat a DuckLake-vs-other-engine gap accordingly, and do not read it as the
+best DuckLake can do. See
+[ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias](../development/adr/adr-ducklake-maturity-and-publishability.md)
+for why this is documented rather than instrumented.
+
 ## Troubleshooting
 
 ### DuckDB Version Too Old
