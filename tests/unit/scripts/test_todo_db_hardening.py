@@ -172,3 +172,180 @@ class TestSweepStalePredicate:
         row = conn.execute("SELECT claimed_by FROM items WHERE id = 'contested-item'").fetchone()
         assert row["claimed_by"] == "new-actor"
         interloper.close()
+
+
+def _age_lease(conn, item_id, hours):
+    """Backdate a lease by `hours` without going through any renewal path."""
+    stamp = todo_db.datetime.now(todo_db.timezone.utc) - todo_db.timedelta(hours=hours)
+    with todo_db._write_txn(conn):
+        conn.execute(
+            "UPDATE items SET claimed_at = ? WHERE id = ?",
+            (stamp.strftime("%Y-%m-%dT%H:%M:%SZ"), item_id),
+        )
+
+
+class TestClaimRenewal:
+    """`claimed_at` was written only at claim time, so liveness was pure
+    elapsed time: a session that legitimately ran past DEFAULT_LEASE_TTL_HOURS
+    was offered to, and claimable by, any other actor with no warning."""
+
+    def test_a_long_running_lease_is_taken_over_without_renewal(self, tmp_path):
+        """The defect these tests close, pinned so it cannot return silently."""
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        _make_parent(conn, item_id="long-work")
+        todo_db.claim_item(conn, "agent-a", "long-work")
+        _age_lease(conn, "long-work", 25)
+
+        assert "long-work" in {i["id"] for i in todo_db.ready_items(conn, "agent-b")}
+        todo_db.claim_item(conn, "agent-b", "long-work")
+        row = conn.execute("SELECT claimed_by FROM items WHERE id = 'long-work'").fetchone()
+        assert row["claimed_by"] == "agent-b"
+
+    def test_renew_keeps_the_lease_out_of_another_actors_reach(self, tmp_path):
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        _make_parent(conn, item_id="long-work")
+        todo_db.claim_item(conn, "agent-a", "long-work")
+        _age_lease(conn, "long-work", 23)
+
+        todo_db.renew_claim(conn, "agent-a", "long-work")
+
+        assert "long-work" not in {i["id"] for i in todo_db.ready_items(conn, "agent-b")}
+        with pytest.raises(todo_db.TodoError, match="claimed by"):
+            todo_db.claim_item(conn, "agent-b", "long-work")
+        row = conn.execute("SELECT claimed_by FROM items WHERE id = 'long-work'").fetchone()
+        assert row["claimed_by"] == "agent-a"
+
+    @pytest.mark.parametrize("verb", ["start", "done", "verify"])
+    def test_progress_verbs_renew_the_lease_implicitly(self, tmp_path, verb):
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="long-work",
+            title="Hardening parent item",
+            worktree="spike",
+            priority="low",
+            description="Parent for lease-renewal tests.",
+            work=[{"id": "w1", "summary": "a unit of work"}],
+            verifications=[{"description": "trivially true", "command": "true"}],
+        )
+        todo_db.claim_item(conn, "agent-a", "long-work")
+        _age_lease(conn, "long-work", 23)
+        before = conn.execute("SELECT claimed_at FROM items WHERE id = 'long-work'").fetchone()["claimed_at"]
+
+        if verb == "start":
+            todo_db.start_unit(conn, "agent-a", "long-work", "w1")
+        elif verb == "done":
+            todo_db.done_unit(conn, "agent-a", "long-work", "w1", "evidence")
+        else:
+            todo_db.run_verification(conn, "agent-a", "long-work", 1)
+
+        after = conn.execute("SELECT claimed_at FROM items WHERE id = 'long-work'").fetchone()["claimed_at"]
+        assert after > before, f"`{verb}` must renew the holder's lease"
+        assert not todo_db._lease_expired(after, todo_db.DEFAULT_LEASE_TTL_HOURS)
+
+    def test_renew_refuses_a_lease_held_by_someone_else(self, tmp_path):
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        _make_parent(conn, item_id="long-work")
+        todo_db.claim_item(conn, "agent-a", "long-work")
+        with pytest.raises(todo_db.TodoError, match="only the holder can renew"):
+            todo_db.renew_claim(conn, "agent-b", "long-work")
+
+    def test_renew_refuses_an_unclaimed_item(self, tmp_path):
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        _make_parent(conn, item_id="long-work")
+        with pytest.raises(todo_db.TodoError, match="not claimed"):
+            todo_db.renew_claim(conn, "agent-a", "long-work")
+
+    def test_an_expired_lease_cannot_be_resurrected_and_stays_claimable(self, tmp_path):
+        """Must-preserve: renewal must never strand an item whose holder is gone."""
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        _make_parent(conn, item_id="long-work")
+        todo_db.claim_item(conn, "agent-a", "long-work")
+        _age_lease(conn, "long-work", 25)
+
+        with pytest.raises(todo_db.TodoError, match="expired"):
+            todo_db.renew_claim(conn, "agent-a", "long-work")
+
+        todo_db.claim_item(conn, "agent-b", "long-work")
+        row = conn.execute("SELECT claimed_by FROM items WHERE id = 'long-work'").fetchone()
+        assert row["claimed_by"] == "agent-b"
+
+    def test_progress_verbs_never_create_a_claim_on_a_released_item(self, tmp_path):
+        """`_touch_lease` renews; it must not become a back-door `claim`."""
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="long-work",
+            title="Hardening parent item",
+            worktree="spike",
+            priority="low",
+            description="Parent for lease-renewal tests.",
+            work=[{"id": "w1", "summary": "a unit of work"}],
+        )
+        todo_db.claim_item(conn, "agent-a", "long-work")
+        todo_db.release_item(conn, "agent-a", "long-work")
+
+        todo_db.done_unit(conn, "agent-a", "long-work", "w1", "evidence")
+
+        row = conn.execute("SELECT claimed_by, claimed_at FROM items WHERE id = 'long-work'").fetchone()
+        assert row["claimed_by"] is None
+        assert row["claimed_at"] is None
+
+    def test_renew_is_conditional_on_the_observed_lease(self, tmp_path, monkeypatch):
+        """Same CAS defense as claim_item and sweep_stale: if the lease changed
+        hands between the renewal's read and its write, it must not fire."""
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        _make_parent(conn, item_id="contested")
+        todo_db.claim_item(conn, "agent-a", "contested")
+        _age_lease(conn, "contested", 23)
+
+        original_now = todo_db.utc_now
+        state: dict[str, bool] = {}
+
+        def hooked():
+            # Between _touch_lease's read and its UPDATE, the lease is taken
+            # over on the primary (emulated on the same connection, as the
+            # sweep test does).
+            if "stolen" not in state:
+                state["stolen"] = True
+                conn.execute(
+                    "UPDATE items SET claimed_by = 'agent-b', claimed_at = ? WHERE id = 'contested'",
+                    (original_now(),),
+                )
+            return original_now()
+
+        before = conn.execute("SELECT claimed_at FROM items WHERE id = 'contested'").fetchone()["claimed_at"]
+        monkeypatch.setattr(todo_db, "utc_now", hooked)
+        with pytest.raises(todo_db.TodoError, match="changed hands concurrently"):
+            todo_db.renew_claim(conn, "agent-a", "contested")
+
+        # The emulation writes on the connection renew_claim already holds, so
+        # _write_txn's rollback correctly discards the interloper's UPDATE too.
+        # What matters is the CAS outcome: the renewal refused rather than
+        # blindly re-stamping, and left no partial write behind.
+        assert state["stolen"], "the interloping write never fired"
+        row = conn.execute("SELECT claimed_by, claimed_at FROM items WHERE id = 'contested'").fetchone()
+        assert row["claimed_by"] == "agent-a"
+        assert row["claimed_at"] == before, "a lease that changed hands must not be re-stamped"
+
+    def test_taking_over_an_expired_lease_is_announced(self, tmp_path, capsys):
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        _make_parent(conn, item_id="long-work")
+        todo_db.claim_item(conn, "agent-a", "long-work")
+        _age_lease(conn, "long-work", 25)
+
+        order = todo_db.claim_item(conn, "agent-b", "long-work")
+        assert order["displaced_holder"]["holder"] == "agent-a"
+
+        todo_db._print_work_order(order)
+        assert "took over an expired lease held by agent-a" in capsys.readouterr().err
+
+    def test_a_normal_claim_announces_nothing(self, tmp_path, capsys):
+        conn = todo_db.connect(tmp_path / "t.sqlite")
+        _make_parent(conn, item_id="long-work")
+        order = todo_db.claim_item(conn, "agent-a", "long-work")
+        assert "displaced_holder" not in order
+        todo_db._print_work_order(order)
+        assert "took over" not in capsys.readouterr().err
