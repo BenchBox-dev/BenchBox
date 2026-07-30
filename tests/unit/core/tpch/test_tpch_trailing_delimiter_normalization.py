@@ -106,3 +106,79 @@ def test_finalize_generation_normalizes_fallback_file_mode_output(tmp_path: Path
     gen._finalize_generation(tmp_path)
 
     assert dirty_path.read_text(encoding="utf-8") == "1|Customer#1|BUILDING|comment.\n"
+
+
+class TestCRLFFraming:
+    r"""Row framing and line terminator are independent variables.
+
+    The helpers above use ``write_text``, so they emit the platform's native
+    terminator: LF on macOS/Linux, CRLF on Windows. That is why all five of
+    these regressions passed locally and failed only on the windows-latest
+    nightly leg -- the probe read the last two bytes looking for ``b"|\n"``,
+    which a CRLF file never matches (its tail is ``b"|\r\n"``), so the file was
+    classified already-clean and never rewritten; and the rewrite replaced only
+    ``b"|\n"``, so even a detected file would have kept its delimiters.
+
+    These fixtures are written as explicit bytes so both framings are exercised
+    on every platform rather than only on the Windows runner.
+    """
+
+    def test_detects_and_strips_a_trailing_delimiter_under_crlf(self, tmp_path: Path) -> None:
+        path = tmp_path / "customer.tbl"
+        path.write_bytes(b"1|Customer#1|BUILDING|comment.|\r\n2|Customer#2|AUTOMOBILE|comment2.|\r\n")
+
+        assert normalize_tbl_trailing_delimiters(path) is True
+        # The delimiter goes; the CRLF terminator is preserved exactly.
+        assert path.read_bytes() == b"1|Customer#1|BUILDING|comment.\r\n2|Customer#2|AUTOMOBILE|comment2.\r\n"
+
+    def test_interior_empty_fields_are_preserved_under_crlf(self, tmp_path: Path) -> None:
+        path = tmp_path / "customer.tbl"
+        path.write_bytes(b"1||BUILDING||comment.|\r\n")
+
+        assert normalize_tbl_trailing_delimiters(path) is True
+        assert path.read_bytes() == b"1||BUILDING||comment.\r\n"
+
+    def test_already_clean_crlf_file_is_byte_stable(self, tmp_path: Path) -> None:
+        # The must-preserve: a normalized CRLF file must not be rewritten, and
+        # in particular its terminators must not be rewritten to LF.
+        original = b"1|Customer#1|BUILDING|comment.\r\n2|Customer#2|AUTOMOBILE|comment2.\r\n"
+        path = tmp_path / "customer.tbl"
+        path.write_bytes(original)
+
+        assert normalize_tbl_trailing_delimiters(path) is False
+        assert path.read_bytes() == original
+
+    def test_idempotent_on_repeated_calls_under_crlf(self, tmp_path: Path) -> None:
+        path = tmp_path / "region.tbl"
+        path.write_bytes(b"0|AFRICA|comment.|\r\n")
+
+        assert normalize_tbl_trailing_delimiters(path) is True
+        after_first = path.read_bytes()
+        assert normalize_tbl_trailing_delimiters(path) is False
+        assert path.read_bytes() == after_first
+
+    def test_chunk_boundary_inside_the_crlf_terminator(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        r"""A chunk may end mid-``|\r\n``, which needs a two-byte carry.
+
+        With a one-byte carry the boundary splits ``|`` from ``\r\n`` and the
+        delimiter survives into the output.
+        """
+        import benchbox.core.tpch.generator as generator_module
+
+        payload = b"1|AB|\r\n2|CD|\r\n"
+        for chunk_size in range(1, len(payload) + 1):
+            monkeypatch.setattr(generator_module, "_NORMALIZE_CHUNK_SIZE", chunk_size)
+            path = tmp_path / f"supplier.tbl.{chunk_size}"
+            path.write_bytes(payload)
+
+            normalize_tbl_trailing_delimiters(path)
+
+            assert path.read_bytes() == b"1|AB\r\n2|CD\r\n", f"corrupted at chunk size {chunk_size}"
+
+    def test_unterminated_final_row_under_crlf(self, tmp_path: Path) -> None:
+        # "|\r" at EOF: drop the delimiter, keep the terminator byte.
+        path = tmp_path / "region.tbl"
+        path.write_bytes(b"0|AFRICA|comment.|\r")
+
+        assert normalize_tbl_trailing_delimiters(path) is True
+        assert path.read_bytes() == b"0|AFRICA|comment.\r"
