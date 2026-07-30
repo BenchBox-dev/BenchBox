@@ -1,0 +1,203 @@
+{
+  "benchmark": {
+    "id": "ssb",
+    "name": "SSB",
+    "scale_factor": 0.1,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": 9,
+      "type": "zstd"
+    },
+    "mode": "dataframe",
+    "phases": [
+      "generate",
+      "load",
+      "power"
+    ]
+  },
+  "cost": {
+    "model": "estimated",
+    "total_usd": 0
+  },
+  "environment": {
+    "client_host": {
+      "machine_id": "machine_aa0d61d0522b17b9"
+    },
+    "machine_id": "machine_aa0d61d0522b17b9",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "engine_host": "host_c99c12bbf816",
+      "runtime_type": "dataframe_process",
+      "source": "inferred"
+    }
+  },
+  "execution": {
+    "compression": {
+      "level": 9,
+      "type": "zstd"
+    },
+    "driver_package": "polars",
+    "driver_runtime_python_executable": "/home/runner/work/BenchBox/BenchBox/.venv/bin/python",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "1.40.0",
+    "driver_version_resolved": "1.40.0",
+    "entry_point": "cli",
+    "mode": "dataframe",
+    "phases": [
+      "generate",
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-07-30T19:22:07.158178"
+  },
+  "export": {
+    "anonymized": true,
+    "timestamp": "2026-07-30T19:22:18.720438",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "not_applicable",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2025.11",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0",
+    "pricing_region": "not_applicable"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "duration_ms": 472,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    }
+  },
+  "platform": {
+    "client_version": "unknown",
+    "cloud": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "compute": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "config": {
+      "driver_package": "polars",
+      "driver_runtime_python_executable": "/home/runner/work/BenchBox/BenchBox/.venv/bin/python",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "1.40.0",
+      "driver_version_resolved": "1.40.0",
+      "execution_mode": "dataframe",
+      "family": "expression",
+      "rechunk": true,
+      "streaming": false,
+      "working_dir": "/home/runner/work/BenchBox/BenchBox/benchmark_runs/datagen/ssb_sf01"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred"
+    },
+    "driver_actual_version": "1.40.0",
+    "driver_package": "polars",
+    "driver_resolved_version": "1.40.0",
+    "driver_runtime_strategy": "current-process",
+    "name": "Polars",
+    "raw_config": {
+      "memory_limit": "12GB",
+      "options": {
+        "force_recreate": false,
+        "force_upload": false,
+        "normalize_plan_literals": false,
+        "rechunk": true,
+        "show_query_plans": false,
+        "streaming": false
+      },
+      "rechunk": true,
+      "streaming": false,
+      "thread_limit": 4,
+      "tuning_source": "baseline",
+      "working_dir": "/home/runner/work/BenchBox/BenchBox/benchmark_runs/datagen/ssb_sf01"
+    },
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "version": "1.40.0"
+  },
+  "queries": [],
+  "run": {
+    "id": "39e54df7",
+    "iterations": 1,
+    "query_time_ms": 0,
+    "streams": 1,
+    "timestamp": "2026-07-30T19:22:18.168009",
+    "total_duration_ms": 473
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 472.3,
+      "rows_loaded": 625757
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 0,
+      "total": 0
+    },
+    "timing": {
+      "avg_ms": 0,
+      "max_ms": 0,
+      "min_ms": 0,
+      "total_ms": 0
+    },
+    "validation": "not_run"
+  },
+  "tables": {
+    "customer": {
+      "load_ms": 1,
+      "rows": 3000
+    },
+    "date": {
+      "load_ms": 7,
+      "rows": 2557
+    },
+    "lineorder": {
+      "rows": 600000
+    },
+    "part": {
+      "rows": 20000
+    },
+    "supplier": {
+      "rows": 200
+    }
+  },
+  "version": "2.1"
+}
