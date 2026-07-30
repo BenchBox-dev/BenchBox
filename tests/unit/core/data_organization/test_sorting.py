@@ -162,15 +162,22 @@ def _write_tbl_clean(path: Path, rows: list[tuple[object, ...]]) -> None:
             f.write("|".join(str(v) for v in row) + "\n")
 
 
-def _write_tbl_crlf(path: Path, rows: list[tuple[object, ...]]) -> None:
-    """Write trailing-delimiter TBL rows with explicit CRLF line endings.
+def _write_tbl_crlf(path: Path, rows: list[tuple[object, ...]], *, trailing_delimiter: bool = True) -> None:
+    """Write TBL rows with explicit CRLF line endings, either framing.
 
     The other helpers open in text mode, so they emit the platform's native
     line ending - LF on macOS/Linux, CRLF on Windows. These bytes are written
     explicitly so the CRLF framing is exercised on every platform rather than
     only on the Windows nightly leg.
+
+    ``trailing_delimiter`` selects the framing. Terminator and framing are
+    independent, and the clean/CRLF combination is the one that would otherwise
+    go unexercised: the LF clean case is covered by
+    ``test_reads_normalized_tbl_with_no_trailing_delimiter``, so without this
+    flag a reader that mishandled *only* clean CRLF input would pass everything.
     """
-    payload = b"".join(("|".join(str(v) for v in row) + "|\r\n").encode("utf-8") for row in rows)
+    suffix = "|\r\n" if trailing_delimiter else "\r\n"
+    payload = b"".join(("|".join(str(v) for v in row) + suffix).encode("utf-8") for row in rows)
     path.write_bytes(payload)
 
 
@@ -275,6 +282,39 @@ class TestSortedParquetWriterSingleColumn:
 
         with pytest.raises(ValueError, match="Sort column 'missing_col' not found"):
             writer.write_sorted_parquet("orders", [source], tmp_path)
+
+    def test_reads_clean_tbl_with_crlf_line_endings(self, tmp_path: Path):
+        r"""The fourth cell: CRLF *without* a trailing delimiter.
+
+        Framing and terminator are independent, so there are four combinations.
+        Three were already covered - LF/clean by
+        test_reads_normalized_tbl_with_no_trailing_delimiter, LF/trailing by the
+        ordinary fixtures, CRLF/trailing above. Without this case a reader that
+        mishandled only clean CRLF input would pass the whole suite: it would
+        add the synthetic column to a file that has N fields, and PyArrow would
+        fail with a column-count mismatch on the *correct* input.
+        """
+        source = tmp_path / "lineitem.tbl"
+        _write_tbl_crlf(
+            source,
+            [
+                (3, "1998-03-01"),
+                (1, "1992-01-02"),
+                (2, "1996-05-17"),
+            ],
+            trailing_delimiter=False,
+        )
+        schema_registry = {"lineitem": {"columns": [{"name": "id"}, {"name": "l_shipdate"}]}}
+        config = DataOrganizationConfig(sort_columns=[SortColumn(name="l_shipdate")], compression="none")
+        writer = SortedParquetWriter(config=config, schema_registry=schema_registry)
+
+        output = writer.write_sorted_parquet("lineitem", [source], tmp_path)
+
+        table = pq.read_table(output)
+        # No synthetic trailing column may survive into the output schema.
+        assert table.column_names == ["id", "l_shipdate"]
+        assert table.column("l_shipdate").to_pylist() == [date(1992, 1, 2), date(1996, 5, 17), date(1998, 3, 1)]
+        assert table.column("id").to_pylist() == [1, 2, 3]
 
 
 class TestSortedParquetWriterMultiColumn:

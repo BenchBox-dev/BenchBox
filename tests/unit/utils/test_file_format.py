@@ -24,6 +24,7 @@ from benchbox.utils.file_format import (
     get_base_name_without_compression,
     get_data_extension,
     get_delimiter_for_file,
+    has_trailing_delimiter,
     is_compression_extension,
     is_csv_format,
     is_data_format_extension,
@@ -575,3 +576,61 @@ class TestGetDataExtension:
         """Critical: .dat must be returned as '.dat', not '.tbl' (unlike detect_data_format)."""
         assert get_data_extension(Path("store_sales.dat")) == ".dat"
         assert get_data_extension(Path("store_sales.dat")) != ".tbl"
+
+
+class TestHasTrailingDelimiterFraming:
+    r"""Row framing and line terminator are INDEPENDENT; all four cells pinned.
+
+    A TBL file written on Windows ends ``|\r\n``, not ``|\n``. PR #1332 fixed
+    Windows misdetection by routing the sorted-parquet reader through this
+    helper, and it is correct for a reason that is easy to lose: the read path
+    opens ``"rt"``, so universal newlines translate ``\r\n`` to ``\n`` before
+    either checker runs -- both only ``rstrip("\n")``.
+
+    Nothing else pins that. Switching either read to binary for throughput on
+    multi-GB TBL files would make ``line.rstrip("\n")`` raise on bytes, and the
+    blanket ``except Exception: return False`` would convert that into a
+    confident "no trailing delimiter" -- silently reviving the original Windows
+    bug across all ten platform callers. These cases are what fails if that
+    happens, so they are the invariant's enforcement, not just coverage.
+
+    Fixtures are written as explicit bytes so CRLF is exercised on every
+    platform rather than only on a Windows runner.
+    """
+
+    FRAMING_CASES = [
+        pytest.param(b"1|x|\r\n", True, id="crlf-trailing-delimiter"),
+        pytest.param(b"1|x\r\n", False, id="crlf-clean"),
+        pytest.param(b"1|x|\n", True, id="lf-trailing-delimiter"),
+        pytest.param(b"1|x\n", False, id="lf-clean"),
+    ]
+
+    @pytest.mark.parametrize("raw,expected", FRAMING_CASES)
+    def test_field_count_checker_handles_both_terminators(self, tmp_path, raw, expected):
+        # The column_names path: the checker every one of the ten platform
+        # callers actually uses.
+        path = tmp_path / "region.tbl"
+        path.write_bytes(raw)
+        assert has_trailing_delimiter(path, "|", ["a", "b"]) is expected
+
+    @pytest.mark.parametrize("raw,expected", FRAMING_CASES)
+    def test_ends_with_checker_handles_both_terminators(self, tmp_path, raw, expected):
+        # The column_names=None fallback is a different checker (ends-with, not
+        # field-count) and is reachable, though no current caller takes it. It
+        # must agree with the field-count path on every framing.
+        path = tmp_path / "region.tbl"
+        path.write_bytes(raw)
+        assert has_trailing_delimiter(path, "|") is expected
+
+    def test_classification_is_taken_from_the_first_row_of_a_multi_row_file(self, tmp_path):
+        # Framing is uniform per file (dbgen/dsdgen decide once per run), so the
+        # helper reads only the first non-empty line. Pin that a realistic
+        # multi-row CRLF file still classifies correctly.
+        path = tmp_path / "region.tbl"
+        path.write_bytes(b"0|AFRICA|comment|\r\n1|AMERICA|comment|\r\n2|ASIA|comment|\r\n")
+        assert has_trailing_delimiter(path, "|", ["r_regionkey", "r_name", "r_comment"]) is True
+
+    def test_leading_blank_lines_do_not_decide_the_framing(self, tmp_path):
+        path = tmp_path / "region.tbl"
+        path.write_bytes(b"\r\n\r\n0|AFRICA|comment|\r\n")
+        assert has_trailing_delimiter(path, "|", ["r_regionkey", "r_name", "r_comment"]) is True
