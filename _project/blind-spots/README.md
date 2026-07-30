@@ -1,8 +1,29 @@
 # Blind-Spot Findings
 
+> **FROZEN — 2026-07-30. This directory is read-only.**
+>
+> All 65 records now live in the shared tracker's findings tables
+> (`SCHEMA_VERSION` 4), imported with verified field-level parity: every
+> frontmatter key, every body section byte-for-byte, and each `## Triage log`
+> line as one `imported_triage_log` event. **Do not add, edit, or delete files
+> here.**
+>
+> - **Capture a new finding**: `todo finding create` — writes a draft to
+>   `~/.benchbox/finding-drafts/`, outside every worktree, with no credentials.
+> - **Land a draft**: `todo finding sync` (a separate authorized step).
+> - **Read or triage**: `todo finding list | show | candidates | triage |
+>   promote`.
+>
+> The freeze runs for one planning cycle, then `findings-phase6-demolition`
+> deletes these records and retires the `make blind-spots-*` machinery. The
+> freeze *is* the rollback window: until it ends, these files remain the
+> fallback if a parity problem surfaces. Git history is untouched either way.
+
 Storage for **blind-spot audit (L2)** findings: framework gaps, post-fix
 pattern notes, and dormant assumptions. One file per finding, sweepable
-later without PR merge collisions.
+later without PR merge collisions. Superseded by the findings domain — see
+`_project/specs/findings-domain.md`; the schema below is retained because it
+remains the **capture format** for drafts.
 
 ## Behavior is governed elsewhere
 
