@@ -563,15 +563,30 @@ class DuckLakeAdapter(DuckDBAdapter):
           data loading are skipped and queries run against the existing catalog.
           Pass ``--force`` to wipe the catalog + data dir for a clean rebuild.
 
-        Postgres catalog: this hook runs BEFORE any connection exists and keys
-        off the local ``metadata_path`` file, which a server-side catalog never
-        has - so it can only ever take the "does not exist yet" branch here.
-        Reuse/force for ``catalog == "postgres"`` is therefore resolved after
-        the ATTACH instead, in ``_resolve_postgres_catalog_reuse()``, which
-        inspects the attached catalog itself; the framework reads
-        ``database_was_reused`` after ``create_connection()`` returns, so
-        deciding it there is equivalent for the runner.
+        Postgres catalog: this hook runs BEFORE any connection exists, and the
+        only thing it can inspect is the local ``metadata_path`` - which
+        describes no part of a server-side catalog. ``metadata_path`` is still
+        always *computed* to a default, so a leftover ``.ducklake`` file from an
+        earlier duckdb-catalog run at the same benchmark/scale would otherwise
+        read as "the database exists, reuse it": the runner then skips schema
+        creation and data loading and fails validation against a PostgreSQL
+        catalog that is in fact empty. Observed at TPC-H SF=1 - "Empty tables
+        detected: region, nation, supplier, ...".
+
+        So this hook declines to decide for the postgres backend, and
+        reuse/force is resolved after the ATTACH in
+        ``_resolve_postgres_catalog_reuse()``, which inspects the attached
+        catalog itself. The framework reads ``database_was_reused`` after
+        ``create_connection()`` returns, so deciding it there is equivalent for
+        the runner.
         """
+        if self.catalog == "postgres":
+            self.log_very_verbose(
+                "DuckLake postgres catalog: deferring the reuse/force decision to the post-ATTACH "
+                "check (a local metadata_path describes no part of a server-side catalog)"
+            )
+            return
+
         if self.dry_run:
             # Never mutate on-disk artifacts during a dry run.
             self.log_verbose("DuckLake catalog validation skipped (dry run mode)")
