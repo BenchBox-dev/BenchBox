@@ -114,9 +114,10 @@ jobs:
         run: |
           # Find new/modified bundle JSONs in this PR (exclude companions and metadata files).
           # Use the base SHA directly rather than a ref name for reliability.
-          CHANGED=$(git diff --name-only --diff-filter=ACMR ${{ github.event.pull_request.base.sha }}...HEAD -- 'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
+          CHANGED=$(git diff --no-renames --name-only --diff-filter=ACMR ${{ github.event.pull_request.base.sha }}...HEAD -- 'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
             | grep -v '\.plans\.json$' \
             | grep -v '\.tuning\.json$' \
+            | grep -v '\.applied\.json$' \
             | grep -v 'corpus-inventory\.json$' \
             | grep -v '\.manifest\.json$' \
             | grep -v 'submission-manifest\.json$' \
@@ -131,7 +132,7 @@ jobs:
           # Include deletions (D): removing a manifest while leaving its paired
           # bundle is a contract change that must still trip validation and the
           # corpus inventory drift check, so a manifest removal cannot bypass it.
-          CHANGED_MANIFESTS=$(git diff --name-only --diff-filter=ACMRD \
+          CHANGED_MANIFESTS=$(git diff --no-renames --name-only --diff-filter=ACMRD \
             ${{ github.event.pull_request.base.sha }}...HEAD -- \
             'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
             | grep '\.manifest\.json$' \
@@ -148,6 +149,28 @@ jobs:
                 CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
               fi
             done <<< "$CHANGED_MANIFESTS"
+          fi
+
+          # Detect changed applied-ledger companions separately. An applied-only
+          # PR would otherwise leave CHANGED empty even though the companion is
+          # covered by the primary bundle's manifest companion_hashes contract.
+          # Derive the paired primary bundle so validate_submission.py checks the
+          # edited companion hash against the manifest. Include deletions: a
+          # removed companion is still a contract change while its bundle exists.
+          CHANGED_APPLIED=$(git diff --no-renames --name-only --diff-filter=ACMRD \
+            ${{ github.event.pull_request.base.sha }}...HEAD -- \
+            'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
+            | grep '\.applied\.json$' \
+            || true)
+          if [ -n "$CHANGED_APPLIED" ]; then
+            while IFS= read -r applied; do
+              bundle="${applied%.applied.json}.json"
+              # Only add if the paired bundle exists and is not already in CHANGED.
+              if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
+                  && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
+                CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
+              fi
+            done <<< "$CHANGED_APPLIED"
           fi
 
           if [ -z "$CHANGED" ]; then
@@ -205,8 +228,13 @@ jobs:
       # context. Fork PRs run this workflow with a read-only GITHUB_TOKEN, so the
       # inline "Post PR comment" step below 403s for them — the companion is the
       # path that actually delivers the comment for external contributors.
-      # workflow_run's github.event.workflow_run.pull_requests is empty for fork
-      # PRs, so we persist the PR number in the artifact for the companion to read.
+      #
+      # This artifact carries ONLY the comment body. It intentionally does NOT
+      # carry a PR number: this workflow runs PR-supplied code before this step
+      # (the validator/workflow-edit guard above is not exhaustive), so anything
+      # written here is attacker-influenced, and the companion posts with a
+      # writable token. The companion instead derives the target PR from
+      # GitHub's own record of which PR the run's head commit belongs to.
       - name: Stage validation comment artifact
         if: steps.changed.outputs.has_bundles == 'true' && always()
         run: |
@@ -214,7 +242,6 @@ jobs:
           if [ -f /tmp/pr_comment.md ]; then
             cp /tmp/pr_comment.md /tmp/pr-comment-artifact/pr_comment.md
           fi
-          echo "${{ github.event.pull_request.number }}" > /tmp/pr-comment-artifact/pr_number.txt
 
       - name: Upload validation comment artifact
         if: steps.changed.outputs.has_bundles == 'true' && always()
