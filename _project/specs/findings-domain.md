@@ -204,7 +204,7 @@ row in the table above fails the gate.
 ## CLI (phase 3)
 
 `todo finding create | list | show | candidates | dismiss | triage | link |
-promote | sync`.
+promote | sync | import`.
 
 - **`create`** prints the review-protocol §2 defect-gate question and requires
   a `--gate class-not-instance` attestation; refuses `finding_kind bug-class`
@@ -218,6 +218,30 @@ promote | sync`.
 - `candidates` lists unsynced drafts; `list`/`show` read the DB; `dismiss`,
   `triage`, `link`, `promote` move a finding through its disposition and record
   a `finding_events` row.
+- **`todo finding import`** is the phase-5 corpus importer (`--corpus DIR`,
+  `--dry-run`, `--report`). Unlike `sync` it **never touches the files** — `sync` renames each
+  landed draft to `*.synced`, which would edit the frozen tree and destroy the
+  rollback path. It is idempotent by record id, records `imported_from`
+  provenance, and imports each `## Triage log` line as one
+  `imported_triage_log` event. `--report` prints the falsifiable parity report
+  and the command exits non-zero on any diff.
+- **`import --bulk`** moves findings over the Hrana pipeline instead of
+  row-by-row (~0.15 s/statement against the primary). It **refuses by default**:
+  against a hosted backend it requires `--confirm-target <db-name>` matching the
+  resolved database, so a stray `--bulk` cannot write to the shared tracker. It
+  also refuses a local backend, a missing token, and a missing replica — the
+  last because without the items snapshot every legacy `todo_id` would read as a
+  false dangler.
+
+**Drafts directory binding.** Every findings surface resolves its drafts
+directory through `TODO_DB_FINDING_DRAFTS_DIR`, falling back to
+`~/.benchbox/finding-drafts/`. BenchBox and the standalone `todo-db` default to
+different locations (the standalone uses
+`~/.todo-db/finding-drafts/<project-id>/`), and the divergence is **silent**:
+`sync` reports `synced 0` and the planning banner counts zero while a real draft
+sits stranded. Pin the variable at cutover so both tools agree; an
+exported-but-empty value is ignored rather than resolving to the process working
+directory.
 
 ## Surfacing (phase 4)
 
