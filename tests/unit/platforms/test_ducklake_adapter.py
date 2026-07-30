@@ -7,6 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import json
 import logging
 
 import pytest
@@ -1042,6 +1043,70 @@ class TestDuckLakeS3Routing:
             data_path="s3://my-bucket/bench/",
         )
         assert adapter._build_s3_secret_sql().startswith("CREATE OR REPLACE SECRET ")
+
+
+class TestDuckLakeResultMetadataRecordsBacking:
+    """Exported results must say which DuckLake deployment produced them.
+
+    ADR decision w12 makes remote-backed DuckLake results publishable and
+    ranking-eligible ON CONDITION that the backing is recorded - a
+    DuckLake-on-S3 number partly measures object-store latency and must never
+    be silently ranked against DuckLake-on-local-disk as the same system.
+    """
+
+    def _metadata(self, tmp_path, **options):
+        adapter = DuckLakeAdapter.from_config(
+            {"benchmark": "tpch", "scale_factor": 0.01, "output_dir": str(tmp_path), "options": options}
+        )
+        return adapter.get_normalized_result_metadata()
+
+    @pytest.mark.parametrize(
+        "options,catalog,is_cloud,location",
+        [
+            ({}, "duckdb", False, "local_filesystem"),
+            ({"catalog": "sqlite"}, "sqlite", False, "local_filesystem"),
+            ({"catalog": "postgres"}, "postgres", False, "local_filesystem"),
+            ({"data_path": "s3://bucket/x"}, "duckdb", True, "cloud_object_store"),
+            ({"catalog": "postgres", "data_path": "s3://bucket/x"}, "postgres", True, "cloud_object_store"),
+        ],
+    )
+    def test_both_axes_are_recorded(self, tmp_path, options, catalog, is_cloud, location):
+        storage = self._metadata(tmp_path, **options)["platform_storage"]
+
+        assert storage["catalog_backend"] == catalog
+        assert storage["data_path_is_cloud"] is is_cloud
+        assert storage["storage_location"] == location
+
+    def test_no_credential_material_reaches_result_metadata(self, tmp_path):
+        # Regression: pg_user was reaching exported metadata. get_platform_info()
+        # omits it deliberately, but the normalized metadata is also built from
+        # adapter.platform_config - the unfiltered constructor config - where
+        # pg_password happens to match the shared secret-key matcher and
+        # pg_user does not.
+        metadata = self._metadata(
+            tmp_path,
+            catalog="postgres",
+            data_path="s3://bucket/x",
+            pg_user="alice-sentinel",
+            pg_password="hunter2-sentinel",
+            s3_key_id="AKIA-sentinel",
+            s3_secret="shh-sentinel",
+        )
+        blob = json.dumps(metadata, default=str)
+
+        for sentinel in ("alice-sentinel", "hunter2-sentinel", "AKIA-sentinel", "shh-sentinel"):
+            assert sentinel not in blob, f"{sentinel} leaked into exported result metadata"
+
+    def test_non_credential_config_still_exported(self, tmp_path):
+        # The scrub must not gut the raw-config block: pg_host/pg_port/
+        # pg_database are how a reader tells two postgres-backed runs apart.
+        metadata = self._metadata(
+            tmp_path, catalog="postgres", pg_host="db.example.com", pg_port=5433, pg_database="benchdb"
+        )
+        blob = json.dumps(metadata, default=str)
+
+        assert "db.example.com" in blob
+        assert "benchdb" in blob
 
 
 class TestDuckLakeRegistration:
