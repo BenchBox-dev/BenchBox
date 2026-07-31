@@ -65,6 +65,12 @@ there require explicit user authorization and
 destructive Git/filesystem commands without explicit approval. Use `rg`, and
 stage only authorized paths; never `git add -A`.
 
+A disposable clone — a remote agent session, a CI runner — has no canonical
+clone to protect and no worktree pool to claim from, so it declares itself with
+`BENCHBOX_EPHEMERAL_CLONE=1` instead of reaching for the emergency override.
+The declaration is ignored wherever a pool is present, so it cannot weaken the
+guard on a machine that uses one.
+
 ## Tooling and implementation
 
 - Prefer repository `make` targets and existing helpers.
