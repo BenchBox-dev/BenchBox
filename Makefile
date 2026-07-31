@@ -825,7 +825,13 @@ guards-fix:
 	@echo "-- UAT spec module-LOC table --"
 	@uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py
 	@echo "-- skill-sync (no-ops with a notice if the skill-sync CLI is not installed) --"
-	@$(MAKE) -s skill-sync
+	@# Last regen step, contained: a failing skill-sync CLI (e.g. "unable to
+	@# read tree <sha>" in a fresh worktree) used to abort guards-fix here,
+	@# AFTER every other artifact had already been rewritten -- the summary and
+	@# the reviewable diff below never printed. Surface the failure loudly and
+	@# still finish the report; direct `make skill-sync` keeps its hard failure,
+	@# and genuine mirror drift is still enforced by skill-sync-check in CI.
+	@$(MAKE) -s skill-sync || echo "guards-fix: WARNING - the skill-sync step FAILED (see its output above); every other drift-guard artifact was still regenerated. Fix and re-run 'make skill-sync' separately."
 	@echo ""
 	@echo "No regen mode -- these are reviewed hand edits, guards-fix does not touch them:"
 	@echo "  - module-size guard: tests/system/test_module_size_thresholds.py (see its failure output for the ALLOWLIST entry to paste)"
