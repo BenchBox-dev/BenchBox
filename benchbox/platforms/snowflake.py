@@ -1599,6 +1599,19 @@ class SnowflakeAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
+    def get_tuning_introspector(self):
+        """Read ``INFORMATION_SCHEMA`` clustering keys to corroborate the ledger.
+
+        Snowflake's tuning footprint is the clustering key, applied after load
+        by ``ALTER TABLE ... CLUSTER BY``. Those statements already reach the
+        applied ledger (``apply_standard_unified_tuning`` wraps the connection
+        in a recording connection), so this supplies the catalog side that lets
+        them be corroborated instead of classified ``unverifiable``.
+        """
+        from benchbox.platforms.snowflake_introspection import SnowflakeTuningIntrospector
+
+        return SnowflakeTuningIntrospector(schema=self.schema)
+
     def close_connection(self, connection: Any) -> None:
         """Close Snowflake connection."""
         try:

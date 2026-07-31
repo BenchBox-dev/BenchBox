@@ -44,8 +44,10 @@ platform-agnostic; the per-platform catalog *reads* live in the
 | `CREATE INDEX [IF NOT EXISTS] n ON T (cols)` | ddl/post_load  | `index`       | a catalog `index` fact on `T` whose columns equal `cols` (order- and case-normal)  | yes                  |
 | `CREATE TABLE ... ORDER BY (cols)`           | ddl/post_load  | `sort_key`    | a catalog `sort_key` fact on `T` whose columns equal `cols`                         | yes                  |
 | `CREATE TABLE ... PARTITION BY (cols)`       | ddl/post_load  | `partition_key` | a catalog `partition_key` fact on `T` whose columns equal `cols`                 | yes                  |
+| `ALTER TABLE T CLUSTER BY (cols)`, `CREATE TABLE ... CLUSTER BY (cols)` | ddl/post_load | `cluster_key` | a catalog `cluster_key` fact on `T` whose columns equal `cols`, in order | yes |
 | `SET ...`, `PRAGMA ...`                       | any            | `transient`   | session/config, no persistent catalog footprint -- noted, **non-blocking**         | no                   |
 | `OPTIMIZE TABLE ...` / maintenance           | ddl/post_load  | `maintenance` | merge/compaction op, no distinct catalog footprint -- noted, **non-blocking**      | no                   |
+| `ALTER TABLE T [RESUME/SUSPEND] RECLUSTER`   | ddl/post_load  | `maintenance` | reorganizes existing data; the clustering KEY is the catalog footprint -- **non-blocking** | no          |
 | session-phase statement (any)                | session        | `transient`   | transient SET -- noted, **non-blocking** (documented default below)                | no                   |
 | anything else                                | ddl/post_load  | `unverifiable`| no corroboration rule -- **blocks** the upgrade (conservative: stay unverified)    | n/a (blocks)         |
 
