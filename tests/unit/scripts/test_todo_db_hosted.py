@@ -1134,3 +1134,160 @@ def test_export_command_uses_read_only_connect(monkeypatch):
     monkeypatch.delenv("TODO_DB_PATH", raising=False)
     todo_db.main(["export", "--out", "/tmp/does-not-matter"])
     assert seen == {"read_only": True}
+
+
+class TestFindingsBulkTransfer:
+    """Phase-5 import moves the FINDINGS tables over the same Hrana pipeline via an
+    explicit table list. Previously only the refuse-by-default target guard was
+    tested -- every guard test fails BEFORE any transfer, so the transfer itself
+    could have broken entirely with all tests still green.
+    """
+
+    @staticmethod
+    def _findings_module():
+        import importlib
+
+        return importlib.import_module("todo_findings")
+
+    def _staging_with_findings(self, path):
+        """A v4 staging DB holding one finding plus evidence, links, sections, events."""
+        tf = self._findings_module()
+        conn = todo_db.connect(path)
+        todo_db.create_item(
+            conn,
+            "t",
+            item_id="linked-item",
+            title="A linked item",
+            worktree="main",
+            priority="medium",
+            description="a description long enough for the CHECK",
+        )
+        fid = "2026-01-02-030405-transfer-record"
+        with todo_db._write_txn(conn):
+            tf.insert_finding(
+                conn,
+                "t",
+                {
+                    "id": fid,
+                    "date": "2026-01-02",
+                    "finding_kind": "framework-gap",
+                    "review_context": "rc",
+                    "title": "T",
+                    "finding_text": "f",
+                    "why_matters": "w",
+                    "next_steps": "n",
+                    "disposition": "open",
+                    "evidence": [{"path": "a.py", "note": "why a matters"}],
+                    "sections": [{"position": 0, "heading": "Why it was missed", "text": "no axis"}],
+                    "related_paths": '["a.py"]',
+                    "suggested_sweep": "rg -n a",
+                    "todo_id": "linked-item",
+                    "todo_link_kind": "resolved-by",
+                },
+            )
+            for i in range(3):
+                tf.log_finding_event(conn, "t", fid, tf.IMPORTED_TRIAGE_ACTION, {"line": f"- {i}"})
+        conn.close()
+        return fid
+
+    def test_findings_tables_transfer_with_full_row_parity(self, tmp_path):
+        tf = self._findings_module()
+        staging_path = tmp_path / "staging.sqlite"
+        fid = self._staging_with_findings(staging_path)
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        # The link target must exist on the primary: target_item is a real FK.
+        seed = sqlite3.connect(primary.path)
+        seed.execute(
+            "INSERT INTO items (id, title, worktree, priority, state, description, created_at)"
+            " VALUES ('linked-item','A linked item','main','medium','planning','a description long enough','t')"
+        )
+        seed.commit()
+        seed.close()
+
+        staging = sqlite3.connect(staging_path)
+        staging.row_factory = sqlite3.Row
+        summary = todo_db.bulk_transfer(
+            staging, HOSTED_URL, "tok", post=primary.post, tables=tf.FINDINGS_TRANSFER_TABLES
+        )
+        staging.close()
+        assert summary["rows"] > 0
+
+        got = sqlite3.connect(primary.path)
+        counts = {t: got.execute(f"SELECT count(*) FROM {t}").fetchone()[0] for t in tf.FINDINGS_TRANSFER_TABLES}
+        assert counts == {
+            "findings": 1,
+            "finding_evidence": 1,
+            "finding_links": 1,
+            "finding_sections": 1,
+            "finding_events": 4,
+        }
+        # Content, not just counts: the lossless v4 columns and the section survive.
+        row = got.execute("SELECT related_paths, suggested_sweep FROM findings WHERE id = ?", (fid,)).fetchone()
+        assert row == ('["a.py"]', "rg -n a")
+        assert got.execute("SELECT heading, text FROM finding_sections").fetchone() == ("Why it was missed", "no axis")
+        assert got.execute("SELECT kind, target_item FROM finding_links").fetchone() == ("resolved-by", "linked-item")
+
+    def test_transfer_does_not_touch_the_items_domain(self, tmp_path):
+        # must-preserve: the findings import leaves production's items alone.
+        tf = self._findings_module()
+        staging_path = tmp_path / "staging.sqlite"
+        self._staging_with_findings(staging_path)
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        seed = sqlite3.connect(primary.path)
+        seed.execute(
+            "INSERT INTO items (id, title, worktree, priority, state, description, created_at)"
+            " VALUES ('linked-item','A linked item','main','medium','planning','a description long enough','t')"
+        )
+        seed.commit()
+        seed.close()
+        before = sqlite3.connect(primary.path).execute("SELECT count(*) FROM items").fetchone()[0]
+
+        staging = sqlite3.connect(staging_path)
+        staging.row_factory = sqlite3.Row
+        todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post, tables=tf.FINDINGS_TRANSFER_TABLES)
+        staging.close()
+
+        after = sqlite3.connect(primary.path).execute("SELECT count(*) FROM items").fetchone()[0]
+        assert after == before == 1
+
+    def test_colliding_pk_aborts_without_the_offset_and_succeeds_with_it(self, tmp_path):
+        """The production failure mode: staging numbers finding_events from 1 while the
+        target already holds seq=1, so the transfer aborts. An empty target hides this,
+        which is why the real scratch rehearsal missed it."""
+        tf = self._findings_module()
+        staging_path = tmp_path / "staging.sqlite"
+        self._staging_with_findings(staging_path)
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        seed = sqlite3.connect(primary.path)
+        seed.execute(
+            "INSERT INTO items (id, title, worktree, priority, state, description, created_at)"
+            " VALUES ('linked-item','A linked item','main','medium','planning','a description long enough','t')"
+        )
+        seed.execute(
+            "INSERT INTO findings (id, date, finding_kind, review_context, title, finding_text,"
+            " why_matters, next_steps, disposition, created_at)"
+            " VALUES ('2026-01-01-000000-pre-existing','2026-01-01','other','rc','T','f','w','n','open','t')"
+        )
+        seed.execute(
+            "INSERT INTO finding_events (seq, at, actor, finding_id, action, detail)"
+            " VALUES (1, 't', 'a', '2026-01-01-000000-pre-existing', 'sync', '{}')"
+        )
+        seed.commit()
+        seed.close()
+
+        maxima = {"finding_events": 1}
+        applied = tf.offset_staging_pks(staging_path, maxima)
+        assert applied["finding_events"] == 1
+
+        staging = sqlite3.connect(staging_path)
+        staging.row_factory = sqlite3.Row
+        todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post, tables=tf.FINDINGS_TRANSFER_TABLES)
+        staging.close()
+
+        got = sqlite3.connect(primary.path)
+        # Pre-existing row intact, staged rows landed above it, nothing overwritten.
+        assert got.execute("SELECT count(*) FROM finding_events").fetchone()[0] == 5
+        assert got.execute("SELECT action FROM finding_events WHERE seq = 1").fetchone()[0] == "sync"
