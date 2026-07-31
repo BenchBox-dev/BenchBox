@@ -1333,8 +1333,18 @@ def claim_item(
             raise TodoError(f"{item_id!r} was claimed concurrently by {current['claimed_by']!r}")
         if item["state"] == "planning":
             _transition(conn, item, "active")
-        log_event(conn, actor, item_id, "claim", {"previous_holder": holder})
-    return work_order(conn, item_id)
+        log_event(conn, actor, item_id, "claim", {"previous_holder": holder, "previous_claimed_at": item["claimed_at"]})
+    order = work_order(conn, item_id)
+    if holder and holder != actor:
+        # Taking over an expired lease stays allowed without a flag: a holder
+        # that is genuinely gone must not be able to strand an item, and the
+        # progress verbs now renew implicitly, so a live session no longer
+        # looks expired in the first place. What changes is that the takeover
+        # is announced instead of silent — the displaced holder cannot be
+        # notified directly, so the next best thing is that the actor doing
+        # the displacing sees whose work they picked up.
+        order["displaced_holder"] = {"holder": holder, "claimed_at": item["claimed_at"]}
+    return order
 
 
 def release_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
@@ -1344,6 +1354,74 @@ def release_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
             return
         conn.execute("UPDATE items SET claimed_by = NULL, claimed_at = NULL WHERE id = ?", (item_id,))
         log_event(conn, actor, item_id, "release", {"holder": item["claimed_by"]})
+
+
+def _touch_lease(
+    conn: sqlite3.Connection,
+    actor: str,
+    item_id: str,
+    ttl_hours: float = DEFAULT_LEASE_TTL_HOURS,
+) -> bool:
+    """Re-stamp `actor`'s own live lease on `item_id`; return whether it moved.
+
+    Lease liveness is elapsed time alone (`_lease_expired`), and `claimed_at`
+    used to be written only at claim time — so a session that legitimately ran
+    longer than the TTL looked abandoned to `ready_items` and `claim_item`, and
+    another actor could take the item out from under it. Progress verbs call
+    this so an actor that is demonstrably still working stays live.
+
+    Two deliberate refusals keep that from becoming a stuck lease:
+
+    * a lease held by someone else is never touched, and
+    * an *expired* lease is never re-stamped, even for its own holder. It may
+      already have been swept or handed on, so resurrecting it would undo a
+      release the tracker made correctly. The holder re-acquires with `claim`,
+      which is exactly the "holder is genuinely gone" path other actors use.
+
+    Caller must already hold a `_write_txn` — the read and the CAS update have
+    to be atomic, and `_write_txn` (BEGIN IMMEDIATE) is not re-entrant.
+    """
+    item = conn.execute("SELECT claimed_by, claimed_at FROM items WHERE id = ?", (item_id,)).fetchone()
+    if item is None or item["claimed_by"] != actor or _lease_expired(item["claimed_at"], ttl_hours):
+        return False
+    # Conditional on the exact lease observed, as in claim_item and
+    # sweep_stale: never re-stamp a lease that changed hands mid-flight.
+    touched = conn.execute(
+        "UPDATE items SET claimed_at = ? WHERE id = ? AND claimed_by = ? AND claimed_at IS ?",
+        (utc_now(), item_id, actor, item["claimed_at"]),
+    )
+    return touched.rowcount == 1
+
+
+def renew_claim(
+    conn: sqlite3.Connection,
+    actor: str,
+    item_id: str,
+    ttl_hours: float = DEFAULT_LEASE_TTL_HOURS,
+) -> str:
+    """Extend the caller's own live lease by another TTL; return the new stamp.
+
+    For sessions that stay busy without touching a work unit for a while. The
+    progress verbs (`start`, `done`, `verify`) renew implicitly, so this is the
+    explicit escape hatch rather than the common path.
+    """
+    with _write_txn(conn):
+        item = _require_item(conn, item_id)
+        holder = item["claimed_by"]
+        if holder is None:
+            raise TodoError(f"{item_id!r} is not claimed; use `todo claim {item_id}` to take it")
+        if holder != actor:
+            raise TodoError(f"{item_id!r} is claimed by {holder!r}, not {actor!r}; only the holder can renew it")
+        if _lease_expired(item["claimed_at"], ttl_hours):
+            raise TodoError(
+                f"{item_id!r}'s lease expired at {item['claimed_at']} and may already have been"
+                f" swept or reassigned; re-acquire it with `todo claim {item_id}`"
+            )
+        if not _touch_lease(conn, actor, item_id, ttl_hours):
+            raise TodoError(f"{item_id!r}'s lease changed hands concurrently; re-check with `todo show {item_id}`")
+        renewed = _require_item(conn, item_id)["claimed_at"]
+        log_event(conn, actor, item_id, "renew", {"previous_claimed_at": item["claimed_at"]})
+    return str(renewed)
 
 
 def start_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str) -> None:
@@ -1360,6 +1438,7 @@ def start_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str) -> 
             " WHERE item_id = ? AND wid = ?",
             (utc_now(), worktree, branch, item_id, wid),
         )
+        _touch_lease(conn, actor, item_id)
         log_event(conn, actor, item_id, "start", {"wid": wid, "worktree": worktree, "branch": branch})
 
 
@@ -1381,6 +1460,7 @@ def done_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str, evid
             " WHERE item_id = ? AND wid = ?",
             (evidence, utc_now(), worktree, branch, item_id, wid),
         )
+        _touch_lease(conn, actor, item_id)
         log_event(conn, actor, item_id, "done", {"wid": wid, "evidence": evidence})
 
 
@@ -1847,6 +1927,7 @@ def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: in
             "UPDATE verifications SET last_run = ?, last_result = ? WHERE item_id = ? AND seq = ?",
             (utc_now(), result, item_id, seq),
         )
+        _touch_lease(conn, actor, item_id)
         log_event(conn, actor, item_id, "verify", {"seq": seq, "result": result})
     return result, output
 
@@ -2499,6 +2580,14 @@ def import_yaml_tree(
 
 
 def _print_work_order(order: dict[str, Any]) -> None:
+    displaced = order.get("displaced_holder")
+    if displaced:
+        print(
+            f"WARNING: took over an expired lease held by {displaced['holder']}"
+            f" since {displaced['claimed_at']}; their partial work may be unfinished."
+            f" Check `todo show {order['id']}` before redoing units marked done.",
+            file=sys.stderr,
+        )
     print(f"== {order['id']} [{order['priority']}] {order['title']}")
     print(f"state={order['state']} worktree={order['worktree']} claimed_by={order['claimed_by'] or '-'}")
     if order["blocked_reason"]:
@@ -2607,6 +2696,7 @@ def main(argv: list[str] | None = None) -> int:
         ("show", "show one item"),
         ("claim", "claim an item and print its work order"),
         ("release", "release a claim"),
+        ("renew", "extend your own live claim by another lease TTL"),
         ("deps", "show dependency edges"),
         ("unblock", "clear the blocked flag"),
     ):
@@ -2957,6 +3047,11 @@ def _cmd_release(conn, actor, args):
     return 0
 
 
+def _cmd_renew(conn, actor, args):
+    print(f"renewed {args.id}; lease now runs from {renew_claim(conn, actor, args.id)}")
+    return 0
+
+
 def _cmd_start(conn, actor, args):
     start_unit(conn, actor, args.id, args.wid)
     print(f"{args.id}:{args.wid} in_progress")
@@ -3212,6 +3307,7 @@ _HANDLERS = {
     "show": _cmd_show,
     "claim": _cmd_claim,
     "release": _cmd_release,
+    "renew": _cmd_renew,
     "start": _cmd_start,
     "done": _cmd_done,
     "defer": _cmd_defer,
