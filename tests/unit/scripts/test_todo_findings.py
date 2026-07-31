@@ -848,13 +848,15 @@ class TestSyncFullPayloadComparison:
         todo_findings.sync_drafts(conn, "tester", tmp_path)
 
         actions = [event["action"] for event in todo_findings.get_finding(conn, stem)["events"]]
-        assert "resync_evidence" in actions
+        assert "resync_capture_owned" in actions
         detail = json.loads(
             next(
-                e["detail"] for e in todo_findings.get_finding(conn, stem)["events"] if e["action"] == "resync_evidence"
+                e["detail"]
+                for e in todo_findings.get_finding(conn, stem)["events"]
+                if e["action"] == "resync_capture_owned"
             )
         )
-        assert detail == {"rows_before": 1, "rows_after": 2}
+        assert detail["rows_before"] == 1 and detail["rows_after"] == 2
 
     def test_unchanged_draft_is_still_skipped_and_marked_synced(self, conn, tmp_path):
         stem = "2026-01-02-030405-unchanged-record"
@@ -1481,3 +1483,146 @@ class TestBulkImportTargetGuard:
         monkeypatch.setattr(todo_findings, "_cmd_import_bulk", _boom)
         args = self._args(dry_run=True, corpus=str(tmp_path))
         assert todo_findings._cmd_import(conn, "tester", args) == 0
+
+
+class TestReconcileCoversV4Columns:
+    """A record landed before its content had a home stayed stale forever:
+    related_paths and suggested_sweep are outside _CONTENT_FIELDS, so the prose
+    comparison called the draft identical and sync reported `skipped` while both
+    columns remained NULL — the state the imported legacy corpus was in."""
+
+    def _file(self, directory: Path, stem: str, *, related=True, sweep=True, section=None):
+        directory.mkdir(parents=True, exist_ok=True)
+        lines = [
+            "---",
+            f"id: {stem}",
+            "date: 2026-01-02",
+            "status: open",
+            "finding_kind: framework-gap",
+            'review_context: "ultrareview X"',
+        ]
+        if related:
+            lines += ["related_paths:", "  - benchbox/core/a.py"]
+        if sweep:
+            lines += ["suggested_sweep: rg -n 'a' benchbox/"]
+        lines += [
+            "---",
+            "",
+            "# A sample class",
+            "",
+            "## Finding",
+            "the review never checks axis Y",
+            "",
+            "## Why this matters",
+            "axis Y is a whole dimension",
+            "",
+            "## Suggested next steps",
+            "- [ ] add a gate",
+        ]
+        if section:
+            lines += ["", f"## {section[0]}", section[1]]
+        (directory / f"{stem}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return directory / f"{stem}.md"
+
+    def test_stale_v4_columns_are_filled_on_resync(self, conn, tmp_path):
+        stem = "2026-01-02-030405-stale-columns"
+        # Landed WITHOUT the v4 columns, exactly like a pre-v4 import.
+        _mk_finding(
+            conn,
+            finding_id=stem,
+            title="A sample class",
+            review_context="ultrareview X",
+            why_matters="axis Y is a whole dimension",
+            next_steps="- [ ] add a gate",
+        )
+        assert todo_findings.get_finding(conn, stem)["related_paths"] is None
+
+        self._file(tmp_path, stem)
+        result = todo_findings.sync_drafts(conn, "tester", tmp_path)
+        assert result["updated"] == [stem]
+
+        stored = todo_findings.get_finding(conn, stem)
+        assert json.loads(stored["related_paths"]) == ["benchbox/core/a.py"]
+        assert stored["suggested_sweep"] == "rg -n 'a' benchbox/"
+
+    def test_absent_keys_never_null_stored_columns(self, conn, tmp_path):
+        # "No assertion" beats "asserted empty", same rule as evidence: a draft that
+        # never mentioned the key must not wipe what an import put there.
+        stem = "2026-01-02-030405-undeclared-columns"
+        _mk_finding(
+            conn,
+            finding_id=stem,
+            title="A sample class",
+            review_context="ultrareview X",
+            why_matters="axis Y is a whole dimension",
+            next_steps="- [ ] add a gate",
+            related_paths='["kept.py"]',
+            suggested_sweep="kept sweep",
+        )
+        self._file(tmp_path, stem, related=False, sweep=False)
+        todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        stored = todo_findings.get_finding(conn, stem)
+        assert json.loads(stored["related_paths"]) == ["kept.py"]
+        assert stored["suggested_sweep"] == "kept sweep"
+
+    def test_extra_sections_are_reconciled(self, conn, tmp_path):
+        stem = "2026-01-02-030405-section-resync"
+        _mk_finding(
+            conn,
+            finding_id=stem,
+            title="A sample class",
+            review_context="ultrareview X",
+            why_matters="axis Y is a whole dimension",
+            next_steps="- [ ] add a gate",
+            related_paths='["benchbox/core/a.py"]',
+            suggested_sweep="rg -n 'a' benchbox/",
+        )
+        assert todo_findings.get_finding(conn, stem)["sections"] == []
+
+        self._file(tmp_path, stem, section=("Why the review missed it", "no axis for it"))
+        assert todo_findings.sync_drafts(conn, "tester", tmp_path)["updated"] == [stem]
+        assert [(s["heading"], s["text"]) for s in todo_findings.get_finding(conn, stem)["sections"]] == [
+            ("Why the review missed it", "no axis for it")
+        ]
+
+
+class TestReconcileNeverWipesUndeclaredEvidence:
+    """Regression: once reconcile is triggered by another capture-owned field, an
+    unconditional evidence replace wipes curated rows the draft never mentioned —
+    reintroducing by a different route the loss `evidence_declared` exists to stop.
+    This really happened to the live evidence-tree record."""
+
+    def test_related_paths_change_does_not_delete_undeclared_evidence(self, conn, tmp_path):
+        stem = "2026-01-02-030405-curated-evidence"
+        _mk_finding(
+            conn,
+            finding_id=stem,
+            title="A sample class",
+            review_context="ultrareview X",
+            why_matters="axis Y is a whole dimension",
+            next_steps="- [ ] add a gate",
+            evidence=[{"path": "curated.py", "note": "added at triage"}],
+        )
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        (tmp_path / f"{stem}.md").write_text(
+            "---\n"
+            f"id: {stem}\n"
+            "date: 2026-01-02\n"
+            "status: open\n"
+            "finding_kind: framework-gap\n"
+            'review_context: "ultrareview X"\n'
+            "related_paths:\n  - benchbox/core/new.py\n"
+            "---\n\n"
+            "# A sample class\n\n"
+            "## Finding\nthe review never checks axis Y\n\n"
+            "## Why this matters\naxis Y is a whole dimension\n\n"
+            "## Suggested next steps\n- [ ] add a gate\n",
+            encoding="utf-8",
+        )
+        assert todo_findings.sync_drafts(conn, "tester", tmp_path)["updated"] == [stem]
+
+        stored = todo_findings.get_finding(conn, stem)
+        assert json.loads(stored["related_paths"]) == ["benchbox/core/new.py"]
+        # The curated evidence row survives: the draft never asserted an evidence list.
+        assert [(r["path"], r["note"]) for r in stored["evidence"]] == [("curated.py", "added at triage")]

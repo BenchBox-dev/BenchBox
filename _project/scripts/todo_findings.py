@@ -487,6 +487,10 @@ def parse_draft(path: Path) -> dict[str, Any]:
         # have been curated at triage (or hand-mapped during an import) and must
         # not be deleted just because the capture file never mentioned them.
         "evidence_declared": "evidence" in data,
+        # Same "no assertion" rule for the v4 columns: a draft that never mentioned
+        # the key must not null a value an import or later edit put there.
+        "related_paths_declared": "related_paths" in data,
+        "suggested_sweep_declared": "suggested_sweep" in data,
         "triage_log": triage_log,
         # v4 homes. related_paths is a JSON array so list ORDER (part of the
         # record) survives, and an absent key stays NULL rather than becoming
@@ -782,7 +786,41 @@ def _evidence_differs(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
     return _normalize_evidence(existing.get("evidence")) != _normalize_evidence(fields.get("evidence"))
 
 
-def _reconcile_evidence(conn: Any, actor: str, existing: dict[str, Any], fields: dict[str, Any]) -> None:
+def _sections_differ(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
+    """Whether the draft's extra `## ` sections disagree with what is stored.
+
+    Always an assertion: the body is parsed in full, so "no extra sections" is a
+    statement about the draft rather than a missing key.
+    """
+    want = [(s["position"], s["heading"], s["text"]) for s in fields.get("sections") or []]
+    got = [(s["position"], s["heading"], s["text"]) for s in existing.get("sections") or []]
+    return want != got
+
+
+def _capture_owned_differs(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
+    """Whether any capture-owned payload disagrees with what is stored.
+
+    Covers the v4 columns as well as evidence. Without this, a record landed before
+    its content had a home stays stale forever: `related_paths` and `suggested_sweep`
+    are outside `_CONTENT_FIELDS`, so the prose comparison calls the draft identical
+    and sync reports `skipped` while both columns remain NULL. That is exactly the
+    state the imported legacy corpus is in.
+
+    Each column is gated on being DECLARED, for the same reason evidence is: a draft
+    that never mentioned a key must not null a value that an import or a later edit
+    put there.
+    """
+    if _evidence_differs(existing, fields) or _sections_differ(existing, fields):
+        return True
+    for column in ("related_paths", "suggested_sweep"):
+        if not fields.get(f"{column}_declared"):
+            continue
+        if (existing.get(column) or None) != (fields.get(column) or None):
+            return True
+    return False
+
+
+def _reconcile_capture_owned(conn: Any, actor: str, existing: dict[str, Any], fields: dict[str, Any]) -> None:
     """Replace a finding's evidence rows with the draft's, in ONE write txn.
 
     The draft file is authoritative for capture-owned payload, so an evidence-only
@@ -796,9 +834,17 @@ def _reconcile_evidence(conn: Any, actor: str, existing: dict[str, Any], fields:
     finding_id = str(existing["id"])
     before = _normalize_evidence(existing.get("evidence"))
     after = _normalize_evidence(fields.get("evidence"))
+    # Only touch evidence when the draft actually ASSERTS an evidence list. Gating
+    # this at the differs level alone was not enough: once reconcile is triggered by
+    # some OTHER capture-owned field (related_paths, say), an unconditional replace
+    # wipes curated rows a draft that never mentioned `evidence:` had no opinion
+    # about -- reintroducing, by a different route, exactly the destructive behaviour
+    # the evidence_declared guard exists to prevent.
+    replace_evidence = _evidence_differs(existing, fields)
     with todo_db._write_txn(conn):
-        conn.execute("DELETE FROM finding_evidence WHERE finding_id = ?", (finding_id,))
-        for entry in fields.get("evidence") or []:
+        if replace_evidence:
+            conn.execute("DELETE FROM finding_evidence WHERE finding_id = ?", (finding_id,))
+        for entry in (fields.get("evidence") or []) if replace_evidence else []:
             if not isinstance(entry, dict):
                 raise todo_db.TodoError(f"finding {finding_id!r} evidence entry must be a mapping, got {entry!r}")
             path = entry.get("path")
@@ -816,13 +862,28 @@ def _reconcile_evidence(conn: Any, actor: str, existing: dict[str, Any], fields:
                     entry.get("note"),
                 ),
             )
-        log_finding_event(
-            conn,
-            actor,
-            finding_id,
-            "resync_evidence",
-            {"rows_before": len(before), "rows_after": len(after)},
-        )
+        changed: dict[str, Any] = {}
+        if replace_evidence:
+            changed.update({"rows_before": len(before), "rows_after": len(after)})
+        # v4 columns and extra sections are capture-owned too. Without this a record
+        # landed before its content had a home stays stale forever: the prose
+        # comparison calls the draft identical, sync reports `skipped`, and both
+        # columns remain NULL -- the state the imported legacy corpus is in.
+        for column in ("related_paths", "suggested_sweep"):
+            if not fields.get(f"{column}_declared"):
+                continue
+            if (existing.get(column) or None) != (fields.get(column) or None):
+                conn.execute(f"UPDATE findings SET {column} = ? WHERE id = ?", (fields.get(column), finding_id))
+                changed[column] = "updated"
+        if _sections_differ(existing, fields):
+            conn.execute("DELETE FROM finding_sections WHERE finding_id = ?", (finding_id,))
+            for section in fields.get("sections") or []:
+                conn.execute(
+                    "INSERT INTO finding_sections (finding_id, position, heading, text) VALUES (?, ?, ?, ?)",
+                    (finding_id, section["position"], section["heading"], section["text"]),
+                )
+            changed["sections"] = len(fields.get("sections") or [])
+        log_finding_event(conn, actor, finding_id, "resync_capture_owned", changed)
 
 
 def _set_disposition(conn: Any, actor: str, finding_id: str, new: str, reason: str | None) -> None:
@@ -927,10 +988,10 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
                 # Prose disagreement is still a loud conflict, never a merge.
                 result["conflicts"].append(fields["id"])
                 continue
-            if _evidence_differs(existing, fields):
+            if _capture_owned_differs(existing, fields):
                 # Capture-owned payload the old comparison ignored entirely: the
                 # draft used to be marked .synced and the edit lost silently.
-                _reconcile_evidence(conn, actor, existing, fields)
+                _reconcile_capture_owned(conn, actor, existing, fields)
                 result["updated"].append(fields["id"])
             else:
                 result["skipped"].append(fields["id"])
