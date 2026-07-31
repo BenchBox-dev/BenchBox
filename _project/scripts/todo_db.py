@@ -263,6 +263,93 @@ CONFIG_KEYS: dict[str, tuple[str, ...]] = {
 }
 
 
+# Maintenance freeze. A cutover that rebuilds every table from a snapshot
+# destroys any write landing between snapshot and restore -- silently, because
+# the rebuilt audit chain rehashes cleanly from the snapshot. Claims cannot gate
+# that: they cover claim/start/done/complete on existing items, not `create`,
+# `defer`, `promote`, `block` or config writes, all of which are unclaimed.
+#
+# The freeze is leased rather than a plain on/off flag so a holder that dies
+# mid-cutover cannot wedge the tracker for every other session forever.
+FREEZE_HOLDER_KEY = "maintenance.frozen_by"
+FREEZE_AT_KEY = "maintenance.frozen_at"
+FREEZE_REASON_KEY = "maintenance.freeze_reason"
+FREEZE_TTL_KEY = "maintenance.freeze_ttl_hours"
+DEFAULT_FREEZE_TTL_HOURS = 2.0
+
+
+def _meta_get(conn: sqlite3.Connection, key: str) -> str | None:
+    row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def get_freeze(conn: sqlite3.Connection) -> dict[str, Any] | None:
+    """The live freeze, or None when absent or its lease has expired."""
+    holder = _meta_get(conn, FREEZE_HOLDER_KEY)
+    if not holder:
+        return None
+    started = _meta_get(conn, FREEZE_AT_KEY)
+    try:
+        ttl = float(_meta_get(conn, FREEZE_TTL_KEY) or DEFAULT_FREEZE_TTL_HOURS)
+    except ValueError:
+        ttl = DEFAULT_FREEZE_TTL_HOURS
+    expired = _lease_expired(started, ttl)
+    return (
+        None
+        if expired
+        else {
+            "holder": holder,
+            "since": started,
+            "ttl_hours": ttl,
+            "reason": _meta_get(conn, FREEZE_REASON_KEY) or "",
+        }
+    )
+
+
+def set_freeze(
+    conn: sqlite3.Connection,
+    actor: str,
+    reason: str,
+    ttl_hours: float = DEFAULT_FREEZE_TTL_HOURS,
+) -> dict[str, Any]:
+    if ttl_hours <= 0:
+        raise TodoError("freeze --ttl must be positive; an unbounded freeze is exactly the stuck lock this avoids")
+    live = get_freeze(conn)
+    if live and live["holder"] != actor:
+        raise TodoError(
+            f"tracker already frozen by {live['holder']} since {live['since']} "
+            f"({live['reason'] or 'no reason given'}); it lapses after {live['ttl_hours']}h"
+        )
+    stamp = utc_now()
+    with _write_txn(conn):
+        for key, value in (
+            (FREEZE_HOLDER_KEY, actor),
+            (FREEZE_AT_KEY, stamp),
+            (FREEZE_REASON_KEY, reason),
+            (FREEZE_TTL_KEY, str(ttl_hours)),
+        ):
+            conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, value))
+        log_event(conn, actor, None, "freeze", {"reason": reason, "ttl_hours": ttl_hours})
+    return {"holder": actor, "since": stamp, "ttl_hours": ttl_hours, "reason": reason}
+
+
+def clear_freeze(conn: sqlite3.Connection, actor: str, *, force: bool = False) -> bool:
+    """Lift the freeze. Returns False when there was no live freeze to lift."""
+    live = get_freeze(conn)
+    if live and live["holder"] != actor and not force:
+        raise TodoError(
+            f"freeze is held by {live['holder']}, not {actor}; "
+            "wait for its lease to lapse or override with `todo freeze --release --force`"
+        )
+    had_rows = _meta_get(conn, FREEZE_HOLDER_KEY) is not None
+    with _write_txn(conn):
+        for key in (FREEZE_HOLDER_KEY, FREEZE_AT_KEY, FREEZE_REASON_KEY, FREEZE_TTL_KEY):
+            conn.execute("DELETE FROM meta WHERE key = ?", (key,))
+        if had_rows:
+            log_event(conn, actor, None, "unfreeze", {"released_holder": live["holder"] if live else None})
+    return live is not None
+
+
 def get_config(conn: sqlite3.Connection, key: str) -> str:
     if key not in CONFIG_KEYS:
         raise TodoError(f"unknown config key {key!r}; known: {', '.join(sorted(CONFIG_KEYS))}")
@@ -943,6 +1030,9 @@ def _command_mutates_tracker(args: argparse.Namespace) -> bool:
     """Whether the parsed command can modify tracker state (fail closed)."""
     if args.command == "init":
         return False
+    if args.command == "freeze":
+        # `--status` is a pure read; setting or lifting a freeze is a write.
+        return not args.status
     if args.command == "import-yaml":
         return not args.dry_run
     if args.command == "verify":
@@ -957,6 +1047,31 @@ def _command_mutates_tracker(args: argparse.Namespace) -> bool:
         # `list`/`show`, so they are absent from READ_ONLY_COMMANDS by design.
         return todo_findings.finding_command_mutates(args)
     return args.command not in _IMPLICIT_LOCAL_READ_COMMANDS
+
+
+def _freeze_refusal(conn: sqlite3.Connection, actor: str, args: argparse.Namespace) -> int | None:
+    """Exit code to return when a maintenance freeze blocks this command, else None.
+
+    `freeze` itself is exempt -- its own handler decides who may set or lift one
+    -- so a freeze can always be lifted by its holder even while it is in force.
+    """
+    if args.command == "freeze" or not _command_mutates_tracker(args):
+        return None
+    try:
+        live = get_freeze(conn)
+    except sqlite3.Error as exc:
+        print(f"error: database failure: {_redacted(exc, _auth_token())}", file=sys.stderr)
+        return 2
+    if not live or live["holder"] == actor:
+        return None
+    print(
+        f"error: tracker is frozen for maintenance by {live['holder']} since {live['since']}"
+        f"{': ' + live['reason'] if live['reason'] else ''}. "
+        f"Reads still work; writes resume when the holder runs `todo freeze --release` "
+        f"or the {live['ttl_hours']}h lease lapses.",
+        file=sys.stderr,
+    )
+    return 2
 
 
 def _report_backend(backend: Path | str, *, implicit_default_local: bool) -> None:
@@ -1857,7 +1972,24 @@ def stats(conn: sqlite3.Connection) -> dict[str, Any]:
         # Additive findings-domain key (phase 4). Present but empty when there are
         # no findings; existing items-domain keys above are untouched.
         "findings_by_disposition": todo_findings.findings_by_disposition(conn),
+        # Write-activity fingerprint. Every mutation logs an event, so this pair
+        # moves whenever *any* actor writes -- claimed or not. Two reads a few
+        # minutes apart that agree are the only sound "nobody is writing" test;
+        # a claim check cannot see `create`/`defer`/`promote`/`block`/config,
+        # none of which take a claim. See write_activity().
+        "events": write_activity(conn),
     }
+
+
+def write_activity(conn: sqlite3.Connection) -> dict[str, Any]:
+    """A fingerprint that changes if any actor has written since the last read.
+
+    `count` alone would miss a delete-plus-insert; `latest` alone would miss two
+    writes landing inside the same whole second. Together they are stable under
+    no writes and move under any write, which is what a cutover needs to gate on.
+    """
+    row = conn.execute("SELECT count(*) AS n, max(seq) AS last_seq, max(at) AS last_at FROM events").fetchone()
+    return {"count": row["n"] or 0, "last_seq": row["last_seq"], "latest": row["last_at"]}
 
 
 # ---------------------------------------------------------------------------
@@ -2784,6 +2916,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("key", nargs="?")
     p.add_argument("value", nargs="?")
 
+    p = sub.add_parser("freeze", help="hold a leased maintenance freeze for a destructive cutover")
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--status", action="store_true", help="report the live freeze, if any, and exit")
+    g.add_argument("--release", action="store_true", help="lift a freeze you hold")
+    p.add_argument("--reason", default="", help="why the tracker is frozen; shown to blocked writers")
+    p.add_argument(
+        "--ttl",
+        type=float,
+        default=DEFAULT_FREEZE_TTL_HOURS,
+        metavar="HOURS",
+        help=f"lease length before the freeze lapses on its own (default {DEFAULT_FREEZE_TTL_HOURS})",
+    )
+    p.add_argument("--force", action="store_true", help="with --release, break another actor's freeze")
+
     p = sub.add_parser("export", help="deterministic JSONL + markdown index")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--out", default=None)
@@ -2843,6 +2989,11 @@ def main(argv: list[str] | None = None) -> int:
     except sqlite3.Error as exc:
         print(f"error: database failure: {_redacted(exc, _auth_token())}", file=sys.stderr)
         return 2
+
+    refusal = _freeze_refusal(conn, actor, args)
+    if refusal is not None:
+        conn.close()
+        return refusal
 
     try:
         return _dispatch(conn, actor, args)
@@ -3293,6 +3444,26 @@ def _cmd_config(conn, actor, args):
     return 0
 
 
+def _cmd_freeze(conn, actor, args):
+    if args.status:
+        live = get_freeze(conn)
+        print(json.dumps(live, indent=2, sort_keys=True) if live else "no live freeze")
+        return 0
+    if args.release:
+        if clear_freeze(conn, actor, force=args.force):
+            print("freeze lifted")
+        else:
+            print("no live freeze to lift")
+        return 0
+    held = set_freeze(conn, actor, args.reason, args.ttl)
+    print(
+        f"tracker frozen by {held['holder']} at {held['since']} for {held['ttl_hours']}h"
+        f"{': ' + held['reason'] if held['reason'] else ''}"
+    )
+    print("other actors' writes now fail; reads are unaffected. Lift with `todo freeze --release`.")
+    return 0
+
+
 def _cmd_migrate(conn, actor, args):
     # Reached only when the DB is already current (main() migrates before
     # connecting for this command); report the no-op for clarity.
@@ -3328,6 +3499,7 @@ _HANDLERS = {
     "export": _cmd_export,
     "migrate": _cmd_migrate,
     "config": _cmd_config,
+    "freeze": _cmd_freeze,
 }
 
 
