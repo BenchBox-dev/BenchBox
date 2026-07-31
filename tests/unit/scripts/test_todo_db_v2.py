@@ -357,6 +357,61 @@ class TestLintConfigGating:
         assert "config" in todo_db._HANDLERS
 
 
+class TestLintUnrunnableCommands:
+    """A rung command that cannot execute exits non-zero on every tree, so it
+    vacuously satisfies "must fail on the unfixed tree" — lint must report it."""
+
+    def _mk_with_command(self, conn, item_id, command):
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id=item_id,
+            title="Item with a verification rung",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            work=[{"id": "w1", "summary": "one unit of work"}],
+            verifications=[{"description": "rung", "command": command, "expected": "whatever"}],
+        )
+
+    def test_placeholder_command_is_reported_with_its_text(self, conn):
+        self._mk_with_command(conn, "ph-item", "<record the four run ids on this item>")
+        findings = todo_db.lint_item(conn, "ph-item")
+        assert any("cannot execute" in f and "record the four run ids" in f for f in findings)
+
+    def test_shell_parse_failure_is_reported(self, conn):
+        self._mk_with_command(conn, "parse-item", "echo 'unterminated")
+        findings = todo_db.lint_item(conn, "parse-item")
+        assert any("cannot execute" in f and "shell parse" in f for f in findings)
+
+    def test_runnable_command_is_not_flagged(self, conn):
+        self._mk_with_command(conn, "ok-item", "uv run -- python -m pytest tests -q")
+        assert not any("cannot execute" in f for f in todo_db.lint_item(conn, "ok-item"))
+
+    def test_piped_command_is_not_flagged(self, conn):
+        self._mk_with_command(conn, "piped-item", "_project/scripts/todo lint some-item | grep -qi 'pattern'")
+        assert not any("cannot execute" in f for f in todo_db.lint_item(conn, "piped-item"))
+
+    def test_multiline_negated_command_is_not_flagged(self, conn):
+        self._mk_with_command(conn, "ml-item", "set -e\nmake regen\n! grep -q 'stale' out.log")
+        assert not any("cannot execute" in f for f in todo_db.lint_item(conn, "ml-item"))
+
+    def test_rung_without_command_is_not_flagged_as_unrunnable(self, conn):
+        self._mk_with_command(conn, "nocmd-item", "uv run -- true")
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="desc-only-item",
+            title="Item whose rung is description-only",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            work=[{"id": "w1", "summary": "one unit of work"}],
+            verifications=[{"description": "manual acceptance only"}],
+        )
+        assert not any("cannot execute" in f for f in todo_db.lint_item(conn, "desc-only-item"))
+
+
 class TestInstructiveGateErrors:
     """Every gate refusal must name its recovery command — the error messages
     are the harness-portable instruction layer."""
