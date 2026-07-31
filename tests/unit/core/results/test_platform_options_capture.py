@@ -401,3 +401,45 @@ def test_result_payload_exports_platform_option_sources_from_run_config() -> Non
         "warehouse": "cli_option",
         "password": "cli_option",
     }
+
+
+class TestUsernameRedactionInternalPath:
+    """Connection usernames must not ride into internal bundles verbatim.
+
+    They are identity, not secrets: the public path pseudonymizes them for
+    grouping, but the internal capture path has no pseudonymizer, so it
+    redacts them instead. Exact normalized match only, so user_agent-class
+    option keys keep their real values.
+    """
+
+    def test_username_keys_are_redacted(self):
+        from benchbox.core.results.platform_options import sanitize_platform_options
+
+        result = sanitize_platform_options(
+            {"username": "alice-sentinel", "user": "bob-sentinel", "pg_user": "carol-sentinel"}
+        )
+        assert result["username"] == REDACTED_VALUE
+        assert result["user"] == REDACTED_VALUE
+        assert result["pg_user"] == REDACTED_VALUE
+
+    def test_user_lookalike_keys_are_not_over_redacted(self):
+        from benchbox.core.results.platform_options import sanitize_platform_options
+
+        result = sanitize_platform_options({"user_agent": "ua/1.0", "num_users": 7, "users_table": "users"})
+        assert result["user_agent"] == "ua/1.0"
+        assert result["num_users"] == 7
+        assert result["users_table"] == "users"
+
+    def test_secret_keys_keep_current_behavior(self):
+        from benchbox.core.results.platform_options import sanitize_platform_options
+
+        result = sanitize_platform_options({"password": "pw-sentinel", "s3_key_id": "AKIA-sentinel"})
+        assert result["password"] == REDACTED_VALUE
+        assert result["s3_key_id"] == REDACTED_VALUE
+
+    def test_nested_username_is_redacted(self):
+        from benchbox.core.results.platform_options import sanitize_platform_options
+
+        result = sanitize_platform_options({"connection": {"username": "alice-sentinel", "host": "db.internal"}})
+        assert result["connection"]["username"] == REDACTED_VALUE
+        assert result["connection"]["host"] == "db.internal"

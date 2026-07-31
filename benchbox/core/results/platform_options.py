@@ -37,6 +37,20 @@ _SECRET_KEY_PARTS = tuple(
         "credential",
     )
 )
+# Connection usernames are identity, not secrets, so they are NOT in
+# _SECRET_KEY_PARTS (the public anonymization path shares that list and must
+# keep PSEUDONYMIZING usernames for grouping, not redacting them). But the
+# internal capture path has no pseudonymizer, so before this set existed a
+# username rode into every internal bundle verbatim. Exact normalized match
+# only - a substring rule on "user" would nuke user_agent/num_users-class
+# options.
+_USERNAME_KEYS = frozenset({"user", "username", "userid", "pguser", "dbuser"})
+
+
+def _is_username_key(key: str) -> bool:
+    return _normalize_secret_key(key) in _USERNAME_KEYS
+
+
 _INTERNAL_OPTION_KEYS = {
     "_explicit_platform_options",
     "verbosity_settings",
@@ -93,7 +107,7 @@ def sanitize_platform_options(
         key_str = str(key)
         if exclude_internal and (key_str.startswith("_") or key_str in _INTERNAL_OPTION_KEYS):
             continue
-        if is_secret_option_key(key_str):
+        if is_secret_option_key(key_str) or _is_username_key(key_str):
             sanitized[key_str] = REDACTED_VALUE
         else:
             sanitized[key_str] = _sanitize_option_value(value, exclude_internal=exclude_internal)
