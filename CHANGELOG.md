@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Unrunnable precompiled TPC binaries now fall back to source compilation** -
+  Binary selection probes that a bundled `dbgen`/`qgen`/`dsdgen`/`dsqgen`
+  actually executes on the host before choosing it over compiling from source.
+  Previously a binary that passed the checksum check but was refused by the OS
+  loader (notably the darwin-arm64 TPC-H tools built against macOS 26, which
+  dyld rejects on macOS 15 and earlier) caused TPC-H data/query generation to
+  fail outright instead of auto-compiling.
 - **Correct TPC throughput metrics in newly exported results** - TPC-H and
   TPC-DS throughput drivers now include every executed query in
   Throughput@Size, correcting the 22x and 99x understatements produced by

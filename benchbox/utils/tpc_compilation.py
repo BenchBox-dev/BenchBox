@@ -28,6 +28,7 @@ import os
 import platform
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -43,6 +44,13 @@ _discovered_paths: dict[str, Optional[Path]] = {}
 
 # Cached checksum verification results (shared across all TPCCompiler instances)
 _checksum_cache: dict[Path, bool] = {}
+
+# Cached exec-probe results (shared across all TPCCompiler instances). A binary
+# can be present, executable-flagged, and checksum-valid yet still refused by
+# the OS loader — e.g. a darwin-arm64 binary built with a deployment target
+# newer than the host macOS. Probing catches that before the binary is chosen
+# over source compilation.
+_exec_probe_cache: dict[Path, bool] = {}
 
 
 def _discover_tpc_paths() -> dict[str, Optional[Path]]:
@@ -368,6 +376,51 @@ class TPCCompiler:
             _checksum_cache[binary_path] = True
             return True  # Assume valid on verification error
 
+    def _verify_executable(self, binary_path: Path) -> bool:
+        """Verify the OS can actually execute *binary_path* (cached globally).
+
+        File-mode and checksum checks cannot detect a binary the loader
+        refuses to run — the known case is the darwin-arm64 TPC-H tools built
+        with LC_BUILD_VERSION minos 26.0, which dyld rejects on macOS <= 15
+        even though the bytes match checksums.md5. Spawn the binary once with
+        an option that only prints usage; any launch failure (OSError from
+        exec, or death by signal such as a dyld abort) marks it unrunnable so
+        callers fall back to source compilation.
+        """
+        if binary_path in _exec_probe_cache:
+            return _exec_probe_cache[binary_path]
+
+        runnable = True
+        try:
+            with tempfile.TemporaryDirectory(prefix="benchbox-exec-probe-") as probe_cwd:
+                proc = subprocess.run(
+                    [str(binary_path), "-h"],
+                    cwd=probe_cwd,
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    timeout=15,
+                )
+            # A usage/error exit is fine — the binary ran. Death by signal
+            # (negative returncode) means the process never got past launch.
+            if proc.returncode < 0:
+                runnable = False
+                logger.warning(
+                    f"Precompiled binary {binary_path} died with signal {-proc.returncode} during exec probe; "
+                    "treating it as unrunnable on this host and falling back to source compilation"
+                )
+        except subprocess.TimeoutExpired:
+            # It launched and kept running; that is all the probe needs to know.
+            runnable = True
+        except OSError as e:
+            runnable = False
+            logger.warning(
+                f"Precompiled binary {binary_path} cannot be executed on this host ({e}); "
+                "it was likely built for a different or newer OS - falling back to source compilation"
+            )
+
+        _exec_probe_cache[binary_path] = runnable
+        return runnable
+
     def is_precompiled_available(self, binary_name: str) -> bool:
         """Check if pre-compiled binary is available and valid."""
         if binary_name not in self.binaries:
@@ -384,7 +437,12 @@ class TPCCompiler:
             return False
 
         # Verify checksum if available
-        return self._verify_checksum(precompiled_path)
+        if not self._verify_checksum(precompiled_path):
+            return False
+
+        # Verify the loader will actually run it (deployment-target mismatches
+        # pass every check above but fail at exec time)
+        return self._verify_executable(precompiled_path)
 
     def is_binary_available(self, binary_name: str) -> bool:
         """Check if binary is already compiled and available.

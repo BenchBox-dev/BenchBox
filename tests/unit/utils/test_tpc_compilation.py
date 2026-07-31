@@ -389,7 +389,9 @@ class TestBinaryAvailability:
     @patch("benchbox.utils.tpc_compilation._discovered_paths", {})
     @patch("benchbox.utils.tpc_compilation._compiler_cache", {})
     @patch("benchbox.utils.tpc_compilation._checksum_cache", {})
-    def test_precompiled_available_with_executable(self, tmp_path):
+    @patch("benchbox.utils.tpc_compilation._exec_probe_cache", {})
+    @patch.object(TPCCompiler, "_verify_executable", return_value=True)
+    def test_precompiled_available_with_executable(self, _mock_probe, tmp_path):
         """Precompiled binary that exists and is executable returns True."""
         precompiled_base = tmp_path / "_binaries"
         platform_dir = precompiled_base / "tpc-h" / "darwin-arm64"
@@ -413,6 +415,102 @@ class TestBinaryAvailability:
         assert compiler.is_precompiled_available("dbgen") is True
         assert compiler.is_binary_available("dbgen") is True
         assert compiler.get_binary_path("dbgen") == dbgen
+
+
+# ---------------------------------------------------------------------------
+# Exec probe (host-runnability of precompiled binaries)
+# ---------------------------------------------------------------------------
+class TestExecProbe:
+    """Tests for _verify_executable and its fallback wiring.
+
+    A precompiled binary can pass the exists/exec-bit/checksum checks yet be
+    refused by the OS loader (e.g. darwin-arm64 tools built with a deployment
+    target newer than the host macOS). The probe must catch that and push
+    selection toward source compilation.
+    """
+
+    @staticmethod
+    def _bare_compiler() -> TPCCompiler:
+        with patch.object(TPCCompiler, "__init__", lambda self, **kw: None):
+            compiler = TPCCompiler.__new__(TPCCompiler)
+        compiler.auto_compile = False
+        compiler.verbose = False
+        return compiler
+
+    @patch("benchbox.utils.tpc_compilation._exec_probe_cache", {})
+    def test_probe_accepts_usage_exit(self, tmp_path):
+        """A binary that runs and exits nonzero (usage text) is runnable."""
+        proc = MagicMock(returncode=1)
+        with patch("benchbox.utils.tpc_compilation.subprocess.run", return_value=proc):
+            assert self._bare_compiler()._verify_executable(tmp_path / "dbgen") is True
+
+    @patch("benchbox.utils.tpc_compilation._exec_probe_cache", {})
+    def test_probe_rejects_exec_oserror(self, tmp_path):
+        """An exec-time OSError (Exec format error, dyld refusal) is unrunnable."""
+        with patch(
+            "benchbox.utils.tpc_compilation.subprocess.run",
+            side_effect=OSError(8, "Exec format error"),
+        ):
+            assert self._bare_compiler()._verify_executable(tmp_path / "dbgen") is False
+
+    @patch("benchbox.utils.tpc_compilation._exec_probe_cache", {})
+    def test_probe_rejects_signal_death(self, tmp_path):
+        """Death by signal (e.g. dyld abort -> SIGABRT) is unrunnable."""
+        proc = MagicMock(returncode=-6)
+        with patch("benchbox.utils.tpc_compilation.subprocess.run", return_value=proc):
+            assert self._bare_compiler()._verify_executable(tmp_path / "dbgen") is False
+
+    @patch("benchbox.utils.tpc_compilation._exec_probe_cache", {})
+    def test_probe_accepts_timeout(self, tmp_path):
+        """A probe that times out means the binary launched; that is enough."""
+        import subprocess as _subprocess
+
+        with patch(
+            "benchbox.utils.tpc_compilation.subprocess.run",
+            side_effect=_subprocess.TimeoutExpired(cmd="dbgen -h", timeout=15),
+        ):
+            assert self._bare_compiler()._verify_executable(tmp_path / "dbgen") is True
+
+    @patch("benchbox.utils.tpc_compilation._exec_probe_cache", {})
+    def test_probe_result_cached(self, tmp_path):
+        """The probe spawns each binary at most once per process."""
+        compiler = self._bare_compiler()
+        proc = MagicMock(returncode=0)
+        with patch("benchbox.utils.tpc_compilation.subprocess.run", return_value=proc) as mock_run:
+            assert compiler._verify_executable(tmp_path / "dbgen") is True
+            assert compiler._verify_executable(tmp_path / "dbgen") is True
+        assert mock_run.call_count == 1
+
+    @pytest.mark.skipif(os.name == "nt", reason="POSIX exec semantics")
+    @patch("benchbox.utils.tpc_compilation._discovered_paths", {})
+    @patch("benchbox.utils.tpc_compilation._compiler_cache", {})
+    @patch("benchbox.utils.tpc_compilation._checksum_cache", {})
+    @patch("benchbox.utils.tpc_compilation._exec_probe_cache", {})
+    def test_unrunnable_precompiled_falls_back_to_compilation(self, tmp_path):
+        """End-to-end: garbage bytes pass mode/checksum checks but fail the real
+        exec probe, so selection falls back to the source-compilation path."""
+        precompiled_base = tmp_path / "_binaries"
+        platform_dir = precompiled_base / "tpc-h" / "test-arch"
+        platform_dir.mkdir(parents=True)
+        dbgen = platform_dir / "dbgen"
+        dbgen.write_bytes(b"\x00not a real executable\x00")
+        dbgen.chmod(0o755)
+        source_dir = tmp_path / "tpch-src"
+        source_dir.mkdir()
+
+        with patch.object(TPCCompiler, "__init__", lambda self, **kw: None):
+            compiler = TPCCompiler.__new__(TPCCompiler)
+            compiler.auto_compile = True
+            compiler.verbose = False
+            compiler.tpc_h_source = source_dir
+            compiler.tpc_ds_source = None
+            compiler.precompiled_base = precompiled_base
+            compiler._setup_binary_configs()
+            compiler.binaries["dbgen"].precompiled_path = dbgen
+
+        assert compiler.is_precompiled_available("dbgen") is False
+        assert compiler.get_binary_path("dbgen") is None
+        assert compiler.needs_compilation("dbgen") is True
 
 
 # ---------------------------------------------------------------------------
@@ -440,7 +538,9 @@ class TestCompileBinary:
     @patch("benchbox.utils.tpc_compilation._discovered_paths", {})
     @patch("benchbox.utils.tpc_compilation._compiler_cache", {})
     @patch("benchbox.utils.tpc_compilation._checksum_cache", {})
-    def test_compile_returns_precompiled_when_available(self, tmp_path):
+    @patch("benchbox.utils.tpc_compilation._exec_probe_cache", {})
+    @patch.object(TPCCompiler, "_verify_executable", return_value=True)
+    def test_compile_returns_precompiled_when_available(self, _mock_probe, tmp_path):
         """When precompiled exists, compile_binary returns PRECOMPILED status."""
         precompiled_base = tmp_path / "_binaries"
         platform_dir = precompiled_base / "tpc-h" / "test-arch"
@@ -810,7 +910,9 @@ class TestExecutableDetectionWindows:
 
     @patch("benchbox.utils.tpc_compilation._discovered_paths", {})
     @patch("benchbox.utils.tpc_compilation._checksum_cache", {})
-    def test_precompiled_windows_skips_executable_bit(self, tmp_path):
+    @patch("benchbox.utils.tpc_compilation._exec_probe_cache", {})
+    @patch.object(TPCCompiler, "_verify_executable", return_value=True)
+    def test_precompiled_windows_skips_executable_bit(self, _mock_probe, tmp_path):
         """On Windows (os.name == 'nt'), existence is sufficient."""
         compiler, binary = self._make_compiler_with_binary(tmp_path, use_precompiled=True)
         with patch("benchbox.utils.tpc_compilation.os.name", "nt"):
