@@ -7,13 +7,14 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import json
 import subprocess
 import sys
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
-from benchbox.core.results.anonymization import AnonymizationConfig, AnonymizationManager
+from benchbox.core.results.anonymization import PUBLIC_REDACTED_VALUE, AnonymizationConfig, AnonymizationManager
 
 pytestmark = [
     pytest.mark.unit,
@@ -718,6 +719,48 @@ class TestValidateAnonymization:
         validation = manager.validate_anonymization({}, {"result": "ok"})
         assert any("machine" in e.lower() for e in validation["errors"])
         assert validation["is_valid"] is False
+
+
+class TestPublicPayloadSecretKeys:
+    """The public export path must honor every secret part the internal
+    capture path honors — both consumers read one shared list, so a key that
+    is redacted at capture time can never be published by re-export either."""
+
+    @staticmethod
+    def _payload(config):
+        return {"platform_metadata": {"platform_raw_config": config}}
+
+    def test_key_id_values_are_redacted(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(
+            self._payload({"s3_key_id": "AKIA-SENTINEL", "kms_key_id": "KMS-SENTINEL"})
+        )
+        raw = json.dumps(out, default=str)
+        assert "AKIA-SENTINEL" not in raw
+        assert "KMS-SENTINEL" not in raw
+
+    def test_already_covered_keys_keep_behavior(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(
+            self._payload({"pg_password": "PW-SENTINEL", "username": "alice-sentinel"})
+        )["platform_metadata"]["platform_raw_config"]
+        assert out["pg_password"] == PUBLIC_REDACTED_VALUE
+        assert out["username"] != "alice-sentinel"
+        assert out["username"].startswith("user_")
+
+    def test_secret_parts_shared_with_platform_options(self):
+        from benchbox.core.results.anonymization import _SECRET_KEY_PARTS as anon_parts
+        from benchbox.core.results.platform_options import _SECRET_KEY_PARTS as capture_parts
+
+        assert set(capture_parts) <= set(anon_parts)
+
+    def test_data_modelling_keys_are_not_over_redacted(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(
+            self._payload({"sort_key": "l_shipdate", "partition_key": "l_orderkey"})
+        )["platform_metadata"]["platform_raw_config"]
+        assert out["sort_key"] == "l_shipdate"
+        assert out["partition_key"] == "l_orderkey"
 
 
 if __name__ == "__main__":

@@ -1,12 +1,7 @@
-secret_key_parts:
-- password
-- token
-- secret
-- accesskey
-- privatekey
-- sessiontoken
-- connectionstring
-- credential
+# secret_key_parts intentionally lives in code, not here: both the internal
+# capture path and this public anonymization path read the single list in
+# benchbox/core/results/platform_options.py (_SECRET_KEY_PARTS). A second
+# hand-synced copy in this file diverged within a month of being split out.
 identifier_keys:
   account: account
   accountid: account
