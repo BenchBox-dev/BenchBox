@@ -146,7 +146,12 @@ def _map_phases_to_test_execution_type(phases: list[str]) -> str:
         return "standard"
 
 
-def register_benchmark_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None:
+def register_benchmark_tools(
+    mcp: MCPServer,
+    *,
+    results_dir: PathProvider,
+    allow_synchronous_execution: bool = True,
+) -> None:
     """Register benchmark execution tools with the MCP server."""
 
     @mcp.tool(annotations=RUN_BENCHMARK_ANNOTATIONS)
@@ -196,6 +201,15 @@ def register_benchmark_tools(mcp: MCPServer, *, results_dir: PathProvider) -> No
         # Handle dry_run mode
         if dry_run:
             return _dry_run_impl(platform, benchmark, scale_factor, queries, mode)
+
+        if not allow_synchronous_execution:
+            response = make_error(
+                ErrorCode.VALIDATION_ERROR,
+                "Remote benchmark execution requires start_benchmark",
+                details={"replacement_tool": "start_benchmark"},
+            )
+            response["status"] = "failed"
+            return response
 
         # Run benchmark
         return _run_benchmark_impl(
@@ -337,9 +351,11 @@ def _run_benchmark_impl(
     capture_plans: bool = False,
     *,
     results_dir: Path,
+    execution_id: str | None = None,
+    data_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Core implementation for running benchmarks."""
-    execution_id = f"mcp_{uuid.uuid4().hex[:8]}"
+    execution_id = execution_id or f"mcp_{uuid.uuid4().hex[:8]}"
     start_time = mono_time()
 
     try:
@@ -367,7 +383,14 @@ def _run_benchmark_impl(
             return _make_failed_response(mode_error, execution_id)
 
         if resolved_mode == "data_only":
-            return _generate_data_impl(benchmark_lower, benchmark_class, scale_factor, execution_id, start_time)
+            return _generate_data_impl(
+                benchmark_lower,
+                benchmark_class,
+                scale_factor,
+                execution_id,
+                start_time,
+                data_dir=data_dir,
+            )
 
         benchmark_instance = benchmark_class(scale_factor=scale_factor)
 
@@ -471,9 +494,11 @@ def _generate_data_impl(
     scale_factor: float,
     execution_id: str,
     start_time: float,
+    *,
+    data_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Generate benchmark data without running queries."""
-    data_dir = get_benchmark_runs_datagen_path(benchmark_lower, scale_factor)
+    data_dir = data_dir or get_benchmark_runs_datagen_path(benchmark_lower, scale_factor)
     data_dir.mkdir(parents=True, exist_ok=True)
 
     bm = benchmark_class(scale_factor=scale_factor)

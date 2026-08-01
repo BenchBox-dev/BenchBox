@@ -65,6 +65,18 @@ class AdmissionLimits(BaseModel):
     lease_seconds: float = Field(default=3_600.0, gt=0.0, le=86_400.0)
 
 
+class JobLimits(BaseModel):
+    """Durable benchmark queue and recovery limits."""
+
+    model_config = ConfigDict(frozen=True)
+
+    queue_limit: int = Field(default=32, ge=1, le=100_000)
+    lease_seconds: float = Field(default=60.0, gt=0.0, le=86_400.0)
+    poll_seconds: float = Field(default=0.25, gt=0.0, le=30.0)
+    max_attempts: int = Field(default=2, ge=1, le=10)
+    retention_seconds: float = Field(default=604_800.0, ge=60.0, le=31_536_000.0)
+
+
 class RemoteSecurityConfig(BaseModel):
     """Fail-closed remote MCP security configuration."""
 
@@ -81,6 +93,7 @@ class RemoteSecurityConfig(BaseModel):
     allowed_benchmarks: tuple[str, ...] = ()
     max_scale_factor: float = Field(default=1.0, gt=0.0)
     admission: AdmissionLimits = Field(default_factory=AdmissionLimits)
+    jobs: JobLimits = Field(default_factory=JobLimits)
 
     @field_validator("allowed_hosts", "allowed_origins", "tokens")
     @classmethod
@@ -217,7 +230,11 @@ class TenantWorkspaceProvider:
 
     def paths_for(self, principal: Principal) -> WorkspacePaths:
         """Return contained, server-owned paths for *principal*."""
-        root = (self._workspace_root / principal.principal_id).resolve()
+        return self.paths_for_principal_id(principal.principal_id)
+
+    def paths_for_principal_id(self, principal_id: str) -> WorkspacePaths:
+        """Return contained paths for a trusted persisted principal identifier."""
+        root = (self._workspace_root / principal_id).resolve()
         root.relative_to(self._workspace_root)
         results_dir = root / "results"
         charts_dir = root / "charts"
@@ -455,6 +472,8 @@ READ_ONLY_TOOLS = frozenset(
         "get_query_plan",
         "validate_results",
         "suggest_charts",
+        "get_benchmark_status",
+        "get_benchmark_result",
     }
 )
 READ_METHODS = frozenset(
@@ -478,13 +497,13 @@ class RemoteSecurityMiddleware:
 
     def _authorize(self, principal: Principal, tool_name: str, arguments: Mapping[str, Any]) -> None:
         required_scope = READ_SCOPE if tool_name in READ_ONLY_TOOLS else WRITE_SCOPE
-        if tool_name == "run_benchmark":
+        if tool_name in {"run_benchmark", "start_benchmark", "cancel_benchmark"}:
             required_scope = EXECUTE_SCOPE
         elif tool_name == "get_results" and arguments.get("output_path"):
             required_scope = WRITE_SCOPE
         if required_scope not in principal.scopes:
             raise MCPError(AUTHORIZATION_ERROR, f"Scope required: {required_scope}")
-        if tool_name != "run_benchmark":
+        if tool_name not in {"run_benchmark", "start_benchmark"}:
             return
         platform = str(arguments.get("platform", "")).lower()
         benchmark = str(arguments.get("benchmark", "")).lower()
@@ -572,12 +591,21 @@ class RemoteSecurityMiddleware:
         lease: AdmissionLease | None = None
         try:
             lease = await self.store.admit(principal.principal_id)
+            dispatch_error: Exception | None = None
+            result: HandlerResult | None = None
             async with anyio.create_task_group() as task_group:
                 task_group.start_soon(self._renew_lease, lease)
                 try:
                     result = await call_next(ctx)
+                except Exception as exc:
+                    # Capture inside the task group so AnyIO does not wrap a
+                    # protocol MCPError in an opaque ExceptionGroup.
+                    dispatch_error = exc
                 finally:
                     task_group.cancel_scope.cancel()
+            if dispatch_error is not None:
+                raise dispatch_error
+            assert result is not None
             execution_id, artifact_ref = self._result_refs(result)
             await self._audit(
                 principal_id=principal.principal_id,

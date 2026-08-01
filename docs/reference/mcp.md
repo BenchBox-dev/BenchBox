@@ -65,6 +65,10 @@ resources, 2 resource templates, and 7 prompts. Tool names, input schemas,
 annotations, resource URIs, prompt schemas, and handler behavior are unchanged;
 only Python-side SDK model attributes use the v2 snake-case names.
 
+An authenticated remote server adds four durable job tools. They use shared
+storage and return immediately, so sessionless requests may reach different
+workers without losing ownership or lifecycle state.
+
 Streamable HTTP supports modern MCP `2026-07-28` as a sessionless protocol:
 each request can reach any server process and no `Mcp-Session-Id` is issued.
 The same endpoint retains the SDK's stateless compatibility path for supported
@@ -178,11 +182,25 @@ CLI result bundles, but MCP does not claim option parity with `benchbox run`.
 | `suggest_charts` | visualization | No | Suggest useful chart types for one or more result files. |
 | `generate_chart` | visualization | Yes | Generate ASCII chart output from result files. |
 
+Authenticated remote mode additionally registers:
+
+| Tool | Category | Writes | Purpose |
+|---|---|---:|---|
+| `start_benchmark` | durable execution | Yes | Queue a tenant-owned benchmark and return an `execution_id`. |
+| `get_benchmark_status` | durable execution | No | Read owned job state, attempts, cancellation, and timestamps. |
+| `get_benchmark_result` | durable execution | No | Read the owned result after atomic publication. |
+| `cancel_benchmark` | durable execution | Yes | Cancel queued work or request cancellation at the next safe worker boundary. |
+
 ### Run Surface Contract
 
-`run_benchmark` is the only benchmark execution tool. Dry-run preview and
-configuration validation are modes on this tool (`dry_run=true` and
-`validate_only=true`), not separate MCP tools.
+`run_benchmark` remains the synchronous local-compatible execution tool.
+Dry-run preview and configuration validation are modes on it (`dry_run=true`
+and `validate_only=true`), not separate MCP tools. Authenticated remote clients
+should use `start_benchmark` for a normal long-running execution; the durable
+tool accepts the same normal-run fields plus an optional `idempotency_key`, but
+does not expose `dry_run` or `validate_only`. In remote mode, a normal
+`run_benchmark` call is rejected immediately; its `dry_run` and `validate_only`
+modes remain available because they do not hold the request for execution.
 
 **MCP run parameter schema**
 
