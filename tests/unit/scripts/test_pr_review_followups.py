@@ -146,11 +146,12 @@ class FakeCodexCommandRunner(pr_review_followups.CommandRunner):
 
     def __init__(self, cwd: Path, codex_prefix: Sequence[str]) -> None:
         super().__init__(cwd)
+        self.codex_command = pr_review_followups._executor_command()
         self.codex_prefix = list(codex_prefix)
 
     def run(self, args: Sequence[str], input_text: str | None = None) -> subprocess.CompletedProcess[str]:
         argv = list(args)
-        if argv and argv[0] == "codex":
+        if argv and argv[0] == self.codex_command:
             argv = [*self.codex_prefix, *argv[1:]]
         return super().run(argv, input_text)
 
