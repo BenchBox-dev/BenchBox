@@ -62,7 +62,14 @@ def run_transport(server: MCPServer, settings: MCPTransportSettings) -> None:
         # automatic policy covers only its three canonical host spellings.
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
-            allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"],
-            allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"],
+            allowed_hosts=["127.0.0.1", "127.0.0.1:*", "localhost", "localhost:*", "[::1]", "[::1]:*"],
+            allowed_origins=[
+                "http://127.0.0.1",
+                "http://127.0.0.1:*",
+                "http://localhost",
+                "http://localhost:*",
+                "http://[::1]",
+                "http://[::1]:*",
+            ],
         ),
     )
