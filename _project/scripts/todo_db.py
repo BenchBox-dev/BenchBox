@@ -2568,6 +2568,26 @@ def _unsatisfiable_verifications(item: dict) -> list[int]:
     return offenders
 
 
+def lint_item_notes(conn: sqlite3.Connection, item_id: str) -> list[str]:
+    """Advisory notes, not defects: policy skips that would otherwise be
+    silent. A category exemption from the falsifiability check is author-
+    selectable free text, so lint says when it applied - an exemption you
+    can see is auditable, one you cannot is a hole."""
+    item = get_item(conn, item_id)
+    notes = []
+    if (
+        get_config(conn, "lint.require_falsifiable_rung") == "on"
+        and item["state"] in ("planning", "active")
+        and (item.get("category") or "") in _FALSIFIABILITY_EXEMPT_CATEGORIES
+        and any((v.get("command") or "").strip() for v in item["verifications"])
+    ):
+        notes.append(
+            f"note: falsifiability check skipped - category '{item['category']}' is exempt "
+            "(tripwires/acceptance runs legitimately pass on the current tree)"
+        )
+    return notes
+
+
 def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
     item = get_item(conn, item_id)
     findings = []
@@ -3909,6 +3929,10 @@ def _cmd_lint(conn, actor, args):
         total += len(findings)
         for finding in findings:
             print(f"{target}: {finding}")
+        # Notes are advisory visibility, not defects: they neither count nor
+        # affect the exit code.
+        for note in lint_item_notes(conn, target):
+            print(f"{target}: {note}")
     print(f"{total} finding(s) across {len(targets)} item(s)")
     return 1 if total else 0
 
