@@ -629,15 +629,12 @@ def _apply_dataframe_suffix_mode(s: types.SimpleNamespace) -> None:
         s.mode = "dataframe"
 
 
-_DUCKLAKE_DEPLOYMENT_MODES = frozenset({"local", "local_catalog_s3", "postgres_catalog", "postgres_catalog_s3"})
-
-
 def _apply_ducklake_deployment_suffix(s: types.SimpleNamespace) -> None:
     """Turn ``ducklake:<mode>`` shorthand into an explicit platform option."""
     if not s.platform or not s.platform.lower().startswith("ducklake:"):
         return
     platform, mode = s.platform.split(":", 1)
-    if mode not in _DUCKLAKE_DEPLOYMENT_MODES:
+    if mode not in ("local", "local_catalog_s3", "postgres_catalog", "postgres_catalog_s3"):
         return
     s.platform = platform
     pairs = list(s.platform_option_pairs or ())
