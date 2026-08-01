@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -12,6 +13,8 @@ from pathlib import Path
 from typing import Sequence
 
 import pytest
+
+from tests.utilities.posix_shell import posix_shell, skip_without_posix_shell
 
 pytestmark = [
     pytest.mark.unit,
@@ -91,6 +94,65 @@ def _comment(
         created_at=created_at,
         in_reply_to_id=in_reply_to_id,
     )
+
+
+def _write_fake_codex_launcher(directory: Path) -> Path:
+    """Write a deterministic fake Codex command resolvable on this host."""
+    directory.mkdir(parents=True, exist_ok=True)
+    bash_shim = directory / "codex"
+    bash_shim.write_text(
+        textwrap.dedent(
+            """
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "${1:-}" == "--version" ]]; then
+              echo "codex-cli 0.128.0"
+              exit 0
+            fi
+            # exec subcommand: write a fix file inside the cwd given via --cd.
+            cd_dir="."
+            for ((i=1; i<=$#; i++)); do
+              if [[ "${!i}" == "--cd" ]]; then
+                next=$((i+1))
+                cd_dir="${!next}"
+              fi
+            done
+            mkdir -p "$cd_dir"
+            echo "codex-fix" > "$cd_dir/codex-fix.txt"
+            cat <<'OUT'
+            Disposition: fixed
+            Evidence: created codex-fix.txt
+            Verification: cat codex-fix.txt
+            OUT
+            """
+        ).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+    bash_shim.chmod(bash_shim.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    if os.name != "nt":
+        return bash_shim
+
+    skip_without_posix_shell()
+    shell = posix_shell()
+    assert shell is not None
+    cmd_launcher = directory / "codex.cmd"
+    cmd_launcher.write_text(f'@"{shell}" "%~dp0codex" %*\n', encoding="utf-8")
+    return cmd_launcher
+
+
+def test_fake_codex_launcher_resolves_from_path_and_reports_version(monkeypatch, tmp_path) -> None:
+    fake_bin = tmp_path / "bin"
+    launcher = _write_fake_codex_launcher(fake_bin)
+    monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}")
+
+    resolved = shutil.which("codex")
+
+    assert resolved is not None
+    assert Path(resolved).resolve() == launcher.resolve()
+    completed = subprocess.run(["codex", "--version"], check=False, capture_output=True, text=True)
+    assert completed.returncode == 0
+    assert completed.stdout.strip() == "codex-cli 0.128.0"
 
 
 def _issue_comment(
@@ -509,39 +571,8 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
     ).stdout.strip()
     subprocess.run(["git", "-C", str(repo_root), "update-ref", "refs/remotes/origin/develop", head], check=True)
 
-    # Fake codex shim that writes a deterministic file to simulate a fix.
     fake_bin = tmp_path / "bin"
-    fake_bin.mkdir()
-    codex_shim = fake_bin / "codex"
-    codex_shim.write_text(
-        textwrap.dedent(
-            """
-            #!/usr/bin/env bash
-            set -euo pipefail
-            if [[ "${1:-}" == "--version" ]]; then
-              echo "codex-cli 0.128.0"
-              exit 0
-            fi
-            # exec subcommand: write a fix file inside the cwd given via --cd.
-            cd_dir="."
-            for ((i=1; i<=$#; i++)); do
-              if [[ "${!i}" == "--cd" ]]; then
-                next=$((i+1))
-                cd_dir="${!next}"
-              fi
-            done
-            mkdir -p "$cd_dir"
-            echo "codex-fix" > "$cd_dir/codex-fix.txt"
-            cat <<'OUT'
-            Disposition: fixed
-            Evidence: created codex-fix.txt
-            Verification: cat codex-fix.txt
-            OUT
-            """
-        ).strip()
-        + "\n"
-    )
-    codex_shim.chmod(codex_shim.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    _write_fake_codex_launcher(fake_bin)
     monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}")
 
     pending_pr = pr_review_followups.PullRequest(
