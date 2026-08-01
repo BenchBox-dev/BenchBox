@@ -133,38 +133,48 @@ def posix_shell() -> str | None:
     return None
 
 
-def run_posix_shell(script: str, **kwargs) -> subprocess.CompletedProcess:
-    """Run ``script`` under a verified POSIX shell.
-
-    Mirrors ``subprocess.run([shell, "-c", script], **kwargs)``. Raises
-    ``RuntimeError`` when no shell is available; pair with
-    :func:`requires_posix_shell` to skip instead.
-    """
-    shell = posix_shell()
-    if shell is None:
-        raise RuntimeError(
-            "No working POSIX shell found for workflow shell-fragment tests. "
-            f"Set {_ENV_OVERRIDE} to a bash executable. On Windows, install Git for "
-            "Windows (C:\\Program Files\\Git\\bin\\bash.exe); note that "
-            "C:\\Windows\\System32\\bash.exe is the WSL launcher, not a shell."
-        )
-    return subprocess.run([shell, "-c", script], **kwargs)
-
-
+_NO_SHELL_ERROR = (
+    "No working POSIX shell found for workflow shell-fragment tests. "
+    f"Set {_ENV_OVERRIDE} to a bash executable. On Windows, install Git for "
+    "Windows (C:\\Program Files\\Git\\bin\\bash.exe); note that "
+    "C:\\Windows\\System32\\bash.exe is the WSL launcher, not a shell."
+)
 _SKIP_REASON = (
     f"no working POSIX shell (set {_ENV_OVERRIDE}); C:\\Windows\\System32\\bash.exe is the WSL launcher, not a shell"
 )
 
 
+def run_posix_shell(script: str, **kwargs) -> subprocess.CompletedProcess:
+    """Run ``script`` under a verified POSIX shell.
+
+    Mirrors ``subprocess.run([shell, "-c", script], **kwargs)``. Raises
+    ``RuntimeError`` when no shell is available; pair with
+    :func:`requires_posix_shell` for the host-specific skip-or-fail policy.
+    """
+    shell = posix_shell()
+    if shell is None:
+        raise RuntimeError(_NO_SHELL_ERROR)
+    return subprocess.run([shell, "-c", script], **kwargs)
+
+
+def _should_skip_without_posix_shell() -> bool:
+    """Return whether missing Bash is an allowed platform capability skip."""
+    if posix_shell() is not None:
+        return False
+    if os.name == "nt":
+        return True
+    raise RuntimeError(_NO_SHELL_ERROR)
+
+
 def requires_posix_shell():
-    """``pytest.mark.skipif`` guard for modules whose every test needs a shell."""
+    """Guard all-shell modules, failing closed when POSIX Bash resolution breaks."""
     import pytest
 
-    return pytest.mark.skipif(posix_shell() is None, reason=_SKIP_REASON)
+    return pytest.mark.skipif(_should_skip_without_posix_shell(), reason=_SKIP_REASON)
 
 
 def skip_without_posix_shell() -> None:
-    """Skip the calling test when no POSIX shell is available.
+    """Skip on Windows when Git Bash is absent; fail closed on POSIX.
 
     Preferred over a module-level mark in mixed modules: most of these files also
     hold YAML/regex assertions that need no shell at all and must keep running on
@@ -173,5 +183,5 @@ def skip_without_posix_shell() -> None:
     """
     import pytest
 
-    if posix_shell() is None:
+    if _should_skip_without_posix_shell():
         pytest.skip(_SKIP_REASON)
