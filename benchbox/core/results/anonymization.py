@@ -336,7 +336,10 @@ class AnonymizationManager:
                     anonymized[key] = self._anonymize_public_value(child, child_path)
             return anonymized
 
-        if isinstance(value, list):
+        if isinstance(value, (list, tuple, set, frozenset)):
+            # Tuples/sets serialize as JSON arrays; recursing as a list keeps
+            # their contents inside the anonymization boundary instead of
+            # falling through to the scalar branch untouched.
             return [self._anonymize_public_value(item, key_path) for item in value]
 
         return self._anonymize_public_scalar(value, key_path)
