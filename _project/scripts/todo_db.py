@@ -38,6 +38,7 @@ import getpass
 import json
 import os
 import re
+import shlex
 import socket
 import sqlite3
 import subprocess
@@ -2091,6 +2092,43 @@ def _command_asserts_on_output(command: str) -> bool:
     return bool(_COMMAND_ASSERTS_ON_OUTPUT_RE.search(command) or _JQ_EXIT_STATUS_RE.search(command))
 
 
+# A rung whose whole command is angle-bracketed prose ("<record the run ids>")
+# is a note to a future author, not a command: it exits non-zero on every tree,
+# so it satisfies "must fail on the unfixed tree" without gating anything.
+_PLACEHOLDER_COMMAND_RE = re.compile(r"^\s*<[^<>]*>\s*$")
+
+
+def _command_unrunnable_reason(command: str) -> str | None:
+    """Why this verification command can never execute, or None if it can.
+
+    Deliberately conservative: piped, multi-line, `!`-negated, env-prefixed and
+    compound commands are all legitimate and must not be flagged, so the only
+    signals used are a whole-command placeholder shape and a failed shell parse.
+    """
+    if _PLACEHOLDER_COMMAND_RE.match(command):
+        return "prose placeholder, not a runnable command"
+    try:
+        tokens = shlex.split(command, posix=True)
+    except ValueError as exc:
+        return f"fails shell parse: {exc}"
+    if not tokens:
+        return "empty after shell parsing"
+    return None
+
+
+def _unrunnable_verifications(item: dict) -> list[tuple[int, str, str]]:
+    """Return (seq, reason, command) for rungs whose command cannot execute."""
+    offenders = []
+    for ver in item["verifications"]:
+        command = ver.get("command") or ""
+        if not command.strip():
+            continue
+        reason = _command_unrunnable_reason(command)
+        if reason:
+            offenders.append((ver["seq"], reason, command))
+    return offenders
+
+
 def _unsatisfiable_verifications(item: dict) -> list[int]:
     """Return seqs of rungs whose command cannot express their expectation."""
     offenders = []
@@ -2111,6 +2149,8 @@ def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
         findings.append("no verification steps recorded")
     elif not any(v["command"] for v in item["verifications"]):
         findings.append("verification steps exist but none has a runnable command")
+    for seq, reason, command in _unrunnable_verifications(item):
+        findings.append(f"verification seq {seq} command cannot execute ({reason}): {command}")
     unsatisfiable = _unsatisfiable_verifications(item)
     if unsatisfiable:
         findings.append(
