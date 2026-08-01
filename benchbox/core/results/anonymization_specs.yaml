@@ -37,6 +37,10 @@ identifier_keys:
   username: user
   user: user
   userid: user
+  pguser: user
+  dbuser: user
+  tenant: tenant
+  tenantid: tenant
   role: role
   rolename: role
   rolearn: role
