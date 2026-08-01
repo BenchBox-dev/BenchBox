@@ -73,12 +73,44 @@ def test_applied_only_change_discovers_paired_primary_bundle(tmp_path: Path) -> 
     assert result.stdout.strip().splitlines() == ["results-data/bundles/result.json"]
 
 
+def test_case_insensitive_primary_bundle_discovery_matches_validator(tmp_path: Path) -> None:
+    """Submission CI must validate every extension casing accepted by bundle discovery."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+    _git(tmp_path, "commit", "--quiet", "--allow-empty", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    bundle_dir = tmp_path / "results-data" / "bundles"
+    bundle_dir.mkdir(parents=True)
+    primary = bundle_dir / "result.JSON"
+    primary.write_text("{}\n", encoding="utf-8")
+    (bundle_dir / "result.PLANS.JSON").write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "uppercase bundle")
+
+    skip_without_posix_shell()
+    env = os.environ.copy()
+    env["BASE_SHA"] = base_sha
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines() == ["results-data/bundles/result.JSON"]
+
+
 def test_applied_companion_derivation_is_deletion_aware() -> None:
     """The workflow must inspect an existing primary when its companion is removed."""
     script = _changed_bundle_discovery_script()
     assert "--diff-filter=ACMRD" in script
     assert "CHANGED_APPLIED" in script
-    assert 'bundle="${applied%.applied.json}.json"' in script
+    assert 'awk -v candidate="${stem}.json"' in script
     assert 'git cat-file -e "HEAD:${bundle}"' in script
 
 
