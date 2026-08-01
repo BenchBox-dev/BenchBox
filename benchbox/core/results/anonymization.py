@@ -55,6 +55,7 @@ _MESSAGE_PATH_RE = re.compile(
     r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
     r")"
 )
+_TUNING_SOURCE_DIGEST_RE = re.compile(r"[0-9a-f]{16,64}", re.IGNORECASE)
 _MESSAGE_URL_RE = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s'\",;)]*", flags=re.IGNORECASE)
 _MESSAGE_SECRET_ASSIGNMENT_RE = re.compile(
     r"\b([a-z0-9][a-z0-9_.-]*)=[^&\s,;)]*",
@@ -326,13 +327,14 @@ class AnonymizationManager:
         return self._anonymize_public_value(payload, ())
 
     def anonymize_tuning_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """Anonymize a tuning companion while preserving its safe provenance.
+        """Anonymize a tuning companion while preserving normalized provenance.
 
         Tuning payloads use table names as mapping keys and column names under
         a generic ``name`` key, so the generic payload walker cannot identify
-        those identifiers. ``source_file`` is already normalized to a
-        repository-relative/template reference by the capture path and is a
-        public provenance field, so it must not be path-hashed here.
+        those identifiers. Current capture emits ``source_file`` as a normalized
+        repository-relative reference, optionally suffixed by a content digest.
+        Legacy or user-authored companions are untrusted, so any other value is
+        path-hashed before a bundle is re-exported.
         """
         source_file = payload.get("source_file")
         working = dict(payload)
@@ -347,12 +349,32 @@ class AnonymizationManager:
 
         anonymized = self.anonymize_result_payload(working)
         if source_file is not None:
-            anonymized["source_file"] = source_file
+            anonymized["source_file"] = (
+                source_file
+                if self._is_normalized_tuning_source_reference(source_file)
+                else self._hash_public_identifier(str(source_file), "path")
+            )
         if table_tunings is not None:
             anonymized_requested = anonymized.setdefault("requested", {})
             if isinstance(anonymized_requested, dict):
                 anonymized_requested["table_tunings"] = self._anonymize_tuning_table_tunings(table_tunings)
         return anonymized
+
+    @staticmethod
+    def _is_normalized_tuning_source_reference(value: Any) -> bool:
+        """Return whether *value* is a safe repo-relative/template reference."""
+        if not isinstance(value, str) or not value or value != value.strip():
+            return False
+        if "\\" in value or "\0" in value or value.startswith(("/", "~")):
+            return False
+
+        reference, separator, digest = value.rpartition(":")
+        if separator:
+            if not _TUNING_SOURCE_DIGEST_RE.fullmatch(digest):
+                return False
+        else:
+            reference = value
+        return bool(reference) and all(part not in {"", ".", ".."} for part in reference.split("/"))
 
     def _anonymize_tuning_table_tunings(self, value: Any) -> Any:
         if isinstance(value, dict):
