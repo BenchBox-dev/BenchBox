@@ -12,6 +12,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -154,6 +155,60 @@ def test_anonymized_export_drops_raw_statement_text(tmp_path) -> None:
     assert sanitized["status"] == "applied_unverified"
     assert sanitized["statements"][0]["phase"] == "session"
     assert sanitized["statements"][0]["mechanism"] == "spark_session_config"
-    assert sanitized["dropped"] == payload["dropped"]
+    assert sanitized["dropped"] == [{"redacted": True}]
     # The caller's payload is never mutated (deep-copy contract).
     assert payload["statements"][0]["statement"].startswith("SET spark")
+
+
+def test_anonymized_export_scrubs_receipt_and_dropped_free_text(tmp_path) -> None:
+    from benchbox.core.results.exporter import ResultExporter
+
+    payload = {
+        "status": "applied_unverified",
+        "statements": [],
+        "dropped": [
+            {
+                "intent": "partitioning:private_catalog.private_schema.orders",
+                "reason": "driver failed at secret.internal/private/path",
+            }
+        ],
+        "receipt": {
+            "platform": "snowflake",
+            "corroborated": False,
+            "summary": {"unverifiable": 1, "absent": 1, "verifiable_total": 2},
+            "error": "connection to secret.internal failed for /private/cert.pem",
+            "dropped": [
+                {
+                    "intent": "partitioning:private_catalog.private_schema.orders",
+                    "reason": "nested driver failure at secret.internal",
+                }
+            ],
+            "entries": [
+                {
+                    "statement": "CREATE INDEX private_idx ON private_catalog.private_schema.orders (id)",
+                    "phase": "ddl",
+                    "verdict": "unverifiable",
+                    "reason": "introspection degraded: connection to secret.internal failed",
+                    "detail": "raw driver detail at /private/cert.pem",
+                },
+                {
+                    "statement": "CREATE INDEX private_idx ON private_catalog.private_schema.orders (id)",
+                    "phase": "ddl",
+                    "verdict": "absent",
+                    "reason": "no index on private_catalog.private_schema.orders found in catalog",
+                },
+            ],
+        },
+    }
+
+    sanitized = ResultExporter(output_dir=tmp_path, anonymize=True)._anonymize_applied_payload(payload)
+    serialized = json.dumps(sanitized, sort_keys=True)
+
+    for secret in ("secret.internal", "/private", "private_catalog", "private_schema"):
+        assert secret not in serialized
+    assert sanitized["receipt"]["error_redacted"] is True
+    assert all(entry["reason_redacted"] is True for entry in sanitized["receipt"]["entries"])
+    assert sanitized["dropped"] == [{"redacted": True}]
+    assert sanitized["receipt"]["dropped"] == [{"redacted": True}]
+    assert sanitized["receipt"]["corroborated"] is False
+    assert sanitized["receipt"]["summary"]["verifiable_total"] == 2

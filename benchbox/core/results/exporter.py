@@ -445,12 +445,14 @@ class ResultExporter:
         arbitrary per-platform SQL/config text, so the free-text ``statement``
         and ``error`` fields are dropped outright, mirroring the plans policy.
 
-        The structural fields (``phase``, ``status``, ``mechanism``, ``table``)
-        and the top-level ``status`` / ``applied_ledger_hash`` / ``dropped``
-        (code-authored reason strings) are retained: the hash still certifies
-        the real executed statements for cross-run comparison, and the honest
-        status is preserved. Operates on a deep copy; the caller's payload and
-        the in-memory result are never mutated.
+        The structural fields (``phase``, ``status``, ``mechanism``) and the
+        top-level ``status`` / ``applied_ledger_hash`` are retained. Dropped
+        intent/reason text is redacted because ``record_dropped`` accepts
+        adapter-provided strings and cannot enforce that they are free of
+        exception detail. The hash still certifies the real executed statements
+        for cross-run comparison, and the honest status is preserved. Operates
+        on a deep copy; the caller's payload and the in-memory result are never
+        mutated.
         """
         sanitized = copy.deepcopy(applied_payload)
         statements = sanitized.get("statements")
@@ -466,6 +468,7 @@ class ResultExporter:
                 # database_name - drop it here for the same reason.
                 entry.pop("table", None)
                 entry["statement_redacted"] = True
+        self._sanitize_applied_dropped(sanitized)
         # The post-load introspection receipt (tuning-introspection-receipts)
         # rides inside this companion and echoes the same free-text statement /
         # identifier fields (plus catalog evidence), so it is scrubbed by the
@@ -477,6 +480,17 @@ class ResultExporter:
         # catalog/table name, so it follows the same drop-free-text policy.
         self._sanitize_applied_drift_check(sanitized.get("drift_check"))
         return sanitized
+
+    @staticmethod
+    def _sanitize_applied_dropped(payload: Any) -> None:
+        """Replace adapter-provided dropped-intent text with count-preserving markers."""
+        if not isinstance(payload, dict) or "dropped" not in payload:
+            return
+        dropped = payload.get("dropped")
+        if not dropped:
+            return
+        count = len(dropped) if isinstance(dropped, list) else 1
+        payload["dropped"] = [{"redacted": True} for _ in range(count)]
 
     @staticmethod
     def _sanitize_applied_drift_check(drift_check: Any) -> None:
@@ -508,16 +522,33 @@ class ResultExporter:
         per-statement ``statement`` / ``diff`` / ``evidence`` and the ``table`` /
         column / index-name identifiers can embed paths or user-chosen catalog
         names, so they are dropped outright for anonymized exports. The
-        structural ``verdict`` / ``kind`` / ``phase`` / ``reason`` and the
-        top-level ``corroborated`` / ``summary`` are retained.
+        structural ``verdict`` / ``kind`` / ``phase`` and the top-level
+        ``corroborated`` / ``summary`` are retained. Free-text ``error``,
+        ``detail``, and ``reason`` fields are removed with additive redaction
+        markers.
         """
         if not isinstance(receipt, dict):
             return
-        _drop = ("statement", "diff", "evidence", "table", "name", "expected_columns", "observed_columns")
+        if "error" in receipt:
+            receipt.pop("error", None)
+            receipt["error_redacted"] = True
+        _drop = (
+            "statement",
+            "diff",
+            "detail",
+            "evidence",
+            "table",
+            "name",
+            "expected_columns",
+            "observed_columns",
+        )
         for entry in receipt.get("entries") or []:
             if isinstance(entry, dict):
                 for key in _drop:
                     entry.pop(key, None)
+                if "reason" in entry:
+                    entry.pop("reason", None)
+                    entry["reason_redacted"] = True
                 entry["statement_redacted"] = True
         for obj in receipt.get("observed") or []:
             if isinstance(obj, dict):
@@ -526,6 +557,7 @@ class ResultExporter:
                 obj.pop("columns", None)
                 obj.pop("evidence", None)
                 obj["redacted"] = True
+        ResultExporter._sanitize_applied_dropped(receipt)
 
     def _convert_datetimes_to_iso(self, obj: Any) -> Any:
         """Convert datetime objects to ISO format strings."""

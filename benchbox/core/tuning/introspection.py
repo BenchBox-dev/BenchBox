@@ -143,6 +143,7 @@ class ReceiptEntry:
     diff: str | None = None
     reason: str | None = None
     evidence: dict[str, Any] | None = None
+    detail: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -164,6 +165,8 @@ class ReceiptEntry:
             payload["diff"] = self.diff
         if self.reason:
             payload["reason"] = self.reason
+        if self.detail:
+            payload["detail"] = self.detail
         if self.evidence:
             payload["evidence"] = self.evidence
         return payload
@@ -578,7 +581,8 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
                         table=intent.table,
                         name=intent.name,
                         expected_columns=intent.columns,
-                        reason=f"introspection degraded: {state_error}",
+                        reason="introspection degraded",
+                        detail=state_error,
                     )
                 )
                 continue
@@ -600,7 +604,7 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
                 observed = fact.columns if fact is not None else ()
                 entry.diff = _short_diff(intent.columns, observed)
             elif verdict == ABSENT:
-                entry.reason = f"no {intent.kind} on {intent.table} found in catalog"
+                entry.reason = f"no {intent.kind} found in catalog"
             entries.append(entry)
 
     verifiable = [e for e in entries if e.verdict in _VERIFIABLE_VERDICTS]
