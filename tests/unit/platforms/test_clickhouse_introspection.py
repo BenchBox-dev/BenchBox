@@ -112,7 +112,7 @@ class TestClickHouseIntrospector:
         ledger = _optimize_ledger()
         receipt = corroborate(ledger, ClickHouseTuningIntrospector().introspect(_FakeCHConnection(rows), ledger))
         assert receipt.corroborated is False
-        assert receipt.summary["verifiable_total"] == 0
+        assert receipt.summary["gate_relevant_total"] == 0
         assert any(o.kind == KIND_SORT_KEY for o in receipt.observed)
 
 
