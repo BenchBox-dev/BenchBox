@@ -24,9 +24,13 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = Number(process.env.E2E_PORT ?? 4319);
 const HOST = process.env.E2E_HOST ?? "127.0.0.1";
 const BASE_URL = `http://${HOST}:${PORT}`;
+const CAPTURE_FIRST_FAILURE = Boolean(process.env.E2E_CAPTURE_FIRST_FAILURE);
 
 export default defineConfig({
   testDir: "./e2e",
+  // The blocking Chromium script runs failure-regression specs separately
+  // with retries disabled, so a probabilistic regression cannot pass as flaky.
+  testIgnore: process.env.E2E_EXCLUDE_FAILURES ? /failures\// : undefined,
   outputDir: "./test-results",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
@@ -50,9 +54,9 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
-    trace: "on-first-retry",
+    trace: CAPTURE_FIRST_FAILURE ? "retain-on-failure" : "on-first-retry",
     screenshot: "only-on-failure",
-    video: "on-first-retry",
+    video: CAPTURE_FIRST_FAILURE ? "retain-on-failure" : "on-first-retry",
   },
 
   projects: [

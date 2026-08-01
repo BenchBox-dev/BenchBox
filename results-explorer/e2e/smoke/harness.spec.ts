@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { waitForDataLoaded } from "../support/fixtures";
+import { dataWaitNavigationAction, waitForDataLoaded } from "../support/fixtures";
 
 /**
  * Harness sanity check - proves that the Playwright webServer boots the
@@ -37,4 +37,13 @@ test("@smoke loads DuckDB-WASM from same-origin bundled assets, not jsDelivr", a
   await waitForDataLoaded(page, /Recent Results/i);
 
   expect(jsDelivrRequests).toEqual([]);
+});
+
+test("data waits re-wait after same-route query canonicalization", () => {
+  expect(
+    dataWaitNavigationAction(
+      "http://127.0.0.1:4319/results/query/?sql=SELECT%20*%20FROM%20bench.results",
+      "http://127.0.0.1:4319/results/query/?sql=SELECT+*+FROM+bench.results",
+    ),
+  ).toBe("rewait");
 });

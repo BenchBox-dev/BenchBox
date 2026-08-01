@@ -112,6 +112,17 @@ cold-load regression guard (the pass-1 bug it pins surfaced as *partial* rows,
 1 of 5, which a `count > 0` check would have passed). Leave its single-shot
 waits and exact row counts alone — if it flakes, that is signal, not noise.
 
+The blocking Chromium command therefore runs every spec under `e2e/failures/`
+in a separate `--retries=0` invocation. The ordinary CI retry policy must not
+turn a probabilistic cold-load regression into a flaky-but-green gate.
+
+`queryRows` deliberately retries only zero-row answers during the bounded cold
+window. A generic non-empty result carries no trustworthy completeness signal:
+retrying every non-empty query would penalize legitimate `LIMIT`, filtered, and
+streaming reads, while guessing expected row counts from SQL would be brittle.
+Partial non-empty reads are therefore an accepted residual risk at this layer,
+pinned by the dedicated cold-load spec's fixture-derived exact row counts.
+
 The root cause is in `results-explorer/src/**` (gate the first keyed query on a
 queryable snapshot, or re-query when it returns zero rows), tracked as
 `explorer-cold-snapshot-zero-row-race-20260729`; the e2e suite is not permitted
