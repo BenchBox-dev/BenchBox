@@ -121,6 +121,25 @@ def test_interactive_cloud_setup_leaves_server_credentials_to_adapter():
     state.ctx.exit.assert_not_called()
 
 
+def test_interactive_cloud_setup_guides_singlestore_credentials():
+    state = SimpleNamespace(
+        database_config=SimpleNamespace(type="singlestore"),
+        non_interactive=False,
+        output=None,
+        ctx=Mock(),
+    )
+
+    with (
+        patch.object(_run_module, "_run_stages_through_cloud_storage", return_value=False),
+        patch.object(_run_module, "_run_requires_platform_credentials", return_value=True),
+        patch.object(_run_module, "check_and_setup_platform_credentials", return_value=True) as check_credentials,
+    ):
+        _run_module._interactive_cloud_setup_if_needed(state)
+
+    check_credentials.assert_called_once_with(platform="singlestore", console_obj=_run_module.console, interactive=True)
+    state.ctx.exit.assert_not_called()
+
+
 def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_path: Path):
     runner = CliRunner()
 

@@ -67,6 +67,56 @@ def _assert_canonical_json_file(path: Path) -> None:
     assert raw == canonical_json_bytes(json.loads(raw))
 
 
+def test_write_file_disables_local_newline_translation(monkeypatch, tmp_path):
+    destination = tmp_path / "result.json"
+
+    def open_without_translation(file_path, mode, *, encoding, newline):
+        assert newline == ""
+        return Path(file_path).open(mode, encoding=encoding, newline=newline)
+
+    monkeypatch.setattr("builtins.open", open_without_translation)
+
+    ResultExporter(output_dir=tmp_path, anonymize=False)._write_file(destination, "{\n}\n")
+
+    assert destination.read_bytes() == b"{\n}\n"
+
+
+def test_write_file_prefers_canonical_cloud_bytes(tmp_path):
+    class CloudPath:
+        content: bytes | None = None
+
+        def write_bytes(self, content: bytes) -> None:
+            self.content = content
+
+        def write_text(self, content: str, *, encoding: str) -> None:
+            raise AssertionError("cloud byte writes must take precedence")
+
+    destination = CloudPath()
+    exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
+    exporter.is_cloud_output = True
+
+    exporter._write_file(destination, "{\n}\n")
+
+    assert destination.content == b"{\n}\n"
+
+
+def test_write_file_supports_legacy_cloud_text_api(tmp_path):
+    class CloudTextPath:
+        content: str | None = None
+
+        def write_text(self, content: str, *, encoding: str) -> None:
+            assert encoding == "utf-8"
+            self.content = content
+
+    destination = CloudTextPath()
+    exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
+    exporter.is_cloud_output = True
+
+    exporter._write_file(destination, "{\n}\n")
+
+    assert destination.content == "{\n}\n"
+
+
 def test_exporter_serializes_execution_phases(tmp_path):
     """JSON export should handle execution phases via v2.0 schema.
 

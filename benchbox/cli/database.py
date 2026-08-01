@@ -17,6 +17,7 @@ from rich.table import Table
 import benchbox.cli.platform_defaults as _platform_defaults  # noqa: F401  # registers builders
 from benchbox.core.databases.manager import check_connection as core_check_connection
 from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.core.schemas import DatabaseConfig, SystemProfile
 from benchbox.utils.printing import quiet_console
 from benchbox.utils.runtime_env import ensure_driver_version
@@ -421,12 +422,14 @@ class DatabaseManager:
         """Build a database configuration using registered platform hooks."""
 
         platform_lower = platform.lower()
+        # Structured/JSON log handlers serialize `extra` in full, so option
+        # values must pass the same redaction as exported result metadata.
         logger.debug(
             "Building database config",
             extra={
                 "platform": platform_lower,
-                "platform_options": platform_options,
-                "runtime_overrides": runtime_overrides,
+                "platform_options": sanitize_platform_options(platform_options or {}),
+                "runtime_overrides": sanitize_platform_options(runtime_overrides or {}),
             },
         )
 
@@ -483,9 +486,15 @@ class DatabaseManager:
         else:
             config.driver_version_resolved = config.driver_version
 
+        # The config object carries connection_string, options, and arbitrary
+        # platform extras (extra="allow"), any of which can hold credentials.
         logger.debug(
             "Database configuration built",
-            extra={"platform": platform_lower, "config": config, "options": config.options},
+            extra={
+                "platform": platform_lower,
+                "config": sanitize_platform_options(config.model_dump()),
+                "options": sanitize_platform_options(config.options),
+            },
         )
         return config
 

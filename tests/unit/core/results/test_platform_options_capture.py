@@ -477,3 +477,18 @@ class TestApiKeyAndAccountKeyRedaction:
         assert result["partition_key"] == "l_orderkey"
         assert result["primary_key"] == "id"
         assert result["account"] == "acct-1"
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "dsn",
+        "database_dsn",
+        "spark.hadoop.fs.azure.sas.container.account.blob.core.windows.net",
+    ],
+)
+def test_dsn_and_sas_credential_keys_are_redacted(key: str) -> None:
+    """Connection DSNs and Azure SAS settings can both carry bearer secrets."""
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    assert sanitize_platform_options({key: "CREDENTIAL-SENTINEL"})[key] == REDACTED_VALUE
