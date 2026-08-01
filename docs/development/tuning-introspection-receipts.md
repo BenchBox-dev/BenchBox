@@ -104,6 +104,24 @@ catalog exists.
   recorded as a corroboratable footprint (e.g. recording the CTAS
   `ORDER BY`, or re-creating the index post-load) -- out of scope here.
 
+- **Snowflake** (`benchbox/platforms/snowflake_introspection.py`): reads
+  `INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY` with bound, normalized schema
+  parameters, then filters the structured rows to ledger tables. Both
+  `LINEAR(A, B)` and `(A, B)` catalog forms normalize to the same exact,
+  order-sensitive column tuple while the live catalog spelling remains
+  unconfirmed.
+
+  A matching catalog key certifies only that Snowflake accepted the clustering
+  **key metadata**. It does not certify that existing micro-partitions have
+  finished reclustering: `ALTER TABLE ... CLUSTER BY` updates metadata before
+  asynchronous maintenance completes, and `RESUME RECLUSTER` remains a
+  non-blocking maintenance statement. This is intentionally weaker than the
+  ClickHouse receipt, whose CREATE-time sorting and partition keys describe the
+  physical MergeTree layout. When a reused Snowflake table already has the
+  requested key, the adapter skips both ALTER and RESUME and records the intent
+  as dropped/already-present; that current run therefore stays fail-closed
+  rather than claiming it physically applied the pre-existing layout.
+
 - **ClickHouse** (`benchbox/platforms/clickhouse/introspection.py`): reads
   `system.tables` (`name` / `sorting_key` / `partition_key` -- structured
   comma-separated key expressions), filtered to `currentDatabase()` and the
