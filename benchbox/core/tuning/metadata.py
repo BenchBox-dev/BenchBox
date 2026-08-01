@@ -165,30 +165,80 @@ class TuningMetadataManager:
     _TUNING_TYPE_SCHEMA_VERSION = "schema_version"
     _TUNING_TYPE_CONSTRAINTS_HASH = "constraints_hash"
     _TUNING_TYPE_PLATFORM_OPT_HASH = "platform_optimizations_hash"
+    _TUNING_TYPE_TABLE_ATTRIBUTES_HASH = "table_attributes_hash"
 
     # Bumped whenever the *shape* of what gets hashed into the section-marker
     # rows changes (e.g. a new field folded into the constraints payload).
-    # Not currently branched on by the reader -- recorded for forward
-    # compatibility so a future reader can tell old and new hash payloads
-    # apart if the hashed shape ever changes incompatibly.
-    _METADATA_SCHEMA_VERSION = 2
+    # The reader branches on this value so legacy rows are never compared
+    # against a hash shape they did not persist.
+    _METADATA_SCHEMA_VERSION = 3
 
     # `MetadataValidationResult.drifted_sections` values.
     _CONSTRAINTS_SECTION = "constraints"
     _PLATFORM_OPTIMIZATIONS_SECTION = "platform_optimizations"
+    _TABLE_ATTRIBUTES_SECTION = "table_attributes"
 
-    def __init__(self, platform_adapter, database_name: Optional[str] = None):
+    def __init__(
+        self,
+        platform_adapter,
+        database_name: Optional[str] = None,
+        connection_config: Optional[dict[str, Any]] = None,
+    ):
         """Initialize the metadata manager.
 
         Args:
             platform_adapter: Database platform adapter instance
             database_name: Optional database name for isolation
+            connection_config: Exact connection settings used by validation
         """
         self.platform_adapter = platform_adapter
         self.database_name = database_name
+        self.connection_config = dict(connection_config or {})
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
         self._metadata_table_name = "benchbox_tuning_metadata"
         self._table_exists = None  # Cache for table existence check
+        self.last_load_error: str | None = None
+        self.marker_save_failed = False
+
+    def _connection_kwargs(self) -> dict[str, Any]:
+        """Use the validated database name instead of silently falling back to another database."""
+        config = dict(self.platform_adapter.platform_config)
+        config.update(self.connection_config)
+        if self.database_name is not None:
+            config["database"] = self.database_name
+        return config
+
+    def _is_missing_metadata_table_error(self, exc: Exception) -> bool:
+        """Distinguish a fresh database from an unreadable metadata store.
+
+        Drivers expose missing-table failures through different exception
+        classes and codes.  Require the managed metadata table name in the
+        message before accepting a known missing-relation code or phrase so an
+        unrelated connection/query failure still fails closed.
+        """
+        current: BaseException | None = exc
+        seen: set[int] = set()
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+            message = str(current).lower()
+            if self._metadata_table_name.lower() in message:
+                code = getattr(current, "sqlstate", None) or getattr(current, "pgcode", None)
+                errno = getattr(current, "errno", None) or getattr(current, "code", None)
+                if code == "42P01" or errno in {60, 1146}:
+                    return True
+                if any(
+                    phrase in message
+                    for phrase in (
+                        "does not exist",
+                        "no such table",
+                        "unknown table",
+                        "undefined table",
+                        "not found",
+                    )
+                ):
+                    return True
+            current = getattr(current, "orig", None) or current.__cause__ or current.__context__
+        return False
 
     def _platform_key(self) -> str:
         """Return the canonical platform type key for lookups and persistence.
@@ -216,6 +266,34 @@ class TuningMetadataManager:
         blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def _constraints_payload(unified_config: UnifiedTuningConfiguration, *, legacy: bool = False) -> dict[str, Any]:
+        payload = {
+            "unique_constraints": unified_config.unique_constraints.to_dict(),
+            "check_constraints": unified_config.check_constraints.to_dict(),
+        }
+        if not legacy:
+            payload = {
+                "primary_keys": unified_config.primary_keys.to_dict(),
+                "foreign_keys": unified_config.foreign_keys.to_dict(),
+                **payload,
+            }
+        return payload
+
+    @staticmethod
+    def _table_attributes_payload(unified_config: UnifiedTuningConfiguration) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        for table_name, table_tuning in sorted(unified_config.table_tunings.items()):
+            sections: dict[str, Any] = {}
+            for tuning_type in TuningType:
+                columns = table_tuning.get_columns_by_type(tuning_type)
+                if columns:
+                    sections[tuning_type.value] = [
+                        column.to_dict() for column in sorted(columns, key=lambda column: column.order)
+                    ]
+            payload[table_name] = sections
+        return payload
+
     def _build_section_marker_records(
         self, unified_config: UnifiedTuningConfiguration, platform: str, created_at: datetime
     ) -> list["TuningMetadata"]:
@@ -223,11 +301,9 @@ class TuningMetadataManager:
         section hashes plus a schema-version marker, using the existing
         TuningMetadata row shape (see `_SECTION_MARKER_TABLE`).
         """
-        constraints_payload = {
-            "unique_constraints": unified_config.unique_constraints.to_dict(),
-            "check_constraints": unified_config.check_constraints.to_dict(),
-        }
+        constraints_payload = self._constraints_payload(unified_config)
         platform_optimizations_payload = unified_config.platform_optimizations.to_dict()
+        table_attributes_payload = self._table_attributes_payload(unified_config)
 
         return [
             TuningMetadata(
@@ -257,6 +333,15 @@ class TuningMetadataManager:
                 created_at=created_at,
                 platform=platform,
             ),
+            TuningMetadata(
+                table_name=self._SECTION_MARKER_TABLE,
+                tuning_type=self._TUNING_TYPE_TABLE_ATTRIBUTES_HASH,
+                column_name="table_attributes_hash",
+                column_order=0,
+                configuration_hash=self._hash_section(table_attributes_payload),
+                created_at=created_at,
+                platform=platform,
+            ),
         ]
 
     def _save_section_markers(self, unified_config: UnifiedTuningConfiguration) -> bool:
@@ -271,13 +356,16 @@ class TuningMetadataManager:
         """
         try:
             if not self.create_metadata_table():
+                self.marker_save_failed = True
                 return False
 
             platform = self._platform_key()
             records = self._build_section_marker_records(unified_config, platform, datetime.now())
             self._batch_insert_records(records)
+            self.marker_save_failed = False
             return True
         except Exception as e:
+            self.marker_save_failed = True
             self.logger.warning(f"Failed to save tuning section markers (non-fatal): {e}")
             return False
 
@@ -297,7 +385,7 @@ class TuningMetadataManager:
         FROM {self._metadata_table_name}
         WHERE table_name = '{self._SECTION_MARKER_TABLE}'
         """
-        temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
+        temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
         try:
             rows = self._fetch_all(temp_conn, query_sql)
         finally:
@@ -325,22 +413,49 @@ class TuningMetadataManager:
             )
             return
 
-        constraints_payload = {
-            "unique_constraints": unified_config.unique_constraints.to_dict(),
-            "check_constraints": unified_config.check_constraints.to_dict(),
-        }
+        try:
+            schema_version = int(existing_markers.get(self._TUNING_TYPE_SCHEMA_VERSION, "1"))
+        except (TypeError, ValueError):
+            result.add_error("Unreadable tuning metadata schema version; database reuse is unsafe")
+            return
+        if schema_version > self._METADATA_SCHEMA_VERSION:
+            result.add_error(
+                f"Unsupported tuning metadata schema version {schema_version}; "
+                f"this BenchBox supports up to {self._METADATA_SCHEMA_VERSION}"
+            )
+            return
+
+        constraints_payload = self._constraints_payload(unified_config, legacy=schema_version < 3)
+        if schema_version < 3:
+            result.add_warning(
+                "Legacy tuning metadata schema does not record primary/foreign-key or column-attribute drift"
+            )
         expected_constraints_hash = self._hash_section(constraints_payload)
         expected_platform_opt_hash = self._hash_section(unified_config.platform_optimizations.to_dict())
 
         existing_constraints_hash = existing_markers.get(self._TUNING_TYPE_CONSTRAINTS_HASH)
         existing_platform_opt_hash = existing_markers.get(self._TUNING_TYPE_PLATFORM_OPT_HASH)
+        existing_table_attributes_hash = existing_markers.get(self._TUNING_TYPE_TABLE_ATTRIBUTES_HASH)
+
+        if schema_version >= 3:
+            required_markers = {
+                self._TUNING_TYPE_CONSTRAINTS_HASH,
+                self._TUNING_TYPE_PLATFORM_OPT_HASH,
+                self._TUNING_TYPE_TABLE_ATTRIBUTES_HASH,
+            }
+            missing_markers = sorted(required_markers - existing_markers.keys())
+            if missing_markers:
+                result.add_error(
+                    "Incomplete tuning metadata section markers; database reuse is unsafe "
+                    f"(missing: {', '.join(missing_markers)})"
+                )
+                return
 
         if existing_constraints_hash is not None and existing_constraints_hash != expected_constraints_hash:
             result.drifted_sections.add(self._CONSTRAINTS_SECTION)
             result.add_error(
-                "Unique/check constraint configuration drift detected: persisted database metadata "
-                "does not match the expected configuration (unique_constraints/check_constraints "
-                "changed since the database was tuned)."
+                "Primary/foreign/unique/check constraint configuration drift detected: persisted database metadata "
+                "does not match the expected configuration (constraint enablement changed since the database was tuned)."
             )
 
         if existing_platform_opt_hash is not None and existing_platform_opt_hash != expected_platform_opt_hash:
@@ -351,6 +466,15 @@ class TuningMetadataManager:
                 "bloom filters, auto-optimize/compact, or materialized views changed since the "
                 "database was tuned)."
             )
+
+        if schema_version >= 3:
+            table_attributes_payload = self._table_attributes_payload(unified_config)
+            if existing_table_attributes_hash != self._hash_section(table_attributes_payload):
+                result.drifted_sections.add(self._TABLE_ATTRIBUTES_SECTION)
+                result.configuration_mismatches[self._TABLE_ATTRIBUTES_SECTION] = (
+                    "Persisted column attributes do not match expected sort order, null placement, compression, or type"
+                )
+                result.add_error("Table tuning column attributes drifted from persisted database metadata")
 
     def create_metadata_table(self) -> bool:
         """Create the tunings metadata table if it doesn't exist.
@@ -368,7 +492,7 @@ class TuningMetadataManager:
             self.logger.info(f"Creating tuning metadata table: {self._metadata_table_name}")
 
             # Create temporary connection for schema operations
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
+            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
             try:
                 self._execute_sql(temp_conn, create_sql)
 
@@ -614,7 +738,7 @@ class TuningMetadataManager:
             )
 
         # Execute batch insert - handle platforms that don't support batch operations
-        temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
+        temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
         try:
             cursor = temp_conn.cursor()
             for params in param_lists:
@@ -633,6 +757,7 @@ class TuningMetadataManager:
             BenchmarkTunings object if found, None otherwise
         """
         try:
+            self.last_load_error = None
             if not self._table_exists_check():
                 return None
 
@@ -644,7 +769,7 @@ class TuningMetadataManager:
             ORDER BY table_name, tuning_type, column_order
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
+            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
             try:
                 results = self._fetch_all(temp_conn, query_sql)
             finally:
@@ -656,6 +781,7 @@ class TuningMetadataManager:
             return self._rebuild_tunings_from_records(results, benchmark_name or "loaded")
 
         except Exception as e:
+            self.last_load_error = str(e)
             self.logger.error(f"Failed to load tunings: {e}")
             return None
 
@@ -667,14 +793,16 @@ class TuningMetadataManager:
         try:
             # Try to query the table
             query_sql = f"SELECT COUNT(*) FROM {self._metadata_table_name} LIMIT 1"
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
+            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
             try:
                 self._fetch_one(temp_conn, query_sql)
                 self._table_exists = True
                 return True
             finally:
                 self.platform_adapter.close_connection(temp_conn)
-        except Exception:
+        except Exception as exc:
+            if not self._is_missing_metadata_table_error(exc):
+                self.last_load_error = str(exc)
             self._table_exists = False
             return False
 
@@ -765,7 +893,10 @@ class TuningMetadataManager:
             # to comparison (which correctly reports "no drift") and let
             # validate_unified_tunings' _compare_section_hashes do its job.
             if existing_tunings is None:
-                result.add_error("No tuning metadata found in database")
+                if self.last_load_error:
+                    result.add_error(f"Failed to load tuning metadata: {self.last_load_error}")
+                else:
+                    result.add_error("No tuning metadata found in database")
                 return result
 
             # Compare configurations
@@ -809,7 +940,7 @@ class TuningMetadataManager:
             result.add_error(f"Expected tuning for table '{table_name}' not found in database")
 
         for table_name in result.extra_tables:
-            result.add_warning(f"Unexpected tuning found for table '{table_name}' in database")
+            result.add_error(f"Unexpected tuning found for table '{table_name}' in database")
 
         # Compare common tables
         common_tables = expected_tables & existing_tables
@@ -865,7 +996,7 @@ class TuningMetadataManager:
 
             # Delete all records (could be filtered by benchmark_name if we stored it)
             delete_sql = f"DELETE FROM {self._metadata_table_name}"
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
+            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
             try:
                 self._execute_sql(temp_conn, delete_sql)
             finally:
@@ -904,7 +1035,7 @@ class TuningMetadataManager:
             WHERE table_name != '{self._SECTION_MARKER_TABLE}'
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self.platform_adapter.platform_config)
+            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
             try:
                 result = self._fetch_one(temp_conn, summary_sql)
             finally:

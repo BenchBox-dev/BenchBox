@@ -133,7 +133,7 @@ class TuningConfigMixin:
                 temp_connection = self.create_connection(**connection_config)
 
             try:
-                metadata_manager = TuningMetadataManager(self, connection_config.get("database"))
+                metadata_manager = TuningMetadataManager(self, connection_config=connection_config)
 
                 effective_config = self.get_effective_tuning_configuration()
                 if effective_config:
@@ -141,8 +141,14 @@ class TuningConfigMixin:
                 else:
                     existing_tunings = metadata_manager.load_unified_tunings()
                     result = MetadataValidationResult()
-                    if existing_tunings:
+                    if metadata_manager.last_load_error:
+                        result.add_error(f"Failed to load tuning metadata: {metadata_manager.last_load_error}")
+                    elif existing_tunings is not None:
                         result.add_warning("Database contains tuning metadata but no tunings expected")
+                        if not self.tuning_enabled:
+                            result.add_error(
+                                "Refusing to reuse a tuned database for a notuning run; recreate the database first"
+                            )
                 # Stash for the .applied.json companion's drift_check section
                 # (routed into the bundle for reused DBs; see ADR-001 addendum).
                 self._drift_validation_result = result
@@ -178,7 +184,16 @@ class TuningConfigMixin:
             from benchbox.core.tuning.metadata import TuningMetadataManager
 
             metadata_manager = TuningMetadataManager(self)
-            return metadata_manager.save_unified_tunings(effective_config)
+            saved = metadata_manager.save_unified_tunings(effective_config)
+            if metadata_manager.marker_save_failed:
+                from benchbox.core.tuning.metadata import MetadataValidationResult
+
+                marker_result = MetadataValidationResult()
+                marker_result.add_warning(
+                    "Tuning metadata section markers were not saved; future drift checks will report reduced coverage"
+                )
+                self._drift_validation_result = marker_result
+            return saved
 
         except Exception as e:
             self.logger.error(f"Failed to save tuning metadata: {e}")

@@ -150,6 +150,32 @@ def test_table_exists_check_caches_true_result(monkeypatch):
     assert calls["n"] == 1
 
 
+def test_table_exists_check_treats_missing_managed_table_as_fresh_database(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    monkeypatch.setattr(
+        manager,
+        "_fetch_one",
+        lambda _conn, _sql: (_ for _ in ()).throw(
+            RuntimeError("Catalog Error: Table with name benchbox_tuning_metadata does not exist!")
+        ),
+    )
+
+    assert manager._table_exists_check() is False
+    assert manager.last_load_error is None
+
+
+def test_table_exists_check_preserves_unrelated_probe_failure(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    monkeypatch.setattr(
+        manager,
+        "_fetch_one",
+        lambda _conn, _sql: (_ for _ in ()).throw(RuntimeError("network unavailable")),
+    )
+
+    assert manager._table_exists_check() is False
+    assert manager.last_load_error == "network unavailable"
+
+
 def test_rebuild_tunings_from_records_groups_columns_by_table_and_type():
     manager = TuningMetadataManager(_Adapter("duckdb"))
     records = [
@@ -181,6 +207,22 @@ def test_compare_tuning_configurations_detects_missing_and_mismatch():
     assert result.is_valid is False
     assert "lineitem" in result.extra_tables
     assert any("mismatch" in e for e in result.errors)
+
+
+def test_compare_tuning_configurations_rejects_extra_table_tunings():
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    expected = BenchmarkTunings("tpch")
+    expected.add_table_tuning(TableTuning(table_name="orders", sorting=[_col("o_orderkey")]))
+    existing = BenchmarkTunings("tpch")
+    existing.add_table_tuning(TableTuning(table_name="orders", sorting=[_col("o_orderkey")]))
+    existing.add_table_tuning(TableTuning(table_name="lineitem", sorting=[_col("l_orderkey")]))
+
+    result = MetadataValidationResult()
+    manager._compare_tuning_configurations(expected, existing, result)
+
+    assert result.is_valid is False
+    assert result.extra_tables == {"lineitem"}
+    assert any("lineitem" in error for error in result.errors)
 
 
 def test_clear_tunings_returns_true_when_no_table_exists(monkeypatch):
@@ -337,6 +379,7 @@ def test_build_section_marker_records_shape():
         TuningMetadataManager._TUNING_TYPE_SCHEMA_VERSION,
         TuningMetadataManager._TUNING_TYPE_CONSTRAINTS_HASH,
         TuningMetadataManager._TUNING_TYPE_PLATFORM_OPT_HASH,
+        TuningMetadataManager._TUNING_TYPE_TABLE_ATTRIBUTES_HASH,
     }
     assert all(r.table_name == TuningMetadataManager._SECTION_MARKER_TABLE for r in records)
 
@@ -454,6 +497,129 @@ def test_compare_section_hashes_no_drift_when_matching(monkeypatch):
     assert not result.drifted_sections
 
 
+def test_table_attribute_hash_uses_declared_column_order():
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    first = UnifiedTuningConfiguration()
+    first.table_tunings["orders"] = TableTuning(
+        table_name="orders",
+        sorting=[_col("o_orderdate", 2), _col("o_orderkey", 1)],
+    )
+    second = UnifiedTuningConfiguration()
+    second.table_tunings["orders"] = TableTuning(
+        table_name="orders",
+        sorting=[_col("o_orderkey", 1), _col("o_orderdate", 2)],
+    )
+
+    assert manager._table_attributes_payload(first) == manager._table_attributes_payload(second)
+
+
+@pytest.mark.parametrize(
+    "missing_marker",
+    [
+        TuningMetadataManager._TUNING_TYPE_CONSTRAINTS_HASH,
+        TuningMetadataManager._TUNING_TYPE_PLATFORM_OPT_HASH,
+        TuningMetadataManager._TUNING_TYPE_TABLE_ATTRIBUTES_HASH,
+    ],
+)
+def test_compare_section_hashes_v3_fails_closed_when_required_marker_is_missing(monkeypatch, missing_marker):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    config = UnifiedTuningConfiguration()
+    markers = {
+        record.tuning_type: record.configuration_hash
+        for record in manager._build_section_marker_records(config, "duckdb", datetime.now())
+    }
+    markers.pop(missing_marker)
+    monkeypatch.setattr(manager, "_load_section_markers", lambda: markers)
+
+    result = MetadataValidationResult()
+    manager._compare_section_hashes(config, result)
+
+    assert result.is_valid is False
+    assert result.errors == [
+        f"Incomplete tuning metadata section markers; database reuse is unsafe (missing: {missing_marker})"
+    ]
+
+
+def test_compare_section_hashes_v2_uses_legacy_shape_without_false_drift(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    expected = UnifiedTuningConfiguration()
+    expected.primary_keys.enabled = False
+    legacy_constraints = {
+        "unique_constraints": expected.unique_constraints.to_dict(),
+        "check_constraints": expected.check_constraints.to_dict(),
+    }
+    markers = {
+        manager._TUNING_TYPE_SCHEMA_VERSION: "2",
+        manager._TUNING_TYPE_CONSTRAINTS_HASH: manager._hash_section(legacy_constraints),
+        manager._TUNING_TYPE_PLATFORM_OPT_HASH: manager._hash_section(expected.platform_optimizations.to_dict()),
+    }
+    monkeypatch.setattr(manager, "_load_section_markers", lambda: markers)
+
+    result = MetadataValidationResult()
+    manager._compare_section_hashes(expected, result)
+
+    assert result.is_valid is True
+    assert any("Legacy tuning metadata schema" in warning for warning in result.warnings)
+
+
+@pytest.mark.parametrize("schema_version", ["not-a-version", "999"])
+def test_compare_section_hashes_fails_closed_on_unreadable_or_future_version(monkeypatch, schema_version):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    monkeypatch.setattr(
+        manager,
+        "_load_section_markers",
+        lambda: {manager._TUNING_TYPE_SCHEMA_VERSION: schema_version},
+    )
+
+    result = MetadataValidationResult()
+    manager._compare_section_hashes(UnifiedTuningConfiguration(), result)
+
+    assert result.is_valid is False
+    assert len(result.errors) == 1
+
+
+def test_validate_tunings_distinguishes_load_error_from_missing_metadata(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+
+    def fail_load(_benchmark_name=None):
+        manager.last_load_error = "network unavailable"
+        return None
+
+    monkeypatch.setattr(manager, "load_tunings", fail_load)
+    result = manager.validate_tunings(BenchmarkTunings("tpch"))
+
+    assert result.is_valid is False
+    assert result.errors == ["Failed to load tuning metadata: network unavailable"]
+
+
+def test_connection_kwargs_uses_database_under_validation():
+    adapter = _Adapter("duckdb")
+    adapter.platform_config = {"database": "default", "read_only": False, "role": "default"}
+
+    assert TuningMetadataManager(
+        adapter,
+        connection_config={"database": "validated", "read_only": True},
+    )._connection_kwargs() == {
+        "database": "validated",
+        "read_only": True,
+        "role": "default",
+    }
+
+
+def test_marker_write_failure_is_nonfatal_but_observable(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    monkeypatch.setattr(manager, "save_tunings", lambda _config: True)
+    monkeypatch.setattr(manager, "create_metadata_table", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_batch_insert_records",
+        lambda _records: (_ for _ in ()).throw(RuntimeError("marker write failed")),
+    )
+
+    assert manager.save_unified_tunings(UnifiedTuningConfiguration()) is True
+    assert manager.marker_save_failed is True
+
+
 class _FakeCursor:
     """Minimal SQL-shape-aware cursor backed by a shared in-memory row list.
 
@@ -546,6 +712,49 @@ def test_validate_unified_tunings_detects_platform_optimization_drift_on_reuse()
     assert result.is_valid is False
     assert result.drifted_sections == {TuningMetadataManager._PLATFORM_OPTIMIZATIONS_SECTION}
     assert any("Platform-optimization" in e for e in result.errors)
+
+
+def test_validate_unified_tunings_detects_primary_and_foreign_key_drift_on_reuse():
+    adapter = _FakeAdapter("duckdb")
+    saved = UnifiedTuningConfiguration()
+    saved.primary_keys.enabled = True
+    saved.foreign_keys.enabled = True
+    assert TuningMetadataManager(adapter).save_unified_tunings(saved) is True
+
+    expected = UnifiedTuningConfiguration()
+    expected.primary_keys.enabled = False
+    expected.foreign_keys.enabled = False
+    result = TuningMetadataManager(adapter).validate_unified_tunings(expected)
+
+    assert result.is_valid is False
+    assert TuningMetadataManager._CONSTRAINTS_SECTION in result.drifted_sections
+    assert any("primary" in error.lower() or "foreign" in error.lower() for error in result.errors)
+
+
+def test_validate_unified_tunings_detects_sort_attribute_drift_on_reuse():
+    adapter = _FakeAdapter("duckdb")
+    saved = UnifiedTuningConfiguration()
+    saved.table_tunings["orders"] = TableTuning(
+        table_name="orders",
+        sorting=[
+            TuningColumn(
+                name="o_orderkey",
+                type="INTEGER",
+                order=1,
+                sort_order="DESC",
+                nulls_position="FIRST",
+                compression="zstd",
+            )
+        ],
+    )
+    assert TuningMetadataManager(adapter).save_unified_tunings(saved) is True
+
+    expected = UnifiedTuningConfiguration()
+    expected.table_tunings["orders"] = TableTuning(table_name="orders", sorting=[_col("o_orderkey")])
+    result = TuningMetadataManager(adapter).validate_unified_tunings(expected)
+
+    assert result.is_valid is False
+    assert TuningMetadataManager._TABLE_ATTRIBUTES_SECTION in result.configuration_mismatches
 
 
 def test_validate_unified_tunings_old_format_table_loads_without_error():

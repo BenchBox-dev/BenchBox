@@ -294,6 +294,28 @@ recording connection are folded into that list at their actual execution phase
 before session statements, via
 `PlatformAdapter._fold_layout_operations_into_ledger`.
 
+## Addendum (2026-08-01): complete reused-database drift boundaries
+
+Metadata schema version 3 extends the sentinel hashes to cover primary- and
+foreign-key enablement plus the complete per-column tuning attributes (type,
+sort direction, null placement, and compression). Readers branch on the
+persisted version: version 2 retains its historical hash shape and produces an
+explicit reduced-coverage warning; malformed or future versions fail closed.
+This prevents a shape upgrade from manufacturing drift in a legacy database.
+
+Extra persisted table tunings are errors, not warnings. Reuse would otherwise
+run an allegedly narrower configuration against physical layout left behind by
+an earlier run. The validator never deletes those tunings; normal lifecycle
+policy recreates or refuses the database.
+
+A notuning run likewise cannot reuse a database carrying tuning metadata. It
+is refused and recreated rather than publishing a baseline result against a
+known tuned layout. Metadata load failures are distinct errors, never reported
+as clean absence. Marker persistence remains non-fatal to the original run,
+but the manager exposes that degraded write and a later reuse without complete
+markers reports reduced drift coverage. None of these `drift_check` outcomes
+can contribute to `applied_verified`.
+
 ## References
 
 - `benchbox/platforms/base/adapter.py:743-747`
