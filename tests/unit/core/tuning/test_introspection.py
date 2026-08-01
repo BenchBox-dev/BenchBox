@@ -304,6 +304,12 @@ class TestPayloadAndProtocol:
         ledger.record("OPTIMIZE TABLE ORDERS FINAL", PHASE_POST_LOAD)
         assert ledger_tables(ledger) == {"lineitem", "orders"}
 
+    def test_ledger_tables_covers_alter_and_optimize_targets(self):
+        ledger = AppliedTuningLedger()
+        ledger.record("ALTER TABLE LINEITEM CLUSTER BY (a)", PHASE_POST_LOAD)
+        ledger.record("OPTIMIZE TABLE ORDERS FINAL", PHASE_POST_LOAD)
+        assert ledger_tables(ledger) == {"lineitem", "orders"}
+
     def test_introspector_protocol_is_runtime_checkable(self):
         class _Impl:
             platform = "x"
