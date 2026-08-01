@@ -412,6 +412,105 @@ class TestLintUnrunnableCommands:
         assert not any("cannot execute" in f for f in todo_db.lint_item(conn, "desc-only-item"))
 
 
+class TestLintUnresolvableScopeAndLadderPaths:
+    """Scope globs and rung file arguments must resolve against the working
+    tree — with planned-new-file literals staying legal on open items."""
+
+    def _mk_scoped(self, conn, item_id, scope=None, verifications=None):
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id=item_id,
+            title="Item exercising scope/path resolution",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            work=[{"id": "w1", "summary": "one unit of work"}],
+            scope=scope or [],
+            verifications=verifications or [],
+        )
+
+    def test_resolvable_glob_is_clean(self, conn):
+        self._mk_scoped(
+            conn,
+            "ok-scope",
+            scope=[("only_modify", "tests/unit/scripts/test_todo_db_v2.py"), ("only_modify", "_project/scripts/**")],
+        )
+        assert not any("matches nothing" in f or "does not exist" in f for f in todo_db.lint_item(conn, "ok-scope"))
+
+    def test_open_item_wildcard_glob_matching_nothing_is_legal(self, conn):
+        # A prospective allowlist for planned outputs: check-scope fnmatches
+        # it against future changed files, so emptiness today is normal.
+        self._mk_scoped(conn, "prospective-glob", scope=[("only_modify", "_project/decisions/planned-out-*.md")])
+        findings = todo_db.lint_item(conn, "prospective-glob")
+        assert not any("planned-out" in f for f in findings)
+
+    def test_settled_item_unresolvable_paths_are_flagged(self):
+        item = {
+            "state": "done",
+            "scope": [
+                {"kind": "only_modify", "path_glob": "tests/no-such-dir/**"},
+                {"kind": "only_modify", "path_glob": "tests/unit/scripts/test_never_materialized.py"},
+            ],
+            "verifications": [
+                {"seq": 1, "command": "uv run -- python -m pytest tests/unit/scripts/test_never_materialized.py -q"}
+            ],
+        }
+        scope_findings = todo_db._unresolvable_scope_findings(item)
+        assert any("resolves to nothing" in f and "tests/no-such-dir/**" in f for f in scope_findings)
+        assert any("test_never_materialized" in f for f in scope_findings)
+        command_findings = todo_db._unresolvable_command_path_findings(item)
+        assert any("resolves to nothing" in f and "test_never_materialized" in f for f in command_findings)
+
+    def test_absolute_paths_are_skipped_even_when_settled(self):
+        item = {
+            "state": "done",
+            "scope": [{"kind": "do_not_modify", "path_glob": "/Users/someone/.claude/projects/**"}],
+            "verifications": [],
+        }
+        assert todo_db._unresolvable_scope_findings(item) == []
+
+    def test_planned_new_file_literal_stays_legal_on_open_item(self, conn):
+        self._mk_scoped(conn, "planned-file", scope=[("only_modify", "tests/unit/scripts/test_zq_upcoming_widget.py")])
+        findings = todo_db.lint_item(conn, "planned-file")
+        assert not any("test_zq_upcoming_widget" in f for f in findings)
+
+    def test_near_miss_literal_is_flagged_on_open_item(self, conn):
+        self._mk_scoped(conn, "typo-file", scope=[("only_modify", "tests/unit/scripts/test_todo_db_v3.py")])
+        findings = todo_db.lint_item(conn, "typo-file")
+        assert any("suspiciously close" in f and "test_todo_db_v3.py" in f for f in findings)
+
+    def test_command_path_argument_is_resolved(self, conn):
+        self._mk_scoped(
+            conn,
+            "bad-cmd-path",
+            verifications=[
+                {
+                    "description": "rung",
+                    "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v9000.py -q",
+                    "expected": "whatever",
+                }
+            ],
+        )
+        findings = todo_db.lint_item(conn, "bad-cmd-path")
+        assert any("suspiciously close" in f and "test_todo_db_v9000.py" in f for f in findings)
+
+    def test_command_path_with_pytest_node_id_resolves_file_part(self, conn):
+        self._mk_scoped(
+            conn,
+            "node-id-cmd",
+            verifications=[
+                {
+                    "description": "rung",
+                    "command": "uv run -- python -m pytest tests/unit/scripts/test_todo_db_v2.py::TestLintUnresolvableScopeAndLadderPaths -q",
+                    "expected": "whatever",
+                }
+            ],
+        )
+        findings = todo_db.lint_item(conn, "node-id-cmd")
+        assert not any("test_todo_db_v2" in f for f in findings)
+
+
 class TestInstructiveGateErrors:
     """Every gate refusal must name its recovery command — the error messages
     are the harness-portable instruction layer."""

@@ -33,6 +33,7 @@ Deviations from the spec DDL (recorded in the spec):
 from __future__ import annotations
 
 import argparse
+import difflib
 import fnmatch
 import getpass
 import json
@@ -2129,6 +2130,114 @@ def _unrunnable_verifications(item: dict) -> list[tuple[int, str, str]]:
     return offenders
 
 
+# Scope globs and rung file arguments are authored against the working tree,
+# but nothing ever resolved them - a typo'd path (test_motherduck_adapter.py
+# for the real test_motherduck.py) lints clean and quietly makes the item's
+# work un-landable in scope. Resolution is deliberately state-aware and
+# conservative, calibrated against the live backlog:
+#   - OPEN items: only a nonexistent LITERAL that closely matches an existing
+#     sibling (a probable typo) is a finding. Wildcard globs are prospective
+#     allowlists - check-scope fnmatches them against future changed files,
+#     so "matches nothing today" is normal for planned outputs - and a plain
+#     nonexistent literal is a legal planned new file.
+#   - DONE/DROPPED items: anything that resolves to nothing is a finding;
+#     by completion the paths had their chance to exist.
+#   - Absolute paths are skipped: out-of-repo scopes are policy statements
+#     about other machines, not references into this tree.
+
+_PATHLIKE_TOKEN_RE = re.compile(
+    r"^(?:benchbox|tests|docs|scripts|_project|results-data|results-explorer|"
+    r"Makefile|pyproject\.toml|uv\.lock)(?:/|$)"
+)
+
+# 0.87 keeps real slips (test_todo_db_v3.py for test_todo_db_v2.py, 0.94) and
+# releases planned new files for genuinely new components
+# (test_ballista_adapter.py vs test_base_adapter.py, 0.86).
+_NEAR_MISS_CUTOFF = 0.87
+
+
+def _lint_repo_root() -> Path | None:
+    result = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        return None
+    return Path(result.stdout.strip())
+
+
+def _glob_resolves(root: Path, pattern: str) -> bool:
+    """Whether ``pattern`` (repo-relative; trailing-slash means directory)
+    matches anything in the working tree."""
+    try:
+        return next(iter(root.glob(pattern.rstrip("/"))), None) is not None
+    except (ValueError, OSError, NotImplementedError):
+        return False
+
+
+def _near_miss(root: Path, literal: str) -> str | None:
+    """An existing sibling whose name closely matches ``literal``'s, if any."""
+    target = root / literal
+    if not target.parent.is_dir():
+        return None
+    names = [entry.name for entry in target.parent.iterdir()]
+    close = difflib.get_close_matches(target.name, names, n=1, cutoff=_NEAR_MISS_CUTOFF)
+    if not close:
+        return None
+    return str(Path(literal).parent / close[0])
+
+
+def _unresolved_path_finding(root: Path, path: str, *, settled: bool) -> str | None:
+    """Why ``path`` failing to resolve is a finding, or None if it is legal."""
+    if Path(path).is_absolute() or path.startswith("~"):
+        return None
+    if settled:
+        return "names a path that resolves to nothing"
+    if any(ch in path for ch in "*?["):
+        return None  # prospective allowlist glob - legal while the item is open
+    close = _near_miss(root, path)
+    if close:
+        return f"names a nonexistent path suspiciously close to existing '{close}'"
+    return None
+
+
+def _unresolvable_scope_findings(item: dict) -> list[str]:
+    root = _lint_repo_root()
+    if root is None:
+        return []
+    settled = item["state"] in ("done", "dropped")
+    findings = []
+    for rule in item["scope"]:
+        pattern = rule["path_glob"]
+        if _glob_resolves(root, pattern):
+            continue
+        reason = _unresolved_path_finding(root, pattern, settled=settled)
+        if reason:
+            findings.append(f"scope {rule['kind']} {reason}: {pattern}")
+    return findings
+
+
+def _unresolvable_command_path_findings(item: dict) -> list[str]:
+    root = _lint_repo_root()
+    if root is None:
+        return []
+    settled = item["state"] in ("done", "dropped")
+    findings = []
+    for ver in item["verifications"]:
+        command = ver.get("command") or ""
+        if not command.strip() or _command_unrunnable_reason(command):
+            continue  # an unrunnable rung is already its own finding
+        for token in shlex.split(command):
+            # Strip pytest node-id suffixes and shell separators shlex leaves
+            # glued to the token ("tests/x.py;" in "cmd tests/x.py; next").
+            path_part = token.split("::", 1)[0].rstrip(";,)")
+            if "$" in token or "=" in token or not _PATHLIKE_TOKEN_RE.match(path_part):
+                continue
+            if _glob_resolves(root, path_part):
+                continue
+            reason = _unresolved_path_finding(root, path_part, settled=settled)
+            if reason:
+                findings.append(f"verification seq {ver['seq']} {reason}: {path_part}")
+    return findings
+
+
 def _unsatisfiable_verifications(item: dict) -> list[int]:
     """Return seqs of rungs whose command cannot express their expectation."""
     offenders = []
@@ -2151,6 +2260,8 @@ def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
         findings.append("verification steps exist but none has a runnable command")
     for seq, reason, command in _unrunnable_verifications(item):
         findings.append(f"verification seq {seq} command cannot execute ({reason}): {command}")
+    findings.extend(_unresolvable_scope_findings(item))
+    findings.extend(_unresolvable_command_path_findings(item))
     unsatisfiable = _unsatisfiable_verifications(item)
     if unsatisfiable:
         findings.append(
