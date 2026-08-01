@@ -35,6 +35,7 @@ from benchbox.mcp.errors import (
     make_not_found_error,
     make_unsupported_mode_error,
 )
+from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 from benchbox.utils.printing import get_quiet_console, silence_output
@@ -145,9 +146,8 @@ def _map_phases_to_test_execution_type(phases: list[str]) -> str:
         return "standard"
 
 
-def register_benchmark_tools(mcp: MCPServer, *, results_dir: Path) -> None:
+def register_benchmark_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None:
     """Register benchmark execution tools with the MCP server."""
-    resolved_results_dir = Path(results_dir)
 
     @mcp.tool(annotations=RUN_BENCHMARK_ANNOTATIONS)
     def run_benchmark(
@@ -206,7 +206,7 @@ def register_benchmark_tools(mcp: MCPServer, *, results_dir: Path) -> None:
             phases,
             mode,
             capture_plans,
-            results_dir=resolved_results_dir,
+            results_dir=resolve_path_provider(results_dir),
         )
 
     @mcp.tool(annotations=QUERY_DETAILS_ANNOTATIONS)
@@ -302,11 +302,11 @@ def _export_and_build_payload(
             with open(result_file_path, encoding="utf-8") as handle:
                 result_payload = json.load(handle)
     except Exception as export_err:
-        logger.warning(f"Failed to export benchmark results: {export_err}")
+        logger.warning("Failed to export benchmark results (%s)", type(export_err).__name__)
         try:
             result_payload = build_result_payload(result)
         except Exception as payload_err:
-            logger.warning(f"Failed to build benchmark payload: {payload_err}")
+            logger.warning("Failed to build benchmark payload (%s)", type(payload_err).__name__)
     return result_file_path, result_payload
 
 
@@ -451,7 +451,7 @@ def _run_benchmark_impl(
         return response
 
     except Exception as e:
-        logger.exception(f"Benchmark execution failed: {e}")
+        logger.error("Benchmark execution failed (%s)", type(e).__name__)
         error_response = make_execution_error(
             f"Benchmark execution failed: {e}",
             execution_id=execution_id,
@@ -613,7 +613,7 @@ def _dry_run_impl(
         return response
 
     except Exception as e:
-        logger.exception(f"Dry run failed: {e}")
+        logger.error("Dry run failed (%s)", type(e).__name__)
         error_response = make_error(
             ErrorCode.INTERNAL_ERROR,
             f"Dry run failed: {e}",

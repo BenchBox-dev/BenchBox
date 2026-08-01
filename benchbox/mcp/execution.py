@@ -419,7 +419,7 @@ async def run_benchmark_async(
             )
 
     except Exception as e:
-        logger.exception(f"Async benchmark execution failed: {e}")
+        logger.error("Async benchmark execution failed (%s)", type(e).__name__)
         tracker.update_status(
             execution_id,
             ExecutionStatus.FAILED,

@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from mcp.server.transport_security import TransportSecuritySettings
 
 from benchbox.mcp.cli import parse_args
+from benchbox.mcp.security import RemoteSecurityRuntime
 from benchbox.mcp.transport import MCPTransportSettings, is_supported_loopback_host, run_transport
+from tests.integration.mcp._security import write_security_config
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -20,6 +23,7 @@ def test_transport_defaults_preserve_stdio() -> None:
     assert args.host == "127.0.0.1"
     assert args.port == 8000
     assert args.streamable_http_path == "/mcp"
+    assert args.security_config is None
 
 
 def test_streamable_http_cli_options_are_forwarded(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -102,7 +106,7 @@ def test_streamable_http_uses_streaming_capable_stateless_sdk_route() -> None:
     )
 
 
-def test_run_server_rejects_public_http_host_before_creating_server() -> None:
+def test_remote_binding_fail_closed_without_security_config() -> None:
     with patch("benchbox.mcp.create_server") as create_server:
         from benchbox.mcp import run_server
 
@@ -110,6 +114,26 @@ def test_run_server_rejects_public_http_host_before_creating_server() -> None:
             run_server(transport="streamable-http", host="0.0.0.0")
 
     create_server.assert_not_called()
+
+
+def test_remote_binding_accepts_complete_https_security_config(tmp_path: Path) -> None:
+    policy = write_security_config(
+        tmp_path,
+        tokens={"token": ("tenant-a", ("benchbox:read",))},
+    )
+    runtime = RemoteSecurityRuntime.from_file(policy)
+    settings = MCPTransportSettings(transport="streamable-http", host="10.0.0.12", remote_security=runtime)
+    assert settings.host == "10.0.0.12"
+
+
+def test_stdio_rejects_remote_security_config(tmp_path: Path) -> None:
+    policy = write_security_config(
+        tmp_path,
+        tokens={"token": ("tenant-a", ("benchbox:read",))},
+    )
+    runtime = RemoteSecurityRuntime.from_file(policy)
+    with pytest.raises(ValueError, match="only valid with Streamable HTTP"):
+        MCPTransportSettings(remote_security=runtime)
 
 
 @pytest.mark.parametrize("port", ["0", "65536"])

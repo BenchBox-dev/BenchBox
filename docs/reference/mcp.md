@@ -48,10 +48,13 @@ localhost-only option at `http://127.0.0.1:8000/mcp`.
 }
 ```
 
-Do not expose this endpoint through a public bind, port forward, or reverse
-proxy. Until the remote-security work lands, BenchBox rejects non-loopback
-hosts because stateless transport does not provide authentication,
-authorization, tenant isolation, quotas, or admission control.
+Do not expose the unauthenticated localhost endpoint through a public bind,
+port forward, or reverse proxy. Non-loopback binding requires a complete
+`--security-config` policy. See [Remote MCP security and tenancy](../operations/mcp-remote-security.md)
+for its threat model, token-digest provisioning, scopes, tenant workspaces,
+shared admission store, and fail-closed proxy requirements. This capability is
+not a production-readiness claim; keep shared endpoint publication disabled
+until the separate conformance and operations gate has current evidence.
 
 ### SDK Compatibility
 
@@ -107,9 +110,10 @@ The inspector provides a web UI to browse tools, test calls, and view responses.
 | `--charts-dir` | Charts root used by MCP visualization paths |
 | `--log-level` | Logging level (DEBUG, INFO, WARNING, ERROR) |
 | `--transport` | `stdio` (default) or opt-in `streamable-http` |
-| `--host` | Streamable HTTP bind host; loopback interfaces only (default `127.0.0.1`) |
+| `--host` | Streamable HTTP bind host; non-loopback requires `--security-config` (default `127.0.0.1`) |
 | `--port` | Streamable HTTP bind port (default `8000`) |
 | `--streamable-http-path` | Streamable HTTP endpoint path (default `/mcp`) |
+| `--security-config` | Remote-only JSON policy for SDK auth, tenancy, authorization, admission, and audit |
 
 **Environment variables**
 

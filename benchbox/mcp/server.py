@@ -22,6 +22,7 @@ from mcp.server.mcpserver import MCPServer
 from benchbox.core.runtime_paths import resolve_runtime_paths
 from benchbox.mcp.prompts import register_all_prompts
 from benchbox.mcp.resources import register_all_resources
+from benchbox.mcp.security import RemoteSecurityRuntime, configure_transport_security_logging
 from benchbox.mcp.tools.analytics import register_analytics_tools
 from benchbox.mcp.tools.benchmark import register_benchmark_tools
 from benchbox.mcp.tools.discovery import register_discovery_tools
@@ -72,6 +73,7 @@ def create_benchbox_server(
     charts_dir: str | Path | None = None,
     log_level: str | int | None = None,
     env: Mapping[str, str] | None = None,
+    remote_security: RemoteSecurityRuntime | None = None,
 ) -> MCPServer:
     """Create and configure the BenchBox MCP server.
 
@@ -104,6 +106,18 @@ def create_benchbox_server(
         resolved_results_dir = runtime_paths.results_dir
         resolved_charts_dir = runtime_paths.charts_dir
 
+    server_kwargs: dict[str, object] = {}
+    if remote_security is not None:
+        # The SDK rejection warnings include the raw attacker-controlled Host
+        # or Origin value. Preserve the generic HTTP rejection without making
+        # those headers a log-egress channel.
+        configure_transport_security_logging()
+        server_kwargs.update(
+            auth=remote_security.auth_settings(),
+            token_verifier=remote_security.verifier,
+            middleware=[remote_security.middleware],
+        )
+
     mcp = MCPServer(
         "benchbox",
         version=version("benchbox"),
@@ -127,6 +141,14 @@ To capture query execution plans, use the capture_plans parameter:
   run_benchmark(platform="datafusion", benchmark="tpch", capture_plans=True)
 Then inspect plans: get_query_plan(result_file="...", query_id="19")
 """,
+        **server_kwargs,
+    )
+
+    results_provider = (
+        remote_security.workspaces.current_results_dir if remote_security is not None else resolved_results_dir
+    )
+    charts_provider = (
+        remote_security.workspaces.current_charts_dir if remote_security is not None else resolved_charts_dir
     )
 
     # Register all tools
@@ -134,23 +156,23 @@ Then inspect plans: get_query_plan(result_file="...", query_id="19")
     register_discovery_tools(mcp)
 
     logger.info("Registering benchmark execution tools...")
-    register_benchmark_tools(mcp, results_dir=resolved_results_dir)
+    register_benchmark_tools(mcp, results_dir=results_provider)
 
     logger.info("Registering results tools...")
-    register_results_tools(mcp, results_dir=resolved_results_dir)
+    register_results_tools(mcp, results_dir=results_provider)
 
     logger.info("Registering analytics tools...")
-    register_analytics_tools(mcp, results_dir=resolved_results_dir)
+    register_analytics_tools(mcp, results_dir=results_provider)
 
     logger.info("Registering visualization tools...")
     register_visualization_tools(
         mcp,
-        results_dir=resolved_results_dir,
-        charts_dir=resolved_charts_dir,
+        results_dir=results_provider,
+        charts_dir=charts_provider,
     )
 
     logger.info("Registering resources...")
-    register_all_resources(mcp, results_dir=resolved_results_dir)
+    register_all_resources(mcp, results_dir=results_provider)
 
     logger.info("Registering prompts...")
     register_all_prompts(mcp)
@@ -159,8 +181,8 @@ Then inspect plans: get_query_plan(result_file="...", query_id="19")
     # They are logged for startup visibility.
     logger.info(
         "MCP path configuration: results_dir=%s charts_dir=%s",
-        resolved_results_dir,
-        resolved_charts_dir,
+        "tenant-scoped" if remote_security is not None else resolved_results_dir,
+        "tenant-scoped" if remote_security is not None else resolved_charts_dir,
     )
     logger.info("BenchBox MCP server configured successfully")
 

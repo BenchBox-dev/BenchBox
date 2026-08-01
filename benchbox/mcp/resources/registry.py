@@ -25,6 +25,7 @@ from benchbox.core.benchmark_registry import (
     get_public_benchmark_class,
     list_public_benchmark_ids,
 )
+from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
@@ -181,7 +182,7 @@ def _parse_result_file_metadata(file_path: Path) -> dict | None:
             "execution_id": data.get("run", {}).get("id", "unknown"),
         }
     except Exception as e:
-        logger.warning(f"Could not parse result file {file_path}: {e}")
+        logger.warning("Could not parse result file %s (%s)", file_path.name, type(e).__name__)
         return None
 
 
@@ -250,14 +251,12 @@ def _build_system_profile() -> str:
     )
 
 
-def register_all_resources(mcp: MCPServer, *, results_dir: Path) -> None:
+def register_all_resources(mcp: MCPServer, *, results_dir: PathProvider) -> None:
     """Register all MCP resources with the server.
 
     Args:
         mcp: The MCPServer instance to register resources with.
     """
-
-    resolved_results_dir = Path(results_dir).expanduser()
 
     @mcp.resource("benchbox://benchmarks")
     def list_benchmarks_resource() -> str:
@@ -282,7 +281,7 @@ def register_all_resources(mcp: MCPServer, *, results_dir: Path) -> None:
     @mcp.resource("benchbox://results/recent")
     def get_recent_results_resource() -> str:
         """Get list of recent benchmark results."""
-        return _build_recent_results(resolved_results_dir)
+        return _build_recent_results(resolve_path_provider(results_dir).expanduser())
 
     @mcp.resource("benchbox://system/profile")
     def get_system_profile_resource() -> str:
