@@ -30,6 +30,7 @@ from benchbox.core.results.environment import (
     build_environment_payload,
     build_platform_metadata_payload,
 )
+from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.core.results.schema_policy import CURRENT_SCHEMA_VERSION, RUNTIME_SCHEMA_POLICY
 from benchbox.validation.bundle import REQUIRED_TOP_KEYS
@@ -535,7 +536,7 @@ def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str,
             cloud=getattr(result, "platform_cloud", None),
             compute=getattr(result, "platform_compute", None),
             storage=getattr(result, "platform_storage", None),
-            raw_config=getattr(result, "platform_raw_config", None) or config,
+            raw_config=getattr(result, "platform_raw_config", None) or sanitize_platform_options(config),
             raw_metadata=(
                 getattr(result, "platform_raw_metadata", None)
                 if getattr(result, "platform_raw_metadata", None) is not None
@@ -1684,4 +1685,7 @@ def _extract_platform_config(platform_info: dict[str, Any]) -> dict[str, Any]:
                 config[key] = value
 
     extract_recursive(platform_info)
-    return config
+    # Adapters keep secrets out of platform_info by convention, but nothing
+    # enforced it - a convention slip would ride into platform.config and the
+    # raw_config fallback verbatim. Filter structurally at the boundary.
+    return sanitize_platform_options(config)
