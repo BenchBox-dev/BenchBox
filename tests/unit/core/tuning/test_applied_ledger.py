@@ -24,6 +24,7 @@ from benchbox.core.tuning.applied_ledger import (
     NOOP,
     NOT_APPLICABLE,
     PHASE_DDL,
+    PHASE_POST_LOAD,
     PHASE_SESSION,
     STATEMENT_FAILED,
     AppliedTuningLedger,
@@ -106,6 +107,24 @@ class TestStatusDerivation:
         ledger = AppliedTuningLedger()
         ledger.record("CREATE INDEX bad", PHASE_DDL, status=STATEMENT_FAILED, error="nope")
         ledger.record("CREATE INDEX good ON t (a)", PHASE_DDL)
+        assert ledger.overall_status(tuning_enabled=True, has_config=True) == APPLIED_UNVERIFIED
+
+    def test_all_physical_statements_failed_despite_session_success(self) -> None:
+        ledger = AppliedTuningLedger()
+        ledger.record("SET use_cached_result=true", PHASE_SESSION)
+        ledger.record(
+            "ALTER TABLE lineitem CLUSTER BY (l_orderkey)",
+            PHASE_POST_LOAD,
+            status=STATEMENT_FAILED,
+            error="nope",
+        )
+
+        assert ledger.overall_status(tuning_enabled=True, has_config=True) == FAILED
+
+    def test_session_only_success_is_applied_unverified(self) -> None:
+        ledger = AppliedTuningLedger()
+        ledger.record("SET use_cached_result=true", PHASE_SESSION)
+
         assert ledger.overall_status(tuning_enabled=True, has_config=True) == APPLIED_UNVERIFIED
 
     def test_overall_status_never_returns_applied_verified(self) -> None:

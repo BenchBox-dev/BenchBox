@@ -26,15 +26,23 @@ iff:
 2. there is **at least one** catalog-backed (`verifiable`) executed
    ddl/post_load statement; and
 3. **every** verifiable statement is `corroborated` -- none `absent`, none
-   `mismatch`, none `unverifiable`.
+   `mismatch`, none `unverifiable`; and
+4. the ledger contains no failed ddl/post_load statement and no dropped
+   tuning intent. Each physical failure receives a blocking `unverifiable`
+   receipt entry with a code-authored failure reason, and dropped intents are
+   copied into the receipt's additive `dropped` section. Raw driver detail
+   remains in the ledger statement's `error` field, not the receipt reason.
 
-Any failure, timeout, empty ledger, or single non-corroborated statement
-leaves the run at `applied_unverified` with a receipt recording why. The
-introspection step must never fail or materially slow a run.
+Any introspection failure, timeout, or single non-corroborated statement keeps
+an otherwise eligible run at `applied_unverified` with a receipt recording why.
+An all-physical-failed ledger derives `failed` before corroboration, and an
+empty ledger cannot earn the upgrade. The introspection step must never fail or
+materially slow a run.
 
 ## Statement classes (per phase x mechanism)
 
-`corroborate()` classifies each **executed** ledger statement and applies a
+`corroborate()` gates every ledger statement by recorded status and phase,
+then classifies each **executed** statement and applies a
 per-class rule. Classification is by generic SQL shape so the core stays
 platform-agnostic; the per-platform catalog *reads* live in the
 `Introspector` implementations.
@@ -49,6 +57,8 @@ platform-agnostic; the per-platform catalog *reads* live in the
 | `OPTIMIZE TABLE ...` / maintenance           | ddl/post_load  | `maintenance` | merge/compaction op, no distinct catalog footprint -- noted, **non-blocking**      | no                   |
 | `ALTER TABLE T [RESUME/SUSPEND] RECLUSTER`   | ddl/post_load  | `maintenance` | reorganizes existing data; the clustering KEY is the catalog footprint -- **non-blocking** | no          |
 | session-phase statement (any)                | session        | `transient`   | transient SET -- noted, **non-blocking** (documented default below)                | no                   |
+| failed statement                             | ddl/post_load  | `unverifiable`| the requested physical change did not execute; failure reason is recorded -- **blocks** | n/a (blocks)     |
+| failed statement                             | session        | `transient`   | transient session failure is noted but has no persistent catalog footprint -- **non-blocking** | no          |
 | anything else                                | ddl/post_load  | `unverifiable`| no corroboration rule -- **blocks** the upgrade (conservative: stay unverified)    | n/a (blocks)         |
 
 A `CREATE TABLE` carrying **both** an `ORDER BY` and a `PARTITION BY` (the
@@ -71,6 +81,12 @@ They are **noted** in the receipt (so the reader sees they ran) but do
 only tuning is session SETs stays `applied_unverified` -- there is nothing
 physical to corroborate. This matches the ledger's own physical-hash
 intent (chronology of *layout* ops).
+
+A failed session statement follows the same transient gate rule: it is
+visible in the receipt but does not block a sibling physical statement that
+the catalog corroborates. Conversely, session success cannot mask a run in
+which every attempted ddl/post_load statement failed; that ledger derives
+`failed`, not `applied_unverified`.
 
 ## Per-platform catalog reads (Introspector)
 
