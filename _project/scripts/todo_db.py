@@ -742,6 +742,24 @@ def _replica_setup_lock(replica: Path):
         os.close(fd)
 
 
+def sync_hosted_replica(conn: _HostedConnection) -> None:
+    """Refresh an embedded replica under the per-worktree synchronization lock.
+
+    Commands that write directly to the hosted primary may need a second sync
+    before reading through an already-open replica.  Keep that sync under the
+    same cross-process lock as connection setup, and keep raw libsql exceptions
+    behind the tracker's redacted ``TodoError`` boundary.
+    """
+    token = _auth_token()
+    with _replica_setup_lock(hosted_replica_path()):
+        try:
+            conn.sync()
+        except Exception as exc:
+            raise TodoError(
+                f"hosted tracker: cannot refresh the replica after the primary write: {_redacted(exc, token)}"
+            ) from exc
+
+
 def _import_libsql():
     try:
         import libsql  # deferred: only hosted mode needs it

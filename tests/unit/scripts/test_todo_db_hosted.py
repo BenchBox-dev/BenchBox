@@ -22,6 +22,7 @@ import json
 import sqlite3
 import sys
 import types
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -350,6 +351,43 @@ class TestHostedConnect:
             # non-blocking acquire succeeds only if connect released the lock
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
             fcntl.flock(handle, fcntl.LOCK_UN)
+
+    def test_explicit_replica_sync_uses_the_setup_lock(self, monkeypatch, tmp_path):
+        events = []
+        replica = tmp_path / "replica.db"
+
+        @contextmanager
+        def recording_lock(path):
+            events.append(("lock", path))
+            yield
+            events.append(("unlock", path))
+
+        class _Conn:
+            def sync(self):
+                events.append(("sync", replica))
+
+        monkeypatch.setattr(todo_db, "hosted_replica_path", lambda: replica)
+        monkeypatch.setattr(todo_db, "_replica_setup_lock", recording_lock)
+
+        todo_db.sync_hosted_replica(_Conn())
+
+        assert events == [("lock", replica), ("sync", replica), ("unlock", replica)]
+
+    def test_explicit_replica_sync_maps_and_redacts_errors(self, monkeypatch, tmp_path):
+        token = "sync-secret-token"
+
+        class _Conn:
+            def sync(self):
+                raise ValueError(f"connection failed with {token}")
+
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", token)
+        monkeypatch.setenv("TODO_DB_REPLICA", str(tmp_path / "replica.db"))
+
+        with pytest.raises(todo_db.TodoError, match="cannot refresh the replica") as caught:
+            todo_db.sync_hosted_replica(_Conn())
+
+        assert token not in str(caught.value)
+        assert "<redacted>" in str(caught.value)
 
     def test_plaintext_http_url_is_refused(self, fake_libsql, capsys):
         with pytest.raises(todo_db.TodoError, match="https"):

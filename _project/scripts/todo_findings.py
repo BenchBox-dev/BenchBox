@@ -1780,6 +1780,13 @@ def _cmd_import_bulk(conn: Any, actor: str, args: argparse.Namespace) -> int:
         f" {moved['rows']} row(s) in {moved['batches']} batch(es);"
         f" skipped {len(staged['skipped'])} already present; pk offsets {applied or 'none'}"
     )
+    # Read-after-write: the transfer went straight to the PRIMARY, while `conn` reads
+    # through a local embedded replica opened before it. Without an explicit sync the
+    # parity check sees none of the new rows and reports every record absent -- a
+    # false PARITY FAILED on a correct import, which is exactly what the first
+    # production run printed. It fails safe (never the reverse), but it makes the
+    # exit code untrustworthy, so sync the replica before comparing.
+    todo_db.sync_hosted_replica(conn)
     report = parity_report(conn, args.corpus, staged)
     if args.report:
         print(json.dumps(report, indent=2, sort_keys=True))
