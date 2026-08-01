@@ -38,6 +38,18 @@ def _declared_requirements(config: dict) -> list[str]:
     return requirements
 
 
+def _can_resolve_mcp_v2(requirement: Requirement) -> bool:
+    return Version("2.0.0") in requirement.specifier
+
+
+@pytest.mark.parametrize(
+    ("declaration", "can_resolve_v2"),
+    [("mcp<2", False), ("mcp<=2", True), ("mcp>=1,<3", True)],
+)
+def test_mcp_v2_resolution_probe(declaration: str, can_resolve_v2: bool) -> None:
+    assert _can_resolve_mcp_v2(Requirement(declaration)) is can_resolve_v2
+
+
 def test_every_mcp_dependency_excludes_major_version_2() -> None:
     with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
         config = tomllib.load(handle)
@@ -48,10 +60,7 @@ def test_every_mcp_dependency_excludes_major_version_2() -> None:
 
     assert mcp_requirements, "pyproject.toml must declare the MCP SDK"
     for requirement in mcp_requirements:
-        upper_bounds = [
-            Version(specifier.version) for specifier in requirement.specifier if specifier.operator in {"<", "<="}
-        ]
-        assert upper_bounds and min(upper_bounds) <= Version("2"), (
+        assert not _can_resolve_mcp_v2(requirement), (
             f"MCP requirement {requirement!s} can resolve incompatible SDK 2; "
             "keep every declaration below 2 until mcp-sdk-v2-server-migration-v2 lands"
         )
