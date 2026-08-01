@@ -1550,7 +1550,10 @@ class SnowflakeAdapter(PlatformAdapter):
                 }
 
             # Get table information
-            cursor.execute(f"""
+            from benchbox.platforms.snowflake_introspection import normalize_snowflake_schema
+
+            cursor.execute(
+                """
                 SELECT
                     TABLE_NAME,
                     ROW_COUNT,
@@ -1560,9 +1563,11 @@ class SnowflakeAdapter(PlatformAdapter):
                     LAST_ALTERED,
                     CLUSTERING_KEY
                 FROM INFORMATION_SCHEMA.TABLES
-                WHERE TABLE_SCHEMA = '{self.schema}'
+                WHERE TABLE_SCHEMA = %s
                 AND TABLE_TYPE = 'BASE TABLE'
-            """)
+                """,
+                (normalize_snowflake_schema(self.schema),),
+            )
             tables = cursor.fetchall()
             metadata["tables"] = [
                 {
@@ -1697,6 +1702,7 @@ class SnowflakeAdapter(PlatformAdapter):
         try:
             # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
+            from benchbox.platforms.snowflake_introspection import normalize_snowflake_schema, parse_clustering_key
 
             # Handle clustering keys
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
@@ -1714,20 +1720,23 @@ class SnowflakeAdapter(PlatformAdapter):
 
             if clustering_columns:
                 # Check current clustering key
-                cursor.execute(f"""
-                    SELECT CLUSTERING_KEY
-                    FROM INFORMATION_SCHEMA.TABLES
-                    WHERE TABLE_SCHEMA = '{self.schema}'
-                    AND TABLE_NAME = '{table_name}'
-                """)
+                cursor.execute(
+                    """
+                        SELECT CLUSTERING_KEY
+                        FROM INFORMATION_SCHEMA.TABLES
+                        WHERE TABLE_SCHEMA = %s
+                        AND TABLE_NAME = %s
+                    """,
+                    (normalize_snowflake_schema(self.schema), table_name),
+                )
                 result = cursor.fetchone()
                 current_clustering = result[0] if result and result[0] else None
 
                 desired_clustering = f"({', '.join(clustering_columns)})"
+                cluster_sql = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(clustering_columns)})"
 
-                if current_clustering != desired_clustering:
+                if parse_clustering_key(current_clustering) != parse_clustering_key(desired_clustering):
                     # Apply clustering key
-                    cluster_sql = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(clustering_columns)})"
                     try:
                         cursor.execute(cluster_sql)
                         self.logger.info(f"Applied clustering key to {table_name}: {', '.join(clustering_columns)}")
@@ -1744,6 +1753,9 @@ class SnowflakeAdapter(PlatformAdapter):
                         self.logger.warning(f"Failed to apply clustering key to {table_name}: {e}")
                 else:
                     self.logger.info(f"Table {table_name} already has desired clustering key: {current_clustering}")
+                    ledger = getattr(self, "_applied_tuning_ledger", None)
+                    if ledger is not None:
+                        ledger.record_dropped(cluster_sql, "already present in Snowflake catalog; ALTER skipped")
 
             # Handle sorting - in Snowflake, this is achieved through clustering
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
