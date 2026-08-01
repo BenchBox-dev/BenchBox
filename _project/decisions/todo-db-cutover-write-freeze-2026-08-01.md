@@ -38,6 +38,8 @@ on its own so a holder that dies mid-cutover cannot wedge the tracker.
 | D3 | Consequence of D2 for the runbook | The freeze is **necessary but not sufficient**. The runbook MUST pair it with independently verified quiescence. Neither gate alone authorizes the restore. | A stale clone writes straight through a live freeze. Quiescence alone was never a gate. Both, together, or not at all. |
 | D4 | How quiescence is measured | The `stats["events"]` fingerprint (`count`, `last_seq`, `latest`) compared across a window, by a probe that **fails when it cannot read the fingerprint**. | The previous probe shelled out to `todo stats --json`, which does not exist; it compared two empty strings and passed unconditionally. See "The vacuous rung". |
 | D5 | Freeze TTL bounds | Finite, positive, `<= MAX_FREEZE_TTL_HOURS` (168h); default 2h. Malformed/torn freeze state reads as **live** (fails closed); `freeze` itself stays exempt from the gate so a torn freeze is always liftable. | A freeze is a maintenance window, not a standing state. A safety gate whose degraded state is "unlocked" is the wrong default; one that cannot be lifted is the other wrong default. Both were real defects (PR #1386). |
+| D7 | Fixing create-time-only fields with todo-db 0.3's audited `update` verb, before the cutover | **Not available.** todo-db 0.3 is `SCHEMA_VERSION = 5` and refuses a v4 database outright: *"database contains a different tracker schema (item_deps, items, meta, work_units); use a dedicated todo-db path"*. It fails **safe** — detects the foreign schema, refuses, does not corrupt. | The verb only becomes usable *after* the cutover, and the cutover is gated on a probe that `update` would have fixed. Circular. Verified 2026-08-01 against a local v4 database, never production. |
+| D8 | The vacuous rung on the freeze item | **Superseded, not edited.** The operative quiescence gate is the probe on `cutover-record-corrections-and-quiescence-probe`. Rung 1 of `tracker-cutover-needs-a-write-freeze-not-a-claim-check` is void and MUST NOT be used to certify quiescence. | Ladders are create-time-only and D7 rules out an in-place edit. The freeze item has **zero** dependents, so drop+recreate would be cheap — but its work is already done and merged, and its ladder only matters at completion time. Superseding is proportionate; dropping a live-claimed item to correct a rung is not. |
 | D6 | Rollback storage | A durable local backup **outside** the repo (`~/todo-db-backups/`) plus a 17-table snapshot, both taken immediately before the restore and retained until an audit verify passes against the hosted DB post-cutover. | The prior attempt ran in an ephemeral container that restarted mid-session. Ephemeral disk is not a rollback path. |
 
 ### D2 rationale — why `SCHEMA_VERSION` is not bumped
@@ -149,17 +151,23 @@ until after a successful cutover is verified.
 
 ## Current verdict — the cutover is NOT authorized
 
-As of 2026-08-01 three conditions block it:
+As of 2026-08-01, **one** condition still blocks it.
 
 1. **The tracker is provably not quiescent.** `root@vm` wrote 21 events between
    12:29Z and 12:33Z and 4 more during a 60s probe window. Items moved
-   1726 → 1758 and events 4440 → 4538 inside a single session.
-2. **The quiescence probe is vacuous** (D4) and its replacement has not shipped.
-3. **Two findings-domain fixes are unmerged** — #1359 (replica sync before the
-   bulk import's parity check) and #1373 (reconcile the v4 capture-owned
-   columns; stop wiping undeclared evidence). Neither
-   `_capture_owned_differs`/`_reconcile_capture_owned` nor the `replace_evidence`
-   guard exists on `develop`. Running a cutover from `develop` runs code without
-   the evidence-wipe fix.
+   1726 → 1758 and events 4440 → 4538 inside a single session. That session is
+   live; its claim on the freeze item is **not** stale and must not be swept.
 
-D3 is the standing rule: the freeze plus verified quiescence, or no cutover.
+Cleared since this ADR was first written:
+
+- ~~The quiescence probe is vacuous~~ — still true of the freeze item's rung 1,
+  but D8 supersedes it and a working probe now exists on
+  `cutover-record-corrections-and-quiescence-probe`. Use that one.
+- ~~Two findings-domain fixes are unmerged~~ — **#1359 and #1373 both merged.**
+  The `replace_evidence` guard and `_reconcile_capture_owned` are on `develop`.
+- Freeze hardening (#1386) is merged: fail-closed torn state, bounded `--ttl`,
+  and a freeze gate for `migrate`.
+
+D3 remains the standing rule: the freeze **plus** verified quiescence, or no
+cutover. With the code blockers cleared, quiescence is now the only gate — and
+it is currently failing for a real reason, which is the gate working.
