@@ -1,0 +1,66 @@
+"""Dependency guards for the optional MCP integration."""
+
+from pathlib import Path
+
+import pytest
+from packaging.requirements import Requirement
+from packaging.version import Version
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
+
+
+REPO_ROOT = Path(__file__).parents[3]
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
+
+
+def _declared_requirements(config: dict) -> list[str]:
+    project = config["project"]
+    requirements = list(project.get("dependencies", []))
+    requirements.extend(
+        requirement
+        for group in project.get("optional-dependencies", {}).values()
+        for requirement in group
+        if isinstance(requirement, str)
+    )
+    requirements.extend(
+        requirement
+        for group in config.get("dependency-groups", {}).values()
+        for requirement in group
+        if isinstance(requirement, str)
+    )
+    return requirements
+
+
+def _can_resolve_mcp_v2(requirement: Requirement) -> bool:
+    return Version("2.0.0") in requirement.specifier
+
+
+@pytest.mark.parametrize(
+    ("declaration", "can_resolve_v2"),
+    [("mcp<2", False), ("mcp<=2", True), ("mcp>=1,<3", True)],
+)
+def test_mcp_v2_resolution_probe(declaration: str, can_resolve_v2: bool) -> None:
+    assert _can_resolve_mcp_v2(Requirement(declaration)) is can_resolve_v2
+
+
+def test_every_mcp_dependency_excludes_major_version_2() -> None:
+    with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
+        config = tomllib.load(handle)
+
+    mcp_requirements = [
+        Requirement(value) for value in _declared_requirements(config) if Requirement(value).name == "mcp"
+    ]
+
+    assert mcp_requirements, "pyproject.toml must declare the MCP SDK"
+    for requirement in mcp_requirements:
+        assert not _can_resolve_mcp_v2(requirement), (
+            f"MCP requirement {requirement!s} can resolve incompatible SDK 2; "
+            "keep every declaration below 2 until mcp-sdk-v2-server-migration-v2 lands"
+        )
