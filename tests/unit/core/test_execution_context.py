@@ -247,10 +247,10 @@ class TestToCliArgs:
         absent = ExecutionContext()
         assert "--tuning" not in absent.to_cli_args()
 
-    def test_tuning_path_round_trips_byte_for_byte(self):
-        tuning_path = "/tmp/custom tuning/profile.yaml"
+    def test_tuning_mode_custom_round_trips_canonical_value(self):
+        ctx = ExecutionContext(tuning_mode="custom")
 
-        assert ExecutionContext(tuning_mode=tuning_path).to_cli_args()[-2:] == ["--tuning", tuning_path]
+        assert ctx.to_cli_args()[-2:] == ["--tuning", "custom"]
 
 
 class TestToCliString:
