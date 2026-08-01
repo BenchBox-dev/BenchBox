@@ -27,6 +27,9 @@ const BASE_URL = `http://${HOST}:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // The blocking Chromium script runs failure-regression specs separately
+  // with retries disabled, so a probabilistic regression cannot pass as flaky.
+  testIgnore: process.env.E2E_EXCLUDE_FAILURES ? /failures\// : undefined,
   outputDir: "./test-results",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),

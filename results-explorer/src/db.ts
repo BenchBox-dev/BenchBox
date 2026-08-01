@@ -414,8 +414,7 @@ export async function queryRows<T>(
   sql: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  let lastError: unknown = null;
-  for (let attempt = 1; attempt <= QUERY_RETRY_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; ; attempt += 1) {
     try {
       const rows = await queryRowsOnce<T>(sql, params);
       if (rows.length > 0 || !isColdEmptyRead(attempt)) return rows;
@@ -425,19 +424,12 @@ export async function queryRows<T>(
       await sleep(QUERY_EMPTY_RETRY_DELAY_MS);
       continue;
     } catch (error: unknown) {
-      lastError = error;
       if (!shouldRetryTransientQueryError(error, attempt)) {
         throw error;
       }
       await sleep(QUERY_RETRY_DELAY_MS * attempt);
     }
   }
-  if (lastError !== null) {
-    throw lastError instanceof Error ? lastError : new Error("DuckDB query failed");
-  }
-  // Every attempt returned empty inside the warm-up window: the result really
-  // is empty (a filtered query, or an id that does not exist).
-  return [];
 }
 
 /**

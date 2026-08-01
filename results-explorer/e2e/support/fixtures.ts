@@ -55,6 +55,13 @@ function navigationKey(url: string): string {
   return parsed.toString();
 }
 
+export function dataWaitNavigationAction(
+  entryUrl: string,
+  currentUrl: string,
+): "renavigate" | "rewait" {
+  return navigationKey(currentUrl) === navigationKey(entryUrl) ? "renavigate" : "rewait";
+}
+
 /**
  * Wait for the DuckDB-WASM attach to complete and the page to render real
  * data, re-navigating between attempts to defeat the zero-row cold-snapshot
@@ -86,10 +93,11 @@ export async function waitForDataElement(page: Page, target: Locator) {
 
   for (const [attempt, budget] of DATA_ATTEMPT_BUDGETS_MS.entries()) {
     if (attempt > 0) {
-      if (navigationKey(page.url()) !== entryKey) break;
-      // Drop the fragment: navigating to a URL identical including its hash is
-      // a same-document scroll, which would not re-initialize the snapshot.
-      await page.goto(entryKey, { timeout: RENAVIGATE_TIMEOUT_MS });
+      if (dataWaitNavigationAction(entryUrl, page.url()) === "renavigate") {
+        // Drop the fragment: navigating to a URL identical including its hash is
+        // a same-document scroll, which would not re-initialize the snapshot.
+        await page.goto(entryKey, { timeout: RENAVIGATE_TIMEOUT_MS });
+      }
     }
     try {
       await expect(target).toBeVisible({ timeout: budget });
@@ -103,7 +111,8 @@ export async function waitForDataElement(page: Page, target: Locator) {
   throw new Error(
     `Data-bound wait failed after ${DATA_ATTEMPT_BUDGETS_MS.length} attempts ` +
       `(budgets ${DATA_ATTEMPT_BUDGETS_MS.map((ms) => `${ms / 1000}s`).join(" + ")}, ` +
-      `${elapsed}s elapsed) on ${entryUrl}. Re-navigating between attempts did not help, so this is ` +
+      `${elapsed}s elapsed) on ${entryUrl}. Re-navigation, or re-waiting after intervening navigation, ` +
+      `did not help, so this is ` +
       `NOT the cold-snapshot zero-row race that budget is sized for -- do not "fix" it by widening ` +
       `the budget. See docs/operations/browser-ci.md.\n\nLast attempt: ${lastError.message}`,
     { cause: lastError },
