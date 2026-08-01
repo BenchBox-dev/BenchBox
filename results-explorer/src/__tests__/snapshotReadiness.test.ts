@@ -8,6 +8,7 @@ vi.mock("@/lib/performanceMarks", () => ({
 }));
 
 import {
+  _COLD_EMPTY_READ_MAX_DELAY_MS_FOR_TEST,
   _waitForSnapshotRowsForTest,
   shouldRetryColdEmptyRead,
   shouldRetryTransientQueryError,
@@ -273,6 +274,10 @@ describe("shouldRetryColdEmptyRead", () => {
   it("retries exactly at the window boundary", () => {
     expect(shouldRetryColdEmptyRead(1, READY_AT + 15_000, READY_AT)).toBe(true);
     expect(shouldRetryColdEmptyRead(1, READY_AT + 15_001, READY_AT)).toBe(false);
+  });
+
+  it("bounds a genuinely empty query below the shortest browser recovery attempt", () => {
+    expect(_COLD_EMPTY_READ_MAX_DELAY_MS_FOR_TEST).toBeLessThan(8_000);
   });
 });
 
