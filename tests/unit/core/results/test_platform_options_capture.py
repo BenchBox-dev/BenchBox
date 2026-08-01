@@ -445,6 +445,35 @@ class TestUsernameRedactionInternalPath:
         assert result["connection"]["host"] == "db.internal"
 
 
+class TestServiceAccountRedaction:
+    """service_account carries an IAM principal email (dataproc); the public
+    layer caught it only when the VALUE was email-shaped, and the internal
+    layer exported it verbatim."""
+
+    def test_service_account_is_redacted_internally(self):
+        from benchbox.core.results.platform_options import sanitize_platform_options
+
+        out = sanitize_platform_options({"service_account": "svc-bench@proj.iam.gserviceaccount.com"})
+        assert out["service_account"] != "svc-bench@proj.iam.gserviceaccount.com"
+
+    def test_non_email_service_account_is_pseudonymized_publicly(self):
+        import json
+
+        from benchbox.core.results.anonymization import AnonymizationManager
+
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"platform_raw_config": {"service_account": "SA-SENTINEL-NOT-AN-EMAIL"}}}
+        )["platform_metadata"]["platform_raw_config"]
+        assert "SA-SENTINEL-NOT-AN-EMAIL" not in json.dumps(out, default=str)
+
+    def test_auth_method_lookalikes_keep_real_values(self):
+        from benchbox.core.results.platform_options import sanitize_platform_options
+
+        out = sanitize_platform_options({"auth_method": "service_principal", "runtime_version": "1.2"})
+        assert out["auth_method"] == "service_principal"
+        assert out["runtime_version"] == "1.2"
+
+
 class TestApiKeyAndAccountKeyRedaction:
     """api_key and *_account_key are credentials and must never export
     verbatim (2026-07-31 sentinel-sweep finding: they leaked through both
