@@ -11,6 +11,7 @@ import pytest
 
 from tests.uat import cells_io, docker_assets, orchestrator
 from tests.uat.config import validate_config
+from tests.uat.docker_path_helpers import compose_path_ends_with
 from tests.uat.phases import execute as exec_phase
 from tests.uat.phases.enumerate import CompatibilityPrunedCell
 from tests.uat.runner import CellResult
@@ -1062,7 +1063,7 @@ def _startup_fail_clickhouse_docker(argv, **kwargs):
     """Fake docker runner: clickhouse compose-up fails, everything else succeeds."""
     action = "up" if "up" in argv else "down"
     compose_file = argv[argv.index("-f") + 1] if "-f" in argv else ""
-    if action == "up" and "/clickhouse/" in compose_file:
+    if action == "up" and compose_path_ends_with(compose_file, "docker", "clickhouse", "docker-compose.yml"):
         return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose up failed")
     return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
