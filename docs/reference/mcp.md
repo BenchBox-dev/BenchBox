@@ -28,9 +28,30 @@ benchbox-mcp
 
 # With explicit MCP path overrides
 benchbox-mcp --results-dir /tmp/benchbox-results --charts-dir /tmp/benchbox-charts
+
+# Opt in to localhost Streamable HTTP
+benchbox-mcp --transport streamable-http
 ```
 
-The server communicates via stdio using JSON-RPC, compatible with Claude Code and other MCP clients.
+The default server communicates via stdio using JSON-RPC, compatible with
+Claude Code and other local MCP clients. Streamable HTTP is an explicit
+localhost-only option at `http://127.0.0.1:8000/mcp`.
+
+```json
+{
+  "mcpServers": {
+    "benchbox": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+Do not expose this endpoint through a public bind, port forward, or reverse
+proxy. Until the remote-security work lands, BenchBox rejects non-loopback
+hosts because stateless transport does not provide authentication,
+authorization, tenant isolation, quotas, or admission control.
 
 ### SDK Compatibility
 
@@ -40,6 +61,14 @@ The v2 migration preserves the public stdio contract: 12 tools, 4 static
 resources, 2 resource templates, and 7 prompts. Tool names, input schemas,
 annotations, resource URIs, prompt schemas, and handler behavior are unchanged;
 only Python-side SDK model attributes use the v2 snake-case names.
+
+Streamable HTTP supports modern MCP `2026-07-28` as a sessionless protocol:
+each request can reach any server process and no `Mcp-Session-Id` is issued.
+The same endpoint retains the SDK's stateless compatibility path for supported
+handshake-era clients. Protocol discovery, version negotiation, headers, and
+DNS-rebinding checks are provided by the MCP SDK rather than reimplemented by
+BenchBox. Responses remain streaming-capable; JSON-only mode is intentionally
+disabled so progress and future request-scoped notifications remain possible.
 
 ### Testing Locally
 
@@ -77,6 +106,10 @@ The inspector provides a web UI to browse tools, test calls, and view responses.
 | `--results-dir` | Results root used by MCP result reads/writes |
 | `--charts-dir` | Charts root used by MCP visualization paths |
 | `--log-level` | Logging level (DEBUG, INFO, WARNING, ERROR) |
+| `--transport` | `stdio` (default) or opt-in `streamable-http` |
+| `--host` | Streamable HTTP bind host; loopback interfaces only (default `127.0.0.1`) |
+| `--port` | Streamable HTTP bind port (default `8000`) |
+| `--streamable-http-path` | Streamable HTTP endpoint path (default `/mcp`) |
 
 **Environment variables**
 
@@ -98,6 +131,16 @@ Example:
 
 ```bash
 BENCHBOX_RESULTS_DIR=/tmp/results BENCHBOX_LOG_LEVEL=DEBUG benchbox-mcp
+```
+
+Additional localhost examples:
+
+```bash
+# IPv4 loopback with a custom port and path
+benchbox-mcp --transport streamable-http --port 8765 --streamable-http-path /benchbox-mcp
+
+# IPv6 loopback
+benchbox-mcp --transport streamable-http --host ::1
 ```
 
 ## Tools
