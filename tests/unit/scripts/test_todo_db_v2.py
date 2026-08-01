@@ -537,6 +537,35 @@ class TestLintUnresolvableScopeAndLadderPaths:
         findings = todo_db.lint_item(conn, "node-id-cmd")
         assert not any("test_todo_db_v2" in f for f in findings)
 
+    def test_stale_reference_to_deleted_path_is_flagged_on_open_item(self, conn):
+        # _project/scripts/todo_cli.py existed and was deleted in the G5
+        # cutover (#1232); six open items still referenced it below the
+        # near-miss cutoff.
+        self._mk_scoped(conn, "stale-ref", scope=[("only_modify", "_project/scripts/todo_cli.py")])
+        findings = todo_db.lint_item(conn, "stale-ref")
+        assert any("deleted from the tree" in f for f in findings)
+
+    def test_deleted_path_in_command_is_flagged(self, conn):
+        self._mk_scoped(
+            conn,
+            "stale-cmd-ref",
+            verifications=[
+                {
+                    "description": "rung",
+                    "command": "uv run -- python _project/scripts/todo_cli.py list",
+                    "expected": "whatever",
+                }
+            ],
+        )
+        findings = todo_db.lint_item(conn, "stale-cmd-ref")
+        assert any("deleted from the tree" in f for f in findings)
+
+    def test_deleted_path_never_existed_stays_legal(self, conn):
+        # A planned new file has no git history - it must stay creatable.
+        self._mk_scoped(conn, "planned-new", scope=[("only_modify", "tests/unit/scripts/test_zq_never_existed.py")])
+        findings = todo_db.lint_item(conn, "planned-new")
+        assert not any("test_zq_never_existed" in f for f in findings)
+
     def test_inert_deny_rule_annotated_glob_is_flagged_on_open_item(self, conn):
         # "path (prose)" can never fnmatch a changed file, so the deny rule
         # silently protects nothing — exactly the enforcement hole to surface.

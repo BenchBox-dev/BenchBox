@@ -2381,6 +2381,31 @@ def _glob_resolves(root: Path, pattern: str) -> bool:
         return False
 
 
+_HISTORY_CACHE: dict[tuple[str, str], bool] = {}
+
+
+def _existed_then_deleted(root: Path, path: str) -> bool:
+    """Whether ``path`` once existed in git history (it does not resolve now).
+
+    Ratios cannot separate a stale reference to a deleted file from a planned
+    new file - todo_cli.py (deleted in the G5 cutover) and a genuinely new
+    test sit at the same difflib distance from their nearest siblings. Git
+    history separates them exactly. Cached per (root, path) so a lint --all
+    pass pays one subprocess per distinct stale path, not per item.
+    """
+    key = (str(root), path)
+    if key not in _HISTORY_CACHE:
+        result = subprocess.run(
+            ["git", "log", "--all", "-1", "--format=%h", "--", path],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        _HISTORY_CACHE[key] = result.returncode == 0 and bool(result.stdout.strip())
+    return _HISTORY_CACHE[key]
+
+
 def _near_miss(root: Path, literal: str, cutoff: float = _NEAR_MISS_CUTOFF) -> str | None:
     """An existing sibling whose name closely matches ``literal``'s, if any."""
     target = root / literal
@@ -2404,6 +2429,8 @@ def _unresolved_path_finding(root: Path, path: str, *, settled: bool) -> str | N
     close = _near_miss(root, path)
     if close:
         return f"names a nonexistent path suspiciously close to existing '{close}'"
+    if _existed_then_deleted(root, path):
+        return "references a file that was deleted from the tree"
     return None
 
 
