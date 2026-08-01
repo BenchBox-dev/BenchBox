@@ -57,7 +57,10 @@ _SECRET_KEY_PARTS = tuple(
 # username rode into every internal bundle verbatim. Exact normalized match
 # only - a substring rule on "user" would nuke user_agent/num_users-class
 # options.
-_USERNAME_KEYS = frozenset({"user", "username", "userid", "pguser", "dbuser"})
+# serviceaccount: an IAM principal email (dataproc) - identity, not a secret,
+# but it names the project and operator, so internal export redacts it like
+# every other username spelling.
+_USERNAME_KEYS = frozenset({"user", "username", "userid", "pguser", "dbuser", "serviceaccount"})
 
 
 def _is_username_key(key: str) -> bool:
