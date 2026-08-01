@@ -792,6 +792,35 @@ class TestPublicPayloadApiKeyAndAccountKey:
         assert "AZKEY-SENTINEL" not in out
 
 
+class TestPublicPayloadTupleRecursion:
+    """A tuple fell through to the scalar branch untouched, so any payload
+    branch not pre-flattened by internal capture leaked tuple contents."""
+
+    def test_tuple_nested_identifier_is_anonymized(self):
+        out = json.dumps(
+            AnonymizationManager().anonymize_result_payload(
+                {"platform_metadata": {"nested": ({"userid": "TUP-SENTINEL"},)}}
+            ),
+            default=str,
+        )
+        assert "TUP-SENTINEL" not in out
+
+    def test_tuple_secret_key_is_redacted(self):
+        out = json.dumps(
+            AnonymizationManager().anonymize_result_payload(
+                {"platform_metadata": {"configs": ({"password": "TUPPW-SENTINEL"},)}}
+            ),
+            default=str,
+        )
+        assert "TUPPW-SENTINEL" not in out
+
+    def test_list_and_dict_recursion_unchanged(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"platform_raw_config": [{"username": "alice-sentinel"}]}}
+        )["platform_metadata"]["platform_raw_config"]
+        assert out[0]["username"].startswith("user_")
+
+
 class TestPublicPayloadWorkspaceRoleAndApplicationIds:
     """Near-miss variants of covered identifier keys are the recurring leak
     pattern: workspace_name, job_role and application_id all exported
