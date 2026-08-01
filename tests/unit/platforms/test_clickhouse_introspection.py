@@ -88,6 +88,15 @@ class TestClickHouseIntrospector:
         tables = {obj.table for obj in state.objects}
         assert tables == {"lineitem"}
 
+    def test_unrelated_rows_at_catalog_cap_do_not_mark_relevant_snapshot_truncated(self):
+        rows = [(f"other_{index}", "id", "") for index in range(999)]
+        rows.append(("lineitem", "l_orderkey", ""))
+
+        state = ClickHouseTuningIntrospector().introspect(_FakeCHConnection(rows), _optimize_ledger())
+
+        assert state.truncated is False
+        assert {obj.table for obj in state.objects} == {"lineitem"}
+
     def test_non_fatal_on_query_failure(self):
         state = ClickHouseTuningIntrospector().introspect(_FakeCHConnection([], fail=True), _optimize_ledger())
         assert state.error is not None

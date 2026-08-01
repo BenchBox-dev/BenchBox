@@ -20,6 +20,7 @@ import pytest
 
 from benchbox.core.tuning.applied_ledger import (
     PHASE_DDL,
+    PHASE_POST_LOAD,
     PHASE_SESSION,
     AppliedTuningLedger,
 )
@@ -120,6 +121,25 @@ class TestSnowflakeIntrospector:
             [("LINEITEM", "LINEAR(A)"), ("ORDERS", "LINEAR(B)")],  # ORDERS not in ledger
         )
         state = SnowflakeTuningIntrospector().introspect(conn, _clustered_ledger())
+        assert {obj.table for obj in state.objects} == {"LINEITEM"}
+
+    def test_alter_target_is_not_filtered_when_another_statement_activates_bounding(self):
+        ledger = AppliedTuningLedger()
+        ledger.record("ALTER TABLE LINEITEM CLUSTER BY (A)", PHASE_POST_LOAD)
+        ledger.record("OPTIMIZE TABLE ORDERS", PHASE_POST_LOAD)
+        conn = _FakeSnowflakeConnection([("LINEITEM", "LINEAR(A)"), ("NATION", "LINEAR(N)")])
+
+        state = SnowflakeTuningIntrospector().introspect(conn, ledger)
+
+        assert {obj.table for obj in state.objects} == {"LINEITEM"}
+
+    def test_unrelated_rows_at_catalog_cap_do_not_mark_relevant_snapshot_truncated(self):
+        rows = [(f"OTHER_{index}", "LINEAR(ID)") for index in range(999)]
+        rows.append(("LINEITEM", "LINEAR(A)"))
+
+        state = SnowflakeTuningIntrospector().introspect(_FakeSnowflakeConnection(rows), _clustered_ledger())
+
+        assert state.truncated is False
         assert {obj.table for obj in state.objects} == {"LINEITEM"}
 
     def test_non_fatal_on_query_failure(self):

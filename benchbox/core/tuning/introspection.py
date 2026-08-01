@@ -333,6 +333,9 @@ def _statement_table(statement: AppliedStatement) -> str | None:
     om = _OPTIMIZE_RE.match(text)
     if om:
         return normalize_identifier(om.group("table"))
+    at = _ALTER_TABLE_RE.match(text)
+    if at:
+        return normalize_identifier(at.group("table"))
     ct = _CREATE_TABLE_RE.match(text)
     if ct:
         return normalize_identifier(ct.group("table"))
@@ -345,7 +348,7 @@ def ledger_tables(ledger: AppliedTuningLedger) -> set[str]:
     """Normalized table names the executed ledger statements reference.
 
     Introspectors use this to BOUND their catalog reads to the tables actually
-    touched (CREATE INDEX / CREATE TABLE / OPTIMIZE targets), so introspection
+    touched (CREATE INDEX / CREATE TABLE / ALTER TABLE / OPTIMIZE targets), so introspection
     cannot scan an unbounded catalog.
     """
     tables: set[str] = set()

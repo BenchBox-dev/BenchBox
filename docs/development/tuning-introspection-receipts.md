@@ -78,7 +78,13 @@ Each platform's `Introspector.introspect(connection, ledger) -> IntrospectedStat
 returns structured catalog facts (`kind`, `table`, `columns`, `name`,
 `evidence`), bounded to the tables the ledger touched and wrapped
 non-fatal. **No screen-scraping of engine DDL text** where a structured
-catalog exists.
+catalog exists. ClickHouse and Snowflake keep a hard catalog-row limit,
+then filter the bounded result to table names extracted from every supported
+ledger statement shape, including `ALTER TABLE`. Their `truncated` flag measures
+the relevant rows after filtering, so an at-cap catalog full of unrelated tables
+does not reject a complete target snapshot. A target omitted by the hard limit
+still yields an `absent` verdict (and therefore cannot verify); a relevant result
+that itself reaches the cap remains explicitly truncated.
 
 - **DuckDB** (`benchbox/platforms/duckdb_introspection.py`): reads
   `duckdb_indexes()` -- the `table_name` / `index_name` / `expressions`
