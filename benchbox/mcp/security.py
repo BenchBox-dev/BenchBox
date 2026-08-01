@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import anyio
+import psutil
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken, TokenVerifier, principal_components
 from mcp.server.auth.settings import AuthSettings
@@ -30,6 +31,11 @@ ADMISSION_ERROR = -32004
 READ_SCOPE = "benchbox:read"
 EXECUTE_SCOPE = "benchbox:execute"
 WRITE_SCOPE = "benchbox:write"
+
+
+def _boot_identity() -> str:
+    """Return a stable identifier shared by processes in the current OS boot."""
+    return repr(psutil.boot_time())
 
 
 class TokenIdentity(BaseModel):
@@ -304,18 +310,30 @@ class DurableSecurityStore:
                     execution_id TEXT,
                     artifact_ref TEXT
                 );
+                CREATE TABLE IF NOT EXISTS mcp_runtime_metadata (
+                    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                    boot_id TEXT NOT NULL
+                );
                 """
             )
-            now = mono_time()
-            latest_ticket = connection.execute("SELECT MAX(created_at) FROM mcp_admission_tickets").fetchone()[0]
-            latest_window = connection.execute("SELECT MAX(window_start) FROM mcp_rate_windows").fetchone()[0]
-            # perf_counter resets on reboot. Discard transient admission state
-            # from the prior boot instead of retaining future-looking leases.
-            if (latest_ticket is not None and float(latest_ticket) > now) or (
-                latest_window is not None and float(latest_window) > now
-            ):
+            boot_id = _boot_identity()
+            self._begin(connection)
+            metadata = connection.execute("SELECT boot_id FROM mcp_runtime_metadata WHERE singleton = 1").fetchone()
+            if metadata is None:
+                # Preserve live state when migrating an existing database. Once
+                # recorded, later boots can be identified without timestamp races.
+                connection.execute(
+                    "INSERT INTO mcp_runtime_metadata (singleton, boot_id) VALUES (1, ?)",
+                    (boot_id,),
+                )
+            elif metadata["boot_id"] != boot_id:
                 connection.execute("DELETE FROM mcp_admission_tickets")
                 connection.execute("DELETE FROM mcp_rate_windows")
+                connection.execute(
+                    "UPDATE mcp_runtime_metadata SET boot_id = ? WHERE singleton = 1",
+                    (boot_id,),
+                )
+            connection.commit()
 
     def _begin(self, connection: sqlite3.Connection) -> None:
         connection.execute("BEGIN IMMEDIATE")

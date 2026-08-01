@@ -128,18 +128,39 @@ def test_admission_promotes_oldest_waiter_with_principal_capacity(tmp_path: Path
     store.release(AdmissionLease(active_a, "principal-a"))
 
 
-def test_admission_state_resets_after_monotonic_clock_restart(monkeypatch, tmp_path: Path) -> None:
+def test_admission_state_resets_after_os_restart(monkeypatch, tmp_path: Path) -> None:
     from benchbox.mcp import security
 
-    monkeypatch.setattr(security, "mono_time", lambda: 1_000.0)
+    monkeypatch.setattr(security, "_boot_identity", lambda: "boot-a")
     first = DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
     first._enqueue("principal-a")
 
-    monkeypatch.setattr(security, "mono_time", lambda: 10.0)
+    monkeypatch.setattr(security, "_boot_identity", lambda: "boot-b")
     restarted = DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
     with restarted._connect() as connection:
         assert connection.execute("SELECT COUNT(*) FROM mcp_admission_tickets").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM mcp_rate_windows").fetchone()[0] == 0
+
+
+def test_concurrent_activity_during_store_startup_is_preserved(monkeypatch, tmp_path: Path) -> None:
+    from benchbox.mcp import security
+
+    monkeypatch.setattr(security, "_boot_identity", lambda: "same-boot")
+    first = DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
+    ticket_id = first._enqueue("principal-a")
+
+    # A later monotonic timestamp in the shared database is ordinary activity,
+    # not evidence of an OS restart.
+    monkeypatch.setattr(security, "mono_time", lambda: 1.0)
+    DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
+
+    with first._connect() as connection:
+        assert (
+            connection.execute(
+                "SELECT ticket_id FROM mcp_admission_tickets WHERE ticket_id = ?", (ticket_id,)
+            ).fetchone()
+            is not None
+        )
 
 
 def test_lost_admission_lease_cancels_running_request(tmp_path: Path) -> None:
