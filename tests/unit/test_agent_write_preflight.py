@@ -83,7 +83,12 @@ def _init_clone(path: Path) -> Path:
     return path
 
 
-def _run_in_clone(repo: Path, *, ephemeral: bool = False) -> subprocess.CompletedProcess[str]:
+def _run_in_clone(
+    repo: Path,
+    *,
+    ephemeral: bool = False,
+    extra_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     env = {**os.environ}
     # Let the script derive the primary clone naturally from this repo.
     env.pop("BENCHBOX_AGENT_PRIMARY_CLONE", None)
@@ -93,6 +98,7 @@ def _run_in_clone(repo: Path, *, ephemeral: bool = False) -> subprocess.Complete
         env["BENCHBOX_EPHEMERAL_CLONE"] = "1"
     else:
         env.pop("BENCHBOX_EPHEMERAL_CLONE", None)
+    env.update(extra_env or {})
 
     return subprocess.run(
         ["sh", str(SCRIPT.resolve())],
@@ -107,6 +113,35 @@ def _run_in_clone(repo: Path, *, ephemeral: bool = False) -> subprocess.Complete
 def test_preflight_still_refuses_an_undeclared_plain_clone(tmp_path: Path) -> None:
     """The declaration is opt-in: absent it, behavior is exactly as before."""
     result = _run_in_clone(_init_clone(tmp_path / "BenchBox"))
+
+    assert result.returncode == 1
+    assert "Refusing BenchBox write preflight in the primary clone" in result.stderr
+
+
+def test_primary_clone_comparison_uses_filesystem_identity_across_path_spellings(tmp_path: Path) -> None:
+    repo = _init_clone(tmp_path / "BenchBox")
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_realpath = fake_bin / "realpath"
+    fake_realpath.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = ".git" ]; then\n'
+        "  printf '%s/.git\\n' \"$BENCHBOX_FAKE_PRIMARY_SPELLING\"\n"
+        "else\n"
+        "  printf '%s\\n' \"$1\"\n"
+        "fi\n",
+        encoding="utf-8",
+    )
+    fake_realpath.chmod(0o755)
+    equivalent_spelling = f"{repo.as_posix()}/../{repo.name}"
+
+    result = _run_in_clone(
+        repo,
+        extra_env={
+            "BENCHBOX_FAKE_PRIMARY_SPELLING": equivalent_spelling,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        },
+    )
 
     assert result.returncode == 1
     assert "Refusing BenchBox write preflight in the primary clone" in result.stderr
