@@ -55,9 +55,10 @@ def _write_wsl_stub(directory: Path) -> Path:
 def _clear_resolver_cache():
     """posix_shell() is lru_cached; each test needs a fresh probe, and must not
     leave a PATH-specific answer cached for whatever runs next."""
-    posix_shell_module.posix_shell.cache_clear()
+    cached_resolver = posix_shell_module.posix_shell
+    cached_resolver.cache_clear()
     yield
-    posix_shell_module.posix_shell.cache_clear()
+    cached_resolver.cache_clear()
 
 
 @pytest.mark.skipif(os.name == "nt", reason="stub uses a POSIX shebang")
@@ -107,3 +108,30 @@ def test_env_override_is_probed_not_trusted(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(stub_dir))
 
     assert posix_shell() is None, "a broken override must not be trusted"
+
+
+@pytest.mark.parametrize("helper_name", ("requires_posix_shell", "skip_without_posix_shell"))
+def test_missing_shell_fails_closed_on_posix(monkeypatch, helper_name):
+    monkeypatch.setattr(posix_shell_module, "posix_shell", lambda: None)
+    monkeypatch.setattr(posix_shell_module.os, "name", "posix")
+
+    with pytest.raises(RuntimeError, match="No working POSIX shell found"):
+        getattr(posix_shell_module, helper_name)()
+
+
+def test_missing_shell_module_guard_skips_on_windows(monkeypatch):
+    monkeypatch.setattr(posix_shell_module, "posix_shell", lambda: None)
+    monkeypatch.setattr(posix_shell_module.os, "name", "nt")
+
+    marker = posix_shell_module.requires_posix_shell()
+
+    assert marker.mark.name == "skipif"
+    assert marker.mark.args == (True,)
+
+
+def test_missing_shell_per_test_guard_skips_on_windows(monkeypatch):
+    monkeypatch.setattr(posix_shell_module, "posix_shell", lambda: None)
+    monkeypatch.setattr(posix_shell_module.os, "name", "nt")
+
+    with pytest.raises(pytest.skip.Exception, match="no working POSIX shell"):
+        posix_shell_module.skip_without_posix_shell()
