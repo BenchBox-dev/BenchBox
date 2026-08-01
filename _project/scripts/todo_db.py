@@ -2396,7 +2396,7 @@ def _existed_then_deleted(root: Path, path: str) -> bool:
     key = (str(root), path)
     if key not in _HISTORY_CACHE:
         result = subprocess.run(
-            ["git", "log", "--all", "-1", "--format=%h", "--", path],
+            ["git", "log", "-1", "--format=%h", "--", path],
             cwd=root,
             capture_output=True,
             text=True,
