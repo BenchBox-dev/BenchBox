@@ -765,3 +765,28 @@ class TestPublicPayloadSecretKeys:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestPublicPayloadApiKeyAndAccountKey:
+    """The shared secret list must cover api_key/*_account_key on the public
+    path too — these leaked through anonymize_result_payload verbatim."""
+
+    def test_api_key_and_storage_account_key_are_redacted(self):
+        manager = AnonymizationManager()
+        out = json.dumps(
+            manager.anonymize_result_payload(
+                {
+                    "platform_metadata": {
+                        "platform_raw_config": {
+                            "api_key": "APIKEY-SENTINEL",
+                            "onehouse_api_key": "OH-SENTINEL",
+                            "storage_account_key": "AZKEY-SENTINEL",
+                        }
+                    }
+                }
+            ),
+            default=str,
+        )
+        assert "APIKEY-SENTINEL" not in out
+        assert "OH-SENTINEL" not in out
+        assert "AZKEY-SENTINEL" not in out

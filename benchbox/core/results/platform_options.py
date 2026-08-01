@@ -35,6 +35,13 @@ _SECRET_KEY_PARTS = tuple(
         "session_token",
         "connection_string",
         "credential",
+        # Found by the 2026-07-31 sentinel sweep leaking through BOTH layers:
+        # api_key/onehouse_api_key (quanton's only credential) and Azure's
+        # storage_account_key matched none of the parts above. Deliberately
+        # narrow - a bare "key" part would redact sort_key/partition_key-class
+        # data-modelling options.
+        "api_key",
+        "account_key",
     )
 )
 # Connection usernames are identity, not secrets, so they are NOT in
