@@ -1786,9 +1786,7 @@ def _cmd_import_bulk(conn: Any, actor: str, args: argparse.Namespace) -> int:
     # false PARITY FAILED on a correct import, which is exactly what the first
     # production run printed. It fails safe (never the reverse), but it makes the
     # exit code untrustworthy, so sync the replica before comparing.
-    replica_sync = getattr(conn, "sync", None)
-    if callable(replica_sync):
-        replica_sync()
+    todo_db.sync_hosted_replica(conn)
     report = parity_report(conn, args.corpus, staged)
     if args.report:
         print(json.dumps(report, indent=2, sort_keys=True))

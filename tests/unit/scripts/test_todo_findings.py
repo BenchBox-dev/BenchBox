@@ -1663,10 +1663,7 @@ class TestBulkImportSyncsBeforeParity:
         calls = []
 
         class _Conn:
-            """Stands in for a hosted connection whose reads are stale until sync()."""
-
-            def sync(self):
-                calls.append("sync")
+            """Stands in for the hosted connection passed to the parity reader."""
 
             def execute(self, *_a, **_k):
                 calls.append("read")
@@ -1679,6 +1676,10 @@ class TestBulkImportSyncsBeforeParity:
                         return iter(())
 
                 return _Cur()
+
+        def _parity_report(*_a, **_k):
+            calls.append("read")
+            return {"ok": True, "stored_records": 1, "corpus_records": 1}
 
         monkeypatch.setattr(todo_db, "resolve_backend", lambda _db: "libsql://benchbox-todo-org.turso.io")
         monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "t")
@@ -1693,12 +1694,9 @@ class TestBulkImportSyncsBeforeParity:
         )
         monkeypatch.setattr(todo_findings, "offset_staging_pks", lambda *_a, **_k: {})
         monkeypatch.setattr(todo_db, "bulk_transfer", lambda *_a, **_k: {"rows": 1, "batches": 1})
+        monkeypatch.setattr(todo_db, "sync_hosted_replica", lambda _conn: calls.append("sync"))
         monkeypatch.setattr(todo_db.sqlite3, "connect", lambda *_a, **_k: SimpleNamespace(close=lambda: None))
-        monkeypatch.setattr(
-            todo_findings,
-            "parity_report",
-            lambda *_a, **_k: {"ok": True, "stored_records": 1, "corpus_records": 1},
-        )
+        monkeypatch.setattr(todo_findings, "parity_report", _parity_report)
 
         args = SimpleNamespace(
             finding_command="import",
@@ -1710,4 +1708,4 @@ class TestBulkImportSyncsBeforeParity:
             db=None,
         )
         assert todo_findings._cmd_import_bulk(_Conn(), "tester", args) == 0
-        assert "sync" in calls, "parity must not be computed against an unsynced replica"
+        assert calls == ["sync", "read"], "parity must not read before the replica sync"

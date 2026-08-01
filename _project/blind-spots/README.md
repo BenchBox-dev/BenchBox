@@ -2,7 +2,7 @@
 
 > **FROZEN — 2026-07-30. This directory is read-only.**
 >
-> All 65 records now live in the shared tracker's findings tables
+> All 64 records now live in the shared tracker's findings tables
 > (`SCHEMA_VERSION` 4), imported with verified field-level parity: every
 > frontmatter key, every body section byte-for-byte, and each `## Triage log`
 > line as one `imported_triage_log` event. **Do not add, edit, or delete files
