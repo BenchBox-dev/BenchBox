@@ -57,6 +57,9 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/visualize.py",
     "benchbox/cli/composite_params.py",
     "benchbox/cli/config.py",
+    # cli-debug-logging-raw-options: sanitizes values attached to internal
+    # DEBUG records. No Click decorator or command signature changes.
+    "benchbox/cli/database.py",
     "benchbox/cli/display.py",
     "benchbox/cli/dryrun.py",
     # tuning-author-experience-honesty-quickfixes: reordered resolve_tuning's

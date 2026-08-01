@@ -7,6 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import logging
+from types import SimpleNamespace
 
 import pytest
 
@@ -63,3 +64,28 @@ class TestCreateConfigDebugLogging:
         DatabaseManager().create_config("duckdb", platform_options={"memory_limit": "4GB"})
         building = [r for r in captured_debug_records if r.getMessage() == "Building database config"]
         assert building[0].platform_options["memory_limit"] == "4GB"
+
+    def test_credential_bearing_dsn_is_sanitized(self, captured_debug_records, monkeypatch):
+        dsn = "databend+http://user:DSN-SENTINEL@host/database"
+        monkeypatch.setattr(
+            "benchbox.cli.database.ensure_driver_version",
+            lambda **_: SimpleNamespace(
+                requested=None,
+                resolved="test",
+                actual="test",
+                runtime_strategy="current-process",
+                runtime_path=None,
+                runtime_python_executable=None,
+                auto_install_used=False,
+            ),
+        )
+
+        DatabaseManager().create_config("databend", platform_options={"dsn": dsn})
+
+        matching = [
+            r
+            for r in captured_debug_records
+            if r.getMessage() in {"Building database config", "Database configuration built"}
+        ]
+        assert matching
+        assert all("DSN-SENTINEL" not in str(record.__dict__) for record in matching)

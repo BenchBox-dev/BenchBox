@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -59,6 +60,35 @@ def test_get_or_create_returns_singleton(monkeypatch: pytest.MonkeyPatch) -> Non
 
     SparkSessionManager.release()
     assert SparkSessionManager._session is None
+
+
+def test_get_or_create_redacts_azure_sas_config_in_debug_log(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Azure Hadoop SAS values are bearer credentials and must not reach logs."""
+    fake_session = SimpleNamespace(stop=lambda: None)
+    sas_key = "spark.hadoop.fs.azure.sas.container.account.blob.core.windows.net"
+
+    monkeypatch.setattr(session_module, "PYSPARK_AVAILABLE", True)
+    monkeypatch.setattr(session_module, "_validate_java_version", lambda: None)
+    _patch_classmethod(monkeypatch, "_create_session", lambda cls, config: fake_session)
+
+    with caplog.at_level(logging.DEBUG, logger="benchbox.platforms.pyspark.session"):
+        SparkSessionManager.get_or_create(
+            master="local[*]",
+            app_name="BenchBox-Tests",
+            driver_memory="2g",
+            executor_memory=None,
+            shuffle_partitions=8,
+            enable_aqe=True,
+            extra_configs={sas_key: "SAS-SENTINEL"},
+        )
+
+    messages = [record.getMessage() for record in caplog.records if "Creating SparkSession" in record.getMessage()]
+    assert messages
+    assert all("SAS-SENTINEL" not in message for message in messages)
+    assert any(sas_key in message for message in messages)
 
 
 def test_configuration_mismatch_raises(monkeypatch: pytest.MonkeyPatch) -> None:
