@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-08-01T15:13:52.998107+00:00",
+  "generated_at": "2026-08-01T18:38:51.243692+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_datafusion_sql_20260502_182815_88aab2ac.json",
@@ -1261,7 +1261,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "7fb291cd6325e194ea08200d3e6bf25df2cd02db86a627e661126bed8c14290d"
+      "bundle_sha256": "abacc17455ae587ff5a855be6eea8c3dba5e388540e59ef24657f1adf95f9541"
     },
     {
       "file": "ssb/duckdb/sf0.1/ssb_sf01_duckdb_sql_20260730_192214_3eb90405.json",
@@ -1274,7 +1274,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "38361616575e1d437cbf1e618ffdc5bc87a1113c895e2dc5bd35b9c5b6c043e3"
+      "bundle_sha256": "5116a0e51726f014031330faab452239349f435dbb3e2adc2a99ba1e30d5353d"
     },
     {
       "file": "ssb_sf001_polars_df_20260502_211239_4e92eecf.json",
