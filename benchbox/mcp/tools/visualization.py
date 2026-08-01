@@ -13,7 +13,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from benchbox.core.visualization.chart_types import CHART_TYPE_DESCRIPTIONS
@@ -82,19 +82,19 @@ MCP_GENERATE_CHART_DESCRIPTION = (
 # Tool annotations for read-only visualization info tools
 VIZ_READONLY_ANNOTATIONS = ToolAnnotations(
     title="Visualization information",
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 # Tool annotations for chart generation (creates files)
 VIZ_GENERATE_ANNOTATIONS = ToolAnnotations(
     title="Generate visualization",
-    readOnlyHint=False,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=False,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 
@@ -320,7 +320,7 @@ def _generate_chart_impl(
 
 
 def register_visualization_tools(
-    mcp: FastMCP,
+    mcp: MCPServer,
     *,
     results_dir: Path,
     charts_dir: Path,

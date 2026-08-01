@@ -52,7 +52,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 try:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 except ImportError as e:
     raise ImportError(
         "MCP SDK not installed. Install with:\n"
@@ -85,11 +85,11 @@ def create_server(
     charts_dir: str | Path | None = None,
     log_level: str | int | None = None,
     env: Mapping[str, str] | None = None,
-) -> FastMCP:
+) -> MCPServer:
     """Create and configure the BenchBox MCP server.
 
     Returns:
-        Configured FastMCP server instance with all tools, resources, and prompts registered.
+        Configured MCPServer instance with all tools, resources, and prompts registered.
     """
     from benchbox.mcp.server import create_benchbox_server
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
@@ -228,11 +228,11 @@ Format recommendations as:
 Include example configuration snippets where applicable."""
 
 
-def register_all_prompts(mcp: FastMCP) -> None:
+def register_all_prompts(mcp: MCPServer) -> None:
     """Register all MCP prompts with the server.
 
     Args:
-        mcp: The FastMCP server instance to register prompts with.
+        mcp: The MCPServer instance to register prompts with.
     """
 
     @mcp.prompt()

@@ -15,7 +15,7 @@ import json
 import logging
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from benchbox.core.benchmark_registry import (
     get_all_benchmarks,
@@ -250,11 +250,11 @@ def _build_system_profile() -> str:
     )
 
 
-def register_all_resources(mcp: FastMCP, *, results_dir: Path) -> None:
+def register_all_resources(mcp: MCPServer, *, results_dir: Path) -> None:
     """Register all MCP resources with the server.
 
     Args:
-        mcp: The FastMCP server instance to register resources with.
+        mcp: The MCPServer instance to register resources with.
     """
 
     resolved_results_dir = Path(results_dir).expanduser()
