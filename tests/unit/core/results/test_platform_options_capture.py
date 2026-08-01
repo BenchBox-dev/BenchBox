@@ -443,3 +443,37 @@ class TestUsernameRedactionInternalPath:
         result = sanitize_platform_options({"connection": {"username": "alice-sentinel", "host": "db.internal"}})
         assert result["connection"]["username"] == REDACTED_VALUE
         assert result["connection"]["host"] == "db.internal"
+
+
+class TestApiKeyAndAccountKeyRedaction:
+    """api_key and *_account_key are credentials and must never export
+    verbatim (2026-07-31 sentinel-sweep finding: they leaked through both
+    the internal and the public layer)."""
+
+    def test_api_key_variants_are_redacted(self):
+        from benchbox.core.results.platform_options import sanitize_platform_options
+
+        result = sanitize_platform_options(
+            {"api_key": "APIKEY-SENTINEL", "onehouse_api_key": "OH-SENTINEL", "apiKey": "CAMEL-SENTINEL"}
+        )
+        assert result["api_key"] == REDACTED_VALUE
+        assert result["onehouse_api_key"] == REDACTED_VALUE
+        assert result["apiKey"] == REDACTED_VALUE
+
+    def test_storage_account_key_is_redacted(self):
+        from benchbox.core.results.platform_options import sanitize_platform_options
+
+        assert sanitize_platform_options({"storage_account_key": "AZKEY-SENTINEL"})["storage_account_key"] == (
+            REDACTED_VALUE
+        )
+
+    def test_data_modelling_keys_still_export(self):
+        from benchbox.core.results.platform_options import sanitize_platform_options
+
+        result = sanitize_platform_options(
+            {"sort_key": "l_shipdate", "partition_key": "l_orderkey", "primary_key": "id", "account": "acct-1"}
+        )
+        assert result["sort_key"] == "l_shipdate"
+        assert result["partition_key"] == "l_orderkey"
+        assert result["primary_key"] == "id"
+        assert result["account"] == "acct-1"
