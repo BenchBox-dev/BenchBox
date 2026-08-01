@@ -813,7 +813,7 @@ class DuckLakeAdapter(DuckDBAdapter):
         identity = self._run_identity(benchmark)
         table = self._quote_identifier(_RUN_IDENTITY_TABLE)
         connection.execute(
-            f"CREATE TABLE IF NOT EXISTS lake.main.{table} (identity_key VARCHAR PRIMARY KEY, identity_value VARCHAR)"
+            f"CREATE TABLE IF NOT EXISTS lake.main.{table} (identity_key VARCHAR, identity_value VARCHAR)"
         )
         connection.execute(f"DELETE FROM lake.main.{table}")
         connection.executemany(

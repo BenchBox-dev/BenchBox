@@ -826,6 +826,40 @@ class TestDuckLakeFromConfigCatalogOptions:
         assert adapter.force_recreate is False
 
 
+class TestDuckLakeRunIdentity:
+    """The persistence marker must use DDL supported by DuckLake itself."""
+
+    class _StubConn:
+        def __init__(self):
+            self.executed: list[str] = []
+            self.inserted: list[tuple[str, str]] = []
+
+        def execute(self, sql):
+            self.executed.append(sql)
+            return self
+
+        def executemany(self, sql, rows):
+            self.executed.append(sql)
+            self.inserted.extend(rows)
+
+    def test_marker_table_omits_unsupported_primary_key_constraint(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+            benchmark="tpch",
+            scale_factor=0.01,
+        )
+        conn = self._StubConn()
+
+        adapter._write_run_identity(conn, object())
+
+        create_sql = conn.executed[0]
+        assert create_sql.startswith('CREATE TABLE IF NOT EXISTS lake.main."__benchbox_run_identity"')
+        assert "PRIMARY KEY" not in create_sql
+        assert "UNIQUE" not in create_sql
+        assert {key for key, _value in conn.inserted} == {"benchmark", "scale_factor", "tuning_sha256"}
+
+
 class TestDuckLakePostgresCatalogReuse:
     """Reuse/force for a server-side catalog, resolved post-ATTACH (w6).
 
