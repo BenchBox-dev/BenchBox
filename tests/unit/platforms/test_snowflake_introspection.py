@@ -20,6 +20,7 @@ import pytest
 
 from benchbox.core.tuning.applied_ledger import (
     PHASE_DDL,
+    PHASE_POST_LOAD,
     PHASE_SESSION,
     AppliedTuningLedger,
 )
@@ -38,9 +39,11 @@ class _FakeCursor:
         self._fail = fail
         self.closed = False
         self.queries: list[str] = []
+        self.calls: list[tuple[str, object]] = []
 
-    def execute(self, query):
+    def execute(self, query, params=None):
         self.queries.append(str(query))
+        self.calls.append((str(query), params))
         if self._fail:
             raise RuntimeError("INFORMATION_SCHEMA unavailable")
 
@@ -110,16 +113,55 @@ class TestSnowflakeIntrospector:
     def test_query_reads_information_schema_not_show_create(self):
         conn = _FakeSnowflakeConnection([("LINEITEM", "LINEAR(A)")])
         SnowflakeTuningIntrospector(schema="BENCH").introspect(conn, _clustered_ledger())
-        query = conn.cursors[0].queries[0].upper()
+        raw_query = conn.cursors[0].queries[0]
+        query = raw_query.upper()
         assert "INFORMATION_SCHEMA.TABLES" in query
         assert "SHOW CREATE" not in query
-        assert "BENCH" in query
+        assert "TABLE_SCHEMA = %s" in raw_query
+        assert conn.cursors[0].calls[0][1] == ("BENCH",)
+
+    def test_lowercase_schema_is_normalized_and_bound(self):
+        conn = _FakeSnowflakeConnection([("LINEITEM", "LINEAR(A)")])
+        state = SnowflakeTuningIntrospector(schema="bench").introspect(conn, _clustered_ledger())
+
+        assert state.error is None
+        query, params = conn.cursors[0].calls[0]
+        assert "TABLE_SCHEMA = %s" in query
+        assert params == ("BENCH",)
+        assert "'bench'" not in query
+
+    def test_unsafe_schema_degrades_without_interpolation(self):
+        conn = _FakeSnowflakeConnection([("LINEITEM", "LINEAR(A)")])
+        state = SnowflakeTuningIntrospector(schema="bench' OR TRUE --").introspect(conn, _clustered_ledger())
+
+        assert state.error is not None
+        assert state.objects == []
+        assert conn.cursors == []
 
     def test_bounded_to_ledger_tables(self):
         conn = _FakeSnowflakeConnection(
             [("LINEITEM", "LINEAR(A)"), ("ORDERS", "LINEAR(B)")],  # ORDERS not in ledger
         )
         state = SnowflakeTuningIntrospector().introspect(conn, _clustered_ledger())
+        assert {obj.table for obj in state.objects} == {"LINEITEM"}
+
+    def test_alter_target_is_not_filtered_when_another_statement_activates_bounding(self):
+        ledger = AppliedTuningLedger()
+        ledger.record("ALTER TABLE LINEITEM CLUSTER BY (A)", PHASE_POST_LOAD)
+        ledger.record("OPTIMIZE TABLE ORDERS", PHASE_POST_LOAD)
+        conn = _FakeSnowflakeConnection([("LINEITEM", "LINEAR(A)"), ("NATION", "LINEAR(N)")])
+
+        state = SnowflakeTuningIntrospector().introspect(conn, ledger)
+
+        assert {obj.table for obj in state.objects} == {"LINEITEM"}
+
+    def test_unrelated_rows_at_catalog_cap_do_not_mark_relevant_snapshot_truncated(self):
+        rows = [(f"OTHER_{index}", "LINEAR(ID)") for index in range(999)]
+        rows.append(("LINEITEM", "LINEAR(A)"))
+
+        state = SnowflakeTuningIntrospector().introspect(_FakeSnowflakeConnection(rows), _clustered_ledger())
+
+        assert state.truncated is False
         assert {obj.table for obj in state.objects} == {"LINEITEM"}
 
     def test_non_fatal_on_query_failure(self):

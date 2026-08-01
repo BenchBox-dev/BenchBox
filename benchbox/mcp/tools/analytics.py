@@ -343,7 +343,15 @@ def _get_query_plan_impl(file_path: Path, result_file: str, query_id: str, forma
 
 def _compare_results_impl(file1: str, file2: str, threshold_percent: float, results_dir: Path) -> dict[str, Any]:
     """Compare two benchmark runs."""
-    exporter = ResultExporter(anonymize=False, console=get_quiet_console())
+    # egress-reviewed: MCP serves a local, same-trust-boundary agent that
+    # needs real paths/hostnames to act on results; secrets are already
+    # redacted at capture time by sanitize_platform_options, and exception
+    # text is scrubbed in mcp/errors.py. Full anonymization would break
+    # path-based workflows without closing a live channel.
+    exporter = ResultExporter(
+        anonymize=False,  # egress-reviewed: local consumer, see comment above
+        console=get_quiet_console(),
+    )
     path1 = resolve_result_file_path(file1, results_dir)
     path2 = resolve_result_file_path(file2, results_dir)
 

@@ -35,6 +35,12 @@ _SECRET_KEY_PARTS = tuple(
         "session_token",
         "connection_string",
         "credential",
+        # DSNs can embed URI userinfo (for example, user:password@host), and
+        # Azure Hadoop ``fs.azure.sas.*`` configuration values are bearer
+        # credentials. Redact the whole option rather than trying to preserve
+        # a partially parsed value across provider-specific formats.
+        "dsn",
+        "sas",
         # Found by the 2026-07-31 sentinel sweep leaking through BOTH layers:
         # api_key/onehouse_api_key (quanton's only credential) and Azure's
         # storage_account_key matched none of the parts above. Deliberately

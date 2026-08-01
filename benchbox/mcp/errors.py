@@ -10,9 +10,29 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+
+# Driver/adapter exceptions echo back the strings they were built from -
+# a DSN, an ATTACH statement, a config assignment - so exception text is a
+# credential materialisation channel (the #1333/#1345 family). Scrub
+# secret-assignment patterns and URL userinfo before the text leaves the
+# server; key-list redaction cannot help here because the secret is already
+# embedded in a value.
+_SECRET_ASSIGNMENT_RE = re.compile(
+    r"((?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|account[_-]?key|"
+    r"key[_-]?id|credential)[a-z0-9_-]*\s*[=:]\s*)"
+    r"(?:'[^']*'|\"[^\"]*\"|[^&\s,;'\")]+)",
+    flags=re.IGNORECASE,
+)
+_URL_USERINFO_RE = re.compile(r"(://)[^/@\s]+@")
+
+
+def scrub_secret_material(text: str) -> str:
+    """Mask secret-assignment values and URL userinfo in free text."""
+    return _URL_USERINFO_RE.sub(r"\1****@", _SECRET_ASSIGNMENT_RE.sub(r"\1****", text))
 
 
 class ErrorCode(str, Enum):
@@ -335,11 +355,11 @@ def make_execution_error(
         details["execution_id"] = execution_id
     if exception:
         details["exception_type"] = type(exception).__name__
-        details["exception_message"] = str(exception)
+        details["exception_message"] = scrub_secret_material(str(exception))
 
     return make_error(
         ErrorCode.BENCHMARK_EXECUTION_FAILED,
-        message,
+        scrub_secret_material(message),
         details=details,
         retry_hint=retry_hint,
     )

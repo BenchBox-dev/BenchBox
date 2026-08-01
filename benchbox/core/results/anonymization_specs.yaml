@@ -16,6 +16,7 @@ identifier_keys:
   projectid: project
   workspace: workspace
   workspaceid: workspace
+  workspacename: workspace
   warehouse: warehouse
   warehousename: warehouse
   workgroup: workgroup
@@ -37,16 +38,22 @@ identifier_keys:
   username: user
   user: user
   userid: user
+  pguser: user
+  dbuser: user
+  tenant: tenant
+  tenantid: tenant
   role: role
   rolename: role
   rolearn: role
   iamrole: role
   iamrolearn: role
+  jobrole: role
   arn: arn
   engine: engine
   enginename: engine
   clientid: client
   machineid: machine
+  applicationid: application
 endpoint_keys:
 - apiendpoint
 - endpoint

@@ -278,6 +278,44 @@ class TestMakePlatformError:
         assert result["suggestion"] == "pip install clickhouse-driver"
 
 
+class TestExceptionSecretScrubbing:
+    """Exception text is a credential materialisation channel (a DSN or SQL
+    text echoed back by a driver); the response must scrub it."""
+
+    def test_secret_assignment_is_scrubbed(self):
+        result = make_execution_error("failed", exception=Exception("motherduck_token=SENT-123 during ATTACH"))
+        msg = result["details"]["exception_message"]
+        assert "SENT-123" not in msg
+        assert "motherduck_token=****" in msg
+
+    def test_url_userinfo_is_scrubbed(self):
+        result = make_execution_error(
+            "failed", exception=Exception("connect databend://joe:PW-SENT@db.example.com:8000 refused")
+        )
+        msg = result["details"]["exception_message"]
+        assert "PW-SENT" not in msg
+        assert "joe" not in msg
+        assert "://****@db.example.com" in msg
+
+    def test_password_colon_assignment_is_scrubbed(self):
+        result = make_execution_error("failed", exception=Exception("bad config: password: hunter2"))
+        assert "hunter2" not in result["details"]["exception_message"]
+
+    def test_quoted_secret_assignments_are_scrubbed(self):
+        result = make_execution_error("failed", exception=Exception("PASSWORD = 'hunter2'; SECRET = \"token\""))
+        msg = result["details"]["exception_message"]
+        assert "hunter2" not in msg
+        assert "token" not in msg
+
+    def test_top_level_message_is_scrubbed(self):
+        result = make_execution_error("Benchmark execution failed: password=hunter2")
+        assert result["message"] == "Benchmark execution failed: password=****"
+
+    def test_plain_text_is_untouched(self):
+        result = make_execution_error("failed", exception=Exception("table lineitem not found"))
+        assert result["details"]["exception_message"] == "table lineitem not found"
+
+
 class TestMakeExecutionError:
     """Tests for make_execution_error helper function."""
 

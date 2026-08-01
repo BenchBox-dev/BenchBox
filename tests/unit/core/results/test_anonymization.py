@@ -790,3 +790,68 @@ class TestPublicPayloadApiKeyAndAccountKey:
         assert "APIKEY-SENTINEL" not in out
         assert "OH-SENTINEL" not in out
         assert "AZKEY-SENTINEL" not in out
+
+
+class TestPublicPayloadWorkspaceRoleAndApplicationIds:
+    """Near-miss variants of covered identifier keys are the recurring leak
+    pattern: workspace_name, job_role and application_id all exported
+    verbatim while workspace/workspaceid and role/iamrole were covered."""
+
+    @staticmethod
+    def _payload(config):
+        return {"platform_metadata": {"platform_raw_config": config}}
+
+    def test_workspace_name_pseudonymizes_like_workspace(self):
+        out = AnonymizationManager().anonymize_result_payload(self._payload({"workspace_name": "WSN-SENTINEL"}))[
+            "platform_metadata"
+        ]["platform_raw_config"]
+        assert out["workspace_name"] != "WSN-SENTINEL"
+        assert out["workspace_name"].startswith("workspace_")
+
+    def test_job_role_pseudonymizes_like_role(self):
+        out = AnonymizationManager().anonymize_result_payload(self._payload({"job_role": "JR-SENTINEL"}))[
+            "platform_metadata"
+        ]["platform_raw_config"]
+        assert out["job_role"] != "JR-SENTINEL"
+        assert out["job_role"].startswith("role_")
+
+    def test_application_id_is_hashed(self):
+        out = AnonymizationManager().anonymize_result_payload(self._payload({"application_id": "APP-SENTINEL"}))[
+            "platform_metadata"
+        ]["platform_raw_config"]
+        assert out["application_id"] != "APP-SENTINEL"
+        assert out["application_id"].startswith("application_")
+
+
+class TestPublicPayloadPgUserAndTenantId:
+    """pg_user must pseudonymize like every other username spelling, and a
+    tenant id (an org-identifying GUID) must hash — both escaped the public
+    identifier map because their compact keys matched nothing."""
+
+    @staticmethod
+    def _payload(config):
+        return {"platform_metadata": {"platform_raw_config": config}}
+
+    def test_pg_user_pseudonymizes_like_username(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(self._payload({"pg_user": "PGUSER-SENTINEL"}))["platform_metadata"][
+            "platform_raw_config"
+        ]
+        assert out["pg_user"] != "PGUSER-SENTINEL"
+        assert out["pg_user"].startswith("user_")
+
+    def test_tenant_id_is_hashed(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(self._payload({"tenant_id": "TENANT-SENTINEL"}))["platform_metadata"][
+            "platform_raw_config"
+        ]
+        assert out["tenant_id"] != "TENANT-SENTINEL"
+        assert out["tenant_id"].startswith("tenant_")
+
+    def test_existing_identifier_behavior_unchanged(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(
+            self._payload({"username": "alice-sentinel", "account": "acct-sentinel"})
+        )["platform_metadata"]["platform_raw_config"]
+        assert out["username"].startswith("user_")
+        assert out["account"].startswith("account_")

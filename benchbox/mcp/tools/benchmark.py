@@ -286,7 +286,16 @@ def _export_and_build_payload(
     result_payload: dict[str, Any] | None = None
     try:
         result.execution_id = execution_id
-        exporter = ResultExporter(output_dir=results_dir, anonymize=False, console=get_quiet_console())
+        # egress-reviewed: MCP serves a local, same-trust-boundary agent that
+        # needs real paths/hostnames to act on results; secrets are already
+        # redacted at capture time by sanitize_platform_options, and exception
+        # text is scrubbed in mcp/errors.py. Full anonymization would break
+        # path-based workflows without closing a live channel.
+        exporter = ResultExporter(
+            output_dir=results_dir,
+            anonymize=False,  # egress-reviewed: local consumer, see comment above
+            console=get_quiet_console(),
+        )
         exported_files = exporter.export_result(result, formats=["json"])
         if "json" in exported_files:
             result_file_path = str(exported_files["json"])

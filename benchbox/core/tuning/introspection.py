@@ -40,6 +40,7 @@ from benchbox.core.tuning.applied_ledger import (
     PHASE_DDL,
     PHASE_POST_LOAD,
     PHASE_SESSION,
+    STATEMENT_FAILED,
     AppliedStatement,
     AppliedTuningLedger,
 )
@@ -181,6 +182,7 @@ class IntrospectionReceipt:
     entries: list[ReceiptEntry] = field(default_factory=list)
     observed: list[IntrospectedObject] = field(default_factory=list)
     error: str | None = None
+    dropped: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def summary(self) -> dict[str, int]:
@@ -208,6 +210,8 @@ class IntrospectionReceipt:
                 }
                 for obj in self.observed
             ]
+        if self.dropped:
+            payload["dropped"] = list(self.dropped)
         if self.error:
             payload["error"] = self.error
         return payload
@@ -281,14 +285,31 @@ def normalize_identifier(value: Any) -> str:
     return text.strip().casefold()
 
 
+def _has_balanced_outer_parentheses(text: str) -> bool:
+    """Return whether one plain parenthesis pair encloses all of *text*."""
+    if not text.startswith("(") or not text.endswith(")"):
+        return False
+    depth = 0
+    for index, char in enumerate(text):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+            if depth == 0 and index != len(text) - 1:
+                return False
+    return depth == 0
+
+
 def normalize_columns(raw: Any) -> tuple[str, ...]:
     """Normalize a comma-separated column list (or a bracketed catalog list).
 
     Accepts ``"a, b"``, ``"[a, b]"`` (DuckDB ``expressions``), or an already
     split iterable. ClickHouse may represent a multi-column partition key as
-    ``tuple(a, b)``; its outer function wrapper is catalog syntax rather than
-    a column name and is removed before splitting. Returns a case-folded,
-    order-preserving tuple with empty entries dropped.
+    ``tuple(a, b)`` or ``(a, b)``; one balanced outer catalog wrapper is
+    removed before splitting. Inner expression parentheses remain untouched.
+    Returns a case-folded, order-preserving tuple with empty entries dropped.
     """
     if raw is None:
         return ()
@@ -300,6 +321,8 @@ def normalize_columns(raw: Any) -> tuple[str, ...]:
             text = text[1:-1]
         elif text[:6].casefold() == "tuple(" and text.endswith(")"):
             text = text[6:-1].strip()
+        elif _has_balanced_outer_parentheses(text):
+            text = text[1:-1].strip()
         items = text.split(",") if text else []
     normalized = [normalize_identifier(item) for item in items]
     return tuple(col for col in normalized if col)
@@ -314,6 +337,9 @@ def _statement_table(statement: AppliedStatement) -> str | None:
     om = _OPTIMIZE_RE.match(text)
     if om:
         return normalize_identifier(om.group("table"))
+    at = _ALTER_TABLE_RE.match(text)
+    if at:
+        return normalize_identifier(at.group("table"))
     ct = _CREATE_TABLE_RE.match(text)
     if ct:
         return normalize_identifier(ct.group("table"))
@@ -326,7 +352,7 @@ def ledger_tables(ledger: AppliedTuningLedger) -> set[str]:
     """Normalized table names the executed ledger statements reference.
 
     Introspectors use this to BOUND their catalog reads to the tables actually
-    touched (CREATE INDEX / CREATE TABLE / OPTIMIZE targets), so introspection
+    touched (CREATE INDEX / CREATE TABLE / ALTER TABLE / OPTIMIZE targets), so introspection
     cannot scan an unbounded catalog.
     """
     tables: set[str] = set()
@@ -478,7 +504,25 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
         state_error = "introspection truncated (catalog row bound hit)"
 
     entries: list[ReceiptEntry] = []
-    for stmt in ledger.executed_statements:
+    for stmt in ledger.statements:
+        if stmt.status == STATEMENT_FAILED:
+            is_session_failure = stmt.phase == PHASE_SESSION
+            reason = (
+                "session/config statement failed -- transient, not corroboration-eligible"
+                if is_session_failure
+                else "ddl/post_load statement failed -- blocks corroboration"
+            )
+            entries.append(
+                ReceiptEntry(
+                    statement=stmt.statement,
+                    phase=stmt.phase,
+                    verdict=TRANSIENT if is_session_failure else UNVERIFIABLE,
+                    table=stmt.table,
+                    reason=reason,
+                )
+            )
+            continue
+
         klass, intents = _classify(stmt)
 
         if klass == TRANSIENT:
@@ -559,12 +603,15 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
     # the ledger happened to contain no verifiable statements.
     if state_error is not None:
         corroborated = False
+    if ledger.dropped:
+        corroborated = False
 
     return IntrospectionReceipt(
         platform=platform,
         corroborated=corroborated,
         entries=entries,
         observed=list(introspected_state.objects) if introspected_state else [],
+        dropped=[item.to_dict() for item in ledger.dropped],
         error=state_error,
     )
 

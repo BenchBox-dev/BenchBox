@@ -13,7 +13,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import os
-import re
 from typing import Optional, Union
 
 from rich.console import Console
@@ -138,16 +137,12 @@ def validate_motherduck_credentials(
         adapter.create_connection()
         return True, None
     except Exception as exc:
-        return False, _redact_token(str(exc), resolved_token)
+        from benchbox.platforms.motherduck import _redact_motherduck_token
+
+        return False, _redact_motherduck_token(str(exc), resolved_token)
     finally:
         if adapter is not None:
             adapter.close_connection()
-
-
-def _redact_token(message: str, token: str) -> str:
-    """Remove MotherDuck token material from connection errors."""
-    redacted = message.replace(token, "****") if token else message
-    return re.sub(r"(motherduck_token=)[^&\s,;)]*", r"\1****", redacted, flags=re.IGNORECASE)
 
 
 __all__ = [

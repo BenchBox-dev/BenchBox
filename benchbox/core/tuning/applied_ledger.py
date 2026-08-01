@@ -225,6 +225,9 @@ class AppliedTuningLedger:
         """
         if not tuning_enabled or not has_config:
             return NOT_APPLICABLE
+        physical_statements = [s for s in self.statements if s.phase in {PHASE_DDL, PHASE_POST_LOAD}]
+        if physical_statements and all(s.status == STATEMENT_FAILED for s in physical_statements):
+            return FAILED
         if any(s.status == EXECUTED for s in self.statements):
             return APPLIED_UNVERIFIED
         if self.statements:  # statements attempted, all failed

@@ -160,9 +160,9 @@ metadata INSERT succeeded":
 | --- | --- |
 | `not_applicable` | tuning disabled, or no effective configuration |
 | `noop` | tuning requested but the execution path ran no statement |
-| `applied_unverified` | ≥1 statement executed; self-attested, not yet introspection-corroborated |
-| `applied_verified` | executed **and** corroborated by a post-load introspection receipt (RESERVED — only the introspection-receipts TODO emits it; never the ledger alone) |
-| `failed` | tuning attempted but every statement failed / the apply path raised |
+| `applied_unverified` | ≥1 statement executed; self-attested, not yet introspection-corroborated. A session-only ledger retains this status. |
+| `applied_verified` | executed **and** corroborated by a post-load introspection receipt; every physical statement must corroborate, with no failed ddl/post_load statement or dropped intent. Only the receipt path emits it; never the ledger alone. |
+| `failed` | ≥1 ddl/post_load statement was attempted and all such statements failed, even if a session statement executed; or the apply path raised |
 | `not_validated` | dataclass default, pre-run (before any derivation) |
 
 Metadata-persistence outcome is **no longer** a tuning status: the old

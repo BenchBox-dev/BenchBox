@@ -77,14 +77,13 @@ class ClickHouseTuningIntrospector:
             logger.debug("clickhouse table introspection degraded: %s", exc)
             return IntrospectedState(platform=self.platform, error=f"system.tables read failed: {exc}")
 
-        truncated = len(rows) >= _MAX_TABLE_ROWS
+        relevant_rows = [row for row in rows if not tables or (row and normalize_identifier(row[0] or "") in tables)]
+        truncated = len(relevant_rows) >= _MAX_TABLE_ROWS
         objects: list[IntrospectedObject] = []
-        for row in rows:
+        for row in relevant_rows:
             try:
                 name, sorting_key, partition_key = row[0], row[1], row[2]
             except Exception:  # pragma: no cover - defensive on row shape
-                continue
-            if tables and normalize_identifier(name or "") not in tables:
                 continue
             if sorting_key:
                 objects.append(

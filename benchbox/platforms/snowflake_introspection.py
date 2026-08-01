@@ -47,6 +47,7 @@ _MAX_TABLE_ROWS = 1000
 #: guessing wrong here would mismatch every clustered table against its own
 #: catalog fact, which fails CLOSED and would be invisible.
 _CLUSTERING_KEY_RE = re.compile(r"^\s*(?:linear\s*)?\((?P<cols>.*)\)\s*$", re.IGNORECASE | re.DOTALL)
+_UNQUOTED_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
 
 
 def parse_clustering_key(raw: Any) -> tuple[str, ...]:
@@ -66,6 +67,14 @@ def parse_clustering_key(raw: Any) -> tuple[str, ...]:
     return normalize_columns(text)
 
 
+def normalize_snowflake_schema(raw: Any) -> str:
+    """Validate and normalize an unquoted Snowflake schema identifier."""
+    text = str(raw).strip()
+    if not _UNQUOTED_IDENTIFIER_RE.fullmatch(text):
+        raise ValueError("Snowflake schema must be a valid unquoted identifier")
+    return text.upper()
+
+
 class SnowflakeTuningIntrospector:
     """Introspect Snowflake ``INFORMATION_SCHEMA`` clustering keys."""
 
@@ -81,31 +90,31 @@ class SnowflakeTuningIntrospector:
         ``error``, and corroboration then refuses the upgrade.
         """
         tables = ledger_tables(ledger)
-        query = (
-            "SELECT TABLE_NAME, CLUSTERING_KEY FROM INFORMATION_SCHEMA.TABLES "
-            f"WHERE CLUSTERING_KEY IS NOT NULL LIMIT {_MAX_TABLE_ROWS}"
-        )
-        if self._schema:
+        try:
             query = (
                 "SELECT TABLE_NAME, CLUSTERING_KEY FROM INFORMATION_SCHEMA.TABLES "
-                f"WHERE TABLE_SCHEMA = '{self._schema}' AND CLUSTERING_KEY IS NOT NULL "
-                f"LIMIT {_MAX_TABLE_ROWS}"
+                f"WHERE CLUSTERING_KEY IS NOT NULL LIMIT {_MAX_TABLE_ROWS}"
             )
-
-        try:
-            rows = _fetch(connection, query)
+            params: tuple[Any, ...] = ()
+            if self._schema:
+                query = (
+                    "SELECT TABLE_NAME, CLUSTERING_KEY FROM INFORMATION_SCHEMA.TABLES "
+                    "WHERE TABLE_SCHEMA = %s AND CLUSTERING_KEY IS NOT NULL "
+                    f"LIMIT {_MAX_TABLE_ROWS}"
+                )
+                params = (normalize_snowflake_schema(self._schema),)
+            rows = _fetch(connection, query, params)
         except Exception as exc:  # introspection must never break a run
             logger.debug("snowflake clustering introspection degraded: %s", exc)
             return IntrospectedState(platform=self.platform, error=f"INFORMATION_SCHEMA read failed: {exc}")
 
-        truncated = len(rows) >= _MAX_TABLE_ROWS
+        relevant_rows = [row for row in rows if not tables or (row and normalize_identifier(row[0] or "") in tables)]
+        truncated = len(relevant_rows) >= _MAX_TABLE_ROWS
         objects: list[IntrospectedObject] = []
-        for row in rows:
+        for row in relevant_rows:
             try:
                 name, clustering_key = row[0], row[1]
             except Exception:  # pragma: no cover - defensive on row shape
-                continue
-            if tables and normalize_identifier(name or "") not in tables:
                 continue
             columns = parse_clustering_key(clustering_key)
             if not columns:
@@ -121,20 +130,23 @@ class SnowflakeTuningIntrospector:
         return IntrospectedState(platform=self.platform, objects=objects, truncated=truncated)
 
 
-def _fetch(connection: Any, query: str) -> list[Any]:
+def _fetch(connection: Any, query: str, params: tuple[Any, ...] = ()) -> list[Any]:
     """Run a read through either a cursor-style or execute-style connection."""
     cursor_factory = getattr(connection, "cursor", None)
     if callable(cursor_factory):
         cursor = cursor_factory()
         try:
-            cursor.execute(query)
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
             return list(cursor.fetchall() or [])
         finally:
             close = getattr(cursor, "close", None)
             if callable(close):
                 close()
-    result = connection.execute(query)
+    result = connection.execute(query, params) if params else connection.execute(query)
     return list(result) if result is not None else []
 
 
-__all__ = ["SnowflakeTuningIntrospector", "parse_clustering_key"]
+__all__ = ["SnowflakeTuningIntrospector", "normalize_snowflake_schema", "parse_clustering_key"]

@@ -38,6 +38,7 @@ from benchbox.core.tuning.introspection import (
     UNVERIFIABLE,
     IntrospectedObject,
     IntrospectedState,
+    IntrospectionReceipt,
     Introspector,
     corroborate,
     ledger_tables,
@@ -85,6 +86,18 @@ class TestNormalization:
     def test_normalize_columns_from_bracketed_catalog_list(self):
         # DuckDB duckdb_indexes().expressions returns a bracketed VARCHAR.
         assert normalize_columns("[L_ORDERKEY, L_LINENUMBER]") == ("l_orderkey", "l_linenumber")
+
+    @pytest.mark.parametrize("raw", ["a, b", "(a, b)", "tuple(a, b)", "[a, b]"])
+    def test_normalize_columns_unifies_multicolumn_catalog_wrappers(self, raw):
+        assert normalize_columns(raw) == ("a", "b")
+
+    def test_normalize_columns_strips_only_a_balanced_plain_outer_wrapper(self):
+        assert normalize_columns("((a, b))") == ("(a", "b)")
+        assert normalize_columns("(a, b") == ("(a", "b")
+        assert normalize_columns("f(a), b") != normalize_columns("f(a, b)")
+
+    def test_normalize_columns_preserves_single_expression_verbatim(self):
+        assert normalize_columns("toYYYYMM(event_ts)") == ("toyyyymm(event_ts)",)
 
     def test_normalize_columns_from_iterable_and_empty(self):
         assert normalize_columns(["A", " B "]) == ("a", "b")
@@ -141,18 +154,41 @@ class TestCorroborate:
         assert receipt.corroborated is False
         assert receipt.summary["verifiable_total"] == 0
 
-    def test_failed_statements_are_not_corroborated(self):
-        # A STATEMENT_FAILED entry is not an executed statement -> ignored, so
-        # the ledger has zero verifiable statements -> no upgrade.
+    def test_failed_physical_statement_gets_blocking_receipt_entry(self):
         ledger = AppliedTuningLedger()
         ledger.record(
             "CREATE INDEX idx_lineitem_sort ON LINEITEM (L_ORDERKEY, L_LINENUMBER)",
             PHASE_DDL,
             status=STATEMENT_FAILED,
+            error="permission denied",
         )
         receipt = corroborate(ledger, _index_state())
         assert receipt.corroborated is False
-        assert receipt.entries == []
+        assert receipt.entries[0].verdict == UNVERIFIABLE
+        assert receipt.entries[0].reason == "ddl/post_load statement failed -- blocks corroboration"
+
+    def test_failed_physical_statement_blocks_corroborated_sibling(self):
+        ledger = _index_ledger()
+        ledger.record(
+            "ALTER TABLE orders CLUSTER BY (o_orderkey)",
+            PHASE_POST_LOAD,
+            status=STATEMENT_FAILED,
+            error="boom",
+        )
+
+        receipt = corroborate(ledger, _index_state())
+
+        assert receipt.corroborated is False
+        assert [entry.verdict for entry in receipt.entries] == [CORROBORATED, UNVERIFIABLE]
+
+    def test_dropped_intent_blocks_corroborated_statement_and_is_in_payload(self):
+        ledger = _index_ledger()
+        ledger.record_dropped("clustering:orders", "capability filtered")
+
+        receipt = corroborate(ledger, _index_state())
+
+        assert receipt.corroborated is False
+        assert receipt.to_payload()["dropped"] == [{"intent": "clustering:orders", "reason": "capability filtered"}]
 
 
 class TestSessionAndMaintenance:
@@ -165,6 +201,16 @@ class TestSessionAndMaintenance:
         verdicts = [e.verdict for e in receipt.entries]
         assert TRANSIENT in verdicts
         assert receipt.summary["verifiable_total"] == 1  # SET excluded from the gate
+
+    def test_failed_session_statement_is_transient_and_non_blocking(self):
+        ledger = _index_ledger()
+        ledger.record("SET threads=4", PHASE_SESSION, status=STATEMENT_FAILED, error="unsupported")
+
+        receipt = corroborate(ledger, _index_state())
+
+        assert receipt.corroborated is True
+        assert [entry.verdict for entry in receipt.entries] == [CORROBORATED, TRANSIENT]
+        assert receipt.entries[1].reason == "session/config statement failed -- transient, not corroboration-eligible"
 
     def test_session_only_ledger_never_verifies(self):
         ledger = AppliedTuningLedger()
@@ -237,6 +283,12 @@ class TestSortKeyAndPartition:
 
 
 class TestPayloadAndProtocol:
+    def test_receipt_additions_preserve_existing_positional_constructor(self):
+        receipt = IntrospectionReceipt("x", False, [], [], "catalog failed")
+
+        assert receipt.error == "catalog failed"
+        assert receipt.dropped == []
+
     def test_receipt_payload_shape(self):
         receipt = corroborate(_index_ledger(), _index_state())
         payload = receipt.to_payload()
@@ -249,6 +301,12 @@ class TestPayloadAndProtocol:
     def test_ledger_tables_covers_index_and_optimize(self):
         ledger = AppliedTuningLedger()
         ledger.record("CREATE INDEX idx ON LINEITEM (a)", PHASE_DDL)
+        ledger.record("OPTIMIZE TABLE ORDERS FINAL", PHASE_POST_LOAD)
+        assert ledger_tables(ledger) == {"lineitem", "orders"}
+
+    def test_ledger_tables_covers_alter_and_optimize_targets(self):
+        ledger = AppliedTuningLedger()
+        ledger.record("ALTER TABLE LINEITEM CLUSTER BY (a)", PHASE_POST_LOAD)
         ledger.record("OPTIMIZE TABLE ORDERS FINAL", PHASE_POST_LOAD)
         assert ledger_tables(ledger) == {"lineitem", "orders"}
 

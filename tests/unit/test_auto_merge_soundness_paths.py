@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
-import stat
+import os
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -119,8 +121,50 @@ def test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge() -> None:
     assert 'result="soundness_path=true"' in workflow
 
 
+def _assert_git_index_executable(path: Path, *, env: dict[str, str] | None = None) -> None:
+    relative_path = path.relative_to(ROOT).as_posix()
+    recorded = subprocess.run(
+        ["git", "ls-files", "--stage", "--", relative_path],
+        cwd=ROOT,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+
+    assert recorded, f"{relative_path} is not tracked by git"
+    assert recorded[0] == "100755", f"expected git mode 100755, got {recorded[0]}"
+
+
 def test_shared_predicate_script_is_executable_for_workflow() -> None:
-    assert SCRIPT_PATH.stat().st_mode & stat.S_IXUSR
+    """The Linux workflow executes the script, so Git must record mode 100755."""
+    _assert_git_index_executable(SCRIPT_PATH)
+
+
+def test_shared_predicate_executable_guard_rejects_non_executable_index_mode(tmp_path: Path) -> None:
+    real_index = subprocess.run(
+        ["git", "rev-parse", "--git-path", "index"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    index_path = Path(real_index)
+    if not index_path.is_absolute():
+        index_path = ROOT / index_path
+
+    test_index = tmp_path / "index"
+    shutil.copyfile(index_path, test_index)
+    env = {**os.environ, "GIT_INDEX_FILE": str(test_index)}
+    subprocess.run(
+        ["git", "update-index", "--chmod=-x", "--", SCRIPT_PATH.relative_to(ROOT).as_posix()],
+        cwd=ROOT,
+        env=env,
+        check=True,
+    )
+
+    with pytest.raises(AssertionError, match="expected git mode 100755, got 100644"):
+        _assert_git_index_executable(SCRIPT_PATH, env=env)
 
 
 def test_codeowners_covers_soundness_paths() -> None:

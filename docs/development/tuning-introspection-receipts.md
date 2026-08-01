@@ -26,15 +26,23 @@ iff:
 2. there is **at least one** catalog-backed (`verifiable`) executed
    ddl/post_load statement; and
 3. **every** verifiable statement is `corroborated` -- none `absent`, none
-   `mismatch`, none `unverifiable`.
+   `mismatch`, none `unverifiable`; and
+4. the ledger contains no failed ddl/post_load statement and no dropped
+   tuning intent. Each physical failure receives a blocking `unverifiable`
+   receipt entry with a code-authored failure reason, and dropped intents are
+   copied into the receipt's additive `dropped` section. Raw driver detail
+   remains in the ledger statement's `error` field, not the receipt reason.
 
-Any failure, timeout, empty ledger, or single non-corroborated statement
-leaves the run at `applied_unverified` with a receipt recording why. The
-introspection step must never fail or materially slow a run.
+Any introspection failure, timeout, or single non-corroborated statement keeps
+an otherwise eligible run at `applied_unverified` with a receipt recording why.
+An all-physical-failed ledger derives `failed` before corroboration, and an
+empty ledger cannot earn the upgrade. The introspection step must never fail or
+materially slow a run.
 
 ## Statement classes (per phase x mechanism)
 
-`corroborate()` classifies each **executed** ledger statement and applies a
+`corroborate()` gates every ledger statement by recorded status and phase,
+then classifies each **executed** statement and applies a
 per-class rule. Classification is by generic SQL shape so the core stays
 platform-agnostic; the per-platform catalog *reads* live in the
 `Introspector` implementations.
@@ -49,6 +57,8 @@ platform-agnostic; the per-platform catalog *reads* live in the
 | `OPTIMIZE TABLE ...` / maintenance           | ddl/post_load  | `maintenance` | merge/compaction op, no distinct catalog footprint -- noted, **non-blocking**      | no                   |
 | `ALTER TABLE T [RESUME/SUSPEND] RECLUSTER`   | ddl/post_load  | `maintenance` | reorganizes existing data; the clustering KEY is the catalog footprint -- **non-blocking** | no          |
 | session-phase statement (any)                | session        | `transient`   | transient SET -- noted, **non-blocking** (documented default below)                | no                   |
+| failed statement                             | ddl/post_load  | `unverifiable`| the requested physical change did not execute; failure reason is recorded -- **blocks** | n/a (blocks)     |
+| failed statement                             | session        | `transient`   | transient session failure is noted but has no persistent catalog footprint -- **non-blocking** | no          |
 | anything else                                | ddl/post_load  | `unverifiable`| no corroboration rule -- **blocks** the upgrade (conservative: stay unverified)    | n/a (blocks)         |
 
 A `CREATE TABLE` carrying **both** an `ORDER BY` and a `PARTITION BY` (the
@@ -72,13 +82,25 @@ only tuning is session SETs stays `applied_unverified` -- there is nothing
 physical to corroborate. This matches the ledger's own physical-hash
 intent (chronology of *layout* ops).
 
+A failed session statement follows the same transient gate rule: it is
+visible in the receipt but does not block a sibling physical statement that
+the catalog corroborates. Conversely, session success cannot mask a run in
+which every attempted ddl/post_load statement failed; that ledger derives
+`failed`, not `applied_unverified`.
+
 ## Per-platform catalog reads (Introspector)
 
 Each platform's `Introspector.introspect(connection, ledger) -> IntrospectedState`
 returns structured catalog facts (`kind`, `table`, `columns`, `name`,
 `evidence`), bounded to the tables the ledger touched and wrapped
 non-fatal. **No screen-scraping of engine DDL text** where a structured
-catalog exists.
+catalog exists. ClickHouse and Snowflake keep a hard catalog-row limit,
+then filter the bounded result to table names extracted from every supported
+ledger statement shape, including `ALTER TABLE`. Their `truncated` flag measures
+the relevant rows after filtering, so an at-cap catalog full of unrelated tables
+does not reject a complete target snapshot. A target omitted by the hard limit
+still yields an `absent` verdict (and therefore cannot verify); a relevant result
+that itself reaches the cap remains explicitly truncated.
 
 - **DuckDB** (`benchbox/platforms/duckdb_introspection.py`): reads
   `duckdb_indexes()` -- the `table_name` / `index_name` / `expressions`
@@ -104,11 +126,41 @@ catalog exists.
   recorded as a corroboratable footprint (e.g. recording the CTAS
   `ORDER BY`, or re-creating the index post-load) -- out of scope here.
 
+- **Snowflake** (`benchbox/platforms/snowflake_introspection.py`): reads
+  `INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY` with bound, normalized schema
+  parameters, then filters the structured rows to ledger tables. Both
+  `LINEAR(A, B)` and `(A, B)` catalog forms normalize to the same exact,
+  order-sensitive column tuple while the live catalog spelling remains
+  unconfirmed.
+
+  A matching catalog key certifies only that Snowflake accepted the clustering
+  **key metadata**. It does not certify that existing micro-partitions have
+  finished reclustering: `ALTER TABLE ... CLUSTER BY` updates metadata before
+  asynchronous maintenance completes, and `RESUME RECLUSTER` remains a
+  non-blocking maintenance statement. This is intentionally weaker than the
+  ClickHouse receipt, whose CREATE-time sorting and partition keys describe the
+  physical MergeTree layout. When a reused Snowflake table already has the
+  requested key, the adapter skips both ALTER and RESUME and records the intent
+  as dropped/already-present; that current run therefore stays fail-closed
+  rather than claiming it physically applied the pre-existing layout.
+
 - **ClickHouse** (`benchbox/platforms/clickhouse/introspection.py`): reads
   `system.tables` (`name` / `sorting_key` / `partition_key` -- structured
   comma-separated key expressions), filtered to `currentDatabase()` and the
   ledger's tables. Returns `sort_key` / `partition_key` facts as receipt
   **evidence**.
+
+  Multi-column catalog keys may be returned as `(a, b)` or `tuple(a, b)`;
+  receipt normalization removes exactly one balanced outer wrapper so those
+  forms compare with the DDL intent `a, b`. Matching remains an exact,
+  order-sensitive tuple comparison. Inner function-call parentheses are not
+  stripped: for example, `f(a), b` remains distinct from `f(a, b)`.
+
+  Expression spelling is deliberately not canonicalized. Verbatim expressions
+  such as `toYYYYMM(ts)` corroborate, while ClickHouse rewrites such as
+  `INTERVAL 1 DAY` to `toIntervalDay(1)` remain an honest fail-closed mismatch.
+  Reimplementing ClickHouse's version-dependent expression canonicalizer here
+  could over-certify a different expression.
 
   ClickHouse applies `ORDER BY` / `PARTITION BY` at `CREATE TABLE` time in the
   *schema* phase, which is not wrapped by the tuning recording connection, so
