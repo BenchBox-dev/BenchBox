@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import benchbox.mcp
+import benchbox.mcp.cli
 
 pytestmark = [
     pytest.mark.unit,
@@ -17,7 +18,7 @@ pytestmark = [
 
 def test_module_main_invokes_run_server(monkeypatch):
     run_server = MagicMock()
-    monkeypatch.setattr(benchbox.mcp, "run_server", run_server)
+    monkeypatch.setattr(benchbox.mcp.cli, "run_server", run_server)
     monkeypatch.setattr(sys, "argv", ["benchbox-mcp"])
 
     runpy.run_module("benchbox.mcp.__main__", run_name="__main__")

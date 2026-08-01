@@ -60,6 +60,8 @@ except ImportError as e:
         "  uv add benchbox --extra mcp  # uv project"
     ) from e
 
+from benchbox.mcp.transport import MCPTransport
+
 # Lazy imports to avoid circular dependencies
 __all__ = [
     "create_server",
@@ -107,6 +109,10 @@ def run_server(
     charts_dir: str | Path | None = None,
     log_level: str | int | None = None,
     env: Mapping[str, str] | None = None,
+    transport: MCPTransport = "stdio",
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    streamable_http_path: str = "/mcp",
 ) -> None:
     """Run the BenchBox MCP server.
 
@@ -114,13 +120,21 @@ def run_server(
     - `benchbox-mcp` CLI command
     - `python -m benchbox.mcp`
     """
+    from benchbox.mcp.transport import MCPTransportSettings, run_transport
+
+    transport_settings = MCPTransportSettings(
+        transport=transport,
+        host=host,
+        port=port,
+        streamable_http_path=streamable_http_path,
+    )
     server = create_server(
         results_dir=results_dir,
         charts_dir=charts_dir,
         log_level=log_level,
         env=env,
     )
-    server.run()
+    run_transport(server, transport_settings)
 
 
 # Lazy-loaded exports for error handling

@@ -10,6 +10,14 @@ from benchbox.core.runtime_paths import resolve_runtime_paths
 from benchbox.mcp import run_server
 
 
+def _http_port(value: str) -> int:
+    """Parse an HTTP port with an argparse-friendly error."""
+    port = int(value)
+    if not 1 <= port <= 65535:
+        raise argparse.ArgumentTypeError("port must be between 1 and 65535")
+    return port
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build parser for MCP server startup options."""
     parser = argparse.ArgumentParser(
@@ -36,6 +44,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--log-level",
         help="Logging level (e.g., DEBUG, INFO, WARNING). Falls back to BENCHBOX_LOG_LEVEL.",
     )
+    parser.add_argument(
+        "--transport",
+        choices=("stdio", "streamable-http"),
+        default="stdio",
+        help="MCP transport (default: stdio; Streamable HTTP is localhost-only).",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Streamable HTTP bind host (loopback interfaces only; default: 127.0.0.1).",
+    )
+    parser.add_argument(
+        "--port",
+        type=_http_port,
+        default=8000,
+        help="Streamable HTTP bind port (default: 8000).",
+    )
+    parser.add_argument(
+        "--streamable-http-path",
+        default="/mcp",
+        help="Streamable HTTP endpoint path (default: /mcp).",
+    )
     return parser
 
 
@@ -58,4 +88,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         charts_dir=runtime_paths.charts_dir,
         log_level=args.log_level,
         env=os.environ,
+        transport=args.transport,
+        host=args.host,
+        port=args.port,
+        streamable_http_path=args.streamable_http_path,
     )
