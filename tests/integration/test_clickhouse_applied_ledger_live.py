@@ -32,8 +32,10 @@ from benchbox.core.tuning.applied_ledger import (
     AppliedTuningLedger,
 )
 from benchbox.core.tuning.interface import TableTuning, TuningColumn, UnifiedTuningConfiguration
+from benchbox.core.tuning.introspection import corroborate
 from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
 from benchbox.platforms.clickhouse.client import ClickHouseLocalClient
+from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
 
 pytestmark = [
     pytest.mark.integration,
@@ -93,6 +95,38 @@ def _run(connection, *, apply_partition: bool) -> tuple[str, dict[str, str]]:
 
 
 class TestAppliedLedgerAgainstLiveClickHouse:
+    def test_multicolumn_partition_key_earns_verification(self, connection):
+        ddl = "CREATE TABLE lineitem (a Int32, b Int32, c Int32) ENGINE=MergeTree PARTITION BY (a, b) ORDER BY (c)"
+        connection.execute(ddl)
+        ledger = AppliedTuningLedger()
+        ledger.record(ddl, PHASE_DDL, table="lineitem")
+
+        state = ClickHouseTuningIntrospector().introspect(connection, ledger)
+        receipt = corroborate(ledger, state)
+
+        assert receipt.corroborated is True
+        assert {entry.kind: entry.verdict for entry in receipt.entries} == {
+            "sort_key": "corroborated",
+            "partition_key": "corroborated",
+        }
+
+    def test_catalog_expression_sugar_mismatch_fails_closed(self, connection):
+        ddl = (
+            "CREATE TABLE lineitem (ts DateTime, id Int32) ENGINE=MergeTree "
+            "PARTITION BY (toStartOfInterval(ts, INTERVAL 1 DAY)) ORDER BY (id)"
+        )
+        connection.execute(ddl)
+        ledger = AppliedTuningLedger()
+        ledger.record(ddl, PHASE_DDL, table="lineitem")
+
+        state = ClickHouseTuningIntrospector().introspect(connection, ledger)
+        receipt = corroborate(ledger, state)
+        partition = next(entry for entry in receipt.entries if entry.kind == "partition_key")
+
+        assert receipt.corroborated is False
+        assert partition.verdict == "mismatch"
+        assert partition.evidence == {"partition_key": "toStartOfInterval(ts, toIntervalDay(1))"}
+
     def test_catalog_reports_the_partition_expression_with_its_closing_paren(self, connection):
         # Pins the assumption the clause regex depends on. If ClickHouse ever
         # reported a bare column here, the regex fix would be over-built; if the
