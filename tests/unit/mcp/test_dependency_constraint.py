@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from packaging.requirements import Requirement
 from packaging.version import Version
 
@@ -12,6 +13,11 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10
 
 
 REPO_ROOT = Path(__file__).parents[3]
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
 
 
 def _declared_requirements(config: dict) -> list[str]:
