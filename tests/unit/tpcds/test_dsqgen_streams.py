@@ -16,6 +16,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import sys
 from pathlib import Path
+from subprocess import CompletedProcess
 
 import pytest
 
@@ -23,6 +24,7 @@ from benchbox.core.tpcds.streams import (
     DSQGenStreamsError,
     _parse_dsqgen_stream_log,
     _resolve_dsqgen_binary_and_templates,
+    _run_dsqgen_streams,
     _split_dsqgen_stream_sql,
     generate_dsqgen_streams,
 )
@@ -248,3 +250,89 @@ class TestGenerateDsqgenStreamsErrors:
 
         with pytest.raises(DSQGenStreamsError, match="dsqgen binary not found"):
             generate_dsqgen_streams(num_streams=1, seed=PINNED_SEED)
+
+
+class TestRunDsqgenStreams:
+    _CITIES_OVERRUN = (
+        "Runtime ERROR: Distribution over-run/under-run\n"
+        "Check distribution definitions and usage for cities.\n"
+        "index = -1, length=1000."
+    )
+
+    @staticmethod
+    def _completed(returncode: int, stderr: str = "") -> CompletedProcess[str]:
+        return CompletedProcess(args=["dsqgen"], returncode=returncode, stdout="", stderr=stderr)
+
+    def test_windows_cities_overrun_retries_after_removing_partial_output(self, monkeypatch, tmp_path):
+        import benchbox.core.tpcds.streams as streams_mod
+
+        partial_sql = tmp_path / "query_0.sql"
+        partial_log = tmp_path / "stream_params.log"
+        partial_sql.write_text("partial", encoding="utf-8")
+        partial_log.write_text("partial", encoding="utf-8")
+        results = [self._completed(1, self._CITIES_OVERRUN), self._completed(0)]
+
+        monkeypatch.setattr(streams_mod.sys, "platform", "win32")
+        monkeypatch.setattr(streams_mod.subprocess, "run", lambda *args, **kwargs: results.pop(0))
+
+        result = _run_dsqgen_streams(["dsqgen.exe"], temp_path=tmp_path, timeout=30, env={})
+
+        assert result.returncode == 0
+        assert not results
+        assert not partial_sql.exists()
+        assert not partial_log.exists()
+
+    def test_windows_unknown_failure_is_not_retried(self, monkeypatch, tmp_path):
+        import benchbox.core.tpcds.streams as streams_mod
+
+        calls = 0
+
+        def _fail_once(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return self._completed(1, "different dsqgen failure")
+
+        monkeypatch.setattr(streams_mod.sys, "platform", "win32")
+        monkeypatch.setattr(streams_mod.subprocess, "run", _fail_once)
+
+        result = _run_dsqgen_streams(["dsqgen.exe"], temp_path=tmp_path, timeout=30, env={})
+
+        assert result.returncode == 1
+        assert calls == 1
+
+    def test_persistent_windows_cities_overrun_stops_at_retry_cap(self, monkeypatch, tmp_path):
+        import benchbox.core.tpcds.streams as streams_mod
+
+        calls = 0
+
+        def _always_overrun(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return self._completed(1, self._CITIES_OVERRUN)
+
+        monkeypatch.setattr(streams_mod.sys, "platform", "win32")
+        monkeypatch.setattr(streams_mod, "_WINDOWS_DSQGEN_MAX_ATTEMPTS", 3)
+        monkeypatch.setattr(streams_mod.subprocess, "run", _always_overrun)
+
+        result = _run_dsqgen_streams(["dsqgen.exe"], temp_path=tmp_path, timeout=30, env={})
+
+        assert result.returncode == 1
+        assert calls == 3
+
+    def test_non_windows_cities_overrun_is_not_retried(self, monkeypatch, tmp_path):
+        import benchbox.core.tpcds.streams as streams_mod
+
+        calls = 0
+
+        def _fail_once(*args, **kwargs):
+            nonlocal calls
+            calls += 1
+            return self._completed(1, self._CITIES_OVERRUN)
+
+        monkeypatch.setattr(streams_mod.sys, "platform", "linux")
+        monkeypatch.setattr(streams_mod.subprocess, "run", _fail_once)
+
+        result = _run_dsqgen_streams(["dsqgen"], temp_path=tmp_path, timeout=30, env={})
+
+        assert result.returncode == 1
+        assert calls == 1
