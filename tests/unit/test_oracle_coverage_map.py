@@ -16,6 +16,7 @@ honest and current:
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -316,6 +317,64 @@ def test_provenance_never_changes_independence(rows):
     # A variant gate has no cross-surface gate entry, so it discloses no provenance.
     assert oracle_surface_provenance(ORACLE_VARIANT_EQUIVALENCE, "tpchavoc") == (PROVENANCE_NONE, PROVENANCE_NONE)
     assert oracle_surface_provenance(ORACLE_CROSS_SURFACE, "coffeeshop")[0] == PROVENANCE_SEPARATE
+
+
+def test_staged_gate_scale_is_read_from_its_own_metadata(monkeypatch):
+    """A STAGED gate's bounded scale must come from the gate, not the shared default.
+
+    ``classify_oracles`` counts a STAGED gate as a cross-surface oracle, so the Scale
+    cell has to resolve through ``STAGED_GATES`` too. Reading only ``GATES`` silently
+    rendered the shared ``EQUIVALENCE_SCALE`` for a staged gate that declares its own
+    ``scale_factor`` -- overstating the scale at which the gate actually holds, on the
+    exact path every cross-surface gate takes before it is promoted to ``GATES``.
+    """
+    from benchbox.core.equivalence.cross_surface import (
+        EQUIVALENCE_SCALE,
+        GATES,
+        STAGED_GATES,
+        SURFACE_INDEPENDENCE_MIXED,
+    )
+
+    staged_scale = EQUIVALENCE_SCALE / 100
+    assert staged_scale != EQUIVALENCE_SCALE, "probe scale must differ from the shared default"
+
+    # Stage a real gate object under a benchmark that has no oracle today, so the row
+    # is classified purely through the STAGED path.
+    probe_id = "nyctaxi"
+    assert probe_id not in GATES, f"{probe_id} gained an enforced gate; pick another staged probe"
+    template = GATES["coffeeshop"]
+    staged = replace(
+        template,
+        name=probe_id,
+        surface_independence=SURFACE_INDEPENDENCE_MIXED,
+        scale_factor=staged_scale,
+    )
+    monkeypatch.setitem(STAGED_GATES, probe_id, staged)
+
+    row = {r["benchmark"]: r for r in build_coverage_map()}[probe_id]
+    assert row["primary_oracle"] == ORACLE_CROSS_SURFACE
+    assert row["cross_surface_enforced"] is False, "a STAGED gate must not report as CI-enforced"
+    assert row["scale"] == f"SF={staged_scale}", (
+        f"staged gate scale must be read from its own metadata, got {row['scale']!r}"
+    )
+
+
+def test_unknown_surface_provenance_label_is_rejected(monkeypatch):
+    """A provenance label outside the closed vocabulary must fail loudly, not render.
+
+    Pinning the PROVENANCE_* constants to the live ``SURFACE_INDEPENDENCE_*`` constants
+    catches a RENAME but not an ADDITION. Without this guard a newly registered gate
+    carrying a brand-new label rendered straight into the table, while the map's
+    Surface-provenance prose still defined only the original three -- the legend
+    silently contradicting the row.
+    """
+    from benchbox.core.equivalence.cross_surface import GATES
+
+    bogus = replace(GATES["coffeeshop"], surface_independence="transpiled-from-sql")
+    monkeypatch.setitem(GATES, "coffeeshop", bogus)
+
+    with pytest.raises(ValueError, match="unknown surface-provenance label"):
+        oracle_surface_provenance(ORACLE_CROSS_SURFACE, "coffeeshop")
 
 
 def test_markdown_renders_independence_and_provenance_as_distinct_columns(rows):

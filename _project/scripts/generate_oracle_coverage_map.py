@@ -93,6 +93,14 @@ PROVENANCE_MIXED = "mixed-provenance"  # mixes generated/shared and bespoke impl
 PROVENANCE_SEPARATE = "separate-handwritten"  # DataFrame families separately handwritten
 PROVENANCE_NONE = "—"  # not a cross-surface gate: the axis does not apply
 
+# The closed vocabulary this column may render. Pinning the three constants above to
+# the live ``cross_surface`` constants catches a RENAME, but not an ADDITION: a new
+# ``SURFACE_INDEPENDENCE_*`` label on a newly registered gate would pass through
+# unvalidated and render a label the map's own prose does not define, leaving the
+# legend quietly contradicting the table. Validating membership keeps the value read
+# live from the gate while making an unknown label a loud failure.
+_KNOWN_PROVENANCE_LABELS = frozenset({PROVENANCE_SHARED_SPEC, PROVENANCE_MIXED, PROVENANCE_SEPARATE})
+
 # Sentinel for "no scale guarantee" (UNGUARDED rows).
 SCALE_NONE = "—"
 
@@ -178,10 +186,16 @@ def _bounded_value_gate_scale(benchmark_id: str) -> str:
     fall back to the shared default for the TPC-Havoc variant gates, which are not
     in the cross-surface ``GATES`` registry. Reading it live keeps the artifact
     honest rather than hand-labelled.
-    """
-    from benchbox.core.equivalence.cross_surface import EQUIVALENCE_SCALE, GATES
 
-    gate = GATES.get(benchmark_id)
+    Both gate registries are consulted. ``classify_oracles`` already treats a
+    STAGED gate as a cross-surface oracle, so looking in ``GATES`` alone would
+    silently render the shared default for a staged gate that declares its own
+    ``scale_factor`` -- overstating the scale at which the gate actually holds,
+    on exactly the path every gate takes before promotion.
+    """
+    from benchbox.core.equivalence.cross_surface import EQUIVALENCE_SCALE, GATES, STAGED_GATES
+
+    gate = GATES.get(benchmark_id) or STAGED_GATES.get(benchmark_id)
     scale = gate.scale_factor if gate is not None else EQUIVALENCE_SCALE
     return f"SF={scale}"
 
@@ -294,6 +308,13 @@ def oracle_surface_provenance(primary: str, benchmark_id: str) -> tuple[str, str
         return (
             PROVENANCE_NONE,
             "Cross-surface gate metadata is unavailable; provenance is undisclosed until the gate is registered.",
+        )
+    if gate.surface_independence not in _KNOWN_PROVENANCE_LABELS:
+        raise ValueError(
+            f"{benchmark_id}: unknown surface-provenance label {gate.surface_independence!r}. "
+            f"Known labels: {sorted(_KNOWN_PROVENANCE_LABELS)}. Add a PROVENANCE_* constant in "
+            "this module AND describe the new label in the Surface-provenance disclosure prose "
+            "in render_markdown(), otherwise the map renders a label its own legend never defines."
         )
     return gate.surface_independence, gate.surface_independence_rationale
 
