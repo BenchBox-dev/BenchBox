@@ -185,5 +185,13 @@ corroborate, and upgrade to `applied_verified` iff the receipt corroborates.
 The receipt rides inside the existing `.applied.json` companion
 (`AppliedTuningLedger.to_payload(status=..., receipt=...)`) -- no new
 companion file, no new plumbing through the CODEOWNERS-locked
-`result_capture.py`. Anonymized exports scrub the receipt's free-text /
-identifier fields exactly like the ledger statements.
+`result_capture.py`.
+
+The explorer ingests and renders receipt text verbatim, so public-export
+anonymization is the only publication gate for this companion. Anonymized
+exports therefore remove the top-level receipt `error`; every entry's
+`statement`, `reason`, `detail`, `diff`, and `evidence`; table, column, and
+index identifiers; observed catalog details; and both top-level and
+receipt-level dropped-intent text. Additive `*_redacted` / `redacted` markers,
+structural verdicts, summary counts, and `corroborated` remain. Non-anonymized
+exports retain the full diagnostic text.

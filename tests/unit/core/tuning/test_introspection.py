@@ -138,7 +138,8 @@ class TestCorroborate:
         receipt = corroborate(_index_ledger(), IntrospectedState(platform="duckdb", objects=[]))
         assert receipt.corroborated is False
         assert receipt.entries[0].verdict == ABSENT
-        assert receipt.entries[0].reason and "lineitem" in receipt.entries[0].reason
+        assert receipt.entries[0].table == "lineitem"
+        assert receipt.entries[0].reason == "no index found in catalog"
 
     def test_one_absent_among_corroborated_blocks_upgrade(self):
         ledger = _index_ledger()
@@ -250,7 +251,8 @@ class TestUnverifiableAndDegraded:
         assert receipt.corroborated is False
         assert receipt.error == "timeout"
         assert receipt.entries[0].verdict == UNVERIFIABLE
-        assert "timeout" in (receipt.entries[0].reason or "")
+        assert receipt.entries[0].reason == "introspection degraded"
+        assert receipt.entries[0].detail == "timeout"
 
     def test_none_state_refuses_upgrade(self):
         receipt = corroborate(_index_ledger(), None)

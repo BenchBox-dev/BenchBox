@@ -54,6 +54,18 @@ class TestReceiptRidesInCompanion:
         payload = ledger.to_payload(status=APPLIED_UNVERIFIED)
         assert "receipt" not in payload
 
+    def test_non_anonymized_receipt_retains_raw_diagnostic_detail(self):
+        ledger = AppliedTuningLedger()
+        ledger.record("CREATE INDEX idx ON private_table (id)", PHASE_DDL)
+        receipt = corroborate(
+            ledger,
+            IntrospectedState(platform="duckdb", error="connection to secret.internal failed"),
+        ).to_payload()
+
+        assert receipt["error"] == "connection to secret.internal failed"
+        assert receipt["entries"][0]["reason"] == "introspection degraded"
+        assert receipt["entries"][0]["detail"] == "connection to secret.internal failed"
+
 
 class TestReceiptAnonymization:
     def test_anonymized_export_scrubs_receipt_freetext(self):
