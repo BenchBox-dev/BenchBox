@@ -154,3 +154,20 @@ block a run outright, versus warn and proceed? See Consequences.
    interface than against ~20 adapter classes with mixed constructor
    requirements. Generators additionally already cover more platforms
    (17 modules) than adapters currently delegate to.
+
+## Addendum (2026-08-01): landed policy seam and current consolidation state
+
+The baseline inversion identified above has landed: ClickHouse's curated OLAP
+pack runs only on the tuned path, while harness-operational and SQL-correctness
+settings apply in every mode and are recorded as session statements. StarRocks
+keeps only its engine-mandatory distribution fallback in baseline; tuned layout
+is rendered by `core.tuning.generators.starrocks`. DuckDB and ClickHouse also
+consume their core generators on their execution paths.
+
+The consolidation is explicit rather than inferred from a package version.
+`benchbox.core.tuning.policy_generation.TUNING_POLICY_GENERATION` stamps
+`adr-003` into tuned bundle summaries and tuning companions, and the Explorer
+warns on comparisons across that seam. The capability registry is the current
+inventory of migrated and remaining adapter-renderer parity: entries that still
+have a distinct execution renderer remain documented gaps, not evidence that
+the repository-wide migration is complete.

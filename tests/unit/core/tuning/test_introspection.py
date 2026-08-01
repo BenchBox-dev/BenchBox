@@ -113,7 +113,7 @@ class TestCorroborate:
         receipt = corroborate(_index_ledger(), _index_state())
         assert receipt.corroborated is True
         assert receipt.summary["corroborated"] == 1
-        assert receipt.summary["verifiable_total"] == 1
+        assert receipt.summary["gate_relevant_total"] == 1
         entry = receipt.entries[0]
         assert entry.verdict == CORROBORATED
         assert entry.kind == KIND_INDEX
@@ -152,7 +152,7 @@ class TestCorroborate:
     def test_empty_ledger_no_upgrade(self):
         receipt = corroborate(AppliedTuningLedger(), _index_state())
         assert receipt.corroborated is False
-        assert receipt.summary["verifiable_total"] == 0
+        assert receipt.summary["gate_relevant_total"] == 0
 
     def test_failed_physical_statement_gets_blocking_receipt_entry(self):
         ledger = AppliedTuningLedger()
@@ -200,7 +200,7 @@ class TestSessionAndMaintenance:
         assert receipt.corroborated is True
         verdicts = [e.verdict for e in receipt.entries]
         assert TRANSIENT in verdicts
-        assert receipt.summary["verifiable_total"] == 1  # SET excluded from the gate
+        assert receipt.summary["gate_relevant_total"] == 1  # SET excluded from the gate
 
     def test_failed_session_statement_is_transient_and_non_blocking(self):
         ledger = _index_ledger()
@@ -218,7 +218,7 @@ class TestSessionAndMaintenance:
         ledger.record("PRAGMA memory_limit='1GB'", PHASE_SESSION)
         receipt = corroborate(ledger, IntrospectedState(platform="duckdb", objects=[]))
         assert receipt.corroborated is False
-        assert receipt.summary["verifiable_total"] == 0
+        assert receipt.summary["gate_relevant_total"] == 0
         assert all(e.verdict == TRANSIENT for e in receipt.entries)
 
     def test_pragma_in_ddl_phase_is_transient(self):
@@ -346,7 +346,7 @@ class TestMultiClauseCreateTable:
         receipt = corroborate(self._ledger(), self._state())
         kinds = [e.kind for e in receipt.entries]
         assert kinds == [KIND_SORT_KEY, KIND_PARTITION_KEY]
-        assert receipt.summary["verifiable_total"] == 2
+        assert receipt.summary["gate_relevant_total"] == 2
         assert receipt.corroborated is True
 
     def test_uncorroborated_partition_blocks_upgrade(self):
@@ -453,7 +453,7 @@ class TestClusterKeyClassification:
         # these neither earn nor block verification (same class as OPTIMIZE).
         receipt = corroborate(self._ledger(statement), self._state())
         assert receipt.entries[0].verdict == MAINTENANCE
-        assert receipt.summary["verifiable_total"] == 0
+        assert receipt.summary["gate_relevant_total"] == 0
 
     def test_unparsable_cluster_clause_fails_closed(self):
         # Visible CLUSTER BY we cannot parse must keep blocking, never vanish.

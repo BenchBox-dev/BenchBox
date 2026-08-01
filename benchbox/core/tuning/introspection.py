@@ -189,7 +189,10 @@ class IntrospectionReceipt:
         counts: dict[str, int] = {}
         for entry in self.entries:
             counts[entry.verdict] = counts.get(entry.verdict, 0) + 1
-        counts["verifiable_total"] = sum(1 for e in self.entries if e.verdict in _VERIFIABLE_VERDICTS)
+        # Includes corroborated catalog facts and every fail-closed verdict
+        # that participates in the upgrade decision. "verifiable" was
+        # misleading because UNVERIFIABLE is intentionally included.
+        counts["gate_relevant_total"] = sum(1 for e in self.entries if e.verdict in _VERIFIABLE_VERDICTS)
         return counts
 
     def to_payload(self) -> dict[str, Any]:

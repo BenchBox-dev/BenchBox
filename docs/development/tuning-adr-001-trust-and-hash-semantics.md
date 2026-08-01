@@ -272,6 +272,28 @@ Scope and honesty constraints:
   dropped under the same policy as the statement/receipt text, leaving the
   structural `is_valid` + `drifted_sections` and a `drift_redacted` marker.
 
+## Addendum (2026-08-01): introspection and fail-closed gating landed
+
+The original Decision section recorded post-load introspection as a future
+direction. It has since landed in `benchbox.core.tuning.introspection` and
+`PlatformAdapter._corroborate_applied_ledger`; this addendum updates current
+state without rewriting that historical decision.
+
+`applied_verified` now requires at least one gate-relevant physical intent,
+every such intent corroborated against structured catalog facts, and no failed
+ddl/post_load statement or dropped tuning intent. Failures receive blocking
+`unverifiable` receipt entries, while dropped intents are copied into the
+receipt. The summary key is `gate_relevant_total` because it counts all verdicts
+that participate in the decision, including fail-closed `unverifiable`; the
+former `verifiable_total` name had no production consumer and was misleading.
+
+The applied-ledger hash continues to preserve statement chronology: JSON object
+keys are sorted for canonical serialization, but the executed-statement list is
+never reordered. Post-load layout operations that do not pass through the
+recording connection are folded into that list at their actual execution phase
+before session statements, via
+`PlatformAdapter._fold_layout_operations_into_ledger`.
+
 ## References
 
 - `benchbox/platforms/base/adapter.py:743-747`

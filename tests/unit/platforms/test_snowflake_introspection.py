@@ -190,7 +190,7 @@ class TestSnowflakeCorroboration:
         assert (KIND_CLUSTER_KEY, "corroborated") in verdicts
         # RESUME RECLUSTER is maintenance and the session SET is transient:
         # noted, but neither earns nor blocks.
-        assert receipt.summary["verifiable_total"] == 1
+        assert receipt.summary["gate_relevant_total"] == 1
         assert receipt.corroborated is True
 
     def test_different_cluster_key_blocks_verification(self):
