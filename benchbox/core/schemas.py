@@ -494,7 +494,7 @@ class ExecutionContext(BaseModel):
     non_interactive: bool = False
 
     # Tuning
-    tuning_mode: Optional[str] = None  # "tuned", "notuning", "auto", or path
+    tuning_mode: Optional[str] = None  # Canonical value from benchbox.core.tuning.modes, or absent.
 
     def to_cli_args(self) -> list[str]:
         """Reconstruct CLI arguments from non-default values.
@@ -547,7 +547,7 @@ class ExecutionContext(BaseModel):
             args.extend(["--queries", ",".join(self.query_subset)])
         if self.strict_plan_capture:
             args.extend(["--plan-config", "strict:true"])
-        if self.tuning_mode and self.tuning_mode != "notuning":
+        if self.tuning_mode:
             args.extend(["--tuning", self.tuning_mode])
 
         return args

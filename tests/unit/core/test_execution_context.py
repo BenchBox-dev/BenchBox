@@ -238,11 +238,19 @@ class TestToCliArgs:
         assert "--tuning" in args
         assert "tuned" in args
 
-    def test_tuning_mode_notuning_not_included(self):
-        """Notuning should not be included (it's the default)."""
+    def test_tuning_mode_notuning_round_trips_explicit_request(self):
+        """Explicit notuning must remain distinct from an absent tuning flag."""
         ctx = ExecutionContext(tuning_mode="notuning")
         args = ctx.to_cli_args()
-        assert "--tuning" not in args
+        assert args[-2:] == ["--tuning", "notuning"]
+
+        absent = ExecutionContext()
+        assert "--tuning" not in absent.to_cli_args()
+
+    def test_tuning_path_round_trips_byte_for_byte(self):
+        tuning_path = "/tmp/custom tuning/profile.yaml"
+
+        assert ExecutionContext(tuning_mode=tuning_path).to_cli_args()[-2:] == ["--tuning", tuning_path]
 
 
 class TestToCliString:
