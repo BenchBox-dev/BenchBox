@@ -1,5 +1,8 @@
 ---
 develop_sha: 253e6a810307ba169f331986420d70c38db6a244
+measured_at_sha: 253e6a810307ba169f331986420d70c38db6a244
+replay_sha: 9ccb704eac45efece6ccde39207bde69f16c7516
+replay_scope: 80 hosted-backend and hardening unit regressions
 ---
 # Evidence record: hosted TODO tracker acceptance (2026-07-18)
 
@@ -114,3 +117,9 @@ tests/unit/scripts/test_todo_db_hardening.py -q`. Live counterpart (needs
 `TODO_TEST_DB_URL` + `TODO_DB_AUTH_TOKEN`, a dedicated test database):
 `uv run -- python -m pytest tests/integration/test_todo_db_hosted_live.py
 -m live_integration -q`.
+
+Spot replay on 2026-08-01 at `9ccb704eac45efece6ccde39207bde69f16c7516`
+ran the documented hosted-backend and hardening unit files single-process:
+80 passed. The credentialed live counterpart and historical latency/import
+totals were deliberately not replayed, so `replay_scope` does not corroborate
+those claims.
