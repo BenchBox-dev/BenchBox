@@ -288,7 +288,9 @@ class TuningMetadataManager:
             for tuning_type in TuningType:
                 columns = table_tuning.get_columns_by_type(tuning_type)
                 if columns:
-                    sections[tuning_type.value] = [column.to_dict() for column in columns]
+                    sections[tuning_type.value] = [
+                        column.to_dict() for column in sorted(columns, key=lambda column: column.order)
+                    ]
             payload[table_name] = sections
         return payload
 

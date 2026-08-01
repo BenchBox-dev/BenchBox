@@ -497,6 +497,22 @@ def test_compare_section_hashes_no_drift_when_matching(monkeypatch):
     assert not result.drifted_sections
 
 
+def test_table_attribute_hash_uses_declared_column_order():
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    first = UnifiedTuningConfiguration()
+    first.table_tunings["orders"] = TableTuning(
+        table_name="orders",
+        sorting=[_col("o_orderdate", 2), _col("o_orderkey", 1)],
+    )
+    second = UnifiedTuningConfiguration()
+    second.table_tunings["orders"] = TableTuning(
+        table_name="orders",
+        sorting=[_col("o_orderkey", 1), _col("o_orderdate", 2)],
+    )
+
+    assert manager._table_attributes_payload(first) == manager._table_attributes_payload(second)
+
+
 @pytest.mark.parametrize(
     "missing_marker",
     [
