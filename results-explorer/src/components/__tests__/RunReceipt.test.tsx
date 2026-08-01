@@ -408,6 +408,7 @@ const APPLIED_RECEIPT = JSON.stringify({
       observed_columns: ["l_shipdate"],
       diff: null,
       reason: null,
+      detail: "catalog introspection completed",
     },
     {
       statement: "CREATE INDEX idx_o_orderdate ON orders(o_orderdate)",
@@ -449,6 +450,8 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     expect(within(corroborated).getByText("corroborated")).toBeTruthy();
     expect(within(corroborated).getByText(/CREATE INDEX idx_l_shipdate/)).toBeTruthy();
     expect(within(corroborated).getByText("lineitem")).toBeTruthy();
+    expect(within(corroborated).getByText("Detail")).toBeTruthy();
+    expect(within(corroborated).getByText("catalog introspection completed")).toBeTruthy();
 
     expect(within(divergent).getByText("divergent")).toBeTruthy();
     expect(within(divergent).getByText("Expected columns")).toBeTruthy();

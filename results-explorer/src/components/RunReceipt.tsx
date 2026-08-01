@@ -286,6 +286,7 @@ interface AppliedReceiptEntry {
   observed_columns?: unknown;
   diff?: unknown;
   reason?: unknown;
+  detail?: unknown;
 }
 
 /**
@@ -369,6 +370,7 @@ function AppliedReceiptEntryBody({ entry }: { entry: AppliedReceiptEntry }) {
     { label: "Observed columns", value: receiptText(entry.observed_columns) },
     { label: "Diff", value: receiptText(entry.diff) },
     { label: "Reason", value: receiptText(entry.reason) },
+    { label: "Detail", value: receiptText(entry.detail) },
   ].filter((field): field is { label: string; value: string } => field.value !== null);
 
   return (
