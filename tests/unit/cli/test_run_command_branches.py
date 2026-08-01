@@ -171,9 +171,30 @@ class TestBuildExecutionContext:
         assert ctx.mode == "sql"
         assert ctx.seed is None
         assert ctx.query_subset is None
-        assert ctx.tuning_mode is None  # "notuning" produces None
+        assert ctx.tuning_mode == "notuning"
         assert ctx.validation_mode == "loose"
         assert ctx.force_datagen is True
+
+    def test_absent_tuning_stays_not_recorded(self):
+        from benchbox.cli.commands.run import _build_execution_context
+        from benchbox.cli.composite_params import CompressionConfig, ForceConfig, ValidationConfig
+
+        ctx = _build_execution_context(
+            phases_to_run=["power"],
+            seed=None,
+            compression=CompressionConfig(enabled=False, type="none", level=None),
+            mode=None,
+            official=False,
+            validation=ValidationConfig(mode="exact"),
+            force=ForceConfig(datagen=False, upload=False),
+            queries_to_run=None,
+            capture_plans=False,
+            strict_plan_capture=False,
+            non_interactive=False,
+            tuning=None,
+        )
+
+        assert ctx.tuning_mode is None
 
     def test_official_mode(self):
         from benchbox.cli.commands.run import _build_execution_context

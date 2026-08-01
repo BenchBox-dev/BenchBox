@@ -358,7 +358,7 @@ def _build_execution_context(
         capture_plans=capture_plans,
         strict_plan_capture=strict_plan_capture,
         non_interactive=non_interactive,
-        tuning_mode=tuning if tuning and tuning != "notuning" else None,
+        tuning_mode=tuning_modes.NOTUNING if tuning == tuning_modes.NOTUNING else tuning,
     )
 
 
