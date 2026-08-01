@@ -569,9 +569,17 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         raise TodoError(f"database schema_version={version} is newer than this CLI ({SCHEMA_VERSION}); use a newer CLI")
 
 
-def connect(db_path: Path) -> sqlite3.Connection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+def connect(
+    db_path: Path,
+    *,
+    read_only: bool = False,
+    validate_schema: bool = True,
+) -> sqlite3.Connection:
+    if read_only:
+        conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
+    else:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     # Autocommit mode: every multi-statement write goes through _write_txn,
     # which takes the write lock up front (BEGIN IMMEDIATE) so check-then-act
@@ -579,7 +587,23 @@ def connect(db_path: Path) -> sqlite3.Connection:
     conn.isolation_level = None
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA busy_timeout = 5000")
-    _ensure_schema(conn)
+    if read_only and validate_schema:
+        version = _schema_version(conn)
+        if version is None:
+            conn.close()
+            raise TodoError("local tracker: no schema found; run `todo init`")
+        if version < SCHEMA_VERSION:
+            conn.close()
+            raise TodoError(
+                f"database schema_version={version}, CLI expects {SCHEMA_VERSION}; run `todo migrate` to upgrade it"
+            )
+        if version > SCHEMA_VERSION:
+            conn.close()
+            raise TodoError(
+                f"database schema_version={version} is newer than this CLI ({SCHEMA_VERSION}); use a newer CLI"
+            )
+    elif not read_only:
+        _ensure_schema(conn)
     return conn
 
 
@@ -820,9 +844,11 @@ def _hosted_read_connect(url: str) -> _HostedConnection:
     return _HostedConnection(libsql.connect(url, auth_token=token))
 
 
-def connect_hosted(url: str, *, read_only: bool = False) -> _HostedConnection:
+def connect_hosted(url: str, *, read_only: bool = False, validate_schema: bool = True) -> _HostedConnection:
     if read_only:
         conn = _hosted_read_connect(url)
+        if not validate_schema:
+            return conn
         version = _schema_version(conn)
         if version is None:
             conn.close()
@@ -1211,10 +1237,17 @@ def _report_backend(backend: Path | str, *, implicit_default_local: bool) -> Non
     print("todo backend: hosted", file=sys.stderr)
 
 
-def connect_backend(backend: Path | str, *, read_only: bool = False) -> sqlite3.Connection | _HostedConnection:
+def connect_backend(
+    backend: Path | str,
+    *,
+    read_only: bool = False,
+    validate_schema: bool = True,
+) -> sqlite3.Connection | _HostedConnection:
     if isinstance(backend, Path):
-        return connect(backend)
-    return connect_hosted(backend, read_only=read_only)
+        return connect(backend, read_only=read_only, validate_schema=validate_schema)
+    if validate_schema:
+        return connect_hosted(backend, read_only=read_only)
+    return connect_hosted(backend, read_only=read_only, validate_schema=False)
 
 
 # `doctor` exit contract. 0 = every check OK (warnings allowed), 4 = auth
@@ -1235,11 +1268,12 @@ _DOCTOR_AUTH_MARKERS = (
     "authentication",
     "401",
     "403",
-    "expired",
     "invalid token",
     "invalidtoken",
     "jwt",
 )
+
+_DOCTOR_TOKEN_EXPIRY_MARKERS = ("token", "jwt", "bearer")
 
 
 def _doctor_is_auth_failure(exc: BaseException) -> bool:
@@ -1251,7 +1285,15 @@ def _doctor_is_auth_failure(exc: BaseException) -> bool:
     is down, so anything unrecognized stays a generic FAIL.
     """
     text = str(exc).lower()
-    return any(marker in text for marker in _DOCTOR_AUTH_MARKERS)
+    return any(marker in text for marker in _DOCTOR_AUTH_MARKERS) or (
+        "expired" in text and any(marker in text for marker in _DOCTOR_TOKEN_EXPIRY_MARKERS)
+    )
+
+
+def _doctor_incompatible_schema_detail(version: int) -> str:
+    if version < SCHEMA_VERSION:
+        return f"v{version}, expected v{SCHEMA_VERSION}; run `todo migrate`"
+    return f"v{version} is newer than this CLI (v{SCHEMA_VERSION}); use a newer CLI"
 
 
 def run_doctor(backend: Path | str, *, implicit_default_local: bool, as_json: bool = False) -> int:
@@ -1307,17 +1349,19 @@ def run_doctor(backend: Path | str, *, implicit_default_local: bool, as_json: bo
     else:
         conn = None
         try:
-            conn = connect_backend(backend, read_only=True)
-            count = list(conn.execute("SELECT count(*) AS n FROM items"))[0]["n"]
-            record("reachable", "OK", f"read {count} item(s)")
+            conn = connect_backend(backend, read_only=True, validate_schema=False)
             version = _schema_version(conn)
             if version == SCHEMA_VERSION:
+                count = list(conn.execute("SELECT count(*) AS n FROM items"))[0]["n"]
+                record("reachable", "OK", f"read {count} item(s)")
                 record("schema", "OK", f"v{version}")
             elif version is None:
+                record("reachable", "OK", "connected")
                 record("schema", "FAIL", "no schema found; run `todo init`")
                 exit_code = DOCTOR_EXIT_FAIL
             else:
-                record("schema", "FAIL", f"v{version}, expected v{SCHEMA_VERSION}; run `todo migrate`")
+                record("reachable", "OK", "connected")
+                record("schema", "FAIL", _doctor_incompatible_schema_detail(version))
                 exit_code = DOCTOR_EXIT_FAIL
         # `Exception`, not `BaseException`: doctor turns failures into check results,
         # but a Ctrl-C during a slow hosted connect must still interrupt rather than

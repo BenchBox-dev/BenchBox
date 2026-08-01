@@ -67,6 +67,44 @@ def test_doctor_reports_healthy_local_backend(local_db, capsys):
     assert f"v{todo_db.SCHEMA_VERSION}" in out
 
 
+def test_doctor_does_not_create_a_missing_local_database(tmp_path, capsys):
+    db = tmp_path / "missing" / "todo.sqlite"
+
+    assert todo_db.main(["--db", str(db), "doctor"]) == todo_db.DOCTOR_EXIT_FAIL
+
+    assert not db.exists()
+    assert not db.parent.exists()
+    assert "FAIL reachable" in capsys.readouterr().out
+
+
+def test_doctor_reports_an_existing_schemaless_database_as_a_schema_failure(tmp_path, capsys):
+    db = tmp_path / "empty.sqlite"
+    db.touch()
+
+    assert todo_db.main(["--db", str(db), "doctor"]) == todo_db.DOCTOR_EXIT_FAIL
+
+    out = capsys.readouterr().out
+    assert "OK   reachable" in out
+    assert "FAIL schema" in out
+    assert "no schema found" in out
+
+
+@pytest.mark.parametrize(
+    ("version", "guidance"),
+    [(todo_db.SCHEMA_VERSION - 1, "migrate"), (todo_db.SCHEMA_VERSION + 1, "newer CLI")],
+)
+def test_read_only_local_connect_rejects_incompatible_schema(local_db, version, guidance):
+    conn = sqlite3.connect(local_db)
+    try:
+        conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(version),))
+        conn.commit()
+    finally:
+        conn.close()
+
+    with pytest.raises(todo_db.TodoError, match=rf"schema_version={version}.*{guidance}"):
+        todo_db.connect_backend(local_db, read_only=True)
+
+
 def test_doctor_json_is_machine_readable(local_db, capsys):
     assert todo_db.main(["--db", str(local_db), "doctor", "--json"]) == todo_db.DOCTOR_EXIT_OK
     payload = json.loads(capsys.readouterr().out)
@@ -101,6 +139,30 @@ def test_rejected_token_is_classified_as_auth_not_a_plain_outage(monkeypatch, ca
     monkeypatch.setattr(todo_db, "connect_backend", boom)
     assert todo_db.main(["--db", _HOSTED_URL, "doctor"]) == todo_db.DOCTOR_EXIT_AUTH
     assert "auth failure" in capsys.readouterr().out
+
+
+def test_expired_token_is_classified_as_auth(monkeypatch, capsys):
+    monkeypatch.setenv("TODO_DB_AUTH_TOKEN", _SECRET)
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("JWT token has expired")
+
+    monkeypatch.setattr(todo_db, "connect_backend", boom)
+    assert todo_db.main(["--db", _HOSTED_URL, "doctor"]) == todo_db.DOCTOR_EXIT_AUTH
+    assert "auth failure" in capsys.readouterr().out
+
+
+def test_expired_tls_certificate_is_a_plain_outage(monkeypatch, capsys):
+    monkeypatch.setenv("TODO_DB_AUTH_TOKEN", _SECRET)
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("TLS certificate has expired")
+
+    monkeypatch.setattr(todo_db, "connect_backend", boom)
+    assert todo_db.main(["--db", _HOSTED_URL, "doctor"]) == todo_db.DOCTOR_EXIT_FAIL
+    out = capsys.readouterr().out
+    assert "FAIL reachable" in out
+    assert "auth failure" not in out
 
 
 def test_plain_outage_is_exit_2_not_auth(monkeypatch, capsys):
