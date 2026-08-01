@@ -27,7 +27,7 @@
     "platform_options": {
       "force_recreate": false,
       "force_upload": false,
-      "memory_limit": "8GB",
+      "memory_limit": "12GB",
       "normalize_plan_literals": false,
       "show_query_plans": false,
       "tuning_source": "baseline"
