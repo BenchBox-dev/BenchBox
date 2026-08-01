@@ -511,6 +511,114 @@ class TestLintUnresolvableScopeAndLadderPaths:
         assert not any("test_todo_db_v2" in f for f in findings)
 
 
+class TestLintFalsifiabilityAndScopeCompleteness:
+    """A ladder must contain at least one rung that FAILS on the unfixed tree
+    (declared in its expected text), and only_modify must not orphan a source
+    file's existing test file."""
+
+    def _mk_item(self, conn, item_id, verifications=None, scope=None, category=None):
+        # Claim-level checks are per-database opt-in (the shared DB turns them
+        # on); enable them here so the tests exercise the checks.
+        todo_db.set_config(conn, "tester", "lint.require_falsifiable_rung", "on")
+        todo_db.set_config(conn, "tester", "lint.require_scope_test_files", "on")
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id=item_id,
+            title="Item exercising claim-level lint",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            category=category,
+            work=[{"id": "w1", "summary": "one unit of work"}],
+            scope=scope or [],
+            verifications=verifications or [],
+        )
+
+    def test_falsifiability_flags_pass_only_ladder(self, conn):
+        self._mk_item(
+            conn,
+            "pass-only",
+            verifications=[
+                {"description": "suite green", "command": "uv run -- pytest tests -q", "expected": "all pass"}
+            ],
+        )
+        assert any("falsifiability" in f for f in todo_db.lint_item(conn, "pass-only"))
+
+    def test_falsifiability_accepts_a_gating_rung(self, conn):
+        self._mk_item(
+            conn,
+            "gated",
+            verifications=[
+                {
+                    "description": "defect gate",
+                    "command": "uv run -- python -c 'raise SystemExit(1)'",
+                    "expected": "exits 1 on an unfixed tree, 0 once fixed",
+                },
+                {"description": "suite green", "command": "uv run -- pytest tests -q", "expected": "all pass"},
+            ],
+        )
+        assert not any("falsifiability" in f for f in todo_db.lint_item(conn, "gated"))
+
+    def test_falsifiability_broken_rung_does_not_vacuously_satisfy(self, conn):
+        # The only rung declaring unfixed-tree failure cannot execute; it exits
+        # non-zero on EVERY tree, so it must not count as the gating rung.
+        self._mk_item(
+            conn,
+            "broken-gate",
+            verifications=[
+                {
+                    "description": "defect gate",
+                    "command": "<run the real check here>",
+                    "expected": "exits 1 on an unfixed tree",
+                }
+            ],
+        )
+        findings = todo_db.lint_item(conn, "broken-gate")
+        assert any("falsifiability" in f for f in findings)
+        assert any("cannot execute" in f for f in findings)
+
+    def test_falsifiability_exempts_flake_tripwires(self, conn):
+        self._mk_item(
+            conn,
+            "flake-watch",
+            category="flake",
+            verifications=[
+                {"description": "still green", "command": "uv run -- pytest tests -q", "expected": "passes"}
+            ],
+        )
+        assert not any("falsifiability" in f for f in todo_db.lint_item(conn, "flake-watch"))
+
+    def test_scope_completeness_flags_omitted_existing_test_file(self, conn):
+        self._mk_item(
+            conn,
+            "orphan-scope",
+            scope=[("only_modify", "benchbox/core/results/anonymization.py")],
+        )
+        findings = todo_db.lint_item(conn, "orphan-scope")
+        assert any("scope completeness" in f and "tests/unit/core/results/test_anonymization.py" in f for f in findings)
+
+    def test_scope_completeness_satisfied_by_covering_glob(self, conn):
+        self._mk_item(
+            conn,
+            "covered-scope",
+            scope=[
+                ("only_modify", "_project/scripts/todo_db.py"),
+                ("only_modify", "tests/unit/scripts/test_todo_db.py"),
+                ("only_modify", "tests/unit/scripts/test_todo_db_*.py"),
+            ],
+        )
+        assert not any("scope completeness" in f for f in todo_db.lint_item(conn, "covered-scope"))
+
+    def test_scope_completeness_ignores_sources_without_existing_tests(self, conn):
+        self._mk_item(
+            conn,
+            "no-test-yet",
+            scope=[("only_modify", "benchbox/core/results/no_such_module.py")],
+        )
+        assert not any("scope completeness" in f for f in todo_db.lint_item(conn, "no-test-yet"))
+
+
 class TestInstructiveGateErrors:
     """Every gate refusal must name its recovery command — the error messages
     are the harness-portable instruction layer."""
