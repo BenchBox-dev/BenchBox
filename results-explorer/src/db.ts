@@ -35,8 +35,17 @@ let initFailures = 0;
 const INIT_FAILURE_LIMIT = 3;
 const SNAPSHOT_READY_ATTEMPTS = 8;
 const SNAPSHOT_READY_DELAY_MS = 100;
-const QUERY_RETRY_ATTEMPTS = 3;
+// Empty reads keep retrying for the warm-up window; this is a safety cap for
+// pathological clocks or zero-delay test timers rather than the normal stop.
+const QUERY_RETRY_ATTEMPTS = 100;
+const QUERY_ERROR_RETRY_ATTEMPTS = 3;
 const QUERY_RETRY_DELAY_MS = 100;
+// Keep a genuinely empty query bounded below the browser suite's shortest
+// data-wait attempt (8s). Linear backoff here previously held the page in its
+// loading skeleton for the full 15s cold window, so the recovery navigation
+// could never run. Frequent re-reads also do more useful work warming the
+// missing HTTP-backed row group than sleeping progressively longer.
+const QUERY_EMPTY_RETRY_DELAY_MS = 50;
 // How long after the snapshot is attached an EMPTY result is treated as a cold
 // read worth re-issuing rather than the truth. Cold init measures P95 ~1s, so
 // this is generous; outside it, empty returns immediately.
@@ -137,6 +146,8 @@ export async function _validateAttachedSnapshotForTest(
 }
 
 export const _EXPECTED_READ_MODEL_VERSION_FOR_TEST = EXPECTED_READ_MODEL_VERSION;
+export const _COLD_EMPTY_READ_MAX_DELAY_MS_FOR_TEST =
+  QUERY_RETRY_ATTEMPTS * QUERY_EMPTY_RETRY_DELAY_MS;
 
 async function verifyReadModelVersion(conn: DuckDBConnection): Promise<void> {
   const found = await readSnapshotReadModelVersion(conn);
@@ -411,11 +422,11 @@ export async function queryRows<T>(
       // Empty, and the snapshot is still warming: re-read rather than let a
       // cold zero-row answer reach the UI as "no such result". See
       // shouldRetryColdEmptyRead.
-      await sleep(QUERY_RETRY_DELAY_MS * attempt);
+      await sleep(QUERY_EMPTY_RETRY_DELAY_MS);
       continue;
     } catch (error: unknown) {
       lastError = error;
-      if (!isTransientDuckDbSnapshotError(error) || attempt === QUERY_RETRY_ATTEMPTS) {
+      if (!shouldRetryTransientQueryError(error, attempt)) {
         throw error;
       }
       await sleep(QUERY_RETRY_DELAY_MS * attempt);
@@ -461,6 +472,10 @@ export function shouldRetryColdEmptyRead(
 
 function isColdEmptyRead(attempt: number): boolean {
   return shouldRetryColdEmptyRead(attempt, Date.now(), snapshotReadyAt);
+}
+
+export function shouldRetryTransientQueryError(error: unknown, attempt: number): boolean {
+  return isTransientDuckDbSnapshotError(error) && attempt < QUERY_ERROR_RETRY_ATTEMPTS;
 }
 
 async function queryRowsOnce<T>(

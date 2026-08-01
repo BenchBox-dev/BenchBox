@@ -189,7 +189,10 @@ class IntrospectionReceipt:
         counts: dict[str, int] = {}
         for entry in self.entries:
             counts[entry.verdict] = counts.get(entry.verdict, 0) + 1
-        counts["verifiable_total"] = sum(1 for e in self.entries if e.verdict in _VERIFIABLE_VERDICTS)
+        # Includes corroborated catalog facts and every fail-closed verdict
+        # that participates in the upgrade decision. "verifiable" was
+        # misleading because UNVERIFIABLE is intentionally included.
+        counts["gate_relevant_total"] = sum(1 for e in self.entries if e.verdict in _VERIFIABLE_VERDICTS)
         return counts
 
     def to_payload(self) -> dict[str, Any]:
@@ -343,6 +346,9 @@ def _statement_table(statement: AppliedStatement) -> str | None:
     ct = _CREATE_TABLE_RE.match(text)
     if ct:
         return normalize_identifier(ct.group("table"))
+    alter = _ALTER_TABLE_RE.match(text)
+    if alter:
+        return normalize_identifier(alter.group("table"))
     if statement.table:
         return normalize_identifier(statement.table)
     return None

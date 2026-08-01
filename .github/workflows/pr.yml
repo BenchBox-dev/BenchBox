@@ -32,6 +32,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate TODO schema migration contract
+        # Bare python is intentional: this static guard is stdlib-only and
+        # must run for every PR without tracker credentials or dependencies.
+        run: python _project/scripts/todo_schema_migration_check.py
+
       - name: Fetch base branch
         run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
 
@@ -240,6 +245,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -263,6 +270,13 @@ jobs:
       # which is what `ci-required-result` actually gates on. Setup steps
       # above (checkout/setup-python/setup-uv/install deps) are not
       # guards and carry neither `id: guard-*` nor `continue-on-error`.
+      - name: Validate uv.lock revision against the PR base
+        id: guard-uv-lock-revision
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: make uv-lock-revision-check
+
       - name: Lint and format check with ruff
         id: guard-ruff
         continue-on-error: true
@@ -284,6 +298,11 @@ jobs:
         id: guard-lint-imports
         continue-on-error: true
         run: make lint-imports
+
+      - name: Validate Windows antipatterns
+        id: guard-windows-antipatterns
+        continue-on-error: true
+        run: make windows-antipatterns-check
 
       - name: Validate artifact hygiene
         id: guard-artifact-hygiene

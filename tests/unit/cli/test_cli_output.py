@@ -972,9 +972,15 @@ class TestResultExporterErrorHandling:
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Path handling differs on Windows")
     def test_export_with_invalid_output_dir(self):
-        """Test export with invalid output directory."""
+        """Test export with invalid output directory.
+
+        A path under a regular file is uncreatable for every uid,
+        including root (mkdir raises NotADirectoryError, converted to
+        FileNotFoundError by the exporter)."""
+        blocker = Path(self.temp_dir) / "blocker"
+        blocker.write_text("")
         with pytest.raises(FileNotFoundError):
-            ResultExporter(output_dir=Path("/invalid/path/that/cannot/be/created"))
+            ResultExporter(output_dir=blocker / "sub")
 
     def test_list_results_with_corrupted_json(self):
         """Test listing results with corrupted JSON files."""

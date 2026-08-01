@@ -39,6 +39,14 @@ An all-physical-failed ledger derives `failed` before corroboration, and an
 empty ledger cannot earn the upgrade. The introspection step must never fail or
 materially slow a run.
 
+The receipt summary calls the count participating in this decision
+`gate_relevant_total`. It includes `corroborated`, `absent`, `mismatch`, and
+blocking `unverifiable` entries; `transient` and `maintenance` are excluded.
+The earlier name `verifiable_total` was removed because a count that includes
+`unverifiable` entries was internally contradictory. There are no production
+consumers of this additive receipt-summary key; the upgrade decision continues
+to use the entry verdicts directly.
+
 ## Statement classes (per phase x mechanism)
 
 `corroborate()` gates every ledger statement by recorded status and phase,
@@ -61,6 +69,12 @@ platform-agnostic; the per-platform catalog *reads* live in the
 | failed statement                             | session        | `transient`   | transient session failure is noted but has no persistent catalog footprint -- **non-blocking** | no          |
 | anything else                                | ddl/post_load  | `unverifiable`| no corroboration rule -- **blocks** the upgrade (conservative: stay unverified)    | n/a (blocks)         |
 
+The generic classifier's non-blocking prefix sets are intentionally narrow and
+are documentation, not an invitation to expand the gate: transient prefixes
+are exactly `set `, `pragma `, `set\t`, `pragma\t`, `reset `, and `use `;
+maintenance prefixes are exactly `optimize `, `vacuum`, `analyze`, and
+`compact `. Any other ddl/post_load shape remains blocking `unverifiable`.
+
 A `CREATE TABLE` carrying **both** an `ORDER BY` and a `PARTITION BY` (the
 ClickHouse MergeTree shape) classifies as both `sort_key` and `partition_key`
 and emits one receipt entry per clause, so each key must corroborate on its
@@ -72,6 +86,18 @@ in catalog), `mismatch` (object present, columns differ -- carries a short
 diff), plus the non-blocking notes `transient` / `maintenance` and the
 blocking `unverifiable`.
 
+Example summary/entry shape (the ledger's statement order is preserved):
+
+```json
+{
+  "summary": {"corroborated": 1, "transient": 1, "gate_relevant_total": 1},
+  "entries": [
+    {"statement": "CREATE INDEX i ON t (a)", "phase": "post_load", "verdict": "corroborated"},
+    {"statement": "SET threads=4", "phase": "session", "verdict": "transient"}
+  ]
+}
+```
+
 ### Session SETs are corroboration-eligible? No (default).
 
 Session `SET`/`PRAGMA` statements are transient: they configure the
@@ -79,8 +105,9 @@ connection, leave no catalog trace, and vanish when the session closes.
 They are **noted** in the receipt (so the reader sees they ran) but do
 **not** block verification and cannot, on their own, earn it. A run whose
 only tuning is session SETs stays `applied_unverified` -- there is nothing
-physical to corroborate. This matches the ledger's own physical-hash
-intent (chronology of *layout* ops).
+physical to corroborate. The applied-ledger hash still includes those executed
+session records in their true chronology; exclusion here is specific to the
+catalog-corroboration gate, not to ledger identity.
 
 A failed session statement follows the same transient gate rule: it is
 visible in the receipt but does not block a sibling physical statement that
@@ -108,23 +135,17 @@ that itself reaches the cap remains explicitly truncated.
   bounded query, filtered to the ledger's tables. Corroborates each
   `CREATE INDEX` ledger entry against its `index` row.
 
-  Caveat (verified 2026-07-22, follow-up for the orchestrator): a DuckDB
-  **SORTING** tuning renders to `CREATE INDEX idx_<t>_sort` *before* data
-  load, but the loader's CTAS sorted ingestion then runs
-  `CREATE OR REPLACE TABLE <t> AS SELECT * FROM <t> ORDER BY ...`, which
-  **drops that index**. So at introspection time the sort index is absent
-  and a sorting-only run honestly stays `applied_unverified` (the receipt
-  records `absent`) -- a live demonstration of the "never verified without
-  corroboration" invariant, not a bug in this module. The `CLUSTERING`
-  branch of DuckDB's `apply_table_tunings` would produce a persisting index
-  (CTAS only consumes SORTING columns), but DuckDB's config validation
-  rejects the `clustering` tuning type, so that branch is currently
-  unreachable. Corroboration -> `applied_verified` is exercised against a
-  live DuckDB catalog where a recorded index persists (see
-  `tests/unit/platforms/test_duckdb_introspection.py`). Making a full
-  DuckDB *sorting* CLI run verification-eligible needs the sort layout
-  recorded as a corroboratable footprint (e.g. recording the CTAS
-  `ORDER BY`, or re-creating the index post-load) -- out of scope here.
+  DuckDB sorting is verification-eligible end to end. The initial tuned
+  `CREATE INDEX` is dropped by the loader's
+  `CREATE OR REPLACE TABLE ... ORDER BY` CTAS, so
+  `DuckDBAdapter.apply_ctas_sort` re-creates that same generator-rendered
+  index after CTAS. `_record_sort_index_layout_op` records the successful or
+  failed re-creation as a `post_load` layout operation, and
+  `PlatformAdapter._fold_layout_operations_into_ledger` folds it into the
+  ledger before corroboration. The live full-flow test
+  `tests/unit/platforms/test_duckdb_introspection.py::TestDuckDBCtasIndexRecreation::test_full_flow_reaches_applied_verified`
+  pins the surviving catalog index and verified outcome. Dry runs capture SQL
+  but neither execute nor record the re-creation.
 
 - **Snowflake** (`benchbox/platforms/snowflake_introspection.py`): reads
   `INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY` with bound, normalized schema
@@ -177,9 +198,10 @@ that itself reaches the cap remains explicitly truncated.
 
 ## Wiring
 
-`run_enhanced_benchmark` (`benchbox/platforms/base/adapter.py`, after the
-`overall_status` derivation ~line 984, connection still open): when the
-derived status is `applied_unverified` and the adapter exposes an
+`PlatformAdapter.run_enhanced_benchmark` folds post-load layout operations
+before session configuration, then derives `overall_status` after execution
+while the connection remains open. When that status is `applied_unverified`
+and the adapter exposes an
 introspector (`get_tuning_introspector()`), run introspection guarded,
 corroborate, and upgrade to `applied_verified` iff the receipt corroborates.
 The receipt rides inside the existing `.applied.json` companion

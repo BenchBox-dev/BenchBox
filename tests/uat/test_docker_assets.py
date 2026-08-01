@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from tests.uat import docker_assets, matrix
+from tests.uat.docker_path_helpers import compose_path_ends_with
 
 pytestmark = pytest.mark.fast
 
@@ -38,7 +39,7 @@ def test_compose_down_commands_are_project_scoped_and_targeted():
     for argv in (containers, volumes, images):
         assert not docker_assets.command_has_forbidden_prune(argv)
         assert "-f" in argv
-        assert any("docker/postgresql/docker-compose.yml" in part for part in argv)
+        assert any(compose_path_ends_with(part, "docker", "postgresql", "docker-compose.yml") for part in argv)
 
 
 @pytest.mark.parametrize(

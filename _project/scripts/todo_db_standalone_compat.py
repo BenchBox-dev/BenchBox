@@ -30,6 +30,7 @@ COMMANDS = frozenset(
         "create",
         "show",
         "claim",
+        "renew",
         "release",
         "deps",
         "unblock",

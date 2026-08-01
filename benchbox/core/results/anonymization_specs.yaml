@@ -54,6 +54,7 @@ identifier_keys:
   clientid: client
   machineid: machine
   applicationid: application
+  serviceaccount: serviceaccount
 endpoint_keys:
 - apiendpoint
 - endpoint

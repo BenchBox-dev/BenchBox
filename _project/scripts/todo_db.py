@@ -46,6 +46,7 @@ import socket
 import sqlite3
 import subprocess
 import sys
+import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1400,7 +1401,7 @@ def _preconnect_command(
         if refusal is not None:
             return refusal
         try:
-            applied = migrate_backend(backend)
+            applied = migrate_backend(backend, actor=actor)
         except TodoError as exc:
             print(f"error: {exc}", file=sys.stderr)
             return 2
@@ -1414,10 +1415,22 @@ def _preconnect_command(
     return None
 
 
-def migrate_backend(backend: Path | str) -> list[int]:
+def _migration_freeze_guard(conn: sqlite3.Connection, actor: str | None) -> None:
+    """Reject a migration while another actor holds a live maintenance freeze."""
+    if not actor:
+        return
+    live = get_freeze(conn)
+    if live and live["holder"] != actor:
+        raise TodoError(
+            f"tracker is frozen for maintenance by {live['holder']} since {live['since']}; "
+            "migrations must run under the freeze holder or after release"
+        )
+
+
+def migrate_backend(backend: Path | str, actor: str | None = None) -> list[int]:
     """Apply pending schema migrations on either backend; returns versions applied."""
     if isinstance(backend, Path):
-        return migrate_db(backend)
+        return migrate_db(backend, actor=actor)
     # Hosted: a fresh sync is a hard requirement — migrating a stale replica
     # against an already-migrated primary would corrupt the version record.
     conn = _hosted_raw_connect(backend, sync_required=True)
@@ -1426,11 +1439,21 @@ def migrate_backend(backend: Path | str) -> list[int]:
         if version is None:
             _ensure_schema(conn)  # fresh database: created at the current version
             return []
+        if version > SCHEMA_VERSION:
+            raise TodoError(
+                f"database schema_version={version} is newer than this CLI ({SCHEMA_VERSION}); use a newer CLI"
+            )
         applied: list[int] = []
         for target in sorted(MIGRATIONS):
             if version < target:
                 with _write_txn(conn):
+                    _migration_freeze_guard(conn, actor)
                     current = _schema_version(conn)
+                    if current is not None and current > SCHEMA_VERSION:
+                        raise TodoError(
+                            f"database schema_version={current} is newer than this CLI ({SCHEMA_VERSION}); "
+                            "use a newer CLI"
+                        )
                     if current is not None and current >= target:
                         # a concurrent migrator won the race; not an error
                         version = current
@@ -1445,7 +1468,7 @@ def migrate_backend(backend: Path | str) -> list[int]:
         conn.close()
 
 
-def migrate_db(db_path: Path) -> list[int]:
+def migrate_db(db_path: Path, *, actor: str | None = None) -> list[int]:
     """Apply pending schema migrations; returns the versions applied."""
     if not db_path.exists():
         # Nothing to migrate — a fresh connect() creates the current schema.
@@ -1457,13 +1480,27 @@ def migrate_db(db_path: Path) -> list[int]:
         version = _schema_version(raw)
         if version is None:
             raise TodoError(f"{db_path} exists but has no tracker schema")
+        if version > SCHEMA_VERSION:
+            raise TodoError(
+                f"database schema_version={version} is newer than this CLI ({SCHEMA_VERSION}); use a newer CLI"
+            )
         applied: list[int] = []
         for target in sorted(MIGRATIONS):
             if version < target:
-                for statement in MIGRATIONS[target]:
-                    raw.execute(statement)
-                raw.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(target),))
-                raw.commit()
+                with _write_txn(raw):
+                    _migration_freeze_guard(raw, actor)
+                    current = _schema_version(raw)
+                    if current is not None and current > SCHEMA_VERSION:
+                        raise TodoError(
+                            f"database schema_version={current} is newer than this CLI ({SCHEMA_VERSION}); "
+                            "use a newer CLI"
+                        )
+                    if current is not None and current >= target:
+                        version = current
+                        continue
+                    for statement in MIGRATIONS[target]:
+                        raw.execute(statement)
+                    raw.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(target),))
                 version = target
                 applied.append(target)
         return applied
@@ -1862,6 +1899,8 @@ def renew_claim(
 def start_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str) -> None:
     with _write_txn(conn):
         _require_item(conn, item_id)
+        if not _touch_lease(conn, actor, item_id):
+            raise TodoError(f"{item_id!r}'s lease is expired, missing, or held by another actor; re-acquire it")
         unit = _require_unit(conn, item_id, wid)
         if unit["status"] == "done":
             raise TodoError(f"{item_id}:{wid} is already done")
@@ -1873,7 +1912,6 @@ def start_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str) -> 
             " WHERE item_id = ? AND wid = ?",
             (utc_now(), worktree, branch, item_id, wid),
         )
-        _touch_lease(conn, actor, item_id)
         log_event(conn, actor, item_id, "start", {"wid": wid, "worktree": worktree, "branch": branch})
 
 
@@ -1884,6 +1922,8 @@ def done_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str, evid
         _require_item(conn, item_id)
         _require_unit(conn, item_id, wid)
         _require_unit_needs_done(conn, item_id, wid)
+        if not _touch_lease(conn, actor, item_id):
+            raise TodoError(f"{item_id!r}'s lease is expired, missing, or held by another actor; re-acquire it")
         # Implicit start: stamp the location if `start` was skipped, so the
         # record of where the work happened survives either path.
         worktree, branch = _git_location()
@@ -1895,7 +1935,6 @@ def done_unit(conn: sqlite3.Connection, actor: str, item_id: str, wid: str, evid
             " WHERE item_id = ? AND wid = ?",
             (evidence, utc_now(), worktree, branch, item_id, wid),
         )
-        _touch_lease(conn, actor, item_id)
         log_event(conn, actor, item_id, "done", {"wid": wid, "evidence": evidence})
 
 
@@ -2308,8 +2347,14 @@ def write_activity(conn: sqlite3.Connection) -> dict[str, Any]:
     writes landing inside the same whole second. Together they are stable under
     no writes and move under any write, which is what a cutover needs to gate on.
     """
-    row = conn.execute("SELECT count(*) AS n, max(seq) AS last_seq, max(at) AS last_at FROM events").fetchone()
-    return {"count": row["n"] or 0, "last_seq": row["last_seq"], "latest": row["last_at"]}
+
+    def fingerprint(table: str) -> dict[str, Any]:
+        row = conn.execute(f"SELECT count(*) AS n, max(seq) AS last_seq, max(at) AS last_at FROM {table}").fetchone()
+        return {"count": row["n"] or 0, "last_seq": row["last_seq"], "latest": row["last_at"]}
+
+    activity = fingerprint("events")
+    activity["findings"] = fingerprint("finding_events")
+    return activity
 
 
 # ---------------------------------------------------------------------------
@@ -2375,11 +2420,12 @@ def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: in
     passed = proc.returncode == 0
     result = "pass" if passed else "fail"
     with _write_txn(conn):
+        if not _touch_lease(conn, actor, item_id):
+            raise TodoError(f"{item_id!r}'s lease is expired, missing, or held by another actor; re-acquire it")
         conn.execute(
             "UPDATE verifications SET last_run = ?, last_result = ? WHERE item_id = ? AND seq = ?",
             (utc_now(), result, item_id, seq),
         )
-        _touch_lease(conn, actor, item_id)
         log_event(conn, actor, item_id, "verify", {"seq": seq, "result": result})
     return result, output
 
@@ -2420,18 +2466,31 @@ _PLACEHOLDER_COMMAND_RE = re.compile(r"^\s*<[^<>]*>\s*$")
 def _command_unrunnable_reason(command: str) -> str | None:
     """Why this verification command can never execute, or None if it can.
 
-    Deliberately conservative: piped, multi-line, `!`-negated, env-prefixed and
-    compound commands are all legitimate and must not be flagged, so the only
-    signals used are a whole-command placeholder shape and a failed shell parse.
+    The command is parsed by the same POSIX shell used by ``subprocess.run(...,
+    shell=True)``. Syntax-only parsing catches malformed pipelines and accepts
+    valid heredocs without executing any command.
     """
     if _PLACEHOLDER_COMMAND_RE.match(command):
         return "prose placeholder, not a runnable command"
-    try:
-        tokens = shlex.split(command, posix=True)
-    except ValueError as exc:
-        return f"fails shell parse: {exc}"
-    if not tokens:
+    if not command.strip():
         return "empty after shell parsing"
+    if os.name == "nt":
+        # ``shell=True`` delegates to cmd.exe on Windows, which has no
+        # portable syntax-only equivalent. Do not invent a shlex grammar here.
+        return None
+    try:
+        parsed = subprocess.run(
+            ["/bin/sh", "-n"],
+            input=command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    if parsed.returncode != 0:
+        detail = (parsed.stderr or "shell syntax error").strip().splitlines()[0]
+        return f"fails shell parse: {detail}"
     return None
 
 
@@ -2473,6 +2532,21 @@ _PATHLIKE_TOKEN_RE = re.compile(
     r"Makefile|pyproject\.toml|uv\.lock)(?:/|$)"
 )
 
+
+def _is_pathlike_token(token: str) -> bool:
+    """Recognize repository-relative path tokens without a root allowlist."""
+    if not token or token.startswith(("-", "$", "~", "/")) or "$" in token or "=" in token:
+        return False
+    if token.startswith(("http://", "https://")):
+        return False
+    if "/" in token:
+        return True
+    return Path(token).suffix in {".py", ".toml", ".yaml", ".yml", ".json", ".md", ".sh"} or token in {
+        "Makefile",
+        "Dockerfile",
+    }
+
+
 # 0.87 keeps real slips (test_todo_db_v3.py for test_todo_db_v2.py, 0.94) and
 # releases planned new files for genuinely new components
 # (test_ballista_adapter.py vs test_base_adapter.py, 0.86).
@@ -2484,10 +2558,9 @@ _NEAR_MISS_CUTOFF = 0.87
 # runner/ package, 0.80; result_capture.py for result_factory.py, 0.76).
 _DENY_NEAR_MISS_CUTOFF = 0.75
 
-# Characters that cannot appear in this repo's tracked paths. Authors annotate
-# scope globs in prose ("scripts/foo.py (item 4, done)"); such a glob can never
-# fnmatch a changed file, so as a deny rule it silently protects nothing.
-_GLOB_ANNOTATION_CHARS = " ()"
+# Scope annotations are prose appended after a path, rather than arbitrary
+# spaces inside a valid repository path (for example, "New Tool.rules").
+_GLOB_ANNOTATION_RE = re.compile(r"\s+\([^()]*\)\s*$")
 
 
 def _lint_repo_root() -> Path | None:
@@ -2501,7 +2574,10 @@ def _glob_resolves(root: Path, pattern: str) -> bool:
     """Whether ``pattern`` (repo-relative; trailing-slash means directory)
     matches anything in the working tree."""
     try:
-        return next(iter(root.glob(pattern.rstrip("/"))), None) is not None
+        normalized = pattern.rstrip("/")
+        if not any(ch in normalized for ch in "*?["):
+            return (root / normalized).exists()
+        return any(_scope_glob_matches(path.relative_to(root).as_posix(), pattern) for path in root.rglob("*"))
     except (ValueError, OSError, NotImplementedError):
         return False
 
@@ -2540,13 +2616,16 @@ def _deny_unresolved_finding(root: Path, glob: str) -> str | None:
     it. A CLEAN nonexistent literal or wildcard stays legal: it forbids
     creating the named file(s), and fnmatch will catch a created match.
     """
-    if any(ch in glob for ch in _GLOB_ANNOTATION_CHARS):
+    if _GLOB_ANNOTATION_RE.search(glob):
         return "contains annotation text so it can never match a repository path"
     if any(ch in glob for ch in "*?["):
         return None  # prospective family deny — forbids creating matches
     if glob.endswith(".py") and (root / glob[: -len(".py")]).is_dir():
         return f"names a module shadowed by existing package directory '{glob[: -len('.py')]}/'"
-    close = _near_miss(root, glob, cutoff=_DENY_NEAR_MISS_CUTOFF)
+    # A space is valid in a repository path; after the explicit annotation
+    # check above, do not reinterpret a prospective spaced path as prose or a
+    # typo merely because it resembles a sibling.
+    close = None if " " in glob else _near_miss(root, glob, cutoff=_DENY_NEAR_MISS_CUTOFF)
     if close:
         return f"names a nonexistent path suspiciously close to existing '{close}'"
     return None
@@ -2556,18 +2635,24 @@ def _unresolvable_scope_findings(item: dict) -> list[str]:
     root = _lint_repo_root()
     if root is None:
         return []
-    settled = item["state"] in ("done", "dropped")
+    if item["state"] in ("done", "dropped"):
+        return []
     findings = []
     for rule in item["scope"]:
         pattern = rule["path_glob"]
+        # Open-item wildcards are prospective policy: they can legitimately
+        # match only files the work will create, and neither finding path below
+        # flags a miss. Avoid walking the repository for an answer we discard.
+        if any(ch in pattern for ch in "*?["):
+            continue
         if _glob_resolves(root, pattern):
             continue
-        if not settled and rule["kind"] == "do_not_modify":
+        if rule["kind"] == "do_not_modify":
             if Path(pattern).is_absolute() or pattern.startswith("~"):
                 continue
             reason = _deny_unresolved_finding(root, pattern)
         else:
-            reason = _unresolved_path_finding(root, pattern, settled=settled)
+            reason = _unresolved_path_finding(root, pattern, settled=False)
         if reason:
             findings.append(f"scope {rule['kind']} {reason}: {pattern}")
     return findings
@@ -2577,21 +2662,31 @@ def _unresolvable_command_path_findings(item: dict) -> list[str]:
     root = _lint_repo_root()
     if root is None:
         return []
-    settled = item["state"] in ("done", "dropped")
+    if item["state"] in ("done", "dropped"):
+        return []
     findings = []
     for ver in item["verifications"]:
         command = ver.get("command") or ""
         if not command.strip() or _command_unrunnable_reason(command):
             continue  # an unrunnable rung is already its own finding
-        for token in shlex.split(command):
+        try:
+            tokens = shlex.split(command)
+        except ValueError:
+            # The shell parser above is authoritative. Valid heredocs may
+            # contain unmatched quotes in their body, which shlex cannot
+            # represent; skip path-token linting rather than rejecting them.
+            continue
+        for token in tokens:
             # Strip pytest node-id suffixes and shell separators shlex leaves
             # glued to the token ("tests/x.py;" in "cmd tests/x.py; next").
             path_part = token.split("::", 1)[0].rstrip(";,)")
-            if "$" in token or "=" in token or not _PATHLIKE_TOKEN_RE.match(path_part):
+            if not _is_pathlike_token(path_part):
                 continue
+            if any(ch in path_part for ch in "*?["):
+                continue  # prospective path family; a miss is legal on open items
             if _glob_resolves(root, path_part):
                 continue
-            reason = _unresolved_path_finding(root, path_part, settled=settled)
+            reason = _unresolved_path_finding(root, path_part, settled=False)
             if reason:
                 findings.append(f"verification seq {ver['seq']} {reason}: {path_part}")
     return findings
@@ -2609,8 +2704,10 @@ def _unresolvable_command_path_findings(item: dict) -> list[str]:
 # for recurrence and legitimately pass until it happens.
 
 _GATING_EXPECTED_RE = re.compile(
-    r"unfixed|must fail|pre-?fix|before the fix|fail(?:s|ed|ing)? (?:on|when|while|as)|"
-    r"exits? [1-9]\d* (?:today|on|when|until)|today|\bonce\b|\buntil\b",
+    r"(?:\b(?:unfixed|pre-?fix|before the fix|before this fix|prior to the fix)\b.{0,100}"
+    r"\b(?:fail|fails|failed|failing|exit|exits|non[- ]zero)\b|"
+    r"\b(?:fail|fails|failed|failing|exit|exits|non[- ]zero)\b.{0,100}"
+    r"\b(?:unfixed|pre-?fix|before the fix|before this fix|prior to the fix)\b)",
     re.IGNORECASE,
 )
 
@@ -2633,8 +2730,9 @@ def _has_falsifiable_rung(item: dict) -> bool:
 
 # Scope completeness: work that promises tests cannot land when only_modify
 # names a source file but omits that file's existing tests. The conventional
-# family is tests/unit/<subpath>/test_<name>*.py - the wildcard admits split
-# suites (test_todo_db.py, test_todo_db_v2.py, ...); scope is complete when
+# family is tests/unit/<subpath>/test_<name>.py plus test_<name>_*.py; the
+# suffix boundary avoids treating test_tpchavoc.py as part of test_tpch.py's
+# family. Scope is complete when
 # it covers ANY existing member. Only EXISTING test files are demanded - a
 # module without tests today stays creatable.
 
@@ -2648,9 +2746,9 @@ def _conventional_test_family(source_path: str) -> tuple[str, str] | None:
         return None
     prefix, stem = match.groups()
     if prefix.startswith("_project/scripts"):
-        return "tests/unit/scripts", f"test_{stem}*.py"
+        return "tests/unit/scripts", f"test_{stem}"
     subpath = prefix[len("benchbox/") :].rstrip("/")
-    return (f"tests/unit/{subpath}" if subpath else "tests/unit"), f"test_{stem}*.py"
+    return (f"tests/unit/{subpath}" if subpath else "tests/unit"), f"test_{stem}"
 
 
 def _missing_scope_test_files(item: dict) -> list[str]:
@@ -2664,7 +2762,11 @@ def _missing_scope_test_files(item: dict) -> list[str]:
         if family is None:
             continue
         test_dir, name_glob = family
-        existing = sorted(str(Path(test_dir) / p.name) for p in (root / test_dir).glob(name_glob))
+        existing = sorted(
+            str(Path(test_dir) / path.name)
+            for path in (root / test_dir).glob("*.py")
+            if path.name == f"{name_glob}.py" or (path.name.startswith(f"{name_glob}_") and path.suffix == ".py")
+        )
         if not existing:
             continue
         if any(_scope_glob_matches(test_path, glob) for test_path in existing for glob in only):
@@ -2687,6 +2789,26 @@ def _unsatisfiable_verifications(item: dict) -> list[int]:
         if _EXPECTED_NEGATES_OUTPUT_RE.search(expected) and not _command_asserts_on_output(command):
             offenders.append(ver["seq"])
     return offenders
+
+
+def lint_item_notes(conn: sqlite3.Connection, item_id: str) -> list[str]:
+    """Advisory notes, not defects: policy skips that would otherwise be
+    silent. A category exemption from the falsifiability check is author-
+    selectable free text, so lint says when it applied - an exemption you
+    can see is auditable, one you cannot is a hole."""
+    item = get_item(conn, item_id)
+    notes = []
+    if (
+        get_config(conn, "lint.require_falsifiable_rung") == "on"
+        and item["state"] in ("planning", "active")
+        and (item.get("category") or "") in _FALSIFIABILITY_EXEMPT_CATEGORIES
+        and any((v.get("command") or "").strip() for v in item["verifications"])
+    ):
+        notes.append(
+            f"note: falsifiability check skipped - category '{item['category']}' is exempt "
+            "(tripwires/acceptance runs legitimately pass on the current tree)"
+        )
+    return notes
 
 
 def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
@@ -2954,9 +3076,20 @@ def write_snapshot(conn: sqlite3.Connection, path: Path) -> Path:
             "write it outside the checkout, e.g. ~/todo-db-backups/."
         )
     resolved.parent.mkdir(parents=True, exist_ok=True)
-    with open(resolved, "w", encoding="utf-8") as handle:
-        json.dump(build_snapshot(conn), handle, sort_keys=True, indent=2)
-        handle.write("\n")
+    # Build before touching the destination, then replace it atomically. A
+    # failed SELECT/serialization must leave an existing backup intact.
+    payload = json.dumps(build_snapshot(conn), sort_keys=True, indent=2) + "\n"
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{resolved.name}.", dir=resolved.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+        os.replace(temporary, resolved)
+    except BaseException:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+        raise
     return resolved
 
 
@@ -4000,6 +4133,10 @@ def _cmd_lint(conn, actor, args):
         total += len(findings)
         for finding in findings:
             print(f"{target}: {finding}")
+        # Notes are advisory visibility, not defects: they neither count nor
+        # affect the exit code.
+        for note in lint_item_notes(conn, target):
+            print(f"{target}: {note}")
     print(f"{total} finding(s) across {len(targets)} item(s)")
     return 1 if total else 0
 

@@ -23,6 +23,7 @@ from benchbox.platforms.dataframe.benchmark_mixin import (
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
+    pytest.mark.usefixtures("sufficient_dataframe_memory"),
 ]
 
 

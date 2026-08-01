@@ -698,6 +698,7 @@ pg-duckdb|postgres_scan_threads|Threads for parallel PostgreSQL table scanning (
 pg-duckdb|compare_native|Run native DuckDB comparison for matched queries|{'parser': 'parse_bool', 'default': False}
 ducklake|metadata_path|DuckLake catalog metadata file path (.ducklake)|{}
 ducklake|data_path|DuckLake Parquet data directory (local path or s3:// URI)|{}
+ducklake|deployment_mode|DuckLake deployment mode: local, local_catalog_s3, postgres_catalog, or postgres_catalog_s3|{'choices': ('local', 'local_catalog_s3', 'postgres_catalog', 'postgres_catalog_s3')}
 ducklake|catalog|DuckLake catalog backend: duckdb, sqlite, or postgres|{'choices': ('duckdb', 'sqlite', 'postgres'), 'default': 'duckdb'}
 ducklake|pg_host|PostgreSQL hostname for the postgres catalog backend|{'default': 'localhost'}
 ducklake|pg_port|PostgreSQL port for the postgres catalog backend|{'parser': 'int', 'default': 5432}

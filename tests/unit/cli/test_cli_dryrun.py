@@ -773,13 +773,15 @@ class TestDryRunErrorHandling:
             assert "Unknown benchmark: invalid" in str(result.warnings)
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Path handling differs on Windows")
-    def test_dry_run_with_missing_output_dir(self):
+    def test_dry_run_with_missing_output_dir(self, tmp_path):
         """Test dry run when output directory cannot be created."""
-        # Should handle missing directory gracefully - but our current implementation fails fast
-        # This is expected behavior, so we expect an exception
+        # Fail-fast is the expected behavior. The invalid path sits under a
+        # regular FILE so creation fails for every uid - root can mkdir
+        # /invalid, which made the old absolute-path probe root-sensitive.
+        blocker = tmp_path / "blocker"
+        blocker.write_text("")
         with pytest.raises(OSError):
-            # Try to create executor with invalid path - should raise OSError
-            DryRunExecutor(output_dir="/invalid")
+            DryRunExecutor(output_dir=str(blocker / "sub"))
 
     @patch("benchbox.cli.dryrun.console")
     def test_dry_run_with_empty_query_list(self, mock_console):

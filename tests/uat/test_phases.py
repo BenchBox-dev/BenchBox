@@ -11,6 +11,7 @@ import pytest
 
 from tests.uat import docker_assets, matrix
 from tests.uat.config import ExecuteConfig, UATConfig, validate_config
+from tests.uat.docker_path_helpers import compose_path_ends_with
 from tests.uat.phases import (
     enumerate as enum_phase,
     execute as exec_phase,
@@ -465,9 +466,9 @@ def test_execute_skips_unreachable_platform(tmp_path):
 
 def _docker_platform_from_argv(argv: list[str]) -> str:
     compose_file = argv[argv.index("-f") + 1]
-    if "/clickhouse/" in compose_file:
+    if compose_path_ends_with(compose_file, "docker", "clickhouse", "docker-compose.yml"):
         return "clickhouse-server"
-    if "/postgresql/" in compose_file:
+    if compose_path_ends_with(compose_file, "docker", "postgresql", "docker-compose.yml"):
         return "postgresql"
     if "pg-duckdb" in compose_file:
         return "pg-duckdb"

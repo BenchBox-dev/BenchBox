@@ -220,3 +220,4 @@ def test_private_export_preserves_raw_platform_metadata_behind_explicit_option(t
     assert "super-secret-password" in serialized
     assert "warehouse.internal.example.com" in serialized
     assert "raw-bucket" in serialized
+    assert payload["platform"]["raw_config"]["username"] == "<redacted>"

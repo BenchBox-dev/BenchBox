@@ -180,7 +180,9 @@ class TestResumeLocation:
         todo_db.claim_item(conn, "alice", "resume-item")
         todo_db.start_unit(conn, "alice", "resume-item", "w1")
         monkeypatch.chdir(git_repo["main"])
-        todo_db.done_unit(conn, "bob", "resume-item", "w1", "finished elsewhere")
+        with pytest.raises(todo_db.TodoError, match="lease"):
+            todo_db.done_unit(conn, "bob", "resume-item", "w1", "finished elsewhere")
+        todo_db.done_unit(conn, "alice", "resume-item", "w1", "finished elsewhere")
         unit = todo_db.get_item(conn, "resume-item")["work"][0]
         assert unit["started_branch"] == "feat-resume"
 
@@ -384,6 +386,16 @@ class TestLintUnrunnableCommands:
         findings = todo_db.lint_item(conn, "parse-item")
         assert any("cannot execute" in f and "shell parse" in f for f in findings)
 
+    def test_shell_parse_rejects_a_malformed_pipeline(self, conn):
+        self._mk_with_command(conn, "pipeline-item", "printf ok |")
+        findings = todo_db.lint_item(conn, "pipeline-item")
+        assert any("cannot execute" in f and "shell parse" in f for f in findings)
+
+    def test_shell_parse_accepts_heredoc_body_quotes(self, conn):
+        command = "cat <<'EOF'\nthis body contains an unmatched apostrophe: '\nEOF"
+        self._mk_with_command(conn, "heredoc-item", command)
+        assert not any("cannot execute" in f for f in todo_db.lint_item(conn, "heredoc-item"))
+
     def test_runnable_command_is_not_flagged(self, conn):
         self._mk_with_command(conn, "ok-item", "uv run -- python -m pytest tests -q")
         assert not any("cannot execute" in f for f in todo_db.lint_item(conn, "ok-item"))
@@ -445,7 +457,25 @@ class TestLintUnresolvableScopeAndLadderPaths:
         findings = todo_db.lint_item(conn, "prospective-glob")
         assert not any("planned-out" in f for f in findings)
 
-    def test_settled_item_unresolvable_paths_are_flagged(self):
+    def test_open_item_prospective_glob_does_not_scan_the_tree(self, monkeypatch):
+        item = {
+            "state": "ready",
+            "scope": [{"kind": "only_modify", "path_glob": "_project/decisions/planned-out-*.md"}],
+            "verifications": [],
+        }
+        monkeypatch.setattr(todo_db, "_glob_resolves", lambda *_args: pytest.fail("prospective glob was scanned"))
+        assert todo_db._unresolvable_scope_findings(item) == []
+
+    def test_open_item_verification_glob_does_not_scan_the_tree(self, monkeypatch):
+        item = {
+            "state": "ready",
+            "scope": [],
+            "verifications": [{"seq": 1, "command": "uv run -- pytest tests/planned/test_*.py", "expected": "passes"}],
+        }
+        monkeypatch.setattr(todo_db, "_glob_resolves", lambda *_args: pytest.fail("prospective glob was scanned"))
+        assert todo_db._unresolvable_command_path_findings(item) == []
+
+    def test_settled_item_paths_are_not_reinterpreted_against_current_tree(self):
         item = {
             "state": "done",
             "scope": [
@@ -456,11 +486,8 @@ class TestLintUnresolvableScopeAndLadderPaths:
                 {"seq": 1, "command": "uv run -- python -m pytest tests/unit/scripts/test_never_materialized.py -q"}
             ],
         }
-        scope_findings = todo_db._unresolvable_scope_findings(item)
-        assert any("resolves to nothing" in f and "tests/no-such-dir/**" in f for f in scope_findings)
-        assert any("test_never_materialized" in f for f in scope_findings)
-        command_findings = todo_db._unresolvable_command_path_findings(item)
-        assert any("resolves to nothing" in f and "test_never_materialized" in f for f in command_findings)
+        assert todo_db._unresolvable_scope_findings(item) == []
+        assert todo_db._unresolvable_command_path_findings(item) == []
 
     def test_absolute_paths_are_skipped_even_when_settled(self):
         item = {
@@ -521,6 +548,15 @@ class TestLintUnresolvableScopeAndLadderPaths:
         findings = todo_db.lint_item(conn, "annotated-deny")
         assert any("do_not_modify" in f and "annotation" in f for f in findings)
 
+    def test_deny_rule_with_space_in_path_stays_legal(self, conn):
+        self._mk_scoped(
+            conn,
+            "spaced-deny",
+            scope=[("do_not_modify", "_sources/tpc-ds/tools/New Tool.rules")],
+        )
+        findings = todo_db.lint_item(conn, "spaced-deny")
+        assert not any("New Tool.rules" in f for f in findings)
+
     def test_inert_deny_rule_package_dir_shadow_is_flagged_on_open_item(self, conn):
         # benchbox/core/runner.py does not exist; the runner/ package does.
         # The deny intent (protect the runner) can never fire.
@@ -555,17 +591,44 @@ class TestLintUnresolvableScopeAndLadderPaths:
         findings = todo_db.lint_item(conn, "family-deny")
         assert not any("zq_forbidden" in f for f in findings)
 
-    def test_inert_deny_rule_checks_do_not_apply_when_settled(self):
-        # Settled items keep the blanket resolves-to-nothing finding; the
-        # deny-specific classification is an open-item aid.
-        item = {
-            "state": "done",
-            "scope": [{"kind": "do_not_modify", "path_glob": "benchbox/core/runner.py"}],
-            "verifications": [],
-        }
-        findings = todo_db._unresolvable_scope_findings(item)
-        assert any("resolves to nothing" in f for f in findings)
-        assert not any("package directory" in f for f in findings)
+
+class TestLintExemptionVisibility:
+    """A category-based falsifiability exemption must be visible in lint
+    output - silent, author-selectable skips are unauditable."""
+
+    def _mk_exempt(self, conn, item_id, category):
+        todo_db.set_config(conn, "tester", "lint.require_falsifiable_rung", "on")
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id=item_id,
+            title="Item exercising exemption visibility",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            category=category,
+            work=[{"id": "w1", "summary": "one unit of work"}],
+            scope=[("only_modify", "tests/conftest.py")],
+            verifications=[{"description": "tripwire", "command": "true", "expected": "always passes"}],
+        )
+
+    def test_exempt_category_gets_note_not_finding(self, conn):
+        self._mk_exempt(conn, "flake-exempt", "flake")
+        assert not any("falsifiability" in f for f in todo_db.lint_item(conn, "flake-exempt"))
+        notes = todo_db.lint_item_notes(conn, "flake-exempt")
+        assert any("exempt" in n for n in notes)
+
+    def test_normal_category_gets_finding_not_note(self, conn):
+        self._mk_exempt(conn, "normal-cat", "security")
+        assert any("falsifiability" in f for f in todo_db.lint_item(conn, "normal-cat"))
+        assert todo_db.lint_item_notes(conn, "normal-cat") == []
+
+    def test_exemption_note_does_not_affect_exit_code(self, conn, capsys):
+        self._mk_exempt(conn, "flake-exit", "flake")
+        rc = todo_db._cmd_lint(conn, "tester", SimpleNamespace(id="flake-exit", all=False))
+        out = capsys.readouterr().out
+        assert "exempt" in out
+        assert rc == 0
 
 
 class TestLintFalsifiabilityAndScopeCompleteness:

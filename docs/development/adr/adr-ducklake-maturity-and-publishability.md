@@ -74,7 +74,7 @@ DuckLake moves to `beta` when **all** of the following hold, and not before:
    a real S3 bucket.)*
 3. A full TPC-H SF>=1 run completes on each of the four deployment modes with
    results validated by the standard correctness gate - not just the SF=0.01
-   smoke coverage that exists today. **(Not met.)**
+   smoke coverage that exists today. *(Met as of 2026-07-30.)*
 4. Catalog reuse and `--force` are verified against a server-side catalog, not
    only a local file. *(Met 2026-07-30; that verification found and fixed a real
    defect where `--force` left orphaned Parquet.)*
@@ -82,9 +82,8 @@ DuckLake moves to `beta` when **all** of the following hold, and not before:
 
 **Basis.** Criteria 1-2 and 4 encode the failure modes this review actually
 found: coverage that existed but ran nowhere, and reuse/force semantics that
-were never exercised against the backend they were written for. Criterion 3 is
-the gap that remains - every DuckLake execution to date is SF=0.01 smoke, which
-exercises correctness but says nothing about behaviour at benchmark scale.
+were never exercised against the backend they were written for. Criterion 3
+was closed by the recorded SF=1 runs across all four deployment modes.
 
 **What would reverse this.** If `beta` acquires a repo-wide definition that
 conflicts with these, that definition wins and this section should be deleted
@@ -183,8 +182,8 @@ layout in results metadata.
 
 ## Consequences
 
-- w11's criterion 3 (scale runs on all four deployment modes) is now the single
-  blocker for `beta`; DuckLake stays `experimental` until it is met.
+- w11's criteria are met; DuckLake is now `beta`. Future demotion would require
+  new evidence against the reversal conditions above.
 - w12 requires that catalog backend and storage location reach result metadata.
   The registry already models these as independent axes (four deployment modes
   as of the w10 fix), so the vocabulary exists; wiring it into result metadata

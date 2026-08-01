@@ -643,6 +643,7 @@ clean:
 # Linting (ruff + explorer token scan)
 lint:
 	uv run ruff check .
+	$(MAKE) windows-antipatterns-check
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
 
@@ -652,7 +653,7 @@ lint:
 # hook gated on uv.lock changes. See docs/development/development.md.
 .PHONY: uv-lock-revision-check
 uv-lock-revision-check:
-	python3 _project/scripts/check_uv_lock_revision.py
+	uv run -- python _project/scripts/check_uv_lock_revision.py $(if $(BASE_REF),--baseline-ref "$(BASE_REF)",)
 
 # Dependency audit - checks that every declared dep has an import site or is allowlisted.
 # Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
@@ -674,6 +675,12 @@ audit-sha-check:
 		--target-ref "$(AUDIT_SHA_TARGET_REF)" \
 		$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \
 		"$(FILE)"
+
+# Reject product-source patterns that depend on Unix-only behavior or the
+# process locale. The scanner is stdlib-only; its default root is benchbox/.
+.PHONY: windows-antipatterns-check
+windows-antipatterns-check:
+	uv run -- python scripts/check_windows_antipatterns.py
 
 # Validate marker registration and the explicit marker-strategy policy.
 lint-markers:
@@ -839,15 +846,19 @@ guards-fix:
 	@# the reviewable diff below never printed. Surface the failure loudly and
 	@# still finish the report; direct `make skill-sync` keeps its hard failure,
 	@# and genuine mirror drift is still enforced by skill-sync-check in CI.
-	@$(MAKE) -s skill-sync || echo "guards-fix: WARNING - the skill-sync step FAILED (see its output above); every other drift-guard artifact was still regenerated. Fix and re-run 'make skill-sync' separately."
-	@echo ""
-	@echo "No regen mode -- these are reviewed hand edits, guards-fix does not touch them:"
-	@echo "  - module-size guard: tests/system/test_module_size_thresholds.py (see its failure output for the ALLOWLIST entry to paste)"
-	@echo "  - DDL governance drift: benchbox/sql_compat/inventory.py --check-ddl-drift (register the transform, alias it, or exempt it)"
-	@echo "  - release curation list: scripts/check_release_curation.py (classify the path as main-only or release-cut curated)"
-	@echo ""
-	@echo "== guards-fix done. Review the diff below, then commit what you intend to keep. =="
-	@git status --porcelain
+	@status=0; $(MAKE) -s skill-sync || status=$$?; \
+	if [ "$$status" -ne 0 ]; then \
+		echo "guards-fix: WARNING - the skill-sync step FAILED (see its output above); every other drift-guard artifact was still regenerated. Fix and re-run 'make skill-sync' separately."; \
+	fi; \
+	echo ""; \
+	echo "No regen mode -- these are reviewed hand edits, guards-fix does not touch them:"; \
+	echo "  - module-size guard: tests/system/test_module_size_thresholds.py (see its failure output for the ALLOWLIST entry to paste)"; \
+	echo "  - DDL governance drift: benchbox/sql_compat/inventory.py --check-ddl-drift (register the transform, alias it, or exempt it)"; \
+	echo "  - release curation list: scripts/check_release_curation.py (classify the path as main-only or release-cut curated)"; \
+	echo ""; \
+	echo "== guards-fix done. Review the diff below, then commit what you intend to keep. =="; \
+	git status --porcelain; \
+	exit "$$status"
 
 ##@ CI Local Equivalents
 # These targets mirror GitHub Actions workflows for local validation
@@ -882,10 +893,14 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed ruff-format"; \
 	uv run ty check; \
 	[ $$? -eq 0 ] || failed="$$failed ty-check"; \
+	$(MAKE) uv-lock-revision-check; \
+	[ $$? -eq 0 ] || failed="$$failed uv-lock-revision"; \
 	$(MAKE) lint-markers; \
 	[ $$? -eq 0 ] || failed="$$failed lint-markers"; \
 	$(MAKE) lint-imports; \
 	[ $$? -eq 0 ] || failed="$$failed lint-imports"; \
+	$(MAKE) windows-antipatterns-check; \
+	[ $$? -eq 0 ] || failed="$$failed windows-antipatterns"; \
 	$(MAKE) lint-explorer-tokens; \
 	[ $$? -eq 0 ] || failed="$$failed lint-explorer-tokens"; \
 	$(MAKE) lint-site-theme-tokens; \
@@ -960,20 +975,18 @@ security-audit:
 # a gitignored directory can never be scanned. Walking the tree made the gate
 # environment-dependent: it stayed green in CI and in fresh pool worktrees, but
 # failed in the maintainer's primary clone on gitignored paths that only exist
-# there (`@~/`, `results-explorer/dist/`). Chasing those names in --skip fixes one
-# clone at a time; deriving the file list from git fixes the class.
+# there. Deriving the file list from git fixes the class.
 #
 # --skip keeps only the FILENAME globs. Its directory entries are dropped on
 # purpose: codespell prunes directories while traversing, so a directory name in
-# --skip has no effect once explicit paths are passed. Tracked directories that
-# must stay unscanned are excluded as git pathspecs instead (the rest of the old
-# list -- _build, benchmark_runs, htmlcov, .venv, node_modules -- is gitignored,
-# so `git ls-files` already excludes it).
+# --skip has no effect once explicit paths are passed. Hidden paths are excluded
+# as Git pathspecs too, preserving codespell's default hidden-directory filtering.
+# Tracked directories that must stay unscanned are excluded as Git pathspecs; the
+# remaining old directory list is gitignored, so `git ls-files` already excludes it.
 SPELLCHECK_SKIP_GLOBS := *.pyc,*.json,*.lock,*.svg,*.min.js,*.min.css,*.tpl,*.dst,*.tbl,*.dat,*.pdf
-# `**/` matches at any depth, so these exclude the directory NAME wherever it
-# appears (e.g. both `_binaries/` and `benchbox/_binaries/`), matching how
-# codespell's --skip pruned directory names during traversal.
 SPELLCHECK_EXCLUDE_PATHS := \
+	':(exclude,glob).*'             ':(exclude,glob).*/**' \
+	':(exclude,glob)**/.*'          ':(exclude,glob)**/.*/**' \
 	':(exclude,glob)**/_binaries/**' ':(exclude,glob)_binaries/**' \
 	':(exclude,glob)**/_sources/**'  ':(exclude,glob)_sources/**' \
 	':(exclude,glob)**/_project/**'  ':(exclude,glob)_project/**' \

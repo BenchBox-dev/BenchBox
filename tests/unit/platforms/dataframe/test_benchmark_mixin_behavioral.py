@@ -29,6 +29,7 @@ from benchbox.platforms.dataframe.benchmark_mixin import (
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
+    pytest.mark.usefixtures("sufficient_dataframe_memory"),
 ]
 
 
@@ -171,6 +172,23 @@ class TestQueryExecutionDispatch:
         executed_ids = [q["query_id"] for q in result.query_results if q.get("run_type") == "measurement"]
         assert "Q1" in executed_ids
         assert "Q2" in executed_ids
+
+    def test_mocked_execution_is_isolated_from_ambient_memory(self, monkeypatch, tmp_path):
+        """Host memory pressure cannot abort tests that exercise mocked execution."""
+        monkeypatch.setattr("benchbox.core.dataframe.capabilities.get_available_memory_gb", lambda: 0.01)
+        adapter = StubAdapter()
+        tbl = tmp_path / "data.tbl"
+        tbl.write_text("1|A|\n")
+
+        result = adapter.run_benchmark(
+            _make_benchmark({"data": tbl}),
+            benchmark_config=_make_config(),
+            phases=DataFramePhases(load=False, execute=True),
+            options=DataFrameRunOptions(prefer_parquet=False),
+        )
+
+        assert result.validation_status != "FAILED"
+        assert adapter.executed_queries == ["Q1", "Q2"]
 
     def test_query_filter_limits_execution(self, tmp_path):
         """When config.queries is set, only matching queries run."""
