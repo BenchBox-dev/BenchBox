@@ -55,7 +55,10 @@ _MESSAGE_PATH_RE = re.compile(
     r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
     r")"
 )
-_TUNING_SOURCE_DIGEST_RE = re.compile(r"[0-9a-f]{16,64}", re.IGNORECASE)
+_TUNING_SOURCE_REFERENCE_RE = re.compile(
+    r"[a-z0-9_.-]+(?:/[a-z0-9_.-]+)*(?::[0-9a-f]{16,64})?",
+    re.IGNORECASE,
+)
 _MESSAGE_URL_RE = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s'\",;)]*", flags=re.IGNORECASE)
 _MESSAGE_SECRET_ASSIGNMENT_RE = re.compile(
     r"\b([a-z0-9][a-z0-9_.-]*)=[^&\s,;)]*",
@@ -363,17 +366,9 @@ class AnonymizationManager:
     @staticmethod
     def _is_normalized_tuning_source_reference(value: Any) -> bool:
         """Return whether *value* is a safe repo-relative/template reference."""
-        if not isinstance(value, str) or not value or value != value.strip():
+        if not isinstance(value, str) or not _TUNING_SOURCE_REFERENCE_RE.fullmatch(value):
             return False
-        if "\\" in value or "\0" in value or value.startswith(("/", "~")):
-            return False
-
-        reference, separator, digest = value.rpartition(":")
-        if separator:
-            if not _TUNING_SOURCE_DIGEST_RE.fullmatch(digest):
-                return False
-        else:
-            reference = value
+        reference = value.rpartition(":")[0] if ":" in value else value
         return bool(reference) and all(part not in {"", ".", ".."} for part in reference.split("/"))
 
     def _anonymize_tuning_table_tunings(self, value: Any) -> Any:

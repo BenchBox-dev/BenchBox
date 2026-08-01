@@ -881,6 +881,8 @@ class TestTuningPayloadAnonymization:
             "/Users/alice/private/custom.yaml",
             r"C:\Users\alice\private\custom.yaml",
             "../private/custom.yaml",
+            "source=/Users/alice/private/custom.yaml",
+            "template.yaml\n/Users/alice/private/custom.yaml",
         ],
     )
     def test_untrusted_tuning_source_path_is_hashed(self, source_file):
