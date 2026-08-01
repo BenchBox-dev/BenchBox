@@ -89,8 +89,15 @@ def test_streamable_http_uses_streaming_capable_stateless_sdk_route() -> None:
         json_response=False,
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
-            allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"],
-            allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"],
+            allowed_hosts=["127.0.0.1", "127.0.0.1:*", "localhost", "localhost:*", "[::1]", "[::1]:*"],
+            allowed_origins=[
+                "http://127.0.0.1",
+                "http://127.0.0.1:*",
+                "http://localhost",
+                "http://localhost:*",
+                "http://[::1]",
+                "http://[::1]:*",
+            ],
         ),
     )
 
