@@ -268,6 +268,22 @@ def test_anonymized_tuning_companion_hides_identifiers_and_preserves_source(tmp_
     assert payload["source_file"] == "examples/tunings/custom.yaml:0123456789abcdef"
 
 
+def test_anonymized_tuning_companion_hashes_legacy_absolute_source(tmp_path):
+    config = _tuned_config()
+    result = _make_result(
+        tunings_applied=config.to_dict(),
+        tuning_source="explicit_file",
+        tuning_source_file="/Users/alice/private/custom.yaml",
+        tuning_config_hash=config.get_configuration_hash(),
+    )
+
+    ResultExporter(output_dir=tmp_path, anonymize=True)._write_companion_files(result, "run-1")
+    payload = json.loads((tmp_path / "run-1.tuning.json").read_text(encoding="utf-8"))
+
+    assert payload["source_file"].startswith("path_")
+    assert "alice" not in json.dumps(payload)
+
+
 def test_requested_block_reports_platform_optimizations_non_defaults_only():
     config = UnifiedTuningConfiguration()
     config.platform_optimizations.z_ordering_enabled = True

@@ -875,6 +875,22 @@ class TestTuningPayloadAnonymization:
         assert tuning[table_key]["sorting"][0]["name"].startswith("column_")
         assert out["source_file"] == "examples/tunings/custom.yaml:0123456789abcdef"
 
+    @pytest.mark.parametrize(
+        "source_file",
+        [
+            "/Users/alice/private/custom.yaml",
+            r"C:\Users\alice\private\custom.yaml",
+            "../private/custom.yaml",
+            "source=/Users/alice/private/custom.yaml",
+            "template.yaml\n/Users/alice/private/custom.yaml",
+        ],
+    )
+    def test_untrusted_tuning_source_path_is_hashed(self, source_file):
+        out = AnonymizationManager().anonymize_tuning_payload({"source_file": source_file})
+
+        assert out["source_file"].startswith("path_")
+        assert "alice" not in out["source_file"]
+
 
 class TestPublicPayloadWorkspaceRoleAndApplicationIds:
     """Near-miss variants of covered identifier keys are the recurring leak
