@@ -792,6 +792,29 @@ class TestPublicPayloadApiKeyAndAccountKey:
         assert "AZKEY-SENTINEL" not in out
 
 
+class TestPublicPayloadSslRootCert:
+    """The libpq sslrootcert spelling ends in neither path nor file, so the
+    raw local path (leaking the home-dir username) passed through."""
+
+    def test_sslrootcert_path_is_hashed(self):
+        out = json.dumps(
+            AnonymizationManager().anonymize_result_payload(
+                {"platform_metadata": {"platform_raw_config": {"sslrootcert": "/Users/joe/certs/root.pem"}}}
+            ),
+            default=str,
+        )
+        assert "/Users/joe" not in out
+
+    def test_underscore_cert_paths_still_hashed(self):
+        out = json.dumps(
+            AnonymizationManager().anonymize_result_payload(
+                {"platform_metadata": {"platform_raw_config": {"ca_cert_path": "/Users/joe/certs/ca.pem"}}}
+            ),
+            default=str,
+        )
+        assert "/Users/joe" not in out
+
+
 class TestPublicPayloadTupleRecursion:
     """A tuple fell through to the scalar branch untouched, so any payload
     branch not pre-flattened by internal capture leaked tuple contents."""
