@@ -548,7 +548,7 @@ class BenchmarkOrchestrator:
         platform = database_config.type.lower()
 
         # Only offer for cloud platforms that support credential setup
-        cloud_platforms = ["snowflake", "bigquery", "databricks", "redshift"]
+        cloud_platforms = ["snowflake", "bigquery", "databricks", "redshift", "singlestore"]
         if platform not in cloud_platforms:
             return False
 
@@ -571,7 +571,7 @@ class BenchmarkOrchestrator:
         """Offer and run interactive credential setup when credentials are missing.
 
         Args:
-            platform: Platform name (snowflake, bigquery, databricks, redshift)
+            platform: Platform name (snowflake, bigquery, databricks, redshift, singlestore)
 
         Returns:
             True if credentials were successfully set up, False otherwise
