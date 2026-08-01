@@ -50,6 +50,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from benchbox.mcp.security import RemoteSecurityRuntime
 
 try:
     from mcp.server.mcpserver import MCPServer
@@ -87,6 +91,7 @@ def create_server(
     charts_dir: str | Path | None = None,
     log_level: str | int | None = None,
     env: Mapping[str, str] | None = None,
+    remote_security: RemoteSecurityRuntime | None = None,
 ) -> MCPServer:
     """Create and configure the BenchBox MCP server.
 
@@ -95,12 +100,15 @@ def create_server(
     """
     from benchbox.mcp.server import create_benchbox_server
 
-    return create_benchbox_server(
-        results_dir=results_dir,
-        charts_dir=charts_dir,
-        log_level=log_level,
-        env=env,
-    )
+    kwargs: dict[str, Any] = {
+        "results_dir": results_dir,
+        "charts_dir": charts_dir,
+        "log_level": log_level,
+        "env": env,
+    }
+    if remote_security is not None:
+        kwargs["remote_security"] = remote_security
+    return create_benchbox_server(**kwargs)
 
 
 def run_server(
@@ -113,6 +121,7 @@ def run_server(
     host: str = "127.0.0.1",
     port: int = 8000,
     streamable_http_path: str = "/mcp",
+    security_config: str | Path | None = None,
 ) -> None:
     """Run the BenchBox MCP server.
 
@@ -120,20 +129,27 @@ def run_server(
     - `benchbox-mcp` CLI command
     - `python -m benchbox.mcp`
     """
+    from benchbox.mcp.security import RemoteSecurityRuntime
     from benchbox.mcp.transport import MCPTransportSettings, run_transport
+
+    remote_security = RemoteSecurityRuntime.from_file(security_config) if security_config is not None else None
 
     transport_settings = MCPTransportSettings(
         transport=transport,
         host=host,
         port=port,
         streamable_http_path=streamable_http_path,
+        remote_security=remote_security,
     )
-    server = create_server(
-        results_dir=results_dir,
-        charts_dir=charts_dir,
-        log_level=log_level,
-        env=env,
-    )
+    server_kwargs: dict[str, Any] = {
+        "results_dir": results_dir,
+        "charts_dir": charts_dir,
+        "log_level": log_level,
+        "env": env,
+    }
+    if remote_security is not None:
+        server_kwargs["remote_security"] = remote_security
+    server = create_server(**server_kwargs)
     run_transport(server, transport_settings)
 
 

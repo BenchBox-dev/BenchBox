@@ -20,6 +20,7 @@ from benchbox.core.visualization.chart_types import CHART_TYPE_DESCRIPTIONS
 from benchbox.core.visualization.orchestration import render_chart_set
 from benchbox.core.visualization.suggestions import build_visualization_profile, recommend_charts, select_primary_chart
 from benchbox.mcp.errors import ErrorCode, make_error
+from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
 
 logger = logging.getLogger(__name__)
@@ -201,7 +202,7 @@ def _generate_ascii_chart(
         }
 
     except Exception as e:
-        logger.exception(f"ASCII chart generation failed: {e}")
+        logger.error("ASCII chart generation failed (%s)", type(e).__name__)
         return make_error(
             ErrorCode.INTERNAL_ERROR,
             f"ASCII chart generation failed: {e}",
@@ -279,7 +280,7 @@ def _suggest_charts_impl(file_list: list[str], resolved_paths: list[Path]) -> di
             details={"result_files": file_list},
         )
     except Exception as e:
-        logger.exception(f"Chart suggestion failed: {e}")
+        logger.error("Chart suggestion failed (%s)", type(e).__name__)
         return make_error(
             ErrorCode.INTERNAL_ERROR,
             f"Chart suggestion failed: {e}",
@@ -322,12 +323,10 @@ def _generate_chart_impl(
 def register_visualization_tools(
     mcp: MCPServer,
     *,
-    results_dir: Path,
-    charts_dir: Path,
+    results_dir: PathProvider,
+    charts_dir: PathProvider,
 ) -> None:
     """Register visualization tools with the MCP server."""
-    configured_results_dir = Path(results_dir)
-    configured_charts_dir = Path(charts_dir)
 
     @mcp.tool(description=MCP_SUGGEST_CHARTS_DESCRIPTION, annotations=VIZ_READONLY_ANNOTATIONS)
     def suggest_charts(result_files: str) -> dict[str, Any]:
@@ -347,7 +346,7 @@ def register_visualization_tools(
                 suggestion="Provide comma-separated list of result filenames",
             )
 
-        result = _resolve_and_validate_result_files(file_list, configured_results_dir)
+        result = _resolve_and_validate_result_files(file_list, resolve_path_provider(results_dir))
         if isinstance(result, dict):
             return result
         resolved_paths, file_list = result
@@ -392,8 +391,8 @@ def register_visualization_tools(
                 suggestion="Provide comma-separated list of result filenames",
             )
 
-        _ = configured_charts_dir  # reserved for future chart file outputs
-        result = _resolve_and_validate_result_files(file_list, configured_results_dir)
+        _ = resolve_path_provider(charts_dir)  # reserved for future chart file outputs
+        result = _resolve_and_validate_result_files(file_list, resolve_path_provider(results_dir))
         if isinstance(result, dict):
             return result
         resolved_paths, file_list = result

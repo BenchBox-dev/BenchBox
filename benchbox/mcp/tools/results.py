@@ -22,6 +22,7 @@ from mcp.types import ToolAnnotations
 
 from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
 from benchbox.mcp.errors import ErrorCode, make_error
+from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
@@ -46,9 +47,8 @@ EXPORT_ANNOTATIONS = ToolAnnotations(
 )
 
 
-def register_results_tools(mcp: MCPServer, *, results_dir: Path) -> None:
+def register_results_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None:
     """Register results tools with the MCP server."""
-    configured_results_dir = Path(results_dir)
 
     @mcp.tool(annotations=RESULTS_READONLY_ANNOTATIONS)
     def get_results(
@@ -76,9 +76,10 @@ def register_results_tools(mcp: MCPServer, *, results_dir: Path) -> None:
         """
         # If no result_file, list recent runs
         if result_file is None or format == "list":
-            return _list_recent_runs_impl(limit, platform, benchmark, configured_results_dir)
+            return _list_recent_runs_impl(limit, platform, benchmark, resolve_path_provider(results_dir))
 
         # Get results for specific file
+        configured_results_dir = resolve_path_provider(results_dir)
         results = _get_results_impl(result_file, include_queries, results_dir=configured_results_dir)
         if "error" in results:
             return results
@@ -153,7 +154,7 @@ def _list_recent_runs_impl(
                 break
 
         except Exception as e:
-            logger.warning(f"Could not parse result file {file_path}: {e}")
+            logger.warning("Could not parse result file %s (%s)", file_path.name, type(e).__name__)
             continue
 
     return {

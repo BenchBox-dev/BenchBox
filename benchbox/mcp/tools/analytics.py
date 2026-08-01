@@ -22,6 +22,7 @@ from mcp.types import ToolAnnotations
 from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.mcp.errors import ErrorCode, make_error, make_not_found_error
+from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
 from benchbox.utils.printing import get_quiet_console
 from benchbox.validation.bundle import COMPANION_SUFFIXES
@@ -38,9 +39,24 @@ ANALYTICS_READONLY_ANNOTATIONS = ToolAnnotations(
 )
 
 
-def register_analytics_tools(mcp: MCPServer, *, results_dir: Path) -> None:
+def _resolve_validation_directory(directory: str, results_dir: Path, *, tenant_scoped: bool) -> Path | dict[str, Any]:
+    """Resolve a validation directory while containing remote tenants."""
+    candidate = Path(directory)
+    if tenant_scoped and candidate.is_absolute():
+        return make_error(ErrorCode.VALIDATION_ERROR, "Absolute validation directories are not allowed")
+    if not candidate.is_absolute():
+        candidate = results_dir / candidate
+    if tenant_scoped:
+        try:
+            candidate.resolve().relative_to(results_dir.resolve())
+        except ValueError:
+            return make_error(ErrorCode.VALIDATION_ERROR, "Validation directory escapes tenant workspace")
+    return candidate
+
+
+def register_analytics_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None:
     """Register analytics tools with the MCP server."""
-    configured_results_dir = Path(results_dir)
+    tenant_scoped = not isinstance(results_dir, Path)
 
     @mcp.tool(annotations=ANALYTICS_READONLY_ANNOTATIONS)
     def analyze_results(
@@ -70,6 +86,7 @@ def register_analytics_tools(mcp: MCPServer, *, results_dir: Path) -> None:
         Returns:
             Analysis results based on the selected type.
         """
+        configured_results_dir = resolve_path_provider(results_dir)
         analysis_lower = analysis.lower()
 
         if analysis_lower == "compare":
@@ -122,6 +139,7 @@ def register_analytics_tools(mcp: MCPServer, *, results_dir: Path) -> None:
                 details={"valid_formats": valid_formats},
             )
 
+        configured_results_dir = resolve_path_provider(results_dir)
         file_path = resolve_result_file_path(result_file, configured_results_dir)
         if file_path is None:
             return make_error(
@@ -139,7 +157,7 @@ def register_analytics_tools(mcp: MCPServer, *, results_dir: Path) -> None:
                 details={"file": result_file, "parse_error": str(e)},
             )
         except Exception as e:
-            logger.exception(f"Failed to get query plan: {e}")
+            logger.error("Failed to get query plan (%s)", type(e).__name__)
             return make_error(
                 ErrorCode.INTERNAL_ERROR,
                 f"Failed to get query plan: {e}",
@@ -170,9 +188,10 @@ def register_analytics_tools(mcp: MCPServer, *, results_dir: Path) -> None:
             validate_file as _validate_file,
         )
 
+        configured_results_dir = resolve_path_provider(results_dir)
         if result_file:
             file_path = resolve_result_file_path(result_file, configured_results_dir)
-            if not file_path.exists():
+            if file_path is None or not file_path.exists():
                 return make_not_found_error(result_file, configured_results_dir)
             report = _validate_file(file_path)
             checks = [
@@ -196,9 +215,14 @@ def register_analytics_tools(mcp: MCPServer, *, results_dir: Path) -> None:
                 "checks": checks,
             }
         elif directory:
-            dir_path = Path(directory)
-            if not dir_path.is_absolute():
-                dir_path = configured_results_dir / directory
+            resolved_directory = _resolve_validation_directory(
+                directory,
+                configured_results_dir,
+                tenant_scoped=tenant_scoped,
+            )
+            if isinstance(resolved_directory, dict):
+                return resolved_directory
+            dir_path = resolved_directory
             if not dir_path.is_dir():
                 return make_error(
                     ErrorCode.RESOURCE_NOT_FOUND,
@@ -439,7 +463,7 @@ def _load_regression_runs(
                 break
 
         except Exception as e:
-            logger.warning(f"Could not parse result file {file_path}: {e}")
+            logger.warning("Could not parse result file %s (%s)", file_path.name, type(e).__name__)
             continue
     return runs
 
@@ -620,7 +644,7 @@ def _load_trend_data_point(
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
     except Exception as e:
-        logger.warning(f"Could not parse result file {file_path}: {e}")
+        logger.warning("Could not parse result file %s (%s)", file_path.name, type(e).__name__)
         return None
 
     run_platform = data.get("platform", {}).get("name", "unknown")
@@ -808,7 +832,7 @@ def _aggregate_results_impl(
             )
 
         except Exception as e:
-            logger.warning(f"Could not parse result file {file_path}: {e}")
+            logger.warning("Could not parse result file %s (%s)", file_path.name, type(e).__name__)
             continue
 
     if not groups:

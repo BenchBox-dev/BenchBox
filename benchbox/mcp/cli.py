@@ -66,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="/mcp",
         help="Streamable HTTP endpoint path (default: /mcp).",
     )
+    parser.add_argument(
+        "--security-config",
+        help="JSON policy enabling authenticated, tenant-scoped Streamable HTTP.",
+    )
     return parser
 
 
@@ -92,4 +96,5 @@ def main(argv: Sequence[str] | None = None) -> None:
         host=args.host,
         port=args.port,
         streamable_http_path=args.streamable_http_path,
+        security_config=args.security_config,
     )
