@@ -65,3 +65,24 @@ class TestRevisionParsing:
     def test_repo_lock_has_parseable_revision(self):
         text = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
         assert guard.parse_revision(text, "uv.lock") >= 3
+
+    def test_baseline_ref_is_used_for_git_lookup(self, monkeypatch, tmp_path):
+        calls = []
+
+        def fake_run(command, **kwargs):
+            calls.append(command)
+            return type("Result", (), {"returncode": 0, "stdout": "revision = 3\n"})()
+
+        monkeypatch.setattr(guard.subprocess, "run", fake_run)
+        assert guard._committed_lock_text(tmp_path, "origin/develop") == "revision = 3\n"
+        assert calls == [["git", "show", "origin/develop:uv.lock"]]
+
+    def test_explicit_missing_baseline_fails_closed(self, monkeypatch, capsys):
+        monkeypatch.setattr(guard, "_committed_lock_text", lambda _root, _ref: None)
+        assert guard.main(["--baseline-ref", "missing-base"]) == 1
+        assert "explicitly requested baseline" in capsys.readouterr().err
+
+    def test_default_missing_head_remains_valid_for_fresh_repo(self, monkeypatch, capsys):
+        monkeypatch.setattr(guard, "_committed_lock_text", lambda _root, _ref: None)
+        assert guard.main([]) == 0
+        assert "nothing to compare" in capsys.readouterr().out

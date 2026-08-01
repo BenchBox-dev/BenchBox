@@ -192,6 +192,25 @@ class TestBinaryConfigSetup:
 
         assert len(compiler.binaries) == 0
 
+    def test_unrunnable_precompiled_without_source_never_falls_back_to_cwd(self, tmp_path):
+        """An installed bundle with no source must fail cleanly, not select ``Path('.')``."""
+        precompiled_base = tmp_path / "_binaries"
+        precompiled_base.mkdir()
+
+        with patch(
+            "benchbox.utils.tpc_compilation._discover_tpc_paths",
+            return_value={"tpc_h_source": None, "tpc_ds_source": None, "precompiled_base": precompiled_base},
+        ):
+            compiler = TPCCompiler()
+
+        info = compiler.binaries["dbgen"]
+        assert info.source_dir is None
+        assert info.binary_path is None
+        assert compiler.needs_compilation("dbgen") is False
+        result = compiler.compile_binary("dbgen")
+        assert result.status == CompilationStatus.FAILED
+        assert result.binary_path is None
+
 
 # ---------------------------------------------------------------------------
 # Checksum verification

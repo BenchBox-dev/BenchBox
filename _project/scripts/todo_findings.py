@@ -499,6 +499,7 @@ def parse_draft(path: Path) -> dict[str, Any]:
         "related_paths": _json_list_or_none(data.get("related_paths")),
         "suggested_sweep": _str_or_none(data.get("suggested_sweep")),
         "todo_id": _str_or_none(data.get("todo_id")),
+        "todo_id_declared": "todo_id" in data,
         # Legacy todo_id -> link kind, by status. A `promoted-to` edge asserts the
         # finding is `promoted`, so an `actioned` record must not use it.
         "todo_link_kind": ("promoted-to" if disposition == "promoted" else "resolved-by"),
@@ -1066,6 +1067,7 @@ def import_corpus(
     corpus_dir: str | Path,
     *,
     dry_run: bool = False,
+    existing_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     """Import legacy records into the findings tables. Reads only; never writes files.
 
@@ -1097,7 +1099,7 @@ def import_corpus(
             resolved = conn.execute("SELECT 1 FROM items WHERE id = ?", (fields["todo_id"],)).fetchone() is not None
             if not resolved:
                 result["danglers"].append({"finding": finding_id, "todo_id": fields["todo_id"]})
-        if get_finding(conn, finding_id) is not None:
+        if (existing_ids is not None and finding_id in existing_ids) or get_finding(conn, finding_id) is not None:
             result["skipped"].append(finding_id)
             continue
         if dry_run:
@@ -1113,7 +1115,14 @@ def import_corpus(
     return result
 
 
-def stage_corpus_import(staging_path: Path, items_source: Path, corpus_dir: str | Path, actor: str) -> dict[str, Any]:
+def stage_corpus_import(
+    staging_path: Path,
+    items_source: Path,
+    corpus_dir: str | Path,
+    actor: str,
+    *,
+    existing_ids: set[str] | None = None,
+) -> dict[str, Any]:
     """Build a v4 staging database holding ONLY this import's findings rows.
 
     ``items_source`` seeds the items domain so legacy ``todo_id`` values resolve --
@@ -1131,7 +1140,7 @@ def stage_corpus_import(staging_path: Path, items_source: Path, corpus_dir: str 
         raw.close()
     conn = todo_db.connect(staging_path)
     try:
-        return import_corpus(conn, actor, corpus_dir)
+        return import_corpus(conn, actor, corpus_dir, existing_ids=existing_ids)
     finally:
         conn.close()
 
@@ -1184,6 +1193,11 @@ def target_findings_maxima(conn: Any) -> dict[str, int]:
     return maxima
 
 
+def target_finding_ids(conn: Any) -> set[str]:
+    """Return finding IDs already present on the hosted target."""
+    return {str(row[0]) for row in conn.execute("SELECT id FROM findings")}
+
+
 def parity_report(conn: Any, corpus_dir: str | Path, imported: dict[str, Any]) -> dict[str, Any]:
     """Machine-checkable parity of the corpus against what is stored.
 
@@ -1199,6 +1213,8 @@ def parity_report(conn: Any, corpus_dir: str | Path, imported: dict[str, Any]) -
         "frontmatter_diffs": [],
         "section_diffs": [],
         "triage_log_diffs": [],
+        "evidence_diffs": [],
+        "link_diffs": [],
         "danglers": imported.get("danglers", []),
         "failed_parses": imported.get("failed", []),
     }
@@ -1239,6 +1255,22 @@ def parity_report(conn: Any, corpus_dir: str | Path, imported: dict[str, Any]) -
             report["section_diffs"].append(
                 {"record": path.stem, "expected": len(want_sections), "stored": len(got_sections)}
             )
+        if fields.get("evidence_declared") and _normalize_evidence(fields.get("evidence")) != _normalize_evidence(
+            stored.get("evidence")
+        ):
+            report["evidence_diffs"].append({"record": path.stem})
+        if fields.get("todo_id_declared"):
+            todo_id = fields.get("todo_id")
+            expected_links = []
+            if todo_id:
+                resolved = conn.execute("SELECT 1 FROM items WHERE id = ?", (todo_id,)).fetchone() is not None
+                note = f"imported from todo_id: {todo_id}" + ("" if resolved else " (no such item at import time)")
+                expected_links.append((fields["todo_link_kind"], todo_id if resolved else None, note))
+            actual_links = [
+                (link.get("kind"), link.get("target_item"), link.get("note")) for link in stored.get("links") or []
+            ]
+            if actual_links != expected_links:
+                report["link_diffs"].append({"record": path.stem, "expected": expected_links, "stored": actual_links})
         # One imported_triage_log event per non-empty line.
         want_lines = _triage_log_lines(fields.get("triage_log") or "")
         got_lines = [e for e in stored.get("events") or [] if e.get("action") == IMPORTED_TRIAGE_ACTION]
@@ -1252,6 +1284,9 @@ def parity_report(conn: Any, corpus_dir: str | Path, imported: dict[str, Any]) -
         and not report["frontmatter_diffs"]
         and not report["section_diffs"]
         and not report["triage_log_diffs"]
+        and not report["evidence_diffs"]
+        and not report["link_diffs"]
+        and not report["danglers"]
         and not report["failed_parses"]
     )
     return report
@@ -1752,16 +1787,27 @@ def _cmd_import_bulk(conn: Any, actor: str, args: argparse.Namespace) -> int:
         )
 
     maxima = target_findings_maxima(conn)
+    existing_ids = target_finding_ids(conn)
     tmpdir = tempfile.mkdtemp(prefix="findings-import-")
     try:
         staging = Path(tmpdir) / "staging.sqlite"
-        staged = stage_corpus_import(staging, items_source, args.corpus, actor)
+        staged = stage_corpus_import(staging, items_source, args.corpus, actor, existing_ids=existing_ids)
         if staged["failed"]:
             for failure in staged["failed"]:
                 print(f"  FAILED {failure['file']}: {failure['error']}", file=todo_db.sys.stderr)
             raise todo_db.TodoError(f"{len(staged['failed'])} record(s) failed to parse; nothing was transferred")
         if not staged["imported"]:
             print("nothing to import: every record is already present")
+            sync = getattr(conn, "sync", None)
+            if callable(sync):
+                sync()
+            report = parity_report(conn, args.corpus, staged)
+            if args.report:
+                print(json.dumps(report, indent=2, sort_keys=True))
+            if not report["ok"]:
+                print("PARITY FAILED after no-op import", file=todo_db.sys.stderr)
+                return 1
+            print(f"parity OK: {report['stored_records']}/{report['corpus_records']} records, zero diffs")
             return 0
         # bulk_transfer copies primary keys verbatim, so staged ids must clear the
         # target's maxima or the first colliding row aborts the whole transfer.

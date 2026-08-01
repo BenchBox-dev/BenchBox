@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import ast
 import re
+import shlex
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tests import conftest as benchbox_conftest
 
@@ -36,7 +38,7 @@ _TREE_WIDE_LANES = (
     "medium and not (slow or stress or resource_heavy or live_integration)",
     "platform_smoke or (integration and fast)",
 )
-_WORKFLOW_TEST_PATH_RE = re.compile(r"tests/[\w/]+/test_\w+\.py")
+_WORKFLOW_TEST_PATH_RE = re.compile(r"tests/[A-Za-z0-9_./-]+/test_[A-Za-z0-9_-]+\.py")
 # Declaring one of these at MODULE level says "this whole module is opt-in and
 # runs outside the automatic lanes" (credentialed cloud suites, stress runs).
 _OPT_IN_LANE_MARKERS = {"live_integration", "stress"}
@@ -286,9 +288,31 @@ def _explicitly_invoked_test_paths() -> set[str]:
     covered, so scan for them rather than reporting a false positive.
     """
     paths: set[str] = set()
+
+    def run_blocks(value):
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == "run" and isinstance(child, str):
+                    yield child
+                else:
+                    yield from run_blocks(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from run_blocks(child)
+
     for workflow in sorted((_REPO_ROOT / ".github" / "workflows").glob("*.yml")):
-        for match in _WORKFLOW_TEST_PATH_RE.finditer(workflow.read_text(encoding="utf-8")):
-            paths.add(match.group(0))
+        document = yaml.safe_load(workflow.read_text(encoding="utf-8")) or {}
+        for command in run_blocks(document):
+            try:
+                tokens = shlex.split(command, comments=True, posix=True)
+            except ValueError:
+                tokens = []
+            pytest_positions = [index for index, token in enumerate(tokens) if token == "pytest"]
+            for index in pytest_positions:
+                for token in tokens[index + 1 :]:
+                    path = token.split("::", 1)[0]
+                    if _WORKFLOW_TEST_PATH_RE.fullmatch(path):
+                        paths.add(path)
     return paths
 
 

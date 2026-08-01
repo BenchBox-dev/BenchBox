@@ -90,19 +90,25 @@ class SnowflakeTuningIntrospector:
         ``error``, and corroboration then refuses the upgrade.
         """
         tables = ledger_tables(ledger)
+        table_params = tuple(sorted(table.upper() for table in tables))
+        table_filter = ""
+        if table_params:
+            placeholders = ", ".join("%s" for _table in table_params)
+            table_filter = f" AND UPPER(TABLE_NAME) IN ({placeholders})"
         try:
             query = (
                 "SELECT TABLE_NAME, CLUSTERING_KEY FROM INFORMATION_SCHEMA.TABLES "
-                f"WHERE CLUSTERING_KEY IS NOT NULL LIMIT {_MAX_TABLE_ROWS}"
+                f"WHERE CLUSTERING_KEY IS NOT NULL{table_filter} LIMIT {_MAX_TABLE_ROWS}"
             )
-            params: tuple[Any, ...] = ()
+            params: tuple[Any, ...] = table_params
             if self._schema:
                 query = (
                     "SELECT TABLE_NAME, CLUSTERING_KEY FROM INFORMATION_SCHEMA.TABLES "
-                    "WHERE TABLE_SCHEMA = %s AND CLUSTERING_KEY IS NOT NULL "
+                    "WHERE TABLE_SCHEMA = %s AND CLUSTERING_KEY IS NOT NULL"
+                    f"{table_filter} "
                     f"LIMIT {_MAX_TABLE_ROWS}"
                 )
-                params = (normalize_snowflake_schema(self._schema),)
+                params = (normalize_snowflake_schema(self._schema), *table_params)
             rows = _fetch(connection, query, params)
         except Exception as exc:  # introspection must never break a run
             logger.debug("snowflake clustering introspection degraded: %s", exc)

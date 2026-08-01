@@ -12,10 +12,12 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import gzip
 from pathlib import Path
 
 import pytest
 
+from benchbox.utils.compression import CompressionError
 from benchbox.utils.file_format import (
     COMPRESSION_EXTENSIONS,
     DATA_FORMAT_EXTENSIONS,
@@ -635,6 +637,15 @@ class TestHasTrailingDelimiterFraming:
         path.write_bytes(b"\r\n\r\n0|AFRICA|comment|\r\n")
         assert has_trailing_delimiter(path, "|", ["r_regionkey", "r_name", "r_comment"]) is True
 
+    @pytest.mark.parametrize("raw,expected", [(b"0|AFRICA|comment|\r\n", True), (b"0|AFRICA|comment\r\n", False)])
+    def test_gzip_framing_uses_the_compressed_read_path(self, tmp_path, raw, expected):
+        path = tmp_path / "region.tbl.gz"
+        with gzip.open(path, "wb") as handle:
+            handle.write(raw)
+
+        assert has_trailing_delimiter(path, "|", ["r_regionkey", "r_name", "r_comment"]) is expected
+        assert has_trailing_delimiter(path, "|") is expected
+
 
 class TestHasTrailingDelimiterSurfacesReadFailures:
     """A file we cannot read is not a file without a trailing delimiter.
@@ -651,21 +662,28 @@ class TestHasTrailingDelimiterSurfacesReadFailures:
         with pytest.raises(OSError):
             has_trailing_delimiter(tmp_path / "does-not-exist.tbl", "|", ["a", "b"])
 
-    def test_unreadable_file_raises_rather_than_reporting_clean(self, tmp_path):
+    def test_unreadable_file_raises_rather_than_reporting_clean(self, tmp_path, monkeypatch):
         path = tmp_path / "locked.tbl"
         path.write_bytes(b"1|x|\n")
-        path.chmod(0o000)
-        try:
-            with pytest.raises(OSError):
-                has_trailing_delimiter(path, "|", ["a", "b"])
-        finally:
-            path.chmod(0o644)
+
+        def deny_open(*args, **kwargs):
+            raise PermissionError("denied")
+
+        monkeypatch.setattr(Path, "open", deny_open)
+        with pytest.raises(OSError):
+            has_trailing_delimiter(path, "|", ["a", "b"])
 
     def test_a_directory_in_place_of_a_file_raises(self, tmp_path):
         target = tmp_path / "a_directory.tbl"
         target.mkdir()
         with pytest.raises(OSError):
             has_trailing_delimiter(target, "|", ["a", "b"])
+
+    def test_unsupported_compression_raises_rather_than_reporting_clean(self, tmp_path):
+        path = tmp_path / "region.tbl.bz2"
+        path.write_bytes(b"not-decoded")
+        with pytest.raises(CompressionError, match="Unsupported compression type 'bzip2'"):
+            has_trailing_delimiter(path, "|", ["a", "b"])
 
     def test_an_empty_file_still_answers_false(self, tmp_path):
         # The one legitimate False: nothing to classify, not a failure to read.

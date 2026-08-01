@@ -118,7 +118,8 @@ class TestSnowflakeIntrospector:
         assert "INFORMATION_SCHEMA.TABLES" in query
         assert "SHOW CREATE" not in query
         assert "TABLE_SCHEMA = %s" in raw_query
-        assert conn.cursors[0].calls[0][1] == ("BENCH",)
+        assert "UPPER(TABLE_NAME) IN (%s)" in raw_query
+        assert conn.cursors[0].calls[0][1] == ("BENCH", "LINEITEM")
 
     def test_lowercase_schema_is_normalized_and_bound(self):
         conn = _FakeSnowflakeConnection([("LINEITEM", "LINEAR(A)")])
@@ -127,7 +128,7 @@ class TestSnowflakeIntrospector:
         assert state.error is None
         query, params = conn.cursors[0].calls[0]
         assert "TABLE_SCHEMA = %s" in query
-        assert params == ("BENCH",)
+        assert params == ("BENCH", "LINEITEM")
         assert "'bench'" not in query
 
     def test_unsafe_schema_degrades_without_interpolation(self):
@@ -144,6 +145,9 @@ class TestSnowflakeIntrospector:
         )
         state = SnowflakeTuningIntrospector().introspect(conn, _clustered_ledger())
         assert {obj.table for obj in state.objects} == {"LINEITEM"}
+        query, params = conn.cursors[0].calls[0]
+        assert "UPPER(TABLE_NAME) IN (%s)" in query
+        assert params == ("LINEITEM",)
 
     def test_alter_target_is_not_filtered_when_another_statement_activates_bounding(self):
         ledger = AppliedTuningLedger()

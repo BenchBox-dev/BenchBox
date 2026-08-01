@@ -53,10 +53,11 @@ def _tuned_adapter() -> ClickHouseAdapter:
     adapter.tuning_enabled = True
     adapter._applied_tuning_ledger = AppliedTuningLedger()
     adapter._applied_layout_operations = []
+    adapter.unified_tuning_configuration = _combined_tuning_config()
     return adapter
 
 
-def _combined_tunings() -> dict:
+def _combined_tuning_config() -> UnifiedTuningConfiguration:
     config = UnifiedTuningConfiguration()
     config.table_tunings["LINEITEM"] = TableTuning(
         table_name="LINEITEM",
@@ -66,7 +67,19 @@ def _combined_tunings() -> dict:
         ],
         partitioning=[TuningColumn(name="l_shipdate", type="DATE", order=1)],
     )
-    return config.table_tunings
+    return config
+
+
+def _combined_tunings() -> dict:
+    return _combined_tuning_config().table_tunings
+
+
+class _Benchmark:
+    def get_create_tables_sql(self, **_kwargs):
+        return SOURCE_DDL
+
+    def get_schema(self):
+        return {}
 
 
 @pytest.fixture
@@ -161,11 +174,7 @@ class TestAppliedLedgerAgainstLiveClickHouse:
 
     def test_ledger_orders_create_table_before_optimize(self, connection):
         adapter = _tuned_adapter()
-        tunings = _combined_tunings()
-        optimized = adapter._optimize_table_definition(SOURCE_DDL, tunings, nullable_columns=set())
-
-        connection.execute(optimized)
-        adapter._record_tuned_sort_key_op(SOURCE_DDL, optimized, "lineitem", tunings)
+        adapter.create_schema(_Benchmark(), connection)
         connection.execute("OPTIMIZE TABLE lineitem FINAL")
         adapter._applied_tuning_ledger.record("OPTIMIZE TABLE lineitem FINAL", PHASE_DDL)
         adapter._fold_layout_operations_into_ledger()

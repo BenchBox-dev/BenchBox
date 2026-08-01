@@ -172,8 +172,8 @@ class BinaryInfo:
     """Information about a TPC binary."""
 
     name: str
-    source_dir: Path
-    binary_path: Path
+    source_dir: Optional[Path]
+    binary_path: Optional[Path]
     precompiled_path: Optional[Path] = None
     makefile_path: Optional[Path] = None
     dependencies: list[str] = None
@@ -263,8 +263,8 @@ class TPCCompiler:
         if self.tpc_h_source or self.precompiled_base:
             self.binaries["dbgen"] = BinaryInfo(
                 name="dbgen",
-                source_dir=self.tpc_h_source or Path(),
-                binary_path=(self.tpc_h_source / f"dbgen{exe_suffix}") if self.tpc_h_source else Path(),
+                source_dir=self.tpc_h_source,
+                binary_path=(self.tpc_h_source / f"dbgen{exe_suffix}") if self.tpc_h_source else None,
                 precompiled_path=get_precompiled_path("tpc-h", "dbgen"),
                 makefile_path=(self.tpc_h_source / "makefile.suite") if self.tpc_h_source else None,
                 dependencies=["gcc", "make"],
@@ -272,8 +272,8 @@ class TPCCompiler:
 
             self.binaries["qgen"] = BinaryInfo(
                 name="qgen",
-                source_dir=self.tpc_h_source or Path(),
-                binary_path=(self.tpc_h_source / f"qgen{exe_suffix}") if self.tpc_h_source else Path(),
+                source_dir=self.tpc_h_source,
+                binary_path=(self.tpc_h_source / f"qgen{exe_suffix}") if self.tpc_h_source else None,
                 precompiled_path=get_precompiled_path("tpc-h", "qgen"),
                 makefile_path=(self.tpc_h_source / "makefile.suite") if self.tpc_h_source else None,
                 dependencies=["gcc", "make"],
@@ -283,8 +283,8 @@ class TPCCompiler:
         if self.tpc_ds_source or self.precompiled_base:
             self.binaries["dsdgen"] = BinaryInfo(
                 name="dsdgen",
-                source_dir=self.tpc_ds_source or Path(),
-                binary_path=(self.tpc_ds_source / f"dsdgen{exe_suffix}") if self.tpc_ds_source else Path(),
+                source_dir=self.tpc_ds_source,
+                binary_path=(self.tpc_ds_source / f"dsdgen{exe_suffix}") if self.tpc_ds_source else None,
                 precompiled_path=get_precompiled_path("tpc-ds", "dsdgen"),
                 makefile_path=(self.tpc_ds_source / "makefile") if self.tpc_ds_source else None,
                 dependencies=["gcc", "make", "yacc"],
@@ -292,8 +292,8 @@ class TPCCompiler:
 
             self.binaries["dsqgen"] = BinaryInfo(
                 name="dsqgen",
-                source_dir=self.tpc_ds_source or Path(),
-                binary_path=(self.tpc_ds_source / f"dsqgen{exe_suffix}") if self.tpc_ds_source else Path(),
+                source_dir=self.tpc_ds_source,
+                binary_path=(self.tpc_ds_source / f"dsqgen{exe_suffix}") if self.tpc_ds_source else None,
                 precompiled_path=get_precompiled_path("tpc-ds", "dsqgen"),
                 makefile_path=(self.tpc_ds_source / "makefile") if self.tpc_ds_source else None,
                 dependencies=["gcc", "make", "yacc"],
@@ -486,7 +486,7 @@ class TPCCompiler:
         binary_info = self.binaries[binary_name]
 
         # Check if source directory exists
-        if not binary_info.source_dir.exists():
+        if binary_info.source_dir is None or not binary_info.source_dir.exists():
             return False
 
         # Check if binary is already available

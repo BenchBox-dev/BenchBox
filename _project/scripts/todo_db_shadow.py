@@ -33,6 +33,13 @@ TABLE_NAMES = (
     "prior_art",
     "deferrals",
 )
+FINDING_TABLE_NAMES = (
+    "findings",
+    "finding_evidence",
+    "finding_links",
+    "finding_events",
+    "finding_sections",
+)
 
 
 class ShadowMigrationError(RuntimeError):
@@ -86,7 +93,7 @@ def write_hosted_legacy_snapshot(connection: Any, output: Path) -> dict[str, int
 
     if output.exists() or output.is_symlink():
         raise ShadowMigrationError(f"hosted snapshot target must not already exist: {output}")
-    table_names = ("items", *(name for name in TABLE_NAMES if name != "items"), "events", "meta")
+    table_names = ("items", *(name for name in TABLE_NAMES if name != "items"), *FINDING_TABLE_NAMES, "events", "meta")
     snapshot = {table: _rows(connection, table) for table in table_names}
     output.parent.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(output, os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0), 0o600)

@@ -7,7 +7,12 @@ vi.mock("@/lib/performanceMarks", () => ({
   markExplorerError: vi.fn(),
 }));
 
-import { _waitForSnapshotRowsForTest, shouldRetryColdEmptyRead } from "@/db";
+import {
+  _COLD_EMPTY_READ_MAX_DELAY_MS_FOR_TEST,
+  _waitForSnapshotRowsForTest,
+  shouldRetryColdEmptyRead,
+  shouldRetryTransientQueryError,
+} from "@/db";
 
 interface FakeRow {
   result_id: string;
@@ -258,8 +263,8 @@ describe("shouldRetryColdEmptyRead", () => {
     expect(shouldRetryColdEmptyRead(1, READY_AT + 60_000, READY_AT)).toBe(false);
   });
 
-  it("stops at the final attempt so an empty result is returned, not looped", () => {
-    expect(shouldRetryColdEmptyRead(3, READY_AT + 1_000, READY_AT)).toBe(false);
+  it("stops at the size-budget attempt so an empty result is returned, not looped", () => {
+    expect(shouldRetryColdEmptyRead(100, READY_AT + 1_000, READY_AT)).toBe(false);
   });
 
   it("does not retry before the snapshot has ever been attached", () => {
@@ -269,5 +274,23 @@ describe("shouldRetryColdEmptyRead", () => {
   it("retries exactly at the window boundary", () => {
     expect(shouldRetryColdEmptyRead(1, READY_AT + 15_000, READY_AT)).toBe(true);
     expect(shouldRetryColdEmptyRead(1, READY_AT + 15_001, READY_AT)).toBe(false);
+  });
+
+  it("bounds a genuinely empty query below the shortest browser recovery attempt", () => {
+    expect(_COLD_EMPTY_READ_MAX_DELAY_MS_FOR_TEST).toBeLessThan(8_000);
+  });
+});
+
+describe("shouldRetryTransientQueryError", () => {
+  const transient = new Error("offset is out of bounds");
+
+  it("keeps transient errors on the original three-attempt budget", () => {
+    expect(shouldRetryTransientQueryError(transient, 1)).toBe(true);
+    expect(shouldRetryTransientQueryError(transient, 2)).toBe(true);
+    expect(shouldRetryTransientQueryError(transient, 3)).toBe(false);
+  });
+
+  it("does not retry non-transient errors", () => {
+    expect(shouldRetryTransientQueryError(new Error("syntax error"), 1)).toBe(false);
   });
 });

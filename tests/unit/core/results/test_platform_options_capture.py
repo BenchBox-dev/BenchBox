@@ -89,6 +89,15 @@ def test_registered_default_recorded_when_no_saved_value() -> None:
     assert sources == {"foo": "registered_default"}
 
 
+def test_capture_retains_usernames_until_the_export_boundary() -> None:
+    values, _sources = build_platform_options_capture(
+        requested_options={"username": "alice-sentinel", "password": "secret-sentinel"}
+    )
+
+    assert values["username"] == "alice-sentinel"
+    assert values["password"] == REDACTED_VALUE
+
+
 @pytest.mark.parametrize(
     "key",
     [
