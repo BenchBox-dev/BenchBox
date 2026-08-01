@@ -2234,11 +2234,16 @@ def _unrunnable_verifications(item: dict) -> list[tuple[int, str, str]]:
 # for the real test_motherduck.py) lints clean and quietly makes the item's
 # work un-landable in scope. Resolution is deliberately state-aware and
 # conservative, calibrated against the live backlog:
-#   - OPEN items: only a nonexistent LITERAL that closely matches an existing
-#     sibling (a probable typo) is a finding. Wildcard globs are prospective
-#     allowlists - check-scope fnmatches them against future changed files,
-#     so "matches nothing today" is normal for planned outputs - and a plain
-#     nonexistent literal is a legal planned new file.
+#   - OPEN items, only_modify: only a nonexistent LITERAL that closely matches
+#     an existing sibling (a probable typo) is a finding. Wildcard globs are
+#     prospective allowlists - check-scope fnmatches them against future
+#     changed files, so "matches nothing today" is normal for planned outputs -
+#     and a plain nonexistent literal is a legal planned new file.
+#   - OPEN items, do_not_modify: stricter, because a deny that matches nothing
+#     protects nothing. Annotated globs ("foo.py (frozen)") and near-named or
+#     package-shadowed literals (runner.py beside runner/) are findings at a
+#     lower cutoff; a clean nonexistent literal/wildcard stays legal (it
+#     forbids creating the match).
 #   - DONE/DROPPED items: anything that resolves to nothing is a finding;
 #     by completion the paths had their chance to exist.
 #   - Absolute paths are skipped: out-of-repo scopes are policy statements
@@ -2253,6 +2258,17 @@ _PATHLIKE_TOKEN_RE = re.compile(
 # releases planned new files for genuinely new components
 # (test_ballista_adapter.py vs test_base_adapter.py, 0.86).
 _NEAR_MISS_CUTOFF = 0.87
+
+# Deny rules get a lower bar: a do_not_modify that matches nothing protects
+# nothing, and the false-positive cost is one lint line, not a blocked plan.
+# 0.75 catches the live slips the allowlist cutoff released (runner.py for the
+# runner/ package, 0.80; result_capture.py for result_factory.py, 0.76).
+_DENY_NEAR_MISS_CUTOFF = 0.75
+
+# Characters that cannot appear in this repo's tracked paths. Authors annotate
+# scope globs in prose ("scripts/foo.py (item 4, done)"); such a glob can never
+# fnmatch a changed file, so as a deny rule it silently protects nothing.
+_GLOB_ANNOTATION_CHARS = " ()"
 
 
 def _lint_repo_root() -> Path | None:
@@ -2271,13 +2287,13 @@ def _glob_resolves(root: Path, pattern: str) -> bool:
         return False
 
 
-def _near_miss(root: Path, literal: str) -> str | None:
+def _near_miss(root: Path, literal: str, cutoff: float = _NEAR_MISS_CUTOFF) -> str | None:
     """An existing sibling whose name closely matches ``literal``'s, if any."""
     target = root / literal
     if not target.parent.is_dir():
         return None
     names = [entry.name for entry in target.parent.iterdir()]
-    close = difflib.get_close_matches(target.name, names, n=1, cutoff=_NEAR_MISS_CUTOFF)
+    close = difflib.get_close_matches(target.name, names, n=1, cutoff=cutoff)
     if not close:
         return None
     return str(Path(literal).parent / close[0])
@@ -2297,6 +2313,26 @@ def _unresolved_path_finding(root: Path, path: str, *, settled: bool) -> str | N
     return None
 
 
+def _deny_unresolved_finding(root: Path, glob: str) -> str | None:
+    """Why an open item's non-resolving deny glob is inert, or None if legal.
+
+    A do_not_modify that can never match a changed file protects nothing —
+    unlike only_modify there is no prospective-allowlist reading that excuses
+    it. A CLEAN nonexistent literal or wildcard stays legal: it forbids
+    creating the named file(s), and fnmatch will catch a created match.
+    """
+    if any(ch in glob for ch in _GLOB_ANNOTATION_CHARS):
+        return "contains annotation text so it can never match a repository path"
+    if any(ch in glob for ch in "*?["):
+        return None  # prospective family deny — forbids creating matches
+    if glob.endswith(".py") and (root / glob[: -len(".py")]).is_dir():
+        return f"names a module shadowed by existing package directory '{glob[: -len('.py')]}/'"
+    close = _near_miss(root, glob, cutoff=_DENY_NEAR_MISS_CUTOFF)
+    if close:
+        return f"names a nonexistent path suspiciously close to existing '{close}'"
+    return None
+
+
 def _unresolvable_scope_findings(item: dict) -> list[str]:
     root = _lint_repo_root()
     if root is None:
@@ -2307,7 +2343,12 @@ def _unresolvable_scope_findings(item: dict) -> list[str]:
         pattern = rule["path_glob"]
         if _glob_resolves(root, pattern):
             continue
-        reason = _unresolved_path_finding(root, pattern, settled=settled)
+        if not settled and rule["kind"] == "do_not_modify":
+            if Path(pattern).is_absolute() or pattern.startswith("~"):
+                continue
+            reason = _deny_unresolved_finding(root, pattern)
+        else:
+            reason = _unresolved_path_finding(root, pattern, settled=settled)
         if reason:
             findings.append(f"scope {rule['kind']} {reason}: {pattern}")
     return findings

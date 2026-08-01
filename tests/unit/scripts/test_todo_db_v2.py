@@ -510,6 +510,63 @@ class TestLintUnresolvableScopeAndLadderPaths:
         findings = todo_db.lint_item(conn, "node-id-cmd")
         assert not any("test_todo_db_v2" in f for f in findings)
 
+    def test_inert_deny_rule_annotated_glob_is_flagged_on_open_item(self, conn):
+        # "path (prose)" can never fnmatch a changed file, so the deny rule
+        # silently protects nothing — exactly the enforcement hole to surface.
+        self._mk_scoped(
+            conn,
+            "annotated-deny",
+            scope=[("do_not_modify", "_project/scripts/todo_db.py (frozen during review)")],
+        )
+        findings = todo_db.lint_item(conn, "annotated-deny")
+        assert any("do_not_modify" in f and "annotation" in f for f in findings)
+
+    def test_inert_deny_rule_package_dir_shadow_is_flagged_on_open_item(self, conn):
+        # benchbox/core/runner.py does not exist; the runner/ package does.
+        # The deny intent (protect the runner) can never fire.
+        self._mk_scoped(conn, "shadowed-deny", scope=[("do_not_modify", "benchbox/core/runner.py")])
+        findings = todo_db.lint_item(conn, "shadowed-deny")
+        assert any("do_not_modify" in f and "package directory" in f for f in findings)
+
+    def test_inert_deny_rule_near_named_sibling_below_allowlist_cutoff(self, conn):
+        # 0.76 to result_factory.py — released by the 0.87 only_modify cutoff,
+        # caught by the stricter deny cutoff.
+        self._mk_scoped(
+            conn,
+            "near-named-deny",
+            scope=[("do_not_modify", "benchbox/core/results/result_capture.py")],
+        )
+        findings = todo_db.lint_item(conn, "near-named-deny")
+        assert any("do_not_modify" in f and "suspiciously close" in f for f in findings)
+
+    def test_inert_deny_rule_clean_future_path_stays_legal(self, conn):
+        # A deny naming a clean nonexistent file forbids creating it; fnmatch
+        # will catch a created match, so the rule is NOT inert.
+        self._mk_scoped(
+            conn,
+            "future-deny",
+            scope=[("do_not_modify", "tests/unit/scripts/test_zq_forbidden_future.py")],
+        )
+        findings = todo_db.lint_item(conn, "future-deny")
+        assert not any("test_zq_forbidden_future" in f for f in findings)
+
+    def test_inert_deny_rule_wildcard_family_stays_legal(self, conn):
+        self._mk_scoped(conn, "family-deny", scope=[("do_not_modify", "benchbox/core/zq_forbidden_*.py")])
+        findings = todo_db.lint_item(conn, "family-deny")
+        assert not any("zq_forbidden" in f for f in findings)
+
+    def test_inert_deny_rule_checks_do_not_apply_when_settled(self):
+        # Settled items keep the blanket resolves-to-nothing finding; the
+        # deny-specific classification is an open-item aid.
+        item = {
+            "state": "done",
+            "scope": [{"kind": "do_not_modify", "path_glob": "benchbox/core/runner.py"}],
+            "verifications": [],
+        }
+        findings = todo_db._unresolvable_scope_findings(item)
+        assert any("resolves to nothing" in f for f in findings)
+        assert not any("package directory" in f for f in findings)
+
 
 class TestLintFalsifiabilityAndScopeCompleteness:
     """A ladder must contain at least one rung that FAILS on the unfixed tree
