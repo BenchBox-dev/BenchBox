@@ -40,6 +40,7 @@ from benchbox.core.tuning.applied_ledger import (
     PHASE_DDL,
     PHASE_POST_LOAD,
     PHASE_SESSION,
+    STATEMENT_FAILED,
     AppliedStatement,
     AppliedTuningLedger,
 )
@@ -181,6 +182,7 @@ class IntrospectionReceipt:
     entries: list[ReceiptEntry] = field(default_factory=list)
     observed: list[IntrospectedObject] = field(default_factory=list)
     error: str | None = None
+    dropped: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def summary(self) -> dict[str, int]:
@@ -208,6 +210,8 @@ class IntrospectionReceipt:
                 }
                 for obj in self.observed
             ]
+        if self.dropped:
+            payload["dropped"] = list(self.dropped)
         if self.error:
             payload["error"] = self.error
         return payload
@@ -478,7 +482,25 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
         state_error = "introspection truncated (catalog row bound hit)"
 
     entries: list[ReceiptEntry] = []
-    for stmt in ledger.executed_statements:
+    for stmt in ledger.statements:
+        if stmt.status == STATEMENT_FAILED:
+            is_session_failure = stmt.phase == PHASE_SESSION
+            reason = (
+                "session/config statement failed -- transient, not corroboration-eligible"
+                if is_session_failure
+                else "ddl/post_load statement failed -- blocks corroboration"
+            )
+            entries.append(
+                ReceiptEntry(
+                    statement=stmt.statement,
+                    phase=stmt.phase,
+                    verdict=TRANSIENT if is_session_failure else UNVERIFIABLE,
+                    table=stmt.table,
+                    reason=reason,
+                )
+            )
+            continue
+
         klass, intents = _classify(stmt)
 
         if klass == TRANSIENT:
@@ -559,12 +581,15 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
     # the ledger happened to contain no verifiable statements.
     if state_error is not None:
         corroborated = False
+    if ledger.dropped:
+        corroborated = False
 
     return IntrospectionReceipt(
         platform=platform,
         corroborated=corroborated,
         entries=entries,
         observed=list(introspected_state.objects) if introspected_state else [],
+        dropped=[item.to_dict() for item in ledger.dropped],
         error=state_error,
     )
 
