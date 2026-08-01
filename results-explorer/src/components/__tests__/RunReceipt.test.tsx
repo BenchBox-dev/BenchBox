@@ -440,7 +440,7 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     // Native <details>: collapsed by default, so the summary is the only
     // thing competing for space in the receipt grid.
     expect((drilldown as HTMLDetailsElement).open).toBe(false);
-    expect(within(drilldown).getByText(/Statement receipt \(2\)/)).toBeTruthy();
+    expect(within(drilldown).getByText(/Receipt entries \(2\)/)).toBeTruthy();
 
     const entries = within(drilldown).getAllByTestId("applied-receipt-entry");
     expect(entries.length).toBe(2);
@@ -473,6 +473,19 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     expect(within(drilldown).queryByText("Table")).toBeNull();
   });
 
+  it("labels defensive truncation loudly and preserves the original entry count", () => {
+    const truncated = JSON.stringify({
+      entries: [{ verdict: "corroborated" }],
+      truncated: true,
+      original_entry_count: 25001,
+    });
+    render(<RunReceipt detail={makeDetail({ applied_receipt: truncated })} />);
+
+    const drilldown = screen.getByTestId("applied-receipt-drilldown");
+    expect(within(drilldown).getByText("Receipt entries (1 of 25001; truncated)")).toBeTruthy();
+    expect(within(drilldown).getByText(/exceeded the defensive receipt bound/)).toBeTruthy();
+  });
+
   it.each([
     ["absent (undefined)", undefined],
     ["explicitly null", null],
@@ -489,7 +502,7 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
     const receipt = expectVerifiedRowIntact();
     expect(within(receipt).queryByTestId("applied-receipt-drilldown")).toBeNull();
     expect(within(receipt).queryByTestId("applied-receipt-entry")).toBeNull();
-    expect(within(receipt).queryByText(/Statement receipt/)).toBeNull();
+    expect(within(receipt).queryByText(/Receipt entries/)).toBeNull();
   });
 
   it("leaves a self-attested run's badge untouched when a receipt is present", () => {

@@ -311,6 +311,31 @@ describe("ComparabilityReceipt", () => {
       expect(tuning?.detail).toContain("applied bbbbbbbbbbbb");
     });
 
+    it("annotates applied-statement drift when the recorded request is identical", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({
+          has_tuning: true,
+          tuning_mode: "tuned",
+          requested_config_hash: "a".repeat(64),
+          applied_ledger_hash: "b".repeat(64),
+        }),
+        makeDetail({
+          result_id: "r2",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          has_tuning: true,
+          tuning_mode: "tuned",
+          requested_config_hash: "a".repeat(64),
+          applied_ledger_hash: "c".repeat(64),
+        }),
+      ]);
+
+      expect(fields.find((field) => field.label === "Tuning")).toMatchObject({
+        status: "diff",
+        summary: "Requested configuration matches; applied statements differ",
+      });
+    });
+
     it("shows a mode-only tuning value as a plain label, never a hash fingerprint", () => {
       // The self-derived tuning_hash must never act as a comparability key, and a
       // mode-only bundle (no ADR-1 identity hash) shows the coarse tuning_mode

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from _project.scripts.explorer_pipeline import transformer as transformer_module
 from _project.scripts.explorer_pipeline.models import DetailResult, ManifestEntry
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
 from benchbox.core.cost.models import DeploymentMetadata, NormalizedCost
@@ -1181,6 +1182,41 @@ class TestAppliedReceiptCompanion:
 
         assert stored_first == stored_second
         assert stored_first == '{"corroborated":false,"entries":[],"platform":"duckdb"}'
+
+    def test_oversized_receipt_entries_are_explicitly_truncated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(transformer_module, "APPLIED_RECEIPT_MAX_ENTRIES", 1)
+        bundle = self._bundle_with_companion(
+            tmp_path,
+            json.dumps({"receipt": {"entries": [{"statement": "one"}, {"statement": "two"}]}}),
+        )
+
+        stored = BundleTransformer().to_detail_result(bundle, result_id="r").applied_receipt
+
+        assert json.loads(stored or "{}") == {
+            "entries": [{"statement": "one"}],
+            "original_entry_count": 2,
+            "truncated": True,
+            "truncation_reason": "entry_limit",
+        }
+
+    def test_oversized_companion_bytes_emit_marker_without_reading_payload(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(transformer_module, "APPLIED_COMPANION_MAX_BYTES", 32)
+        bundle = self._bundle_with_companion(
+            tmp_path,
+            json.dumps({"receipt": {"entries": [], "padding": "x" * 64}}),
+        )
+
+        stored = BundleTransformer().to_detail_result(bundle, result_id="r").applied_receipt
+
+        marker = json.loads(stored or "{}")
+        assert marker["entries"] == []
+        assert marker["truncated"] is True
+        assert marker["truncation_reason"] == "byte_limit"
+        assert marker["original_byte_count"] > 32
 
     def test_missing_companion_yields_none(self, tmp_path: Path) -> None:
         """The common case: no introspection ran, so no companion exists."""

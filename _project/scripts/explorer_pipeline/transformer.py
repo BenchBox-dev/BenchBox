@@ -29,6 +29,7 @@ from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY
 from benchbox.core.results.status import bundle_failed_query_count, bundle_non_clean_reason, normalize_validation_status
 from benchbox.core.tuning.modes import is_canonical_mode
+from benchbox.validation.bundle import APPLIED_COMPANION_MAX_BYTES, APPLIED_RECEIPT_MAX_ENTRIES
 
 logger = logging.getLogger(__name__)
 
@@ -315,8 +316,26 @@ def _applied_receipt(bundle_path: Path) -> str | None:
     common case: introspection did not run, or a legacy bundle), unreadable,
     malformed JSON, not a JSON object, or carrying no ``receipt`` key. A broken
     companion must never fail the build, so every failure degrades to ``None``.
+    Inputs beyond the public submission caps are the exception: already-published
+    legacy data is bounded defensively and stored with an explicit truncation
+    marker rather than being silently dropped.
     """
     companion = bundle_path.with_name(f"{bundle_path.stem}.applied.json")
+    try:
+        companion_size = companion.stat().st_size
+    except (OSError, ValueError):
+        return None
+    if companion_size > APPLIED_COMPANION_MAX_BYTES:
+        return json.dumps(
+            {
+                "entries": [],
+                "original_byte_count": companion_size,
+                "truncated": True,
+                "truncation_reason": "byte_limit",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
     try:
         payload = json.loads(companion.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -326,6 +345,16 @@ def _applied_receipt(bundle_path: Path) -> str | None:
     receipt = payload.get("receipt")
     if receipt is None:
         return None
+    if isinstance(receipt, dict) and isinstance(receipt.get("entries"), list):
+        entries = receipt["entries"]
+        if len(entries) > APPLIED_RECEIPT_MAX_ENTRIES:
+            receipt = {
+                **receipt,
+                "entries": entries[:APPLIED_RECEIPT_MAX_ENTRIES],
+                "original_entry_count": len(entries),
+                "truncated": True,
+                "truncation_reason": "entry_limit",
+            }
     try:
         return json.dumps(receipt, sort_keys=True, separators=(",", ":"))
     except (TypeError, ValueError):
