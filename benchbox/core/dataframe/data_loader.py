@@ -78,7 +78,11 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # inference; and empty fields in declared string columns load as '' instead of
 # null when the SQL dialect keeps '' (null_marker is None). Pre-v4 caches must be
 # regenerated to pick up the declared dtypes and the empty-string contract.
-DATAFRAME_CACHE_VERSION = "v4"
+# v5: headered CSVs are read with skip_rows=1 when explicit column names are
+# supplied. Pre-v5 caches for such benchmarks either failed conversion (and
+# silently fell back to an untyped read of the source file) or embedded the header
+# row as data, so they must be regenerated.
+DATAFRAME_CACHE_VERSION = "v5"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -365,6 +369,7 @@ class FormatConverter:
         write_config: DataFrameWriteConfiguration | None = None,
         column_types: dict[str, str] | None = None,
         null_marker: str | None = "",
+        has_header: bool = False,
     ) -> tuple[ConversionStatus, int]:
         """Convert CSV/TBL file to Parquet format.
 
@@ -411,8 +416,15 @@ class FormatConverter:
             if is_tbl_file and column_names and has_trailing:
                 actual_column_names = column_names + [TRAILING_DUMMY_COLUMN]
 
+            # PyArrow's `column_names` REPLACES the header names but does NOT skip
+            # the header LINE, so a headered CSV read with explicit column names
+            # parses its own header as a data row. With declared numeric/date types
+            # that conversion FAILS, and the caller then silently falls back to the
+            # raw source file -- an UNTYPED read where dates stay strings and every
+            # date filter matches nothing. Headerless TPC `.tbl` is unaffected.
             read_options = pv.ReadOptions(
                 column_names=actual_column_names if actual_column_names else None,
+                skip_rows=1 if (has_header and actual_column_names) else 0,
             )
             parse_options = pv.ParseOptions(delimiter=delimiter)
             arrow_column_types = FormatConverter._resolve_arrow_types(column_types)
@@ -1270,6 +1282,7 @@ class DataFrameDataLoader:
         table_metadata: dict[str, dict[str, Any]] = {}
 
         benchmark_delimiter = getattr(benchmark, "csv_delimiter", None)
+        benchmark_has_header = bool(getattr(benchmark, "csv_has_header", False))
 
         for table_name, source_path in source_files.items():
             source_list = source_path if isinstance(source_path, list) else [source_path]
@@ -1286,6 +1299,7 @@ class DataFrameDataLoader:
                 benchmark_delimiter,
                 cache_path,
                 null_marker=null_markers.get(table_name, ""),
+                has_header=benchmark_has_header,
             )
 
             if len(converted_list) == 1:
@@ -1332,6 +1346,7 @@ class DataFrameDataLoader:
         cache_path: Path,
         *,
         null_marker: str | None = "",
+        has_header: bool = False,
     ) -> tuple[list[Path], list[dict[str, Any]]]:
         """Convert a single table's source files to Parquet."""
         converted_list: list[Path] = []
@@ -1359,6 +1374,7 @@ class DataFrameDataLoader:
                 write_config=table_write_config,
                 column_types=column_types,
                 null_marker=null_marker,
+                has_header=has_header and format_type == "csv",
             )
 
             if status == ConversionStatus.SUCCESS:
