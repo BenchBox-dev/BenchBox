@@ -549,7 +549,8 @@ class TestStreamRunnerNonBlockingShutdown:
         -- the executor lifecycle change must not disturb this wiring."""
 
         def slow_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
-            time.sleep(0.1)
+            cancel_event = cfg._stream_cancel_events[stream_id]  # type: ignore[attr-defined]
+            assert cancel_event.wait(timeout=1.0), "StreamRunner did not signal cooperative cancellation"
             return _make_stream_result(stream_id)
 
         config = _FakeConfig(num_streams=1, stream_timeout=self.TINY_TIMEOUT, cancel_on_timeout=True)
