@@ -36,7 +36,7 @@ if [ "${BENCHBOX_EPHEMERAL_CLONE:-}" = "1" ] &&
   ephemeral=yes
 fi
 
-if [ "$top_abs" = "$primary_abs" ] && [ "$allow_main" != "1" ] && [ "$ephemeral" != "yes" ]; then
+if [ "$top_abs" -ef "$primary_abs" ] && [ "$allow_main" != "1" ] && [ "$ephemeral" != "yes" ]; then
   cat >&2 <<EOF
 Refusing BenchBox write preflight in the primary clone:
   $top_abs
