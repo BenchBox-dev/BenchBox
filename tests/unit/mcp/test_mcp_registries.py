@@ -199,6 +199,7 @@ class TestRegisterAllPrompts:
             mcp, "analyze_results", benchmark="tpch", platform="duckdb", focus="slowest_queries"
         )
         assert len(result) == 1
+        assert result[0].text.startswith("Analyze the TPCH benchmark results")
         assert "TPCH" in result[0].text
         assert "duckdb" in result[0].text
         assert "slowest_queries" in result[0].text

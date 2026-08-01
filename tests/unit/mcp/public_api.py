@@ -116,7 +116,7 @@ def list_prompt_names(server: MCPServer) -> set[str]:
 
 
 def get_prompt_contents(server: MCPServer, name: str, **arguments: Any) -> list[TextContent]:
-    """Get a prompt through the public API and normalize its text content."""
+    """Get a prompt through the public API and preserve its wire text."""
 
     async def get() -> list[TextContent]:
         result = await server.get_prompt(name, arguments)
@@ -125,8 +125,7 @@ def get_prompt_contents(server: MCPServer, name: str, **arguments: Any) -> list[
             content = message.content
             if not isinstance(content, TextContent):
                 raise AssertionError(f"Expected text prompt content for {name!r}")
-            decoded = json.loads(content.text)
-            contents.append(TextContent.model_validate(decoded))
+            contents.append(content)
         return contents
 
     return anyio.run(get)

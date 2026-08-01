@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 
 from mcp.server.mcpserver import MCPServer
-from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
 
@@ -240,49 +239,45 @@ def register_all_prompts(mcp: MCPServer) -> None:
         benchmark: str = "tpch",
         platform: str = "duckdb",
         focus: str | None = None,
-    ) -> list[TextContent]:
+    ) -> str:
         """Analyze benchmark results. (benchmark=tpch, platform=duckdb, focus=optional)"""
-        return [TextContent(type="text", text=_build_analyze_results_prompt(benchmark, platform, focus))]
+        return _build_analyze_results_prompt(benchmark, platform, focus)
 
     @mcp.prompt()
     def compare_platforms(
         benchmark: str = "tpch",
         platforms: str = "duckdb,polars-df",
         scale_factor: float = 0.01,
-    ) -> list[TextContent]:
+    ) -> str:
         """Compare performance across platforms. (benchmark=tpch, platforms=duckdb,polars-df, scale_factor=0.01)"""
-        return [TextContent(type="text", text=_build_compare_platforms_prompt(benchmark, platforms, scale_factor))]
+        return _build_compare_platforms_prompt(benchmark, platforms, scale_factor)
 
     @mcp.prompt()
     def identify_regressions(
         baseline_run: str | None = None,
         comparison_run: str | None = None,
         threshold_percent: float = 10.0,
-    ) -> list[TextContent]:
+    ) -> str:
         """Find performance regressions between runs. (baseline_run, comparison_run, threshold_percent=10)"""
-        return [
-            TextContent(type="text", text=_build_regressions_prompt(baseline_run, comparison_run, threshold_percent))
-        ]
+        return _build_regressions_prompt(baseline_run, comparison_run, threshold_percent)
 
     @mcp.prompt()
     def benchmark_planning(
         use_case: str = "testing",
         platforms: str | None = None,
         time_budget_minutes: int = 30,
-    ) -> list[TextContent]:
+    ) -> str:
         """Plan a benchmark strategy. (use_case=testing|production|comparison, platforms, time_budget_minutes=30)"""
-        return [
-            TextContent(type="text", text=_build_benchmark_planning_prompt(use_case, platforms, time_budget_minutes))
-        ]
+        return _build_benchmark_planning_prompt(use_case, platforms, time_budget_minutes)
 
     @mcp.prompt()
     def troubleshoot_failure(
         error_message: str | None = None,
         platform: str | None = None,
         benchmark: str | None = None,
-    ) -> list[TextContent]:
+    ) -> str:
         """Diagnose benchmark failures. (error_message, platform, benchmark)"""
-        return [TextContent(type="text", text=_build_troubleshoot_prompt(error_message, platform, benchmark))]
+        return _build_troubleshoot_prompt(error_message, platform, benchmark)
 
     @mcp.prompt()
     def benchmark_run(
@@ -290,16 +285,16 @@ def register_all_prompts(mcp: MCPServer) -> None:
         benchmark: str = "tpch",
         scale_factor: float = 0.01,
         queries: str | None = None,
-    ) -> list[TextContent]:
+    ) -> str:
         """Execute a planned benchmark. (platform=duckdb, benchmark=tpch, scale_factor=0.01, queries=optional)"""
-        return [TextContent(type="text", text=_build_benchmark_run_prompt(platform, benchmark, scale_factor, queries))]
+        return _build_benchmark_run_prompt(platform, benchmark, scale_factor, queries)
 
     @mcp.prompt()
     def platform_tuning(
         platform: str = "duckdb",
         workload: str | None = None,
-    ) -> list[TextContent]:
+    ) -> str:
         """Get tuning recommendations for a platform. (platform=duckdb, workload=optional)"""
-        return [TextContent(type="text", text=_build_platform_tuning_prompt(platform, workload))]
+        return _build_platform_tuning_prompt(platform, workload)
 
     logger.info("Registered MCP prompts")
