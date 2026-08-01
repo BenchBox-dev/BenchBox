@@ -68,6 +68,9 @@ endpoint_keys:
 path_keys:
 - credentialfile
 - databasepath
+# libpq spelling (redshift.py): no underscore, so the *path/*file suffix
+# rules never fire and the raw local path (home-dir username) leaked.
+- sslrootcert
 - datadirectory
 - datapath
 - filepath
