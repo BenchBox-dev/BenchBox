@@ -41,6 +41,7 @@ import math
 import os
 import re
 import shlex
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -1087,7 +1088,9 @@ def bulk_transfer(
 # fast embedded replica (which needs a read-write token anyway).
 READ_ONLY_COMMANDS = frozenset({"export"})
 
-_IMPLICIT_LOCAL_READ_COMMANDS = frozenset({"check-scope", "deps", "export", "lint", "list", "ready", "show", "stats"})
+_IMPLICIT_LOCAL_READ_COMMANDS = frozenset(
+    {"check-scope", "deps", "doctor", "export", "lint", "list", "ready", "show", "stats"}
+)
 
 
 def _command_mutates_tracker(args: argparse.Namespace) -> bool:
@@ -1193,6 +1196,204 @@ def connect_backend(backend: Path | str, *, read_only: bool = False) -> sqlite3.
     if isinstance(backend, Path):
         return connect(backend)
     return connect_hosted(backend, read_only=read_only)
+
+
+# `doctor` exit contract. 0 = every check OK (warnings allowed), 4 = auth
+# failure, 2 = any other failing check. 4 is distinct because the batch workflow
+# HALTS on it: a bad token desynchronizes the record from the work, so it must be
+# distinguishable from "the database is unreachable" without parsing prose.
+DOCTOR_EXIT_OK = 0
+DOCTOR_EXIT_FAIL = 2
+DOCTOR_EXIT_AUTH = 4
+
+# Matched against a lowercased message. `jwt`/`invalidtoken` are here because the
+# hosted transport reports a rejected token as `JWT error: InvalidToken` -- no
+# spaces, so an "invalid token" marker alone silently missed the single most
+# likely auth failure and returned 2, which would let a batch keep running
+# against a dead token instead of halting.
+_DOCTOR_AUTH_MARKERS = (
+    "unauthorized",
+    "authentication",
+    "401",
+    "403",
+    "expired",
+    "invalid token",
+    "invalidtoken",
+    "jwt",
+)
+
+
+def _doctor_is_auth_failure(exc: BaseException) -> bool:
+    """Whether a connection/query failure is an AUTH failure rather than a plain outage.
+
+    Matched on the message because neither sqlite3 nor the hosted transport raises a
+    distinct auth exception type. Kept deliberately narrow: a false positive would
+    tell the operator to re-mint a token when the real problem is that the database
+    is down, so anything unrecognized stays a generic FAIL.
+    """
+    text = str(exc).lower()
+    return any(marker in text for marker in _DOCTOR_AUTH_MARKERS)
+
+
+def run_doctor(backend: Path | str, *, implicit_default_local: bool, as_json: bool = False) -> int:
+    """Side-effect-free health check over config, identity, reachability, and auth.
+
+    The preflight the batch workflow mandates. It performs NO tracker write and
+    emits no audit event: hosted reachability goes through the read-only connected
+    path (no embedded replica sync), so it is safe to run mid-freeze and with a
+    read-only token. It is also the one command that must survive a broken backend
+    -- every failure is reported as a check result rather than raised, which is why
+    it runs before the normal connect/freeze path in `main`.
+
+    Never prints the hosted DSN or the token, matching `_report_backend`.
+    """
+    hosted = not isinstance(backend, Path)
+    checks: list[dict[str, str]] = []
+    exit_code = DOCTOR_EXIT_OK
+
+    def record(name: str, status: str, detail: str) -> None:
+        checks.append({"check": name, "status": status, "detail": detail})
+
+    # 1. Backend + identity. The implicit local fallback is a WARN, not a FAIL:
+    # it is a legitimate scratch target, but it is NOT the production tracker, and
+    # a batch run that silently used it would write real work to a throwaway DB.
+    if hosted:
+        record("backend", "OK", "hosted (URL withheld)")
+    else:
+        record("backend", "OK", f"local ({backend})")
+    if implicit_default_local:
+        record(
+            "identity",
+            "WARN",
+            "implicit local fallback -- NOT the production tracker; set --db, TODO_DB_PATH, or TODO_DB_URL",
+        )
+    else:
+        record("identity", "OK", "backend selected explicitly")
+
+    # 2. Auth. Only hosted needs a token; checked before reachability so a missing
+    # token reports as auth rather than as a confusing connection error.
+    if hosted and not _auth_token():
+        record("auth", "FAIL", "TODO_DB_AUTH_TOKEN is not set")
+        exit_code = DOCTOR_EXIT_AUTH
+    elif hosted:
+        record("auth", "OK", "TODO_DB_AUTH_TOKEN is set")
+    else:
+        record("auth", "OK", "not required for a local backend")
+
+    # 3. Reachability + schema, via a trivial read. Skipped when auth already
+    # failed: it would fail too, and reporting one root cause beats two.
+    if exit_code == DOCTOR_EXIT_AUTH:
+        record("reachable", "SKIP", "not attempted: auth check failed")
+        record("schema", "SKIP", "not attempted: auth check failed")
+    else:
+        conn = None
+        try:
+            conn = connect_backend(backend, read_only=True)
+            count = list(conn.execute("SELECT count(*) AS n FROM items"))[0]["n"]
+            record("reachable", "OK", f"read {count} item(s)")
+            version = _schema_version(conn)
+            if version == SCHEMA_VERSION:
+                record("schema", "OK", f"v{version}")
+            elif version is None:
+                record("schema", "FAIL", "no schema found; run `todo init`")
+                exit_code = DOCTOR_EXIT_FAIL
+            else:
+                record("schema", "FAIL", f"v{version}, expected v{SCHEMA_VERSION}; run `todo migrate`")
+                exit_code = DOCTOR_EXIT_FAIL
+        # `Exception`, not `BaseException`: doctor turns failures into check results,
+        # but a Ctrl-C during a slow hosted connect must still interrupt rather than
+        # be swallowed and reported as an unreachable backend.
+        except Exception as exc:  # noqa: BLE001 - doctor reports, never raises
+            # `_redacted` scrubs the TOKEN only. A transport error routinely quotes
+            # the DSN back, and this module's invariant is that neither is printed,
+            # so scrub the hosted URL out of the detail as well.
+            detail = str(_redacted(exc, _auth_token()))
+            if hosted:
+                detail = detail.replace(str(backend), "<hosted-url>")
+            if _doctor_is_auth_failure(exc):
+                record("reachable", "FAIL", f"auth failure: {detail}")
+                exit_code = DOCTOR_EXIT_AUTH
+            else:
+                record("reachable", "FAIL", detail)
+                exit_code = DOCTOR_EXIT_FAIL
+            record("schema", "SKIP", "not attempted: backend unreachable")
+        finally:
+            if conn is not None:
+                conn.close()
+
+    # 4. turso CLI. Advisory only -- tokens are minted with it, but an already
+    # exported token works without it, so its absence must never fail the preflight.
+    if hosted:
+        if shutil.which("turso"):
+            record("turso-cli", "OK", "on PATH")
+        else:
+            record("turso-cli", "WARN", "not on PATH; token re-minting is unavailable in this shell")
+
+    if as_json:
+        print(json.dumps({"exit_code": exit_code, "checks": checks}, indent=2, sort_keys=True))
+    else:
+        for entry in checks:
+            print(f"{entry['status']:<4} {entry['check']:<11} {entry['detail']}")
+        if exit_code == DOCTOR_EXIT_AUTH:
+            # stdout is block-buffered when redirected while stderr is not, so the
+            # remediation would otherwise print ABOVE the checks it refers to.
+            sys.stdout.flush()
+            print(
+                "\nAUTH FAILURE. Stop tracker writes and restore auth:\n"
+                "  turso auth login\n"
+                "  export TODO_DB_AUTH_TOKEN=$(turso db tokens create <db> --expiration 1d)",
+                file=sys.stderr,
+            )
+    return exit_code
+
+
+def _preconnect_command(
+    args: argparse.Namespace,
+    actor: str,
+    backend: Path | str,
+    *,
+    implicit_default_local: bool,
+) -> int | None:
+    """Handle the commands that must run BEFORE `connect_backend`, else ``None``.
+
+    Returning ``None`` means "carry on to the normal connect/freeze/dispatch path".
+    Extracted from `main` so these three concerns stay together and `main` stays
+    under the complexity budget.
+
+    * `doctor` must DIAGNOSE an unreachable, unmigrated, or frozen backend, so it
+      cannot be gated behind successfully connecting to one.
+    * the implicit-local write refusal has to precede any write.
+    * `migrate` must precede `connect`, which refuses an outdated schema; that also
+      puts it ahead of the normal freeze gate, so it runs the gate itself.
+    """
+    if args.command == "doctor":
+        return run_doctor(backend, implicit_default_local=implicit_default_local, as_json=args.as_json)
+
+    if implicit_default_local and _command_mutates_tracker(args):
+        print(
+            "error: refusing to write through the implicit local fallback; "
+            "select a backend with --db, TODO_DB_PATH, or TODO_DB_URL",
+            file=sys.stderr,
+        )
+        return 2
+
+    if args.command == "migrate":
+        refusal = _premigrate_freeze_refusal(backend, actor)
+        if refusal is not None:
+            return refusal
+        try:
+            applied = migrate_backend(backend)
+        except TodoError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        except sqlite3.Error as exc:
+            print(f"error: database failure: {_redacted(exc, _auth_token())}", file=sys.stderr)
+            return 2
+        if applied:
+            print(f"applied migration(s) to v{', v'.join(str(v) for v in applied)}")
+            return 0
+        # No pending migration: fall through to the normal path, as before.
+    return None
 
 
 def migrate_backend(backend: Path | str) -> list[int]:
@@ -3296,6 +3497,9 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("migrate", help="apply pending schema migrations to the database")
 
+    p = sub.add_parser("doctor", help="side-effect-free health check (batch preflight)")
+    p.add_argument("--json", action="store_true", dest="as_json", help="machine-readable report for automation")
+
     p = sub.add_parser("config", help="list, get, or set per-database configuration")
     p.add_argument("key", nargs="?")
     p.add_argument("value", nargs="?")
@@ -3345,31 +3549,9 @@ def main(argv: list[str] | None = None) -> int:
 
     backend, implicit_default_local = _resolve_backend(args.db)
     _report_backend(backend, implicit_default_local=implicit_default_local)
-    if implicit_default_local and _command_mutates_tracker(args):
-        print(
-            "error: refusing to write through the implicit local fallback; "
-            "select a backend with --db, TODO_DB_PATH, or TODO_DB_URL",
-            file=sys.stderr,
-        )
-        return 2
-    if args.command == "migrate":
-        # Must run before connect(): connect refuses an outdated schema. That
-        # also puts it ahead of the normal freeze gate, so run the gate here --
-        # otherwise `migrate` is the one mutating command a freeze never covers.
-        refusal = _premigrate_freeze_refusal(backend, actor)
-        if refusal is not None:
-            return refusal
-        try:
-            applied = migrate_backend(backend)
-        except TodoError as exc:
-            print(f"error: {exc}", file=sys.stderr)
-            return 2
-        except sqlite3.Error as exc:
-            print(f"error: database failure: {_redacted(exc, _auth_token())}", file=sys.stderr)
-            return 2
-        if applied:
-            print(f"applied migration(s) to v{', v'.join(str(v) for v in applied)}")
-            return 0
+    early = _preconnect_command(args, actor, backend, implicit_default_local=implicit_default_local)
+    if early is not None:
+        return early
     try:
         conn = connect_backend(backend, read_only=args.command in READ_ONLY_COMMANDS)
     except TodoError as exc:
