@@ -1586,6 +1586,31 @@ class TestReconcileCoversV4Columns:
             ("Why the review missed it", "no axis for it")
         ]
 
+    @pytest.mark.parametrize("draft_section", [None, ("Why the review missed it", "changed text")])
+    def test_established_extra_sections_are_conflicts(self, conn, tmp_path, draft_section):
+        stem = "2026-01-02-030405-section-conflict"
+        _mk_finding(
+            conn,
+            finding_id=stem,
+            title="A sample class",
+            review_context="ultrareview X",
+            why_matters="axis Y is a whole dimension",
+            next_steps="- [ ] add a gate",
+        )
+        conn.execute(
+            "INSERT INTO finding_sections (finding_id, position, heading, text) VALUES (?, ?, ?, ?)",
+            (stem, 0, "Why the review missed it", "preserved text"),
+        )
+        self._file(tmp_path, stem, section=draft_section)
+
+        with pytest.raises(todo_db.TodoError, match="sync conflict"):
+            todo_findings.sync_drafts(conn, "tester", tmp_path)
+
+        stored = todo_findings.get_finding(conn, stem)
+        assert [(s["heading"], s["text"]) for s in stored["sections"]] == [
+            ("Why the review missed it", "preserved text")
+        ]
+
 
 class TestReconcileNeverWipesUndeclaredEvidence:
     """Regression: once reconcile is triggered by another capture-owned field, an

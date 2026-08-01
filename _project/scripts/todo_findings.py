@@ -786,15 +786,26 @@ def _evidence_differs(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
     return _normalize_evidence(existing.get("evidence")) != _normalize_evidence(fields.get("evidence"))
 
 
-def _sections_differ(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
-    """Whether the draft's extra `## ` sections disagree with what is stored.
+def _section_values(record: dict[str, Any]) -> list[tuple[Any, ...]]:
+    """Extra body sections in their durable comparison shape."""
+    return [(s["position"], s["heading"], s["text"]) for s in record.get("sections") or []]
 
-    Always an assertion: the body is parsed in full, so "no extra sections" is a
-    statement about the draft rather than a missing key.
+
+def _sections_need_backfill(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
+    """Whether a pre-v4 record has no section rows that the draft can backfill."""
+    return not _section_values(existing) and bool(_section_values(fields))
+
+
+def _sections_conflict(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
+    """Whether established body sections disagree with the draft.
+
+    Extra sections are prose, not freely reconcilable metadata.  The v4 migration
+    may backfill rows that are entirely absent from an older record, but once rows
+    exist an edit or removal follows the same loud-conflict contract as the body
+    fields with dedicated columns.
     """
-    want = [(s["position"], s["heading"], s["text"]) for s in fields.get("sections") or []]
-    got = [(s["position"], s["heading"], s["text"]) for s in existing.get("sections") or []]
-    return want != got
+    got = _section_values(existing)
+    return bool(got) and got != _section_values(fields)
 
 
 def _capture_owned_differs(existing: dict[str, Any], fields: dict[str, Any]) -> bool:
@@ -810,7 +821,7 @@ def _capture_owned_differs(existing: dict[str, Any], fields: dict[str, Any]) -> 
     that never mentioned a key must not null a value that an import or a later edit
     put there.
     """
-    if _evidence_differs(existing, fields) or _sections_differ(existing, fields):
+    if _evidence_differs(existing, fields) or _sections_need_backfill(existing, fields):
         return True
     for column in ("related_paths", "suggested_sweep"):
         if not fields.get(f"{column}_declared"):
@@ -821,11 +832,13 @@ def _capture_owned_differs(existing: dict[str, Any], fields: dict[str, Any]) -> 
 
 
 def _reconcile_capture_owned(conn: Any, actor: str, existing: dict[str, Any], fields: dict[str, Any]) -> None:
-    """Replace a finding's evidence rows with the draft's, in ONE write txn.
+    """Reconcile capture-owned metadata and pre-v4 section gaps in ONE write txn.
 
-    The draft file is authoritative for capture-owned payload, so an evidence-only
+    The draft file is authoritative for declared metadata, so an evidence-only
     edit is persisted rather than silently marked synced (which lost the edit) or
-    reported as a content conflict (which the prose did not justify). The
+    reported as a content conflict (which the dedicated prose fields did not
+    justify). Extra body sections are only backfilled when no rows exist; established
+    sections remain on the conflict path. The
     before/after is recorded in ``finding_events``, so the audit trail carries the
     change instead of the row quietly differing from its draft. ``existing`` is the
     row the caller already fetched -- re-reading it here would cost an extra hosted
@@ -875,8 +888,7 @@ def _reconcile_capture_owned(conn: Any, actor: str, existing: dict[str, Any], fi
             if (existing.get(column) or None) != (fields.get(column) or None):
                 conn.execute(f"UPDATE findings SET {column} = ? WHERE id = ?", (fields.get(column), finding_id))
                 changed[column] = "updated"
-        if _sections_differ(existing, fields):
-            conn.execute("DELETE FROM finding_sections WHERE finding_id = ?", (finding_id,))
+        if _sections_need_backfill(existing, fields):
             for section in fields.get("sections") or []:
                 conn.execute(
                     "INSERT INTO finding_sections (finding_id, position, heading, text) VALUES (?, ?, ?, ?)",
@@ -947,10 +959,12 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
     marked synced). Same-id/different *prose* is a loud error naming the id --
     never a merge (silent data loss in an audit-trail domain).
 
-    Capture-owned payload the prose comparison does not cover -- today the
-    evidence rows -- is reconciled IN PLACE from the draft and recorded in
-    ``finding_events``. Comparing only the prose fields meant an evidence-only
-    edit was marked ``.synced`` and lost with `sync` reporting success. Judgement
+    Capture-owned payload the dedicated prose comparison does not cover -- evidence
+    rows and declared v4 frontmatter -- is reconciled IN PLACE from the draft and
+    recorded in ``finding_events``. Missing pre-v4 extra-section rows are backfilled,
+    while edits to established section prose remain conflicts. Comparing only the
+    dedicated prose fields meant an evidence-only edit was marked ``.synced`` and
+    lost with `sync` reporting success. Judgement
     fields (urgency/breadth/confidence/reconsider_after) are excluded from every
     comparison: they are DB-owned once triage sets them, so reconciling them from
     a pre-triage draft would wipe the judgement.
@@ -984,7 +998,7 @@ def sync_drafts(conn: Any, actor: str, drafts_dir: str | Path) -> dict[str, Any]
             result["unmapped"][fields["id"]] = unmapped
         existing = get_finding(conn, fields["id"])
         if existing is not None:
-            if not _finding_matches(existing, fields):
+            if not _finding_matches(existing, fields) or _sections_conflict(existing, fields):
                 # Prose disagreement is still a loud conflict, never a merge.
                 result["conflicts"].append(fields["id"])
                 continue
