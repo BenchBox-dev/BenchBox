@@ -956,9 +956,33 @@ security-audit:
 # CI (which never installs it) and fail locally on vendored typos - inverting
 # what a preflight is for. Keep any future vendored/generated tree out the same
 # way; do NOT skip a directory that holds tracked content.
+# Spellcheck scans the TRACKED file list rather than walking the working tree, so
+# a gitignored directory can never be scanned. Walking the tree made the gate
+# environment-dependent: it stayed green in CI and in fresh pool worktrees, but
+# failed in the maintainer's primary clone on gitignored paths that only exist
+# there (`@~/`, `results-explorer/dist/`). Chasing those names in --skip fixes one
+# clone at a time; deriving the file list from git fixes the class.
+#
+# --skip keeps only the FILENAME globs. Its directory entries are dropped on
+# purpose: codespell prunes directories while traversing, so a directory name in
+# --skip has no effect once explicit paths are passed. Tracked directories that
+# must stay unscanned are excluded as git pathspecs instead (the rest of the old
+# list -- _build, benchmark_runs, htmlcov, .venv, node_modules -- is gitignored,
+# so `git ls-files` already excludes it).
+SPELLCHECK_SKIP_GLOBS := *.pyc,*.json,*.lock,*.svg,*.min.js,*.min.css,*.tpl,*.dst,*.tbl,*.dat,*.pdf
+# `**/` matches at any depth, so these exclude the directory NAME wherever it
+# appears (e.g. both `_binaries/` and `benchbox/_binaries/`), matching how
+# codespell's --skip pruned directory names during traversal.
+SPELLCHECK_EXCLUDE_PATHS := \
+	':(exclude,glob)**/_binaries/**' ':(exclude,glob)_binaries/**' \
+	':(exclude,glob)**/_sources/**'  ':(exclude,glob)_sources/**' \
+	':(exclude,glob)**/_project/**'  ':(exclude,glob)_project/**' \
+	':(exclude,glob)**/_blog/**'     ':(exclude,glob)_blog/**'
+
 spellcheck:
 	@echo "Running spellcheck..."
-	uvx codespell --ignore-words=.codespell-ignore.txt --skip="*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv,node_modules"
+	git ls-files -z -- $(SPELLCHECK_EXCLUDE_PATHS) \
+		| xargs -0 uvx codespell --ignore-words=.codespell-ignore.txt --skip="$(SPELLCHECK_SKIP_GLOBS)"
 	@echo "✅ Spellcheck passed"
 
 # Linkcheck - exact match for docs.yml linkcheck job
