@@ -682,3 +682,77 @@ class TestGetTPCHColumnNamesCompleteness:
         """TPC-H region table has exactly 3 columns."""
         columns = get_tpch_column_names()
         assert len(columns["region"]) == 3
+
+
+class TestHeaderedCsvConversion:
+    """A headered CSV converted with explicit column names must skip its header.
+
+    PyArrow's ``column_names`` REPLACES the header names but does not skip the
+    header LINE, so a headered CSV read with explicit names parses its own header
+    as a data row. With declared numeric/date column types that conversion FAILS,
+    and the loader then silently falls back to the raw source file -- an untyped
+    read where date columns stay strings and every date filter matches nothing.
+    Headerless TPC ``.tbl`` must be unaffected.
+    """
+
+    def _column_types(self):
+        return {"id": "int64", "event_date": "date32", "label": "string"}
+
+    def test_headered_csv_converts_with_typed_columns(self, tmp_path: Path):
+        pytest.importorskip("pyarrow")
+        source = tmp_path / "events.csv"
+        source.write_text("id,event_date,label\n1,2024-12-01,alpha\n2,2024-12-02,beta\n")
+
+        status, rows = FormatConverter.convert_csv_to_parquet(
+            source_path=source,
+            target_path=tmp_path / "events.parquet",
+            column_names=["id", "event_date", "label"],
+            delimiter=",",
+            column_types=self._column_types(),
+            has_header=True,
+        )
+
+        assert status == ConversionStatus.SUCCESS, "typed conversion of a headered CSV must not fail"
+        assert rows == 2, f"header row must not be counted as data; got {rows} rows"
+
+    def test_header_row_is_not_ingested_as_data(self, tmp_path: Path):
+        """The literal header text must not survive into the converted table."""
+        pyarrow = pytest.importorskip("pyarrow")
+        pq = pytest.importorskip("pyarrow.parquet")
+        source = tmp_path / "events.csv"
+        source.write_text("id,event_date,label\n1,2024-12-01,alpha\n")
+        target = tmp_path / "events.parquet"
+
+        status, _ = FormatConverter.convert_csv_to_parquet(
+            source_path=source,
+            target_path=target,
+            column_names=["id", "event_date", "label"],
+            delimiter=",",
+            column_types=self._column_types(),
+            has_header=True,
+        )
+        assert status == ConversionStatus.SUCCESS
+
+        table = pq.read_table(target)
+        assert "label" not in table.column("label").to_pylist(), "header row leaked in as data"
+        assert pyarrow.types.is_date(table.schema.field("event_date").type), (
+            "event_date must keep its declared date type, not fall back to string"
+        )
+
+    def test_headerless_source_is_unchanged(self, tmp_path: Path):
+        """has_header=False (TPC .tbl and friends) must keep every row."""
+        pytest.importorskip("pyarrow")
+        source = tmp_path / "events.csv"
+        source.write_text("1,2024-12-01,alpha\n2,2024-12-02,beta\n")
+
+        status, rows = FormatConverter.convert_csv_to_parquet(
+            source_path=source,
+            target_path=tmp_path / "events.parquet",
+            column_names=["id", "event_date", "label"],
+            delimiter=",",
+            column_types=self._column_types(),
+            has_header=False,
+        )
+
+        assert status == ConversionStatus.SUCCESS
+        assert rows == 2, "a headerless source must not lose its first row"
