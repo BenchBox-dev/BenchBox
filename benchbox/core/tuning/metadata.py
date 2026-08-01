@@ -208,6 +208,38 @@ class TuningMetadataManager:
             config["database"] = self.database_name
         return config
 
+    def _is_missing_metadata_table_error(self, exc: Exception) -> bool:
+        """Distinguish a fresh database from an unreadable metadata store.
+
+        Drivers expose missing-table failures through different exception
+        classes and codes.  Require the managed metadata table name in the
+        message before accepting a known missing-relation code or phrase so an
+        unrelated connection/query failure still fails closed.
+        """
+        current: BaseException | None = exc
+        seen: set[int] = set()
+        while current is not None and id(current) not in seen:
+            seen.add(id(current))
+            message = str(current).lower()
+            if self._metadata_table_name.lower() in message:
+                code = getattr(current, "sqlstate", None) or getattr(current, "pgcode", None)
+                errno = getattr(current, "errno", None) or getattr(current, "code", None)
+                if code == "42P01" or errno in {60, 1146}:
+                    return True
+                if any(
+                    phrase in message
+                    for phrase in (
+                        "does not exist",
+                        "no such table",
+                        "unknown table",
+                        "undefined table",
+                        "not found",
+                    )
+                ):
+                    return True
+            current = getattr(current, "orig", None) or current.__cause__ or current.__context__
+        return False
+
     def _platform_key(self) -> str:
         """Return the canonical platform type key for lookups and persistence.
 
@@ -767,7 +799,8 @@ class TuningMetadataManager:
             finally:
                 self.platform_adapter.close_connection(temp_conn)
         except Exception as exc:
-            self.last_load_error = str(exc)
+            if not self._is_missing_metadata_table_error(exc):
+                self.last_load_error = str(exc)
             self._table_exists = False
             return False
 

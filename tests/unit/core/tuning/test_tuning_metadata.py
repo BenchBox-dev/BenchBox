@@ -150,6 +150,32 @@ def test_table_exists_check_caches_true_result(monkeypatch):
     assert calls["n"] == 1
 
 
+def test_table_exists_check_treats_missing_managed_table_as_fresh_database(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    monkeypatch.setattr(
+        manager,
+        "_fetch_one",
+        lambda _conn, _sql: (_ for _ in ()).throw(
+            RuntimeError("Catalog Error: Table with name benchbox_tuning_metadata does not exist!")
+        ),
+    )
+
+    assert manager._table_exists_check() is False
+    assert manager.last_load_error is None
+
+
+def test_table_exists_check_preserves_unrelated_probe_failure(monkeypatch):
+    manager = TuningMetadataManager(_Adapter("duckdb"))
+    monkeypatch.setattr(
+        manager,
+        "_fetch_one",
+        lambda _conn, _sql: (_ for _ in ()).throw(RuntimeError("network unavailable")),
+    )
+
+    assert manager._table_exists_check() is False
+    assert manager.last_load_error == "network unavailable"
+
+
 def test_rebuild_tunings_from_records_groups_columns_by_table_and_type():
     manager = TuningMetadataManager(_Adapter("duckdb"))
     records = [
