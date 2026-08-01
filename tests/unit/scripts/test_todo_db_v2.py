@@ -161,6 +161,107 @@ class TestScopeSelfExemption:
         assert todo_db.check_paths([".todo-db/todo.sqlite"], rules) == []
 
 
+class TestAuditedScopeUpdate:
+    def test_scope_update_requires_reason_and_logs_exact_rules(self, conn):
+        _mk(
+            conn,
+            scope=[
+                ("only_modify", "src/**"),
+                ("do_not_modify", "src/generated/**"),
+            ],
+        )
+
+        with pytest.raises(todo_db.TodoError, match="scope changes require --reason"):
+            todo_db.update_scope_rules(conn, "tester", "resume-item", [("only_modify", "tests/**")], [])
+
+        detail = todo_db.update_scope_rules(
+            conn,
+            "tester",
+            "resume-item",
+            [("only_modify", "tests/**")],
+            [("do_not_modify", "src/generated/**")],
+            "tests are part of the reviewed verification boundary",
+        )
+
+        assert detail == {
+            "reason": "tests are part of the reviewed verification boundary",
+            "scope_added": [{"kind": "only_modify", "path_glob": "tests/**"}],
+            "scope_dropped": [{"kind": "do_not_modify", "path_glob": "src/generated/**"}],
+        }
+        assert todo_db.get_item(conn, "resume-item")["scope"] == [
+            {"kind": "only_modify", "path_glob": "src/**"},
+            {"kind": "only_modify", "path_glob": "tests/**"},
+        ]
+        event = conn.execute("SELECT action, detail FROM events ORDER BY seq DESC LIMIT 1").fetchone()
+        assert event["action"] == "update"
+        assert json.loads(event["detail"]) == detail
+
+    def test_scope_update_is_atomic_and_rejects_invalid_rules(self, conn):
+        _mk(conn, scope=[("only_modify", "src/**")])
+        events_before = conn.execute("SELECT count(*) AS count FROM events").fetchone()["count"]
+
+        invalid_updates = [
+            ([("only_modify", "tests/**")], [("do_not_modify", "missing/**")], "no scope rule"),
+            ([("only_modify", "tests/**"), ("only_modify", "tests/**")], [], "more than once"),
+            ([("only_modify", "tests/**")], [("only_modify", "tests/**")], "add and drop"),
+            ([("only_modify", "   ")], [], "must not be empty"),
+            ([("only_modify", "src/**")], [], "already exists"),
+        ]
+        for additions, removals, message in invalid_updates:
+            with pytest.raises(todo_db.TodoError, match=message):
+                todo_db.update_scope_rules(
+                    conn,
+                    "tester",
+                    "resume-item",
+                    additions,
+                    removals,
+                    "exercise atomic validation",
+                )
+
+        assert todo_db.get_item(conn, "resume-item")["scope"] == [{"kind": "only_modify", "path_glob": "src/**"}]
+        assert conn.execute("SELECT count(*) AS count FROM events").fetchone()["count"] == events_before
+
+    def test_cli_scope_update_routes_all_rule_kinds(self, tmp_path, capsys):
+        db = tmp_path / "todo.sqlite"
+        connection = todo_db.connect(db)
+        _mk(
+            connection,
+            scope=[
+                ("only_modify", "src/**"),
+                ("do_not_modify", "generated/**"),
+            ],
+        )
+        connection.close()
+
+        assert (
+            todo_db.main(
+                [
+                    "--db",
+                    str(db),
+                    "--actor",
+                    "tester",
+                    "scope-update",
+                    "resume-item",
+                    "--add-only-modify",
+                    "tests/**",
+                    "--drop-do-not-modify",
+                    "generated/**",
+                    "--reason",
+                    "tests replace the generated-output boundary",
+                ]
+            )
+            == 0
+        )
+        assert "updated resume-item (scope_added, scope_dropped)" in capsys.readouterr().out
+
+        connection = todo_db.connect(db)
+        assert todo_db.get_item(connection, "resume-item")["scope"] == [
+            {"kind": "only_modify", "path_glob": "src/**"},
+            {"kind": "only_modify", "path_glob": "tests/**"},
+        ]
+        connection.close()
+
+
 @pytest.mark.parametrize(
     ("args", "expected"),
     [

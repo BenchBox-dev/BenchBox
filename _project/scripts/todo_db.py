@@ -47,6 +47,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -1803,6 +1804,76 @@ def add_item_dep(conn: sqlite3.Connection, item_id: str, needs_item: str) -> Non
         )
     except sqlite3.IntegrityError as exc:
         raise TodoError(f"dependency {item_id!r} -> {needs_item!r} references a missing item: {exc}") from exc
+
+
+def _normalize_scope_updates(rules: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
+    normalized: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for raw_kind, raw_path_glob in rules:
+        kind = str(raw_kind)
+        path_glob = str(raw_path_glob).strip()
+        if kind not in ("only_modify", "do_not_modify"):
+            raise TodoError(f"invalid scope rule kind: {kind}")
+        if not path_glob:
+            raise TodoError("scope path glob must not be empty")
+        rule = (kind, path_glob)
+        if rule in seen:
+            raise TodoError(f"scope rule named more than once: {kind}:{path_glob}")
+        seen.add(rule)
+        normalized.append(rule)
+    return normalized
+
+
+def update_scope_rules(
+    conn: sqlite3.Connection,
+    actor: str,
+    item_id: str,
+    add_scope: Iterable[tuple[str, str]] = (),
+    drop_scope: Iterable[tuple[str, str]] = (),
+    reason: str | None = None,
+) -> dict[str, Any]:
+    """Atomically amend an item's write boundary and record the exact diff."""
+    additions = _normalize_scope_updates(add_scope)
+    removals = _normalize_scope_updates(drop_scope)
+    reason = reason.strip() if reason and reason.strip() else None
+    if not additions and not removals:
+        raise TodoError("scope-update requires at least one scope change flag")
+    if reason is None:
+        raise TodoError("scope changes require --reason because they amend the item's write boundary")
+    conflict = set(additions) & set(removals)
+    if conflict:
+        kind, path_glob = sorted(conflict)[0]
+        raise TodoError(f"cannot add and drop the same scope rule: {kind}:{path_glob}")
+
+    with _write_txn(conn):
+        _require_item(conn, item_id)
+        existing = {
+            (row["kind"], row["path_glob"])
+            for row in conn.execute("SELECT kind, path_glob FROM scope_rules WHERE item_id = ?", (item_id,))
+        }
+        for kind, path_glob in additions:
+            if (kind, path_glob) in existing:
+                raise TodoError(f"scope rule already exists on {item_id!r}: {kind}:{path_glob}")
+        for kind, path_glob in removals:
+            if (kind, path_glob) not in existing:
+                raise TodoError(f"no scope rule on {item_id!r}: {kind}:{path_glob}")
+        for kind, path_glob in removals:
+            conn.execute(
+                "DELETE FROM scope_rules WHERE item_id = ? AND kind = ? AND path_glob = ?",
+                (item_id, kind, path_glob),
+            )
+        for kind, path_glob in additions:
+            conn.execute(
+                "INSERT INTO scope_rules (item_id, kind, path_glob) VALUES (?, ?, ?)",
+                (item_id, kind, path_glob),
+            )
+        detail = {
+            "reason": reason,
+            "scope_added": [{"kind": kind, "path_glob": path_glob} for kind, path_glob in additions],
+            "scope_dropped": [{"kind": kind, "path_glob": path_glob} for kind, path_glob in removals],
+        }
+        log_event(conn, actor, item_id, "update", detail)
+    return detail
 
 
 def claim_item(
@@ -3655,6 +3726,14 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
 
+    p = sub.add_parser("scope-update", help="atomically amend an item's audited scope rules")
+    p.add_argument("id")
+    p.add_argument("--add-only-modify", action="append", default=[], metavar="GLOB")
+    p.add_argument("--drop-only-modify", action="append", default=[], metavar="GLOB")
+    p.add_argument("--add-do-not-modify", action="append", default=[], metavar="GLOB")
+    p.add_argument("--drop-do-not-modify", action="append", default=[], metavar="GLOB")
+    p.add_argument("--reason", required=True)
+
     for name, help_text in (
         ("show", "show one item"),
         ("claim", "claim an item and print its work order"),
@@ -3996,6 +4075,22 @@ def _cmd_create(conn, actor, args):
     return 0
 
 
+def _cmd_update(conn, actor, args):
+    detail = update_scope_rules(
+        conn,
+        actor,
+        args.id,
+        [("only_modify", value) for value in args.add_only_modify]
+        + [("do_not_modify", value) for value in args.add_do_not_modify],
+        [("only_modify", value) for value in args.drop_only_modify]
+        + [("do_not_modify", value) for value in args.drop_do_not_modify],
+        args.reason,
+    )
+    changed = [key for key in ("scope_added", "scope_dropped") if detail[key]]
+    print(f"updated {args.id} ({', '.join(changed)})")
+    return 0
+
+
 def _cmd_show(conn, actor, args):
     if args.json:
         print(json.dumps(get_item(conn, args.id), indent=2, sort_keys=True))
@@ -4296,6 +4391,7 @@ _HANDLERS = {
     "init": _cmd_init,
     "import-yaml": _cmd_import_yaml,
     "create": _cmd_create,
+    "scope-update": _cmd_update,
     "show": _cmd_show,
     "claim": _cmd_claim,
     "release": _cmd_release,
