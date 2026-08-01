@@ -37,6 +37,7 @@ import difflib
 import fnmatch
 import getpass
 import json
+import math
 import os
 import re
 import shlex
@@ -289,11 +290,50 @@ FREEZE_AT_KEY = "maintenance.frozen_at"
 FREEZE_REASON_KEY = "maintenance.freeze_reason"
 FREEZE_TTL_KEY = "maintenance.freeze_ttl_hours"
 DEFAULT_FREEZE_TTL_HOURS = 2.0
+# A freeze is a maintenance window, not a standing state. The ceiling exists to
+# keep the TTL inside timedelta's range: `timedelta(hours=inf)` (and any value
+# past ~2.4e10 hours) raises, and that raise used to escape through every
+# mutating command -- including `freeze --release`, the designated escape hatch.
+MAX_FREEZE_TTL_HOURS = 168.0  # 7 days
 
 
 def _meta_get(conn: sqlite3.Connection, key: str) -> str | None:
     row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
     return row["value"] if row else None
+
+
+def _coerce_freeze_ttl(raw: str | None) -> float:
+    """A finite, positive, bounded TTL. Anything else falls back to the default.
+
+    Only reachable with a tampered or torn `meta` row now that `set_freeze`
+    validates, but this is the read path for a safety gate: it must not raise.
+    """
+    try:
+        ttl = float(raw) if raw is not None else DEFAULT_FREEZE_TTL_HOURS
+    except (TypeError, ValueError):
+        return DEFAULT_FREEZE_TTL_HOURS
+    if not math.isfinite(ttl) or ttl <= 0:
+        return DEFAULT_FREEZE_TTL_HOURS
+    return min(ttl, MAX_FREEZE_TTL_HOURS)
+
+
+def _freeze_lease_expired(started: str | None, ttl_hours: float) -> bool:
+    """Freeze liveness, failing CLOSED where claim leases fail open.
+
+    A claim with a missing or corrupt `claimed_at` should lapse so the item can
+    be reclaimed. A *freeze* is the opposite: it guards a destructive cutover,
+    so a half-written or unparseable stamp must read as still-frozen. Returning
+    "expired" here would let every other actor write straight through a torn
+    freeze -- a safety gate whose degraded state is "unlocked".
+
+    The freeze stays liftable regardless: `freeze` is exempt from the gate.
+    """
+    if not started:
+        return False
+    try:
+        return _lease_expired(started, ttl_hours)
+    except (ValueError, OverflowError):
+        return False
 
 
 def get_freeze(conn: sqlite3.Connection) -> dict[str, Any] | None:
@@ -302,17 +342,16 @@ def get_freeze(conn: sqlite3.Connection) -> dict[str, Any] | None:
     if not holder:
         return None
     started = _meta_get(conn, FREEZE_AT_KEY)
-    try:
-        ttl = float(_meta_get(conn, FREEZE_TTL_KEY) or DEFAULT_FREEZE_TTL_HOURS)
-    except ValueError:
-        ttl = DEFAULT_FREEZE_TTL_HOURS
-    expired = _lease_expired(started, ttl)
+    ttl = _coerce_freeze_ttl(_meta_get(conn, FREEZE_TTL_KEY))
+    expired = _freeze_lease_expired(started, ttl)
     return (
         None
         if expired
         else {
             "holder": holder,
-            "since": started,
+            # A torn freeze (holder written, stamp not) still reads as live;
+            # say so rather than interpolating a bare None into the message.
+            "since": started or "unknown",
             "ttl_hours": ttl,
             "reason": _meta_get(conn, FREEZE_REASON_KEY) or "",
         }
@@ -325,16 +364,26 @@ def set_freeze(
     reason: str,
     ttl_hours: float = DEFAULT_FREEZE_TTL_HOURS,
 ) -> dict[str, Any]:
-    if ttl_hours <= 0:
-        raise TodoError("freeze --ttl must be positive; an unbounded freeze is exactly the stuck lock this avoids")
-    live = get_freeze(conn)
-    if live and live["holder"] != actor:
+    if not math.isfinite(ttl_hours) or ttl_hours <= 0:
         raise TodoError(
-            f"tracker already frozen by {live['holder']} since {live['since']} "
-            f"({live['reason'] or 'no reason given'}); it lapses after {live['ttl_hours']}h"
+            "freeze --ttl must be positive and finite; an unbounded freeze is exactly the stuck lock this avoids"
+        )
+    if ttl_hours > MAX_FREEZE_TTL_HOURS:
+        raise TodoError(
+            f"freeze --ttl must not exceed {MAX_FREEZE_TTL_HOURS:g}h; "
+            "a longer maintenance window should be re-taken, not held open"
         )
     stamp = utc_now()
+    # Read the incumbent inside the write transaction: BEGIN IMMEDIATE holds the
+    # write lock across the check-then-act, so two actors racing to freeze cannot
+    # both observe "no live freeze" and both install themselves as holder.
     with _write_txn(conn):
+        live = get_freeze(conn)
+        if live and live["holder"] != actor:
+            raise TodoError(
+                f"tracker already frozen by {live['holder']} since {live['since']} "
+                f"({live['reason'] or 'no reason given'}); it lapses after {live['ttl_hours']}h"
+            )
         for key, value in (
             (FREEZE_HOLDER_KEY, actor),
             (FREEZE_AT_KEY, stamp),
@@ -348,14 +397,16 @@ def set_freeze(
 
 def clear_freeze(conn: sqlite3.Connection, actor: str, *, force: bool = False) -> bool:
     """Lift the freeze. Returns False when there was no live freeze to lift."""
-    live = get_freeze(conn)
-    if live and live["holder"] != actor and not force:
-        raise TodoError(
-            f"freeze is held by {live['holder']}, not {actor}; "
-            "wait for its lease to lapse or override with `todo freeze --release --force`"
-        )
-    had_rows = _meta_get(conn, FREEZE_HOLDER_KEY) is not None
+    # Same check-then-act discipline as set_freeze: hold the write lock across
+    # the ownership check so a concurrent freeze cannot slip in behind it.
     with _write_txn(conn):
+        live = get_freeze(conn)
+        if live and live["holder"] != actor and not force:
+            raise TodoError(
+                f"freeze is held by {live['holder']}, not {actor}; "
+                "wait for its lease to lapse or override with `todo freeze --release --force`"
+            )
+        had_rows = _meta_get(conn, FREEZE_HOLDER_KEY) is not None
         for key in (FREEZE_HOLDER_KEY, FREEZE_AT_KEY, FREEZE_REASON_KEY, FREEZE_TTL_KEY):
             conn.execute("DELETE FROM meta WHERE key = ?", (key,))
         if had_rows:
@@ -1077,13 +1128,50 @@ def _freeze_refusal(conn: sqlite3.Connection, actor: str, args: argparse.Namespa
         return 2
     if not live or live["holder"] == actor:
         return None
-    print(
+    print(_freeze_refusal_message(live), file=sys.stderr)
+    return 2
+
+
+def _freeze_refusal_message(live: dict[str, Any]) -> str:
+    return (
         f"error: tracker is frozen for maintenance by {live['holder']} since {live['since']}"
         f"{': ' + live['reason'] if live['reason'] else ''}. "
         f"Reads still work; writes resume when the holder runs `todo freeze --release` "
-        f"or the {live['ttl_hours']}h lease lapses.",
-        file=sys.stderr,
+        f"or the {live['ttl_hours']}h lease lapses."
     )
+
+
+def _premigrate_freeze_refusal(backend: Path | str, actor: str) -> int | None:
+    """Freeze gate for `migrate`, which necessarily runs before connect_backend().
+
+    `migrate` cannot use the normal gate: connect_backend() refuses an outdated
+    schema, so `_freeze_refusal` is unreachable on exactly the databases that
+    have migrations pending -- letting a schema change land mid-cutover through
+    a live freeze. Read the freeze off a raw connection instead.
+    """
+    try:
+        if isinstance(backend, Path):
+            if not backend.exists():
+                return None  # nothing to migrate, nothing to protect
+            conn: Any = sqlite3.connect(backend)
+            conn.row_factory = sqlite3.Row
+        else:
+            conn = _hosted_raw_connect(backend, sync_required=True)
+        try:
+            if _schema_version(conn) is None:
+                return None  # fresh/schemaless database: no freeze can be stored
+            live = get_freeze(conn)
+        finally:
+            conn.close()
+    except TodoError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except sqlite3.Error as exc:
+        print(f"error: database failure: {_redacted(exc, _auth_token())}", file=sys.stderr)
+        return 2
+    if not live or live["holder"] == actor:
+        return None
+    print(_freeze_refusal_message(live), file=sys.stderr)
     return 2
 
 
@@ -2288,7 +2376,7 @@ def _has_falsifiable_rung(item: dict) -> bool:
 # family is tests/unit/<subpath>/test_<name>*.py - the wildcard admits split
 # suites (test_todo_db.py, test_todo_db_v2.py, ...); scope is complete when
 # it covers ANY existing member. Only EXISTING test files are demanded - a
-# module without tests today stays createable.
+# module without tests today stays creatable.
 
 _SOURCE_SCOPE_RE = re.compile(r"^(benchbox/(?:[\w./-]+/)?|_project/scripts/)(\w+)\.py$")
 
@@ -3224,7 +3312,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 2
     if args.command == "migrate":
-        # Must run before connect(): connect refuses an outdated schema.
+        # Must run before connect(): connect refuses an outdated schema. That
+        # also puts it ahead of the normal freeze gate, so run the gate here --
+        # otherwise `migrate` is the one mutating command a freeze never covers.
+        refusal = _premigrate_freeze_refusal(backend, actor)
+        if refusal is not None:
+            return refusal
         try:
             applied = migrate_backend(backend)
         except TodoError as exc:

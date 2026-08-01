@@ -11,6 +11,8 @@ config writes take no claim at all.
 from __future__ import annotations
 
 import importlib.util
+import math
+import sqlite3
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -286,3 +288,159 @@ class TestFreezeGate:
         connection = todo_db.connect(db)
         assert todo_db.write_activity(connection) == before
         connection.close()
+
+
+class TestFreezeTtlIsBounded:
+    """A TTL that timedelta cannot represent used to wedge the tracker through
+    the documented `--ttl` flag: every mutating command, `--status`, `--release`
+    and even `--release --force` raised OverflowError, leaving raw SQL as the
+    only recovery. The lease exists precisely so that cannot happen.
+    """
+
+    @pytest.mark.parametrize("bad", ["inf", "-inf", "nan"])
+    def test_non_finite_ttl_is_refused(self, conn, bad):
+        with pytest.raises(todo_db.TodoError):
+            todo_db.set_freeze(conn, "alice", "cutover", ttl_hours=float(bad))
+        assert todo_db.get_freeze(conn) is None
+
+    def test_ttl_beyond_the_ceiling_is_refused(self, conn):
+        with pytest.raises(todo_db.TodoError):
+            todo_db.set_freeze(conn, "alice", "cutover", ttl_hours=todo_db.MAX_FREEZE_TTL_HOURS + 1)
+        assert todo_db.get_freeze(conn) is None
+
+    def test_ttl_at_the_ceiling_is_allowed(self, conn):
+        todo_db.set_freeze(conn, "alice", "cutover", ttl_hours=todo_db.MAX_FREEZE_TTL_HOURS)
+        assert todo_db.get_freeze(conn)["ttl_hours"] == todo_db.MAX_FREEZE_TTL_HOURS
+
+    @pytest.mark.parametrize("stored", ["inf", "nan", "1e308", "not-a-number", "-5"])
+    def test_a_tampered_ttl_row_never_raises(self, conn, stored):
+        """Recovery path for a database wedged before the validation landed."""
+        todo_db.set_freeze(conn, "alice", "cutover", ttl_hours=1)
+        conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+            (todo_db.FREEZE_TTL_KEY, stored),
+        )
+        live = todo_db.get_freeze(conn)  # must not raise
+        assert live is not None
+        assert math.isfinite(live["ttl_hours"])
+        assert 0 < live["ttl_hours"] <= todo_db.MAX_FREEZE_TTL_HOURS
+
+    def test_a_wedged_database_can_still_be_released(self, tmp_path):
+        db = tmp_path / "todo.sqlite"
+        connection = todo_db.connect(db)
+        todo_db.set_freeze(connection, "alice", "cutover", ttl_hours=1)
+        connection.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+            (todo_db.FREEZE_TTL_KEY, "inf"),
+        )
+        connection.commit()
+        connection.close()
+        assert _run(db, "freeze", "--release", "--force", actor="bob") == 0
+
+
+class TestTornFreezeFailsClosed:
+    """A half-written freeze must read as still-frozen. Returning "expired" let
+    every other actor write straight through it -- a safety gate whose degraded
+    state is "unlocked".
+    """
+
+    def _tear(self, conn, value=None):
+        if value is None:
+            conn.execute("DELETE FROM meta WHERE key = ?", (todo_db.FREEZE_AT_KEY,))
+        else:
+            conn.execute(
+                "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                (todo_db.FREEZE_AT_KEY, value),
+            )
+
+    def test_missing_stamp_reads_as_live(self, conn):
+        todo_db.set_freeze(conn, "alice", "cutover", ttl_hours=1)
+        self._tear(conn)
+        live = todo_db.get_freeze(conn)
+        assert live is not None
+        assert live["holder"] == "alice"
+
+    def test_malformed_stamp_reads_as_live(self, conn):
+        todo_db.set_freeze(conn, "alice", "cutover", ttl_hours=1)
+        self._tear(conn, "not-a-timestamp")
+        assert todo_db.get_freeze(conn) is not None
+
+    @pytest.mark.parametrize("stamp", [None, "not-a-timestamp"])
+    def test_torn_freeze_refuses_a_foreign_write_cleanly(self, tmp_path, stamp):
+        db = tmp_path / "todo.sqlite"
+        connection = todo_db.connect(db)
+        _mk(connection, "existing-item")
+        todo_db.set_freeze(connection, "alice", "cutover", ttl_hours=1)
+        self._tear(connection, stamp)
+        connection.commit()
+        connection.close()
+        # exit 2, not an uncaught ValueError escaping main()
+        assert _run(db, "claim", "existing-item", actor="bob") == 2
+
+    @pytest.mark.parametrize("stamp", [None, "not-a-timestamp"])
+    def test_torn_freeze_is_still_liftable(self, tmp_path, stamp):
+        db = tmp_path / "todo.sqlite"
+        connection = todo_db.connect(db)
+        todo_db.set_freeze(connection, "alice", "cutover", ttl_hours=1)
+        self._tear(connection, stamp)
+        connection.commit()
+        connection.close()
+        assert _run(db, "freeze", "--release", "--force", actor="bob") == 0
+
+
+class TestMigrateIsGatedByTheFreeze:
+    """`migrate` runs before connect_backend() -- which refuses an outdated
+    schema -- so the normal gate is unreachable on exactly the databases that
+    have migrations pending. Without its own check, a schema change lands
+    mid-cutover through a live freeze.
+    """
+
+    def _v3_db(self, tmp_path, holder):
+        db = tmp_path / "todo.sqlite"
+        raw = sqlite3.connect(db)
+        raw.row_factory = sqlite3.Row
+        raw.executescript(todo_db._CORE_SCHEMA_SQL)
+        # Climb to v3 only; v4 is what the CLI under test should (or should not)
+        # apply. _CORE_SCHEMA_SQL already carries the v2 columns.
+        for statement in todo_db.MIGRATIONS[3]:
+            raw.execute(statement)
+        raw.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '3')")
+        for key, value in (
+            (todo_db.FREEZE_HOLDER_KEY, holder),
+            (todo_db.FREEZE_AT_KEY, todo_db.utc_now()),
+            (todo_db.FREEZE_REASON_KEY, "cutover"),
+            (todo_db.FREEZE_TTL_KEY, "2.0"),
+        ):
+            raw.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, value))
+        raw.commit()
+        raw.close()
+        return db
+
+    def _version(self, db):
+        raw = sqlite3.connect(db)
+        raw.row_factory = sqlite3.Row
+        try:
+            return todo_db._schema_version(raw)
+        finally:
+            raw.close()
+
+    def test_foreign_actor_cannot_migrate_through_a_freeze(self, tmp_path):
+        db = self._v3_db(tmp_path, holder="alice")
+        assert self._version(db) == 3
+        assert _run(db, "migrate", actor="bob") == 2
+        assert self._version(db) == 3, "schema changed under a live freeze"
+
+    def test_the_holder_may_still_migrate(self, tmp_path):
+        """The holder runs the cutover, so it must keep its own write access."""
+        db = self._v3_db(tmp_path, holder="alice")
+        assert _run(db, "migrate", actor="alice") == 0
+        assert self._version(db) == todo_db.SCHEMA_VERSION
+
+    def test_migrate_is_unaffected_with_no_freeze(self, tmp_path):
+        db = self._v3_db(tmp_path, holder="alice")
+        raw = sqlite3.connect(db)
+        raw.execute("DELETE FROM meta WHERE key LIKE 'maintenance.%'")
+        raw.commit()
+        raw.close()
+        assert _run(db, "migrate", actor="bob") == 0
+        assert self._version(db) == todo_db.SCHEMA_VERSION
