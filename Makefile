@@ -643,6 +643,7 @@ clean:
 # Linting (ruff + explorer token scan)
 lint:
 	uv run ruff check .
+	$(MAKE) windows-antipatterns-check
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
 
@@ -674,6 +675,12 @@ audit-sha-check:
 		--target-ref "$(AUDIT_SHA_TARGET_REF)" \
 		$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \
 		"$(FILE)"
+
+# Reject product-source patterns that depend on Unix-only behavior or the
+# process locale. The scanner is stdlib-only; its default root is benchbox/.
+.PHONY: windows-antipatterns-check
+windows-antipatterns-check:
+	uv run -- python scripts/check_windows_antipatterns.py
 
 # Validate marker registration and the explicit marker-strategy policy.
 lint-markers:
@@ -892,6 +899,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed lint-markers"; \
 	$(MAKE) lint-imports; \
 	[ $$? -eq 0 ] || failed="$$failed lint-imports"; \
+	$(MAKE) windows-antipatterns-check; \
+	[ $$? -eq 0 ] || failed="$$failed windows-antipatterns"; \
 	$(MAKE) lint-explorer-tokens; \
 	[ $$? -eq 0 ] || failed="$$failed lint-explorer-tokens"; \
 	$(MAKE) lint-site-theme-tokens; \

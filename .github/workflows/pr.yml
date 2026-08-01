@@ -299,6 +299,11 @@ jobs:
         continue-on-error: true
         run: make lint-imports
 
+      - name: Validate Windows antipatterns
+        id: guard-windows-antipatterns
+        continue-on-error: true
+        run: make windows-antipatterns-check
+
       - name: Validate artifact hygiene
         id: guard-artifact-hygiene
         continue-on-error: true

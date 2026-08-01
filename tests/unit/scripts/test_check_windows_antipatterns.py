@@ -114,6 +114,47 @@ def test_wa002_all_signal_names(tmp_path: Path) -> None:
 
 
 # ------------------------------------------------------------------ #
+# WA003 tests                                                          #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "path.read_text()",
+        "path.read_text(errors='replace')",
+        "path.read_text(encoding=None)",
+        "path.read_text(None)",
+        "path.read_text(*options)",
+        "path.read_text(**options)",
+    ],
+)
+def test_wa003_read_text_without_explicit_encoding(tmp_path: Path, call: str) -> None:
+    violations = check_file(_write(tmp_path, f"def read(path, options=()):\n    return {call}\n"))
+    assert len(violations) == 1
+    assert violations[0].code == "WA003"
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "path.read_text(encoding='utf-8')",
+        "path.read_text('utf-8')",
+        "path.read_text(encoding='cp1252', errors='strict')",
+        "path.read_text(resolve_encoding())",
+    ],
+)
+def test_wa003_explicit_encoding_is_allowed(tmp_path: Path, call: str) -> None:
+    violations = check_file(_write(tmp_path, f"def read(path):\n    return {call}\n"))
+    assert violations == []
+
+
+def test_wa003_binary_reads_are_unchanged(tmp_path: Path) -> None:
+    src = "def read(path):\n    return path.read_bytes(), path.open('rb').read()\n"
+    assert check_file(_write(tmp_path, src)) == []
+
+
+# ------------------------------------------------------------------ #
 # noqa suppression tests                                               #
 # ------------------------------------------------------------------ #
 
@@ -135,6 +176,11 @@ def test_noqa_wrong_code_no_effect(tmp_path: Path) -> None:
     violations = check_file(_write(tmp_path, src))
     assert len(violations) == 1
     assert violations[0].code == "WA001"
+
+
+def test_noqa_suppresses_wa003(tmp_path: Path) -> None:
+    src = "def read(path):\n    return path.read_text()  # noqa: WA003\n"
+    assert check_file(_write(tmp_path, src)) == []
 
 
 # ------------------------------------------------------------------ #
