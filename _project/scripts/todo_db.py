@@ -569,9 +569,12 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         raise TodoError(f"database schema_version={version} is newer than this CLI ({SCHEMA_VERSION}); use a newer CLI")
 
 
-def connect(db_path: Path) -> sqlite3.Connection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+def connect(db_path: Path, *, read_only: bool = False) -> sqlite3.Connection:
+    if read_only:
+        conn = sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
+    else:
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     # Autocommit mode: every multi-statement write goes through _write_txn,
     # which takes the write lock up front (BEGIN IMMEDIATE) so check-then-act
@@ -579,7 +582,8 @@ def connect(db_path: Path) -> sqlite3.Connection:
     conn.isolation_level = None
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA busy_timeout = 5000")
-    _ensure_schema(conn)
+    if not read_only:
+        _ensure_schema(conn)
     return conn
 
 
@@ -1213,7 +1217,7 @@ def _report_backend(backend: Path | str, *, implicit_default_local: bool) -> Non
 
 def connect_backend(backend: Path | str, *, read_only: bool = False) -> sqlite3.Connection | _HostedConnection:
     if isinstance(backend, Path):
-        return connect(backend)
+        return connect(backend, read_only=read_only)
     return connect_hosted(backend, read_only=read_only)
 
 
@@ -1235,11 +1239,12 @@ _DOCTOR_AUTH_MARKERS = (
     "authentication",
     "401",
     "403",
-    "expired",
     "invalid token",
     "invalidtoken",
     "jwt",
 )
+
+_DOCTOR_TOKEN_EXPIRY_MARKERS = ("token", "jwt", "bearer")
 
 
 def _doctor_is_auth_failure(exc: BaseException) -> bool:
@@ -1251,7 +1256,9 @@ def _doctor_is_auth_failure(exc: BaseException) -> bool:
     is down, so anything unrecognized stays a generic FAIL.
     """
     text = str(exc).lower()
-    return any(marker in text for marker in _DOCTOR_AUTH_MARKERS)
+    return any(marker in text for marker in _DOCTOR_AUTH_MARKERS) or (
+        "expired" in text and any(marker in text for marker in _DOCTOR_TOKEN_EXPIRY_MARKERS)
+    )
 
 
 def run_doctor(backend: Path | str, *, implicit_default_local: bool, as_json: bool = False) -> int:

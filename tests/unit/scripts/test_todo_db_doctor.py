@@ -67,6 +67,16 @@ def test_doctor_reports_healthy_local_backend(local_db, capsys):
     assert f"v{todo_db.SCHEMA_VERSION}" in out
 
 
+def test_doctor_does_not_create_a_missing_local_database(tmp_path, capsys):
+    db = tmp_path / "missing" / "todo.sqlite"
+
+    assert todo_db.main(["--db", str(db), "doctor"]) == todo_db.DOCTOR_EXIT_FAIL
+
+    assert not db.exists()
+    assert not db.parent.exists()
+    assert "FAIL reachable" in capsys.readouterr().out
+
+
 def test_doctor_json_is_machine_readable(local_db, capsys):
     assert todo_db.main(["--db", str(local_db), "doctor", "--json"]) == todo_db.DOCTOR_EXIT_OK
     payload = json.loads(capsys.readouterr().out)
@@ -101,6 +111,30 @@ def test_rejected_token_is_classified_as_auth_not_a_plain_outage(monkeypatch, ca
     monkeypatch.setattr(todo_db, "connect_backend", boom)
     assert todo_db.main(["--db", _HOSTED_URL, "doctor"]) == todo_db.DOCTOR_EXIT_AUTH
     assert "auth failure" in capsys.readouterr().out
+
+
+def test_expired_token_is_classified_as_auth(monkeypatch, capsys):
+    monkeypatch.setenv("TODO_DB_AUTH_TOKEN", _SECRET)
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("JWT token has expired")
+
+    monkeypatch.setattr(todo_db, "connect_backend", boom)
+    assert todo_db.main(["--db", _HOSTED_URL, "doctor"]) == todo_db.DOCTOR_EXIT_AUTH
+    assert "auth failure" in capsys.readouterr().out
+
+
+def test_expired_tls_certificate_is_a_plain_outage(monkeypatch, capsys):
+    monkeypatch.setenv("TODO_DB_AUTH_TOKEN", _SECRET)
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("TLS certificate has expired")
+
+    monkeypatch.setattr(todo_db, "connect_backend", boom)
+    assert todo_db.main(["--db", _HOSTED_URL, "doctor"]) == todo_db.DOCTOR_EXIT_FAIL
+    out = capsys.readouterr().out
+    assert "FAIL reachable" in out
+    assert "auth failure" not in out
 
 
 def test_plain_outage_is_exit_2_not_auth(monkeypatch, capsys):
