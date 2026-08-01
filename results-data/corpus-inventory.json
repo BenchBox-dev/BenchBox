@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-07-16T14:04:24.857595+00:00",
+  "generated_at": "2026-08-01T15:13:52.998107+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_datafusion_sql_20260502_182815_88aab2ac.json",
@@ -1199,6 +1199,19 @@
       "bundle_sha256": "66a5c9ac9d7ea29e6b8508290683ea2d879dcbf6d4a3ea72e99900f112c78d7a"
     },
     {
+      "file": "ssb/datafusion/sf0.01/ssb_sf001_datafusion_sql_20260730_192204_090d9fc0.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.01,
+      "timestamp": "2026-07-30T19:22:04.423889",
+      "query_count": 39,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "2227d5c410bde6ec0ade1dce18ab5134b52b92476b1e17796f6591b0544afbb8"
+    },
+    {
       "file": "ssb_sf01_datafusion_df_20260502_223328_8c02d649.json",
       "benchmark": "ssb",
       "benchmark_name": "SSB",
@@ -1212,6 +1225,19 @@
       "bundle_sha256": "82b58d31f7cc5044f15c1cfd6b2934481bf1201fa953856cea656552b337d294"
     },
     {
+      "file": "ssb/datafusion/sf0.1/ssb_sf01_datafusion_sql_20260730_192207_30516ed8.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DataFusion",
+      "platform_version": "53.0.0",
+      "scale_factor": 0.1,
+      "timestamp": "2026-07-30T19:22:07.370460",
+      "query_count": 39,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "c0c043ef5c7d13697777ea11b0ba0652f965a7107e381ad6dbef92e09632f3b9"
+    },
+    {
       "file": "ssb_sf1_datafusion_df_20260502_223330_2b2f5243.json",
       "benchmark": "ssb",
       "benchmark_name": "SSB",
@@ -1223,6 +1249,32 @@
       "trust_label": "community-submission",
       "funding": "unspecified",
       "bundle_sha256": "7c85bf5a89e53ccdb53ea93cdf2faed5259f10f07d859c623a3883f8853909fe"
+    },
+    {
+      "file": "ssb/duckdb/sf0.01/ssb_sf001_duckdb_sql_20260730_192156_cfc95eee.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.01,
+      "timestamp": "2026-07-30T19:21:56.823547",
+      "query_count": 39,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "7fb291cd6325e194ea08200d3e6bf25df2cd02db86a627e661126bed8c14290d"
+    },
+    {
+      "file": "ssb/duckdb/sf0.1/ssb_sf01_duckdb_sql_20260730_192214_3eb90405.json",
+      "benchmark": "ssb",
+      "benchmark_name": "Star Schema",
+      "platform": "DuckDB",
+      "platform_version": "1.3.2",
+      "scale_factor": 0.1,
+      "timestamp": "2026-07-30T19:22:14.950097",
+      "query_count": 39,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "38361616575e1d437cbf1e618ffdc5bc87a1113c895e2dc5bd35b9c5b6c043e3"
     },
     {
       "file": "ssb_sf001_polars_df_20260502_211239_4e92eecf.json",
@@ -2773,6 +2825,7 @@
     ],
     "ssb@sf0.01": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
@@ -2780,6 +2833,7 @@
     ],
     "ssb@sf0.1": [
       "DataFusion",
+      "DuckDB",
       "Polars",
       "PySpark",
       "SQLite",
@@ -2915,7 +2969,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 203,
+    "total_bundles": 207,
     "by_benchmark": {
       "amplab": 16,
       "clickbench": 6,
@@ -2927,7 +2981,7 @@
       "metadata_primitives": 3,
       "nyctaxi": 9,
       "read_primitives": 9,
-      "ssb": 16,
+      "ssb": 20,
       "star_schema": 6,
       "tpcdi": 9,
       "tpcds_obt": 5,
@@ -2939,8 +2993,8 @@
     },
     "by_platform": {
       "ClickHouse Local": 1,
-      "DataFusion": 65,
-      "DuckDB": 14,
+      "DataFusion": 67,
+      "DuckDB": 16,
       "LakeSail": 1,
       "Polars": 38,
       "PySpark": 34,
@@ -2949,10 +3003,10 @@
     },
     "by_trust_label": {
       "community-submission": 191,
-      "maintainer-run": 12
+      "maintainer-run": 16
     },
     "by_funding": {
-      "unspecified": 203
+      "unspecified": 207
     }
   }
 }
