@@ -32,6 +32,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate TODO schema migration contract
+        # Bare python is intentional: this static guard is stdlib-only and
+        # must run for every PR without tracker credentials or dependencies.
+        run: python _project/scripts/todo_schema_migration_check.py
+
       - name: Fetch base branch
         run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
 

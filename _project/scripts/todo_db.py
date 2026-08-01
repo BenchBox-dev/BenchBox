@@ -1238,12 +1238,21 @@ def migrate_backend(backend: Path | str, actor: str | None = None) -> list[int]:
         if version is None:
             _ensure_schema(conn)  # fresh database: created at the current version
             return []
+        if version > SCHEMA_VERSION:
+            raise TodoError(
+                f"database schema_version={version} is newer than this CLI ({SCHEMA_VERSION}); use a newer CLI"
+            )
         applied: list[int] = []
         for target in sorted(MIGRATIONS):
             if version < target:
                 with _write_txn(conn):
                     _migration_freeze_guard(conn, actor)
                     current = _schema_version(conn)
+                    if current is not None and current > SCHEMA_VERSION:
+                        raise TodoError(
+                            f"database schema_version={current} is newer than this CLI ({SCHEMA_VERSION}); "
+                            "use a newer CLI"
+                        )
                     if current is not None and current >= target:
                         # a concurrent migrator won the race; not an error
                         version = current
@@ -1270,11 +1279,24 @@ def migrate_db(db_path: Path, *, actor: str | None = None) -> list[int]:
         version = _schema_version(raw)
         if version is None:
             raise TodoError(f"{db_path} exists but has no tracker schema")
+        if version > SCHEMA_VERSION:
+            raise TodoError(
+                f"database schema_version={version} is newer than this CLI ({SCHEMA_VERSION}); use a newer CLI"
+            )
         applied: list[int] = []
         for target in sorted(MIGRATIONS):
             if version < target:
                 with _write_txn(raw):
                     _migration_freeze_guard(raw, actor)
+                    current = _schema_version(raw)
+                    if current is not None and current > SCHEMA_VERSION:
+                        raise TodoError(
+                            f"database schema_version={current} is newer than this CLI ({SCHEMA_VERSION}); "
+                            "use a newer CLI"
+                        )
+                    if current is not None and current >= target:
+                        version = current
+                        continue
                     for statement in MIGRATIONS[target]:
                         raw.execute(statement)
                     raw.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(target),))
