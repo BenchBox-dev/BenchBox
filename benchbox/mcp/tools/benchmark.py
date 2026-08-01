@@ -16,7 +16,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import (
@@ -44,19 +44,19 @@ logger = logging.getLogger(__name__)
 # Tool annotations for benchmark execution tools
 RUN_BENCHMARK_ANNOTATIONS = ToolAnnotations(
     title="Execute benchmark",
-    readOnlyHint=False,  # Creates files, runs queries
-    destructiveHint=False,  # Does not delete existing data
-    idempotentHint=False,  # Each run produces new results
-    openWorldHint=True,  # Interacts with external databases
+    read_only_hint=False,  # Creates files, runs queries
+    destructive_hint=False,  # Does not delete existing data
+    idempotent_hint=False,  # Each run produces new results
+    open_world_hint=True,  # Interacts with external databases
 )
 
 # Tool annotations for query details (read-only)
 QUERY_DETAILS_ANNOTATIONS = ToolAnnotations(
     title="Get query details",
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 
@@ -145,7 +145,7 @@ def _map_phases_to_test_execution_type(phases: list[str]) -> str:
         return "standard"
 
 
-def register_benchmark_tools(mcp: FastMCP, *, results_dir: Path) -> None:
+def register_benchmark_tools(mcp: MCPServer, *, results_dir: Path) -> None:
     """Register benchmark execution tools with the MCP server."""
     resolved_results_dir = Path(results_dir)
 

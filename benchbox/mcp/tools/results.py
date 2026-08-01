@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
@@ -30,23 +30,23 @@ logger = logging.getLogger(__name__)
 # Tool annotations for read-only results tools
 RESULTS_READONLY_ANNOTATIONS = ToolAnnotations(
     title="Read benchmark results",
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 # Tool annotations for export (creates files)
 EXPORT_ANNOTATIONS = ToolAnnotations(
     title="Export benchmark results",
-    readOnlyHint=False,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=False,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 
-def register_results_tools(mcp: FastMCP, *, results_dir: Path) -> None:
+def register_results_tools(mcp: MCPServer, *, results_dir: Path) -> None:
     """Register results tools with the MCP server."""
     configured_results_dir = Path(results_dir)
 

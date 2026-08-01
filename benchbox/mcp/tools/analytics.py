@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from benchbox.core.results.exporter import ResultExporter
@@ -31,14 +31,14 @@ logger = logging.getLogger(__name__)
 # Tool annotations for read-only analytics tools
 ANALYTICS_READONLY_ANNOTATIONS = ToolAnnotations(
     title="Read-only analytics tool",
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 
-def register_analytics_tools(mcp: FastMCP, *, results_dir: Path) -> None:
+def register_analytics_tools(mcp: MCPServer, *, results_dir: Path) -> None:
     """Register analytics tools with the MCP server."""
     configured_results_dir = Path(results_dir)
 

@@ -32,6 +32,15 @@ benchbox-mcp --results-dir /tmp/benchbox-results --charts-dir /tmp/benchbox-char
 
 The server communicates via stdio using JSON-RPC, compatible with Claude Code and other MCP clients.
 
+### SDK Compatibility
+
+BenchBox uses the Python MCP SDK 2.x `MCPServer` API and reports its own
+`benchbox` server name and BenchBox package version during initialization.
+The v2 migration preserves the public stdio contract: 12 tools, 4 static
+resources, 2 resource templates, and 7 prompts. Tool names, input schemas,
+annotations, resource URIs, prompt schemas, and handler behavior are unchanged;
+only Python-side SDK model attributes use the v2 snake-case names.
+
 ### Testing Locally
 
 To verify the server works, you can test it interactively:

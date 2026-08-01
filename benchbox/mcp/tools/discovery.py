@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import (
@@ -31,10 +31,10 @@ logger = logging.getLogger(__name__)
 # Tool annotations for read-only discovery tools
 READONLY_ANNOTATIONS = ToolAnnotations(
     title="Read-only discovery tool",
-    readOnlyHint=True,
-    destructiveHint=False,
-    idempotentHint=True,
-    openWorldHint=False,
+    read_only_hint=True,
+    destructive_hint=False,
+    idempotent_hint=True,
+    open_world_hint=False,
 )
 
 
@@ -245,7 +245,7 @@ def _check_dependencies_impl(platform: str | None, verbose: bool) -> dict[str, A
     return results
 
 
-def register_discovery_tools(mcp: FastMCP) -> None:
+def register_discovery_tools(mcp: MCPServer) -> None:
     """Register discovery tools with the MCP server."""
 
     @mcp.tool(annotations=READONLY_ANNOTATIONS)

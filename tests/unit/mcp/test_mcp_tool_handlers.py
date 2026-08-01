@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.fixtures.result_dict_fixtures import write_v2_result_file
+from tests.unit.mcp.public_api import get_tool_functions
 
 pytestmark = [
     pytest.mark.unit,
@@ -28,17 +29,11 @@ pytestmark = [
 
 
 def _get_tool_functions():
-    """Create a fresh MCP server and extract registered tool functions."""
+    """Create a fresh MCP server and expose public tool invokers."""
     from benchbox.mcp import create_server
 
     server = create_server()
-    # FastMCP stores tools in _tool_manager._tools (private dict of name -> Tool)
-    tools = {}
-    if hasattr(server, "_tool_manager"):
-        tool_dict = getattr(server._tool_manager, "_tools", {})
-        for name, tool in tool_dict.items():
-            tools[name] = tool.fn
-    return tools
+    return get_tool_functions(server)
 
 
 @pytest.fixture(scope="module")

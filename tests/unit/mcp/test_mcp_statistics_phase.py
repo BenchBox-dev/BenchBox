@@ -36,16 +36,12 @@ pytestmark = [
 
 
 def _get_tool_functions() -> dict[str, Any]:
-    """Create a fresh MCP server and extract registered tool functions."""
+    """Create a fresh MCP server and expose public tool invokers."""
     from benchbox.mcp import create_server
+    from tests.unit.mcp.public_api import get_tool_functions
 
     server = create_server()
-    tools: dict[str, Any] = {}
-    if hasattr(server, "_tool_manager"):
-        tool_dict = getattr(server._tool_manager, "_tools", {})
-        for name, tool in tool_dict.items():
-            tools[name] = tool.fn
-    return tools
+    return get_tool_functions(server)
 
 
 @pytest.fixture(scope="module")

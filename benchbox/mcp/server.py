@@ -1,6 +1,6 @@
 """BenchBox MCP Server implementation.
 
-This module creates and configures the FastMCP server with all BenchBox
+This module creates and configures the MCPServer with all BenchBox
 tools, resources, and prompts.
 
 Copyright 2026 Joe Harris / BenchBox Project
@@ -14,9 +14,10 @@ import logging
 import os
 import sys
 from collections.abc import Mapping
+from importlib.metadata import version
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from benchbox.core.runtime_paths import resolve_runtime_paths
 from benchbox.mcp.prompts import register_all_prompts
@@ -71,7 +72,7 @@ def create_benchbox_server(
     charts_dir: str | Path | None = None,
     log_level: str | int | None = None,
     env: Mapping[str, str] | None = None,
-) -> FastMCP:
+) -> MCPServer:
     """Create and configure the BenchBox MCP server.
 
     The server provides tools for:
@@ -80,7 +81,7 @@ def create_benchbox_server(
     - Results: Get results, compare runs, export data
 
     Returns:
-        Configured FastMCP server instance.
+        Configured MCPServer instance.
     """
     # Suppress all console output - MCP servers must not write to stdout
     # (stdout is reserved exclusively for JSON-RPC messages)
@@ -103,9 +104,9 @@ def create_benchbox_server(
         resolved_results_dir = runtime_paths.results_dir
         resolved_charts_dir = runtime_paths.charts_dir
 
-    # Create the FastMCP server
-    mcp = FastMCP(
-        name="benchbox",
+    mcp = MCPServer(
+        "benchbox",
+        version=version("benchbox"),
         instructions="""BenchBox is a SQL benchmarking framework for OLAP databases.
 
 Use these tools to:

@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.unit.mcp.public_api import get_tool
+
 # Skip all tests if Python < 3.10
 pytestmark = [
     pytest.mark.unit,
@@ -19,20 +21,19 @@ pytestmark = [
 
 
 def _make_analytics_mcp(results_dir: Path):
-    """Create a FastMCP server with analytics tools registered."""
-    from mcp.server.fastmcp import FastMCP
+    """Create an MCPServer with analytics tools registered."""
+    from mcp.server.mcpserver import MCPServer
 
     from benchbox.mcp.tools.analytics import register_analytics_tools
 
-    mcp = FastMCP("test")
+    mcp = MCPServer("test", version="test")
     register_analytics_tools(mcp, results_dir=results_dir)
     return mcp
 
 
 def _get_tool(mcp, name: str):
-    """Look up a registered MCP tool by name."""
-    tools = list(mcp._tool_manager._tools.values())
-    return next(t for t in tools if t.name == name)
+    """Look up a registered MCP tool by public name."""
+    return get_tool(mcp, name)
 
 
 @pytest.fixture

@@ -91,9 +91,10 @@ OMITTED_CLI_OPTIONS = {
 
 def _registered_tools() -> dict[str, Any]:
     from benchbox.mcp import create_server
+    from tests.unit.mcp.public_api import list_tools_by_name
 
     server = create_server(log_level="ERROR")
-    return dict(getattr(server._tool_manager, "_tools", {}))
+    return list_tools_by_name(server)
 
 
 def _doc_text() -> str:
@@ -209,7 +210,7 @@ class TestMCPDocsContract:
         assert not (STALE_TOOL_NAMES & _documented_inventory_tools(text))
 
     def test_docs_run_benchmark_table_matches_registered_schema(self):
-        schema = _registered_tools()["run_benchmark"].parameters
+        schema = _registered_tools()["run_benchmark"].input_schema
         documented_params = _documented_run_params(_doc_text())
 
         assert list(schema["properties"]) == list(EXPECTED_RUN_PARAMS)
@@ -221,10 +222,10 @@ class TestMCPDocsContract:
         text = _doc_text()
 
         for tool_name, tool in tools.items():
-            assert _documented_tool_params(text, tool_name) == _schema_params(tool.parameters), tool_name
+            assert _documented_tool_params(text, tool_name) == _schema_params(tool.input_schema), tool_name
 
     def test_docs_record_cli_only_controls_as_intentional_omissions(self):
-        schema = _registered_tools()["run_benchmark"].parameters
+        schema = _registered_tools()["run_benchmark"].input_schema
         text = _doc_text()
 
         assert not (set(schema["properties"]) & set(OMITTED_CLI_OPTIONS.values()))

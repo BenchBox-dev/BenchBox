@@ -38,19 +38,25 @@ def _declared_requirements(config: dict) -> list[str]:
     return requirements
 
 
-def _can_resolve_mcp_v2(requirement: Requirement) -> bool:
-    return Version("2.0.0") in requirement.specifier
+def _can_resolve_mcp_major(requirement: Requirement, major: int) -> bool:
+    return Version(f"{major}.0.0") in requirement.specifier
 
 
 @pytest.mark.parametrize(
-    ("declaration", "can_resolve_v2"),
-    [("mcp<2", False), ("mcp<=2", True), ("mcp>=1,<3", True)],
+    ("declaration", "resolvable_majors"),
+    [
+        ("mcp<2", {1}),
+        ("mcp<=2", {1, 2}),
+        ("mcp>=1,<3", {1, 2}),
+        ("mcp>=2,<3", {2}),
+    ],
 )
-def test_mcp_v2_resolution_probe(declaration: str, can_resolve_v2: bool) -> None:
-    assert _can_resolve_mcp_v2(Requirement(declaration)) is can_resolve_v2
+def test_mcp_major_resolution_probe(declaration: str, resolvable_majors: set[int]) -> None:
+    requirement = Requirement(declaration)
+    assert {major for major in (1, 2, 3) if _can_resolve_mcp_major(requirement, major)} == resolvable_majors
 
 
-def test_every_mcp_dependency_excludes_major_version_2() -> None:
+def test_every_mcp_dependency_requires_major_version_2() -> None:
     with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
         config = tomllib.load(handle)
 
@@ -60,7 +66,10 @@ def test_every_mcp_dependency_excludes_major_version_2() -> None:
 
     assert mcp_requirements, "pyproject.toml must declare the MCP SDK"
     for requirement in mcp_requirements:
-        assert not _can_resolve_mcp_v2(requirement), (
-            f"MCP requirement {requirement!s} can resolve incompatible SDK 2; "
-            "keep every declaration below 2 until mcp-sdk-v2-server-migration-v2 lands"
+        assert not _can_resolve_mcp_major(requirement, 1), (
+            f"MCP requirement {requirement!s} can resolve unsupported SDK 1 after the v2 migration"
+        )
+        assert _can_resolve_mcp_major(requirement, 2), f"MCP requirement {requirement!s} cannot resolve required SDK 2"
+        assert not _can_resolve_mcp_major(requirement, 3), (
+            f"MCP requirement {requirement!s} can resolve unreviewed SDK 3"
         )
