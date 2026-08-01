@@ -55,14 +55,43 @@ def _migration_revisions(module: ast.Module, source: Path) -> list[int]:
     raise SchemaMigrationError(f"{source}: missing MIGRATIONS assignment")
 
 
+def _migration_statement_counts(module: ast.Module, source: Path) -> dict[int, int]:
+    for node in module.body:
+        targets: list[ast.expr]
+        if isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        elif isinstance(node, ast.AnnAssign):
+            targets, value = [node.target], node.value
+        else:
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == "MIGRATION_STATEMENT_COUNTS" for target in targets):
+            continue
+        if not isinstance(value, ast.Dict):
+            raise SchemaMigrationError(f"{source}: MIGRATION_STATEMENT_COUNTS must be a dict literal")
+        counts: dict[int, int] = {}
+        for key, count in zip(value.keys, value.values, strict=True):
+            if not isinstance(key, ast.Constant) or not isinstance(key.value, int):
+                raise SchemaMigrationError(f"{source}: every migration-count key must be an integer literal")
+            if not isinstance(count, ast.Constant) or not isinstance(count.value, int) or count.value <= 0:
+                raise SchemaMigrationError(f"{source}: migration {key.value} needs a positive statement count")
+            counts[key.value] = count.value
+        return counts
+    raise SchemaMigrationError(f"{source}: missing MIGRATION_STATEMENT_COUNTS assignment")
+
+
 def validate_contract(*, tracker: Path, wrapper: Path, inventory: Path) -> None:
     module = ast.parse(tracker.read_text(encoding="utf-8"), filename=str(tracker))
     schema_version = _integer_assignment(module, "SCHEMA_VERSION", tracker)
     revisions = _migration_revisions(module, tracker)
+    statement_counts = _migration_statement_counts(module, tracker)
     expected_revisions = list(range(2, schema_version + 1))
     if revisions != expected_revisions:
         raise SchemaMigrationError(
             f"{tracker}: migration revisions {revisions!r} must be ordered and contiguous {expected_revisions!r}"
+        )
+    if list(statement_counts) != revisions:
+        raise SchemaMigrationError(
+            f"{tracker}: migration statement counts {list(statement_counts)!r} must match revisions {revisions!r}"
         )
 
     wrapper_text = wrapper.read_text(encoding="utf-8")
@@ -99,6 +128,12 @@ def validate_contract(*, tracker: Path, wrapper: Path, inventory: Path) -> None:
         for field in ("summary", "deployment_order"):
             if not isinstance(entry.get(field), str) or not entry[field].strip():
                 raise SchemaMigrationError(f"{inventory}: revision {revision} needs non-empty {field}")
+        expected_count = statement_counts[revision]
+        if entry.get("statement_count") != expected_count:
+            raise SchemaMigrationError(
+                f"{inventory}: revision {revision} statement_count={entry.get('statement_count')!r} "
+                f"does not match runtime contract {expected_count}"
+            )
     current = entries[-1]
     evidence = current.get("deployment_evidence")
     if not isinstance(evidence, str) or not evidence.strip():

@@ -7,6 +7,8 @@ from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any, Literal, TypeAlias
 from urllib.parse import urlparse
 
+from benchbox.core.results.platform_options import sanitize_platform_options
+
 MetadataSource: TypeAlias = Literal[
     "registered_default",
     "saved_config",
@@ -265,6 +267,7 @@ def build_platform_metadata_payload(
     storage: PlatformStorageMetadata | Mapping[str, Any] | None,
     raw_config: Mapping[str, Any] | None,
     raw_metadata: Mapping[str, Any] | None,
+    sanitize_raw_config: bool = True,
 ) -> dict[str, Any]:
     """Build normalized ``platform`` metadata blocks with conservative defaults."""
     default_deployment = _default_deployment_metadata(platform_info or {}, platform_config or {})
@@ -274,7 +277,12 @@ def build_platform_metadata_payload(
         "compute": _metadata_dict(compute) or PlatformComputeMetadata().to_dict(),
         "storage": _metadata_dict(storage) or PlatformStorageMetadata().to_dict(),
     }
+    # ``raw_config`` may come from an adapter-specific hook rather than the
+    # normalized platform config fallback. Keep this as the public export
+    # boundary so every selected source receives the same structural filtering.
     raw_config_payload = _metadata_dict(raw_config)
+    if sanitize_raw_config:
+        raw_config_payload = sanitize_platform_options(raw_config_payload)
     if raw_config_payload:
         payload["raw_config"] = raw_config_payload
     raw_metadata_payload = _metadata_dict(raw_metadata)

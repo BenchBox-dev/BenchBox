@@ -210,7 +210,7 @@ class SchemaV2Validator:
             raise SchemaV2ValidationError(f"schema v2.0 payload contains unexpected keys: {sorted(unexpected)}")
 
 
-def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
+def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets: bool = True) -> dict[str, Any]:
     """Build v2.0 result payload from BenchmarkResults.
 
     Args:
@@ -240,7 +240,7 @@ def build_result_payload(result: BenchmarkResults) -> dict[str, Any]:
     run = _build_run_section(result, query_times_ms, iterations_set, streams_set)
     benchmark = _build_benchmark_section(result)
     driver_metadata = _collect_driver_metadata(result)
-    platform = _build_platform_section(result, driver_metadata)
+    platform = _build_platform_section(result, driver_metadata, sanitize_platform_secrets=sanitize_platform_secrets)
 
     # Build environment block
     environment = _build_environment_block(result)
@@ -509,7 +509,12 @@ def _dataset_identity_fields(result: BenchmarkResults) -> dict[str, str]:
     }
 
 
-def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str, Any]) -> dict[str, Any]:
+def _build_platform_section(
+    result: BenchmarkResults,
+    driver_metadata: dict[str, Any],
+    *,
+    sanitize_platform_secrets: bool = True,
+) -> dict[str, Any]:
     """Build the platform block of the payload."""
     platform_name = str(result.platform).replace(" (DataFrame)", "")
     platform: dict[str, Any] = {"name": platform_name}
@@ -542,6 +547,7 @@ def _build_platform_section(result: BenchmarkResults, driver_metadata: dict[str,
                 if getattr(result, "platform_raw_metadata", None) is not None
                 else getattr(result, "platform_metadata", None)
             ),
+            sanitize_raw_config=sanitize_platform_secrets,
         )
     )
 

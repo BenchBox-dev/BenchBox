@@ -18,6 +18,7 @@ import datetime as dt
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -718,6 +719,16 @@ def build_executor_prompt(
     return rendered.strip()
 
 
+def _executor_command() -> str:
+    """Return an executable command, including the Windows launcher suffix."""
+    if os.name != "nt":
+        return "codex"
+    resolved = shutil.which("codex")
+    if resolved is None:
+        raise FileNotFoundError("codex")
+    return resolved
+
+
 def check_executor_version(
     runner: CommandRunner, *, minimum: tuple[int, int, int] = MIN_EXECUTOR_VERSION
 ) -> tuple[int, int, int]:
@@ -729,14 +740,15 @@ def check_executor_version(
     fast instead of mid-loop with an opaque flag-not-recognized error.
     """
     try:
-        result = runner.run(["codex", "--version"])
+        command = _executor_command()
+        result = runner.run([command, "--version"])
     except FileNotFoundError as exc:
         raise RuntimeError(
             "Executor binary `codex` not found on PATH. Install codex-cli "
             f">= {'.'.join(str(p) for p in minimum)} (https://github.com/openai/codex)."
         ) from exc
     if result.returncode != 0:
-        raise CommandError(["codex", "--version"], result)
+        raise CommandError([command, "--version"], result)
     text = (result.stdout or result.stderr or "").strip()
     match = re.search(r"(\d+)\.(\d+)\.(\d+)", text)
     if not match:
@@ -766,7 +778,7 @@ def run_executor_for_comment(
     # syntax (`-c approval_policy=<mode>`) works across the supported version
     # range and is forward-stable.
     cmd = [
-        "codex",
+        _executor_command(),
         "exec",
         "--cd",
         str(runner.cwd),

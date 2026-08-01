@@ -150,7 +150,7 @@ def test_fake_codex_launcher_resolves_from_path_and_reports_version(monkeypatch,
 
     assert resolved is not None
     assert Path(resolved).resolve() == launcher.resolve()
-    completed = subprocess.run(["codex", "--version"], check=False, capture_output=True, text=True)
+    completed = subprocess.run([str(resolved), "--version"], check=False, capture_output=True, text=True)
     assert completed.returncode == 0
     assert completed.stdout.strip() == "codex-cli 0.128.0"
 

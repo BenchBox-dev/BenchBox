@@ -145,8 +145,10 @@ that itself reaches the cap remains explicitly truncated.
   DuckDB sorting is verification-eligible end to end. The initial tuned
   `CREATE INDEX` is dropped by the loader's
   `CREATE OR REPLACE TABLE ... ORDER BY` CTAS, so
-  `DuckDBAdapter.apply_ctas_sort` re-creates that same generator-rendered
-  index after CTAS. `_record_sort_index_layout_op` records the successful or
+  `DuckDBAdapter.apply_ctas_sort` re-creates that same index after CTAS using
+  the shared `_duckdb_sort_index_sql` helper (the generator renders the CTAS
+  `ORDER BY`, not this index statement). `_record_sort_index_layout_op` records
+  the successful or
   failed re-creation as a `post_load` layout operation, and
   `PlatformAdapter._fold_layout_operations_into_ledger` folds it into the
   ledger before corroboration. The live full-flow test
@@ -168,9 +170,9 @@ that itself reaches the cap remains explicitly truncated.
   non-blocking maintenance statement. This is intentionally weaker than the
   ClickHouse receipt, whose CREATE-time sorting and partition keys describe the
   physical MergeTree layout. When a reused Snowflake table already has the
-  requested key, the adapter skips both ALTER and RESUME and records the intent
-  as dropped/already-present; that current run therefore stays fail-closed
-  rather than claiming it physically applied the pre-existing layout.
+  requested key, the adapter skips ALTER, records the intent as
+  dropped/already-present, and separately reads `AUTO_CLUSTERING_ON` to resume
+  maintenance when it is suspended.
 
 - **ClickHouse** (`benchbox/platforms/clickhouse/introspection.py`): reads
   `system.tables` (`name` / `sorting_key` / `partition_key` -- structured

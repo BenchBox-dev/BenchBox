@@ -76,10 +76,10 @@ inside the transfer's `BEGIN IMMEDIATE` transaction).
 Recorded result (drifts as TODO/DONE files land):
 `imported: 1364  skipped: 0  warnings: 18`,
 `deps_resolved 539, deps_dangling 1`, stats `open` deferrals 629 — these
-reproduce exactly at this file's pinned SHA. The live run's row total,
-32,595 in 82 data batches / 44s wall via the Hrana bulk path (vs 4s
-local-SQLite control, vs ~2.5h projected for row-by-row delegation), came
-from the PR #1219 head tree; a replay at the pinned SHA yields 32,621
+reproduce exactly at this file's pinned SHA. The historical PR #1219 live
+measurement is separately bound to that exact head tree in
+[`todo-db-hosted-live-measurement-2026-07-18.md`](todo-db-hosted-live-measurement-2026-07-18.md).
+A replay at the pinned SHA yields 32,621
 rows (intervening TODO/DONE edits), and the hardened CLI reports pipeline
 requests (data batches + guard + commit), so a replay prints 84. Verify hosted == local by
 running the same import into a scratch local file

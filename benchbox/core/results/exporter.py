@@ -248,7 +248,7 @@ class ResultExporter:
     def _export_json_v2(self, result: ResultLike, filename_base: str) -> Path:
         """Export result to JSON using schema v2.0 with companion files."""
         # Build primary payload
-        payload = build_result_payload(result)
+        payload = build_result_payload(result, sanitize_platform_secrets=self.anonymize)
 
         # Apply anonymization if enabled
         if self.anonymize and self.anonymization_manager:
@@ -301,7 +301,7 @@ class ResultExporter:
         # Tuning companion file
         tuning_payload = build_tuning_payload(result)
         if tuning_payload and self.anonymize and self.anonymization_manager:
-            tuning_payload = self.anonymization_manager.anonymize_result_payload(tuning_payload)
+            tuning_payload = self.anonymization_manager.anonymize_tuning_payload(tuning_payload)
         if tuning_payload:
             tuning_path = self._create_file_path(f"{filename_base}.tuning.json")
             self._write_file(tuning_path, canonical_json_text(tuning_payload))
