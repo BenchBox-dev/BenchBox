@@ -552,6 +552,12 @@ class TestLintUnrunnableCommands:
         findings = todo_db.lint_item(conn, "piped-structured-export-item")
         assert not any("substring-scans _project/todo-db-export" in finding for finding in findings)
 
+    def test_escaped_pipe_stays_in_negated_grep_segment(self, conn):
+        command = r"! grep -Eq foo\|bar _project/todo-db-export/items.jsonl"
+        self._mk_with_command(conn, "escaped-pipe-export-item", command)
+        findings = todo_db.lint_item(conn, "escaped-pipe-export-item")
+        assert any("substring-scans _project/todo-db-export" in finding for finding in findings)
+
     def test_structured_export_check_is_not_reported_as_grep(self, conn):
         command = 'jq -e \'all(has("id") and (has("finding_sections") | not))\' _project/todo-db-export/items.jsonl'
         self._mk_with_command(conn, "structured-export-item", command)

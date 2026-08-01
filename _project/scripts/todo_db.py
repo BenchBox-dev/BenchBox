@@ -2574,7 +2574,7 @@ _JQ_EXIT_STATUS_RE = re.compile(r"(?:^|[|;&]\s*)jq\b[^|;&\n]*?(?:--exit-status\b
 # an unrelated grep look like it reads the export. Structured jq/Python
 # inspection of the same files remains the supported absence-check alternative.
 _NEGATED_GREP_SEGMENT_RE = re.compile(
-    r"(?:^|[|;&]\s*)!\s*(?:grep|rg)\b(?P<body>(?:[^|;&\n'\"]|'[^']*'|\"[^\"]*\")*)",
+    r"(?:^|[|;&]\s*)!\s*(?:grep|rg)\b(?P<body>(?:\\[^\n]|[^|;&\n'\"]|'[^']*'|\"[^\"]*\")*)",
     re.IGNORECASE,
 )
 _TRACKER_EXPORT_PATH_RE = re.compile(r"_project[/\\]todo-db-export(?:[/\\]|\b)", re.IGNORECASE)
