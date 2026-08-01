@@ -361,7 +361,8 @@ cloud-spark = [
 # Note: mcp requires Python 3.10+, so this extra only works on 3.10+
 # Includes visualization deps since MCP server exposes chart generation tools
 mcp = [
-    "mcp>=1.28.1",  # >=1.28.1: CVE-2026-52870/52869/59950 fixes
+    # Keep SDK v1 until mcp-sdk-v2-server-migration-v2 lands; v2 removes FastMCP.
+    "mcp>=1.28.1,<2",  # >=1.28.1: CVE-2026-52870/52869/59950 fixes
 ]
 spark = [
     "pyspark>=4.0.1",
@@ -453,7 +454,7 @@ dev = [
     "influxdb3-python>=0.10.0", # Databricks SDK (needed for tests/unit/platforms/test_databricks_copy_into.py UC volumes)
     "databricks-sdk>=0.20.0", # PySpark (needed for tests/unit/platforms/dataframe/test_pyspark_df.py and related)
     "pyspark>=3.5.0", # XML parsing (needed for tests/unit/core/tpcdi/test_etl_sources.py)
-    "mcp>=1.28.1",  # >=1.28.1: CVE-2026-52870/52869/59950 fixes
+    "mcp>=1.28.1,<2",  # Keep v1 until mcp-sdk-v2-server-migration-v2 lands
     "sphinx>=7.4.7", # Documentation
     "roman-numerals<4.0", # Sphinx 9 needs roman_numerals module; v4.x broke the import
     "myst-parser>=3.0.1",
