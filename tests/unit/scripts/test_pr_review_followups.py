@@ -144,15 +144,22 @@ def _write_fake_codex_launcher(directory: Path) -> tuple[Path, list[str]]:
 class FakeCodexCommandRunner(pr_review_followups.CommandRunner):
     """Execute only the test's fake Codex command through its portable prefix."""
 
-    def __init__(self, cwd: Path, codex_prefix: Sequence[str]) -> None:
+    def __init__(self, cwd: Path, codex_launcher: Path, codex_prefix: Sequence[str]) -> None:
         super().__init__(cwd)
+        self.codex_launcher = codex_launcher.resolve()
         self.codex_prefix = list(codex_prefix)
 
     def run(self, args: Sequence[str], input_text: str | None = None) -> subprocess.CompletedProcess[str]:
         argv = list(args)
-        if argv and argv[0] == "codex":
+        if argv and (argv[0] == "codex" or Path(argv[0]).resolve() == self.codex_launcher):
             argv = [*self.codex_prefix, *argv[1:]]
         return super().run(argv, input_text)
+
+
+@pytest.fixture
+def logical_codex_command(monkeypatch) -> None:
+    """Keep mocked-runner tests independent of host-specific launcher discovery."""
+    monkeypatch.setattr(pr_review_followups, "_executor_command", lambda: "codex")
 
 
 def test_fake_codex_launcher_resolves_from_path_and_reports_version(monkeypatch, tmp_path) -> None:
@@ -458,7 +465,7 @@ def test_stage_paths_uses_explicit_paths_not_git_add_all() -> None:
     ]
 
 
-def test_check_executor_version_accepts_supported_release() -> None:
+def test_check_executor_version_accepts_supported_release(logical_codex_command) -> None:
     runner = RecordingRunner(
         responses={
             ("codex", "--version"): subprocess.CompletedProcess(["codex", "--version"], 0, "codex-cli 0.128.0\n", "")
@@ -470,7 +477,7 @@ def test_check_executor_version_accepts_supported_release() -> None:
     assert parsed == (0, 128, 0)
 
 
-def test_check_executor_version_rejects_too_old_release() -> None:
+def test_check_executor_version_rejects_too_old_release(logical_codex_command) -> None:
     runner = RecordingRunner(
         responses={
             ("codex", "--version"): subprocess.CompletedProcess(["codex", "--version"], 0, "codex-cli 0.10.0\n", "")
@@ -481,7 +488,7 @@ def test_check_executor_version_rejects_too_old_release() -> None:
         pr_review_followups.check_executor_version(runner)
 
 
-def test_check_executor_version_surfaces_missing_binary() -> None:
+def test_check_executor_version_surfaces_missing_binary(logical_codex_command) -> None:
     class MissingBinaryRunner(RecordingRunner):
         def run(self, args, input_text=None):  # type: ignore[override]
             self.commands.append(list(args))
@@ -493,7 +500,7 @@ def test_check_executor_version_surfaces_missing_binary() -> None:
         pr_review_followups.check_executor_version(runner)
 
 
-def test_run_executor_for_comment_uses_config_override_for_approval_policy() -> None:
+def test_run_executor_for_comment_uses_config_override_for_approval_policy(logical_codex_command) -> None:
     """The legacy `--ask-for-approval` flag was dropped in codex-cli >= 0.20.
 
     The orchestrator must use `-c approval_policy=<mode>` so it works against
@@ -521,7 +528,7 @@ def test_run_executor_for_comment_uses_config_override_for_approval_policy() -> 
     assert result.disposition == "no-current-action"  # RecordingRunner produces no diff
 
 
-def test_run_executor_for_comment_treats_clean_local_commit_as_fixed() -> None:
+def test_run_executor_for_comment_treats_clean_local_commit_as_fixed(logical_codex_command) -> None:
     pending = pr_review_followups.PendingComment(pr=_pr(), comment=_comment(51), replies=())
     runner = RecordingRunner(
         scripted={
@@ -586,7 +593,7 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
     subprocess.run(["git", "-C", str(repo_root), "update-ref", "refs/remotes/origin/develop", head], check=True)
 
     fake_bin = tmp_path / "bin"
-    _, codex_prefix = _write_fake_codex_launcher(fake_bin)
+    launcher, codex_prefix = _write_fake_codex_launcher(fake_bin)
     monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}")
 
     pending_pr = pr_review_followups.PullRequest(
@@ -628,7 +635,7 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(pr_review_followups, "reply_to_comment", trace_reply)
     monkeypatch.setattr(pr_review_followups, "finalize_changes", trace_finalize)
 
-    runner = FakeCodexCommandRunner(repo_root, codex_prefix)
+    runner = FakeCodexCommandRunner(repo_root, launcher, codex_prefix)
     args = pr_review_followups.build_parser().parse_args(
         [
             "run",
