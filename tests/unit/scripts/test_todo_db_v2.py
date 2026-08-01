@@ -76,6 +76,34 @@ def conn(tmp_path):
     connection.close()
 
 
+@pytest.fixture()
+def deleted_path_repo(tmp_path):
+    """Repository with deleted paths on the current and an unrelated lineage."""
+    root = tmp_path / "history"
+    root.mkdir()
+    _git(root, "init", "-q", "-b", "trunk")
+    _git(root, "commit", "--allow-empty", "-q", "-m", "root")
+
+    sibling_path = root / "tests" / "planned_only_on_sibling.py"
+    _git(root, "switch", "-q", "-c", "sibling")
+    sibling_path.parent.mkdir(parents=True)
+    sibling_path.write_text("planned = True\n")
+    _git(root, "add", sibling_path.relative_to(root).as_posix())
+    _git(root, "commit", "-q", "-m", "add sibling path")
+    _git(root, "rm", "-q", sibling_path.relative_to(root).as_posix())
+    _git(root, "commit", "-q", "-m", "delete sibling path")
+
+    deleted_path = root / "_project" / "scripts" / "deleted_in_lineage.py"
+    _git(root, "switch", "-q", "trunk")
+    deleted_path.parent.mkdir(parents=True)
+    deleted_path.write_text("deleted = True\n")
+    _git(root, "add", deleted_path.relative_to(root).as_posix())
+    _git(root, "commit", "-q", "-m", "add current path")
+    _git(root, "rm", "-q", deleted_path.relative_to(root).as_posix())
+    _git(root, "commit", "-q", "-m", "delete current path")
+    return root
+
+
 def _mk(conn, item_id="resume-item", **overrides):
     kwargs = {
         "item_id": item_id,
@@ -536,6 +564,40 @@ class TestLintUnresolvableScopeAndLadderPaths:
         )
         findings = todo_db.lint_item(conn, "node-id-cmd")
         assert not any("test_todo_db_v2" in f for f in findings)
+
+    def test_stale_reference_to_deleted_path_is_flagged_on_open_item(self, conn, deleted_path_repo, monkeypatch):
+        monkeypatch.setattr(todo_db, "_lint_repo_root", lambda: deleted_path_repo)
+        self._mk_scoped(conn, "stale-ref", scope=[("only_modify", "_project/scripts/deleted_in_lineage.py")])
+        findings = todo_db.lint_item(conn, "stale-ref")
+        assert any("deleted from the tree" in f for f in findings)
+
+    def test_deleted_path_in_command_is_flagged(self, conn, deleted_path_repo, monkeypatch):
+        monkeypatch.setattr(todo_db, "_lint_repo_root", lambda: deleted_path_repo)
+        self._mk_scoped(
+            conn,
+            "stale-cmd-ref",
+            verifications=[
+                {
+                    "description": "rung",
+                    "command": "uv run -- python _project/scripts/deleted_in_lineage.py list",
+                    "expected": "whatever",
+                }
+            ],
+        )
+        findings = todo_db.lint_item(conn, "stale-cmd-ref")
+        assert any("deleted from the tree" in f for f in findings)
+
+    def test_deleted_path_never_existed_stays_legal(self, conn):
+        # A planned new file has no git history - it must stay creatable.
+        self._mk_scoped(conn, "planned-new", scope=[("only_modify", "tests/unit/scripts/test_zq_never_existed.py")])
+        findings = todo_db.lint_item(conn, "planned-new")
+        assert not any("test_zq_never_existed" in f for f in findings)
+
+    def test_path_deleted_only_on_unrelated_branch_stays_legal(self, conn, deleted_path_repo, monkeypatch):
+        monkeypatch.setattr(todo_db, "_lint_repo_root", lambda: deleted_path_repo)
+        self._mk_scoped(conn, "sibling-only", scope=[("only_modify", "tests/planned_only_on_sibling.py")])
+        findings = todo_db.lint_item(conn, "sibling-only")
+        assert not any("planned_only_on_sibling" in f for f in findings)
 
     def test_inert_deny_rule_annotated_glob_is_flagged_on_open_item(self, conn):
         # "path (prose)" can never fnmatch a changed file, so the deny rule
