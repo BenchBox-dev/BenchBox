@@ -110,7 +110,7 @@ def test_applied_companion_derivation_is_deletion_aware() -> None:
     script = _changed_bundle_discovery_script()
     assert "--diff-filter=ACMRD" in script
     assert "CHANGED_APPLIED" in script
-    assert 'awk -v candidate="${stem}.json"' in script
+    assert 'awk -v stem="$stem"' in script
     assert 'git cat-file -e "HEAD:${bundle}"' in script
 
 
@@ -149,3 +149,48 @@ def test_applied_companion_rename_discovers_the_source_primary_bundle(tmp_path: 
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().splitlines() == ["results-data/bundles/result.json"]
+
+
+def test_companion_pairing_preserves_stem_case(tmp_path: Path) -> None:
+    """Case-insensitive extensions must not conflate distinct case-sensitive stems."""
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    blob_file = tmp_path / "blob"
+    blob_file.write_text("{}\n", encoding="utf-8")
+    base_blob = _git(tmp_path, "hash-object", "-w", str(blob_file))
+    for path in (
+        "results-data/bundles/FOO.JSON",
+        "results-data/bundles/foo.json",
+        "results-data/bundles/foo.applied.json",
+    ):
+        _git(tmp_path, "update-index", "--add", "--cacheinfo", f"100644,{base_blob},{path}")
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    blob_file.write_text('{"status": "passed"}\n', encoding="utf-8")
+    applied_blob = _git(tmp_path, "hash-object", "-w", str(blob_file))
+    _git(
+        tmp_path,
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        f"100644,{applied_blob},results-data/bundles/foo.applied.json",
+    )
+    _git(tmp_path, "commit", "--quiet", "-m", "applied")
+
+    skip_without_posix_shell()
+    env = os.environ.copy()
+    env["BASE_SHA"] = base_sha
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines() == ["results-data/bundles/foo.json"]

@@ -141,7 +141,7 @@ jobs:
             while IFS= read -r manifest; do
               stem="${manifest:0:${#manifest}-14}"
               bundle=$(git ls-tree -r --name-only HEAD -- results-data/bundles \
-                | awk -v candidate="${stem}.json" 'tolower($0) == tolower(candidate) { print; exit }')
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
               # Only add if the paired bundle exists and is not already in CHANGED.
               # For a deleted manifest whose bundle remains, the bundle still
               # exists at HEAD and is added; if both were removed, there is no
@@ -168,7 +168,7 @@ jobs:
             while IFS= read -r applied; do
               stem="${applied:0:${#applied}-13}"
               bundle=$(git ls-tree -r --name-only HEAD -- results-data/bundles \
-                | awk -v candidate="${stem}.json" 'tolower($0) == tolower(candidate) { print; exit }')
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
               # Only add if the paired bundle exists and is not already in CHANGED.
               if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
