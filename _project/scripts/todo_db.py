@@ -2569,12 +2569,22 @@ _JQ_EXIT_STATUS_RE = re.compile(r"(?:^|[|;&]\s*)jq\b[^|;&\n]*?(?:--exit-status\b
 # The committed tracker export contains each item's prose as well as structured
 # fields. A substring scan for a schema identifier therefore matches the TODO
 # that describes removing that identifier, making absence checks self-referential.
-# Restrict this to direct grep/rg segments that name the export path; structured
-# jq/Python inspection of the same files remains the supported alternative.
-_EXPORT_SUBSTRING_SCAN_RE = re.compile(
-    r"(?:^|[|;&]\s*)!?\s*(?:grep|rg)\b[^;&\n]*_project[/\\]todo-db-export(?:[/\\]|\b)",
+# Restrict this to directly negated grep/rg segments that name the export path;
+# positive content checks are valid, and a later pipeline segment must not make
+# an unrelated grep look like it reads the export. Structured jq/Python
+# inspection of the same files remains the supported absence-check alternative.
+_NEGATED_GREP_SEGMENT_RE = re.compile(
+    r"(?:^|[|;&]\s*)!\s*(?:grep|rg)\b(?P<body>(?:[^|;&\n'\"]|'[^']*'|\"[^\"]*\")*)",
     re.IGNORECASE,
 )
+_TRACKER_EXPORT_PATH_RE = re.compile(r"_project[/\\]todo-db-export(?:[/\\]|\b)", re.IGNORECASE)
+
+
+def _is_export_substring_scan(command: str) -> bool:
+    """Return whether a directly negated grep/rg segment scans the tracker export."""
+    return any(
+        _TRACKER_EXPORT_PATH_RE.search(match.group("body")) for match in _NEGATED_GREP_SEGMENT_RE.finditer(command)
+    )
 
 
 def _command_asserts_on_output(command: str) -> bool:
@@ -2945,7 +2955,7 @@ def _unsatisfiable_verifications(item: dict) -> list[int]:
 
 def _export_substring_scan_verifications(item: dict) -> list[int]:
     """Return rungs that substring-scan the self-describing tracker export."""
-    return [ver["seq"] for ver in item["verifications"] if _EXPORT_SUBSTRING_SCAN_RE.search(ver.get("command") or "")]
+    return [ver["seq"] for ver in item["verifications"] if _is_export_substring_scan(ver.get("command") or "")]
 
 
 def lint_item_notes(conn: sqlite3.Connection, item_id: str) -> list[str]:

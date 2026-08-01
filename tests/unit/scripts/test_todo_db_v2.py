@@ -540,6 +540,18 @@ class TestLintUnrunnableCommands:
         findings = todo_db.lint_item(conn, f"export-{tool}-item")
         assert any("substring-scans _project/todo-db-export" in finding for finding in findings)
 
+    def test_positive_export_grep_is_not_reported_as_absence_check(self, conn):
+        command = "grep -q '\"action\"' _project/todo-db-export/events.jsonl"
+        self._mk_with_command(conn, "positive-export-grep-item", command)
+        findings = todo_db.lint_item(conn, "positive-export-grep-item")
+        assert not any("substring-scans _project/todo-db-export" in finding for finding in findings)
+
+    def test_unrelated_grep_does_not_cross_pipeline_boundary(self, conn):
+        command = "grep -q needle input.txt | jq -e . _project/todo-db-export/items.jsonl"
+        self._mk_with_command(conn, "piped-structured-export-item", command)
+        findings = todo_db.lint_item(conn, "piped-structured-export-item")
+        assert not any("substring-scans _project/todo-db-export" in finding for finding in findings)
+
     def test_structured_export_check_is_not_reported_as_grep(self, conn):
         command = 'jq -e \'all(has("id") and (has("finding_sections") | not))\' _project/todo-db-export/items.jsonl'
         self._mk_with_command(conn, "structured-export-item", command)
