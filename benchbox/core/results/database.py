@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.results.platform_options import sanitize_platform_options
 
 logger = logging.getLogger(__name__)
 
@@ -353,7 +354,10 @@ class ResultDatabase:
         # Build metadata
         metadata = {
             "system_profile": result.system_profile,
-            "platform_info": result.platform_info,
+            # ~/.benchbox/results.db outlives the run; sanitize so a
+            # convention slip in an adapter's platform_info never persists a
+            # secret to the local sink.
+            "platform_info": sanitize_platform_options(result.platform_info or {}),
             "tunings_applied": result.tunings_applied,
             "test_execution_type": result.test_execution_type,
         }

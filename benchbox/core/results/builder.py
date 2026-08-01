@@ -58,6 +58,7 @@ from benchbox.core.results.platform_info import (
     PlatformInfoInput,
     format_platform_display_name,
 )
+from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.core.results.query_normalizer import (
     QueryResultInput,
     format_query_id,
@@ -1090,7 +1091,9 @@ class ResultBuilder:
             cloud=self._platform_cloud,
             compute=self._platform_compute,
             storage=self._platform_storage,
-            raw_config=self._platform_raw_config if self._platform_raw_config is not None else platform_config,
+            raw_config=self._platform_raw_config
+            if self._platform_raw_config is not None
+            else sanitize_platform_options(platform_config),
             raw_metadata=self._platform_raw_metadata,
         )
 
