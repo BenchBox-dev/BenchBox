@@ -14,7 +14,15 @@ from rich.table import Table
 from benchbox.cli.shared import console
 from benchbox.security.credentials import CredentialManager, CredentialStatus
 
-SUPPORTED_SETUP_PLATFORMS = ("databricks", "snowflake", "bigquery", "redshift", "athena", "motherduck")
+SUPPORTED_SETUP_PLATFORMS = (
+    "databricks",
+    "snowflake",
+    "bigquery",
+    "redshift",
+    "athena",
+    "motherduck",
+    "singlestore",
+)
 
 PLATFORM_DISPLAY_NAMES = {
     "athena": "Athena",
@@ -22,6 +30,7 @@ PLATFORM_DISPLAY_NAMES = {
     "databricks": "Databricks",
     "motherduck": "MotherDuck",
     "redshift": "Redshift",
+    "singlestore": "SingleStore",
     "snowflake": "Snowflake",
 }
 
@@ -42,7 +51,7 @@ def setup_credentials(ctx, platform, validate_only, list_platforms_flag, show_st
     """Interactive setup for cloud platform credentials.
 
     Guides you through setting up authentication for Databricks, Snowflake,
-    BigQuery, Redshift, Athena, and MotherDuck platforms. Most platforms use
+    BigQuery, Redshift, Athena, MotherDuck, and SingleStore platforms. Most platforms use
     secure local credential storage; MotherDuck validates MOTHERDUCK_TOKEN
     without storing the token.
 
@@ -152,6 +161,12 @@ def _list_platforms(cred_manager: CredentialManager):
             "key": "motherduck",
             "description": "Serverless DuckDB cloud",
             "required": ["MOTHERDUCK_TOKEN", "database"],
+        },
+        {
+            "name": "SingleStore",
+            "key": "singlestore",
+            "description": "Distributed SQL database",
+            "required": ["host", "port", "database", "username", "password"],
         },
     ]
 
@@ -333,6 +348,10 @@ def _validate_credentials(cred_manager: CredentialManager, platform: str):
             from benchbox.platforms.credentials.motherduck import validate_motherduck_credentials
 
             success, error = validate_motherduck_credentials(cred_manager)
+        elif platform == "singlestore":
+            from benchbox.platforms.credentials.singlestore import validate_singlestore_credentials
+
+            success, error = validate_singlestore_credentials(cred_manager)
         else:
             console.print(f"[red]❌ Validation not implemented for {platform}[/red]")
             return
@@ -372,7 +391,7 @@ def run_platform_credential_setup(platform: str, console_obj, show_welcome: bool
     """Run interactive credential setup for a platform.
 
     Args:
-        platform: Platform name (snowflake, bigquery, databricks, redshift)
+        platform: Platform name (snowflake, bigquery, databricks, redshift, singlestore)
         console_obj: Console object for output
         show_welcome: Whether to show welcome panel (False when called from run command)
 
@@ -420,6 +439,11 @@ def run_platform_credential_setup(platform: str, console_obj, show_welcome: bool
             from benchbox.platforms.credentials.motherduck import setup_motherduck_credentials
 
             return setup_motherduck_credentials(cred_manager, console_obj)
+        elif platform == "singlestore":
+            from benchbox.platforms.credentials.singlestore import setup_singlestore_credentials
+
+            setup_singlestore_credentials(cred_manager, console_obj)
+            return cred_manager.has_credentials(platform)
         else:
             console_obj.print(f"[red]❌ Setup not implemented for {platform}[/red]")
             return False

@@ -126,6 +126,18 @@ catalog exists.
   ledger's tables. Returns `sort_key` / `partition_key` facts as receipt
   **evidence**.
 
+  Multi-column catalog keys may be returned as `(a, b)` or `tuple(a, b)`;
+  receipt normalization removes exactly one balanced outer wrapper so those
+  forms compare with the DDL intent `a, b`. Matching remains an exact,
+  order-sensitive tuple comparison. Inner function-call parentheses are not
+  stripped: for example, `f(a), b` remains distinct from `f(a, b)`.
+
+  Expression spelling is deliberately not canonicalized. Verbatim expressions
+  such as `toYYYYMM(ts)` corroborate, while ClickHouse rewrites such as
+  `INTERVAL 1 DAY` to `toIntervalDay(1)` remain an honest fail-closed mismatch.
+  Reimplementing ClickHouse's version-dependent expression canonicalizer here
+  could over-certify a different expression.
+
   ClickHouse applies `ORDER BY` / `PARTITION BY` at `CREATE TABLE` time in the
   *schema* phase, which is not wrapped by the tuning recording connection, so
   `create_schema` records the executed statement onto the ledger itself

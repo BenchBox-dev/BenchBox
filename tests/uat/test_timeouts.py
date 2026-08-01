@@ -122,7 +122,9 @@ def test_kill_process_group_falls_back_to_proc_kill_without_os_killpg(monkeypatc
 
 def test_kill_process_group_uses_killpg_when_available(monkeypatch):
     """Sanity check the guard did not disturb the ordinary POSIX ladder."""
-    calls: list[tuple[int, int]] = []
+    sigterm = object()
+    sigkill = object()
+    calls: list[tuple[int, object]] = []
 
     def fake_killpg(pid, sig):
         calls.append((pid, sig))
@@ -131,11 +133,13 @@ def test_kill_process_group_uses_killpg_when_available(monkeypatch):
     # injecting it makes the hasattr guard take the POSIX branch, which is exactly
     # the ladder under test. A skipif here would drop that coverage instead.
     monkeypatch.setattr(timeouts.os, "killpg", fake_killpg, raising=False)
+    monkeypatch.setattr(timeouts.signal, "SIGTERM", sigterm, raising=False)
+    monkeypatch.setattr(timeouts.signal, "SIGKILL", sigkill, raising=False)
     mock_proc = Mock(pid=999)
 
     timeouts._kill_process_group(mock_proc)
 
-    assert calls == [(999, timeouts.signal.SIGTERM), (999, timeouts.signal.SIGKILL)]
+    assert calls == [(999, sigterm), (999, sigkill)]
     mock_proc.kill.assert_not_called()
 
 

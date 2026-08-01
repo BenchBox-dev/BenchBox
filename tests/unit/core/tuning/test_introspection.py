@@ -87,6 +87,18 @@ class TestNormalization:
         # DuckDB duckdb_indexes().expressions returns a bracketed VARCHAR.
         assert normalize_columns("[L_ORDERKEY, L_LINENUMBER]") == ("l_orderkey", "l_linenumber")
 
+    @pytest.mark.parametrize("raw", ["a, b", "(a, b)", "tuple(a, b)", "[a, b]"])
+    def test_normalize_columns_unifies_multicolumn_catalog_wrappers(self, raw):
+        assert normalize_columns(raw) == ("a", "b")
+
+    def test_normalize_columns_strips_only_a_balanced_plain_outer_wrapper(self):
+        assert normalize_columns("((a, b))") == ("(a", "b)")
+        assert normalize_columns("(a, b") == ("(a", "b")
+        assert normalize_columns("f(a), b") != normalize_columns("f(a, b)")
+
+    def test_normalize_columns_preserves_single_expression_verbatim(self):
+        assert normalize_columns("toYYYYMM(event_ts)") == ("toyyyymm(event_ts)",)
+
     def test_normalize_columns_from_iterable_and_empty(self):
         assert normalize_columns(["A", " B "]) == ("a", "b")
         assert normalize_columns("") == ()

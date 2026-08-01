@@ -595,6 +595,13 @@ class TestBenchmarkOrchestratorErrorHandling:
         """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
+    def test_singlestore_missing_credentials_offers_guided_setup(self):
+        database_config = Mock(type="singlestore")
+
+        assert self.orchestrator._should_offer_credential_setup(
+            database_config, RuntimeError("configuration requires username and password")
+        )
+
     def test_platform_config_without_system_profile(self):
         """Test platform config generation without system profile."""
         database_config = Mock()

@@ -23,7 +23,8 @@ from typing import Any
 # embedded in a value.
 _SECRET_ASSIGNMENT_RE = re.compile(
     r"((?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|account[_-]?key|"
-    r"key[_-]?id|credential)[a-z0-9_-]*\s*[=:]\s*)[^&\s,;'\")]+",
+    r"key[_-]?id|credential)[a-z0-9_-]*\s*[=:]\s*)"
+    r"(?:'[^']*'|\"[^\"]*\"|[^&\s,;'\")]+)",
     flags=re.IGNORECASE,
 )
 _URL_USERINFO_RE = re.compile(r"(://)[^/@\s]+@")
@@ -358,7 +359,7 @@ def make_execution_error(
 
     return make_error(
         ErrorCode.BENCHMARK_EXECUTION_FAILED,
-        message,
+        scrub_secret_material(message),
         details=details,
         retry_hint=retry_hint,
     )
