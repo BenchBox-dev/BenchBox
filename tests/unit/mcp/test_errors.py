@@ -301,6 +301,16 @@ class TestExceptionSecretScrubbing:
         result = make_execution_error("failed", exception=Exception("bad config: password: hunter2"))
         assert "hunter2" not in result["details"]["exception_message"]
 
+    def test_quoted_secret_assignments_are_scrubbed(self):
+        result = make_execution_error("failed", exception=Exception("PASSWORD = 'hunter2'; SECRET = \"token\""))
+        msg = result["details"]["exception_message"]
+        assert "hunter2" not in msg
+        assert "token" not in msg
+
+    def test_top_level_message_is_scrubbed(self):
+        result = make_execution_error("Benchmark execution failed: password=hunter2")
+        assert result["message"] == "Benchmark execution failed: password=****"
+
     def test_plain_text_is_untouched(self):
         result = make_execution_error("failed", exception=Exception("table lineitem not found"))
         assert result["details"]["exception_message"] == "table lineitem not found"

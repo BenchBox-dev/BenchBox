@@ -81,7 +81,9 @@ from benchbox.utils.verbosity import VerbositySettings
 
 logger = logging.getLogger(__name__)
 DATA_ORGANIZATION_ENV = "BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON"
-_GUIDED_CREDENTIAL_PLATFORMS = frozenset({"athena", "bigquery", "databricks", "motherduck", "redshift", "snowflake"})
+_GUIDED_CREDENTIAL_PLATFORMS = frozenset(
+    {"athena", "bigquery", "databricks", "motherduck", "redshift", "singlestore", "snowflake"}
+)
 
 # Benchmark name aliases - maps common variations to canonical names
 BENCHMARK_ALIASES: dict[str, str] = {
