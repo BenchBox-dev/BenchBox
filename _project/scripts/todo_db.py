@@ -2495,6 +2495,16 @@ _COMMAND_ASSERTS_ON_OUTPUT_RE = re.compile(
 )
 _JQ_EXIT_STATUS_RE = re.compile(r"(?:^|[|;&]\s*)jq\b[^|;&\n]*?(?:--exit-status\b|-e(?:\s|$))", re.IGNORECASE)
 
+# The committed tracker export contains each item's prose as well as structured
+# fields. A substring scan for a schema identifier therefore matches the TODO
+# that describes removing that identifier, making absence checks self-referential.
+# Restrict this to direct grep/rg segments that name the export path; structured
+# jq/Python inspection of the same files remains the supported alternative.
+_EXPORT_SUBSTRING_SCAN_RE = re.compile(
+    r"(?:^|[|;&]\s*)!?\s*(?:grep|rg)\b[^;&\n]*_project[/\\]todo-db-export(?:[/\\]|\b)",
+    re.IGNORECASE,
+)
+
 
 def _command_asserts_on_output(command: str) -> bool:
     """Return whether a verification command makes output affect its exit status."""
@@ -2862,6 +2872,11 @@ def _unsatisfiable_verifications(item: dict) -> list[int]:
     return offenders
 
 
+def _export_substring_scan_verifications(item: dict) -> list[int]:
+    """Return rungs that substring-scan the self-describing tracker export."""
+    return [ver["seq"] for ver in item["verifications"] if _EXPORT_SUBSTRING_SCAN_RE.search(ver.get("command") or "")]
+
+
 def lint_item_notes(conn: sqlite3.Connection, item_id: str) -> list[str]:
     """Advisory notes, not defects: policy skips that would otherwise be
     silent. A category exemption from the falsifiability check is author-
@@ -2899,6 +2914,13 @@ def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
             f"verification seq {unsatisfiable} expects output that must be absent, but the command is graded "
             "only on exit status - make the command self-asserting (exit 0 iff satisfied), e.g. pipe to `grep -q` "
             "or negate with `!`"
+        )
+    export_substring_scans = _export_substring_scan_verifications(item)
+    if export_substring_scans:
+        findings.append(
+            f"verification seq {export_substring_scans} substring-scans _project/todo-db-export with grep/rg; "
+            "the export contains item prose that names schema identifiers, so the check can match its own TODO. "
+            "Parse JSON and assert on top-level keys or table membership instead"
         )
     if get_config(conn, "lint.require_scope_rules") == "on" and item["work"] and not item["scope"]:
         findings.append("has work units but no scope rules (only_modify/do_not_modify)")
@@ -3626,6 +3648,8 @@ def main(argv: list[str] | None = None) -> int:
             "A verification rung. COMMAND is graded ONLY on its exit status, so it must be "
             "self-asserting: exit 0 if and only if the criterion holds. Assert on output by "
             "composing (`cmd | grep -q PATTERN`), and on expected failure by negating (`! cmd`). "
+            "Do not grep/rg `_project/todo-db-export` for schema absence because item prose is self-matching; "
+            "parse JSON keys or table membership instead. "
             "EXPECTED is human acceptance text and is never evaluated - it documents the rung, "
             "it does not check it."
         ),

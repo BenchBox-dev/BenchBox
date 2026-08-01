@@ -432,6 +432,19 @@ class TestLintUnrunnableCommands:
         self._mk_with_command(conn, "piped-item", "_project/scripts/todo lint some-item | grep -qi 'pattern'")
         assert not any("cannot execute" in f for f in todo_db.lint_item(conn, "piped-item"))
 
+    @pytest.mark.parametrize("tool", ["grep", "rg"])
+    def test_export_grep_is_reported_as_self_matching(self, conn, tool):
+        command = f"! {tool} -q 'finding_sections|finding_evidence' _project/todo-db-export/*.jsonl"
+        self._mk_with_command(conn, f"export-{tool}-item", command)
+        findings = todo_db.lint_item(conn, f"export-{tool}-item")
+        assert any("substring-scans _project/todo-db-export" in finding for finding in findings)
+
+    def test_structured_export_check_is_not_reported_as_grep(self, conn):
+        command = 'jq -e \'all(has("id") and (has("finding_sections") | not))\' _project/todo-db-export/items.jsonl'
+        self._mk_with_command(conn, "structured-export-item", command)
+        findings = todo_db.lint_item(conn, "structured-export-item")
+        assert not any("substring-scans _project/todo-db-export" in finding for finding in findings)
+
     def test_multiline_negated_command_is_not_flagged(self, conn):
         self._mk_with_command(conn, "ml-item", "set -e\nmake regen\n! grep -q 'stale' out.log")
         assert not any("cannot execute" in f for f in todo_db.lint_item(conn, "ml-item"))
