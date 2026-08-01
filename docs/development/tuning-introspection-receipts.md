@@ -98,6 +98,13 @@ Example summary/entry shape (the ledger's statement order is preserved):
 }
 ```
 
+Clause matching first blanks string literals, quoted identifiers, line
+comments, and block comments with a small lexical scanner, then applies the
+auditable regex shapes above. Clause-looking text in a `DEFAULT` literal or
+comment therefore cannot create an intent or suppress ClickHouse's tuned-key
+recording. Empty parsed column tuples never corroborate: even an empty catalog
+tuple is treated as a fail-closed mismatch, not trivial equality.
+
 ### Session SETs are corroboration-eligible? No (default).
 
 Session `SET`/`PRAGMA` statements are transient: they configure the
@@ -182,6 +189,14 @@ that itself reaches the cap remains explicitly truncated.
   `INTERVAL 1 DAY` to `toIntervalDay(1)` remain an honest fail-closed mismatch.
   Reimplementing ClickHouse's version-dependent expression canonicalizer here
   could over-certify a different expression.
+
+  Table identity also stays conservative. Generic corroboration compares the
+  normalized table strings exactly; it does not suffix-match a
+  schema-qualified intent such as `analytics.t` to a bare catalog fact `t`.
+  Current introspectors are scoped to a database/schema and emit the names their
+  structured catalogs provide. Until the contract carries qualification on
+  both sides, an ambiguous qualified-vs-bare pair remains `absent` rather than
+  widening matching and risking certification of the wrong table.
 
   ClickHouse applies `ORDER BY` / `PARTITION BY` at `CREATE TABLE` time in the
   *schema* phase, which is not wrapped by the tuning recording connection, so

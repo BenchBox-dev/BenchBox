@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.tuning.introspection import has_order_by_clause
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.printing import emit
@@ -220,7 +221,7 @@ class ClickHouseWorkloadMixin:
         try:
             if not (getattr(self, "tuning_enabled", False) and table_tunings):
                 return
-            if "ORDER BY" in original_statement.upper():
+            if has_order_by_clause(original_statement):
                 return  # pre-existing ORDER BY was not overridden by tuning
             tuning_clauses = self._resolve_tuned_ddl_clauses(original_statement, table_tunings)
             if tuning_clauses is None:
