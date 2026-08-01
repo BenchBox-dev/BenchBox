@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate `develop_sha` frontmatter on audit Markdown files."""
+"""Validate tree and measurement SHA provenance on audit Markdown files."""
 
 from __future__ import annotations
 
@@ -11,6 +11,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+NUMERIC_EVIDENCE_RE = re.compile(
+    r"(?:\b[0-9][0-9,]*(?:\.[0-9]+)?\s+"
+    r"(?:tests?|checks?|queries|bundles|items|comments|findings|platforms|benchmarks|rows|files?|prs?)\b)"
+    r"|(?:\b[0-9][0-9,]*(?:\.[0-9]+)?\s+(?:passed|failed|skipped|timed\s+out)\b)",
+    re.IGNORECASE,
+)
 
 
 class AuditShaError(Exception):
@@ -24,6 +30,16 @@ class Frontmatter:
     start_line: int
     end_line: int
     fields: dict[str, str]
+
+
+@dataclass(frozen=True)
+class AuditValidation:
+    """Validated provenance returned to the CLI."""
+
+    develop_sha: str
+    distance: int | None
+    measured_at_sha: str | None
+    replay_sha: str | None
 
 
 def run_git(args: list[str]) -> str:
@@ -92,8 +108,35 @@ def parse_frontmatter(path: Path) -> Frontmatter | None:
     return Frontmatter(start_line=0, end_line=end_index, fields=fields)
 
 
-def validate_audit(path: Path, target_ref: str, require_current: int | None = None) -> tuple[str, int | None]:
-    """Validate one audit file and return `(develop_sha, distance)`.
+def numeric_evidence_lines(path: Path, frontmatter: Frontmatter) -> list[int]:
+    """Return body line numbers containing conservative empirical-count signals.
+
+    Dates, issue/PR references (``#123``), versions, and prose ordinals are not
+    evidence signals. The intentionally narrow detector covers explicit result
+    counts and counted audit entities; expanding content lint belongs in a
+    separate policy change.
+    """
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return [
+        line_number
+        for line_number, line in enumerate(lines, start=1)
+        if line_number > frontmatter.end_line + 1 and NUMERIC_EVIDENCE_RE.search(line)
+    ]
+
+
+def _require_sha(path: Path, frontmatter: Frontmatter, field: str) -> str:
+    value = frontmatter.fields.get(field, "").strip()
+    if not value:
+        raise AuditShaError(f"{path}: missing required {field} frontmatter field")
+    if not SHA_RE.fullmatch(value):
+        raise AuditShaError(f"{path}: {field} must be a full 40-character commit SHA, got {value!r}")
+    if not git_ok(["cat-file", "-e", f"{value}^{{commit}}"]):
+        raise AuditShaError(f"{path}: {field} {value} is not a local commit object")
+    return value.lower()
+
+
+def validate_audit(path: Path, target_ref: str, require_current: int | None = None) -> AuditValidation:
+    """Validate one audit file and return its bound provenance.
 
     `distance` is the number of commits between the stamped SHA and the target
     ref when freshness checking is requested; otherwise it is omitted.
@@ -107,14 +150,7 @@ def validate_audit(path: Path, target_ref: str, require_current: int | None = No
     if frontmatter is None:
         raise AuditShaError(f"{path}: missing YAML frontmatter with required develop_sha")
 
-    develop_sha = frontmatter.fields.get("develop_sha", "").strip()
-    if not develop_sha:
-        raise AuditShaError(f"{path}: missing required develop_sha frontmatter field")
-    if not SHA_RE.fullmatch(develop_sha):
-        raise AuditShaError(f"{path}: develop_sha must be a full 40-character commit SHA, got {develop_sha!r}")
-
-    if not git_ok(["cat-file", "-e", f"{develop_sha}^{{commit}}"]):
-        raise AuditShaError(f"{path}: develop_sha {develop_sha} is not a local commit object")
+    develop_sha = _require_sha(path, frontmatter, "develop_sha")
 
     try:
         target_sha = run_git(["rev-parse", "--verify", f"{target_ref}^{{commit}}"])
@@ -136,7 +172,35 @@ def validate_audit(path: Path, target_ref: str, require_current: int | None = No
                 f"allowed distance is {require_current}"
             )
 
-    return develop_sha.lower(), distance
+    evidence_lines = numeric_evidence_lines(path, frontmatter)
+    measured_at_sha: str | None = None
+    if evidence_lines or frontmatter.fields.get("measured_at_sha"):
+        measured_at_sha = _require_sha(path, frontmatter, "measured_at_sha")
+        expected_measurement = frontmatter.fields.get("checked_sha", develop_sha).lower()
+        if not SHA_RE.fullmatch(expected_measurement):
+            raise AuditShaError(f"{path}: checked_sha must be a full 40-character commit SHA")
+        if measured_at_sha != expected_measurement:
+            raise AuditShaError(
+                f"{path}: measured_at_sha {measured_at_sha} does not match the declared exact tree "
+                f"{expected_measurement}"
+            )
+        if not git_ok(["merge-base", "--is-ancestor", measured_at_sha, "HEAD"]):
+            raise AuditShaError(f"{path}: measured_at_sha {measured_at_sha} is not reachable from HEAD")
+
+    replay_sha: str | None = None
+    if frontmatter.fields.get("replay_sha") or frontmatter.fields.get("replay_scope"):
+        if measured_at_sha is None:
+            raise AuditShaError(f"{path}: replay_sha requires measured_at_sha")
+        replay_sha = _require_sha(path, frontmatter, "replay_sha")
+        replay_scope = frontmatter.fields.get("replay_scope", "").strip()
+        if not replay_scope:
+            raise AuditShaError(f"{path}: replay_sha requires a non-empty replay_scope")
+        if not git_ok(["merge-base", "--is-ancestor", measured_at_sha, replay_sha]):
+            raise AuditShaError(f"{path}: replay_sha {replay_sha} must descend from measured_at_sha {measured_at_sha}")
+        if not git_ok(["merge-base", "--is-ancestor", replay_sha, "HEAD"]):
+            raise AuditShaError(f"{path}: replay_sha {replay_sha} is not reachable from HEAD")
+
+    return AuditValidation(develop_sha, distance, measured_at_sha, replay_sha)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -162,9 +226,15 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         for file_path in args.files:
-            develop_sha, distance = validate_audit(file_path, args.target_ref, args.require_current)
-            suffix = f" distance={distance}" if distance is not None else ""
-            print(f"OK {file_path}: develop_sha={develop_sha} target_ref={args.target_ref}{suffix}")
+            result = validate_audit(file_path, args.target_ref, args.require_current)
+            details = [f"develop_sha={result.develop_sha}", f"target_ref={args.target_ref}"]
+            if result.distance is not None:
+                details.append(f"distance={result.distance}")
+            if result.measured_at_sha is not None:
+                details.append(f"measured_at_sha={result.measured_at_sha}")
+            if result.replay_sha is not None:
+                details.append(f"replay_sha={result.replay_sha}")
+            print(f"OK {file_path}: {' '.join(details)}")
     except AuditShaError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
