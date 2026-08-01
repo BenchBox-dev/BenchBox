@@ -228,6 +228,8 @@ package), env-configured via `TODO_DB_URL` (never echoed). All writes stamp
 
 ```
 todo create   --title ... --worktree ... --priority ... [--edit-body]   # opens/accepts structured flags for guardrail rows
+todo update   <id> --add-only-modify GLOB [--drop-only-modify GLOB] --reason ...
+                                            # atomic, audited scope amendment; also supports do-not-modify
 todo show     <id> [--json]                 # full item incl. guardrail rows
 todo claim    <id>                          # atomic claim + prints WORK ORDER:
                                             #   ready units, scope globs, preserves,
@@ -251,6 +253,12 @@ todo admin migrate                          # only schema-migration path; CLI pi
 The `expected` field is human-readable acceptance guidance shown in the work
 order; commands that need output assertions must encode them directly (for
 example with a test assertion or `grep`).
+
+Every `todo update` scope amendment requires `--reason`. The command validates
+all additions and removals before writing, applies them in one transaction, and
+records one `update` event containing the exact `scope_added` and
+`scope_dropped` rules. Duplicate, conflicting, already-present, and missing
+rules fail without changing the item or audit log.
 
 `todo lint` mechanical checks (replaces the rubric's mechanical axes):
 verification rows exist and ≥1 has a `command`; scope rules present for code
