@@ -234,6 +234,20 @@ def test_cli_surface_guard_skips_when_base_ref_is_missing(monkeypatch: pytest.Mo
         _verified_base_ref()
 
 
+def test_git_output_decoding_is_independent_of_the_host_locale(monkeypatch: pytest.MonkeyPatch):
+    utf8_output = "benchbox/cli/commands/λ.py\n".encode()
+
+    def fake_run(args, **kwargs):
+        encoding = kwargs.get("encoding", "cp1252")
+        return subprocess.CompletedProcess(args, 0, utf8_output.decode(encoding), "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    result = _git("diff", "--name-only")
+
+    assert result.stdout == "benchbox/cli/commands/λ.py\n"
+
+
 def _verified_base_ref() -> str:
     inside = _git("rev-parse", "--is-inside-work-tree", check=False)
     if inside.returncode != 0 or inside.stdout.strip() != "true":
@@ -307,7 +321,7 @@ def _git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         ["git", *args],
         cwd=REPO_ROOT,
-        text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )
