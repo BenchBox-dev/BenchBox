@@ -843,6 +843,38 @@ class TestPublicPayloadTupleRecursion:
         )["platform_metadata"]["platform_raw_config"]
         assert out[0]["username"].startswith("user_")
 
+    def test_unordered_collections_are_sorted_before_export(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"values": frozenset({"zeta", "alpha"})}}
+        )
+
+        assert out["platform_metadata"]["values"] == ["alpha", "zeta"]
+
+
+class TestTuningPayloadAnonymization:
+    def test_table_and_column_identifiers_are_pseudonymized_but_source_is_preserved(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_tuning_payload(
+            {
+                "source_file": "examples/tunings/custom.yaml:0123456789abcdef",
+                "requested": {
+                    "table_tunings": {
+                        "lineitem": {
+                            "table_name": "lineitem",
+                            "sorting": [{"name": "l_orderkey", "order": 1}],
+                        }
+                    }
+                },
+            }
+        )
+
+        tuning = out["requested"]["table_tunings"]
+        table_key = next(iter(tuning))
+        assert table_key.startswith("table_")
+        assert tuning[table_key]["table_name"].startswith("table_")
+        assert tuning[table_key]["sorting"][0]["name"].startswith("column_")
+        assert out["source_file"] == "examples/tunings/custom.yaml:0123456789abcdef"
+
 
 class TestPublicPayloadWorkspaceRoleAndApplicationIds:
     """Near-miss variants of covered identifier keys are the recurring leak

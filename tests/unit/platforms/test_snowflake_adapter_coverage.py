@@ -1050,6 +1050,19 @@ class TestApplyTableTunings:
         alter_sqls = [s for s in all_sqls if "ALTER TABLE" in s.upper() and "CLUSTER BY" in s.upper()]
         assert len(alter_sqls) == 0
 
+    def test_resumes_reclustering_when_matching_key_is_suspended(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("(o_orderdate)", "OFF")
+
+        tuning = self._make_tuning(table_name="ORDERS", cluster_cols=[self._make_col("o_orderdate")])
+        adapter.apply_table_tunings(tuning, mock_conn)
+
+        all_sqls = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert "ALTER TABLE ORDERS RESUME RECLUSTER" in all_sqls
+
     def test_linear_catalog_form_skips_alter_and_records_dropped_intent(self):
         adapter = _make_adapter()
         adapter._applied_tuning_ledger = AppliedTuningLedger()

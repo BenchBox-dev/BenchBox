@@ -38,7 +38,11 @@ def test_todo_schema_migration_contract_is_current() -> None:
 
 def test_todo_schema_migration_contract_rejects_cli_bump_without_migration(tmp_path: Path) -> None:
     tracker = tmp_path / "todo_db.py"
-    tracker.write_text("SCHEMA_VERSION = 5\nMIGRATIONS = {2: ['a'], 3: ['b'], 4: ['c']}\n", encoding="utf-8")
+    tracker.write_text(
+        "SCHEMA_VERSION = 5\nMIGRATIONS = {2: ['a'], 3: ['b'], 4: ['c']}\n"
+        "MIGRATION_STATEMENT_COUNTS = {2: 1, 3: 1, 4: 1}\n",
+        encoding="utf-8",
+    )
     paths = _contract_paths()
     with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="contiguous"):
         todo_schema_migration_check.validate_contract(
@@ -65,6 +69,33 @@ def test_todo_schema_migration_contract_requires_current_deployment_evidence(tmp
     with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="deployment_evidence"):
         todo_schema_migration_check.validate_contract(
             tracker=paths["tracker"], wrapper=paths["wrapper"], inventory=inventory
+        )
+
+
+def test_todo_schema_migration_contract_requires_statement_count_inventory(tmp_path: Path) -> None:
+    inventory = tmp_path / "migrations.json"
+    record = json.loads(_contract_paths()["inventory"].read_text(encoding="utf-8"))
+    record["migrations"][-1].pop("statement_count")
+    inventory.write_text(json.dumps(record), encoding="utf-8")
+    paths = _contract_paths()
+
+    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="statement_count"):
+        todo_schema_migration_check.validate_contract(
+            tracker=paths["tracker"], wrapper=paths["wrapper"], inventory=inventory
+        )
+
+
+def test_todo_schema_migration_contract_requires_static_count_contract(tmp_path: Path) -> None:
+    tracker = tmp_path / "todo_db.py"
+    tracker.write_text(
+        "SCHEMA_VERSION = 2\nMIGRATIONS = {2: build_migration()}\n",
+        encoding="utf-8",
+    )
+    paths = _contract_paths()
+
+    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="MIGRATION_STATEMENT_COUNTS"):
+        todo_schema_migration_check.validate_contract(
+            tracker=tracker, wrapper=paths["wrapper"], inventory=paths["inventory"]
         )
 
 

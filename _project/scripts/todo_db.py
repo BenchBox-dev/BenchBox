@@ -98,6 +98,14 @@ MIGRATIONS: dict[int, list[str]] = {
     4: todo_findings.finding_migration_v4_statements(),
 }
 
+# The migration builders are intentionally callable so the findings schema can
+# remain the single DDL source. Keep an explicit statement-count contract next
+# to the runtime map: a future helper cannot silently return an empty or
+# truncated migration without failing immediately at import time.
+MIGRATION_STATEMENT_COUNTS: dict[int, int] = {2: 3, 3: 6, 4: 8}
+if {revision: len(statements) for revision, statements in MIGRATIONS.items()} != MIGRATION_STATEMENT_COUNTS:
+    raise RuntimeError("MIGRATIONS do not match MIGRATION_STATEMENT_COUNTS")
+
 PRIORITIES = ("critical", "high", "medium-high", "medium", "low")
 STATES = ("planning", "active", "done", "dropped")
 # Legal item-state transitions; everything else is rejected.
@@ -2948,12 +2956,12 @@ def _export_substring_scan_verifications(item: dict) -> list[int]:
     return [ver["seq"] for ver in item["verifications"] if _EXPORT_SUBSTRING_SCAN_RE.search(ver.get("command") or "")]
 
 
-def lint_item_notes(conn: sqlite3.Connection, item_id: str) -> list[str]:
+def lint_item_notes(conn: sqlite3.Connection, item_id: str, *, item: dict[str, Any] | None = None) -> list[str]:
     """Advisory notes, not defects: policy skips that would otherwise be
     silent. A category exemption from the falsifiability check is author-
     selectable free text, so lint says when it applied - an exemption you
     can see is auditable, one you cannot is a hole."""
-    item = get_item(conn, item_id)
+    item = item if item is not None else get_item(conn, item_id)
     notes = []
     if (
         get_config(conn, "lint.require_falsifiable_rung") == "on"
@@ -2968,8 +2976,8 @@ def lint_item_notes(conn: sqlite3.Connection, item_id: str) -> list[str]:
     return notes
 
 
-def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
-    item = get_item(conn, item_id)
+def lint_item(conn: sqlite3.Connection, item_id: str, *, item: dict[str, Any] | None = None) -> list[str]:
+    item = item if item is not None else get_item(conn, item_id)
     findings = []
     if not item["verifications"]:
         findings.append("no verification steps recorded")
@@ -4319,13 +4327,14 @@ def _cmd_lint(conn, actor, args):
         raise TodoError("lint requires an item id or --all")
     total = 0
     for target in targets:
-        findings = lint_item(conn, target)
+        item = get_item(conn, target)
+        findings = lint_item(conn, target, item=item)
         total += len(findings)
         for finding in findings:
             print(f"{target}: {finding}")
         # Notes are advisory visibility, not defects: they neither count nor
         # affect the exit code.
-        for note in lint_item_notes(conn, target):
+        for note in lint_item_notes(conn, target, item=item):
             print(f"{target}: {note}")
     print(f"{total} finding(s) across {len(targets)} item(s)")
     return 1 if total else 0

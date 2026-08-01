@@ -12,6 +12,7 @@ import json
 
 import pytest
 
+from benchbox.core.results.environment import build_platform_metadata_payload
 from benchbox.core.results.platform_options import REDACTED_VALUE
 from benchbox.core.results.schema import _extract_platform_config
 
@@ -38,6 +39,21 @@ class TestExtractPlatformConfigFiltering:
 
 
 class TestResultsDbMetadataFiltering:
+    def test_explicit_raw_config_is_filtered_at_metadata_boundary(self):
+        payload = build_platform_metadata_payload(
+            platform_info=None,
+            platform_config=None,
+            deployment=None,
+            cloud=None,
+            compute=None,
+            storage=None,
+            raw_config={"password": "RAW-PASSWORD-SENTINEL", "threads": 4},
+            raw_metadata=None,
+        )
+
+        assert payload["raw_config"]["password"] == REDACTED_VALUE
+        assert payload["raw_config"]["threads"] == 4
+
     def test_platform_info_secret_never_reaches_metadata_json(self, tmp_path):
         from datetime import datetime
 

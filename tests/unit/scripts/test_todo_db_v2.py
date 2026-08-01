@@ -799,12 +799,22 @@ class TestLintExemptionVisibility:
         assert any("falsifiability" in f for f in todo_db.lint_item(conn, "normal-cat"))
         assert todo_db.lint_item_notes(conn, "normal-cat") == []
 
-    def test_exemption_note_does_not_affect_exit_code(self, conn, capsys):
+    def test_exemption_note_does_not_affect_exit_code(self, conn, capsys, monkeypatch):
         self._mk_exempt(conn, "flake-exit", "flake")
+        original_get_item = todo_db.get_item
+        calls = 0
+
+        def counted_get_item(connection, item_id):
+            nonlocal calls
+            calls += 1
+            return original_get_item(connection, item_id)
+
+        monkeypatch.setattr(todo_db, "get_item", counted_get_item)
         rc = todo_db._cmd_lint(conn, "tester", SimpleNamespace(id="flake-exit", all=False))
         out = capsys.readouterr().out
         assert "exempt" in out
         assert rc == 0
+        assert calls == 1
 
 
 class TestLintFalsifiabilityAndScopeCompleteness:

@@ -1722,7 +1722,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 # Check current clustering key
                 cursor.execute(
                     """
-                        SELECT CLUSTERING_KEY
+                        SELECT CLUSTERING_KEY, AUTO_CLUSTERING_ON
                         FROM INFORMATION_SCHEMA.TABLES
                         WHERE TABLE_SCHEMA = %s
                         AND TABLE_NAME = %s
@@ -1731,11 +1731,22 @@ class SnowflakeAdapter(PlatformAdapter):
                 )
                 result = cursor.fetchone()
                 current_clustering = result[0] if result and result[0] else None
+                automatic_clustering_value = result[1] if result and len(result) > 1 else None
+                automatic_clustering_on = automatic_clustering_value is True or str(
+                    automatic_clustering_value
+                ).strip().upper() in {
+                    "ON",
+                    "TRUE",
+                    "1",
+                }
 
                 desired_clustering = f"({', '.join(clustering_columns)})"
                 cluster_sql = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(clustering_columns)})"
 
-                if parse_clustering_key(current_clustering) != parse_clustering_key(desired_clustering):
+                clustering_matches = parse_clustering_key(current_clustering) == parse_clustering_key(
+                    desired_clustering
+                )
+                if not clustering_matches:
                     # Apply clustering key
                     try:
                         cursor.execute(cluster_sql)
@@ -1756,6 +1767,16 @@ class SnowflakeAdapter(PlatformAdapter):
                     ledger = getattr(self, "_applied_tuning_ledger", None)
                     if ledger is not None:
                         ledger.record_dropped(cluster_sql, "already present in Snowflake catalog; ALTER skipped")
+
+                    # A reused table can have the right key while Automatic
+                    # Clustering is suspended. The key check and maintenance
+                    # state are independent catalog facts.
+                    if len(clustering_columns) <= 4 and not automatic_clustering_on:
+                        try:
+                            cursor.execute(f"ALTER TABLE {table_name} RESUME RECLUSTER")
+                            self.logger.info(f"Enabled automatic clustering for {table_name}")
+                        except Exception as e:
+                            self.logger.debug(f"Could not enable automatic clustering for {table_name}: {e}")
 
             # Handle sorting - in Snowflake, this is achieved through clustering
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)

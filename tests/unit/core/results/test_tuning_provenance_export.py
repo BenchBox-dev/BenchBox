@@ -16,6 +16,7 @@ from datetime import datetime
 
 import pytest
 
+from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.schema import (
     build_applied_ledger_payload,
@@ -244,6 +245,27 @@ def test_no_absolute_paths_anywhere_in_emitted_bundle_or_companion():
         assert "/Users/" not in text
         assert "/root/" not in text
         assert "C:\\\\" not in text
+
+
+def test_anonymized_tuning_companion_hides_identifiers_and_preserves_source(tmp_path):
+    config = _tuned_config()
+    result = _make_result(
+        tunings_applied=config.to_dict(),
+        tuning_source="explicit_file",
+        tuning_source_file="examples/tunings/custom.yaml:0123456789abcdef",
+        tuning_config_hash=config.get_configuration_hash(),
+    )
+
+    exporter = ResultExporter(output_dir=tmp_path, anonymize=True)
+    exporter._write_companion_files(result, "run-1")
+    payload = json.loads((tmp_path / "run-1.tuning.json").read_text(encoding="utf-8"))
+
+    table_tunings = payload["requested"]["table_tunings"]
+    table_key = next(iter(table_tunings))
+    assert table_key.startswith("table_")
+    assert table_tunings[table_key]["table_name"].startswith("table_")
+    assert table_tunings[table_key]["sorting"][0]["name"].startswith("column_")
+    assert payload["source_file"] == "examples/tunings/custom.yaml:0123456789abcdef"
 
 
 def test_requested_block_reports_platform_optimizations_non_defaults_only():

@@ -325,6 +325,60 @@ class AnonymizationManager:
         """
         return self._anonymize_public_value(payload, ())
 
+    def anonymize_tuning_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Anonymize a tuning companion while preserving its safe provenance.
+
+        Tuning payloads use table names as mapping keys and column names under
+        a generic ``name`` key, so the generic payload walker cannot identify
+        those identifiers. ``source_file`` is already normalized to a
+        repository-relative/template reference by the capture path and is a
+        public provenance field, so it must not be path-hashed here.
+        """
+        source_file = payload.get("source_file")
+        working = dict(payload)
+        working.pop("source_file", None)
+
+        requested = working.get("requested")
+        table_tunings = None
+        if isinstance(requested, dict):
+            requested = dict(requested)
+            table_tunings = requested.pop("table_tunings", None)
+            working["requested"] = requested
+
+        anonymized = self.anonymize_result_payload(working)
+        if source_file is not None:
+            anonymized["source_file"] = source_file
+        if table_tunings is not None:
+            anonymized_requested = anonymized.setdefault("requested", {})
+            if isinstance(anonymized_requested, dict):
+                anonymized_requested["table_tunings"] = self._anonymize_tuning_table_tunings(table_tunings)
+        return anonymized
+
+    def _anonymize_tuning_table_tunings(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                self._hash_public_identifier(str(key), "table"): self._anonymize_tuning_value(child)
+                for key, child in value.items()
+            }
+        return self._anonymize_tuning_value(value)
+
+    def _anonymize_tuning_value(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            anonymized: dict[str, Any] = {}
+            for key, child in value.items():
+                if key in {"table", "table_name"}:
+                    anonymized[key] = self._hash_public_identifier(str(child), "table")
+                elif key in {"column", "column_name", "name"}:
+                    anonymized[key] = self._hash_public_identifier(str(child), "column")
+                else:
+                    anonymized[key] = self._anonymize_tuning_value(child)
+            return anonymized
+        if isinstance(value, list):
+            return [self._anonymize_tuning_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._anonymize_tuning_value(item) for item in value]
+        return value
+
     def _anonymize_public_value(self, value: Any, key_path: tuple[str, ...]) -> Any:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
@@ -335,6 +389,12 @@ class AnonymizationManager:
                 else:
                     anonymized[key] = self._anonymize_public_value(child, child_path)
             return anonymized
+
+        if isinstance(value, (set, frozenset)):
+            # Set iteration depends on PYTHONHASHSEED. Sort by the stable
+            # scalar representation before recursing so canonical JSON is
+            # reproducible across processes.
+            value = sorted(value, key=repr)
 
         if isinstance(value, (list, tuple, set, frozenset)):
             # Tuples/sets serialize as JSON arrays; recursing as a list keeps

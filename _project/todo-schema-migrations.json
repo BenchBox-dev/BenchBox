@@ -3,16 +3,19 @@
   "migrations": [
     {
       "revision": 2,
+      "statement_count": 3,
       "summary": "Add work-unit execution provenance columns",
       "deployment_order": "Migration code shipped before or with the schema-revision consumer."
     },
     {
       "revision": 3,
+      "statement_count": 6,
       "summary": "Add the findings domain",
       "deployment_order": "Migration code shipped before or with the schema-revision consumer."
     },
     {
       "revision": 4,
+      "statement_count": 8,
       "summary": "Preserve legacy finding capture fields and deferrable item links",
       "deployment_order": "The hosted primary was migrated to revision 4 before revision-4-only tracker writes resumed.",
       "deployment_evidence": "_project/decisions/todo-db-cutover-write-freeze-2026-08-01.md"
