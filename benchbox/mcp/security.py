@@ -306,6 +306,16 @@ class DurableSecurityStore:
                 );
                 """
             )
+            now = mono_time()
+            latest_ticket = connection.execute("SELECT MAX(created_at) FROM mcp_admission_tickets").fetchone()[0]
+            latest_window = connection.execute("SELECT MAX(window_start) FROM mcp_rate_windows").fetchone()[0]
+            # perf_counter resets on reboot. Discard transient admission state
+            # from the prior boot instead of retaining future-looking leases.
+            if (latest_ticket is not None and float(latest_ticket) > now) or (
+                latest_window is not None and float(latest_window) > now
+            ):
+                connection.execute("DELETE FROM mcp_admission_tickets")
+                connection.execute("DELETE FROM mcp_rate_windows")
 
     def _begin(self, connection: sqlite3.Connection) -> None:
         connection.execute("BEGIN IMMEDIATE")
@@ -343,7 +353,7 @@ class DurableSecurityStore:
 
     def _enqueue(self, principal_id: str) -> str:
         ticket_id = uuid.uuid4().hex
-        now = utc_now().timestamp()
+        now = mono_time()
         with self._connect() as connection:
             self._begin(connection)
             self._cleanup_expired(connection, now)
@@ -367,7 +377,7 @@ class DurableSecurityStore:
         return ticket_id
 
     def _try_promote(self, ticket_id: str, principal_id: str) -> bool:
-        now = utc_now().timestamp()
+        now = mono_time()
         with self._connect() as connection:
             self._begin(connection)
             self._cleanup_expired(connection, now)
@@ -382,7 +392,19 @@ class DurableSecurityStore:
                 connection.commit()
                 return True
             first_waiting = connection.execute(
-                "SELECT ticket_id FROM mcp_admission_tickets WHERE state = 'waiting' ORDER BY created_at, ticket_id LIMIT 1"
+                """SELECT waiting.ticket_id
+                   FROM mcp_admission_tickets AS waiting
+                   LEFT JOIN (
+                       SELECT principal_id, COUNT(*) AS active_count
+                       FROM mcp_admission_tickets
+                       WHERE state = 'active'
+                       GROUP BY principal_id
+                   ) AS active ON active.principal_id = waiting.principal_id
+                   WHERE waiting.state = 'waiting'
+                     AND COALESCE(active.active_count, 0) < ?
+                   ORDER BY waiting.created_at, waiting.ticket_id
+                   LIMIT 1""",
+                (self.limits.principal_concurrency,),
             ).fetchone()
             if (
                 first_waiting is not None
@@ -423,7 +445,7 @@ class DurableSecurityStore:
             cursor = connection.execute(
                 """UPDATE mcp_admission_tickets SET lease_expires_at = ?
                    WHERE ticket_id = ? AND principal_id = ? AND state = 'active'""",
-                (utc_now().timestamp() + self.limits.lease_seconds, lease.ticket_id, lease.principal_id),
+                (mono_time() + self.limits.lease_seconds, lease.ticket_id, lease.principal_id),
             )
         return cursor.rowcount == 1
 
@@ -511,9 +533,9 @@ class RemoteSecurityMiddleware:
             scale_factor = float(arguments.get("scale_factor", 0.01))
         except (TypeError, ValueError) as exc:
             raise MCPError(AUTHORIZATION_ERROR, "Invalid benchmark scale factor") from exc
-        if self.config.allowed_platforms and platform not in self.config.allowed_platforms:
+        if platform not in self.config.allowed_platforms:
             raise MCPError(AUTHORIZATION_ERROR, "Platform is not authorized")
-        if self.config.allowed_benchmarks and benchmark not in self.config.allowed_benchmarks:
+        if benchmark not in self.config.allowed_benchmarks:
             raise MCPError(AUTHORIZATION_ERROR, "Benchmark is not authorized")
         if not math.isfinite(scale_factor) or scale_factor <= 0:
             raise MCPError(AUTHORIZATION_ERROR, "Benchmark scale factor must be finite and positive")
@@ -593,8 +615,9 @@ class RemoteSecurityMiddleware:
             lease = await self.store.admit(principal.principal_id)
             dispatch_error: Exception | None = None
             result: HandlerResult | None = None
+            lease_lost = anyio.Event()
             async with anyio.create_task_group() as task_group:
-                task_group.start_soon(self._renew_lease, lease)
+                task_group.start_soon(self._renew_lease, lease, task_group.cancel_scope, lease_lost)
                 try:
                     result = await call_next(ctx)
                 except Exception as exc:
@@ -603,6 +626,8 @@ class RemoteSecurityMiddleware:
                     dispatch_error = exc
                 finally:
                     task_group.cancel_scope.cancel()
+            if lease_lost.is_set():
+                raise MCPError(ADMISSION_ERROR, "Admission lease was lost during request execution")
             if dispatch_error is not None:
                 raise dispatch_error
             assert result is not None
@@ -625,12 +650,19 @@ class RemoteSecurityMiddleware:
             if lease is not None:
                 await anyio.to_thread.run_sync(self.store.release, lease)
 
-    async def _renew_lease(self, lease: AdmissionLease) -> None:
+    async def _renew_lease(
+        self,
+        lease: AdmissionLease,
+        request_scope: anyio.CancelScope,
+        lease_lost: anyio.Event,
+    ) -> None:
         """Heartbeat one active request without process-local authority."""
-        interval = max(0.05, min(self.store.limits.lease_seconds / 3, 30.0))
+        interval = max(0.001, min(self.store.limits.lease_seconds / 3, 30.0))
         while True:
             await anyio.sleep(interval)
             if not await anyio.to_thread.run_sync(self.store.renew, lease):
+                lease_lost.set()
+                request_scope.cancel()
                 return
 
     async def _audit(

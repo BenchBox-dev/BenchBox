@@ -352,7 +352,6 @@ def _run_benchmark_impl(
     *,
     results_dir: Path,
     execution_id: str | None = None,
-    data_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Core implementation for running benchmarks."""
     execution_id = execution_id or f"mcp_{uuid.uuid4().hex[:8]}"
@@ -389,7 +388,7 @@ def _run_benchmark_impl(
                 scale_factor,
                 execution_id,
                 start_time,
-                data_dir=data_dir,
+                results_dir=results_dir,
             )
 
         benchmark_instance = benchmark_class(scale_factor=scale_factor)
@@ -495,10 +494,10 @@ def _generate_data_impl(
     execution_id: str,
     start_time: float,
     *,
-    data_dir: Path | None = None,
+    results_dir: Path,
 ) -> dict[str, Any]:
     """Generate benchmark data without running queries."""
-    data_dir = data_dir or get_benchmark_runs_datagen_path(benchmark_lower, scale_factor)
+    data_dir = get_benchmark_runs_datagen_path(benchmark_lower, scale_factor, results_dir / "datagen")
     data_dir.mkdir(parents=True, exist_ok=True)
 
     bm = benchmark_class(scale_factor=scale_factor)

@@ -478,7 +478,6 @@ class DurableJobWorker:
             bool(request.get("capture_plans", False)),
             results_dir=staging,
             execution_id=job.execution_id,
-            data_dir=staging / "generated_data",
         )
 
     async def run(self) -> None:

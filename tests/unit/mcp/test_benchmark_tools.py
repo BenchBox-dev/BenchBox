@@ -399,11 +399,19 @@ class TestBenchmarkTiming:
                 (Path(output_dir) / "lineitem.parquet").write_text("x", encoding="utf-8")
 
         mock_clock = Mock(return_value=103.21)
+        tenant_results = tmp_path / "tenant" / "results"
+        tenant_data = tenant_results / "datagen" / "tpch_sf001"
         with (
-            patch.object(benchmark_tools, "get_benchmark_runs_datagen_path", return_value=tmp_path),
+            patch.object(
+                benchmark_tools, "get_benchmark_runs_datagen_path", return_value=tenant_data
+            ) as resolve_datagen,
             patch.object(benchmark_tools, "mono_time", mock_clock),
             patch("benchbox.utils.clock.mono_time", mock_clock),
         ):
-            response = benchmark_tools._generate_data_impl("tpch", _FakeBenchmark, 0.01, "exec-1", 100.0)
+            response = benchmark_tools._generate_data_impl(
+                "tpch", _FakeBenchmark, 0.01, "exec-1", 100.0, results_dir=tenant_results
+            )
 
         assert response["mcp_metadata"]["execution_time_seconds"] == 3.21
+        assert response["data_generation"]["data_path"] == str(tenant_data)
+        resolve_datagen.assert_called_once_with("tpch", 0.01, tenant_results / "datagen")
