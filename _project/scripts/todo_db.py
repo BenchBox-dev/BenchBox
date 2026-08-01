@@ -262,6 +262,17 @@ def default_actor() -> str:
 CONFIG_KEYS: dict[str, tuple[str, ...]] = {
     "lint.require_w0_revalidation": ("on", "off"),
     "lint.require_scope_rules": ("on", "off"),
+    # Claim-level checks (falsifiable ladder, test-file scope completeness)
+    # default OFF: they judge authoring conventions, so a database opts in
+    # explicitly (the shared BenchBox DB does) instead of every fresh/test
+    # database inheriting them.
+    "lint.require_falsifiable_rung": ("on", "off"),
+    "lint.require_scope_test_files": ("on", "off"),
+}
+
+_CONFIG_DEFAULTS: dict[str, str] = {
+    "lint.require_falsifiable_rung": "off",
+    "lint.require_scope_test_files": "off",
 }
 
 
@@ -356,7 +367,7 @@ def get_config(conn: sqlite3.Connection, key: str) -> str:
     if key not in CONFIG_KEYS:
         raise TodoError(f"unknown config key {key!r}; known: {', '.join(sorted(CONFIG_KEYS))}")
     row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
-    return row["value"] if row else "on"
+    return row["value"] if row else _CONFIG_DEFAULTS.get(key, "on")
 
 
 def set_config(conn: sqlite3.Connection, actor: str, key: str, value: str) -> None:
@@ -2238,6 +2249,85 @@ def _unresolvable_command_path_findings(item: dict) -> list[str]:
     return findings
 
 
+# Falsifiability: a ladder in which every rung passes on the unfixed tree can
+# "verify" work that was never done - the audit that motivated this found five
+# open items whose rungs were green pre-fix. Lint cannot run rung commands, so
+# the check is declarative: at least one rung must DECLARE unfixed-tree
+# failure in its expected text ("exits 1 on an unfixed tree", "fails today",
+# "removed once the table is re-measured", ...), and a rung that cannot
+# execute never counts - a broken rung exits non-zero everywhere, which is
+# exactly the vacuous satisfaction this check exists to reject. Items in
+# observational categories (flake tripwires) are exempt: their rungs watch
+# for recurrence and legitimately pass until it happens.
+
+_GATING_EXPECTED_RE = re.compile(
+    r"unfixed|must fail|pre-?fix|before the fix|fail(?:s|ed|ing)? (?:on|when|while|as)|"
+    r"exits? [1-9]\d* (?:today|on|when|until)|today|\bonce\b|\buntil\b",
+    re.IGNORECASE,
+)
+
+# flake = tripwires that legitimately pass until a recurrence; validation =
+# confirmation runs whose rungs describe acceptance, not a defect gate.
+_FALSIFIABILITY_EXEMPT_CATEGORIES = frozenset({"flake", "validation"})
+
+
+def _has_falsifiable_rung(item: dict) -> bool:
+    unrunnable = {seq for seq, _reason, _command in _unrunnable_verifications(item)}
+    for ver in item["verifications"]:
+        if not (ver.get("command") or "").strip():
+            continue
+        if ver["seq"] in unrunnable:
+            continue
+        if _GATING_EXPECTED_RE.search(ver.get("expected") or ""):
+            return True
+    return False
+
+
+# Scope completeness: work that promises tests cannot land when only_modify
+# names a source file but omits that file's existing tests. The conventional
+# family is tests/unit/<subpath>/test_<name>*.py - the wildcard admits split
+# suites (test_todo_db.py, test_todo_db_v2.py, ...); scope is complete when
+# it covers ANY existing member. Only EXISTING test files are demanded - a
+# module without tests today stays createable.
+
+_SOURCE_SCOPE_RE = re.compile(r"^(benchbox/(?:[\w./-]+/)?|_project/scripts/)(\w+)\.py$")
+
+
+def _conventional_test_family(source_path: str) -> tuple[str, str] | None:
+    """(test directory, filename glob) for ``source_path``, or None."""
+    match = _SOURCE_SCOPE_RE.match(source_path)
+    if not match:
+        return None
+    prefix, stem = match.groups()
+    if prefix.startswith("_project/scripts"):
+        return "tests/unit/scripts", f"test_{stem}*.py"
+    subpath = prefix[len("benchbox/") :].rstrip("/")
+    return (f"tests/unit/{subpath}" if subpath else "tests/unit"), f"test_{stem}*.py"
+
+
+def _missing_scope_test_files(item: dict) -> list[str]:
+    root = _lint_repo_root()
+    if root is None:
+        return []
+    only = [rule["path_glob"] for rule in item["scope"] if rule["kind"] == "only_modify"]
+    findings = []
+    for pattern in only:
+        family = _conventional_test_family(pattern)
+        if family is None:
+            continue
+        test_dir, name_glob = family
+        existing = sorted(str(Path(test_dir) / p.name) for p in (root / test_dir).glob(name_glob))
+        if not existing:
+            continue
+        if any(_scope_glob_matches(test_path, glob) for test_path in existing for glob in only):
+            continue
+        findings.append(
+            f"scope completeness: only_modify names {pattern} but omits its existing test file(s) "
+            f"({', '.join(existing[:3])})"
+        )
+    return findings
+
+
 def _unsatisfiable_verifications(item: dict) -> list[int]:
     """Return seqs of rungs whose command cannot express their expectation."""
     offenders = []
@@ -2279,6 +2369,20 @@ def lint_item(conn: sqlite3.Connection, item_id: str) -> list[str]:
         findings.append("description cites point-in-time evidence but has no w0 re-validation unit")
     if not item["work"] and item["state"] in ("planning", "active"):
         findings.append("no work breakdown")
+    if (
+        get_config(conn, "lint.require_falsifiable_rung") == "on"
+        and item["state"] in ("planning", "active")
+        and (item.get("category") or "") not in _FALSIFIABILITY_EXEMPT_CATEGORIES
+        and any((v.get("command") or "").strip() for v in item["verifications"])
+        and not _has_falsifiable_rung(item)
+    ):
+        findings.append(
+            "no falsifiability: every rung's expected text reads as passing on the unfixed tree "
+            "(an unrunnable rung does not count) - at least one rung must fail while the defect "
+            "exists, e.g. 'exits 1 on an unfixed tree'"
+        )
+    if get_config(conn, "lint.require_scope_test_files") == "on" and item["state"] in ("planning", "active"):
+        findings.extend(_missing_scope_test_files(item))
     return findings
 
 
