@@ -96,8 +96,8 @@ def _comment(
     )
 
 
-def _write_fake_codex_launcher(directory: Path) -> Path:
-    """Write a deterministic fake Codex command resolvable on this host."""
+def _write_fake_codex_launcher(directory: Path) -> tuple[Path, list[str]]:
+    """Write a fake Codex command and return its PATH entry and execution prefix."""
     directory.mkdir(parents=True, exist_ok=True)
     bash_shim = directory / "codex"
     bash_shim.write_text(
@@ -131,26 +131,40 @@ def _write_fake_codex_launcher(directory: Path) -> Path:
     )
     bash_shim.chmod(bash_shim.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     if os.name != "nt":
-        return bash_shim
+        return bash_shim, [str(bash_shim)]
 
     skip_without_posix_shell()
     shell = posix_shell()
     assert shell is not None
     cmd_launcher = directory / "codex.cmd"
     cmd_launcher.write_text(f'@"{shell}" "%~dp0codex" %*\n', encoding="utf-8")
-    return cmd_launcher
+    return cmd_launcher, [str(shell), str(bash_shim)]
+
+
+class FakeCodexCommandRunner(pr_review_followups.CommandRunner):
+    """Execute only the test's fake Codex command through its portable prefix."""
+
+    def __init__(self, cwd: Path, codex_prefix: Sequence[str]) -> None:
+        super().__init__(cwd)
+        self.codex_prefix = list(codex_prefix)
+
+    def run(self, args: Sequence[str], input_text: str | None = None) -> subprocess.CompletedProcess[str]:
+        argv = list(args)
+        if argv and argv[0] == "codex":
+            argv = [*self.codex_prefix, *argv[1:]]
+        return super().run(argv, input_text)
 
 
 def test_fake_codex_launcher_resolves_from_path_and_reports_version(monkeypatch, tmp_path) -> None:
     fake_bin = tmp_path / "bin"
-    launcher = _write_fake_codex_launcher(fake_bin)
+    launcher, codex_prefix = _write_fake_codex_launcher(fake_bin)
     monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}")
 
     resolved = shutil.which("codex")
 
     assert resolved is not None
     assert Path(resolved).resolve() == launcher.resolve()
-    completed = subprocess.run([str(resolved), "--version"], check=False, capture_output=True, text=True)
+    completed = subprocess.run([*codex_prefix, "--version"], check=False, capture_output=True, text=True)
     assert completed.returncode == 0
     assert completed.stdout.strip() == "codex-cli 0.128.0"
 
@@ -572,7 +586,7 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
     subprocess.run(["git", "-C", str(repo_root), "update-ref", "refs/remotes/origin/develop", head], check=True)
 
     fake_bin = tmp_path / "bin"
-    _write_fake_codex_launcher(fake_bin)
+    _, codex_prefix = _write_fake_codex_launcher(fake_bin)
     monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}")
 
     pending_pr = pr_review_followups.PullRequest(
@@ -614,7 +628,7 @@ def test_run_action_loop_commits_before_replying(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(pr_review_followups, "reply_to_comment", trace_reply)
     monkeypatch.setattr(pr_review_followups, "finalize_changes", trace_finalize)
 
-    runner = pr_review_followups.CommandRunner(repo_root)
+    runner = FakeCodexCommandRunner(repo_root, codex_prefix)
     args = pr_review_followups.build_parser().parse_args(
         [
             "run",
