@@ -81,7 +81,7 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareValues("Platform version", results, (result) => valueOrMissing(result.platform_version)),
     compareValues("Driver version", results, (result) => valueOrMissing(result.driver_version)),
     compareValues("Execution mode", results, (result) => valueOrMissing(result.execution_mode)),
-    compareValues("Tuning", results, formatTuning),
+    buildTuningField(results),
     compareValues("Validation", results, (result) => valueOrMissing(result.validation_status)),
     buildEnvironmentField(results),
     compareValues("Normalized cost", results, normalizedCostLabel),
@@ -298,6 +298,22 @@ function formatTuning(result: DetailResult) {
     appliedHash ? `applied ${shortHash(appliedHash)}` : null,
   ].filter((part): part is string => part !== null);
   return parts.join(", ");
+}
+
+function buildTuningField(results: DetailResult[]): ComparabilityField {
+  const field = compareValues("Tuning", results, formatTuning);
+  if (field.status !== "diff") return field;
+
+  const requestedHashes = results.map((result) => result.requested_config_hash);
+  const appliedHashes = results.map((result) => result.applied_ledger_hash ?? null);
+  const sameRecordedRequest = requestedHashes.every(Boolean) && new Set(requestedHashes).size === 1;
+  const appliedStatementsDiffer = new Set(appliedHashes).size > 1;
+  if (!sameRecordedRequest || !appliedStatementsDiffer) return field;
+
+  return {
+    ...field,
+    summary: "Requested configuration matches; applied statements differ",
+  };
 }
 
 function formatEnvironment(environment: Environment) {

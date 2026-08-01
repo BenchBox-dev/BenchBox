@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import benchbox.validation.bundle as bundle_module
 from benchbox.validation.bundle import (
     SUBMISSION_NOTES_MAX_LEN,
     ValidationResult,
@@ -439,6 +440,52 @@ class TestValidateManifestHash:
         _validate_manifest_hash(manifest, bundle_dir, vr)
         assert vr.ok
 
+    def test_oversized_applied_companion_bytes_are_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(bundle_module, "APPLIED_COMPANION_MAX_BYTES", 32)
+        bundle_file = tmp_path / "result.json"
+        bundle_file.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        companion = tmp_path / "result.applied.json"
+        companion.write_text(json.dumps({"receipt": {"entries": [], "padding": "x" * 64}}), encoding="utf-8")
+        manifest = tmp_path / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": bundle_file.name,
+                    "bundle_hash": self._hash_of(bundle_file),
+                    "companion_hashes": {companion.name: self._hash_of(companion)},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, tmp_path, vr)
+
+        assert any("byte limit" in error for error in vr.errors)
+
+    def test_oversized_applied_receipt_entry_count_is_rejected(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        monkeypatch.setattr(bundle_module, "APPLIED_RECEIPT_MAX_ENTRIES", 1)
+        bundle_file = tmp_path / "result.json"
+        bundle_file.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        companion = tmp_path / "result.applied.json"
+        companion.write_text(json.dumps({"receipt": {"entries": [{}, {}]}}), encoding="utf-8")
+        manifest = tmp_path / "submission-manifest.json"
+        manifest.write_text(
+            json.dumps(
+                {
+                    "bundle_file": bundle_file.name,
+                    "bundle_hash": self._hash_of(bundle_file),
+                    "companion_hashes": {companion.name: self._hash_of(companion)},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        vr = ValidationResult("test")
+        _validate_manifest_hash(manifest, tmp_path, vr)
+
+        assert any("entry limit" in error for error in vr.errors)
+
     def test_mismatched_hash_fails(self, tmp_path: Path):
         bundle_dir = tmp_path / "bundle"
         bundle_dir.mkdir()
@@ -613,6 +660,13 @@ class TestDiscoverBundles:
         assert len(found) == 1
         assert found[0].name == "result.json"
 
+    def test_ignores_json_named_directories_and_companions_case_insensitively(self, tmp_path: Path):
+        (tmp_path / "directory.json").mkdir()
+        (tmp_path / "result.JSON").write_text("{}", encoding="utf-8")
+        (tmp_path / "result.APPLIED.JSON").write_text("{}", encoding="utf-8")
+
+        assert discover_bundles(tmp_path) == [tmp_path / "result.JSON"]
+
 
 # ---------------------------------------------------------------------------
 # validate_bundles (integration)
@@ -638,6 +692,30 @@ class TestValidateBundles:
         results = validate_bundles([missing])
         assert len(results) == 1
         assert not results[0].ok
+
+    def test_json_named_directory_returns_clean_validation_error(self, tmp_path: Path):
+        directory = tmp_path / "not-a-bundle.json"
+        directory.mkdir()
+
+        results = validate_bundles([directory])
+
+        assert not results[0].ok
+        assert any("regular file" in error for error in results[0].errors)
+
+    def test_unlisted_adjacent_applied_companion_still_obeys_caps(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(bundle_module, "APPLIED_COMPANION_MAX_BYTES", 32)
+        bundle = tmp_path / "result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        (tmp_path / "result.applied.json").write_text(
+            json.dumps({"receipt": {"entries": [], "padding": "x" * 64}}), encoding="utf-8"
+        )
+
+        results = validate_bundles([bundle])
+
+        assert not results[0].ok
+        assert any("byte limit" in error for error in results[0].errors)
 
     def test_non_object_json(self, tmp_path: Path):
         f = tmp_path / "array.json"

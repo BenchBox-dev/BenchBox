@@ -35,7 +35,7 @@ from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
     _platform_percentile_stats,
 )
-from benchbox.validation.bundle import COMPANION_SUFFIXES
+from benchbox.validation.bundle import discover_bundles
 
 logger = logging.getLogger(__name__)
 
@@ -423,20 +423,7 @@ class ExplorerPipeline:
             logger.warning("Bundles directory does not exist: %s", bundles_dir)
             bundle_files: list[Path] = []
         else:
-            bundle_files = sorted(
-                path
-                for path in bundles_dir.rglob("*.json")
-                if path.is_file()
-                # Companion sidecars (.plans.json / .tuning.json /
-                # .applied.json) are published next to their bundle by
-                # bundle_publisher, but they are NOT result bundles. Gate on
-                # the canonical COMPANION_SUFFIXES tuple rather than a local
-                # literal so a newly added companion kind cannot silently be
-                # transformed as if it were a bundle.
-                and not path.name.endswith(COMPANION_SUFFIXES)
-                and not path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
-                and path.name != SUBMISSION_MANIFEST_FILENAME
-            )
+            bundle_files = discover_bundles(bundles_dir)
             logger.info("Found %d bundle(s) in %s", len(bundle_files), bundles_dir)
 
         output_dir.mkdir(parents=True, exist_ok=True)

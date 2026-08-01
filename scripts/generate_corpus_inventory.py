@@ -14,10 +14,14 @@ from pathlib import Path
 BUNDLES_DIR = Path("results-data/bundles")
 INVENTORY_PATH = Path("results-data/corpus-inventory.json")
 
-SKIP_NAMES = {"corpus-inventory.json", "submission-manifest.json"}
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json")
 SUBMISSION_MANIFEST = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
+
+CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
+if str(CHECKOUT_ROOT) not in sys.path:
+    sys.path.insert(0, str(CHECKOUT_ROOT))
+
+from benchbox.validation.bundle import discover_bundles as discover_primary_bundles
 
 # Canonical provenance vocabulary. Import the one source of truth when the full
 # package is available; fall back to inline literals on the slim
@@ -53,13 +57,7 @@ def _normalize_funding(value: object) -> str:
 
 def discover_bundles(bundles_dir: Path) -> list[Path]:
     """Find all primary bundle JSON files."""
-    return [
-        path
-        for path in sorted(bundles_dir.rglob("*.json"))
-        if path.name not in SKIP_NAMES
-        and not any(path.name.endswith(s) for s in COMPANION_SUFFIXES)
-        and not path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
-    ]
+    return discover_primary_bundles(bundles_dir)
 
 
 def _bundle_hash(bundle_path: Path) -> str:

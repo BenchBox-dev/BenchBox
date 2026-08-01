@@ -35,6 +35,13 @@ except ImportError:  # pragma: no cover - slim published-results branch mirror.
 # Max length for the optional free-text submission_notes manifest field.
 SUBMISSION_NOTES_MAX_LEN = 500
 
+# Applied tuning receipts are attacker-controlled submission companions. These
+# ceilings sit well above realistic runs while bounding validation and Explorer
+# ingestion work. Oversized submissions fail loudly; the Explorer pipeline has
+# a separate defensive truncation marker for already-published legacy inputs.
+APPLIED_RECEIPT_MAX_ENTRIES = 10_000
+APPLIED_COMPANION_MAX_BYTES = 8 * 1024 * 1024
+
 # ---------------------------------------------------------------------------
 # Schema-v2 required top-level keys
 # ---------------------------------------------------------------------------
@@ -658,25 +665,68 @@ def _validate_manifest_hash(manifest_path: Path, bundle_dir: Path, vr: Validatio
         return
 
     for comp_name, comp_expected in companion_hashes.items():
-        if not isinstance(comp_name, str) or not _is_safe_bundle_filename(comp_name):
-            vr.error(f"Unsafe companion filename in manifest: {comp_name!r} (must be a plain filename)")
-            continue
-        comp_path = bundle_dir / comp_name
-        if comp_path.is_symlink():
-            vr.error(f"Companion file is a symlink, not a regular file: {comp_name} (symlinks not allowed)")
-            continue
-        if not comp_path.is_file():
-            vr.error(f"Companion file declared in manifest not found in PR: {comp_name}")
-            continue
-        if not isinstance(comp_expected, str) or not comp_expected:
-            vr.error(f"Empty companion hash for {comp_name}")
-            continue
-        comp_actual = _hash_file(comp_path)
-        if comp_actual != comp_expected:
-            vr.error(
-                f"Companion hash mismatch for {comp_name}: manifest says "
-                f"{comp_expected[:16]}..., computed {comp_actual[:16]}..."
-            )
+        _validate_manifest_companion(comp_name, comp_expected, bundle_dir, vr)
+
+
+def _validate_manifest_companion(
+    comp_name: object,
+    comp_expected: object,
+    bundle_dir: Path,
+    vr: ValidationResult,
+) -> None:
+    """Validate one manifest-declared companion without widening orchestration."""
+    if not isinstance(comp_name, str) or not _is_safe_bundle_filename(comp_name):
+        vr.error(f"Unsafe companion filename in manifest: {comp_name!r} (must be a plain filename)")
+        return
+    comp_path = bundle_dir / comp_name
+    if comp_path.is_symlink():
+        vr.error(f"Companion file is a symlink, not a regular file: {comp_name} (symlinks not allowed)")
+        return
+    if not comp_path.is_file():
+        vr.error(f"Companion file declared in manifest not found in PR: {comp_name}")
+        return
+    if not isinstance(comp_expected, str) or not comp_expected:
+        vr.error(f"Empty companion hash for {comp_name}")
+        return
+    if not _validate_applied_companion_limits(comp_path, vr):
+        return
+    comp_actual = _hash_file(comp_path)
+    if comp_actual != comp_expected:
+        vr.error(
+            f"Companion hash mismatch for {comp_name}: manifest says "
+            f"{comp_expected[:16]}..., computed {comp_actual[:16]}..."
+        )
+
+
+def _validate_applied_companion_limits(companion: Path, vr: ValidationResult) -> bool:
+    """Reject an applied receipt that exceeds the public submission bounds."""
+    if not companion.name.lower().endswith(".applied.json"):
+        return True
+    try:
+        size = companion.stat().st_size
+    except OSError as exc:
+        vr.error(f"Cannot inspect applied companion {companion.name}: {exc}")
+        return False
+    if size > APPLIED_COMPANION_MAX_BYTES:
+        vr.error(
+            f"Applied companion {companion.name} exceeds the {APPLIED_COMPANION_MAX_BYTES}-byte limit ({size} bytes)"
+        )
+        return False
+    try:
+        payload = json.loads(companion.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        # Companion schema validation remains owned by its producer. This gate
+        # only bounds inputs and must not broaden existing rejection semantics.
+        return True
+    receipt = payload.get("receipt") if isinstance(payload, dict) else None
+    entries = receipt.get("entries") if isinstance(receipt, dict) else None
+    if isinstance(entries, list) and len(entries) > APPLIED_RECEIPT_MAX_ENTRIES:
+        vr.error(
+            f"Applied receipt {companion.name} exceeds the {APPLIED_RECEIPT_MAX_ENTRIES}-entry limit "
+            f"({len(entries)} entries)"
+        )
+        return False
+    return True
 
 
 def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, vr: ValidationResult) -> None:
@@ -727,16 +777,21 @@ def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, 
 
 def discover_bundles(path: Path) -> list[Path]:
     """Find all primary bundle JSON files under a directory (excludes companions)."""
-    bundles = []
-    for f in sorted(path.rglob("*.json")):
-        if any(f.name.endswith(s) for s in COMPANION_SUFFIXES):
-            continue
-        if f.name == "corpus-inventory.json":
-            continue
-        if _is_submission_manifest_path(f):
-            continue
-        bundles.append(f)
-    return bundles
+    return [candidate for candidate in sorted(path.rglob("*")) if is_primary_bundle_file(candidate)]
+
+
+def is_primary_bundle_file(path: Path) -> bool:
+    """Return whether *path* is a regular primary bundle, case-insensitively."""
+    if not path.is_file():
+        return False
+    name = path.name.lower()
+    if not name.endswith(".json"):
+        return False
+    if any(name.endswith(suffix) for suffix in COMPANION_SUFFIXES):
+        return False
+    if name == "corpus-inventory.json":
+        return False
+    return not _is_submission_manifest_path(path)
 
 
 def _is_submission_manifest_path(path: Path) -> bool:
@@ -749,7 +804,8 @@ def _is_submission_manifest_path(path: Path) -> bool:
     ``<bundle_stem>.manifest.json`` exclusively, and the published-results
     workflow filter mirrors this skip pattern.
     """
-    return path.name == SUBMISSION_MANIFEST_FILENAME or path.name.endswith(SUBMISSION_MANIFEST_SUFFIX)
+    name = path.name.lower()
+    return name == SUBMISSION_MANIFEST_FILENAME or name.endswith(SUBMISSION_MANIFEST_SUFFIX)
 
 
 def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[ValidationResult]:
@@ -775,6 +831,10 @@ def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[
             vr.error(f"File not found: {bundle_path}")
             results.append(vr)
             continue
+        if not bundle_path.is_file():
+            vr.error(f"Bundle path is not a regular file: {bundle_path}")
+            results.append(vr)
+            continue
 
         try:
             data = json.loads(bundle_path.read_text(encoding="utf-8"))
@@ -789,6 +849,18 @@ def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[
             continue
 
         _validate_bundle(data, vr)
+
+        # Bound an adjacent applied companion even if a hand-authored manifest
+        # omitted it. The manifest hash contract is checked separately below;
+        # resource bounds must not depend on honest companion enumeration.
+        applied_name = f"{bundle_path.stem}.applied.json".lower()
+        for companion in bundle_path.parent.iterdir():
+            if companion.name.lower() != applied_name:
+                continue
+            if companion.is_symlink():
+                vr.error(f"Companion file is a symlink, not a regular file: {companion.name} (symlinks not allowed)")
+            elif companion.is_file():
+                _validate_applied_companion_limits(companion, vr)
 
         # Check for submission manifest alongside the bundle.
         # Prefer per-bundle name (<stem>.manifest.json), fall back to legacy.

@@ -289,29 +289,45 @@ interface AppliedReceiptEntry {
   detail?: unknown;
 }
 
+interface ParsedAppliedReceipt {
+  entries: AppliedReceiptEntry[];
+  truncated: boolean;
+  originalEntryCount?: number;
+}
+
 /**
- * Best-effort parse of the receipt's `entries` list.
+ * Best-effort parse of the receipt's `entries` list and defensive cap marker.
  *
- * Returns an empty array for every degraded shape - absent, empty, unparsable,
- * not an object, or no `entries` array - so the caller renders no drill-down
- * and no error. A published receipt must never be able to break the receipt
- * panel, so this never throws.
+ * Returns an empty receipt for every degraded shape - absent, empty,
+ * unparsable, not an object, or no `entries` array - so the caller renders no
+ * drill-down and no error. A published receipt must never be able to break the
+ * receipt panel, so this never throws.
  */
-function parseAppliedReceiptEntries(raw: string | null | undefined): AppliedReceiptEntry[] {
-  if (typeof raw !== "string" || raw.trim() === "") return [];
+function parseAppliedReceipt(raw: string | null | undefined): ParsedAppliedReceipt {
+  const empty = { entries: [], truncated: false };
+  if (typeof raw !== "string" || raw.trim() === "") return empty;
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return [];
+    return empty;
   }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return [];
-  const entries = (parsed as { entries?: unknown }).entries;
-  if (!Array.isArray(entries)) return [];
-  return entries.filter(
-    (entry): entry is AppliedReceiptEntry =>
-      entry !== null && typeof entry === "object" && !Array.isArray(entry),
-  );
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return empty;
+  const receipt = parsed as {
+    entries?: unknown;
+    original_entry_count?: unknown;
+    truncated?: unknown;
+  };
+  if (!Array.isArray(receipt.entries)) return empty;
+  return {
+    entries: receipt.entries.filter(
+      (entry): entry is AppliedReceiptEntry =>
+        entry !== null && typeof entry === "object" && !Array.isArray(entry),
+    ),
+    truncated: receipt.truncated === true,
+    originalEntryCount:
+      typeof receipt.original_entry_count === "number" ? receipt.original_entry_count : undefined,
+  };
 }
 
 /**
@@ -334,14 +350,25 @@ function receiptText(value: unknown): string | null {
 }
 
 function AppliedReceiptDrilldown({ raw }: { raw?: string | null }) {
-  const entries = parseAppliedReceiptEntries(raw);
-  if (entries.length === 0) return null;
+  const { entries, truncated, originalEntryCount } = parseAppliedReceipt(raw);
+  if (entries.length === 0 && !truncated) return null;
+  const entryCount =
+    truncated && originalEntryCount !== undefined
+      ? `${entries.length} of ${originalEntryCount}; truncated`
+      : truncated
+        ? `${entries.length}; truncated`
+        : String(entries.length);
 
   return (
     <details class="mt-2" data-testid="applied-receipt-drilldown">
       <summary class="cursor-pointer select-none text-xs text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]">
-        Statement receipt ({entries.length})
+        Receipt entries ({entryCount})
       </summary>
+      {truncated && (
+        <p class="mt-2 text-xs text-[var(--bb-tone-warning-fg)]">
+          The published receipt exceeded the defensive receipt bound; the list below is incomplete.
+        </p>
+      )}
       <ul class="mt-2 list-none space-y-2 p-0">
         {entries.map((entry, index) => (
           <li
