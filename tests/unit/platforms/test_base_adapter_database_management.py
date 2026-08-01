@@ -312,6 +312,26 @@ def test_handle_existing_database_recreates_incompatible_database(adapter, tmp_p
     adapter._remove_database.assert_called_once()
 
 
+def test_handle_existing_database_recreates_for_extra_tuning_drift(adapter, tmp_path):
+    db_file = tmp_path / "extra-tuning.db"
+    db_file.write_text("db")
+    adapter.check_database_exists = Mock(return_value=True)
+    adapter._validate_database_compatibility = Mock(
+        return_value=SimpleNamespace(
+            warnings=[],
+            issues=["Tuning: Unexpected tuning found for table 'lineitem' in database"],
+            is_valid=False,
+            can_reuse=False,
+        )
+    )
+    adapter._remove_database = Mock()
+
+    adapter.handle_existing_database(database_path=str(db_file))
+
+    assert adapter.database_was_reused is False
+    adapter._remove_database.assert_called_once()
+
+
 def test_remove_database_deletes_file(tmp_path):
     db_file = tmp_path / "sample.db"
     db_file.write_text("db")
@@ -560,8 +580,8 @@ class TestAdapterValidationGaps:
 
     def test_validate_tuning_metadata_no_tuning_expected_with_existing(self, adapter, monkeypatch):
         class FakeMetadataManager:
-            def __init__(self, adapter, database):
-                pass
+            def __init__(self, adapter, **_kwargs):
+                self.last_load_error = None
 
             def load_unified_tunings(self):
                 return {"some": "tuning"}
@@ -571,9 +591,12 @@ class TestAdapterValidationGaps:
 
         monkeypatch.setattr("benchbox.core.tuning.metadata.TuningMetadataManager", FakeMetadataManager)
         adapter.get_effective_tuning_configuration = Mock(return_value=None)
+        adapter.tuning_enabled = False
 
         result = adapter._validate_database_tunings(database="test")
         assert any("Database contains tuning metadata but no tunings expected" in warn for warn in result.warnings)
+        assert result.is_valid is False
+        assert any("notuning" in error for error in result.errors)
 
     def test_save_tuning_metadata_disabled_or_no_config(self, adapter):
         adapter.tuning_enabled = False
@@ -602,6 +625,24 @@ class TestAdapterValidationGaps:
 
         assert result is False
         assert "Failed to save tuning metadata: save boom" in caplog.text
+
+    def test_save_tuning_metadata_marker_failure_is_nonfatal_and_stashed(self, adapter, monkeypatch):
+        adapter.tuning_enabled = True
+        adapter.get_effective_tuning_configuration = Mock(return_value={"some": "config"})
+
+        class FakeMetadataManager:
+            marker_save_failed = True
+
+            def __init__(self, adapter):
+                pass
+
+            def save_unified_tunings(self, config):
+                return True
+
+        monkeypatch.setattr("benchbox.core.tuning.metadata.TuningMetadataManager", FakeMetadataManager)
+
+        assert adapter.save_tuning_metadata(Mock()) is True
+        assert any("section markers were not saved" in warning for warning in adapter._drift_validation_result.warnings)
 
     def test_validate_row_counts_success(self, adapter, monkeypatch):
         class FakeValidator:

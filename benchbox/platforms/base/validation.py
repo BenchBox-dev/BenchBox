@@ -112,31 +112,17 @@ class TuningValidator(BaseValidator):
         """
         result = ValidationResult(is_valid=True)
 
-        # Get effective tuning configuration
-        effective_config = self.adapter.get_effective_tuning_configuration()
-
-        if self.adapter.tuning_enabled and effective_config:
-            # Validate tunings using existing method
-            tuning_result = self.adapter._validate_database_tunings(**self.connection_config)
-            if not tuning_result.is_valid:
-                # Include first 3 errors
-                for error in tuning_result.errors[:3]:
-                    result.add_error(f"Tuning: {error}")
-                # Include summary if more errors exist
-                if len(tuning_result.errors) > 3:
-                    result.add_error(f"Tuning: ... and {len(tuning_result.errors) - 3} more tuning errors")
-
-        elif self.adapter.tuning_enabled and not effective_config:
-            # Check for unexpected tuning metadata
-            try:
-                from benchbox.core.tuning.metadata import TuningMetadataManager
-
-                metadata_manager = TuningMetadataManager(self.adapter, self.connection_config.get("database"))
-                existing_tunings = metadata_manager.load_tunings()
-                if existing_tunings and len(existing_tunings) > 0:
-                    result.add_warning("Database contains tuning metadata but no tunings expected for this run")
-            except Exception:
-                pass  # Ignore metadata check failures
+        # Reused-database validation is required even for a notuning run: a
+        # physically tuned database is not a valid baseline. The adapter path
+        # also preserves a MetadataValidationResult for the companion receipt.
+        tuning_result = self.adapter._validate_database_tunings(**self.connection_config)
+        for warning in tuning_result.warnings:
+            result.add_warning(warning)
+        if not tuning_result.is_valid:
+            for error in tuning_result.errors[:3]:
+                result.add_error(f"Tuning: {error}")
+            if len(tuning_result.errors) > 3:
+                result.add_error(f"Tuning: ... and {len(tuning_result.errors) - 3} more tuning errors")
 
         return result
 
