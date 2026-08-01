@@ -114,13 +114,13 @@ jobs:
         run: |
           # Find new/modified bundle JSONs in this PR (exclude companions and metadata files).
           # Use the base SHA directly rather than a ref name for reliability.
-          CHANGED=$(git diff --no-renames --name-only --diff-filter=ACMR ${{ github.event.pull_request.base.sha }}...HEAD -- 'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
-            | grep -v '\.plans\.json$' \
-            | grep -v '\.tuning\.json$' \
-            | grep -v '\.applied\.json$' \
-            | grep -v 'corpus-inventory\.json$' \
-            | grep -v '\.manifest\.json$' \
-            | grep -v 'submission-manifest\.json$' \
+          CHANGED=$(git diff --no-renames --name-only --diff-filter=ACMR ${{ github.event.pull_request.base.sha }}...HEAD -- ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -vi '\.plans\.json$' \
+            | grep -vi '\.tuning\.json$' \
+            | grep -vi '\.applied\.json$' \
+            | grep -vi 'corpus-inventory\.json$' \
+            | grep -vi '\.manifest\.json$' \
+            | grep -vi 'submission-manifest\.json$' \
             || true)
 
           # Detect changed manifest files separately. A manifest-only PR skips
@@ -134,12 +134,14 @@ jobs:
           # corpus inventory drift check, so a manifest removal cannot bypass it.
           CHANGED_MANIFESTS=$(git diff --no-renames --name-only --diff-filter=ACMRD \
             ${{ github.event.pull_request.base.sha }}...HEAD -- \
-            'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
-            | grep '\.manifest\.json$' \
+            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -i '\.manifest\.json$' \
             || true)
           if [ -n "$CHANGED_MANIFESTS" ]; then
             while IFS= read -r manifest; do
-              bundle="${manifest%.manifest.json}.json"
+              stem="${manifest:0:${#manifest}-14}"
+              bundle=$(git ls-tree -r --name-only HEAD -- results-data/bundles \
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
               # Only add if the paired bundle exists and is not already in CHANGED.
               # For a deleted manifest whose bundle remains, the bundle still
               # exists at HEAD and is added; if both were removed, there is no
@@ -159,12 +161,14 @@ jobs:
           # removed companion is still a contract change while its bundle exists.
           CHANGED_APPLIED=$(git diff --no-renames --name-only --diff-filter=ACMRD \
             ${{ github.event.pull_request.base.sha }}...HEAD -- \
-            'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
-            | grep '\.applied\.json$' \
+            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -i '\.applied\.json$' \
             || true)
           if [ -n "$CHANGED_APPLIED" ]; then
             while IFS= read -r applied; do
-              bundle="${applied%.applied.json}.json"
+              stem="${applied:0:${#applied}-13}"
+              bundle=$(git ls-tree -r --name-only HEAD -- results-data/bundles \
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
               # Only add if the paired bundle exists and is not already in CHANGED.
               if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
                   && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
