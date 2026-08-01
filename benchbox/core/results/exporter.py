@@ -123,10 +123,12 @@ class ResultExporter:
         Result bundles are byte-defined, so text writes must not translate LF
         characters to the host platform's native newline sequence.
         """
-        if self.is_cloud_output and hasattr(file_path, "write_text"):
-            file_path.write_text(content, encoding="utf-8", newline="")
-        elif self.is_cloud_output and hasattr(file_path, "write_bytes"):
+        if self.is_cloud_output and hasattr(file_path, "write_bytes"):
             file_path.write_bytes(content.encode("utf-8"))
+        elif self.is_cloud_output and hasattr(file_path, "write_text"):
+            # Keep compatibility with cloudpathlib 0.15, whose write_text()
+            # does not yet expose pathlib's newline keyword.
+            file_path.write_text(content, encoding="utf-8")
         else:
             with open(file_path, mode, encoding="utf-8", newline="") as handle:
                 handle.write(content)

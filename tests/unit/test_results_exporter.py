@@ -81,13 +81,31 @@ def test_write_file_disables_local_newline_translation(monkeypatch, tmp_path):
     assert destination.read_bytes() == b"{\n}\n"
 
 
-def test_write_file_disables_cloud_text_newline_translation(tmp_path):
+def test_write_file_prefers_canonical_cloud_bytes(tmp_path):
+    class CloudPath:
+        content: bytes | None = None
+
+        def write_bytes(self, content: bytes) -> None:
+            self.content = content
+
+        def write_text(self, content: str, *, encoding: str) -> None:
+            raise AssertionError("cloud byte writes must take precedence")
+
+    destination = CloudPath()
+    exporter = ResultExporter(output_dir=tmp_path, anonymize=False)
+    exporter.is_cloud_output = True
+
+    exporter._write_file(destination, "{\n}\n")
+
+    assert destination.content == b"{\n}\n"
+
+
+def test_write_file_supports_legacy_cloud_text_api(tmp_path):
     class CloudTextPath:
         content: str | None = None
 
-        def write_text(self, content: str, *, encoding: str, newline: str) -> None:
+        def write_text(self, content: str, *, encoding: str) -> None:
             assert encoding == "utf-8"
-            assert newline == ""
             self.content = content
 
     destination = CloudTextPath()
