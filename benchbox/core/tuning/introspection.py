@@ -281,14 +281,31 @@ def normalize_identifier(value: Any) -> str:
     return text.strip().casefold()
 
 
+def _has_balanced_outer_parentheses(text: str) -> bool:
+    """Return whether one plain parenthesis pair encloses all of *text*."""
+    if not text.startswith("(") or not text.endswith(")"):
+        return False
+    depth = 0
+    for index, char in enumerate(text):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+            if depth == 0 and index != len(text) - 1:
+                return False
+    return depth == 0
+
+
 def normalize_columns(raw: Any) -> tuple[str, ...]:
     """Normalize a comma-separated column list (or a bracketed catalog list).
 
     Accepts ``"a, b"``, ``"[a, b]"`` (DuckDB ``expressions``), or an already
     split iterable. ClickHouse may represent a multi-column partition key as
-    ``tuple(a, b)``; its outer function wrapper is catalog syntax rather than
-    a column name and is removed before splitting. Returns a case-folded,
-    order-preserving tuple with empty entries dropped.
+    ``tuple(a, b)`` or ``(a, b)``; one balanced outer catalog wrapper is
+    removed before splitting. Inner expression parentheses remain untouched.
+    Returns a case-folded, order-preserving tuple with empty entries dropped.
     """
     if raw is None:
         return ()
@@ -300,6 +317,8 @@ def normalize_columns(raw: Any) -> tuple[str, ...]:
             text = text[1:-1]
         elif text[:6].casefold() == "tuple(" and text.endswith(")"):
             text = text[6:-1].strip()
+        elif _has_balanced_outer_parentheses(text):
+            text = text[1:-1].strip()
         items = text.split(",") if text else []
     normalized = [normalize_identifier(item) for item in items]
     return tuple(col for col in normalized if col)
