@@ -1837,7 +1837,7 @@ def update_scope_rules(
     removals = _normalize_scope_updates(drop_scope)
     reason = reason.strip() if reason and reason.strip() else None
     if not additions and not removals:
-        raise TodoError("update requires at least one scope change flag")
+        raise TodoError("scope-update requires at least one scope change flag")
     if reason is None:
         raise TodoError("scope changes require --reason because they amend the item's write boundary")
     conflict = set(additions) & set(removals)
@@ -3702,7 +3702,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
 
-    p = sub.add_parser("update", help="atomically amend an item's audited scope rules")
+    p = sub.add_parser("scope-update", help="atomically amend an item's audited scope rules")
     p.add_argument("id")
     p.add_argument("--add-only-modify", action="append", default=[], metavar="GLOB")
     p.add_argument("--drop-only-modify", action="append", default=[], metavar="GLOB")
@@ -4367,7 +4367,7 @@ _HANDLERS = {
     "init": _cmd_init,
     "import-yaml": _cmd_import_yaml,
     "create": _cmd_create,
-    "update": _cmd_update,
+    "scope-update": _cmd_update,
     "show": _cmd_show,
     "claim": _cmd_claim,
     "release": _cmd_release,

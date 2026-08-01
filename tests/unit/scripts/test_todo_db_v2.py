@@ -240,7 +240,7 @@ class TestAuditedScopeUpdate:
                     str(db),
                     "--actor",
                     "tester",
-                    "update",
+                    "scope-update",
                     "resume-item",
                     "--add-only-modify",
                     "tests/**",
