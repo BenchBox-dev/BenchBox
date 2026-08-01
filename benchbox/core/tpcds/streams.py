@@ -303,6 +303,12 @@ class DSQGenStreamsError(Exception):
 _DSQGEN_BEGIN_STREAM_RE = re.compile(r"^BEGIN STREAM\s+(\d+)\s*$", re.IGNORECASE)
 _DSQGEN_TEMPLATE_RE = re.compile(r"^Template:\s*query(\d+)([ab]?)\.tpl\s*$", re.IGNORECASE)
 _DSQGEN_STATEMENT_SPLIT_RE = re.compile(r"(?<=;)\n+(?=\S)")
+_WINDOWS_DSQGEN_CITIES_OVERRUN_FRAGMENTS = (
+    "Runtime ERROR: Distribution over-run/under-run",
+    "Check distribution definitions and usage for cities.",
+    "index = -1, length=1000.",
+)
+_WINDOWS_DSQGEN_MAX_ATTEMPTS = 10
 
 
 def _resolve_dsqgen_binary_and_templates() -> tuple[Path, Path]:
@@ -344,6 +350,49 @@ def _stage_dsqgen_streams_workdir(temp_path: Path, templates_dir: Path, tools_di
                 break
 
     return env
+
+
+def _run_dsqgen_streams(
+    cmd: list[str],
+    *,
+    temp_path: Path,
+    timeout: int,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[str]:
+    """Run dsqgen, retrying only its known transient Windows cities failure.
+
+    Query 46 selects a five-city list through dsqgen's non-seeded internal
+    random path. The bundled Windows runtime can intermittently turn that draw
+    into an out-of-range ``cities`` distribution index even though the same
+    binary, distribution files, arguments, and seed succeed on another
+    invocation. Keep the workaround fail-closed: other errors return
+    immediately, and a persistent cities failure is returned after the bounded
+    retry cap so the caller raises ``DSQGenStreamsError`` as before.
+    """
+    max_attempts = _WINDOWS_DSQGEN_MAX_ATTEMPTS if sys.platform == "win32" else 1
+
+    for attempt in range(max_attempts):
+        result = subprocess.run(
+            cmd,
+            cwd=temp_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+        )
+        is_transient_windows_overrun = sys.platform == "win32" and all(
+            fragment in result.stderr for fragment in _WINDOWS_DSQGEN_CITIES_OVERRUN_FRAGMENTS
+        )
+        if result.returncode == 0 or not is_transient_windows_overrun or attempt == max_attempts - 1:
+            return result
+
+        # A failed -STREAMS pass may leave partial output behind. Never let a
+        # later successful attempt accidentally consume it.
+        for output_path in temp_path.glob("query_*.sql"):
+            output_path.unlink()
+        (temp_path / "stream_params.log").unlink(missing_ok=True)
+
+    raise AssertionError("unreachable")
 
 
 def _parse_dsqgen_stream_log(log_text: str) -> dict[int, list[tuple[int, Optional[str]]]]:
@@ -489,11 +538,9 @@ def generate_dsqgen_streams(
             cmd.extend([f"{opt}RNGSEED", str(seed)])
 
         try:
-            result = subprocess.run(
+            result = _run_dsqgen_streams(
                 cmd,
-                cwd=temp_dir,
-                capture_output=True,
-                text=True,
+                temp_path=temp_path,
                 timeout=timeout,
                 env=env,
             )
