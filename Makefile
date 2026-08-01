@@ -646,6 +646,14 @@ lint:
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
 
+# Reject a uv.lock schema-revision downgrade (an older local uv rewrites
+# revision 3 back to 2 as a silent side effect of any `uv add`/`uv lock`).
+# Compares HEAD:uv.lock against the working tree; also wired as a pre-commit
+# hook gated on uv.lock changes. See docs/development/development.md.
+.PHONY: uv-lock-revision-check
+uv-lock-revision-check:
+	python3 _project/scripts/check_uv_lock_revision.py
+
 # Dependency audit - checks that every declared dep has an import site or is allowlisted.
 # Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
 audit-deps:

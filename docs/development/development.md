@@ -12,7 +12,12 @@ This guide provides information for developers who want to contribute to BenchBo
 ### Prerequisites
 
 - Python 3.10+
-- [`uv`](https://docs.astral.sh/uv/) (recommended for environment management)
+- [`uv`](https://docs.astral.sh/uv/) **0.8 or newer** (recommended for environment
+  management). The committed `uv.lock` uses lockfile `revision = 3`; an older uv
+  silently rewrites it to revision 2 as a side effect of any `uv add`/`uv lock`
+  run. A pre-commit guard (`_project/scripts/check_uv_lock_revision.py`, also
+  runnable via `make uv-lock-revision-check`) rejects such a downgrade — if it
+  fires, upgrade uv (`uv self update`) and regenerate the lock.
 - `git`
 
 ### Setting up the Development Environment

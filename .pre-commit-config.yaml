@@ -17,6 +17,18 @@ repos:
         stages: [pre-commit]
         files: ^results-data/bundles/
 
+      # An older local uv silently rewrites the committed lock schema
+      # (revision 3 -> 2) alongside any real dependency change; reject the
+      # downgrade before it rides into a commit. Stdlib-only, runs only when
+      # uv.lock is staged.
+      - id: uv-lock-revision-guard
+        name: uv.lock revision downgrade guard
+        entry: python3 _project/scripts/check_uv_lock_revision.py
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+        files: ^uv\.lock$
+
       - id: uat-loc-table
         name: UAT spec LOC table drift check
         entry: uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check
