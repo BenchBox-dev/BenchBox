@@ -781,12 +781,12 @@ def discover_bundles(path: Path) -> list[Path]:
 
 
 def is_primary_bundle_file(path: Path) -> bool:
-    """Return whether *path* is a regular primary bundle, case-insensitively."""
+    """Return whether *path* is a regular, workflow-detectable primary bundle."""
     if not path.is_file():
         return False
-    name = path.name.lower()
-    if not name.endswith(".json"):
+    if not path.name.endswith(".json"):
         return False
+    name = path.name.lower()
     if any(name.endswith(suffix) for suffix in COMPANION_SUFFIXES):
         return False
     if name == "corpus-inventory.json":

@@ -152,14 +152,17 @@ class TestGenerateInventory:
         assert [entry["file"] for entry in inventory["bundles"]] == ["a.json", "b.json"]
         assert inventory["summary"]["total_bundles"] == 2
 
-    def test_discovery_ignores_json_named_directories_and_mixed_case_companions(self, tmp_path: Path) -> None:
+    def test_discovery_ignores_json_named_directories_uppercase_primaries_and_mixed_case_companions(
+        self, tmp_path: Path
+    ) -> None:
         (tmp_path / "directory.json").mkdir()
-        _write_bundle(tmp_path / "result.JSON")
-        (tmp_path / "result.APPLIED.JSON").write_text("{}", encoding="utf-8")
+        _write_bundle(tmp_path / "result.json")
+        _write_bundle(tmp_path / "bypass.JSON")
+        (tmp_path / "result.APPLIED.json").write_text("{}", encoding="utf-8")
 
         inventory = script.generate_inventory(tmp_path)
 
-        assert [entry["file"] for entry in inventory["bundles"]] == ["result.JSON"]
+        assert [entry["file"] for entry in inventory["bundles"]] == ["result.json"]
 
     def test_cohort_summary_groups_platforms(self, tmp_path: Path) -> None:
         _write_bundle(tmp_path / "duckdb.json", benchmark_id="tpch", scale_factor=0.1, platform="DuckDB")

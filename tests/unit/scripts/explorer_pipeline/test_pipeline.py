@@ -427,12 +427,15 @@ class TestExplorerPipelineRun:
         # Only the real bundle, not the applied-ledger companion.
         assert len(_duckdb_results(output)) == 1
 
-    def test_discovery_ignores_json_named_directories_and_mixed_case_companions(self, tmp_path: Path) -> None:
+    def test_discovery_ignores_json_named_directories_uppercase_primaries_and_mixed_case_companions(
+        self, tmp_path: Path
+    ) -> None:
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         (bundles_dir / "directory.json").mkdir()
-        (bundles_dir / "real_bundle.JSON").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
-        (bundles_dir / "real_bundle.APPLIED.JSON").write_text("{}", encoding="utf-8")
+        (bundles_dir / "real_bundle.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        (bundles_dir / "bypass.JSON").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        (bundles_dir / "real_bundle.APPLIED.json").write_text("{}", encoding="utf-8")
 
         output = tmp_path / "out"
         ExplorerPipeline().run(tmp_path / "data", output)

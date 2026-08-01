@@ -660,12 +660,13 @@ class TestDiscoverBundles:
         assert len(found) == 1
         assert found[0].name == "result.json"
 
-    def test_ignores_json_named_directories_and_companions_case_insensitively(self, tmp_path: Path):
+    def test_ignores_json_named_directories_uppercase_primaries_and_mixed_case_companions(self, tmp_path: Path):
         (tmp_path / "directory.json").mkdir()
-        (tmp_path / "result.JSON").write_text("{}", encoding="utf-8")
-        (tmp_path / "result.APPLIED.JSON").write_text("{}", encoding="utf-8")
+        (tmp_path / "result.json").write_text("{}", encoding="utf-8")
+        (tmp_path / "bypass.JSON").write_text("{}", encoding="utf-8")
+        (tmp_path / "result.APPLIED.json").write_text("{}", encoding="utf-8")
 
-        assert discover_bundles(tmp_path) == [tmp_path / "result.JSON"]
+        assert discover_bundles(tmp_path) == [tmp_path / "result.json"]
 
 
 # ---------------------------------------------------------------------------
