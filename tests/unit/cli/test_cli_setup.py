@@ -74,6 +74,7 @@ class TestSetupCommand:
         assert "BigQuery" in result.output
         assert "Redshift" in result.output
         assert "MotherDuck" in result.output
+        assert "SingleStore" in result.output
         assert "✅ Configured" in result.output
         assert "○ Not configured" in result.output
 
@@ -304,6 +305,23 @@ class TestSetupCommand:
 
     @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
+    @patch("benchbox.platforms.credentials.singlestore.setup_singlestore_credentials")
+    def test_setup_interactive_singlestore(self, mock_setup_singlestore, mock_check_deps, mock_cred_manager_class):
+        """Test interactive setup for SingleStore."""
+        mock_manager = MagicMock()
+        mock_cred_manager_class.return_value = mock_manager
+        mock_check_deps.return_value = (True, [])
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["setup", "--platform", "singlestore"])
+
+        assert result.exit_code == 0
+        assert "SingleStore Credentials Setup" in result.output
+        mock_setup_singlestore.assert_called_once()
+        assert mock_setup_singlestore.call_args[0][0] == mock_manager
+
+    @patch("benchbox.cli.commands.setup.CredentialManager")
+    @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.bigquery.setup_bigquery_credentials")
     def test_setup_interactive_bigquery(self, mock_setup_bigquery, mock_check_deps, mock_cred_manager_class):
         """Test interactive setup for BigQuery."""
@@ -406,6 +424,22 @@ class TestSetupValidation:
             "database": "benchbox",
             "token_env_var": "MOTHERDUCK_TOKEN",
         }
+
+    @patch("benchbox.cli.commands.setup.CredentialManager")
+    @patch("benchbox.platforms.credentials.singlestore.validate_singlestore_credentials")
+    def test_validate_singlestore(self, mock_validate, mock_cred_manager_class):
+        """Test validate-only dispatch for SingleStore."""
+        mock_manager = MagicMock()
+        mock_manager.has_credentials.return_value = True
+        mock_cred_manager_class.return_value = mock_manager
+        mock_validate.return_value = (True, None)
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["setup", "--platform", "singlestore", "--validate-only"])
+
+        assert result.exit_code == 0
+        assert "SingleStore credentials are valid" in result.output
+        mock_validate.assert_called_once_with(mock_manager)
 
 
 class TestSetupIntegration:

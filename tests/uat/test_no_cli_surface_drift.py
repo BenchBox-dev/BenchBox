@@ -80,6 +80,10 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/platform.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
+    # pr-review-followup-1394: SingleStore credential setup is intentionally
+    # added to the public setup platform choice and dispatch paths; the CLI
+    # tests pin the choice, interactive handler, and validate-only handler.
+    "benchbox/cli/commands/setup.py",
     "benchbox/cli/commands/calculate_qphh.py",
     "benchbox/cli/commands/compare_dataframes.py",
     "benchbox/cli/commands/compare_plans.py",
