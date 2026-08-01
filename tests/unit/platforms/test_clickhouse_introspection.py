@@ -290,6 +290,20 @@ class TestCombinedPartitionAndSortKey:
         recorded = adapter._applied_tuning_ledger.executed_statements
         assert len(recorded) == 1 and recorded[0].mechanism == "partition_key"
 
+    def test_partition_only_table_with_order_by_literal_decoy_is_recorded(self):
+        adapter = self._tuned_adapter()
+        tunings = _partitioned_only_tuning_config().table_tunings
+        original = (
+            "CREATE TABLE orders (o_orderkey INTEGER PRIMARY KEY, "
+            "note VARCHAR DEFAULT 'ORDER BY (decoy)', o_orderdate DATE)"
+        )
+        optimized = adapter._optimize_table_definition(original, tunings, nullable_columns=set())
+
+        adapter._record_tuned_sort_key_op(original, optimized, "orders", tunings)
+
+        recorded = adapter._applied_tuning_ledger.executed_statements
+        assert len(recorded) == 1 and recorded[0].mechanism == "partition_key"
+
     def test_partition_only_table_with_unapplied_partition_blocks_run(self):
         adapter = self._tuned_adapter()
         # One sort-tuned table whose key DID apply...

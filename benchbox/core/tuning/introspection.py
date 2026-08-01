@@ -275,6 +275,64 @@ _TRANSIENT_PREFIXES = ("set ", "pragma ", "set\t", "pragma\t", "reset ", "use ")
 _MAINTENANCE_PREFIXES = ("optimize ", "vacuum", "analyze", "compact ")
 
 
+def _strip_sql_literals_and_comments(statement: str) -> str:
+    """Blank quoted/comment text while preserving offsets and SQL shape.
+
+    This is deliberately a small lexical guard, not a SQL parser. Existing
+    clause regexes must never classify ``ORDER BY`` / ``PARTITION BY`` text
+    embedded in defaults or comments. Quoted identifiers also blank out and
+    therefore fail closed rather than being guessed into corroboration.
+    """
+    chars = list(statement)
+    index = 0
+    quote_end: str | None = None
+    while index < len(chars):
+        char = chars[index]
+        following = chars[index + 1] if index + 1 < len(chars) else ""
+        if quote_end is not None:
+            if char == quote_end:
+                chars[index] = " "
+                if following == quote_end and quote_end != "]":
+                    chars[index + 1] = " "
+                    index += 2
+                    continue
+                quote_end = None
+            elif char != "\n":
+                chars[index] = " "
+            index += 1
+            continue
+        if char == "-" and following == "-":
+            while index < len(chars) and chars[index] != "\n":
+                chars[index] = " "
+                index += 1
+            continue
+        if char == "/" and following == "*":
+            chars[index] = chars[index + 1] = " "
+            index += 2
+            while index < len(chars):
+                if chars[index] == "*" and index + 1 < len(chars) and chars[index + 1] == "/":
+                    chars[index] = chars[index + 1] = " "
+                    index += 2
+                    break
+                if chars[index] != "\n":
+                    chars[index] = " "
+                index += 1
+            continue
+        if char in "'\"`":
+            quote_end = char
+            chars[index] = " "
+        elif char == "[":
+            quote_end = "]"
+            chars[index] = " "
+        index += 1
+    return "".join(chars)
+
+
+def has_order_by_clause(statement: str) -> bool:
+    """Whether statement shape contains ORDER BY outside literals/comments."""
+    return _ORDER_BY_KEYWORD_RE.search(_strip_sql_literals_and_comments(statement)) is not None
+
+
 def normalize_identifier(value: Any) -> str:
     """Case-fold and strip quoting from a single SQL identifier."""
     text = str(value).strip()
@@ -388,7 +446,7 @@ def _classify(statement: AppliedStatement) -> tuple[str, list[_Intent]]:
     MergeTree does exactly this), and corroborating only the first would let a
     run reach ``applied_verified`` while the other key silently never applied.
     """
-    text = str(statement.statement or "").strip()
+    text = _strip_sql_literals_and_comments(str(statement.statement or "")).strip()
     lowered = text.lower()
 
     if statement.phase == PHASE_SESSION or lowered.startswith(_TRANSIENT_PREFIXES):
@@ -472,6 +530,10 @@ def _match_object(intent: _Intent, state: IntrospectedState) -> tuple[str, Intro
     ]
     if not same_table:
         return ABSENT, None
+    if not intent.columns:
+        # Empty == empty is not evidence of a realized physical key. Treat a
+        # present table/key row as a fail-closed mismatch, never corroboration.
+        return MISMATCH, same_table[0]
     # Exact column match (order-sensitive) is corroboration. Prefer a
     # name-matched fact when the intent carries an index name.
     for obj in same_table:

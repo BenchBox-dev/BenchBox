@@ -23,6 +23,7 @@ from benchbox.core.tuning.applied_ledger import (
     PHASE_POST_LOAD,
     PHASE_SESSION,
     STATEMENT_FAILED,
+    AppliedStatement,
     AppliedTuningLedger,
 )
 from benchbox.core.tuning.introspection import (
@@ -40,6 +41,9 @@ from benchbox.core.tuning.introspection import (
     IntrospectedState,
     IntrospectionReceipt,
     Introspector,
+    _classify,
+    _Intent,
+    _match_object,
     corroborate,
     ledger_tables,
     normalize_columns,
@@ -99,6 +103,20 @@ class TestNormalization:
     def test_normalize_columns_preserves_single_expression_verbatim(self):
         assert normalize_columns("toYYYYMM(event_ts)") == ("toyyyymm(event_ts)",)
 
+    def test_classifier_ignores_clause_decoys_in_literals_and_comments(self):
+        statement = AppliedStatement(
+            statement=(
+                "CREATE TABLE t (c String DEFAULT 'order by (decoy)') "
+                "ENGINE=MergeTree /* PARTITION BY (also_decoy) */ ORDER BY (real_col)"
+            ),
+            phase=PHASE_DDL,
+        )
+
+        klass, intents = _classify(statement)
+
+        assert klass == "verifiable"
+        assert [(intent.kind, intent.columns) for intent in intents] == [(KIND_SORT_KEY, ("real_col",))]
+
     def test_normalize_columns_from_iterable_and_empty(self):
         assert normalize_columns(["A", " B "]) == ("a", "b")
         assert normalize_columns("") == ()
@@ -125,6 +143,28 @@ class TestCorroborate:
         receipt = corroborate(_index_ledger(), _index_state(columns=("l_linenumber", "l_orderkey")))
         assert receipt.corroborated is False
         assert receipt.entries[0].verdict == MISMATCH
+
+    def test_empty_columns_cannot_corroborate_trivially(self):
+        verdict, _ = _match_object(
+            _Intent(kind=KIND_SORT_KEY, table="t", columns=()),
+            IntrospectedState(
+                platform="x",
+                objects=[IntrospectedObject(kind=KIND_SORT_KEY, table="t", columns=())],
+            ),
+        )
+
+        assert verdict != CORROBORATED
+
+    def test_schema_qualified_intent_does_not_suffix_match_bare_catalog_fact(self):
+        verdict, _ = _match_object(
+            _Intent(kind=KIND_SORT_KEY, table="analytics.t", columns=("a",)),
+            IntrospectedState(
+                platform="x",
+                objects=[IntrospectedObject(kind=KIND_SORT_KEY, table="t", columns=("a",))],
+            ),
+        )
+
+        assert verdict == ABSENT
 
     def test_mismatch_has_diff_and_no_upgrade(self):
         # Catalog index over (a) only, ledger says (a, b).
