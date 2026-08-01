@@ -1538,6 +1538,7 @@ class TestBulkImportTargetGuard:
         monkeypatch.setattr(todo_db, "hosted_replica_path", lambda: replica)
         monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "token")
         monkeypatch.setattr(todo_db, "bulk_transfer", fake_bulk_transfer)
+        monkeypatch.setattr(todo_db, "sync_hosted_replica", lambda _conn: None)
 
         assert (
             todo_findings._cmd_import(conn, "tester", self._args(corpus=str(corpus), confirm_target="benchbox-todo"))
@@ -1771,4 +1772,5 @@ class TestBulkImportSyncsBeforeParity:
             db=None,
         )
         assert todo_findings._cmd_import_bulk(_Conn(), "tester", args) == 0
-        assert calls == ["sync", "read"], "parity must not read before the replica sync"
+        assert calls == ["read", "sync", "read"]
+        assert calls[-2:] == ["sync", "read"], "post-transfer parity must not read before the replica sync"
