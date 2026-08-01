@@ -21,6 +21,8 @@ from urllib.parse import urlparse
 
 import yaml
 
+from benchbox.core.results.platform_options import _SECRET_KEY_PARTS
+
 logger = logging.getLogger(__name__)
 
 PUBLIC_REDACTED_VALUE = "<redacted>"
@@ -33,7 +35,12 @@ def _load_anonymization_specs() -> dict[str, Any]:
 
 _ANONYMIZATION_SPECS = _load_anonymization_specs()
 
-_SECRET_KEY_PARTS = tuple(_ANONYMIZATION_SPECS["secret_key_parts"])
+# Secret-key matching is shared with the internal capture path: both consumers
+# read platform_options._SECRET_KEY_PARTS (imported above) so the lists cannot
+# diverge again. The spec file deliberately no longer carries its own copy -
+# the two hand-synced lists drifted within a month of #1346 ('keyid' was added
+# to platform_options only), which left *_key_id values unredacted on this
+# public path.
 _IDENTIFIER_KEYS = dict(_ANONYMIZATION_SPECS["identifier_keys"])
 _ENDPOINT_KEYS = set(_ANONYMIZATION_SPECS["endpoint_keys"])
 _PATH_KEYS = set(_ANONYMIZATION_SPECS["path_keys"])
