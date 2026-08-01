@@ -103,6 +103,7 @@ def sanitize_platform_options(
     options: Mapping[str, Any] | None,
     *,
     exclude_internal: bool = False,
+    redact_usernames: bool = True,
 ) -> dict[str, Any]:
     """Return a JSON-friendly platform-options dict with secret-like values redacted.
 
@@ -120,10 +121,14 @@ def sanitize_platform_options(
         key_str = str(key)
         if exclude_internal and (key_str.startswith("_") or key_str in _INTERNAL_OPTION_KEYS):
             continue
-        if is_secret_option_key(key_str) or _is_username_key(key_str):
+        if is_secret_option_key(key_str) or (redact_usernames and _is_username_key(key_str)):
             sanitized[key_str] = REDACTED_VALUE
         else:
-            sanitized[key_str] = _sanitize_option_value(value, exclude_internal=exclude_internal)
+            sanitized[key_str] = _sanitize_option_value(
+                value,
+                exclude_internal=exclude_internal,
+                redact_usernames=redact_usernames,
+            )
     return sanitized
 
 
@@ -159,7 +164,10 @@ def build_platform_options_capture(
         values[key] = value
         sources[key] = requested_source
 
-    sanitized_values = sanitize_platform_options(values, exclude_internal=True)
+    # Keep usernames available to the public anonymizer so distinct connection
+    # identities receive distinct stable pseudonyms. The non-anonymized exporter
+    # redacts these keys at the final internal-export boundary.
+    sanitized_values = sanitize_platform_options(values, exclude_internal=True, redact_usernames=False)
     return sanitized_values, {key: sources[key] for key in sanitized_values if key in sources}
 
 
@@ -173,13 +181,31 @@ def _iter_public_options(options: Mapping[str, Any] | None):
         yield key_str, value
 
 
-def _sanitize_option_value(value: Any, *, exclude_internal: bool = False) -> Any:
+def _sanitize_option_value(value: Any, *, exclude_internal: bool = False, redact_usernames: bool = True) -> Any:
     if isinstance(value, Mapping):
-        return sanitize_platform_options(value, exclude_internal=exclude_internal)
+        return sanitize_platform_options(
+            value,
+            exclude_internal=exclude_internal,
+            redact_usernames=redact_usernames,
+        )
     if isinstance(value, list):
-        return [_sanitize_option_value(item, exclude_internal=exclude_internal) for item in value]
+        return [
+            _sanitize_option_value(
+                item,
+                exclude_internal=exclude_internal,
+                redact_usernames=redact_usernames,
+            )
+            for item in value
+        ]
     if isinstance(value, tuple):
-        return [_sanitize_option_value(item, exclude_internal=exclude_internal) for item in value]
+        return [
+            _sanitize_option_value(
+                item,
+                exclude_internal=exclude_internal,
+                redact_usernames=redact_usernames,
+            )
+            for item in value
+        ]
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     try:
@@ -192,8 +218,16 @@ def _sanitize_option_value(value: Any, *, exclude_internal: bool = False) -> Any
         except Exception:
             return f"<unserializable:{type(value).__name__}>"
         if isinstance(as_dict, Mapping):
-            return sanitize_platform_options(as_dict, exclude_internal=exclude_internal)
-        return _sanitize_option_value(as_dict, exclude_internal=exclude_internal)
+            return sanitize_platform_options(
+                as_dict,
+                exclude_internal=exclude_internal,
+                redact_usernames=redact_usernames,
+            )
+        return _sanitize_option_value(
+            as_dict,
+            exclude_internal=exclude_internal,
+            redact_usernames=redact_usernames,
+        )
     # No canonical serialization available. Never fall back to str()/repr()
     # here: that would silently publish opaque Python repr text into
     # exported bundles/payloads. Leave an explicit marker instead so gaps

@@ -40,6 +40,7 @@ from benchbox.core.results.anonymization import (
 from benchbox.core.results.canonical_json import canonical_json_text
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.normalizer import get_query_map, normalize_result_dict
+from benchbox.core.results.platform_options import REDACTED_VALUE, _is_username_key
 from benchbox.core.results.schema import (
     SchemaV2ValidationError,
     SchemaV2Validator,
@@ -57,6 +58,18 @@ logger = logging.getLogger(__name__)
 
 ResultLike = BenchmarkResults
 QueryResultLike = "QueryResult | dict[str, Any]"
+
+
+def _redact_usernames(value: Any) -> Any:
+    """Redact connection-identity keys for a non-anonymized export."""
+    if isinstance(value, dict):
+        return {
+            str(key): REDACTED_VALUE if _is_username_key(str(key)) else _redact_usernames(child)
+            for key, child in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_usernames(item) for item in value]
+    return value
 
 
 class ResultExporter:
@@ -242,6 +255,10 @@ class ResultExporter:
             self._apply_anonymization(payload)
             anonymized = True
         else:
+            # Capture retains usernames until the public anonymizer can assign
+            # stable per-value pseudonyms. Private exports still must not carry
+            # connection identities verbatim, so redact them at this boundary.
+            payload = _redact_usernames(payload)
             anonymized = False
 
         # Add export metadata

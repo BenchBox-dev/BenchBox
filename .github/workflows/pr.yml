@@ -240,6 +240,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -263,6 +265,13 @@ jobs:
       # which is what `ci-required-result` actually gates on. Setup steps
       # above (checkout/setup-python/setup-uv/install deps) are not
       # guards and carry neither `id: guard-*` nor `continue-on-error`.
+      - name: Validate uv.lock revision against the PR base
+        id: guard-uv-lock-revision
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: make uv-lock-revision-check
+
       - name: Lint and format check with ruff
         id: guard-ruff
         continue-on-error: true

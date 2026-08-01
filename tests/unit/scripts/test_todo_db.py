@@ -147,6 +147,7 @@ class TestWorkUnits:
                 {"id": "w2", "summary": "second unit", "needs": ["w1"]},
             ],
         )
+        todo_db.claim_item(conn, "tester", "sample-item")
         with pytest.raises(todo_db.TodoError, match="needs unfinished"):
             todo_db.done_unit(conn, "tester", "sample-item", "w2", "ran tests")
         todo_db.done_unit(conn, "tester", "sample-item", "w1", "ran tests")
@@ -317,6 +318,7 @@ class TestVerifyRun:
                 {"description": "always fails", "command": "false"},
             ],
         )
+        todo_db.claim_item(conn, "tester", "sample-item")
         result, _ = todo_db.run_verification(conn, "tester", "sample-item", 1)
         assert result == "pass"
         result, _ = todo_db.run_verification(conn, "tester", "sample-item", 2)
@@ -342,6 +344,7 @@ class TestVerifyRun:
                 {"description": "fails", "command": "false", "expected": "human-readable criterion"},
             ],
         )
+        todo_db.claim_item(conn, "tester", "sample-item")
         assert todo_db.run_verification(conn, "tester", "sample-item", 1)[0] == "pass"
         assert todo_db.run_verification(conn, "tester", "sample-item", 2)[0] == "fail"
 

@@ -287,7 +287,8 @@ class TestClaimRenewal:
         todo_db.claim_item(conn, "agent-a", "long-work")
         todo_db.release_item(conn, "agent-a", "long-work")
 
-        todo_db.done_unit(conn, "agent-a", "long-work", "w1", "evidence")
+        with pytest.raises(todo_db.TodoError, match="lease"):
+            todo_db.done_unit(conn, "agent-a", "long-work", "w1", "evidence")
 
         row = conn.execute("SELECT claimed_by, claimed_at FROM items WHERE id = 'long-work'").fetchone()
         assert row["claimed_by"] is None

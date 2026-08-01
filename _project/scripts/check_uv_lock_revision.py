@@ -9,6 +9,7 @@ ceremony.
 
 Modes:
   --old N --new N   pure comparison (test interface, no git or files needed)
+  --baseline-ref R compare ``git show R:uv.lock`` against ./uv.lock
   default           compare ``git show HEAD:uv.lock`` against ./uv.lock
 
 Exit status: 0 ok, 1 downgrade (or malformed lock), 2 usage error.
@@ -45,9 +46,9 @@ def check(old: int, new: int) -> int:
     return 0
 
 
-def _committed_lock_text(repo_root: Path) -> str | None:
+def _committed_lock_text(repo_root: Path, ref: str = "HEAD") -> str | None:
     result = subprocess.run(
-        ["git", "show", "HEAD:uv.lock"],
+        ["git", "show", f"{ref}:uv.lock"],
         cwd=repo_root,
         capture_output=True,
         text=True,
@@ -62,6 +63,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--old", type=int, default=None, help="baseline revision (test interface)")
     parser.add_argument("--new", type=int, default=None, help="candidate revision (test interface)")
+    parser.add_argument("--baseline-ref", help="git ref containing the baseline uv.lock (default: HEAD)")
     args = parser.parse_args(argv)
 
     if (args.old is None) != (args.new is None):
@@ -74,13 +76,20 @@ def main(argv: list[str] | None = None) -> int:
     if not working_lock.exists():
         print("uv.lock not found in working tree; nothing to check")
         return 0
-    committed = _committed_lock_text(repo_root)
+    baseline_ref = args.baseline_ref or "HEAD"
+    committed = _committed_lock_text(repo_root, baseline_ref)
     if committed is None:
+        if args.baseline_ref is not None:
+            print(
+                f"uv.lock revision guard: explicitly requested baseline {baseline_ref!r} is unavailable",
+                file=sys.stderr,
+            )
+            return 1
         # No committed baseline (fresh repo / uv.lock not yet tracked).
-        print("no committed uv.lock baseline (HEAD); nothing to compare")
+        print(f"no committed uv.lock baseline ({baseline_ref}); nothing to compare")
         return 0
     try:
-        old = parse_revision(committed, "HEAD:uv.lock")
+        old = parse_revision(committed, f"{baseline_ref}:uv.lock")
         new = parse_revision(working_lock.read_text(encoding="utf-8"), "uv.lock")
     except ValueError as exc:
         print(f"uv.lock revision guard: {exc}", file=sys.stderr)

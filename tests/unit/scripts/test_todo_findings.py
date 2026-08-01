@@ -189,7 +189,10 @@ class TestFindingsNonClaimable:
         # a future stats key that wrongly reflects findings is still caught.
 
         def items_domain(snapshot):
-            return {k: v for k, v in snapshot.items() if k != "findings_by_disposition"}
+            result = {k: v for k, v in snapshot.items() if k != "findings_by_disposition"}
+            result["events"] = dict(result["events"])
+            result["events"].pop("findings", None)
+            return result
 
         assert items_domain(after) == items_domain(before)
         assert after["findings_by_disposition"] == {"open": 2}
@@ -1293,6 +1296,14 @@ class TestFindingImportParity:
         ]
         assert len(events) == 1
 
+    def test_import_skips_target_ids_when_staging_for_bulk_transfer(self, conn, tmp_path):
+        finding_id = "2026-01-02-030405-target-present"
+        self._record(tmp_path, finding_id)
+        result = todo_findings.import_corpus(conn, "importer", tmp_path, existing_ids={finding_id})
+        assert result["imported"] == []
+        assert result["skipped"] == [finding_id]
+        assert todo_findings.get_finding(conn, finding_id) is None
+
     def test_import_records_provenance(self, conn, tmp_path):
         path = self._record(tmp_path, "2026-01-02-030405-provenance-record")
         todo_findings.import_corpus(conn, "importer", tmp_path)
@@ -1343,6 +1354,20 @@ class TestFindingImportParity:
         report = todo_findings.parity_report(conn, tmp_path, result)
         assert report["ok"] is False
         assert report["triage_log_diffs"][0]["expected_lines"] == 3
+
+    def test_parity_report_fails_closed_when_evidence_is_lost(self, conn, tmp_path):
+        self._record(tmp_path, "2026-01-02-030405-lossy-evidence", extra_section=None)
+        path = tmp_path / "2026-01-02-030405-lossy-evidence.md"
+        text = path.read_text(encoding="utf-8").replace(
+            'review_context: "ultrareview X"', 'review_context: "ultrareview X"\nevidence:\n  - path: a.py'
+        )
+        path.write_text(text, encoding="utf-8")
+        result = todo_findings.import_corpus(conn, "importer", tmp_path)
+        with todo_db._write_txn(conn):
+            conn.execute("DELETE FROM finding_evidence WHERE finding_id = ?", (path.stem,))
+        report = todo_findings.parity_report(conn, tmp_path, result)
+        assert report["ok"] is False
+        assert report["evidence_diffs"] == [{"record": path.stem}]
 
     def test_dangling_todo_id_is_reported_not_silently_skipped(self, conn, tmp_path):
         self._record(tmp_path, "2026-01-02-030405-dangling-import", todo_id="no-such-item")
@@ -1483,6 +1508,44 @@ class TestBulkImportTargetGuard:
         monkeypatch.setattr(todo_findings, "_cmd_import_bulk", _boom)
         args = self._args(dry_run=True, corpus=str(tmp_path))
         assert todo_findings._cmd_import(conn, "tester", args) == 0
+
+    def test_import_command_drives_successful_bulk_orchestration(self, conn, tmp_path, monkeypatch, capsys):
+        """The CLI branch must stage, transfer the requested tables, and verify parity."""
+        finding_id = "2026-01-02-030405-bulk-command"
+        corpus = tmp_path / "corpus"
+        _draft(corpus / "draft.md", finding_id)
+
+        replica = tmp_path / "replica.sqlite"
+        replica_conn = todo_db.connect(replica)
+        replica_conn.close()
+        transfer_calls = []
+
+        def fake_bulk_transfer(staging, _url, _token, **kwargs):
+            transfer_calls.append(kwargs)
+            tables = kwargs["tables"]
+            row_count = 0
+            with todo_db._write_txn(conn):
+                for table in tables:
+                    columns = [row[1] for row in staging.execute(f"PRAGMA table_info({table})")]
+                    names = ", ".join(columns)
+                    placeholders = ", ".join("?" for _ in columns)
+                    for row in staging.execute(f"SELECT {names} FROM {table}"):
+                        conn.execute(f"INSERT INTO {table} ({names}) VALUES ({placeholders})", tuple(row))
+                        row_count += 1
+            return {"rows": row_count, "batches": 1}
+
+        monkeypatch.setattr(todo_db, "resolve_backend", lambda _db: self.HOSTED)
+        monkeypatch.setattr(todo_db, "hosted_replica_path", lambda: replica)
+        monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "token")
+        monkeypatch.setattr(todo_db, "bulk_transfer", fake_bulk_transfer)
+
+        assert (
+            todo_findings._cmd_import(conn, "tester", self._args(corpus=str(corpus), confirm_target="benchbox-todo"))
+            == 0
+        )
+        assert transfer_calls == [{"require_empty": False, "tables": todo_findings.FINDINGS_TRANSFER_TABLES}]
+        assert conn.execute("SELECT count(*) FROM findings WHERE id = ?", (finding_id,)).fetchone()[0] == 1
+        assert "parity OK: 1/1 records" in capsys.readouterr().out
 
 
 class TestReconcileCoversV4Columns:

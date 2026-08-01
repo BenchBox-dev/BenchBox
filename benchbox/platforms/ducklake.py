@@ -25,6 +25,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import logging
 import re
 import shutil
@@ -47,6 +49,7 @@ _VALID_CATALOGS: tuple[str, ...] = ("duckdb", "sqlite", "postgres")
 # Stable, idempotent secret name so reconnects/CREATE OR REPLACE don't
 # accumulate anonymous secrets.
 _S3_SECRET_NAME = "benchbox_ducklake_s3"
+_RUN_IDENTITY_TABLE = "__benchbox_run_identity"
 
 # Connection credentials that must never reach exported result metadata.
 # get_platform_info() already omits these, but the normalized metadata is also
@@ -388,6 +391,9 @@ class DuckLakeAdapter(DuckDBAdapter):
 
         adapter_config["metadata_path"] = metadata_path
         adapter_config["data_path"] = data_path
+        for key in ("benchmark", "scale_factor"):
+            if key in config:
+                adapter_config[key] = config[key]
 
         # Pass through DuckDB-family configuration (base DuckDB connection
         # settings for the "shell" connection the DuckLake catalog attaches to).
@@ -439,8 +445,10 @@ class DuckLakeAdapter(DuckDBAdapter):
         # left unspecified. Explicit options stay authoritative - a
         # contradiction warns rather than being overridden, because whoever
         # typed `--platform-option catalog=...` said the more specific thing.
-        catalog = _resolve_catalog_with_deployment_mode(config.get("deployment_mode"), catalog)
-        _warn_if_deployment_mode_contradicts_storage(config.get("deployment_mode"), data_path)
+        deployment_mode = config.get("deployment_mode") or _resolve_option("deployment_mode")
+        catalog = _resolve_catalog_with_deployment_mode(deployment_mode, catalog)
+        _warn_if_deployment_mode_contradicts_storage(deployment_mode, data_path)
+        adapter_config["deployment_mode"] = deployment_mode
 
         if catalog is not None:
             adapter_config["catalog"] = catalog
@@ -459,6 +467,8 @@ class DuckLakeAdapter(DuckDBAdapter):
 
     def __init__(self, **config):
         super().__init__(**config)
+        self._expected_benchmark = config.get("benchmark")
+        self._expected_scale_factor = config.get("scale_factor")
 
         metadata_path = config.get("metadata_path")
         data_path = config.get("data_path")
@@ -757,17 +767,81 @@ class DuckLakeAdapter(DuckDBAdapter):
             "superseded Parquet from earlier runs remains and must be cleared manually."
         )
 
-    def _existing_lake_tables(self, setup_conn: Any) -> list[str]:
-        """Names of user tables already present in the ATTACHed ``lake`` catalog.
+    @staticmethod
+    def _quote_identifier(identifier: Any) -> str:
+        """Quote one DuckDB identifier for a generated maintenance statement."""
+        return '"' + str(identifier).replace('"', '""') + '"'
+
+    def _existing_lake_tables(self, setup_conn: Any) -> list[tuple[str, str]]:
+        """Schema/table pairs present in the attached ``lake`` catalog.
 
         ``duckdb_tables()`` reports every catalog the session can see, so the
         result is filtered to ``lake`` - the base memory/file catalog of the
         shell connection is not part of DuckLake's persistence unit.
         """
         rows = setup_conn.execute(
-            "SELECT table_name FROM duckdb_tables() WHERE database_name = 'lake' ORDER BY table_name"
+            "SELECT schema_name, table_name FROM duckdb_tables() "
+            "WHERE database_name = 'lake' ORDER BY schema_name, table_name"
         ).fetchall()
-        return [row[0] for row in rows]
+        return [(row[0], row[1]) for row in rows]
+
+    def _run_identity(self, benchmark: Any | None = None) -> dict[str, str]:
+        benchmark_name = self._expected_benchmark
+        if benchmark_name is None and benchmark is not None:
+            benchmark_name = getattr(benchmark, "_name", None) or benchmark.__class__.__name__
+        scale_factor = self._expected_scale_factor
+        if scale_factor is None and benchmark is not None:
+            scale_factor = getattr(benchmark, "scale_factor", None)
+        tuning = self.unified_tuning_configuration
+        try:
+            from dataclasses import asdict, is_dataclass
+
+            if is_dataclass(tuning):
+                tuning = asdict(tuning)
+            tuning_payload = json.dumps(tuning, sort_keys=True, default=str, separators=(",", ":"))
+        except (TypeError, ValueError):
+            tuning_payload = repr(tuning)
+        return {
+            "benchmark": str(benchmark_name or ""),
+            "scale_factor": str(scale_factor if scale_factor is not None else ""),
+            "tuning_sha256": hashlib.sha256(tuning_payload.encode("utf-8")).hexdigest(),
+        }
+
+    def _write_run_identity(self, connection: Any, benchmark: Any) -> None:
+        if self._expected_benchmark is None or self._expected_scale_factor is None:
+            return
+        identity = self._run_identity(benchmark)
+        table = self._quote_identifier(_RUN_IDENTITY_TABLE)
+        connection.execute(
+            f"CREATE TABLE IF NOT EXISTS lake.main.{table} (identity_key VARCHAR PRIMARY KEY, identity_value VARCHAR)"
+        )
+        connection.execute(f"DELETE FROM lake.main.{table}")
+        connection.executemany(
+            f"INSERT INTO lake.main.{table} (identity_key, identity_value) VALUES (?, ?)",
+            list(identity.items()),
+        )
+
+    def _verify_run_identity(self, setup_conn: Any) -> None:
+        if self._expected_benchmark is None or self._expected_scale_factor is None:
+            return
+        table = self._quote_identifier(_RUN_IDENTITY_TABLE)
+        rows = setup_conn.execute(
+            f"SELECT identity_key, identity_value FROM lake.main.{table} ORDER BY identity_key"
+        ).fetchall()
+        actual = {row[0]: row[1] for row in rows}
+        expected = self._run_identity()
+        if actual != expected:
+            raise RuntimeError(
+                "DuckLake catalog identity does not match this run "
+                f"(expected benchmark={expected['benchmark']!r}, scale_factor={expected['scale_factor']!r}, "
+                "and tuning configuration). Use --force or a fresh catalog."
+            )
+
+    def create_schema(self, benchmark: Any, connection: Any) -> float:
+        """Create benchmark tables and persist their benchmark/run identity."""
+        elapsed = super().create_schema(benchmark, connection)
+        self._write_run_identity(_unwrap_duckdb_connection(connection), benchmark)
+        return elapsed
 
     def _resolve_postgres_catalog_reuse(self, setup_conn: Any) -> None:
         """Apply reuse/force semantics to a server-side (postgres) catalog.
@@ -796,13 +870,35 @@ class DuckLakeAdapter(DuckDBAdapter):
             self.log_very_verbose("DuckLake postgres catalog holds no tables yet - treating as a fresh run")
             return
 
+        identity_name = _RUN_IDENTITY_TABLE.casefold()
+        user_tables = [
+            (schema, table) for schema, table in existing if str(table).strip('"').casefold() != identity_name
+        ]
+        if not user_tables and not self.force_recreate:
+            self.log_very_verbose("DuckLake catalog contains only its identity marker - treating as a fresh run")
+            return
+        if (
+            user_tables
+            and not self.force_recreate
+            and self._expected_benchmark is not None
+            and self._expected_scale_factor is not None
+        ):
+            if not any(str(table).strip('"').casefold() == identity_name for _schema, table in existing):
+                raise RuntimeError(
+                    "DuckLake catalog is populated but has no BenchBox run identity; "
+                    "refusing to reuse it. Use --force or a fresh catalog."
+                )
+            self._verify_run_identity(setup_conn)
+
         if self.force_recreate:
             self.log_verbose(
                 f"Force recreate enabled - dropping {len(existing)} table(s) from the DuckLake "
-                f"postgres catalog: {', '.join(existing)}"
+                f"postgres catalog: {', '.join(f'{schema}.{table}' for schema, table in existing)}"
             )
-            for table in existing:
-                setup_conn.execute(f'DROP TABLE IF EXISTS lake.main."{table}"')
+            for schema, table in existing:
+                setup_conn.execute(
+                    f"DROP TABLE IF EXISTS lake.{self._quote_identifier(schema)}.{self._quote_identifier(table)}"
+                )
             # Dropping the catalog entries is only half of --force: the Parquet
             # those tables were written from is still in DATA_PATH, and every
             # other backend clears it. Verified live against PostgreSQL 18 -

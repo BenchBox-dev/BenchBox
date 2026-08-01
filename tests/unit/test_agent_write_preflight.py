@@ -22,6 +22,7 @@ def _run_preflight(*, primary_clone: Path, allow: bool = False) -> subprocess.Co
         **os.environ,
         "BENCHBOX_AGENT_PRIMARY_CLONE": str(primary_clone),
     }
+    env.pop("BENCHBOX_EPHEMERAL_CLONE", None)
     if allow:
         env["BENCHBOX_ALLOW_MAIN_CLONE_WRITE"] = "1"
     else:

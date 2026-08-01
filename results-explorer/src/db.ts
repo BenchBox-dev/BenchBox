@@ -35,7 +35,10 @@ let initFailures = 0;
 const INIT_FAILURE_LIMIT = 3;
 const SNAPSHOT_READY_ATTEMPTS = 8;
 const SNAPSHOT_READY_DELAY_MS = 100;
-const QUERY_RETRY_ATTEMPTS = 3;
+// Empty reads keep retrying for the warm-up window; this is a safety cap for
+// pathological clocks or zero-delay test timers rather than the normal stop.
+const QUERY_RETRY_ATTEMPTS = 100;
+const QUERY_ERROR_RETRY_ATTEMPTS = 3;
 const QUERY_RETRY_DELAY_MS = 100;
 // How long after the snapshot is attached an EMPTY result is treated as a cold
 // read worth re-issuing rather than the truth. Cold init measures P95 ~1s, so
@@ -415,7 +418,7 @@ export async function queryRows<T>(
       continue;
     } catch (error: unknown) {
       lastError = error;
-      if (!isTransientDuckDbSnapshotError(error) || attempt === QUERY_RETRY_ATTEMPTS) {
+      if (!shouldRetryTransientQueryError(error, attempt)) {
         throw error;
       }
       await sleep(QUERY_RETRY_DELAY_MS * attempt);
@@ -461,6 +464,10 @@ export function shouldRetryColdEmptyRead(
 
 function isColdEmptyRead(attempt: number): boolean {
   return shouldRetryColdEmptyRead(attempt, Date.now(), snapshotReadyAt);
+}
+
+export function shouldRetryTransientQueryError(error: unknown, attempt: number): boolean {
+  return isTransientDuckDbSnapshotError(error) && attempt < QUERY_ERROR_RETRY_ATTEMPTS;
 }
 
 async function queryRowsOnce<T>(

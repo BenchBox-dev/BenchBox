@@ -839,7 +839,7 @@ class TestDuckLakePostgresCatalogReuse:
     class _StubConn:
         """Minimal setup-connection stub recording the SQL it is given."""
 
-        def __init__(self, tables: list[str]):
+        def __init__(self, tables: list[str] | list[tuple[str, str]]):
             self._tables = tables
             self.executed: list[str] = []
 
@@ -848,7 +848,7 @@ class TestDuckLakePostgresCatalogReuse:
             return self
 
         def fetchall(self):
-            return [(name,) for name in self._tables]
+            return [table if isinstance(table, tuple) else ("main", table) for table in self._tables]
 
     def _adapter(self, tmp_path, **kwargs):
         return DuckLakeAdapter(
@@ -879,8 +879,8 @@ class TestDuckLakePostgresCatalogReuse:
         assert adapter.database_was_reused is False
         dropped = [sql for sql in conn.executed if sql.startswith("DROP TABLE")]
         assert dropped == [
-            'DROP TABLE IF EXISTS lake.main."lineitem"',
-            'DROP TABLE IF EXISTS lake.main."orders"',
+            'DROP TABLE IF EXISTS lake."main"."lineitem"',
+            'DROP TABLE IF EXISTS lake."main"."orders"',
         ]
 
     def test_force_also_clears_the_local_data_path(self, tmp_path):

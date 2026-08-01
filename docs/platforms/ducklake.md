@@ -8,7 +8,7 @@
 DuckLake is an open lakehouse table format shipped as a DuckDB extension: table **data** is stored as Parquet files, while table **metadata** (the catalog) lives in a SQL database. BenchBox runs DuckLake through the same DuckDB engine used by the `duckdb` platform, inheriting DuckDB's SQL dialect and benchmark compatibility unchanged.
 
 ```{warning}
-The DuckLake platform is **beta** (promoted from experimental on 2026-07-30). All four combinations of catalog backend and storage location have been validated with a TPC-H SF=1 run through the correctness gate - see [Catalog Backends](#catalog-backends) below and the [maturity ADR](../development/adr/adr-ducklake-maturity-and-publishability.md) for what promotion required.
+The DuckLake platform is **beta** (promoted from experimental on 2026-07-30). The four registry deployment modes (catalog/storage pairings) have each been validated with a TPC-H SF=1 run through the correctness gate; this is not a claim that every one of the six possible backend-by-storage cross-product combinations was separately exercised - see [Catalog Backends](#catalog-backends) below and the [maturity ADR](../development/adr/adr-ducklake-maturity-and-publishability.md) for what promotion required.
 ```
 
 ## Features
@@ -263,7 +263,9 @@ RuntimeError: Failed to initialize the DuckLake catalog (INSTALL/LOAD/ATTACH 'du
 
 If a benchmark run is interrupted mid-load, a subsequent run without `--force` reuses the existing (partially loaded) catalog. Pass `--force` to wipe the catalog metadata file and Parquet data directory and rebuild from scratch.
 
-For `catalog=postgres`, `--force` only clears local artifacts and does **not** reach the remote catalog (see below) - use a fresh `pg_database` per run instead if you hit this with a PostgreSQL catalog.
+For `catalog=postgres`, the adapter inspects the attached catalog, verifies the
+benchmark/scale/tuning identity before reuse, and drops its tables when
+`--force` is passed.
 
 ### PostgreSQL Catalog: Database Does Not Exist
 

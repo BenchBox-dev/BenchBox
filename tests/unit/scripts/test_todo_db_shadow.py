@@ -289,7 +289,13 @@ def test_hosted_snapshot_is_bulk_complete_private_and_no_clobber(
     monkeypatch.setattr(shadow, "_rows", fake_rows)
     output = tmp_path / "snapshot.json"
     counts = shadow.write_hosted_legacy_snapshot(object(), output)
-    expected_tables = ["items", *[name for name in shadow.TABLE_NAMES if name != "items"], "events", "meta"]
+    expected_tables = [
+        "items",
+        *[name for name in shadow.TABLE_NAMES if name != "items"],
+        *shadow.FINDING_TABLE_NAMES,
+        "events",
+        "meta",
+    ]
     assert queried == expected_tables
     assert counts == dict.fromkeys(expected_tables, 1)
     assert output.stat().st_mode & 0o777 == 0o600

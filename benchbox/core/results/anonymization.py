@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 
 import yaml
 
-from benchbox.core.results.platform_options import _SECRET_KEY_PARTS
+from benchbox.core.results.platform_options import _SECRET_KEY_PARTS, is_secret_option_key
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ _MESSAGE_PATH_RE = re.compile(
 )
 _MESSAGE_URL_RE = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s'\",;)]*", flags=re.IGNORECASE)
 _MESSAGE_SECRET_ASSIGNMENT_RE = re.compile(
-    r"\b([a-z0-9_]*(?:token|password|secret|access_key|private_key)[a-z0-9_]*)=[^&\s,;)]*",
+    r"\b([a-z0-9][a-z0-9_.-]*)=[^&\s,;)]*",
     flags=re.IGNORECASE,
 )
 
@@ -411,17 +411,16 @@ class AnonymizationManager:
     def _looks_like_connection_string(value: str) -> bool:
         if re.search(r"://[^/@\s:]+:[^/@\s]+@", value):
             return True
-        return bool(
-            re.search(
-                r"\b[a-z0-9_]*(?:password|token|secret|access_key|private_key)[a-z0-9_]*=",
-                value,
-                flags=re.IGNORECASE,
-            )
-        )
+        return any(is_secret_option_key(match.group(1)) for match in _MESSAGE_SECRET_ASSIGNMENT_RE.finditer(value))
 
     def _sanitize_public_message(self, value: str) -> str:
         cleaned = self.remove_pii(value)
-        cleaned = _MESSAGE_SECRET_ASSIGNMENT_RE.sub(lambda match: f"{match.group(1)}={PUBLIC_REDACTED_VALUE}", cleaned)
+        cleaned = _MESSAGE_SECRET_ASSIGNMENT_RE.sub(
+            lambda match: (
+                f"{match.group(1)}={PUBLIC_REDACTED_VALUE}" if is_secret_option_key(match.group(1)) else match.group(0)
+            ),
+            cleaned,
+        )
         cleaned = _MESSAGE_URL_RE.sub(lambda match: self._hash_public_identifier(match.group(0), "endpoint"), cleaned)
         cleaned = _MESSAGE_PATH_RE.sub(lambda match: self._hash_public_identifier(match.group(0), "path"), cleaned)
         return cleaned

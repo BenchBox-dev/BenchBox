@@ -855,3 +855,20 @@ class TestPublicPayloadPgUserAndTenantId:
         )["platform_metadata"]["platform_raw_config"]
         assert out["username"].startswith("user_")
         assert out["account"].startswith("account_")
+
+
+class TestPublicPayloadSecretMessages:
+    def test_message_values_use_the_shared_secret_key_classifier(self):
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload(
+            {
+                "platform_metadata": {
+                    "error_message": "api_key=API-SENTINEL storage_account_key=AZ-SENTINEL",
+                    "stderr": "AccountKey=AZ-CONNECTION-SENTINEL",
+                }
+            }
+        )
+        serialized = json.dumps(out, default=str)
+        assert "API-SENTINEL" not in serialized
+        assert "AZ-SENTINEL" not in serialized
+        assert "AZ-CONNECTION-SENTINEL" not in serialized
