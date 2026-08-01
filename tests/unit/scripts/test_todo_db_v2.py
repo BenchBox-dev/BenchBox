@@ -592,6 +592,45 @@ class TestLintUnresolvableScopeAndLadderPaths:
         assert not any("zq_forbidden" in f for f in findings)
 
 
+class TestLintExemptionVisibility:
+    """A category-based falsifiability exemption must be visible in lint
+    output - silent, author-selectable skips are unauditable."""
+
+    def _mk_exempt(self, conn, item_id, category):
+        todo_db.set_config(conn, "tester", "lint.require_falsifiable_rung", "on")
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id=item_id,
+            title="Item exercising exemption visibility",
+            worktree="spike",
+            priority="medium",
+            description="A description longer than ten characters.",
+            category=category,
+            work=[{"id": "w1", "summary": "one unit of work"}],
+            scope=[("only_modify", "tests/conftest.py")],
+            verifications=[{"description": "tripwire", "command": "true", "expected": "always passes"}],
+        )
+
+    def test_exempt_category_gets_note_not_finding(self, conn):
+        self._mk_exempt(conn, "flake-exempt", "flake")
+        assert not any("falsifiability" in f for f in todo_db.lint_item(conn, "flake-exempt"))
+        notes = todo_db.lint_item_notes(conn, "flake-exempt")
+        assert any("exempt" in n for n in notes)
+
+    def test_normal_category_gets_finding_not_note(self, conn):
+        self._mk_exempt(conn, "normal-cat", "security")
+        assert any("falsifiability" in f for f in todo_db.lint_item(conn, "normal-cat"))
+        assert todo_db.lint_item_notes(conn, "normal-cat") == []
+
+    def test_exemption_note_does_not_affect_exit_code(self, conn, capsys):
+        self._mk_exempt(conn, "flake-exit", "flake")
+        rc = todo_db._cmd_lint(conn, "tester", SimpleNamespace(id="flake-exit", all=False))
+        out = capsys.readouterr().out
+        assert "exempt" in out
+        assert rc == 0
+
+
 class TestLintFalsifiabilityAndScopeCompleteness:
     """A ladder must contain at least one rung that FAILS on the unfixed tree
     (declared in its expected text), and only_modify must not orphan a source
