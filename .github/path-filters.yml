@@ -127,3 +127,14 @@ viz:
   - "results-explorer/**"
   - "tests/parity/**"
   - "_project/scripts/explorer_pipeline/**"
+
+# Results Explorer unit-test contract. Keep this broader than the frontend
+# source tree: read-model/build-contract, curated data, fixture generators,
+# and publication workflow changes can all invalidate Vitest expectations.
+explorer-vitest:
+  - "results-explorer/**"
+  - "_project/scripts/explorer_pipeline/**"
+  - "_project/scripts/explorer_publish.py"
+  - "results-data/**"
+  - "scripts/generate_corpus_inventory.py"
+  - ".github/workflows/results-explorer-browser.yml"
