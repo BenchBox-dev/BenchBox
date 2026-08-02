@@ -28,6 +28,17 @@ def test_generic_otlp_endpoint_appends_trace_signal_path() -> None:
     assert settings.endpoint == "https://otel.example/collector/v1/traces"
 
 
+def test_empty_trace_specific_endpoint_falls_back_to_generic() -> None:
+    settings = TelemetrySettings.from_env(
+        {
+            "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "",
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "https://otel.example/collector/",
+        }
+    )
+
+    assert settings.endpoint == "https://otel.example/collector/v1/traces"
+
+
 def test_trace_specific_endpoint_takes_precedence_without_rewriting() -> None:
     settings = TelemetrySettings.from_env(
         {

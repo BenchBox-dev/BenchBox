@@ -60,8 +60,8 @@ class TelemetrySettings:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> TelemetrySettings:
-        endpoint = env.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
-        generic_endpoint = env.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+        endpoint = env.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or None
+        generic_endpoint = env.get("OTEL_EXPORTER_OTLP_ENDPOINT") or None
         if endpoint is None and generic_endpoint is not None:
             parsed = urlsplit(generic_endpoint)
             endpoint = urlunsplit(parsed._replace(path=f"{parsed.path.rstrip('/')}/v1/traces"))
