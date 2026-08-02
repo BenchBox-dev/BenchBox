@@ -7,6 +7,18 @@ and anyone triaging a red or advisory browser-lane check on a PR.
 [`docs/development/results-explorer-browser-testing.md`](../development/results-explorer-browser-testing.md)
 (how to run the suite locally, what's covered, how to add tests).
 
+## Frontend dependency audit
+
+The blocking Chromium job and the nightly parity job run
+`npm run audit:high` immediately after `npm ci`. The command fails on any
+high or critical advisory; low-severity build-tool advisories remain visible
+in the audit output and are not silently allowlisted. Dependency updates must
+use the narrowest patched range and retain deterministic `npm ci` behavior;
+`npm audit fix --force` is not an accepted remediation. The only transitive
+override currently present is `undici >=7.28.0`, constrained to remove the
+Playwright tooling advisory range; remove it when the upstream graph no longer
+needs it.
+
 ## Current lane status
 
 | Browser  | Job name                          | Scope                | Gate       | Status as of 2026-07-23 |

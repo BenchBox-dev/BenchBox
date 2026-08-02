@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "audit:high": "npm audit --audit-level=high",
     "test:e2e:chromium": "npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium:run",
     "test:e2e:chromium:run": "E2E_EXCLUDE_FAILURES=1 playwright test --project=chromium --workers=1 --grep-invert @performance && E2E_CAPTURE_FIRST_FAILURE=1 playwright test --project=chromium --workers=1 --retries=0 e2e/failures/ && playwright test --project=chromium --workers=1 --retries=0 e2e/performance.spec.ts",
     "test:e2e:chromium:setup": "npm run test:e2e:install:chromium && npm run test:e2e:chromium",
@@ -31,7 +32,7 @@
     "preact-router": "^4.1.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.0",
+    "@playwright/test": "^1.62.1",
     "@preact/preset-vite": "^2.9.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/preact": "^3.2.4",
@@ -43,10 +44,13 @@
     "autoprefixer": "^10.4.20",
     "jest-axe": "^9.0.0",
     "jsdom": "^29.0.2",
-    "postcss": "^8.5.1",
+    "postcss": "^8.5.25",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
-    "vite": "^6.1.0",
+    "vite": "^6.4.3",
     "vitest": "^4.1.4"
+  },
+  "overrides": {
+    "undici": "^7.28.0"
   }
 }
