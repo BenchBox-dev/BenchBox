@@ -398,6 +398,14 @@ visualization registries and are discoverable with `list_available(category="cha
 ## Prompts
 
 Prompts are reusable templates for AI analysis. Invoke via slash commands in Claude Code.
+The same prompt catalog is available through both supported transports: use
+`prompts/list` to discover the seven names and argument schemas, then
+`prompts/get` with a prompt name and string-valued arguments to render one
+prompt. Stdio and sessionless Streamable HTTP return the same prompt metadata
+and rendered text; HTTP requests do not require or receive an `Mcp-Session-Id`.
+The landing quickstart catalog references three of these prompts for guided
+benchmark flows; the four remaining prompts are still first-class MCP prompts
+and are discoverable at runtime.
 
 ### `analyze_results`
 

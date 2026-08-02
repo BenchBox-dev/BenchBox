@@ -16,6 +16,24 @@ from tests.integration.mcp._transport import http_client
 
 pytestmark = [pytest.mark.integration, pytest.mark.fast]
 
+PROMPT_ARGUMENTS: dict[str, dict[str, str]] = {
+    "analyze_results": {"benchmark": "tpch", "platform": "duckdb", "focus": "slowest_queries"},
+    "benchmark_planning": {"use_case": "comparison", "platforms": "duckdb,snowflake", "time_budget_minutes": "60"},
+    "benchmark_run": {"platform": "duckdb", "benchmark": "tpch", "scale_factor": "0.01", "queries": "Q1,Q6"},
+    "compare_platforms": {"benchmark": "tpch", "platforms": "duckdb,polars-df", "scale_factor": "0.1"},
+    "identify_regressions": {
+        "baseline_run": "run1.json",
+        "comparison_run": "run2.json",
+        "threshold_percent": "15",
+    },
+    "platform_tuning": {"platform": "duckdb", "workload": "OLAP heavy joins"},
+    "troubleshoot_failure": {
+        "error_message": "Connection refused",
+        "platform": "snowflake",
+        "benchmark": "tpch",
+    },
+}
+
 
 async def _inventory(client: Client) -> dict[str, list[dict[str, Any]]]:
     """Return the public discovery contract in a transport-neutral shape."""
@@ -38,8 +56,22 @@ async def _inventory(client: Client) -> dict[str, list[dict[str, Any]]]:
     }
 
 
+async def _prompt_payloads(client: Client) -> dict[str, list[str]]:
+    """Render every prompt through the public client API."""
+    rendered: dict[str, list[str]] = {}
+    for name, arguments in PROMPT_ARGUMENTS.items():
+        result = await client.get_prompt(name, arguments)
+        rendered[name] = [message.content.text for message in result.messages]
+    return rendered
+
+
 def test_stdio_and_streamable_http_publish_identical_contracts(tmp_path: Path) -> None:
-    async def exercise() -> tuple[dict[str, list[dict[str, Any]]], dict[str, list[dict[str, Any]]]]:
+    async def exercise() -> tuple[
+        dict[str, list[dict[str, Any]]],
+        dict[str, list[dict[str, Any]]],
+        dict[str, list[str]],
+        dict[str, list[str]],
+    ]:
         results_dir = tmp_path / "results"
         charts_dir = tmp_path / "charts"
         params = StdioServerParameters(
@@ -57,6 +89,7 @@ def test_stdio_and_streamable_http_publish_identical_contracts(tmp_path: Path) -
         with open(os.devnull, "w", encoding="utf-8") as errlog:
             async with Client(stdio_client(params, errlog=errlog), mode="legacy") as stdio:
                 stdio_inventory = await _inventory(stdio)
+                stdio_prompts = await _prompt_payloads(stdio)
 
         async with http_client(
             tmp_path,
@@ -65,12 +98,16 @@ def test_stdio_and_streamable_http_publish_identical_contracts(tmp_path: Path) -
             response_headers=[],
         ) as http:
             http_inventory = await _inventory(http)
+            http_prompts = await _prompt_payloads(http)
 
-        return stdio_inventory, http_inventory
+        return stdio_inventory, http_inventory, stdio_prompts, http_prompts
 
-    stdio_inventory, http_inventory = anyio.run(exercise)
+    stdio_inventory, http_inventory, stdio_prompts, http_prompts = anyio.run(exercise)
 
     assert stdio_inventory == http_inventory
+    assert stdio_prompts == http_prompts
+    assert set(http_prompts) == {prompt["name"] for prompt in http_inventory["prompts"]}
+    assert all(payload and all(text.strip() for text in payload) for payload in http_prompts.values())
     assert len(http_inventory["tools"]) == 12
     assert len(http_inventory["resources"]) == 4
     assert len(http_inventory["resource_templates"]) == 2
