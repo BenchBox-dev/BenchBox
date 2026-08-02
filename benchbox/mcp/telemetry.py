@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 from mcp.shared.exceptions import MCPError
@@ -60,7 +60,11 @@ class TelemetrySettings:
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> TelemetrySettings:
-        endpoint = env.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") or env.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+        endpoint = env.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+        generic_endpoint = env.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+        if endpoint is None and generic_endpoint is not None:
+            parsed = urlsplit(generic_endpoint)
+            endpoint = urlunsplit(parsed._replace(path=f"{parsed.path.rstrip('/')}/v1/traces"))
         return cls(endpoint=endpoint)
 
 

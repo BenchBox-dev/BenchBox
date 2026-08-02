@@ -19,9 +19,12 @@ not imply production certification.
 | Persistence | Shared SQLite-compatible state, tenant artifact storage, backup, and restore exercise | Storage owner | 30 days |
 | Operations | Scale test, rollback exercise, dashboards, alerts, and incident runbook | Service operator | 30 days |
 
-The automated verifier owns the first five rows. The operator supplies the
-external evidence for the final three rows. Evidence is tied to the deployed
-source revision and cannot be reused after a code change.
+The automated verifier certifies protocol, compatibility, and the local
+observability/cache regressions. It deliberately leaves `multiworker` false:
+an operator must replace that value only after a deployment-grade run proves
+process-level coordination on the deployed shared storage class. The operator
+also supplies the external evidence for the final three rows. Evidence is tied
+to the deployed source revision and cannot be reused after a code change.
 
 ## Protocol policy
 
