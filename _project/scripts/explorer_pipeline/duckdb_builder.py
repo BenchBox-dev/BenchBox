@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import logging
 import math
+import os
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -269,21 +271,22 @@ class DuckDBSnapshotBuilder:
             )
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Remove stale database so we always start clean.
-        if output_path.exists():
-            output_path.unlink()
+        candidate_path = self._candidate_path(output_path)
 
         col_defs = ", ".join(f"{name} {dtype}" for name, dtype in self._COLUMNS)
 
         rows = [self._entry_to_tuple(e) for e in entries]
 
-        with duckdb.connect(str(output_path)) as con:
-            self._create_metadata(con)
-            con.execute(f"CREATE TABLE results ({col_defs})")
-            if rows:
-                placeholders = ", ".join("?" * len(col_names))
-                con.executemany(f"INSERT INTO results VALUES ({placeholders})", rows)
+        try:
+            with duckdb.connect(str(candidate_path)) as con:
+                self._create_metadata(con)
+                con.execute(f"CREATE TABLE results ({col_defs})")
+                if rows:
+                    placeholders = ", ".join("?" * len(col_names))
+                    con.executemany(f"INSERT INTO results VALUES ({placeholders})", rows)
+            os.replace(candidate_path, output_path)
+        finally:
+            self._cleanup_candidate(candidate_path)
 
         logger.info("Wrote %d rows to %s", len(rows), output_path)
 
@@ -323,26 +326,43 @@ class DuckDBSnapshotBuilder:
             ) from exc
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        if output_path.exists():
-            output_path.unlink()
+        candidate_path = self._candidate_path(output_path)
 
         prefix = bundle_url_prefix.rstrip("/")
 
-        with duckdb.connect(str(output_path)) as con:
-            self._create_schema(con)
-            self._create_metadata(con)
-            self._populate_supporting_tables(con, entries, details_map)
-            self._populate_results(con, entries, details_map, prefix)
-            self._populate_query_display_timings(con, entries, details_map)
-            self._populate_query_executions(con, entries, details_map)
-            self._populate_benchmark_matrix_cells(con, summaries)
-            entries_by_result = {entry.result_id: entry for entry in entries}
-            self._populate_benchmark_rankings(con, summaries, full_to_short, entries_by_result)
-            self._populate_cohort_metadata(con, meta, summaries, entries_by_result)
-            self._populate_meta_leaderboard(con, meta)
-            self._populate_short_ids(con, short_id_map)
+        try:
+            with duckdb.connect(str(candidate_path)) as con:
+                self._create_schema(con)
+                self._create_metadata(con)
+                self._populate_supporting_tables(con, entries, details_map)
+                self._populate_results(con, entries, details_map, prefix)
+                self._populate_query_display_timings(con, entries, details_map)
+                self._populate_query_executions(con, entries, details_map)
+                self._populate_benchmark_matrix_cells(con, summaries)
+                entries_by_result = {entry.result_id: entry for entry in entries}
+                self._populate_benchmark_rankings(con, summaries, full_to_short, entries_by_result)
+                self._populate_cohort_metadata(con, meta, summaries, entries_by_result)
+                self._populate_meta_leaderboard(con, meta)
+                self._populate_short_ids(con, short_id_map)
+            os.replace(candidate_path, output_path)
+        finally:
+            self._cleanup_candidate(candidate_path)
 
         logger.info("Built full DuckDB browser store (%d results) at %s", len(entries), output_path)
+
+    @staticmethod
+    def _candidate_path(output_path: Path) -> Path:
+        """Return an exact same-directory temporary path for atomic promotion."""
+        return output_path.with_name(f".{output_path.name}.{uuid.uuid4().hex}.tmp")
+
+    @staticmethod
+    def _cleanup_candidate(candidate_path: Path) -> None:
+        """Remove only the builder-owned candidate and its exact WAL sibling."""
+        for path in (candidate_path, candidate_path.with_name(candidate_path.name + ".wal")):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
 
     # ------------------------------------------------------------------
     # Schema DDL

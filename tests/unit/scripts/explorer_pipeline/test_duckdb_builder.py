@@ -43,6 +43,22 @@ class TestDuckDBSnapshotBuilder:
         assert out.exists()
         assert out.stat().st_size > 0
 
+    def test_failed_rebuild_preserves_last_known_good_snapshot(self, tmp_path: Path, monkeypatch) -> None:
+        builder = DuckDBSnapshotBuilder()
+        out = tmp_path / "results.duckdb"
+        builder.build([_make_entry()], out)
+        before = out.read_bytes()
+
+        def fail_metadata(*_args, **_kwargs):
+            raise RuntimeError("simulated interrupted rebuild")
+
+        monkeypatch.setattr(builder, "_create_metadata", fail_metadata)
+        with pytest.raises(RuntimeError, match="simulated interrupted rebuild"):
+            builder.build([_make_entry(result_id="new-result")], out)
+
+        assert out.read_bytes() == before
+        assert not list(tmp_path.glob(".results.duckdb.*.tmp"))
+
     def test_writes_read_model_version_metadata(self, tmp_path: Path) -> None:
         builder = DuckDBSnapshotBuilder()
         out = tmp_path / "results.duckdb"
