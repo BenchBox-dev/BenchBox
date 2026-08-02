@@ -3,6 +3,7 @@ import {
   ensureSentence,
   formatCandidateCount,
   formatCount,
+  formatCountWithVerb,
   formatSelectedCount,
   formatWarningCount,
   removeDuplicatedTerminalPunctuation,
@@ -18,6 +19,8 @@ describe("copyFormatters", () => {
     expect(formatCount(4, "run")).toBe("4 runs");
     expect(formatCount(2, "query", "queries")).toBe("2 queries");
     expect(formatCount(2, "more", "more")).toBe("2 more");
+    expect(formatCountWithVerb(1, "public benchmark", "has", "have")).toBe("1 public benchmark has");
+    expect(formatCountWithVerb(2, "public benchmark", "has", "have")).toBe("2 public benchmarks have");
   });
 
   it("formats selected states without duplicating count rules", () => {

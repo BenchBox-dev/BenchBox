@@ -524,6 +524,30 @@ describe("Home", () => {
     expect(within(summary).queryByText(/^leaderboard ranking$/)).toBeNull();
   });
 
+  it("keeps tuning metadata visible while hiding a non-discriminating tuning filter", async () => {
+    const unlabelledRows = RESULT_ROWS.map((row) => ({ ...row, tuning_mode: null }));
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return unlabelledRows;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return COHORT_ROWS;
+      return [];
+    });
+
+    render(<Home />);
+    await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
+
+    const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
+    fireEvent.click(screen.getByText("Advanced filters"));
+    expect(within(selector).getByTestId("tuning-filter-unavailable")).toHaveTextContent(
+      "Tuning filter unavailable",
+    );
+    expect(within(selector).queryByRole("button", { name: "All tuning labels" })).toBeNull();
+    expect(within(selector).getByTestId("tuning-filter-unavailable")).toHaveTextContent("4 public results have");
+  });
+
   it("states leaderboard cohort scope separately from public browse scope", async () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());

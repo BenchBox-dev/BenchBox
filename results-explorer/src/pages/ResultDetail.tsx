@@ -28,6 +28,7 @@ interface ResultDetailProps extends RoutableProps {
 type MedianSortKey = "query_id" | "display_ms" | "sample_count";
 type RawSortKey = "query_id" | "duration_ms" | "status";
 type PrimaryMetric = "power_score" | "display_geomean_ms";
+type SortAriaValue = "ascending" | "descending" | "none";
 interface DetailState {
   detail: DetailResult;
   primaryMetric: PrimaryMetric;
@@ -159,6 +160,11 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
     return sort.direction === "asc" ? " ↑" : " ↓";
   }
 
+  function sortAriaValue(state: SortState<MedianSortKey>, key: MedianSortKey): SortAriaValue {
+    if (state.key !== key) return "none";
+    return state.direction === "asc" ? "ascending" : "descending";
+  }
+
   function toggleRawSort(key: RawSortKey) {
     setRawSort((prev) =>
       prev.key === key
@@ -170,6 +176,11 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   function rawSortArrow(key: RawSortKey) {
     if (rawSort.key !== key) return " ↕";
     return rawSort.direction === "asc" ? " ↑" : " ↓";
+  }
+
+  function rawSortAriaValue(key: RawSortKey): SortAriaValue {
+    if (rawSort.key !== key) return "none";
+    return rawSort.direction === "asc" ? "ascending" : "descending";
   }
 
   // Derive tuning sidecar URL from bundle download URL.
@@ -369,7 +380,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
               <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                 <thead class="bg-[var(--bb-surface-data-muted)]">
                   <tr>
-                    <th class="p-0" scope="col">
+                    <th class="p-0" scope="col" aria-sort={sortAriaValue(sort, "query_id")}>
                       <button
                         type="button"
                         class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
@@ -378,7 +389,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                         Query{sortArrow("query_id")}
                       </button>
                     </th>
-                    <th class="p-0" scope="col">
+                    <th class="p-0" scope="col" aria-sort={sortAriaValue(sort, "display_ms")}>
                       <button
                         type="button"
                         class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
@@ -387,7 +398,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                         Median latency{sortArrow("display_ms")}
                       </button>
                     </th>
-                    <th class="p-0" scope="col">
+                    <th class="p-0" scope="col" aria-sort={sortAriaValue(sort, "sample_count")}>
                       <button
                         type="button"
                         class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
@@ -418,32 +429,32 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                   <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                     <thead class="bg-[var(--bb-surface-data-muted)]">
                       <tr>
-                        <th
-                          class="table-th cursor-pointer select-none"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleRawSort("query_id")}
-                          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleRawSort("query_id")}
-                        >
-                          Query{rawSortArrow("query_id")}
+                        <th class="p-0" scope="col" aria-sort={rawSortAriaValue("query_id")}>
+                          <button
+                            type="button"
+                            class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                            onClick={() => toggleRawSort("query_id")}
+                          >
+                            Query{rawSortArrow("query_id")}
+                          </button>
                         </th>
-                        <th
-                          class="table-th cursor-pointer select-none"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleRawSort("duration_ms")}
-                          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleRawSort("duration_ms")}
-                        >
-                          Duration{rawSortArrow("duration_ms")}
+                        <th class="p-0" scope="col" aria-sort={rawSortAriaValue("duration_ms")}>
+                          <button
+                            type="button"
+                            class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                            onClick={() => toggleRawSort("duration_ms")}
+                          >
+                            Duration{rawSortArrow("duration_ms")}
+                          </button>
                         </th>
-                        <th
-                          class="table-th cursor-pointer select-none"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => toggleRawSort("status")}
-                          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleRawSort("status")}
-                        >
-                          Status{rawSortArrow("status")}
+                        <th class="p-0" scope="col" aria-sort={rawSortAriaValue("status")}>
+                          <button
+                            type="button"
+                            class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                            onClick={() => toggleRawSort("status")}
+                          >
+                            Status{rawSortArrow("status")}
+                          </button>
                         </th>
                       </tr>
                     </thead>

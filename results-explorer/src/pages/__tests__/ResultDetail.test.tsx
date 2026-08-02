@@ -154,6 +154,23 @@ describe("ResultDetail - median-first contract", () => {
     expect(screen.getAllByText(/^Duration/i).length).toBeGreaterThan(0);
   });
 
+  it("announces sort state on native median and raw table controls", async () => {
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    const medianHeader = screen.getByRole("columnheader", { name: /Median latency/ });
+    expect(medianHeader).toHaveAttribute("aria-sort", "none");
+    fireEvent.click(within(medianHeader).getByRole("button"));
+    expect(medianHeader).toHaveAttribute("aria-sort", "ascending");
+
+    fireEvent.click(screen.getByText(/Individual samples \(6\)/i));
+    const rawDurationHeader = screen.getByRole("columnheader", { name: /Duration/ });
+    expect(rawDurationHeader).toHaveAttribute("aria-sort", "none");
+    expect(rawDurationHeader.querySelector('[role="button"]')).toBeNull();
+    fireEvent.click(within(rawDurationHeader).getByRole("button"));
+    expect(rawDurationHeader).toHaveAttribute("aria-sort", "ascending");
+  });
+
   it("(d) registry-driven chart panel uses display_timings-backed charts", async () => {
     const detail = makeDetail();
     vi.mocked(getDetailResult).mockResolvedValue(detail);

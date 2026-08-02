@@ -3,6 +3,16 @@ export function formatCount(count: number, singular: string, plural = `${singula
   return `${count.toLocaleString()} ${noun}`;
 }
 
+export function formatCountWithVerb(
+  count: number,
+  singular: string,
+  singularVerb: string,
+  pluralVerb: string,
+  plural = `${singular}s`,
+): string {
+  return `${formatCount(count, singular, plural)} ${count === 1 ? singularVerb : pluralVerb}`;
+}
+
 export function formatWarningCount(count: number): string {
   return formatCount(count, "warning");
 }
