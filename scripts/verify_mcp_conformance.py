@@ -35,12 +35,6 @@ SCENARIOS = (
     "server-sse-multiple-streams",
     "server-stateless",
 )
-EXPECTED_FAILURES = """server:
-  - server-stateless:sep-2575-server-rejects-undeclared-capability
-  - server-stateless:sep-2575-missing-capability-http-400
-  - server-stateless:sep-2575-server-sends-prompts-list-changed-on-subscription
-  - server-stateless:sep-2575-server-sends-tools-list-changed-on-subscription
-"""
 
 
 def _run(command: list[str], *, cwd: Path | None = None, timeout: int = 600) -> None:
@@ -81,8 +75,6 @@ def _prepare_conformance(checkout: Path) -> Path:
 
 def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None:
     conformance = _prepare_conformance(workspace / "conformance")
-    baseline = workspace / "expected-failures.yaml"
-    baseline.write_text(EXPECTED_FAILURES, encoding="utf-8")
     for scenario in SCENARIOS:
         command = [
             "node",
@@ -95,8 +87,6 @@ def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None
             "--spec-version",
             protocol_version,
         ]
-        if scenario == "server-stateless":
-            command.extend(["--expected-failures", str(baseline)])
         _run(command)
 
 
@@ -151,6 +141,10 @@ def _write_evidence(path: Path, protocol_version: str) -> None:
     if subprocess.check_output(["git", "status", "--porcelain"], text=True).strip():  # noqa: S603
         raise RuntimeError("Refusing to write production evidence from a dirty worktree")
     source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()  # noqa: S603
+    automated = dict.fromkeys(sorted(AUTOMATED_GATES), True)
+    # Focused in-process tests are useful regressions, but only a deployed
+    # multi-worker acceptance run can certify the shared storage class.
+    automated["multiworker"] = False
     payload = {
         "source_revision": source_revision,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -159,7 +153,7 @@ def _write_evidence(path: Path, protocol_version: str) -> None:
         "inspector_version": INSPECTOR_VERSION,
         "inspector_revision": INSPECTOR_REVISION,
         "inspector_integrity": INSPECTOR_INTEGRITY,
-        "automated": dict.fromkeys(sorted(AUTOMATED_GATES), True),
+        "automated": automated,
         # These require operator evidence; false deliberately keeps publication blocked.
         "external": dict.fromkeys(sorted(EXTERNAL_GATES), False),
     }
