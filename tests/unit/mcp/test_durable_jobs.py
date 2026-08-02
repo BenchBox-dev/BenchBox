@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import anyio
@@ -32,6 +35,8 @@ def test_job_submission_is_tenant_owned_and_idempotent(tmp_path: Path) -> None:
     assert repository.get_owned(first.execution_id, "tenant-b") is None
     with pytest.raises(MCPError, match="different request"):
         repository.submit("tenant-a", _request(0.1), idempotency_key="request-1")
+    with pytest.raises(MCPError, match="1 to 200"):
+        repository.submit("tenant-a", _request(), idempotency_key="")
 
 
 def test_job_queue_is_bounded_across_repository_instances(tmp_path: Path) -> None:
@@ -122,6 +127,34 @@ def test_completed_job_is_recorded_only_after_atomic_artifact_publication(tmp_pa
     assert ".staging" not in str(result_file)
 
 
+def test_heartbeat_renews_lease_through_slow_artifact_flush(monkeypatch, tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.06, poll_seconds=0.01)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    workspaces = TenantWorkspaceProvider(tmp_path / "workspaces")
+
+    def executor(job, staging: Path):
+        result = staging / "benchmark.json"
+        result.write_text("{}", encoding="utf-8")
+        return {"mcp_metadata": {"execution_id": job.execution_id, "result_file": str(result)}}
+
+    worker = DurableJobWorker(repository, workspaces, executor=executor, worker_id="worker-a")
+    original_sync_tree = worker._sync_tree
+
+    def slow_sync_tree(root: Path) -> None:
+        time.sleep(0.14)
+        original_sync_tree(root)
+
+    monkeypatch.setattr(worker, "_sync_tree", slow_sync_tree)
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim(worker.worker_id)
+    assert claimed is not None
+
+    anyio.run(worker._run_job, claimed)
+
+    completed = repository.get(submitted.execution_id)
+    assert completed is not None and completed.state == "completed"
+
+
 def test_data_only_artifact_path_is_rewritten_into_final_tenant_job(tmp_path: Path) -> None:
     staging = tmp_path / ".staging" / "attempt"
     final_dir = tmp_path / "job"
@@ -141,6 +174,7 @@ def test_expired_lease_recovery_requeues_without_duplicate_publication(tmp_path:
     claimed = repository.claim("lost-worker")
     assert claimed is not None
 
+    worker.recover_expired()
     anyio.run(anyio.sleep, 0.06)
     worker.recover_expired()
     recovered = repository.get(submitted.execution_id)
@@ -149,6 +183,113 @@ def test_expired_lease_recovery_requeues_without_duplicate_publication(tmp_path:
     assert replacement is not None
     assert repository.begin_publication(submitted.execution_id, "lost-worker") is False
     assert repository.complete(submitted.execution_id, "lost-worker", tmp_path / "stale.json") is False
+
+
+def test_expired_recovery_fences_worker_before_artifact_cleanup(tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("lost-worker")
+    assert claimed is not None
+    assert repository.begin_publication(claimed.execution_id, "lost-worker")
+
+    repository.claim_expired("observer")
+    anyio.run(anyio.sleep, 0.06)
+    fenced = repository.claim_expired("recovery-owner")
+
+    assert fenced is not None and fenced.lease_owner == "recovery-owner"
+    assert repository.complete(submitted.execution_id, "lost-worker", tmp_path / "stale.json") is False
+
+
+def test_publication_commit_excludes_recovery_fence(tmp_path: Path) -> None:
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(lease_seconds=0.08))
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+    assert repository.begin_publication(claimed.execution_id, "worker-a")
+    assert repository.claim_expired("observer") is None
+    entered_publish = threading.Event()
+    release_publish = threading.Event()
+
+    def publish() -> None:
+        entered_publish.set()
+        assert release_publish.wait(timeout=2)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        completion = executor.submit(
+            repository.complete,
+            submitted.execution_id,
+            "worker-a",
+            tmp_path / "response.json",
+            publish=publish,
+        )
+        assert entered_publish.wait(timeout=2)
+        time.sleep(0.09)
+        recovery = executor.submit(repository.claim_expired, "recovery-owner")
+        time.sleep(0.02)
+        assert not recovery.done()
+        release_publish.set()
+        assert completion.result(timeout=2)
+        assert recovery.result(timeout=2) is None
+
+
+def test_recovery_removes_only_expired_attempt_staging(tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    worker = DurableJobWorker(repository, TenantWorkspaceProvider(tmp_path / "workspaces"), worker_id="recovery")
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("lost-worker")
+    assert claimed is not None
+    staging, _, _ = worker._job_paths(claimed)
+    staging.mkdir(parents=True)
+    (staging / "large-result.bin").write_bytes(b"orphan")
+
+    worker.recover_expired()
+    anyio.run(anyio.sleep, 0.06)
+    worker.recover_expired()
+
+    assert not staging.exists()
+    recovered = repository.get(submitted.execution_id)
+    assert recovered is not None and recovered.state == "queued"
+
+
+def test_job_leases_use_shared_generations_across_host_clock_offsets(monkeypatch, tmp_path: Path) -> None:
+    from benchbox.mcp import jobs
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    repository.submit("tenant-a", _request())
+    claimed = repository.claim("worker-a")
+    assert claimed is not None and claimed.lease_version == 2
+    observer = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    monkeypatch.setattr(jobs, "mono_time", lambda: 10.0)
+    assert observer.claim_expired("recovery") is None
+
+    assert repository.renew(claimed.execution_id, "worker-a")
+    monkeypatch.setattr(jobs, "mono_time", lambda: 100_000.0)
+    assert observer.claim_expired("recovery") is None
+
+
+def test_legacy_epoch_lease_remains_compatible_during_rolling_upgrade(tmp_path: Path) -> None:
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("legacy-worker")
+    assert claimed is not None
+    with sqlite3.connect(repository.path) as connection:
+        connection.execute(
+            """UPDATE mcp_benchmark_jobs
+               SET lease_version = 1, lease_generation = 0, lease_expires_at = unixepoch() + 60
+               WHERE execution_id = ?""",
+            (submitted.execution_id,),
+        )
+    assert repository.claim_expired("new-worker") is None
+
+    with sqlite3.connect(repository.path) as connection:
+        connection.execute(
+            "UPDATE mcp_benchmark_jobs SET lease_expires_at = unixepoch() - 1 WHERE execution_id = ?",
+            (submitted.execution_id,),
+        )
+    recovered = repository.claim_expired("new-worker")
+    assert recovered is not None and recovered.execution_id == submitted.execution_id
 
 
 def test_unexpected_worker_failure_retries_then_can_complete(tmp_path: Path) -> None:
@@ -194,6 +335,7 @@ def test_publishing_recovery_completes_existing_durable_artifact(tmp_path: Path)
     response_path.write_text('{"mcp_metadata": {"execution_id": "recovered"}}', encoding="utf-8")
     (final_dir / ".published").write_text(claimed.execution_id, encoding="ascii")
 
+    worker.recover_expired()
     anyio.run(anyio.sleep, 0.06)
     worker.recover_expired()
     recovered = repository.get(submitted.execution_id)
