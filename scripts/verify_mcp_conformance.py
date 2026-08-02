@@ -35,6 +35,16 @@ SCENARIOS = (
     "server-sse-multiple-streams",
     "server-stateless",
 )
+# This is an exact, revision-bound fixture baseline.  Keep every entry
+# individually named: the conformance runner must fail closed for any result
+# not listed here, and a baseline entry never waives a real BenchBox defect.
+EXPECTED_FAILURE_IDS = (
+    "server-stateless:sep-2575-server-rejects-undeclared-capability",
+    "server-stateless:sep-2575-missing-capability-http-400",
+    "server-stateless:sep-2575-server-sends-prompts-list-changed-on-subscription",
+    "server-stateless:sep-2575-server-sends-tools-list-changed-on-subscription",
+)
+EXPECTED_FAILURES = "server:\n" + "".join(f"  - {failure}\n" for failure in EXPECTED_FAILURE_IDS)
 
 
 def _run(command: list[str], *, cwd: Path | None = None, timeout: int = 600) -> None:
