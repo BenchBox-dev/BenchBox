@@ -192,6 +192,35 @@ class TestRunBenchmarkTool:
         assert tuning.platform_optimizations.databricks_clustering_strategy == "liquid_clustering"
         assert tuning.platform_optimizations.liquid_clustering_columns == ["customer_id", "order_id"]
 
+    def test_every_matrix_option_reaches_effective_preparation(self):
+        """Each reviewed option reaches a concrete adapter-facing setting."""
+        from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST, validate_platform_options
+        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+        for platform, specs in MCP_PLATFORM_OPTION_ALLOWLIST.items():
+            for option_name, spec in specs.items():
+                if spec.kind == "bool":
+                    value: object = False
+                elif spec.kind == "int":
+                    value = spec.minimum if spec.minimum is not None else 1
+                elif spec.kind == "float":
+                    value = spec.minimum if spec.minimum is not None else 1.0
+                elif spec.choices:
+                    value = spec.choices[0]
+                elif option_name == "liquid_clustering_columns":
+                    value = "id"
+                else:
+                    value = "1GB"
+
+                normalized = validate_platform_options(platform, {option_name: value})
+                prepared = _prepare_adapter_platform_options(platform, normalized)
+                if platform == "duckdb" and option_name == "threads":
+                    assert prepared == {"thread_limit": value}
+                elif platform == "databricks":
+                    assert "tuning_config" in prepared
+                else:
+                    assert prepared[option_name] == value
+
 
 class TestGetQueryDetailsTool:
     """Tests for get_query_details tool functionality."""

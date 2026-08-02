@@ -247,6 +247,11 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
+- The authoritative option-to-consumer, security-class, alias, and rejection
+  matrix is maintained in
+  `docs/development/mcp-platform-option-contract.md`. Every allow-listed key
+  must have a matching matrix entry; a missing entry fails closed before
+  adapter construction or durable-job persistence.
 - Normal execution uses `BaseBenchmark.run_with_platform()` through public
   benchmark and adapter APIs.
 - MCP execution intentionally suppresses console output and returns structured

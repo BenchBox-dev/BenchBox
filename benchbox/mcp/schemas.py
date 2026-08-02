@@ -90,6 +90,24 @@ class MCPPlatformOptionSpec:
 
 _MCP_OPTION = MCPPlatformOptionSpec
 
+
+@dataclass(frozen=True, slots=True)
+class MCPPlatformOptionContract:
+    """Review metadata for one accepted MCP option.
+
+    The contract is deliberately separate from the Pydantic-like value spec:
+    bounds validate syntax, while this record documents the effective consumer,
+    security class, compatibility aliases, and rejected alternatives.  The
+    validator requires both records to agree so a new allow-listed option
+    cannot bypass the review matrix accidentally.
+    """
+
+    consumer: str
+    security_class: Literal["execution", "resource", "device", "layout", "connection"]
+    aliases: tuple[str, ...] = ()
+    rejected_alternatives: tuple[str, ...] = ()
+
+
 # This is deliberately narrower than the CLI registry.  MCP callers cannot
 # change credentials, destinations, filesystem locations, package installation,
 # or other tenant-owned connection state through request arguments.
@@ -156,6 +174,109 @@ MCP_PLATFORM_OPTION_ALLOWLIST: dict[str, dict[str, MCPPlatformOptionSpec]] = {
 }
 
 
+def _contract(
+    consumer: str,
+    security_class: Literal["execution", "resource", "device", "layout", "connection"],
+    *,
+    aliases: tuple[str, ...] = (),
+    rejected_alternatives: tuple[str, ...] = (),
+) -> MCPPlatformOptionContract:
+    return MCPPlatformOptionContract(
+        consumer=consumer,
+        security_class=security_class,
+        aliases=aliases,
+        rejected_alternatives=rejected_alternatives,
+    )
+
+
+# Canonical option-to-consumer matrix.  Keep this map explicit instead of
+# deriving it from the allow-list: an accepted option must have a reviewed
+# consumer and security classification before it can cross the MCP boundary.
+MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = {
+    "clickhouse": {
+        "deployment_mode": _contract("ClickHouseAdapter.from_config(deployment_mode)", "execution"),
+        "port": _contract(
+            "ClickHouseAdapter.from_config(port)",
+            "connection",
+            rejected_alternatives=("server-owned port", "arbitrary destination selection"),
+        ),
+        "secure": _contract(
+            "ClickHouseAdapter.from_config(secure)",
+            "connection",
+            rejected_alternatives=("server-owned TLS policy", "transport downgrade"),
+        ),
+    },
+    "clickhouse-server": {
+        "port": _contract(
+            "ClickHouseAdapter.from_config(port)",
+            "connection",
+            rejected_alternatives=("server-owned port", "arbitrary destination selection"),
+        ),
+        "secure": _contract(
+            "ClickHouseAdapter.from_config(secure)",
+            "connection",
+            rejected_alternatives=("server-owned TLS policy", "transport downgrade"),
+        ),
+    },
+    "cudf": {
+        "device_id": _contract("cuDF runtime device selection", "device"),
+        "spill_to_host": _contract("cuDF memory policy", "resource"),
+    },
+    "dask": {
+        "memory_limit": _contract("Dask worker resource envelope", "resource"),
+        "n_workers": _contract("Dask LocalCluster worker count", "resource"),
+        "threads_per_worker": _contract("Dask LocalCluster thread count", "resource"),
+        "use_distributed": _contract("Dask execution-mode selector", "execution"),
+    },
+    "datafusion": {
+        "batch_size": _contract("DataFusion execution configuration", "resource"),
+        "memory_limit": _contract("DataFusion memory policy", "resource"),
+        "parquet_pushdown": _contract("DataFusion parquet execution options", "execution"),
+        "repartition_joins": _contract("DataFusion join execution options", "execution"),
+        "target_partitions": _contract("DataFusion partition configuration", "resource"),
+    },
+    "duckdb": {
+        "memory_limit": _contract("DuckDB thread/memory adapter settings", "resource"),
+        "threads": _contract(
+            "DuckDBAdapter.thread_limit",
+            "resource",
+            aliases=("thread_limit",),
+        ),
+    },
+    "firebolt": {
+        "disable_result_cache": _contract("Firebolt query execution options", "execution"),
+        "strict_validation": _contract("Firebolt validation options", "execution"),
+    },
+    "databricks": {
+        "databricks_clustering_strategy": _contract(
+            "Databricks PlatformOptimizationConfiguration clustering strategy", "layout"
+        ),
+        "liquid_clustering_columns": _contract(
+            "Databricks PlatformOptimizationConfiguration clustering columns", "layout"
+        ),
+    },
+    "modin": {"engine": _contract("Modin dataframe backend selector", "execution")},
+    "pandas": {"dtype_backend": _contract("pandas dataframe dtype backend", "execution")},
+    "polars": {
+        "n_rows": _contract("Polars input row limit", "resource"),
+        "rechunk": _contract("Polars dataframe memory layout", "resource"),
+        "streaming": _contract("Polars dataframe execution mode", "execution"),
+    },
+    "spark": {"adaptive_enabled": _contract("Spark adaptive execution setting", "execution")},
+    "sqlite": {
+        "check_same_thread": _contract("SQLite connection safety setting", "execution"),
+        "timeout": _contract("SQLite connection timeout", "resource"),
+    },
+    "velox": {
+        "adaptive_enabled": _contract("Velox execution options", "execution"),
+        "deployment": _contract("Velox local/remote deployment selector", "connection"),
+        "driver_memory": _contract("Velox driver resource envelope", "resource"),
+        "offheap_size": _contract("Velox off-heap resource envelope", "resource"),
+        "shuffle_partitions": _contract("Velox shuffle resource envelope", "resource"),
+    },
+}
+
+
 def _validate_memory_limit(name: str, value: str) -> str:
     """Validate a bounded memory-size option without accepting paths or expressions."""
     if not MEMORY_LIMIT_PATTERN.fullmatch(value):
@@ -181,13 +302,18 @@ def validate_platform_options(platform: str, options: Mapping[str, object] | Non
     if specs is None and platform_name.endswith("-df"):
         specs = MCP_PLATFORM_OPTION_ALLOWLIST.get(platform_name[:-3])
     specs = specs or {}
+    contracts = MCP_PLATFORM_OPTION_CONTRACT.get(platform_name)
+    if contracts is None and platform_name.endswith("-df"):
+        contracts = MCP_PLATFORM_OPTION_CONTRACT.get(platform_name[:-3])
+    contracts = contracts or {}
     normalized: dict[str, object] = {}
     for raw_name, raw_value in options.items():
         if not isinstance(raw_name, str) or not PLATFORM_OPTION_NAME_PATTERN.fullmatch(raw_name):
             raise MCPValidationError("Platform option names must use lowercase snake_case")
         name = raw_name.lower()
         spec = specs.get(name)
-        if spec is None:
+        contract = contracts.get(name)
+        if spec is None or contract is None:
             raise MCPValidationError(f"Platform option '{name}' is not authorized for MCP")
         parsed = spec.parse(name, raw_value)
         if spec.kind == "string" and name in {"memory_limit", "driver_memory", "offheap_size"}:

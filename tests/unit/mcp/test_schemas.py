@@ -11,6 +11,8 @@ from pydantic import ValidationError as PydanticValidationError
 from benchbox.mcp.schemas import (
     MAX_QUERY_ID_LENGTH,
     MAX_QUERY_IDS,
+    MCP_PLATFORM_OPTION_ALLOWLIST,
+    MCP_PLATFORM_OPTION_CONTRACT,
     CompareResultsInput,
     DryRunInput,
     ExportSummaryInput,
@@ -259,6 +261,22 @@ class TestRunBenchmarkInput:
             platform_options={"threads": 4, "memory_limit": "2GB"},
         )
         assert inp.platform_options == {"threads": 4, "memory_limit": "2GB"}
+
+    def test_every_allowlisted_option_has_an_explicit_contract(self):
+        """The value allow-list cannot grow without a reviewed consumer matrix."""
+        assert set(MCP_PLATFORM_OPTION_ALLOWLIST) == set(MCP_PLATFORM_OPTION_CONTRACT)
+        for platform, specs in MCP_PLATFORM_OPTION_ALLOWLIST.items():
+            contracts = MCP_PLATFORM_OPTION_CONTRACT[platform]
+            assert set(specs) == set(contracts)
+            for option_name, contract in contracts.items():
+                assert contract.consumer
+                assert contract.security_class in {"execution", "resource", "device", "layout", "connection"}
+                assert all(alias != option_name for alias in contract.aliases)
+
+    def test_option_without_contract_is_rejected_fail_closed(self, monkeypatch):
+        monkeypatch.delitem(MCP_PLATFORM_OPTION_CONTRACT["duckdb"], "threads")
+        with pytest.raises(MCPValidationError, match="not authorized"):
+            validate_platform_options("duckdb", {"threads": 2})
 
     def test_secret_and_unknown_platform_options_are_rejected(self):
         with pytest.raises(PydanticValidationError):
