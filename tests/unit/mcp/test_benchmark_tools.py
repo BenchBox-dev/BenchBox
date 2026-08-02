@@ -138,6 +138,36 @@ class TestRunBenchmarkTool:
         assert "load" in phases_to_run
         assert "power" in phases_to_run
 
+    def test_platform_options_are_forwarded_only_after_validation(self, tmp_path: Path):
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+
+        class DummyBenchmark:
+            def __init__(self, scale_factor: float) -> None:
+                self.scale_factor = scale_factor
+
+            def run_with_platform(self, *_args, **_kwargs):
+                return None
+
+        adapter = Mock()
+        with (
+            patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
+            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=DummyBenchmark),
+            patch.object(benchmark_tools, "_get_platform_adapter", return_value=adapter) as get_adapter,
+        ):
+            response = benchmark_tools._run_benchmark_impl(
+                "duckdb",
+                "tpch",
+                0.01,
+                None,
+                "load,power",
+                "sql",
+                platform_options={"threads": 4},
+                results_dir=tmp_path,
+            )
+
+        assert response["mcp_metadata"]["status"] == "no_results"
+        assert get_adapter.call_args.kwargs["threads"] == 4
+
 
 class TestGetQueryDetailsTool:
     """Tests for get_query_details tool functionality."""

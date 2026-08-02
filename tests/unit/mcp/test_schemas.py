@@ -23,6 +23,7 @@ from benchbox.mcp.schemas import (
     validate_benchmark_name,
     validate_filename,
     validate_platform_name,
+    validate_platform_options,
     validate_query_id,
     validate_query_list,
     validate_scale_factor,
@@ -250,6 +251,38 @@ class TestRunBenchmarkInput:
         """Test invalid scale factor is rejected."""
         with pytest.raises(PydanticValidationError):
             RunBenchmarkInput(platform="duckdb", benchmark="tpch", scale_factor=-1)
+
+    def test_platform_options_are_typed_and_normalized(self):
+        inp = RunBenchmarkInput(
+            platform="duckdb",
+            benchmark="tpch",
+            platform_options={"threads": 4, "memory_limit": "2GB"},
+        )
+        assert inp.platform_options == {"threads": 4, "memory_limit": "2GB"}
+
+    def test_secret_and_unknown_platform_options_are_rejected(self):
+        with pytest.raises(PydanticValidationError):
+            RunBenchmarkInput(platform="duckdb", benchmark="tpch", platform_options={"password": "secret"})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("snowflake", {"warehouse": "secret"})
+
+    def test_platform_option_bounds_and_types_are_rejected(self):
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("duckdb", {"threads": 0})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("duckdb", {"threads": "4"})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("duckdb", {"memory_limit": "/tmp/secret"})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("sqlite", {"timeout": float("nan")})
+
+    def test_dataframe_aliases_and_identifier_options_are_bounded(self):
+        assert validate_platform_options("polars-df", {"streaming": True}) == {"streaming": True}
+        assert validate_platform_options("databricks", {"liquid_clustering_columns": "event_time,customer_id"}) == {
+            "liquid_clustering_columns": "event_time,customer_id"
+        }
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("databricks", {"liquid_clustering_columns": "event_time;DROP"})
 
 
 class TestDryRunInput:

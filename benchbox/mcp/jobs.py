@@ -19,6 +19,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.shared.exceptions import MCPError
 from mcp.types import ToolAnnotations
 
+from benchbox.mcp.schemas import MCPValidationError, validate_platform_options
 from benchbox.mcp.security import (
     AUTHORIZATION_ERROR,
     JobLimits,
@@ -583,6 +584,7 @@ class DurableJobWorker:
             request.get("phases"),
             request.get("mode"),
             bool(request.get("capture_plans", False)),
+            platform_options=request.get("platform_options"),
             results_dir=staging,
             execution_id=job.execution_id,
         )
@@ -819,10 +821,15 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         phases: str | None = None,
         mode: str | None = None,
         capture_plans: bool = False,
+        platform_options: dict[str, object] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         """Queue a tenant-owned benchmark and immediately return its durable handle."""
         principal = authenticated_principal()
+        try:
+            normalized_platform_options = validate_platform_options(platform, platform_options)
+        except MCPValidationError as exc:
+            raise MCPError(-32602, str(exc)) from exc
         request = {
             "platform": platform,
             "benchmark": benchmark,
@@ -832,6 +839,8 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
             "mode": mode,
             "capture_plans": capture_plans,
         }
+        if normalized_platform_options:
+            request["platform_options"] = normalized_platform_options
         job, created = await anyio.to_thread.run_sync(
             lambda: runtime.repository.submit(principal.principal_id, request, idempotency_key=idempotency_key)
         )

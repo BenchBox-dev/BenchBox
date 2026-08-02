@@ -227,6 +227,7 @@ modes remain available because they do not hold the request for execution.
 | `capture_plans` | boolean | No | `false` | Capture query plans where the selected platform supports them. |
 | `dry_run` | boolean | No | `false` | Preview the run plan without executing queries. |
 | `validate_only` | boolean | No | `false` | Validate platform, benchmark, scale, and mode without executing. |
+| `platform_options` | object or null | No | `null` | Typed, bounded, non-secret settings approved for the selected platform; credentials, endpoints, paths, and package-install controls are rejected. |
 
 **Behavior**
 
@@ -238,6 +239,14 @@ modes remain available because they do not hold the request for execution.
 - `mode=data_only` generates benchmark data without running queries.
 - `phases` applies to normal execution and maps to the benchmark execution type
   used by `BaseBenchmark.run_with_platform()`.
+- `platform_options` is normalized and validated before any adapter is built.
+  The allow-list is intentionally narrower than the CLI's
+  `--platform-option` surface: only bounded execution settings such as
+  DuckDB `memory_limit`/`threads`, DataFusion partition settings, and selected
+  DataFrame toggles are accepted. Unknown keys, credentials, DSNs, hosts,
+  filesystem paths, unbounded values, and driver auto-install/version controls
+  fail closed. Authenticated durable jobs persist only this normalized object,
+  so retries and worker restarts cannot reintroduce raw request mappings.
 - Normal execution uses `BaseBenchmark.run_with_platform()` through public
   benchmark and adapter APIs.
 - MCP execution intentionally suppresses console output and returns structured
@@ -252,7 +261,7 @@ or a shared non-CLI execution service below both CLI and MCP.
 | CLI surface | MCP status | Reason |
 |---|---|---|
 | `--output` | Omitted | MCP result roots are server configuration (`--results-dir`, env vars). |
-| `--platform-option` | Omitted | Platform-specific key/value plumbing is CLI orchestration surface. |
+| `--platform-option` | Narrow MCP subset | MCP accepts only its typed, non-secret allow-list; the full CLI key/value surface remains CLI-only. |
 | `--benchmark-option` | Omitted | Benchmark-specific key/value plumbing is CLI orchestration surface. |
 | `--tuning`, `--table-mode`, `--sorted-ingestion-*` | Omitted | Tuning/table layout workflows are CLI-equivalent scope. |
 | `--force` | Omitted | Regeneration/upload forcing needs broader lifecycle service semantics. |
