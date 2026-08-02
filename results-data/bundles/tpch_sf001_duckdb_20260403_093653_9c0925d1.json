@@ -15,14 +15,14 @@
   "environment": {
     "arch": "arm64",
     "cpu_count": 10,
-    "machine_id": "machine_45d1a3ef31a1728d",
+    "machine_id": "machine_3d46427037d2",
     "memory_gb": 16,
     "os": "Darwin 25.3.0",
     "python": "3.12.11"
   },
   "execution": {
     "driver_package": "duckdb",
-    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-acabb4a7/.venv/bin/python",
+    "driver_runtime_python_executable": "path_2891a231af24",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "1.4.3",
     "driver_version_resolved": "1.4.3",
@@ -77,9 +77,9 @@
     "client_version": "unknown",
     "config": {
       "connection_mode": "file",
-      "database_path": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-acabb4a7/benchmark_runs/databases/tpch_sf001/tpch_sf001_notuning_uniq_check.duckdb",
+      "database_path": "path_0beb862d3fdb",
       "driver_package": "duckdb",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-acabb4a7/.venv/bin/python",
+      "driver_runtime_python_executable": "path_2891a231af24",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.4.3",
       "driver_version_resolved": "1.4.3",

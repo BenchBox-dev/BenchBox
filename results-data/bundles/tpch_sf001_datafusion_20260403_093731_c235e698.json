@@ -15,14 +15,14 @@
   "environment": {
     "arch": "arm64",
     "cpu_count": 10,
-    "machine_id": "machine_45d1a3ef31a1728d",
+    "machine_id": "machine_3d46427037d2",
     "memory_gb": 16,
     "os": "Darwin 25.3.0",
     "python": "3.12.11"
   },
   "execution": {
     "driver_package": "datafusion",
-    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-acabb4a7/.venv/bin/python",
+    "driver_runtime_python_executable": "path_2891a231af24",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "51.0.0",
     "driver_version_resolved": "51.0.0",
@@ -80,7 +80,7 @@
       "connection_mode": "in-memory",
       "data_format": "parquet",
       "driver_package": "datafusion",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-acabb4a7/.venv/bin/python",
+      "driver_runtime_python_executable": "path_2891a231af24",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "51.0.0",
       "driver_version_resolved": "51.0.0",
@@ -88,7 +88,7 @@
       "memory_limit": "12GB",
       "result_cache_enabled": false,
       "target_partitions": 10,
-      "working_dir": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-acabb4a7/benchmark_runs/databases/tpch_sf001/tpch_sf001_notuning_uniq_check.datafusion"
+      "working_dir": "path_bf12b74e8ec8"
     },
     "driver_actual_version": "51.0.0",
     "driver_package": "datafusion",

@@ -1,12 +1,12 @@
 {
   "benchmark": "JoinOrderBenchmark",
   "bundle_file": "joinorder_sf1_duckdb_sql_20260512_202135_4bd91dc4.json",
-  "bundle_hash": "0e18c952f66be9390c6772bfd68be2e894126cff1513de3b449ac1ae468d1872",
+  "bundle_hash": "1ec650fe05e6143b62f519ac76c13d30f70fe2a04e7c452c0d1831210795f205",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DuckDB",
   "scale_factor": 1.0,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-13T02:50:54.303448+00:00",
   "submitted_by": "Joe Harris"

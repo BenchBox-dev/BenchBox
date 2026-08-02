@@ -1,12 +1,12 @@
 {
   "benchmark": "Read Primitives",
   "bundle_file": "read_primitives_sf01_polars_df_20260502_210844_1cb50efa.json",
-  "bundle_hash": "6a693ea7db7eac675f4ec0bb4c241e265dd88761aecb5904233bfcfbb8522037",
+  "bundle_hash": "37188e1ea0c486d5e6e431255f573a89ba70555e1c915b38aa2a61df1ad8fa87",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.1,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:49:42.595955+00:00",
   "submitted_by": "BenchBox UAT"

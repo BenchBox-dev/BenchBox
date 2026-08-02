@@ -22,12 +22,12 @@
   },
   "environment": {
     "client_host": {
-      "machine_id": "machine_45d1a3ef31a1728d"
+      "machine_id": "machine_3d46427037d2"
     },
-    "machine_id": "machine_45d1a3ef31a1728d",
+    "machine_id": "machine_3d46427037d2",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_c99c12bbf816",
+      "engine_host": "host_7a80dd7bd3dc",
       "runtime_type": "dataframe_process",
       "source": "inferred"
     }
@@ -327,7 +327,7 @@
       "type": "zstd"
     },
     "driver_package": "polars",
-    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3",
+    "driver_runtime_python_executable": "path_ae50093e082b",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "1.40.0",
     "driver_version_resolved": "1.40.0",
@@ -399,7 +399,7 @@
     },
     "config": {
       "driver_package": "polars",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3",
+      "driver_runtime_python_executable": "path_ae50093e082b",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.40.0",
       "driver_version_resolved": "1.40.0",
@@ -407,7 +407,7 @@
       "family": "expression",
       "rechunk": true,
       "streaming": false,
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/clickbench_sf1"
+      "working_dir": "path_d2b42dacc254"
     },
     "deployment": {
       "collection_status": "partial",
@@ -480,11 +480,11 @@
       "streaming": false,
       "thread_limit": 8,
       "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/clickbench_sf1"
+      "working_dir": "path_d2b42dacc254"
     },
     "raw_metadata": {
       "driver_package": "polars",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox.pool-03/.venv/bin/python3",
+      "driver_runtime_python_executable": "path_ae50093e082b",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.40.0",
       "driver_version_resolved": "1.40.0"

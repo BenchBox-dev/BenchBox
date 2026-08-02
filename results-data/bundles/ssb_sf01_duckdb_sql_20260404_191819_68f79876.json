@@ -22,7 +22,7 @@
   "environment": {
     "arch": "arm64",
     "cpu_count": 10,
-    "machine_id": "machine_45d1a3ef31a1728d",
+    "machine_id": "machine_3d46427037d2",
     "memory_gb": 16,
     "os": "Darwin 25.3.0",
     "python": "3.11.12"
@@ -32,7 +32,7 @@
       "type": "zstd"
     },
     "driver_package": "duckdb",
-    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox/.venv/bin/python3",
+    "driver_runtime_python_executable": "path_2b036483c7f0",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "1.5.1",
     "driver_version_resolved": "1.5.1",
@@ -97,9 +97,9 @@
     "client_version": "1.5.1",
     "config": {
       "connection_mode": "file",
-      "database_path": "/Users/joe/Developer/BenchBox/benchmark_runs/databases/ssb_sf01/ssb_sf01_notuning_uniq_check.duckdb",
+      "database_path": "path_d6e187118177",
       "driver_package": "duckdb",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox/.venv/bin/python3",
+      "driver_runtime_python_executable": "path_2b036483c7f0",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.5.1",
       "driver_version_resolved": "1.5.1",

@@ -1,12 +1,12 @@
 {
   "benchmark": "AMPLab Big Data",
   "bundle_file": "amplab_sf01_spark_sql_20260502_204708_ec068a47.json",
-  "bundle_hash": "c1ec6a7dc1787de3adab233462bca9b0976f3e975f139a4f993e80d4b38a2eb8",
+  "bundle_hash": "5f13a393dd769df7aa8f2a9c3cf032830e69e2b000c398dceeb62d666382033f",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Spark",
   "scale_factor": 0.1,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:46:48.214752+00:00",
   "submitted_by": "BenchBox UAT"
