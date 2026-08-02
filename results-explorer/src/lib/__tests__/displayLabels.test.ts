@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   formatBenchmarkLabel,
+  canonicalBenchmarkSlug,
+  canonicalPhase,
   formatCostStatus,
   formatEnumLabel,
   formatFunding,
@@ -89,12 +91,19 @@ describe("formatEnumLabel", () => {
 });
 
 describe("formatBenchmarkLabel", () => {
-  it("disambiguates the legacy ssb slug from canonical star_schema", () => {
-    expect(formatBenchmarkLabel("star_schema")).toBe("SSB");
-    expect(formatBenchmarkLabel("ssb")).toBe("SSB (legacy slug)");
+  it("marks the legacy star_schema slug while keeping ssb canonical", () => {
+    expect(formatBenchmarkLabel("star_schema")).toBe("SSB (legacy slug)");
+    expect(formatBenchmarkLabel("ssb")).toBe("SSB");
     // The two slugs MUST yield distinguishable labels; that's the whole
     // point of this helper.
     expect(formatBenchmarkLabel("star_schema")).not.toBe(formatBenchmarkLabel("ssb"));
+  });
+
+  it("canonicalizes aliases without changing raw evidence", () => {
+    expect(canonicalBenchmarkSlug("star_schema")).toBe("ssb");
+    expect(canonicalBenchmarkSlug(" SSB ")).toBe("ssb");
+    expect(canonicalPhase(null)).toBe("unknown");
+    expect(canonicalPhase(" POWER ")).toBe("power");
   });
 
   it("falls through to humanizeBenchmark for other slugs", () => {

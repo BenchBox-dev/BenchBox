@@ -28,6 +28,8 @@ from _project.scripts.explorer_pipeline.models import (
     QueryDisplayTiming,
     QueryTiming,
     _platform_id,
+    canonical_benchmark_slug,
+    canonical_phase,
     is_ranking_eligible,
     ranking_exclusion_reason,
     select_canonical_row,
@@ -40,6 +42,13 @@ from _project.scripts.explorer_pipeline.transformer import (
 from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+
+def test_canonical_cohort_identity_preserves_alias_and_unknown_phase() -> None:
+    assert canonical_benchmark_slug("star_schema") == "ssb"
+    assert canonical_benchmark_slug(" SSB ") == "ssb"
+    assert canonical_phase(None) == "unknown"
+    assert canonical_phase(" POWER ") == "power"
 
 
 # ---------------------------------------------------------------------------

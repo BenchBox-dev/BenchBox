@@ -78,12 +78,11 @@ describe("compareSelectionLabel", () => {
     expect(a).not.toBe(b);
   });
 
-  it("relabels SSB legacy slug via formatBenchmarkLabel", () => {
-    const legacy = compareSelectionLabel({ platform: "DuckDB", benchmark: "ssb" });
-    const canonical = compareSelectionLabel({ platform: "DuckDB", benchmark: "star_schema" });
-    expect(legacy).toContain("SSB (legacy slug)");
-    expect(canonical).toContain("SSB");
-    expect(canonical).not.toContain("legacy");
+  it("treats SSB aliases as one compare cohort", () => {
+    const legacy = compareCohortSignatureForRow({ benchmark: "ssb", scale_factor: 1, phase: "power" });
+    const rawAlias = compareCohortSignatureForRow({ benchmark: "star_schema", scale_factor: 1, phase: "power" });
+    expect(rawAlias).toEqual(legacy);
+    expect(compareSelectionLabel({ platform: "DuckDB", benchmark: "ssb" })).toContain("SSB");
   });
 
   it("falls back to a generic label when no inputs are provided", () => {

@@ -274,11 +274,14 @@ side-by-side in the explore compare view.
 
 | Field | Requirement |
 |---|---|
-| `benchmark` | Must be identical across all results in the cohort (e.g., `tpch`) |
+| `canonical_benchmark` | Must be identical across all results. `star_schema` is the legacy raw alias for canonical `ssb`; raw `benchmark` remains available for audit. |
 | `scale_factor` | Must be identical across all results in the cohort (e.g., `1.0`) |
+| `canonical_phase` | Must be identical for ranking identity. It is normalized raw `test_type`, or explicit `unknown` when provenance is absent. |
 
-These two fields form the minimum cohort key. Results with different values on
-either field cannot appear in the same compare view.
+These fields form the ranking cohort key. Raw submitted benchmark and phase
+values are never rewritten; the derived identity is generated centrally by the
+publish pipeline and consumed by the explorer. Results with different
+canonical values cannot appear in the same ranking claim.
 
 ### 3.2 Hard Blocks
 
@@ -309,9 +312,11 @@ Soft warnings do not prevent rendering. The compare view shows all selected
 results with the warning banner at the top. Users may dismiss the warning after
 reading it.
 
-Additional fields that produce soft warnings if they differ: `phases` (e.g.,
-comparing a power-only run against a throughput+power run), `driver_version`
-(if the submitter has pinned a non-default driver version).
+Additional fields that produce soft warnings if they differ: `driver_version`
+(if the submitter has pinned a non-default driver version). Phase differences
+are not a soft ranking mismatch: they select separate cohorts. A compare view
+may render mixed phases as evidence, but it must suppress winner/ranking claims
+and identify the phase mismatch explicitly.
 
 ### 3.4 Ranking Eligibility
 
@@ -687,9 +692,12 @@ direct URL, but the result must not appear in autocomplete, search, or browse.
 
 The frontend enforces cohort rules before rendering:
 
-1. **Hard block check:** If any two selected results differ in `benchmark` or
-   `scale_factor`, show an error and refuse to render the comparison. Link to
-   the result detail pages so the user can verify their selection.
+1. **Hard block check:** If any two selected results differ in canonical
+   benchmark or `scale_factor`, show an error and refuse to render the
+   comparison. If canonical phases differ, render evidence only and suppress
+   winner/ranking claims. Link to the result detail pages so the user can verify
+   the raw provenance. Raw aliases such as `ssb` and `star_schema` are one
+   benchmark family for this check.
 2. **Soft warning check:** If any two selected results differ in `query_subset`
    or `tuning_mode`, show a dismissible warning banner above the comparison
    table. Do not block rendering.

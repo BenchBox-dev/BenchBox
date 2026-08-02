@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import type { UrlSerde } from "@/lib/useUrlState";
+import { canonicalBenchmarkSlug } from "@/lib/displayLabels";
 
 export const FACET_KEYS = [
   "benchmark",
@@ -358,7 +359,7 @@ export function facetsToWhereClause(
   const clauses: string[] = [];
   const params: unknown[] = [];
 
-  addListClause("benchmark", facets.benchmark, clauses, params);
+  addCanonicalBenchmarkClause(facets.benchmark, clauses, params);
   addNumericListClause("scale_factor", facets.scale_factor, clauses, params);
   addListClause("test_type", facets.phase, clauses, params);
   addPlatformClause(facets.platform, clauses, params);
@@ -383,6 +384,17 @@ export function facetsToWhereClause(
     sql: clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "",
     params,
   };
+}
+
+function addCanonicalBenchmarkClause(values: readonly string[], clauses: string[], params: unknown[]) {
+  if (values.length === 0) return;
+  const canonicalValues = [...new Set(values.map(canonicalBenchmarkSlug))];
+  clauses.push(
+    "CASE WHEN benchmark = 'star_schema' THEN 'ssb' ELSE lower(benchmark) END IN (" +
+      canonicalValues.map(() => "?").join(", ") +
+      ")",
+  );
+  params.push(...canonicalValues);
 }
 
 function normalizeStringList(values: readonly string[]): string[] {

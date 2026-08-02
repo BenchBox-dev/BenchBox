@@ -11,6 +11,10 @@
 --   - ATTACH ... (READ_ONLY) is enforced at the browser layer; DDL never runs in-browser.
 --   - If the column set of `results` changes, bump
 --     EXPLORER_READ_MODEL_VERSION in `_project/scripts/explorer_pipeline/contract.py`.
+--   - Cohort/ranking identity is derived during publish: raw `benchmark` and
+--     `test_type` remain immutable evidence, while canonical aliases
+--     (`star_schema` -> `ssb`) and missing phase (`unknown`) are written into
+--     ranking/cohort keys. The frontend consumes the same v7 contract.
 
 -- ---------------------------------------------------------------------------
 -- Metadata table (required by browser read-model version guard)

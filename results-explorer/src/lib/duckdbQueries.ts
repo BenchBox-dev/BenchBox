@@ -10,6 +10,7 @@
 
 import { queryRows } from "@/db";
 import type { FacetWhereClause } from "@/lib/facetModel";
+import { canonicalBenchmarkSlug } from "@/lib/displayLabels";
 import type {
   BenchmarkSummary,
   CostDeploymentFields,
@@ -551,7 +552,12 @@ export async function listResults(where: FacetWhereClause = { sql: "", params: [
 export async function listBenchmarksWithPublicResults(): Promise<string[]> {
   const rows = await memoizedSnapshotQueryRows<{ benchmark: string }>(
     "distinct-benchmarks-with-public-results",
-    { sql: "SELECT DISTINCT benchmark FROM bench.results ORDER BY benchmark", params: [] },
+    {
+      sql:
+        "SELECT DISTINCT CASE WHEN benchmark = 'star_schema' THEN 'ssb' ELSE lower(benchmark) END AS benchmark " +
+        "FROM bench.results ORDER BY benchmark",
+      params: [],
+    },
     { cacheEmpty: false },
   );
   return rows.map((row) => row.benchmark);
@@ -705,6 +711,7 @@ export async function getBenchmarkMatrixCells(
   scaleFactor: number,
   phase: string,
 ): Promise<BenchmarkMatrixCellRow[]> {
+  benchmark = canonicalBenchmarkSlug(benchmark);
   return queryRows<BenchmarkMatrixCellRow>(
     "SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms," +
       " is_valid_display_timing, timing_exclusion_reason" +
@@ -720,6 +727,7 @@ export async function getBenchmarkRanking(
   scaleFactor: number,
   phase: string,
 ): Promise<BenchmarkRankingRow[]> {
+  benchmark = canonicalBenchmarkSlug(benchmark);
   return queryRows<BenchmarkRankingRow>(
     `SELECT ${BENCHMARK_RANKING_COLUMNS}, r.platform_version, r.validation_status,` +
       " r.normalized_cost_usd, r.cost_model_version, r.cost_model_source," +
@@ -774,6 +782,7 @@ export async function getBenchmarkSummaryFromDuckDB(
   scaleFactor: number,
   phase: string,
 ): Promise<BenchmarkSummary | null> {
+  benchmark = canonicalBenchmarkSlug(benchmark);
   return memoizedSnapshotQuery(
     `benchmark-summary:${benchmark}\u0000${scaleFactor}\u0000${phase}`,
     () => loadBenchmarkSummaryFromDuckDB(benchmark, scaleFactor, phase),
@@ -909,7 +918,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " COALESCE(si.short_id, '') AS short_id," +
     " r.benchmark," +
     " r.scale_factor," +
-    " CASE WHEN br.phase IS NOT NULL THEN br.phase WHEN r.test_type IS NOT NULL THEN r.test_type ELSE 'power' END AS phase," +
+    " CASE WHEN br.phase IS NOT NULL THEN br.phase WHEN r.test_type IS NOT NULL THEN lower(r.test_type) ELSE 'unknown' END AS phase," +
     " r.platform," +
     " r.platform_id," +
     " r.driver_version," +

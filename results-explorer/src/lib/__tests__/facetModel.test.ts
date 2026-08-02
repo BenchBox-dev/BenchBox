@@ -166,7 +166,7 @@ describe("facetsToWhereClause", () => {
       { now: new Date("2026-05-02T00:00:00.000Z") },
     );
 
-    expect(sql).toContain("benchmark IN (?)");
+    expect(sql).toContain("CASE WHEN benchmark = 'star_schema' THEN 'ssb'");
     expect(sql).toContain("scale_factor IN (?)");
     expect(sql).toContain("test_type IN (?)");
     expect(sql).toContain("(platform IN (?) OR platform_id IN (?))");
