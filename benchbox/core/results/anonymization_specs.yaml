@@ -83,6 +83,18 @@ path_keys:
 - sourceroot
 - staginglocation
 - stagingurl
+- datadir
+- workingdir
+- workingdirectory
+- workdir
+- workingroot
+- outputdir
+- resultdir
+- resultpath
+- logpath
+- logfile
+- pythonexecutable
+- driverruntimepythonexecutable
 mount_collection_keys:
 - bindmounts
 - mounts

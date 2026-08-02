@@ -169,6 +169,22 @@ class TestExplorerPipelineRun:
         bundle_copy = output / "bundles" / f"{result_id}.json"
         assert bundle_copy.exists()
 
+    def test_copied_bundle_scrubs_private_paths(self, tmp_path: Path) -> None:
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle = json.loads(json.dumps(MINIMAL_BUNDLE))
+        bundle["platform"]["working_dir"] = "/Users/alice/private-run"
+        source = bundles_dir / "private_path.json"
+        source.write_text(json.dumps(bundle), encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        result_id = _duckdb_results(output)[0]["result_id"]
+        published = (output / "bundles" / f"{result_id}.json").read_text(encoding="utf-8")
+        assert "/Users/alice" not in published
+        assert "path_" in published
+
     def test_publishes_plans_sidecar_when_present(self, tmp_path: Path) -> None:
         """w1 wire-up: when a ``*.plans.json`` sidecar exists alongside a
         bundle, the pipeline must copy it to ``out/bundles/<result_id>.plans.json``

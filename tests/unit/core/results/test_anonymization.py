@@ -14,7 +14,12 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
-from benchbox.core.results.anonymization import PUBLIC_REDACTED_VALUE, AnonymizationConfig, AnonymizationManager
+from benchbox.core.results.anonymization import (
+    PUBLIC_REDACTED_VALUE,
+    AnonymizationConfig,
+    AnonymizationManager,
+    find_public_path_leaks,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -972,3 +977,34 @@ class TestPublicPayloadSecretMessages:
         assert "API-SENTINEL" not in serialized
         assert "AZ-SENTINEL" not in serialized
         assert "AZ-CONNECTION-SENTINEL" not in serialized
+
+
+class TestPublicPayloadPathPrivacy:
+    def test_generic_working_directory_is_hashed(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"working_dir": "/Users/alice/benchbox/run"}}
+        )
+        serialized = json.dumps(out, default=str)
+        assert "/Users/alice" not in serialized
+        assert out["platform_metadata"]["working_dir"].startswith("path_")
+
+    def test_nested_generic_metadata_paths_are_hashed_without_field_allowlist(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"raw_config": {"runtime": {"path_value": "/home/alice/cache"}}}}
+        )
+        assert "/home/alice" not in json.dumps(out, default=str)
+        assert out["platform_metadata"]["raw_config"]["runtime"]["path_value"].startswith("path_")
+
+    def test_relative_references_and_urls_are_not_false_positives(self):
+        payload = {
+            "source_ref": "examples/tunings/custom.yaml:0123456789abcdef",
+            "url": "https://example.com/home/alice/reference",
+        }
+        assert find_public_path_leaks(payload) == []
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        assert out["source_ref"] == payload["source_ref"]
+        assert out["url"].startswith("endpoint_")
+
+    def test_detector_reports_field_paths_without_echoing_values(self):
+        leaks = find_public_path_leaks({"nested": [{"working_dir": "/Users/alice/private"}]})
+        assert leaks == ["nested.0.working_dir"]

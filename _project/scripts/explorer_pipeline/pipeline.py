@@ -35,6 +35,8 @@ from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
     _platform_percentile_stats,
 )
+from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
+from benchbox.core.results.canonical_json import canonical_json_bytes
 from benchbox.validation.bundle import discover_bundles
 
 logger = logging.getLogger(__name__)
@@ -428,6 +430,10 @@ class ExplorerPipeline:
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # All copied public JSON passes through one manager so the same stable
+        # pseudonyms are used across a primary bundle and its companions.
+        public_anonymizer = AnonymizationManager()
+
         out_bundles_dir = output_dir / "bundles"
         if out_bundles_dir.exists():
             shutil.rmtree(out_bundles_dir)
@@ -492,7 +498,6 @@ class ExplorerPipeline:
                     result_id=result_id,
                     data=bundle_data,
                 )
-                manifest_entries.append(entry)
 
                 detail = self._transformer.to_detail_result(
                     bundle_path,
@@ -512,7 +517,13 @@ class ExplorerPipeline:
                         result_id,
                     )
                     continue
-                shutil.copy2(bundle_path, dest_bundle)
+                public_bundle = public_anonymizer.anonymize_result_payload(bundle_data)
+                public_leaks = find_public_path_leaks(public_bundle)
+                if public_leaks:
+                    raise ValueError(
+                        "public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks)))
+                    )
+                dest_bundle.write_bytes(canonical_json_bytes(public_bundle))
 
                 # Publish the plans sidecar alongside the bundle when present
                 # and set ``plans_published`` on the detail so the explorer UI
@@ -525,8 +536,24 @@ class ExplorerPipeline:
                 if plans_src.exists():
                     plans_dest = (out_bundles_dir / f"{result_id}.plans.json").resolve()
                     if plans_dest.is_relative_to(out_bundles_dir.resolve()):
-                        shutil.copy2(plans_src, plans_dest)
-                        detail.plans_published = True
+                        try:
+                            plans_payload = json.loads(plans_src.read_text(encoding="utf-8"))
+                            public_plans = public_anonymizer.anonymize_result_payload(plans_payload)
+                            plans_leaks = find_public_path_leaks(public_plans)
+                            if plans_leaks:
+                                raise ValueError(
+                                    "public plans privacy check failed for fields: "
+                                    + ", ".join(sorted(set(plans_leaks)))
+                                )
+                            plans_dest.write_bytes(canonical_json_bytes(public_plans))
+                            detail.plans_published = True
+                        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+                            logger.warning("Skipping plans companion %s - %s: %s", plans_src, type(exc).__name__, exc)
+
+                # Add the entry only after the public bundle has been copied
+                # successfully.  A privacy rejection must not leave a
+                # manifest row without its corresponding detail record.
+                manifest_entries.append(entry)
 
                 # Accumulate for benchmark summary artifacts.
                 phase = detail.test_type or "power"
