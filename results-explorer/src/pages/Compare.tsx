@@ -85,6 +85,41 @@ function searchParamsFromUrl(url: string): URLSearchParams {
   return new URL(url, "https://benchbox.dev").searchParams;
 }
 
+interface CompareIdPlan {
+  retained: string[];
+  duplicates: string[];
+  overflow: string[];
+}
+
+function planCompareIds(rawIds: string[], limit: number): CompareIdPlan {
+  const unique: string[] = [];
+  const duplicates: string[] = [];
+  const seen = new Set<string>();
+  for (const rawId of rawIds) {
+    const id = rawId.trim();
+    if (!id) continue;
+    if (seen.has(id)) {
+      duplicates.push(id);
+      continue;
+    }
+    seen.add(id);
+    unique.push(id);
+  }
+  return {
+    retained: unique.slice(0, limit),
+    duplicates,
+    overflow: unique.slice(limit),
+  };
+}
+
+function formatIdList(ids: string[]): string {
+  return ids.map((id) => `“${id}”`).join(", ");
+}
+
+function appendCompareNotice(current: string | null, next: string): string {
+  return current ? `${current} ${next}` : next;
+}
+
 export function Compare({ url }: CompareProps) {
   const activeUrl = currentCompareUrl(url);
   const [compareState, setCompareState] = useState<CompareState | null>(null);
@@ -99,6 +134,7 @@ export function Compare({ url }: CompareProps) {
   // dead-ended the user on the page they came from.
   const [builderPinnedId, setBuilderPinnedId] = useState<string | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [compareNotice, setCompareNotice] = useState<string | null>(null);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const results = compareState?.results ?? EMPTY_RESULTS;
   const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
@@ -114,14 +150,23 @@ export function Compare({ url }: CompareProps) {
     setLoading(true);
     setBuilderPinnedId(null);
     setShowBuilder(false);
+    setCompareNotice(null);
 
     const params = searchParamsFromUrl(activeUrl);
     const idsParam = params.get("ids") ?? "";
-    const ids = idsParam
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 4);
+    const plan = planCompareIds(idsParam.split(","), MAX_COMPARE_SELECTIONS);
+    let initialNotice: string | null = null;
+    if (plan.duplicates.length > 0) {
+      initialNotice = `Ignored duplicate result ID${plan.duplicates.length === 1 ? "" : "s"}: ${formatIdList(plan.duplicates)}.`;
+    }
+    if (plan.overflow.length > 0) {
+      initialNotice = appendCompareNotice(
+        initialNotice,
+        `Ignored ${plan.overflow.length} additional result ID${plan.overflow.length === 1 ? "" : "s"} (${formatIdList(plan.overflow)}); comparisons are limited to ${MAX_COMPARE_SELECTIONS} unique results.`,
+      );
+    }
+    if (initialNotice) setCompareNotice(initialNotice);
+    const ids = plan.retained;
 
     if (ids.length === 0) {
       setShowBuilder(true);
@@ -165,23 +210,78 @@ export function Compare({ url }: CompareProps) {
       };
     }
 
-    Promise.all(ids.map((id) => resolveShortId(id)))
-      .then(async (resolvedIds) => {
+    Promise.all(
+      ids.map(async (requestedId) => {
+        try {
+          return { requestedId, resolvedId: await resolveShortId(requestedId), error: null };
+        } catch (error) {
+          return { requestedId, resolvedId: null, error };
+        }
+      }),
+    )
+      .then(async (resolved) => {
         if (cancelled) return;
 
-        const loaded = await Promise.all(resolvedIds.map((id) => getDetailResult(id)));
+        const resolvedSeen = new Set<string>();
+        const aliases = resolved.filter(
+          (entry): entry is { requestedId: string; resolvedId: string; error: null } => {
+            if (entry.resolvedId === null || !resolvedSeen.has(entry.resolvedId)) {
+              if (entry.resolvedId !== null) resolvedSeen.add(entry.resolvedId);
+              return false;
+            }
+            return true;
+          },
+        );
+        if (aliases.length > 0) {
+          const aliasNotice = `Ignored duplicate result ID${aliases.length === 1 ? "" : "s"} after alias resolution: ${formatIdList(aliases.map((entry) => entry.requestedId))}.`;
+          initialNotice = appendCompareNotice(initialNotice, aliasNotice);
+          setCompareNotice(initialNotice);
+        }
+
+        const candidates = resolved.filter(
+          (entry): entry is { requestedId: string; resolvedId: string; error: null } =>
+            entry.resolvedId !== null && !aliases.some((alias) => alias.requestedId === entry.requestedId),
+        );
+        const loaded = await Promise.all(
+          candidates.map(async (entry) => {
+            try {
+              return { ...entry, detail: await getDetailResult(entry.resolvedId), loadError: null };
+            } catch (error) {
+              return { ...entry, detail: null, loadError: error };
+            }
+          }),
+        );
         if (cancelled) return;
 
-        const missing = resolvedIds.filter((_, i) => loaded[i] === null);
-        if (missing.length > 0) {
-          setError(
-            `No result found for: ${missing.join(", ")}. ` +
-              "These results may have been removed from the published dataset.",
-          );
+        const missing = loaded.filter((entry) => entry.detail === null && entry.loadError === null);
+        const failed = [
+          ...resolved.filter((entry) => entry.error !== null),
+          ...loaded.filter((entry) => entry.loadError !== null),
+        ];
+        const details = loaded.flatMap((entry) => (entry.detail ? [entry.detail] : []));
+        if (details.length === 0) {
+          if (failed.length > 0) {
+            const firstFailure = failed[0]!;
+            const failureError = firstFailure.error ?? ("loadError" in firstFailure ? firstFailure.loadError : null);
+            setError(errMsg(failureError));
+          } else {
+            const missingIds = missing.map((entry) => entry.requestedId);
+            setError(
+              `No result found for: ${missingIds.join(", ")}. ` +
+                "These results may have been removed from the published dataset.",
+            );
+          }
           setLoading(false);
           return;
         }
-        const details = loaded as DetailResult[];
+        if (missing.length > 0 || failed.length > 0) {
+          const unavailable = [...missing, ...failed].map((entry) => entry.requestedId);
+          initialNotice = appendCompareNotice(
+            initialNotice,
+            `Ignored unavailable result ID${unavailable.length === 1 ? "" : "s"}: ${formatIdList(unavailable)}.`,
+          );
+          setCompareNotice(initialNotice);
+        }
 
         const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
         if (cancelled) return;
@@ -203,21 +303,50 @@ export function Compare({ url }: CompareProps) {
     };
   }, [activeUrl]);
 
-  // Canonicalize URL to short IDs once data is loaded and URL has long-form IDs.
+  // Canonicalize URL to the retained short IDs once data is loaded. This also
+  // removes stale, duplicate, or excess entries so a copied URL reproduces
+  // the same visible comparison state after refresh.
   useEffect(() => {
     const ids = results.map((r) => r.result_id);
-    if (ids.length === 0) return;
-    const raw = new URLSearchParams(window.location.search).get("ids") ?? "";
-    const hasLongForm = raw.split(",").some((id) => id.trim().includes("-"));
-    if (!hasLongForm) return;
+    if (ids.length === 0 || typeof window === "undefined") return;
+    const currentParams = new URLSearchParams(window.location.search);
+    const currentRawIds = currentParams.get("ids") ?? "";
+    // A URL that started as a multi-selection must remain a multi-selection
+    // after stale-ID recovery. Keeping its explicit membership is the only
+    // way for a one-result recovery to reload into the same comparison surface
+    // instead of being reinterpreted as the single-result builder entrypoint.
+    if (ids.length < 2 && planCompareIds(currentRawIds.split(","), MAX_COMPARE_SELECTIONS).retained.length > 1) {
+      setCompareNotice((current) =>
+        appendCompareNotice(current, "The original comparison URL is kept so refresh preserves this recovery state."),
+      );
+      return;
+    }
     toShortIds(ids)
       .then((shortIds) => {
+        if (shortIds.length !== ids.length || new Set(shortIds).size !== ids.length) {
+          setCompareNotice((current) =>
+            appendCompareNotice(
+              current,
+              "The comparison URL could not be canonicalized; retained result order is unchanged.",
+            ),
+          );
+          return;
+        }
         const params = new URLSearchParams(window.location.search);
-        params.set("ids", shortIds.join(","));
-        history.replaceState(null, "", `/results/compare?${params.toString()}`);
+        const currentIds = params.get("ids") ?? "";
+        const canonicalIds = shortIds.join(",");
+        if (currentIds === canonicalIds) return;
+        params.set("ids", canonicalIds);
+        const search = params.toString();
+        history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
       })
       .catch(() => {
-        /* silently skip - non-critical */
+        setCompareNotice((current) =>
+          appendCompareNotice(
+            current,
+            "The comparison URL could not be canonicalized; sharing it will retry when the dataset is available.",
+          ),
+        );
       });
   }, [results]);
 
@@ -233,7 +362,7 @@ export function Compare({ url }: CompareProps) {
     );
 
   if (showBuilder) {
-    return <CompareBuilder pinnedId={builderPinnedId} />;
+    return <CompareBuilder pinnedId={builderPinnedId} notice={compareNotice} />;
   }
 
   if (results.length === 0) return null;
@@ -354,6 +483,16 @@ export function Compare({ url }: CompareProps) {
               ]
         }
       />
+
+      {compareNotice && (
+        <div
+          class="mt-4 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]"
+          role="status"
+          data-testid="compare-url-notice"
+        >
+          {compareNotice}
+        </div>
+      )}
 
       <section class="mt-6 mb-8 panel-elevated p-5" aria-label="Comparison summary">
         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -604,7 +743,7 @@ function severeCohortMismatchReason(results: DetailResult[]) {
   return reasons.length > 0 ? reasons.join(" and ") : null;
 }
 
-function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
+function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice: string | null }) {
   const [candidates, setCandidates] = useState<ResultRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
@@ -785,6 +924,16 @@ function CompareBuilder({ pinnedId }: { pinnedId: string | null }) {
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8" data-testid="compare-builder">
       <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: "Compare" }]} />
+
+      {notice && (
+        <div
+          class="mt-4 rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]"
+          role="status"
+          data-testid="compare-url-notice"
+        >
+          {notice}
+        </div>
+      )}
 
       <section class="mt-6 mb-6 panel-elevated p-5" aria-label="Compare builder intro">
         <p class="text-xs font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Compare</p>
