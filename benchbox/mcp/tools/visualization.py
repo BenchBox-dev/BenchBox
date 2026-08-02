@@ -77,7 +77,8 @@ MCP_GENERATE_CHART_DESCRIPTION = (
     "Generate ASCII chart output from BenchBox result files using semantic chart IDs or chart templates. "
     f"{BENCHBOX_CHART_NAMESPACE_NOTE} "
     f"Current semantic chart IDs: {_semantic_chart_id_help()}. "
-    f"Current templates: {_template_name_help()}."
+    f"Current templates: {_template_name_help()}. "
+    "MCP output is inline-only: file output and non-ASCII formats are rejected."
 )
 
 # Tool annotations for read-only visualization info tools
@@ -391,7 +392,20 @@ def register_visualization_tools(
                 suggestion="Provide comma-separated list of result filenames",
             )
 
-        _ = resolve_path_provider(charts_dir)  # reserved for future chart file outputs
+        if format != "ascii":
+            return make_error(
+                ErrorCode.VALIDATION_INVALID_FORMAT,
+                "MCP chart output supports only the inline 'ascii' format",
+                details={"format": format, "supported_formats": ["ascii"]},
+            )
+        if output_dir is not None:
+            return make_error(
+                ErrorCode.VALIDATION_ERROR,
+                "MCP chart output is inline-only; file output is not supported",
+                details={"output_mode": "inline", "supported_formats": ["ascii"]},
+            )
+
+        resolve_path_provider(charts_dir)  # Validate the configured provider without accepting a caller path.
         result = _resolve_and_validate_result_files(file_list, resolve_path_provider(results_dir))
         if isinstance(result, dict):
             return result

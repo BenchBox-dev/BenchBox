@@ -527,6 +527,23 @@ class TestGenerateChartIntegration:
         assert result["format"] == "ascii"
         assert "content" in result
 
+    def test_file_output_is_explicitly_rejected(self, tmp_path):
+        tools = _get_viz_tool_functions(results_dir=tmp_path / "results")
+        result = tools["generate_chart"](result_files="missing.json", output_dir="../escape")
+
+        assert result["error"] is True
+        assert result["error_code"] == "VALIDATION_ERROR"
+        assert result["details"]["output_mode"] == "inline"
+        assert "escape" not in str(result)
+
+    def test_non_ascii_formats_are_explicitly_rejected(self, tmp_path):
+        tools = _get_viz_tool_functions(results_dir=tmp_path / "results")
+        result = tools["generate_chart"](result_files="missing.json", format="png")
+
+        assert result["error"] is True
+        assert result["error_code"] == "VALIDATION_INVALID_FORMAT"
+        assert result["details"]["supported_formats"] == ["ascii"]
+
     def test_rejects_invalid_chart_type(self, tmp_path):
         """Test that invalid chart type is rejected."""
         results_dir = tmp_path / "benchmark_runs" / "results"
