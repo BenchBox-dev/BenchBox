@@ -114,10 +114,11 @@ def _prepare_adapter_platform_options(platform: str, options: Mapping[str, objec
             platform_optimizations.physical_rendering_id = None
         columns = normalized.pop("liquid_clustering_columns", None)
         if columns is not None:
-            platform_optimizations.liquid_clustering_columns = [
-                column.strip() for column in str(columns).split(",") if column.strip()
-            ]
-            platform_optimizations.liquid_clustering_enabled = bool(platform_optimizations.liquid_clustering_columns)
+            parsed_columns = [column.strip() for column in str(columns).split(",") if column.strip()]
+            platform_optimizations.liquid_clustering_columns = parsed_columns
+            platform_optimizations.liquid_clustering_enabled = bool(parsed_columns)
+            if parsed_columns and strategy is None:
+                platform_optimizations.databricks_clustering_strategy = "liquid_clustering"
         platform_optimizations.__post_init__()
         normalized["tuning_config"] = tuning_config
         normalized["tuning_enabled"] = True

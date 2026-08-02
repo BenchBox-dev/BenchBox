@@ -172,6 +172,20 @@ class TestDataFusionAdapter:
             mock_config.with_parquet_pruning.assert_called_once_with(False)
             mock_config.with_repartition_joins.assert_called_once_with(False)
 
+    def test_from_config_forwards_optimization_flags(self, tmp_path):
+        """Unified configuration must preserve DataFusion optimization flags."""
+        with patch.object(DataFusionAdapter, "__init__", return_value=None) as init:
+            DataFusionAdapter.from_config(
+                {
+                    "working_dir": str(tmp_path),
+                    "parquet_pushdown": False,
+                    "repartition_joins": False,
+                }
+            )
+
+        assert init.call_args.kwargs["parquet_pushdown"] is False
+        assert init.call_args.kwargs["repartition_joins"] is False
+
     def test_parse_memory_limit(self):
         """Test memory limit parsing."""
         with patch("benchbox.platforms.datafusion.SessionContext"), tempfile.TemporaryDirectory() as tmpdir:
