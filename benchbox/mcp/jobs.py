@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Any
 
 import anyio
-import psutil
 from mcp.server.mcpserver import MCPServer
 from mcp.shared.exceptions import MCPError
 from mcp.types import ToolAnnotations
@@ -36,11 +35,6 @@ JOB_NOT_FOUND = -32005
 JOB_NOT_READY = -32006
 JOB_QUEUE_FULL = -32007
 JOB_IDEMPOTENCY_CONFLICT = -32008
-
-
-def _boot_identity() -> str:
-    """Return a stable identifier shared by processes in the current OS boot."""
-    return repr(psutil.boot_time())
 
 
 START_ANNOTATIONS = ToolAnnotations(
@@ -78,6 +72,8 @@ class JobRecord:
     attempts: int
     lease_owner: str | None
     lease_expires_at: float | None
+    lease_version: int
+    lease_generation: int
     cancel_requested: bool
     artifact_path: str | None
     error_code: str | None
@@ -92,6 +88,7 @@ class DurableJobRepository:
     def __init__(self, path: Path, limits: JobLimits):
         self.path = path
         self.limits = limits
+        self._lease_observations: dict[str, tuple[str | None, int, float]] = {}
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -116,6 +113,8 @@ class DurableJobRepository:
                     attempts INTEGER NOT NULL DEFAULT 0,
                     lease_owner TEXT,
                     lease_expires_at REAL,
+                    lease_version INTEGER NOT NULL DEFAULT 1,
+                    lease_generation INTEGER NOT NULL DEFAULT 0,
                     cancel_requested INTEGER NOT NULL DEFAULT 0,
                     artifact_path TEXT,
                     error_code TEXT,
@@ -130,37 +129,15 @@ class DurableJobRepository:
                     ON mcp_benchmark_jobs (state, created_at);
                 CREATE INDEX IF NOT EXISTS mcp_job_owner_idx
                     ON mcp_benchmark_jobs (principal_id, execution_id);
-                CREATE TABLE IF NOT EXISTS mcp_job_runtime_metadata (
-                    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                    boot_id TEXT NOT NULL
-                );
                 """
             )
-            boot_id = _boot_identity()
-            connection.execute("BEGIN IMMEDIATE")
-            metadata = connection.execute("SELECT boot_id FROM mcp_job_runtime_metadata WHERE singleton = 1").fetchone()
-            if metadata is None:
-                wall_now = utc_now().timestamp()
-                monotonic_now = mono_time()
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(mcp_benchmark_jobs)")}
+            if "lease_version" not in columns:
+                connection.execute("ALTER TABLE mcp_benchmark_jobs ADD COLUMN lease_version INTEGER NOT NULL DEFAULT 1")
+            if "lease_generation" not in columns:
                 connection.execute(
-                    """UPDATE mcp_benchmark_jobs
-                       SET lease_expires_at = ? + MAX(0, MIN(lease_expires_at - ?, ?))
-                       WHERE state IN ('running', 'publishing') AND lease_expires_at IS NOT NULL""",
-                    (monotonic_now, wall_now, self.limits.lease_seconds),
+                    "ALTER TABLE mcp_benchmark_jobs ADD COLUMN lease_generation INTEGER NOT NULL DEFAULT 0"
                 )
-                connection.execute(
-                    "INSERT INTO mcp_job_runtime_metadata (singleton, boot_id) VALUES (1, ?)",
-                    (boot_id,),
-                )
-            elif metadata["boot_id"] != boot_id:
-                connection.execute(
-                    "UPDATE mcp_benchmark_jobs SET lease_expires_at = 0 WHERE state IN ('running', 'publishing')"
-                )
-                connection.execute(
-                    "UPDATE mcp_job_runtime_metadata SET boot_id = ? WHERE singleton = 1",
-                    (boot_id,),
-                )
-            connection.commit()
 
     @staticmethod
     def _record(row: sqlite3.Row) -> JobRecord:
@@ -173,6 +150,8 @@ class DurableJobRepository:
             attempts=row["attempts"],
             lease_owner=row["lease_owner"],
             lease_expires_at=row["lease_expires_at"],
+            lease_version=row["lease_version"],
+            lease_generation=row["lease_generation"],
             cancel_requested=bool(row["cancel_requested"]),
             artifact_path=row["artifact_path"],
             error_code=row["error_code"],
@@ -247,7 +226,7 @@ class DurableJobRepository:
 
     def claim(self, worker_id: str) -> JobRecord | None:
         """Transactionally lease the oldest queued job."""
-        now_epoch = mono_time()
+        now_epoch = utc_now().timestamp()
         now = utc_now().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -261,7 +240,8 @@ class DurableJobRepository:
             changed = connection.execute(
                 """
                 UPDATE mcp_benchmark_jobs
-                SET state = 'running', attempts = attempts + 1, lease_owner = ?, lease_expires_at = ?, updated_at = ?
+                SET state = 'running', attempts = attempts + 1, lease_owner = ?, lease_expires_at = ?,
+                    lease_version = 2, lease_generation = lease_generation + 1, updated_at = ?
                 WHERE execution_id = ? AND state = 'queued'
                 """,
                 (worker_id, now_epoch + self.limits.lease_seconds, now, execution_id),
@@ -281,11 +261,13 @@ class DurableJobRepository:
         with self._connect() as connection:
             changed = connection.execute(
                 """
-                UPDATE mcp_benchmark_jobs SET lease_expires_at = ?, updated_at = ?
-                WHERE execution_id = ? AND lease_owner = ? AND state IN ('running', 'publishing')
+                UPDATE mcp_benchmark_jobs
+                SET lease_expires_at = ?, lease_generation = lease_generation + 1, updated_at = ?
+                WHERE execution_id = ? AND lease_owner = ? AND lease_version = 2
+                  AND state IN ('running', 'publishing')
                 """,
                 (
-                    mono_time() + self.limits.lease_seconds,
+                    utc_now().timestamp() + self.limits.lease_seconds,
                     utc_now().isoformat(),
                     execution_id,
                     worker_id,
@@ -300,9 +282,9 @@ class DurableJobRepository:
                 """
                 UPDATE mcp_benchmark_jobs SET state = 'publishing', updated_at = ?
                 WHERE execution_id = ? AND state = 'running' AND lease_owner = ?
-                  AND lease_expires_at > ? AND cancel_requested = 0
+                  AND cancel_requested = 0
                 """,
-                (utc_now().isoformat(), execution_id, worker_id, mono_time()),
+                (utc_now().isoformat(), execution_id, worker_id),
             ).rowcount
         return changed == 1
 
@@ -321,8 +303,8 @@ class DurableJobRepository:
             current = connection.execute(
                 """SELECT state FROM mcp_benchmark_jobs
                    WHERE execution_id = ? AND state = 'publishing' AND lease_owner = ?
-                     AND lease_expires_at > ? AND cancel_requested = 0""",
-                (execution_id, worker_id, mono_time()),
+                     AND cancel_requested = 0""",
+                (execution_id, worker_id),
             ).fetchone()
             if current is None:
                 connection.rollback()
@@ -361,7 +343,7 @@ class DurableJobRepository:
                 """
                 UPDATE mcp_benchmark_jobs
                 SET state = ?, lease_owner = NULL, lease_expires_at = NULL, error_code = ?,
-                    updated_at = ?, completed_at = ?
+                    lease_version = 1, lease_generation = 0, updated_at = ?, completed_at = ?
                 WHERE execution_id = ? AND lease_owner = ?
                 """,
                 (next_state, error_code[:80], now, completed_at, execution_id, worker_id),
@@ -403,40 +385,81 @@ class DurableJobRepository:
 
     def claim_expired(self, recovery_owner: str) -> JobRecord | None:
         """Transactionally fence and return the oldest expired lease."""
-        now = mono_time()
+        observed_at = mono_time()
+        wall_now = utc_now().timestamp()
         with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
+            rows = connection.execute(
                 """
                 SELECT * FROM mcp_benchmark_jobs
-                WHERE state IN ('running', 'publishing') AND lease_expires_at <= ?
-                ORDER BY created_at LIMIT 1
+                WHERE state IN ('running', 'publishing')
+                ORDER BY created_at
                 """,
-                (now,),
-            ).fetchone()
-            if row is None:
-                connection.commit()
-                return None
-            changed = connection.execute(
-                """UPDATE mcp_benchmark_jobs SET lease_owner = ?, lease_expires_at = ?, updated_at = ?
-                   WHERE execution_id = ? AND lease_owner = ? AND lease_expires_at <= ?
-                     AND state IN ('running', 'publishing')""",
-                (
-                    recovery_owner,
-                    now + self.limits.lease_seconds,
-                    utc_now().isoformat(),
-                    row["execution_id"],
-                    row["lease_owner"],
-                    now,
-                ),
-            ).rowcount
+            ).fetchall()
+        active_ids = {str(row["execution_id"]) for row in rows}
+        self._lease_observations = {
+            execution_id: observation
+            for execution_id, observation in self._lease_observations.items()
+            if execution_id in active_ids
+        }
+        candidate: sqlite3.Row | None = None
+        for row in rows:
+            if int(row["lease_version"]) == 1:
+                if row["lease_expires_at"] is not None and float(row["lease_expires_at"]) <= wall_now:
+                    candidate = row
+                    break
+                continue
+            identity = (row["lease_owner"], int(row["lease_generation"]))
+            observation = self._lease_observations.get(row["execution_id"])
+            if observation is None or observation[:2] != identity:
+                self._lease_observations[row["execution_id"]] = (*identity, observed_at)
+                continue
+            if observed_at - observation[2] >= self.limits.lease_seconds:
+                candidate = row
+                break
+        if candidate is None:
+            return None
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if int(candidate["lease_version"]) == 1:
+                changed = connection.execute(
+                    """UPDATE mcp_benchmark_jobs
+                       SET lease_owner = ?, lease_expires_at = ?, lease_version = 2,
+                           lease_generation = lease_generation + 1, updated_at = ?
+                       WHERE execution_id = ? AND lease_owner = ? AND lease_version = 1
+                         AND lease_expires_at <= ? AND state IN ('running', 'publishing')""",
+                    (
+                        recovery_owner,
+                        wall_now + self.limits.lease_seconds,
+                        utc_now().isoformat(),
+                        candidate["execution_id"],
+                        candidate["lease_owner"],
+                        wall_now,
+                    ),
+                ).rowcount
+            else:
+                changed = connection.execute(
+                    """UPDATE mcp_benchmark_jobs
+                       SET lease_owner = ?, lease_expires_at = ?, lease_version = 2,
+                           lease_generation = lease_generation + 1, updated_at = ?
+                       WHERE execution_id = ? AND lease_owner = ? AND lease_version = 2
+                         AND lease_generation = ? AND state IN ('running', 'publishing')""",
+                    (
+                        recovery_owner,
+                        wall_now + self.limits.lease_seconds,
+                        utc_now().isoformat(),
+                        candidate["execution_id"],
+                        candidate["lease_owner"],
+                        candidate["lease_generation"],
+                    ),
+                ).rowcount
             if changed != 1:
                 connection.rollback()
                 return None
             fenced = connection.execute(
-                "SELECT * FROM mcp_benchmark_jobs WHERE execution_id = ?", (row["execution_id"],)
+                "SELECT * FROM mcp_benchmark_jobs WHERE execution_id = ?", (candidate["execution_id"],)
             ).fetchone()
             connection.commit()
+        self._lease_observations.pop(candidate["execution_id"], None)
         assert fenced is not None
         return self._record(fenced)
 
@@ -475,6 +498,7 @@ class DurableJobRepository:
                 """
                 UPDATE mcp_benchmark_jobs
                 SET state = ?, artifact_path = ?, lease_owner = NULL, lease_expires_at = NULL,
+                    lease_version = 1, lease_generation = 0,
                     error_code = ?, updated_at = ?, completed_at = ?
                 WHERE execution_id = ? AND lease_owner = ?
                 """,

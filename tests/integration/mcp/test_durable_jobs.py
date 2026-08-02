@@ -59,6 +59,8 @@ def test_restart_recovers_expired_worker_lease(tmp_path: Path) -> None:
         worker_id="restarted-worker",
     )
     restarted_worker.recover_expired()
+    anyio.run(anyio.sleep, 0.06)
+    restarted_worker.recover_expired()
     claimed = restarted_repository.claim(restarted_worker.worker_id)
     assert claimed is not None
     anyio.run(restarted_worker._run_job, claimed)

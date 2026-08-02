@@ -174,6 +174,7 @@ def test_expired_lease_recovery_requeues_without_duplicate_publication(tmp_path:
     claimed = repository.claim("lost-worker")
     assert claimed is not None
 
+    worker.recover_expired()
     anyio.run(anyio.sleep, 0.06)
     worker.recover_expired()
     recovered = repository.get(submitted.execution_id)
@@ -192,6 +193,7 @@ def test_expired_recovery_fences_worker_before_artifact_cleanup(tmp_path: Path) 
     assert claimed is not None
     assert repository.begin_publication(claimed.execution_id, "lost-worker")
 
+    repository.claim_expired("observer")
     anyio.run(anyio.sleep, 0.06)
     fenced = repository.claim_expired("recovery-owner")
 
@@ -205,6 +207,7 @@ def test_publication_commit_excludes_recovery_fence(tmp_path: Path) -> None:
     claimed = repository.claim("worker-a")
     assert claimed is not None
     assert repository.begin_publication(claimed.execution_id, "worker-a")
+    assert repository.claim_expired("observer") is None
     entered_publish = threading.Event()
     release_publish = threading.Event()
 
@@ -241,6 +244,7 @@ def test_recovery_removes_only_expired_attempt_staging(tmp_path: Path) -> None:
     staging.mkdir(parents=True)
     (staging / "large-result.bin").write_bytes(b"orphan")
 
+    worker.recover_expired()
     anyio.run(anyio.sleep, 0.06)
     worker.recover_expired()
 
@@ -249,22 +253,43 @@ def test_recovery_removes_only_expired_attempt_staging(tmp_path: Path) -> None:
     assert recovered is not None and recovered.state == "queued"
 
 
-def test_job_leases_use_monotonic_time_and_expire_across_os_restart(monkeypatch, tmp_path: Path) -> None:
+def test_job_leases_use_shared_generations_across_host_clock_offsets(monkeypatch, tmp_path: Path) -> None:
     from benchbox.mcp import jobs
 
-    monkeypatch.setattr(jobs, "_boot_identity", lambda: "boot-a")
-    monkeypatch.setattr(jobs, "mono_time", lambda: 1_000.0)
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
     repository.submit("tenant-a", _request())
     claimed = repository.claim("worker-a")
-    assert claimed is not None and claimed.lease_expires_at is not None
-    assert claimed.lease_expires_at > 1_000.0
-
-    monkeypatch.setattr(jobs, "_boot_identity", lambda: "boot-b")
+    assert claimed is not None and claimed.lease_version == 2
+    observer = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
     monkeypatch.setattr(jobs, "mono_time", lambda: 10.0)
-    restarted = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
-    fenced = restarted.claim_expired("recovery")
-    assert fenced is not None and fenced.execution_id == claimed.execution_id
+    assert observer.claim_expired("recovery") is None
+
+    assert repository.renew(claimed.execution_id, "worker-a")
+    monkeypatch.setattr(jobs, "mono_time", lambda: 100_000.0)
+    assert observer.claim_expired("recovery") is None
+
+
+def test_legacy_epoch_lease_remains_compatible_during_rolling_upgrade(tmp_path: Path) -> None:
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("legacy-worker")
+    assert claimed is not None
+    with sqlite3.connect(repository.path) as connection:
+        connection.execute(
+            """UPDATE mcp_benchmark_jobs
+               SET lease_version = 1, lease_generation = 0, lease_expires_at = unixepoch() + 60
+               WHERE execution_id = ?""",
+            (submitted.execution_id,),
+        )
+    assert repository.claim_expired("new-worker") is None
+
+    with sqlite3.connect(repository.path) as connection:
+        connection.execute(
+            "UPDATE mcp_benchmark_jobs SET lease_expires_at = unixepoch() - 1 WHERE execution_id = ?",
+            (submitted.execution_id,),
+        )
+    recovered = repository.claim_expired("new-worker")
+    assert recovered is not None and recovered.execution_id == submitted.execution_id
 
 
 def test_unexpected_worker_failure_retries_then_can_complete(tmp_path: Path) -> None:
@@ -310,6 +335,7 @@ def test_publishing_recovery_completes_existing_durable_artifact(tmp_path: Path)
     response_path.write_text('{"mcp_metadata": {"execution_id": "recovered"}}', encoding="utf-8")
     (final_dir / ".published").write_text(claimed.execution_id, encoding="ascii")
 
+    worker.recover_expired()
     anyio.run(anyio.sleep, 0.06)
     worker.recover_expired()
     recovered = repository.get(submitted.execution_id)
