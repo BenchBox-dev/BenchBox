@@ -852,6 +852,38 @@ class TestPublicPayloadTupleRecursion:
 
 
 class TestTuningPayloadAnonymization:
+    def test_constraint_table_and_column_identifiers_are_pseudonymized(self):
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "primary_keys": {
+                            "enabled": True,
+                            "tables": {"orders": ["o_orderkey"]},
+                        },
+                        "foreign_keys": {
+                            "enabled": True,
+                            "tables": {
+                                "lineitem": {
+                                    "columns": ["l_orderkey"],
+                                    "referenced_table": "orders",
+                                    "referenced_columns": ["o_orderkey"],
+                                }
+                            },
+                        },
+                    }
+                }
+            }
+        )
+
+        serialized = json.dumps(out)
+        assert all(identifier not in serialized for identifier in ("orders", "lineitem", "o_orderkey", "l_orderkey"))
+        constraints = out["requested"]["constraints"]
+        assert next(iter(constraints["primary_keys"]["tables"])).startswith("table_")
+        assert constraints["primary_keys"]["tables"][next(iter(constraints["primary_keys"]["tables"]))][0].startswith(
+            "column_"
+        )
+
     def test_table_and_column_identifiers_are_pseudonymized_but_source_is_preserved(self):
         manager = AnonymizationManager()
         out = manager.anonymize_tuning_payload(

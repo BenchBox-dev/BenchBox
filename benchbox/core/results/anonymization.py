@@ -344,9 +344,11 @@ class AnonymizationManager:
         working.pop("source_file", None)
 
         requested = working.get("requested")
+        constraints = None
         table_tunings = None
         if isinstance(requested, dict):
             requested = dict(requested)
+            constraints = requested.get("constraints")
             table_tunings = requested.pop("table_tunings", None)
             working["requested"] = requested
 
@@ -357,10 +359,13 @@ class AnonymizationManager:
                 if self._is_normalized_tuning_source_reference(source_file)
                 else self._hash_public_identifier(str(source_file), "path")
             )
-        if table_tunings is not None:
+        if constraints is not None or table_tunings is not None:
             anonymized_requested = anonymized.setdefault("requested", {})
             if isinstance(anonymized_requested, dict):
-                anonymized_requested["table_tunings"] = self._anonymize_tuning_table_tunings(table_tunings)
+                if isinstance(constraints, dict):
+                    anonymized_requested["constraints"] = self._anonymize_tuning_constraints(constraints)
+                if table_tunings is not None:
+                    anonymized_requested["table_tunings"] = self._anonymize_tuning_table_tunings(table_tunings)
         return anonymized
 
     @staticmethod
@@ -370,6 +375,63 @@ class AnonymizationManager:
             return False
         reference = value.rpartition(":")[0] if ":" in value else value
         return bool(reference) and all(part not in {"", ".", ".."} for part in reference.split("/"))
+
+    def _anonymize_tuning_constraints(self, value: Any) -> Any:
+        """Anonymize table/column identifiers nested in constraint settings."""
+        if isinstance(value, dict):
+            anonymized: dict[str, Any] = {}
+            for key, child in value.items():
+                if key in {"table", "table_name", "referenced_table", "referenced_table_name"}:
+                    anonymized[key] = self._hash_public_identifier(str(child), "table")
+                elif key in {
+                    "column",
+                    "column_name",
+                    "name",
+                    "referenced_column",
+                    "referenced_column_name",
+                }:
+                    anonymized[key] = self._hash_public_identifier(str(child), "column")
+                elif key in {"tables", "table_names", "referenced_tables"}:
+                    anonymized[key] = self._anonymize_constraint_identifier_collection(child, "table")
+                elif key in {"columns", "column_names", "referenced_columns", "referenced_column_names"}:
+                    anonymized[key] = self._anonymize_constraint_identifier_collection(child, "column")
+                else:
+                    anonymized[key] = self._anonymize_tuning_constraints(child)
+            return anonymized
+        if isinstance(value, list):
+            return [self._anonymize_tuning_constraints(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._anonymize_tuning_constraints(item) for item in value]
+        return value
+
+    def _anonymize_constraint_identifier_collection(self, value: Any, prefix: str) -> Any:
+        """Hash identifier collections while preserving their container shape."""
+        if isinstance(value, dict):
+            return {
+                self._hash_public_identifier(str(key), prefix): self._anonymize_constraint_columns(child)
+                for key, child in value.items()
+            }
+        if isinstance(value, list):
+            return [
+                self._hash_public_identifier(str(item), prefix) if isinstance(item, str) else item for item in value
+            ]
+        if isinstance(value, tuple):
+            return [
+                self._hash_public_identifier(str(item), prefix) if isinstance(item, str) else item for item in value
+            ]
+        if isinstance(value, str):
+            return self._hash_public_identifier(value, prefix)
+        return value
+
+    def _anonymize_constraint_columns(self, value: Any) -> Any:
+        """Hash column lists stored as values under a table identifier."""
+        if isinstance(value, (list, tuple)):
+            return [
+                self._hash_public_identifier(str(item), "column") if isinstance(item, str) else item for item in value
+            ]
+        if isinstance(value, dict):
+            return self._anonymize_tuning_constraints(value)
+        return value
 
     def _anonymize_tuning_table_tunings(self, value: Any) -> Any:
         if isinstance(value, dict):
