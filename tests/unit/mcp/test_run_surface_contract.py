@@ -34,6 +34,12 @@ EXPECTED_TOOLS = {
     "system_profile",
     "validate_results",
 }
+EXPECTED_REMOTE_TOOLS = {
+    "cancel_benchmark",
+    "get_benchmark_result",
+    "get_benchmark_status",
+    "start_benchmark",
+}
 
 STALE_TOOL_NAMES = {
     "aggregate_results",
@@ -119,6 +125,12 @@ def _tool_section(text: str, tool_name: str) -> str:
 
 def _documented_inventory_tools(text: str) -> set[str]:
     inventory = _section(text, "### Actual Tool Inventory", "### Run Surface Contract")
+    inventory = inventory.split("Authenticated remote mode additionally registers:", maxsplit=1)[0]
+    return set(re.findall(r"^\| `([^`]+)` \|", inventory, flags=re.MULTILINE))
+
+
+def _documented_remote_inventory_tools(text: str) -> set[str]:
+    inventory = _section(text, "Authenticated remote mode additionally registers:", "### Run Surface Contract")
     return set(re.findall(r"^\| `([^`]+)` \|", inventory, flags=re.MULTILINE))
 
 
@@ -208,6 +220,21 @@ class TestMCPDocsContract:
         assert set(tools) == EXPECTED_TOOLS
         assert _documented_inventory_tools(text) == EXPECTED_TOOLS
         assert not (STALE_TOOL_NAMES & _documented_inventory_tools(text))
+
+    def test_docs_remote_inventory_matches_authenticated_server(self, tmp_path: Path):
+        from benchbox.mcp import create_server
+        from benchbox.mcp.security import RemoteSecurityRuntime
+        from tests.integration.mcp._security import write_security_config
+        from tests.unit.mcp.public_api import list_tools_by_name
+
+        config = write_security_config(
+            tmp_path,
+            tokens={"token": ("tenant", ("benchbox:read", "benchbox:execute"))},
+        )
+        server = create_server(log_level="ERROR", remote_security=RemoteSecurityRuntime.from_file(config))
+
+        assert set(list_tools_by_name(server)) == EXPECTED_TOOLS | EXPECTED_REMOTE_TOOLS
+        assert _documented_remote_inventory_tools(_doc_text()) == EXPECTED_REMOTE_TOOLS
 
     def test_docs_run_benchmark_table_matches_registered_schema(self):
         schema = _registered_tools()["run_benchmark"].input_schema

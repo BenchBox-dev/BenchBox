@@ -52,16 +52,51 @@ the lowercase SHA-256 digest of its exact bearer value.
     "queue_limit": 32,
     "queue_timeout_seconds": 5,
     "lease_seconds": 3600
+  },
+  "jobs": {
+    "queue_limit": 32,
+    "lease_seconds": 60,
+    "poll_seconds": 0.25,
+    "max_attempts": 2,
+    "retention_seconds": 604800
   }
 }
 ```
 
 The scope contract is:
 
-- `benchbox:read`: discovery, system profile, result reads, analytics, and chart suggestions;
+- `benchbox:read`: discovery, system profile, result reads, analytics, chart
+  suggestions, and durable job status/result reads;
 - `benchbox:write`: chart generation and other non-benchmark artifact writes;
-- `benchbox:execute`: `run_benchmark`, still constrained by platform,
-  benchmark, and maximum-scale policy.
+- `benchbox:execute`: `run_benchmark`, `start_benchmark`, and
+  `cancel_benchmark`, still constrained by platform, benchmark, and
+  maximum-scale policy.
+
+## Durable remote benchmark jobs
+
+Remote clients should use `start_benchmark` instead of holding a
+`run_benchmark` request open. It returns an opaque `execution_id`; use
+`get_benchmark_status`, `get_benchmark_result`, and `cancel_benchmark` for the
+rest of the lifecycle. These four tools are registered only when remote
+security is configured. Remote `run_benchmark` retains its immediate
+`dry_run` and `validate_only` modes but rejects normal execution with a pointer
+to `start_benchmark`. Local stdio clients retain the complete synchronous
+`run_benchmark` contract unchanged.
+
+Jobs are persisted in `state_db` and owned by the stable authenticated
+principal, never by an MCP session. Every worker uses transactional claims and
+renewable leases. An expired running lease is requeued within `max_attempts`;
+an expired publishing lease is completed only when the final response artifact
+already exists, otherwise it follows the retry policy. A repeated
+`idempotency_key` returns the original job only when its request is identical.
+
+Cancellation is immediate while queued and cooperative while running. Once a
+worker enters the publishing transition, publication is the commit point and
+cancellation is too late. The worker writes the response and result bundle to a
+tenant-owned staging directory, flushes it, atomically renames it to the final
+job directory, and only then records `completed`. This prevents a completed
+status from preceding its durable artifact. Terminal metadata and its owned
+artifact are removed after `retention_seconds`.
 
 ## Fail-closed deployment
 
@@ -82,7 +117,7 @@ Startup is rejected if a non-loopback host has no policy, if its public URLs
 are not HTTPS, or if Host/Origin/token allowlists are empty. Stdio keeps its
 existing local behavior and rejects the remote-only policy option.
 
-The SQLite file is a durable shared backend only for workers on storage that
+The SQLite file and workspace root are durable shared backends only for workers on storage that
 provides correct cross-process locking. Before multi-host use, replace or mount
 it on an explicitly supported shared storage service and pass the production
 readiness acceptance matrix. Statelessness must never substitute for this

@@ -107,7 +107,15 @@ def create_benchbox_server(
         resolved_charts_dir = runtime_paths.charts_dir
 
     server_kwargs: dict[str, object] = {}
+    job_runtime = None
     if remote_security is not None:
+        from benchbox.mcp.jobs import DurableJobRuntime
+
+        job_runtime = DurableJobRuntime.create(
+            remote_security.config.state_db,
+            remote_security.config.jobs,
+            remote_security.workspaces,
+        )
         # The SDK rejection warnings include the raw attacker-controlled Host
         # or Origin value. Preserve the generic HTTP rejection without making
         # those headers a log-egress channel.
@@ -116,6 +124,7 @@ def create_benchbox_server(
             auth=remote_security.auth_settings(),
             token_verifier=remote_security.verifier,
             middleware=[remote_security.middleware],
+            lifespan=job_runtime.lifespan,
         )
 
     mcp = MCPServer(
@@ -156,7 +165,15 @@ Then inspect plans: get_query_plan(result_file="...", query_id="19")
     register_discovery_tools(mcp)
 
     logger.info("Registering benchmark execution tools...")
-    register_benchmark_tools(mcp, results_dir=results_provider)
+    register_benchmark_tools(
+        mcp,
+        results_dir=results_provider,
+        allow_synchronous_execution=remote_security is None,
+    )
+    if job_runtime is not None:
+        from benchbox.mcp.jobs import register_durable_job_tools
+
+        register_durable_job_tools(mcp, job_runtime)
 
     logger.info("Registering results tools...")
     register_results_tools(mcp, results_dir=results_provider)
