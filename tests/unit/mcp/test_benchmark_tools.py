@@ -182,6 +182,16 @@ class TestRunBenchmarkTool:
         assert tuning.platform_optimizations.databricks_clustering_strategy == "liquid_clustering"
         assert tuning.platform_optimizations.liquid_clustering_columns == ["event_time", "id"]
 
+    def test_databricks_columns_infer_liquid_clustering_strategy(self):
+        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+        options = _prepare_adapter_platform_options("databricks", {"liquid_clustering_columns": "customer_id,order_id"})
+
+        tuning = options["tuning_config"]
+        assert options["tuning_enabled"] is True
+        assert tuning.platform_optimizations.databricks_clustering_strategy == "liquid_clustering"
+        assert tuning.platform_optimizations.liquid_clustering_columns == ["customer_id", "order_id"]
+
 
 class TestGetQueryDetailsTool:
     """Tests for get_query_details tool functionality."""

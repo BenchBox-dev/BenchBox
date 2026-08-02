@@ -290,6 +290,8 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             "tuning_source_file",
             "verbose_enabled",
             "very_verbose",
+            "parquet_pushdown",
+            "repartition_joins",
         ]:
             if key in config:
                 adapter_config[key] = config[key]
