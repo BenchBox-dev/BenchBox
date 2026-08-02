@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import anyio
+import psutil
 from mcp.server.mcpserver import MCPServer
 from mcp.shared.exceptions import MCPError
 from mcp.types import ToolAnnotations
@@ -35,6 +36,12 @@ JOB_NOT_FOUND = -32005
 JOB_NOT_READY = -32006
 JOB_QUEUE_FULL = -32007
 JOB_IDEMPOTENCY_CONFLICT = -32008
+
+
+def _boot_identity() -> str:
+    """Return a stable identifier shared by processes in the current OS boot."""
+    return repr(psutil.boot_time())
+
 
 START_ANNOTATIONS = ToolAnnotations(
     title="Start benchmark job",
@@ -123,8 +130,37 @@ class DurableJobRepository:
                     ON mcp_benchmark_jobs (state, created_at);
                 CREATE INDEX IF NOT EXISTS mcp_job_owner_idx
                     ON mcp_benchmark_jobs (principal_id, execution_id);
+                CREATE TABLE IF NOT EXISTS mcp_job_runtime_metadata (
+                    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                    boot_id TEXT NOT NULL
+                );
                 """
             )
+            boot_id = _boot_identity()
+            connection.execute("BEGIN IMMEDIATE")
+            metadata = connection.execute("SELECT boot_id FROM mcp_job_runtime_metadata WHERE singleton = 1").fetchone()
+            if metadata is None:
+                wall_now = utc_now().timestamp()
+                monotonic_now = mono_time()
+                connection.execute(
+                    """UPDATE mcp_benchmark_jobs
+                       SET lease_expires_at = ? + MAX(0, MIN(lease_expires_at - ?, ?))
+                       WHERE state IN ('running', 'publishing') AND lease_expires_at IS NOT NULL""",
+                    (monotonic_now, wall_now, self.limits.lease_seconds),
+                )
+                connection.execute(
+                    "INSERT INTO mcp_job_runtime_metadata (singleton, boot_id) VALUES (1, ?)",
+                    (boot_id,),
+                )
+            elif metadata["boot_id"] != boot_id:
+                connection.execute(
+                    "UPDATE mcp_benchmark_jobs SET lease_expires_at = 0 WHERE state IN ('running', 'publishing')"
+                )
+                connection.execute(
+                    "UPDATE mcp_job_runtime_metadata SET boot_id = ? WHERE singleton = 1",
+                    (boot_id,),
+                )
+            connection.commit()
 
     @staticmethod
     def _record(row: sqlite3.Row) -> JobRecord:
@@ -153,7 +189,7 @@ class DurableJobRepository:
         idempotency_key: str | None = None,
     ) -> tuple[JobRecord, bool]:
         """Create a queued job, or return the principal's idempotent match."""
-        normalized_key = idempotency_key.strip() if idempotency_key else None
+        normalized_key = idempotency_key.strip() if idempotency_key is not None else None
         if normalized_key is not None and (not normalized_key or len(normalized_key) > 200):
             raise MCPError(-32602, "idempotency_key must contain 1 to 200 characters")
         now = utc_now().isoformat()
@@ -211,7 +247,7 @@ class DurableJobRepository:
 
     def claim(self, worker_id: str) -> JobRecord | None:
         """Transactionally lease the oldest queued job."""
-        now_epoch = utc_now().timestamp()
+        now_epoch = mono_time()
         now = utc_now().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -249,7 +285,7 @@ class DurableJobRepository:
                 WHERE execution_id = ? AND lease_owner = ? AND state IN ('running', 'publishing')
                 """,
                 (
-                    utc_now().timestamp() + self.limits.lease_seconds,
+                    mono_time() + self.limits.lease_seconds,
                     utc_now().isoformat(),
                     execution_id,
                     worker_id,
@@ -266,24 +302,43 @@ class DurableJobRepository:
                 WHERE execution_id = ? AND state = 'running' AND lease_owner = ?
                   AND lease_expires_at > ? AND cancel_requested = 0
                 """,
-                (utc_now().isoformat(), execution_id, worker_id, utc_now().timestamp()),
+                (utc_now().isoformat(), execution_id, worker_id, mono_time()),
             ).rowcount
         return changed == 1
 
-    def complete(self, execution_id: str, worker_id: str, artifact_path: Path) -> bool:
+    def complete(
+        self,
+        execution_id: str,
+        worker_id: str,
+        artifact_path: Path,
+        *,
+        publish: Callable[[], None] | None = None,
+    ) -> bool:
         """Mark complete only after the worker has durably published the artifact."""
         now = utc_now().isoformat()
         with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            current = connection.execute(
+                """SELECT state FROM mcp_benchmark_jobs
+                   WHERE execution_id = ? AND state = 'publishing' AND lease_owner = ?
+                     AND lease_expires_at > ? AND cancel_requested = 0""",
+                (execution_id, worker_id, mono_time()),
+            ).fetchone()
+            if current is None:
+                connection.rollback()
+                return False
+            if publish is not None:
+                publish()
             changed = connection.execute(
                 """
                 UPDATE mcp_benchmark_jobs
                 SET state = 'completed', artifact_path = ?, lease_owner = NULL, lease_expires_at = NULL,
                     updated_at = ?, completed_at = ?
                 WHERE execution_id = ? AND state = 'publishing' AND lease_owner = ?
-                  AND lease_expires_at > ? AND cancel_requested = 0
                 """,
-                (str(artifact_path), now, now, execution_id, worker_id, utc_now().timestamp()),
+                (str(artifact_path), now, now, execution_id, worker_id),
             ).rowcount
+            connection.commit()
         return changed == 1
 
     def fail_attempt(self, execution_id: str, worker_id: str, error_code: str, *, retryable: bool = True) -> str | None:
@@ -346,18 +401,44 @@ class DurableJobRepository:
         assert updated is not None
         return self._record(updated)
 
-    def recover_expired(self) -> list[JobRecord]:
-        """Return expired leases for filesystem-aware deterministic recovery."""
+    def claim_expired(self, recovery_owner: str) -> JobRecord | None:
+        """Transactionally fence and return the oldest expired lease."""
+        now = mono_time()
         with self._connect() as connection:
-            rows = connection.execute(
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
                 """
                 SELECT * FROM mcp_benchmark_jobs
                 WHERE state IN ('running', 'publishing') AND lease_expires_at <= ?
-                ORDER BY created_at
+                ORDER BY created_at LIMIT 1
                 """,
-                (utc_now().timestamp(),),
-            ).fetchall()
-        return [self._record(row) for row in rows]
+                (now,),
+            ).fetchone()
+            if row is None:
+                connection.commit()
+                return None
+            changed = connection.execute(
+                """UPDATE mcp_benchmark_jobs SET lease_owner = ?, lease_expires_at = ?, updated_at = ?
+                   WHERE execution_id = ? AND lease_owner = ? AND lease_expires_at <= ?
+                     AND state IN ('running', 'publishing')""",
+                (
+                    recovery_owner,
+                    now + self.limits.lease_seconds,
+                    utc_now().isoformat(),
+                    row["execution_id"],
+                    row["lease_owner"],
+                    now,
+                ),
+            ).rowcount
+            if changed != 1:
+                connection.rollback()
+                return None
+            fenced = connection.execute(
+                "SELECT * FROM mcp_benchmark_jobs WHERE execution_id = ?", (row["execution_id"],)
+            ).fetchone()
+            connection.commit()
+        assert fenced is not None
+        return self._record(fenced)
 
     def recover(self, job: JobRecord, *, published_artifact: Path | None = None) -> str | None:
         """Recover one expired lease without allowing duplicate completion."""
@@ -371,7 +452,6 @@ class DurableJobRepository:
                 current is None
                 or current["state"] not in {"running", "publishing"}
                 or current["lease_owner"] != job.lease_owner
-                or current["lease_expires_at"] > utc_now().timestamp()
             ):
                 connection.rollback()
                 return None
@@ -391,7 +471,7 @@ class DurableJobRepository:
                 next_state = "failed"
                 artifact = None
                 completed_at = now
-            connection.execute(
+            changed = connection.execute(
                 """
                 UPDATE mcp_benchmark_jobs
                 SET state = ?, artifact_path = ?, lease_owner = NULL, lease_expires_at = NULL,
@@ -407,7 +487,10 @@ class DurableJobRepository:
                     job.execution_id,
                     job.lease_owner,
                 ),
-            )
+            ).rowcount
+            if changed != 1:
+                connection.rollback()
+                return None
             connection.commit()
         return next_state
 
@@ -496,12 +579,17 @@ class DurableJobWorker:
 
     def recover_expired(self) -> None:
         """Resolve expired publishing artifacts before requeueing work."""
-        for job in self.repository.recover_expired():
-            _, final_dir, response_path = self._job_paths(job)
+        while True:
+            recovery_owner = f"{self.worker_id}:recovery:{uuid.uuid4().hex}"
+            job = self.repository.claim_expired(recovery_owner)
+            if job is None:
+                return
+            staging, final_dir, response_path = self._job_paths(job)
             marker = final_dir / ".published"
             published = response_path if marker.is_file() and response_path.is_file() else None
             if job.state == "publishing" and published is None:
                 shutil.rmtree(final_dir, ignore_errors=True)
+            shutil.rmtree(staging, ignore_errors=True)
             self.repository.recover(job, published_artifact=published)
 
     async def _run_job(self, job: JobRecord) -> None:
@@ -514,42 +602,42 @@ class DurableJobWorker:
             async with anyio.create_task_group() as task_group:
                 task_group.start_soon(self._heartbeat, job.execution_id)
                 try:
-                    response = await anyio.to_thread.run_sync(self.executor, job, staging)
-                except Exception as exc:
-                    execution_error = exc
+                    try:
+                        response = await anyio.to_thread.run_sync(self.executor, job, staging)
+                    except Exception as exc:
+                        execution_error = exc
+                    if execution_error is None:
+                        assert response is not None
+                        if response.get("status") == "failed":
+                            await anyio.to_thread.run_sync(
+                                lambda: self.repository.fail_attempt(
+                                    job.execution_id, self.worker_id, "benchmark_rejected", retryable=False
+                                )
+                            )
+                            shutil.rmtree(staging, ignore_errors=True)
+                            return
+                        current = await anyio.to_thread.run_sync(self.repository.get, job.execution_id)
+                        if current is None or current.cancel_requested:
+                            await anyio.to_thread.run_sync(
+                                self.repository.fail_attempt, job.execution_id, self.worker_id, "cancelled"
+                            )
+                            shutil.rmtree(staging, ignore_errors=True)
+                            return
+                        if not await anyio.to_thread.run_sync(
+                            self.repository.begin_publication, job.execution_id, self.worker_id
+                        ):
+                            shutil.rmtree(staging, ignore_errors=True)
+                            return
+                        final_result = self._rewrite_result_paths(response, staging, final_dir)
+                        published = await anyio.to_thread.run_sync(
+                            self._publish_artifact, job, final_result, staging, final_dir, response_path
+                        )
+                        if not published:
+                            shutil.rmtree(staging, ignore_errors=True)
                 finally:
                     task_group.cancel_scope.cancel()
             if execution_error is not None:
                 raise execution_error
-            assert response is not None
-            if response.get("status") == "failed":
-                await anyio.to_thread.run_sync(
-                    lambda: self.repository.fail_attempt(
-                        job.execution_id, self.worker_id, "benchmark_rejected", retryable=False
-                    )
-                )
-                shutil.rmtree(staging, ignore_errors=True)
-                return
-            current = await anyio.to_thread.run_sync(self.repository.get, job.execution_id)
-            if current is None or current.cancel_requested:
-                await anyio.to_thread.run_sync(
-                    self.repository.fail_attempt, job.execution_id, self.worker_id, "cancelled"
-                )
-                shutil.rmtree(staging, ignore_errors=True)
-                return
-            if not await anyio.to_thread.run_sync(self.repository.begin_publication, job.execution_id, self.worker_id):
-                shutil.rmtree(staging, ignore_errors=True)
-                return
-            final_result = self._rewrite_result_paths(response, staging, final_dir)
-            (staging / "response.json").write_text(json.dumps(final_result, sort_keys=True), encoding="utf-8")
-            (staging / ".published").write_text(job.execution_id, encoding="ascii")
-            self._sync_tree(staging)
-            os.replace(staging, final_dir)
-            self._sync_path(final_dir.parent)
-            if not await anyio.to_thread.run_sync(
-                self.repository.complete, job.execution_id, self.worker_id, response_path
-            ):
-                logger.warning("A stale MCP job worker published an orphan (%s)", job.execution_id)
         except BaseException as exc:
             shutil.rmtree(staging, ignore_errors=True)
             if isinstance(exc, anyio.get_cancelled_exc_class()):
@@ -572,6 +660,30 @@ class DurableJobWorker:
             await anyio.sleep(interval)
             if not await anyio.to_thread.run_sync(self.repository.renew, execution_id, self.worker_id):
                 return
+
+    def _publish_artifact(
+        self,
+        job: JobRecord,
+        response: dict[str, Any],
+        staging: Path,
+        final_dir: Path,
+        response_path: Path,
+    ) -> bool:
+        """Flush and atomically publish while the database fence remains owned."""
+        (staging / "response.json").write_text(json.dumps(response, sort_keys=True), encoding="utf-8")
+        (staging / ".published").write_text(job.execution_id, encoding="ascii")
+        self._sync_tree(staging)
+
+        def publish() -> None:
+            os.replace(staging, final_dir)
+            self._sync_path(final_dir.parent)
+
+        return self.repository.complete(
+            job.execution_id,
+            self.worker_id,
+            response_path,
+            publish=publish,
+        )
 
     @staticmethod
     def _rewrite_result_paths(response: dict[str, Any], staging: Path, final_dir: Path) -> dict[str, Any]:
