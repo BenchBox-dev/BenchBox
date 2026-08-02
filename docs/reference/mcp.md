@@ -192,7 +192,7 @@ CLI result bundles, but MCP does not claim option parity with `benchbox run`.
 | `get_query_plan` | analytics | No | Read captured query plans from a result bundle. |
 | `validate_results` | analytics | No | Validate result JSON integrity, completeness, and believability. |
 | `suggest_charts` | visualization | No | Suggest useful chart types for one or more result files. |
-| `generate_chart` | visualization | Yes | Generate ASCII chart output from result files. |
+| `generate_chart` | visualization | No | Generate ASCII chart output from result files. |
 
 Authenticated remote mode additionally registers:
 

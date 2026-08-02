@@ -185,6 +185,23 @@ class TestExplorerPipelineRun:
         assert "/Users/alice" not in published
         assert "path_" in published
 
+    def test_applied_receipt_is_sanitized_before_duckdb_publication(self, tmp_path: Path) -> None:
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        source = bundles_dir / "with_receipt.json"
+        source.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        source.with_name("with_receipt.applied.json").write_text(
+            json.dumps({"receipt": {"entries": [{"statement": "SET path=/Users/alice/private"}]}}),
+            encoding="utf-8",
+        )
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        row = _duckdb_results(output)[0]
+        assert row["applied_receipt"] is not None
+        assert "/Users/alice" not in row["applied_receipt"]
+
     def test_publishes_plans_sidecar_when_present(self, tmp_path: Path) -> None:
         """w1 wire-up: when a ``*.plans.json`` sidecar exists alongside a
         bundle, the pipeline must copy it to ``out/bundles/<result_id>.plans.json``

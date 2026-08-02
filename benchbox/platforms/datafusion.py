@@ -308,6 +308,8 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         self.data_format = config.get("data_format", "parquet")
         self.temp_dir = config.get("temp_dir")
         self.batch_size = config.get("batch_size", 8192)
+        self.parquet_pushdown = bool(config.get("parquet_pushdown", True))
+        self.repartition_joins = bool(config.get("repartition_joins", True))
 
         # Schema tracking (populated during create_schema)
         self._table_schemas = {}
@@ -413,8 +415,8 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         config = config.with_target_partitions(self.target_partitions)
 
         # Enable optimizations
-        config = config.with_parquet_pruning(True)
-        config = config.with_repartition_joins(True)
+        config = config.with_parquet_pruning(self.parquet_pushdown)
+        config = config.with_repartition_joins(self.repartition_joins)
         config = config.with_repartition_aggregations(True)
         config = config.with_repartition_windows(True)
         config = config.with_information_schema(True)
@@ -426,8 +428,8 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         config_applied = [
             f"target_partitions={self.target_partitions}",
             f"batch_size={self.batch_size}",
-            "parquet_pruning=enabled",
-            "repartitioning=enabled",
+            f"parquet_pruning={'enabled' if self.parquet_pushdown else 'disabled'}",
+            f"repartition_joins={'enabled' if self.repartition_joins else 'disabled'}",
         ]
 
         # Add runtime configuration to tracking

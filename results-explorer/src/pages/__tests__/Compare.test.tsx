@@ -297,6 +297,37 @@ describe("Compare", () => {
     expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
   });
 
+  it("resolves aliases before applying the four-result comparison limit", async () => {
+    setupUrl(["r1", "alias-r1", "r2", "r3", "r4"]);
+    vi.mocked(resolveShortId).mockImplementation((id) =>
+      Promise.resolve(id === "alias-r1" ? "r1" : id),
+    );
+    const r4 = makeResult({ result_id: "r4", platform: "Trino", platform_id: "trino" });
+    const byId: Record<string, DetailResult> = { r1: DUCKDB, r2: SQLITE, r3: POSTGRES, r4 };
+    vi.mocked(getDetailResult).mockImplementation((id) => Promise.resolve(byId[id] ?? null));
+
+    render(<Compare />);
+
+    await waitFor(() => expect(document.title).toBe("Compare (4) · BenchBox Results"));
+    expect(screen.getAllByText("Trino").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("compare-url-notice")).toHaveTextContent(
+      "Ignored duplicate result ID after alias resolution: “alias-r1”.",
+    );
+  });
+
+  it("preserves requested IDs when a detail lookup rejects", async () => {
+    setupUrl(["r1", "r2", "r3"]);
+    vi.mocked(getDetailResult).mockImplementation((id) => {
+      if (id === "r2") return Promise.reject(new Error("transient detail failure"));
+      return Promise.resolve(id === "r1" ? DUCKDB : POSTGRES);
+    });
+
+    render(<Compare />);
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy());
+    expect(new URL(window.location.href).searchParams.get("ids")).toBe("r1,r2,r3");
+  });
+
   it("renders the in-page compare builder when no ids are provided (no URL editing required)", async () => {
     setupUrl([]);
 

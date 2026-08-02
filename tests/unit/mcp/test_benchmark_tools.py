@@ -166,7 +166,21 @@ class TestRunBenchmarkTool:
             )
 
         assert response["mcp_metadata"]["status"] == "no_results"
-        assert get_adapter.call_args.kwargs["threads"] == 4
+        assert get_adapter.call_args.kwargs["thread_limit"] == 4
+
+    def test_databricks_layout_options_build_unified_tuning_config(self):
+        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+        options = _prepare_adapter_platform_options(
+            "databricks",
+            {"databricks_clustering_strategy": "liquid_clustering", "liquid_clustering_columns": "event_time,id"},
+        )
+
+        tuning = options["tuning_config"]
+        assert options["tuning_enabled"] is True
+        assert "databricks_clustering_strategy" not in options
+        assert tuning.platform_optimizations.databricks_clustering_strategy == "liquid_clustering"
+        assert tuning.platform_optimizations.liquid_clustering_columns == ["event_time", "id"]
 
 
 class TestGetQueryDetailsTool:

@@ -137,4 +137,6 @@ explorer-vitest:
   - "_project/scripts/explorer_publish.py"
   - "results-data/**"
   - "scripts/generate_corpus_inventory.py"
+  - "tests/parity/fixtures/**"
+  - "tests/unit/core/tuning/fixtures/**"
   - ".github/workflows/results-explorer-browser.yml"

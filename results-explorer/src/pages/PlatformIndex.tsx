@@ -220,7 +220,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     const canonical = canonicalPlatformRouteKey(platform);
     if (requested === canonical) return;
     if (rows.some((row) => normalizePlatformKey(row.platform_id) === canonical)) {
-      route(`/results/p/${canonical}/`, true);
+      route(`/results/p/${canonical}/${window.location.search}`, true);
     }
   }, [platform, rows]);
 
