@@ -102,6 +102,7 @@ def test_tenant_job_tools_are_remote_only_and_cross_tenant_fail_closed(tmp_path:
                     "platform": "duckdb",
                     "benchmark": "tpch",
                     "scale_factor": 0.01,
+                    "platform_options": {"threads": 2},
                     "idempotency_key": "acceptance-1",
                 },
             )
@@ -124,6 +125,17 @@ def test_tenant_job_tools_are_remote_only_and_cross_tenant_fail_closed(tmp_path:
                 "run_benchmark", {"platform": "duckdb", "benchmark": "tpch", "scale_factor": 0.01}
             )
             assert "requires start_benchmark" in synchronous.content[0].text
+
+            with pytest.raises(MCPError, match="not authorized") as rejected:
+                await client_a.call_tool(
+                    "start_benchmark",
+                    {
+                        "platform": "duckdb",
+                        "benchmark": "tpch",
+                        "platform_options": {"password": "SECRET_SENTINEL"},
+                    },
+                )
+            assert "SECRET_SENTINEL" not in str(rejected.value)
 
         async with authenticated_http_client(config, token_b) as (client_b, _):
             for tool_name in ("get_benchmark_status", "cancel_benchmark", "get_benchmark_result"):
