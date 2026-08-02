@@ -21,7 +21,12 @@ from urllib.parse import urlparse
 
 import yaml
 
-from benchbox.core.results.platform_options import _SECRET_KEY_PARTS, is_secret_option_key
+from benchbox.core.results import platform_options as _platform_options
+
+is_secret_option_key = _platform_options.is_secret_option_key
+# Compatibility export for callers/tests that compare the shared classifier's
+# source list; behavior goes through ``is_secret_option_key`` below.
+_SECRET_KEY_PARTS = _platform_options._SECRET_KEY_PARTS
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +40,11 @@ def _load_anonymization_specs() -> dict[str, Any]:
 
 _ANONYMIZATION_SPECS = _load_anonymization_specs()
 
-# Secret-key matching is shared with the internal capture path: both consumers
-# read platform_options._SECRET_KEY_PARTS (imported above) so the lists cannot
-# diverge again. The spec file deliberately no longer carries its own copy -
-# the two hand-synced lists drifted within a month of #1346 ('keyid' was added
-# to platform_options only), which left *_key_id values unredacted on this
-# public path.
+# Secret-key matching is shared with the internal capture path through
+# ``is_secret_option_key`` so the lists cannot diverge again. The spec file
+# deliberately no longer carries its own copy - the two hand-synced lists
+# drifted within a month of #1346 (``keyid`` was added to platform_options
+# only), which left ``*_key_id`` values unredacted on this public path.
 _IDENTIFIER_KEYS = dict(_ANONYMIZATION_SPECS["identifier_keys"])
 _ENDPOINT_KEYS = set(_ANONYMIZATION_SPECS["endpoint_keys"])
 _PATH_KEYS = set(_ANONYMIZATION_SPECS["path_keys"])
@@ -443,8 +447,7 @@ class AnonymizationManager:
         return value
 
     def _is_secret_metadata_key(self, key_path: tuple[str, ...]) -> bool:
-        key = _compact_key(key_path[-1]) if key_path else ""
-        return any(part in key for part in _SECRET_KEY_PARTS)
+        return bool(key_path) and is_secret_option_key(key_path[-1])
 
     def _is_message_metadata_key(self, key_path: tuple[str, ...]) -> bool:
         key = _compact_key(key_path[-1]) if key_path else ""

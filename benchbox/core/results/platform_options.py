@@ -50,6 +50,10 @@ _SECRET_KEY_PARTS = tuple(
         "account_key",
     )
 )
+# These provider/CLI aliases are credential names only when used as the whole
+# option key. In particular, ``pat`` must not be a substring rule because it
+# would classify legitimate ``path`` options as secrets.
+_EXACT_SECRET_KEYS = frozenset({"passwd", "pwd", "pat"})
 # Connection usernames are identity, not secrets, so they are NOT in
 # _SECRET_KEY_PARTS (the public anonymization path shares that list and must
 # keep PSEUDONYMIZING usernames for grouping, not redacting them). But the
@@ -99,7 +103,7 @@ _INTERNAL_OPTION_KEYS = {
 
 def is_secret_option_key(key: str) -> bool:
     normalized = _normalize_secret_key(key)
-    return any(part in normalized for part in _SECRET_KEY_PARTS)
+    return normalized in _EXACT_SECRET_KEYS or any(part in normalized for part in _SECRET_KEY_PARTS)
 
 
 def sanitize_platform_options(
