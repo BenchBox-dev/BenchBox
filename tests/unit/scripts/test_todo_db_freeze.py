@@ -444,3 +444,58 @@ class TestMigrateIsGatedByTheFreeze:
         raw.close()
         assert _run(db, "migrate", actor="bob") == 0
         assert self._version(db) == todo_db.SCHEMA_VERSION
+
+
+class TestFreezeCoversBulkWritePaths:
+    """The two paths that stage through a temp local database before copying to
+    the primary. Both are gated at the command level in main(), before dispatch,
+    so neither can reach `bulk_transfer` under a foreign freeze -- but that was
+    reasoned rather than executed until these tests existed.
+    """
+
+    @pytest.fixture()
+    def frozen_db(self, tmp_path):
+        db = tmp_path / "todo.sqlite"
+        connection = todo_db.connect(db)
+        todo_db.set_freeze(connection, "alice", "cutover", ttl_hours=1)
+        connection.commit()
+        connection.close()
+        return db
+
+    def test_import_yaml_replace_is_refused(self, frozen_db, capsys):
+        # Assert on the REASON, not the exit code. `--replace` exits 2 on a local
+        # backend regardless, so an exit-code-only assertion passes even with the
+        # gate deleted -- verified by mutation, which is how this test was fixed.
+        assert _run(frozen_db, "import-yaml", "--replace", actor="bob") == 2
+        assert "frozen for maintenance" in capsys.readouterr().err
+
+    def test_import_yaml_dry_run_is_a_read(self, frozen_db, capsys):
+        # --dry-run writes nothing, so a freeze must not block it.
+        _run(frozen_db, "import-yaml", "--dry-run", actor="bob")
+        assert "frozen for maintenance" not in capsys.readouterr().err
+
+    def test_finding_import_bulk_is_refused(self, frozen_db, tmp_path, capsys):
+        corpus = tmp_path / "corpus"
+        corpus.mkdir()
+        assert (
+            _run(
+                frozen_db,
+                "finding",
+                "import",
+                "--corpus",
+                str(corpus),
+                "--bulk",
+                "--confirm-target",
+                "benchbox-todo",
+                actor="bob",
+            )
+            == 2
+        )
+        assert "frozen for maintenance" in capsys.readouterr().err
+
+    def test_the_refusal_is_the_freeze_not_an_incidental_error(self, tmp_path, capsys):
+        """Control: with no freeze the same command fails for a DIFFERENT reason."""
+        db = tmp_path / "todo.sqlite"
+        todo_db.connect(db).close()
+        _run(db, "import-yaml", "--replace", actor="bob")
+        assert "frozen for maintenance" not in capsys.readouterr().err
