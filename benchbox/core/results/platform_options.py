@@ -9,6 +9,7 @@ from typing import Any
 REDACTED_VALUE = "<redacted>"
 
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
+_URI_USERINFO_RE = re.compile(r"(?P<prefix>[a-z][a-z0-9+.-]*://)[^/@\s]+@", flags=re.IGNORECASE)
 
 
 def _normalize_secret_key(key: str) -> str:
@@ -69,6 +70,11 @@ _USERNAME_KEYS = frozenset({"user", "username", "userid", "pguser", "dbuser", "s
 
 def _is_username_key(key: str) -> bool:
     return _normalize_secret_key(key) in _USERNAME_KEYS
+
+
+def _scrub_uri_userinfo(value: str) -> str:
+    """Replace credential-bearing URI userinfo without changing ordinary values."""
+    return _URI_USERINFO_RE.sub(r"\g<prefix>****@", value)
 
 
 _INTERNAL_OPTION_KEYS = {
@@ -189,6 +195,8 @@ def _iter_public_options(options: Mapping[str, Any] | None):
 
 
 def _sanitize_option_value(value: Any, *, exclude_internal: bool = False, redact_usernames: bool = True) -> Any:
+    if isinstance(value, str):
+        return _scrub_uri_userinfo(value)
     if isinstance(value, Mapping):
         return sanitize_platform_options(
             value,

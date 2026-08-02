@@ -241,6 +241,26 @@ def test_credential_aliases_are_redacted_without_touching_paths_or_tuning_keys()
     assert sanitized["primary_key"] == "id"
 
 
+def test_uri_userinfo_credentials_are_redacted_without_touching_public_values() -> None:
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options(
+        {
+            "database_path": "postgresql://user:URI_PASSWORD@db.example/db",
+            "output_location": "https://user:URI_TOKEN@example.com/export",
+            "url": "https://public.example/export",
+            "path": "/tmp/data",
+            "sort_key": "o_orderkey",
+        }
+    )
+
+    assert sanitized["database_path"] == "postgresql://****@db.example/db"
+    assert sanitized["output_location"] == "https://****@example.com/export"
+    assert sanitized["url"] == "https://public.example/export"
+    assert sanitized["path"] == "/tmp/data"
+    assert sanitized["sort_key"] == "o_orderkey"
+
+
 def test_lifecycle_run_config_persists_sanitized_platform_options_with_provenance() -> None:
     benchmark_config = BenchmarkConfig(
         name="tpch",
