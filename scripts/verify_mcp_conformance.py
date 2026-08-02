@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+"""Run the revision-pinned MCP conformance and Inspector acceptance gate."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+from benchbox.mcp.readiness import (
+    AUTOMATED_GATES,
+    CONFORMANCE_REVISION,
+    CURRENT_PROTOCOL_VERSION,
+    EXTERNAL_GATES,
+    INSPECTOR_INTEGRITY,
+    INSPECTOR_REVISION,
+    INSPECTOR_VERSION,
+)
+
+CONFORMANCE_REPOSITORY = "https://github.com/modelcontextprotocol/conformance.git"
+SCENARIOS = (
+    "caching",
+    "dns-rebinding-protection",
+    "http-header-validation",
+    "tools-list",
+    "resources-list",
+    "prompts-list",
+    "server-sse-multiple-streams",
+    "server-stateless",
+)
+EXPECTED_FAILURES = """server:
+  - server-stateless:sep-2575-server-rejects-undeclared-capability
+  - server-stateless:sep-2575-missing-capability-http-400
+  - server-stateless:sep-2575-server-sends-prompts-list-changed-on-subscription
+  - server-stateless:sep-2575-server-sends-tools-list-changed-on-subscription
+"""
+
+
+def _run(command: list[str], *, cwd: Path | None = None, timeout: int = 600) -> None:
+    subprocess.run(command, cwd=cwd, check=True, timeout=timeout)  # noqa: S603
+
+
+def _free_port() -> int:
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
+
+
+def _wait_for_port(port: int, process: subprocess.Popen[bytes], timeout: float = 30.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f"BenchBox MCP exited before readiness (code {process.returncode})")
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+                return
+        except OSError:
+            time.sleep(0.1)
+    raise TimeoutError("BenchBox MCP did not open its loopback port")
+
+
+def _prepare_conformance(checkout: Path) -> Path:
+    _run(["git", "init", "--quiet", str(checkout)])
+    _run(["git", "remote", "add", "origin", CONFORMANCE_REPOSITORY], cwd=checkout)
+    _run(["git", "fetch", "--quiet", "--depth=1", "origin", CONFORMANCE_REVISION], cwd=checkout)
+    _run(["git", "checkout", "--quiet", "--detach", "FETCH_HEAD"], cwd=checkout)
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=checkout, text=True).strip()  # noqa: S603
+    if revision != CONFORMANCE_REVISION:
+        raise RuntimeError("Conformance checkout revision mismatch")
+    _run(["npm", "ci", "--ignore-scripts"], cwd=checkout)
+    _run(["npm", "run", "build"], cwd=checkout)
+    return checkout / "dist" / "index.js"
+
+
+def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None:
+    conformance = _prepare_conformance(workspace / "conformance")
+    baseline = workspace / "expected-failures.yaml"
+    baseline.write_text(EXPECTED_FAILURES, encoding="utf-8")
+    for scenario in SCENARIOS:
+        command = [
+            "node",
+            str(conformance),
+            "server",
+            "--url",
+            url,
+            "--scenario",
+            scenario,
+            "--spec-version",
+            protocol_version,
+        ]
+        if scenario == "server-stateless":
+            command.extend(["--expected-failures", str(baseline)])
+        _run(command)
+
+
+def _run_inspector(url: str) -> None:
+    metadata = json.loads(
+        subprocess.check_output(  # noqa: S603
+            [
+                "npm",
+                "view",
+                f"@modelcontextprotocol/inspector@{INSPECTOR_VERSION}",
+                "dist.integrity",
+                "gitHead",
+                "--json",
+            ],
+            text=True,
+        )
+    )
+    if metadata != {"dist.integrity": INSPECTOR_INTEGRITY, "gitHead": INSPECTOR_REVISION}:
+        raise RuntimeError("Inspector package metadata does not match the pinned revision and integrity")
+    _run(
+        [
+            "npx",
+            "--yes",
+            f"@modelcontextprotocol/inspector@{INSPECTOR_VERSION}",
+            "--cli",
+            url,
+            "--transport",
+            "http",
+            "--method",
+            "tools/list",
+            "--format",
+            "json",
+        ]
+    )
+
+
+def _run_automated_acceptance() -> None:
+    _run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/integration/mcp/test_protocol_compatibility.py",
+            "tests/integration/mcp/test_multiworker_acceptance.py",
+            "tests/integration/mcp/test_observability_and_cache.py",
+            "-q",
+        ]
+    )
+
+
+def _write_evidence(path: Path, protocol_version: str) -> None:
+    if subprocess.check_output(["git", "status", "--porcelain"], text=True).strip():  # noqa: S603
+        raise RuntimeError("Refusing to write production evidence from a dirty worktree")
+    source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()  # noqa: S603
+    payload = {
+        "source_revision": source_revision,
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "protocol_version": protocol_version,
+        "conformance_revision": CONFORMANCE_REVISION,
+        "inspector_version": INSPECTOR_VERSION,
+        "inspector_revision": INSPECTOR_REVISION,
+        "inspector_integrity": INSPECTOR_INTEGRITY,
+        "automated": dict.fromkeys(sorted(AUTOMATED_GATES), True),
+        # These require operator evidence; false deliberately keeps publication blocked.
+        "external": dict.fromkeys(sorted(EXTERNAL_GATES), False),
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--protocol-version", required=True)
+    parser.add_argument("--evidence-output", type=Path)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    if args.protocol_version != CURRENT_PROTOCOL_VERSION:
+        raise SystemExit(f"unsupported production protocol version: {args.protocol_version}")
+    port = _free_port()
+    url = f"http://127.0.0.1:{port}/mcp"
+    with tempfile.TemporaryDirectory(prefix="benchbox-mcp-conformance-") as temp:
+        workspace = Path(temp)
+        with (workspace / "server.log").open("wb") as server_log:
+            process = subprocess.Popen(  # noqa: S603
+                [
+                    sys.executable,
+                    "-m",
+                    "benchbox.mcp",
+                    "--transport",
+                    "streamable-http",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    str(port),
+                    "--results-dir",
+                    str(workspace / "results"),
+                    "--charts-dir",
+                    str(workspace / "charts"),
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=server_log,
+                env=dict(os.environ),
+            )
+            try:
+                _wait_for_port(port, process)
+                _run_protocol_gate(url, args.protocol_version, workspace)
+                _run_inspector(url)
+            finally:
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+
+    if args.evidence_output is not None:
+        _run_automated_acceptance()
+        _write_evidence(args.evidence_output, args.protocol_version)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -16,13 +16,16 @@ import sys
 from collections.abc import Mapping
 from importlib.metadata import version
 from pathlib import Path
+from typing import Any
 
+from mcp.server.caching import CacheHint
 from mcp.server.mcpserver import MCPServer
 
 from benchbox.core.runtime_paths import resolve_runtime_paths
 from benchbox.mcp.prompts import register_all_prompts
 from benchbox.mcp.resources import register_all_resources
 from benchbox.mcp.security import RemoteSecurityRuntime, configure_transport_security_logging
+from benchbox.mcp.telemetry import RedactedTelemetryMiddleware, TelemetrySettings, configure_telemetry
 from benchbox.mcp.tools.analytics import register_analytics_tools
 from benchbox.mcp.tools.benchmark import register_benchmark_tools
 from benchbox.mcp.tools.discovery import register_discovery_tools
@@ -37,6 +40,16 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+MCP_CACHE_HINTS = {
+    "server/discover": CacheHint(ttl_ms=300_000, scope="public"),
+    "tools/list": CacheHint(ttl_ms=300_000, scope="public"),
+    "prompts/list": CacheHint(ttl_ms=300_000, scope="public"),
+    "resources/list": CacheHint(ttl_ms=300_000, scope="public"),
+    "resources/templates/list": CacheHint(ttl_ms=300_000, scope="public"),
+    # Resource bodies include tenant result metadata and system profiles.
+    "resources/read": CacheHint(ttl_ms=0, scope="private"),
+}
 
 
 def _resolve_log_level(
@@ -106,7 +119,10 @@ def create_benchbox_server(
         resolved_results_dir = runtime_paths.results_dir
         resolved_charts_dir = runtime_paths.charts_dir
 
-    server_kwargs: dict[str, object] = {}
+    environment = env if env is not None else os.environ
+    configure_telemetry(TelemetrySettings.from_env(environment))
+    middleware: list[Any] = [RedactedTelemetryMiddleware()]
+    server_kwargs: dict[str, object] = {"cache_hints": MCP_CACHE_HINTS}
     job_runtime = None
     if remote_security is not None:
         from benchbox.mcp.jobs import DurableJobRuntime
@@ -120,12 +136,13 @@ def create_benchbox_server(
         # or Origin value. Preserve the generic HTTP rejection without making
         # those headers a log-egress channel.
         configure_transport_security_logging()
+        middleware.append(remote_security.middleware)
         server_kwargs.update(
             auth=remote_security.auth_settings(),
             token_verifier=remote_security.verifier,
-            middleware=[remote_security.middleware],
             lifespan=job_runtime.lifespan,
         )
+    server_kwargs["middleware"] = middleware
 
     mcp = MCPServer(
         "benchbox",
