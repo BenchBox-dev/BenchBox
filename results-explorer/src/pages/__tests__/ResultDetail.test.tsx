@@ -90,6 +90,16 @@ describe("ResultDetail - median-first contract", () => {
     vi.mocked(getPrimaryMetricForBenchmark).mockResolvedValue("power_score");
   });
 
+  it("gives an invalid result ID a recovery link", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(null);
+
+    render(<ResultDetail resultId="stale-result" />);
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+
+    expect(screen.getByRole("alert")).toHaveTextContent('No result found for "stale-result".');
+    expect(screen.getByRole("link", { name: "Back to Results" })).toHaveAttribute("href", "/results/");
+  });
+
   it("(a) default table shows one row per display_timing, not per raw query", async () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());

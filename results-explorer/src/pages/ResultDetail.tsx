@@ -129,7 +129,19 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
     [detail, rawSort],
   );
 
-  if (error) return <ErrorMessage message={error} />;
+  if (error) {
+    return (
+      <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: "Result detail" }]} />
+        <div class="mt-8">
+          <ErrorMessage message={error} />
+          <a href="/results/" class="mt-4 inline-block btn btn-secondary no-underline">
+            Back to Results
+          </a>
+        </div>
+      </div>
+    );
+  }
   if (!detail || !chartContext) return <LoadingSpinner message="Loading result..." />;
 
   const benchmarkLabel = humanizeBenchmark(detail.benchmark);

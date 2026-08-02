@@ -47,6 +47,12 @@ type TrendMetric = "power_score" | "display_geomean_ms";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
 const MIN_TREND_OBSERVATIONS = 3;
+const PLATFORM_ROUTE_ALIASES: Readonly<Record<string, string>> = {
+  // Historical links used underscores, while the registry's canonical ID is
+  // hyphenated. Keep this explicit: arbitrary underscore rewriting would
+  // corrupt legitimate platform or benchmark identifiers.
+  clickhouse_local: "clickhouse-local",
+};
 const PLATFORM_RESULT_FACET_KEYS: FacetKey[] = [
   "benchmark",
   "scale_factor",
@@ -77,8 +83,13 @@ function normalizePlatformKey(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function canonicalPlatformRouteKey(value: string): string {
+  const normalized = normalizePlatformKey(value);
+  return PLATFORM_ROUTE_ALIASES[normalized] ?? normalized;
+}
+
 function platformRowsForRequest(rows: PlatformIndexRowRow[], platform: string): PlatformIndexRowRow[] {
-  const requested = normalizePlatformKey(platform);
+  const requested = canonicalPlatformRouteKey(platform);
   // platform_id is the canonical URL identity. Only fall back to display
   // labels when no canonical id matches, otherwise same-name sibling tracks
   // such as datafusion/datafusion-44 would collapse into one page.
@@ -204,6 +215,16 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   }, []);
 
   useEffect(() => {
+    if (!rows) return;
+    const requested = normalizePlatformKey(platform);
+    const canonical = canonicalPlatformRouteKey(platform);
+    if (requested === canonical) return;
+    if (rows.some((row) => normalizePlatformKey(row.platform_id) === canonical)) {
+      route(`/results/p/${canonical}/`, true);
+    }
+  }, [platform, rows]);
+
+  useEffect(() => {
     setVisibleLimit(TABLE_RENDER_LIMIT);
   }, [
     platform,
@@ -242,7 +263,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   // Fall back to matching by display name for backward compatibility with any
   // old links constructed from the display name.
   const allPlatformResults = platformRowsForRequest(rows, platform);
-  const canonicalPlatformId = normalizePlatformKey(allPlatformResults[0]?.platform_id ?? platform);
+  const canonicalPlatformId = normalizePlatformKey(allPlatformResults[0]?.platform_id ?? canonicalPlatformRouteKey(platform));
 
   // Distinct platform options for the in-page sibling pivot, sorted by
   // display name. Platform ids can arrive with mixed casing from older

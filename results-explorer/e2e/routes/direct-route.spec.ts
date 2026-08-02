@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { waitForDataElement, waitForShell } from "../support/fixtures";
+import { waitForDataElement, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const SHORT_DUCKDB = "ba6a8c83";
 const SHORT_DATAFUSION = "5e6c5eba";
@@ -60,6 +60,28 @@ test.describe("direct route parity", () => {
 
     await page.goto("/results/compare");
     await waitForDataElement(page, page.getByRole("heading", { name: /^Pick runs to compare$/ }));
+  });
+
+  test("flywheel documentation CTAs use real native navigation", async ({ page }) => {
+    await page.route("**/docs/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: "<!doctype html><title>BenchBox docs</title><h1>Documentation route</h1>",
+      });
+    });
+    await page.goto("/results/");
+    await waitForDataLoaded(page, /Recent Results/i);
+
+    await page.getByRole("link", { name: "Run a benchmark" }).click();
+    await expect(page).toHaveURL(/\/docs\/usage\/installation\.html$/);
+    await expect(page.getByRole("heading", { name: "Documentation route" })).toBeVisible();
+
+    await page.goto("/results/");
+    await waitForDataLoaded(page, /Recent Results/i);
+    await page.getByRole("link", { name: "Submit a bundle" }).click();
+    await expect(page).toHaveURL(/\/docs\/contributing-results\.html$/);
+    await expect(page.getByRole("heading", { name: "Documentation route" })).toBeVisible();
   });
 
   test("direct route compare warning copy uses singular and plural labels", async ({ page }) => {
