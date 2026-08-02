@@ -396,8 +396,15 @@ its tools remain a separate raw rendering namespace.
 | `result_files` | string | Yes | - | Comma-separated result filenames. |
 | `chart_type` | string | No | `performance_bar` | Chart type for single-chart output. |
 | `template` | string or null | No | `null` | Template name for multi-chart output. |
-| `output_dir` | string or null | No | `null` | Output directory relative to charts dir. |
-| `format` | string | No | `ascii` | Output format; current MCP output is ASCII. |
+| `output_dir` | string or null | No | `null` | Must remain `null`; MCP chart output is intentionally inline-only and caller-selected file paths are rejected. |
+| `format` | string | No | `ascii` | Must be `ascii`; other formats are rejected until a tenant-scoped artifact contract is approved. |
+
+Chart generation is intentionally inline-only. `generate_chart` returns the
+ASCII content in the MCP response and does not create a caller-selected file.
+This keeps chart output inside the response boundary while a future artifact
+contract is designed for tenant ownership, path containment, overwrite and
+retention semantics. Requests that set `output_dir` or choose another format
+fail closed with a structured validation error.
 
 Available `chart_type` values and template names are derived from the
 visualization registries and are discoverable with `list_available(category="charts")`.
