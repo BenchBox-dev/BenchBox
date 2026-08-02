@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 
+from benchbox.mcp.readiness import verify_publication_evidence
 from benchbox.mcp.security import RemoteSecurityRuntime
+from benchbox.mcp.telemetry import TelemetrySettings
 
 MCPTransport = Literal["stdio", "streamable-http"]
 
@@ -27,6 +32,8 @@ class MCPTransportSettings:
     port: int = 8000
     streamable_http_path: str = "/mcp"
     remote_security: RemoteSecurityRuntime | None = None
+    readiness_evidence: Path | None = None
+    env: Mapping[str, str] | None = None
 
     def __post_init__(self) -> None:
         if self.transport not in ("stdio", "streamable-http"):
@@ -37,6 +44,8 @@ class MCPTransportSettings:
             raise ValueError("MCP Streamable HTTP path must start with '/'")
         if self.transport == "stdio" and self.remote_security is not None:
             raise ValueError("Remote security configuration is only valid with Streamable HTTP")
+        if self.transport == "stdio" and self.readiness_evidence is not None:
+            raise ValueError("MCP readiness evidence is only valid with Streamable HTTP")
         if (
             self.transport == "streamable-http"
             and not is_supported_loopback_host(self.host)
@@ -48,9 +57,21 @@ class MCPTransportSettings:
             )
         if self.transport == "streamable-http":
             object.__setattr__(self, "host", self.host.strip().lower())
+        if (
+            self.transport == "streamable-http"
+            and is_supported_loopback_host(self.host)
+            and self.readiness_evidence is not None
+        ):
+            raise ValueError("MCP readiness evidence is only valid for a non-loopback bind")
         if self.transport == "streamable-http" and not is_supported_loopback_host(self.host):
             assert self.remote_security is not None
             self.remote_security.config.require_remote_tls()
+            if self.readiness_evidence is None:
+                raise ValueError("Remote MCP publication requires current readiness evidence")
+            environment = self.env if self.env is not None else os.environ
+            verify_publication_evidence(self.readiness_evidence, environment)
+            if TelemetrySettings.from_env(environment).endpoint is None:
+                raise ValueError("Remote MCP publication requires an OTLP traces endpoint")
 
 
 def run_transport(server: MCPServer, settings: MCPTransportSettings) -> None:

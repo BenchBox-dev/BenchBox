@@ -18,8 +18,8 @@ The pre-provisioned token verifier is a resource-server integration seam, not
 an authorization server. Tokens must be issued out of band. For horizontally
 scaled deployments, every worker must mount the configured state database and
 workspace root from storage with shared locking and durability semantics. Do
-not use node-local files on multiple hosts. A later production-readiness gate
-must pass before publishing a shared endpoint.
+not use node-local files on multiple hosts. The production-readiness gate must
+pass for the exact deployed revision before publishing a shared endpoint.
 
 ## Configuration
 
@@ -103,25 +103,77 @@ artifact are removed after `retention_seconds`.
 Run the process behind a TLS-terminating reverse proxy. The externally visible
 issuer and resource-server URLs must use HTTPS. The proxy must preserve the
 validated `Host`, `Origin`, `Content-Type`, and `Authorization` headers and must
-not log bearer values.
+not log bearer values. Configure request-body and header-size limits at the
+proxy, disable response caching, and set an upstream timeout long enough for
+normal MCP calls; benchmark execution itself uses durable job handles.
+
+Do not run the following command until the acceptance matrix is complete. The
+evidence JSON must name the deployed `BENCHBOX_BUILD_SHA`, be no more than seven
+days old, contain passing automated and external gates, and match the digest
+provisioned independently as `BENCHBOX_MCP_READINESS_SHA256`. OTLP credentials
+belong in the standard OpenTelemetry environment, never in the evidence file.
 
 ```bash
+export BENCHBOX_BUILD_SHA=<deployed-commit-sha>
+export BENCHBOX_MCP_READINESS_SHA256=<sha256-of-readiness-json>
+export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://otel.example.com/v1/traces
+
 benchbox-mcp \
   --transport streamable-http \
   --host 10.0.0.12 \
   --port 8000 \
-  --security-config /etc/benchbox/mcp-security.json
+  --security-config /etc/benchbox/mcp-security.json \
+  --readiness-evidence /etc/benchbox/mcp-readiness.json
 ```
 
 Startup is rejected if a non-loopback host has no policy, if its public URLs
-are not HTTPS, or if Host/Origin/token allowlists are empty. Stdio keeps its
-existing local behavior and rejects the remote-only policy option.
+are not HTTPS, if Host/Origin/token allowlists are empty, if OTLP is absent, or
+if evidence is missing, stale, failed, digest-mismatched, pin-mismatched, or for
+another source revision. Stdio keeps its existing local behavior and rejects
+the remote-only policy and evidence options.
 
 The SQLite file and workspace root are durable shared backends only for workers on storage that
 provides correct cross-process locking. Before multi-host use, replace or mount
 it on an explicitly supported shared storage service and pass the production
 readiness acceptance matrix. Statelessness must never substitute for this
 coordination.
+
+## Storage, scaling, and recovery
+
+Treat `state_db` and `workspace_root` as one recovery unit. The state database
+contains authentication coordination, shared admission tickets, job leases,
+and job metadata; the workspace contains the corresponding tenant artifacts.
+Snapshots must preserve SQLite WAL consistency and artifact ordering. Test a
+restore into an isolated environment and prove that completed jobs have their
+published marker and response bundle, queued jobs remain claimable, expired
+running jobs are recovered, and no artifact crosses tenant roots.
+
+Scale workers only after the alternating-worker acceptance test passes against
+the same storage class used in production. Watch queue depth, admission wait,
+lease loss, retry count, failure rate, and artifact publication latency in
+shared telemetry. `MetricsCollector` is process-local diagnostics only; it is
+not cross-worker truth and resets on restart.
+
+Rollback uses the previous application revision with a readiness document
+generated for that exact revision. Before rollback, stop new publication at
+the proxy and let publishing jobs reach their commit point. Do not roll back
+across an incompatible state schema. Resume traffic only after protocol,
+storage, and smoke checks pass on the rollback pool.
+
+## Incident diagnostics
+
+1. Remove the endpoint from service discovery or deny traffic at the proxy;
+   do not delete state or artifacts.
+2. Preserve proxy request IDs, bounded OTLP trace IDs, redacted audit rows,
+   application revision, evidence digest, state/WAL snapshots, and storage
+   health. Never collect bearer tokens, raw database URLs, arguments, or result
+   payloads into telemetry.
+3. Determine whether the fault is protocol, identity/policy, admission,
+   worker lease, queue, publication, or storage. Compare multiple workers; do
+   not infer fleet health from one process-local metrics collector.
+4. Rotate credentials if exposure is suspected, restore the state/workspace
+   pair if durability is affected, and rerun the complete gate before
+   republishing.
 
 ## Audit contract
 

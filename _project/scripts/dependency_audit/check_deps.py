@@ -103,6 +103,8 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
     "mutmut": {"mutmut"},
     "codespell": {"codespell_lib"},
     "mcp": {"mcp"},
+    "opentelemetry-exporter-otlp-proto-http": {"opentelemetry.exporter.otlp.proto.http"},
+    "opentelemetry-sdk": {"opentelemetry.sdk"},
     "boto3": {"boto3", "botocore"},
     "cloudpathlib": {"cloudpathlib"},
     "click": {"click"},

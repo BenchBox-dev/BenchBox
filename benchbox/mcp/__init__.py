@@ -122,6 +122,7 @@ def run_server(
     port: int = 8000,
     streamable_http_path: str = "/mcp",
     security_config: str | Path | None = None,
+    readiness_evidence: str | Path | None = None,
 ) -> None:
     """Run the BenchBox MCP server.
 
@@ -140,6 +141,8 @@ def run_server(
         port=port,
         streamable_http_path=streamable_http_path,
         remote_security=remote_security,
+        readiness_evidence=Path(readiness_evidence) if readiness_evidence is not None else None,
+        env=env,
     )
     server_kwargs: dict[str, Any] = {
         "results_dir": results_dir,

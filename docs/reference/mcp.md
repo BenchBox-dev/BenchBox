@@ -54,7 +54,8 @@ port forward, or reverse proxy. Non-loopback binding requires a complete
 for its threat model, token-digest provisioning, scopes, tenant workspaces,
 shared admission store, and fail-closed proxy requirements. This capability is
 not a production-readiness claim; keep shared endpoint publication disabled
-until the separate conformance and operations gate has current evidence.
+until the [production-readiness gate](../operations/mcp-production-readiness.md)
+has current evidence for the deployed revision.
 
 ### SDK Compatibility
 
@@ -69,7 +70,9 @@ An authenticated remote server adds four durable job tools. They use shared
 storage and return immediately, so sessionless requests may reach different
 workers without losing ownership or lifecycle state.
 
-Streamable HTTP supports modern MCP `2026-07-28` as a sessionless protocol:
+Streamable HTTP supports modern MCP `2026-07-28` as a sessionless protocol.
+The only production-supported legacy handshake is `2025-11-25`; earlier
+revisions are not covered by the acceptance matrix:
 each request can reach any server process and no `Mcp-Session-Id` is issued.
 The same endpoint retains the SDK's stateless compatibility path for supported
 handshake-era clients. Protocol discovery, version negotiation, headers, and
@@ -90,14 +93,13 @@ This should return a JSON response listing all available tools.
 
 ### Using the MCP Inspector
 
-For interactive testing, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+For interactive testing, use the pinned official
+[MCP Inspector](https://github.com/modelcontextprotocol/inspector):
 
 ```bash
-# Install the inspector
-npx @anthropic-ai/inspector
-
-# Connect to BenchBox
-npx @anthropic-ai/inspector "uv run python -m benchbox.mcp"
+# Connect to an already-running localhost Streamable HTTP endpoint
+npx --yes @modelcontextprotocol/inspector@2.0.0 --cli \
+  http://127.0.0.1:8000/mcp --transport http --method tools/list --format json
 ```
 
 The inspector provides a web UI to browse tools, test calls, and view responses.
@@ -118,6 +120,7 @@ The inspector provides a web UI to browse tools, test calls, and view responses.
 | `--port` | Streamable HTTP bind port (default `8000`) |
 | `--streamable-http-path` | Streamable HTTP endpoint path (default `/mcp`) |
 | `--security-config` | Remote-only JSON policy for SDK auth, tenancy, authorization, admission, and audit |
+| `--readiness-evidence` | Revision-bound evidence required for every non-loopback bind |
 
 **Environment variables**
 
@@ -127,6 +130,15 @@ The inspector provides a web UI to browse tools, test calls, and view responses.
 | `BENCHBOX_CHARTS_DIR` | `benchmark_runs/charts` | Charts root when `--charts-dir` is not provided |
 | `BENCHBOX_OUTPUT_DIR` | `benchmark_runs` | Base root used to derive results/charts when specific vars are unset |
 | `BENCHBOX_LOG_LEVEL` | `INFO` | Logging level when `--log-level` is not provided |
+| `BENCHBOX_BUILD_SHA` | none | Exact deployed revision matched by remote readiness evidence |
+| `BENCHBOX_MCP_READINESS_SHA256` | none | Out-of-band digest of the readiness evidence file |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | none | Shared OTLP/HTTP trace endpoint required for remote publication |
+
+Discovery and list responses carry a public five-minute cache hint. Resource
+bodies, including recent results and system profiles, are always private and
+immediately stale. BenchBox exports only bounded allow-listed MCP span fields;
+tool arguments, result payloads, identities, authorization data, credentials,
+and raw database URLs are excluded.
 
 **Precedence**
 

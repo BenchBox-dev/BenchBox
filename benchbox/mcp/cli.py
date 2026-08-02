@@ -70,6 +70,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--security-config",
         help="JSON policy enabling authenticated, tenant-scoped Streamable HTTP.",
     )
+    parser.add_argument(
+        "--readiness-evidence",
+        help="Revision-bound production evidence required for a non-loopback bind.",
+    )
     return parser
 
 
@@ -97,4 +101,5 @@ def main(argv: Sequence[str] | None = None) -> None:
         port=args.port,
         streamable_http_path=args.streamable_http_path,
         security_config=args.security_config,
+        readiness_evidence=args.readiness_evidence,
     )

@@ -101,6 +101,8 @@ keep this map in sync when adding or auditing deps.
 | `pytest-benchmark` | `pytest_benchmark` |
 | `pytest-timeout` | `pytest_timeout` |
 | `codespell` | `codespell_lib` |
+| `opentelemetry-exporter-otlp-proto-http` | `opentelemetry.exporter.otlp.proto.http` |
+| `opentelemetry-sdk` | `opentelemetry.sdk` |
 
 ---
 
