@@ -64,6 +64,17 @@ _MESSAGE_SECRET_ASSIGNMENT_RE = re.compile(
     r"\b([a-z0-9][a-z0-9_.-]*)=[^&\s,;)]*",
     flags=re.IGNORECASE,
 )
+# Public bundles may contain path-like values below generic metadata keys
+# (for example ``working_dir`` or a nested ``raw_config`` entry).  Keep this
+# detector deliberately narrower than a generic slash matcher: URL paths,
+# SQL literals, and repository-relative tuning references must remain intact.
+_PRIVATE_LOCAL_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+    r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
+    r")",
+    flags=re.IGNORECASE,
+)
 
 
 def _compact_key(key: str) -> str:
@@ -431,6 +442,17 @@ class AnonymizationManager:
         if isinstance(value, str) and self._is_message_metadata_key(key_path):
             return self._sanitize_public_message(value)
 
+        if isinstance(value, str):
+            # Key-aware path handling covers the normal schema fields, while
+            # this recursive value check protects generic/nested metadata that
+            # a producer can add without first adding a field-name allowlist.
+            # Replace only the private path token so surrounding diagnostic
+            # text remains useful and URLs/SQL are not blanket-redacted.
+            value = _PRIVATE_LOCAL_PATH_RE.sub(
+                lambda match: self._hash_public_identifier(match.group(0), "path"),
+                value,
+            )
+
         prefix = self._identifier_prefix_for_key_path(key_path)
         if prefix is not None:
             if prefix == "host" and isinstance(value, str) and self._is_local_endpoint_value(value):
@@ -471,7 +493,16 @@ class AnonymizationManager:
             return "host" if key in {"host", "hostname", "server", "enginehost"} else "endpoint"
         if key.endswith("url") or key.endswith("endpoint"):
             return "endpoint"
-        if key.endswith("path") or key.endswith("directory") or key.endswith("file") or key in _PATH_KEYS:
+        if (
+            key.endswith("path")
+            or key.endswith("directory")
+            or key.endswith("dir")
+            or key.endswith("folder")
+            or key.endswith("root")
+            or key.endswith("file")
+            or key.endswith("executable")
+            or key in _PATH_KEYS
+        ):
             return "path"
         return None
 
@@ -799,3 +830,37 @@ class AnonymizationManager:
         validation["is_valid"] = len(validation["errors"]) == 0
 
         return validation
+
+
+def find_public_path_leaks(value: Any, key_path: tuple[str, ...] = ()) -> list[str]:
+    """Return dotted paths containing private absolute paths in public JSON.
+
+    The detector is intentionally value-redacting: callers can report the
+    offending field path without echoing a user's home directory or other
+    machine-local material.  It is shared by submission validation and the
+    Explorer publication boundary so both surfaces enforce the same contract.
+    """
+
+    leaks: list[str] = []
+
+    if isinstance(value, dict):
+        for key, child in value.items():
+            leaks.extend(find_public_path_leaks(child, (*key_path, str(key))))
+        return leaks
+
+    if isinstance(value, (list, tuple, set, frozenset)):
+        for index, child in enumerate(value):
+            leaks.extend(find_public_path_leaks(child, (*key_path, str(index))))
+        return leaks
+
+    if isinstance(value, str) and _PRIVATE_LOCAL_PATH_RE.search(value):
+        leaks.append(".".join(key_path) or "<root>")
+    return leaks
+
+
+__all__ = [
+    "PUBLIC_REDACTED_VALUE",
+    "AnonymizationConfig",
+    "AnonymizationManager",
+    "find_public_path_leaks",
+]

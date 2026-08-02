@@ -166,6 +166,18 @@ class TestValidateBundle:
         assert vr.ok
         assert len(vr.errors) == 0
 
+    def test_public_private_path_is_rejected_by_cli_boundary(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+        bundle_path = tmp_path / "tpch_result.json"
+        payload = _minimal_bundle()
+        payload["platform"]["working_dir"] = "/Users/alice/private-run"
+        bundle_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        assert main([str(bundle_path)]) == 1
+        output = capsys.readouterr().out
+        assert "FAIL" in output
+        assert "Users/alice" not in output
+        assert "working_dir" in output
+
     def test_missing_top_level_keys(self):
         data = {"version": "2.1"}  # Missing everything else
         vr = ValidationResult("test")

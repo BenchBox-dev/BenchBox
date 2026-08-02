@@ -9,6 +9,8 @@ Usage:
 from __future__ import annotations
 
 import importlib.util
+import json
+import re
 import sys
 from pathlib import Path
 
@@ -42,6 +44,34 @@ except ImportError:
     format_summary = bundle.format_summary
     validate_bundles = bundle.validate_bundles
 
+try:
+    from benchbox.core.results.anonymization import find_public_path_leaks
+except ImportError:  # pragma: no cover - published-results keeps a slim package mirror.
+    _PRIVATE_LOCAL_PATH_RE = re.compile(
+        r"(?<![A-Za-z0-9_])(?:"
+        r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+        r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
+        r")",
+        flags=re.IGNORECASE,
+    )
+
+    def find_public_path_leaks(value, key_path=()):
+        """Slim-branch fallback for the shared public path privacy contract."""
+        if isinstance(value, dict):
+            return [
+                leak for key, child in value.items() for leak in find_public_path_leaks(child, (*key_path, str(key)))
+            ]
+        if isinstance(value, (list, tuple)):
+            return [
+                leak
+                for index, child in enumerate(value)
+                for leak in find_public_path_leaks(child, (*key_path, str(index)))
+            ]
+        if isinstance(value, str) and _PRIVATE_LOCAL_PATH_RE.search(value):
+            return [".".join(key_path) or "<root>"]
+        return []
+
+
 __all__ = [
     "ValidationResult",
     "discover_bundles",
@@ -50,6 +80,44 @@ __all__ = [
     "main",
     "validate_bundles",
 ]
+
+
+_PUBLIC_COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".manifest.json")
+
+
+def _public_json_surfaces(bundle_path: Path) -> list[Path]:
+    """Return a primary bundle plus its JSON companions for privacy scanning."""
+    candidates = [bundle_path]
+    for suffix in _PUBLIC_COMPANION_SUFFIXES:
+        candidate = bundle_path.with_name(f"{bundle_path.stem}{suffix}")
+        if candidate.is_file():
+            candidates.append(candidate)
+    legacy_manifest = bundle_path.parent / "submission-manifest.json"
+    if legacy_manifest.is_file():
+        candidates.append(legacy_manifest)
+    return list(dict.fromkeys(candidates))
+
+
+def _append_public_privacy_errors(paths: list[Path], results: list[ValidationResult]) -> None:
+    """Fail closed when any public JSON surface contains a private absolute path."""
+    by_path = {Path(result.path): result for result in results}
+    for bundle_path in paths:
+        result = by_path.get(bundle_path)
+        if result is None:
+            continue
+        for surface in _public_json_surfaces(bundle_path):
+            try:
+                payload = json.loads(surface.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                # The schema/manifest validators own malformed JSON reporting;
+                # do not duplicate or alter those diagnostics here.
+                continue
+            leaks = sorted(set(find_public_path_leaks(payload)))
+            if leaks:
+                result.error(
+                    f"Public privacy contract rejects private absolute paths in {surface.name} "
+                    f"at field(s): {', '.join(leaks)}"
+                )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -92,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     results = validate_bundles(paths, require_manifest=require_manifest)
+    _append_public_privacy_errors(paths, results)
     print(format_summary(results))
 
     if pr_comment_path is not None:
