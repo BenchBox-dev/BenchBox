@@ -134,7 +134,7 @@ MCP_PLATFORM_OPTION_ALLOWLIST: dict[str, dict[str, MCPPlatformOptionSpec]] = {
         ),
         "liquid_clustering_columns": _MCP_OPTION("string"),
     },
-    "modin": {"engine": _MCP_OPTION("string", choices=("pandas", "ray", "dask"))},
+    "modin": {"engine": _MCP_OPTION("string", choices=("ray", "dask"))},
     "pandas": {"dtype_backend": _MCP_OPTION("string", choices=("numpy_nullable", "pyarrow"))},
     "polars": {
         "n_rows": _MCP_OPTION("int", minimum=1, maximum=10_000_000),
@@ -148,7 +148,7 @@ MCP_PLATFORM_OPTION_ALLOWLIST: dict[str, dict[str, MCPPlatformOptionSpec]] = {
     },
     "velox": {
         "adaptive_enabled": _MCP_OPTION("bool"),
-        "deployment": _MCP_OPTION("string", choices=("local", "docker")),
+        "deployment": _MCP_OPTION("string", choices=("local", "remote")),
         "driver_memory": _MCP_OPTION("string"),
         "offheap_size": _MCP_OPTION("string"),
         "shuffle_partitions": _MCP_OPTION("int", minimum=1, maximum=1_024),

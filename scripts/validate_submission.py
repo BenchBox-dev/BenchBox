@@ -49,7 +49,7 @@ try:
 except ImportError:  # pragma: no cover - published-results keeps a slim package mirror.
     _PRIVATE_LOCAL_PATH_RE = re.compile(
         r"(?<![A-Za-z0-9_])(?:"
-        r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+        r"(?:~|/Users|/home|/root|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
         r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
         r")",
         flags=re.IGNORECASE,
@@ -88,9 +88,13 @@ _PUBLIC_COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".
 def _public_json_surfaces(bundle_path: Path) -> list[Path]:
     """Return a primary bundle plus its JSON companions for privacy scanning."""
     candidates = [bundle_path]
+    try:
+        siblings = {path.name.lower(): path for path in bundle_path.parent.iterdir() if path.is_file()}
+    except OSError:
+        siblings = {}
     for suffix in _PUBLIC_COMPANION_SUFFIXES:
-        candidate = bundle_path.with_name(f"{bundle_path.stem}{suffix}")
-        if candidate.is_file():
+        candidate = siblings.get(f"{bundle_path.stem}{suffix}".lower())
+        if candidate is not None:
             candidates.append(candidate)
     legacy_manifest = bundle_path.parent / "submission-manifest.json"
     if legacy_manifest.is_file():
@@ -107,10 +111,18 @@ def _append_public_privacy_errors(paths: list[Path], results: list[ValidationRes
             continue
         for surface in _public_json_surfaces(bundle_path):
             try:
-                payload = json.loads(surface.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                # The schema/manifest validators own malformed JSON reporting;
-                # do not duplicate or alter those diagnostics here.
+                raw_text = surface.read_text(encoding="utf-8")
+            except OSError as exc:
+                result.error(f"Cannot read public JSON surface {surface.name}: {exc}")
+                continue
+            try:
+                payload = json.loads(raw_text)
+            except json.JSONDecodeError:
+                if surface != bundle_path:
+                    result.error(f"Malformed public companion JSON: {surface.name}")
+                raw_leaks = sorted(set(find_public_path_leaks(raw_text)))
+                if raw_leaks:
+                    result.error(f"Public privacy contract rejects private absolute paths in malformed {surface.name}")
                 continue
             leaks = sorted(set(find_public_path_leaks(payload)))
             if leaks:

@@ -135,6 +135,7 @@ export function Compare({ url }: CompareProps) {
   const [builderPinnedId, setBuilderPinnedId] = useState<string | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
   const [compareNotice, setCompareNotice] = useState<string | null>(null);
+  const [preserveRequestedIds, setPreserveRequestedIds] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const results = compareState?.results ?? EMPTY_RESULTS;
   const primaryMetric = compareState?.primaryMetric ?? "display_geomean_ms";
@@ -151,10 +152,14 @@ export function Compare({ url }: CompareProps) {
     setBuilderPinnedId(null);
     setShowBuilder(false);
     setCompareNotice(null);
+    setPreserveRequestedIds(false);
 
     const params = searchParamsFromUrl(activeUrl);
     const idsParam = params.get("ids") ?? "";
-    const plan = planCompareIds(idsParam.split(","), MAX_COMPARE_SELECTIONS);
+    const rawIds = idsParam.split(",");
+    // Resolve every requested ID before applying the comparison limit so a
+    // short ID and its long-form alias consume one slot, not two.
+    const plan = planCompareIds(rawIds, rawIds.length);
     let initialNotice: string | null = null;
     if (plan.duplicates.length > 0) {
       initialNotice = `Ignored duplicate result ID${plan.duplicates.length === 1 ? "" : "s"}: ${formatIdList(plan.duplicates)}.`;
@@ -238,9 +243,21 @@ export function Compare({ url }: CompareProps) {
           setCompareNotice(initialNotice);
         }
 
-        const candidates = resolved.filter(
-          (entry): entry is { requestedId: string; resolvedId: string; error: null } =>
-            entry.resolvedId !== null && !aliases.some((alias) => alias.requestedId === entry.requestedId),
+        const deduplicated = resolved.filter(
+          (entry) => !aliases.some((alias) => alias.requestedId === entry.requestedId),
+        );
+        const retained = deduplicated.slice(0, MAX_COMPARE_SELECTIONS);
+        const overflow = deduplicated.slice(MAX_COMPARE_SELECTIONS);
+        if (overflow.length > 0) {
+          const aliasResolutionNote = aliases.length > 0 ? " after alias resolution" : "";
+          initialNotice = appendCompareNotice(
+            initialNotice,
+            `Ignored ${overflow.length} additional result ID${overflow.length === 1 ? "" : "s"}${aliasResolutionNote} (${formatIdList(overflow.map((entry) => entry.requestedId))}); comparisons are limited to ${MAX_COMPARE_SELECTIONS} unique results.`,
+          );
+          setCompareNotice(initialNotice);
+        }
+        const candidates = retained.filter(
+          (entry): entry is { requestedId: string; resolvedId: string; error: null } => entry.resolvedId !== null,
         );
         const loaded = await Promise.all(
           candidates.map(async (entry) => {
@@ -255,10 +272,12 @@ export function Compare({ url }: CompareProps) {
 
         const missing = loaded.filter((entry) => entry.detail === null && entry.loadError === null);
         const failed = [
-          ...resolved.filter((entry) => entry.error !== null),
+          ...retained.filter((entry) => entry.error !== null),
           ...loaded.filter((entry) => entry.loadError !== null),
         ];
-        const details = loaded.flatMap((entry) => (entry.detail ? [entry.detail] : []));
+        const retainedLoaded = loaded;
+        const details = retainedLoaded.flatMap((entry) => (entry.detail ? [entry.detail] : []));
+        if (failed.length > 0) setPreserveRequestedIds(true);
         if (details.length === 0) {
           if (failed.length > 0) {
             const firstFailure = failed[0]!;
@@ -274,8 +293,13 @@ export function Compare({ url }: CompareProps) {
           setLoading(false);
           return;
         }
-        if (missing.length > 0 || failed.length > 0) {
-          const unavailable = [...missing, ...failed].map((entry) => entry.requestedId);
+        const retainedMissing = retainedLoaded.filter((entry) => entry.detail === null && entry.loadError === null);
+        const retainedFailed = [
+          ...retained.filter((entry) => entry.error !== null),
+          ...retainedLoaded.filter((entry) => entry.loadError !== null),
+        ];
+        if (retainedMissing.length > 0 || retainedFailed.length > 0) {
+          const unavailable = [...retainedMissing, ...retainedFailed].map((entry) => entry.requestedId);
           initialNotice = appendCompareNotice(
             initialNotice,
             `Ignored unavailable result ID${unavailable.length === 1 ? "" : "s"}: ${formatIdList(unavailable)}.`,
@@ -309,6 +333,7 @@ export function Compare({ url }: CompareProps) {
   useEffect(() => {
     const ids = results.map((r) => r.result_id);
     if (ids.length === 0 || typeof window === "undefined") return;
+    if (preserveRequestedIds) return;
     const currentParams = new URLSearchParams(window.location.search);
     const currentRawIds = currentParams.get("ids") ?? "";
     // A URL that started as a multi-selection must remain a multi-selection
@@ -348,7 +373,7 @@ export function Compare({ url }: CompareProps) {
           ),
         );
       });
-  }, [results]);
+  }, [preserveRequestedIds, results]);
 
   if (loading) return <CompareSummarySkeleton message="Loading results for comparison..." />;
   if (error)

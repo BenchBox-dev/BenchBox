@@ -55,7 +55,7 @@ _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
 
 _MESSAGE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])("
-    r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+    r"(?:~|/Users|/home|/root|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
     r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
     r")"
 )
@@ -74,7 +74,7 @@ _MESSAGE_SECRET_ASSIGNMENT_RE = re.compile(
 # SQL literals, and repository-relative tuning references must remain intact.
 _PRIVATE_LOCAL_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
-    r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+    r"(?:~|/Users|/home|/root|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
     r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
     r")",
     flags=re.IGNORECASE,
@@ -411,7 +411,11 @@ class AnonymizationManager:
                 elif key in {"columns", "column_names", "referenced_columns", "referenced_column_names"}:
                     anonymized[key] = self._anonymize_constraint_identifier_collection(child, "column")
                 else:
-                    anonymized[key] = self._anonymize_tuning_constraints(child)
+                    anonymized[key] = (
+                        self._anonymize_tuning_constraints(child)
+                        if isinstance(child, (dict, list, tuple))
+                        else self._anonymize_public_value({str(key): child}, ())[str(key)]
+                    )
             return anonymized
         if isinstance(value, list):
             return [self._anonymize_tuning_constraints(item) for item in value]

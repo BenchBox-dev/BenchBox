@@ -37,7 +37,12 @@ _SECRET_QUOTED_ASSIGNMENT_RE = re.compile(
     flags=re.IGNORECASE,
 )
 _SECRET_COLON_ASSIGNMENT_RE = re.compile(
-    rf"(?P<prefix>{_SECRET_KEY_PATTERN}\s*:\s*)(?P<value>[^&\s,;'\")]+)",
+    rf"(?P<prefix>{_SECRET_KEY_PATTERN}\s*:\s*)(?P<value>'[^']*'|\"[^\"]*\"|[^&\s,;]+)",
+    flags=re.IGNORECASE,
+)
+_SECRET_PROSE_CONNECTOR_RE = re.compile(
+    rf"(?P<prefix>\b{_SECRET_KEY_PATTERN}\s+(?:is|was|equals?|set\s+to|configured\s+as)\s+)"
+    r"(?P<value>[^\s,;:()]+)",
     flags=re.IGNORECASE,
 )
 _SECRET_PROSE_RE = re.compile(
@@ -96,6 +101,7 @@ def scrub_secret_material(text: str) -> str:
     scrubbed = _SECRET_QUOTED_ASSIGNMENT_RE.sub(replace_quoted, text)
     scrubbed = _SECRET_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
     scrubbed = _SECRET_COLON_ASSIGNMENT_RE.sub(replace_colon, scrubbed)
+    scrubbed = _SECRET_PROSE_CONNECTOR_RE.sub(replace_prose, scrubbed)
     scrubbed = _SECRET_PROSE_RE.sub(replace_prose, scrubbed)
     return _URL_USERINFO_RE.sub(r"\1****@", scrubbed)
 

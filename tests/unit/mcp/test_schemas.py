@@ -284,6 +284,13 @@ class TestRunBenchmarkInput:
         with pytest.raises(MCPValidationError):
             validate_platform_options("databricks", {"liquid_clustering_columns": "event_time;DROP"})
 
+    def test_mcp_platform_choices_match_adapter_contracts(self):
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("velox", {"deployment": "docker"})
+        assert validate_platform_options("velox", {"deployment": "remote"}) == {"deployment": "remote"}
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("modin", {"engine": "pandas"})
+
 
 class TestDryRunInput:
     """Tests for DryRunInput Pydantic model."""

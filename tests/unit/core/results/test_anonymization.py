@@ -882,6 +882,28 @@ class TestPublicPayloadTupleRecursion:
 
 
 class TestTuningPayloadAnonymization:
+    def test_unknown_constraint_fields_use_generic_public_sanitization(self):
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "foreign_keys": {
+                            "password": "CONSTRAINT-PASSWORD",
+                            "owner_email": "owner@example.com",
+                            "endpoint": "https://warehouse.example.com",
+                            "path": "/Users/alice/private-run",
+                        }
+                    }
+                }
+            }
+        )
+
+        serialized = json.dumps(out)
+        assert "CONSTRAINT-PASSWORD" not in serialized
+        assert "owner@example.com" not in serialized
+        assert "warehouse.example.com" not in serialized
+        assert "/Users/alice" not in serialized
+
     def test_constraint_table_and_column_identifiers_are_pseudonymized(self):
         out = AnonymizationManager().anonymize_tuning_payload(
             {
@@ -1065,3 +1087,10 @@ class TestPublicPayloadPathPrivacy:
     def test_detector_reports_field_paths_without_echoing_values(self):
         leaks = find_public_path_leaks({"nested": [{"working_dir": "/Users/alice/private"}]})
         assert leaks == ["nested.0.working_dir"]
+
+    def test_root_owned_home_paths_are_private_even_under_generic_keys(self):
+        payload = {"raw_config": {"location": "/root/private-run"}}
+
+        assert find_public_path_leaks(payload)
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        assert "/root/private-run" not in json.dumps(out, default=str)
