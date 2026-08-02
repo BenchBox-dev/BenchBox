@@ -797,6 +797,31 @@ class TestPublicPayloadApiKeyAndAccountKey:
         assert "AZKEY-SENTINEL" not in out
 
 
+class TestPublicPayloadCredentialAliases:
+    """The public anonymizer must share exact alias handling with capture."""
+
+    def test_aliases_are_redacted_while_preserving_tuning_keys_and_path_contract(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {
+                "platform_metadata": {
+                    "platform_raw_config": {
+                        "passwd": "PASSWD_SECRET",
+                        "pwd": "PWD_SECRET",
+                        "pat": "PAT_SECRET",
+                        "path": "/tmp/data",
+                        "sort_key": "o_orderkey",
+                    }
+                }
+            }
+        )["platform_metadata"]["platform_raw_config"]
+
+        assert out["passwd"] == PUBLIC_REDACTED_VALUE
+        assert out["pwd"] == PUBLIC_REDACTED_VALUE
+        assert out["pat"] == PUBLIC_REDACTED_VALUE
+        assert out["path"].startswith("path_")
+        assert out["sort_key"] == "o_orderkey"
+
+
 class TestPublicPayloadSslRootCert:
     """The libpq sslrootcert spelling ends in neither path nor file, so the
     raw local path (leaking the home-dir username) passed through."""
