@@ -307,6 +307,28 @@ class TestExceptionSecretScrubbing:
         assert "hunter2" not in msg
         assert "token" not in msg
 
+    def test_json_secret_assignments_are_scrubbed(self):
+        result = make_execution_error(
+            "failed",
+            exception=Exception('{"password": "JSON_SECRET", "token": "JSON_TOKEN"}'),
+        )
+        msg = result["details"]["exception_message"]
+        assert "JSON_SECRET" not in msg
+        assert "JSON_TOKEN" not in msg
+        assert '"password": "****"' in msg
+        assert '"token": "****"' in msg
+
+    def test_prose_secret_values_are_scrubbed(self):
+        result = make_execution_error("failed", exception=Exception("driver returned password PROSE_SECRET"))
+        assert "PROSE_SECRET" not in result["details"]["exception_message"]
+
+    def test_non_secret_secret_key_prose_is_untouched(self):
+        result = make_execution_error(
+            "failed",
+            exception=Exception("password: field is missing; token expired while connecting"),
+        )
+        assert result["details"]["exception_message"] == "password: field is missing; token expired while connecting"
+
     def test_top_level_message_is_scrubbed(self):
         result = make_execution_error("Benchmark execution failed: password=hunter2")
         assert result["message"] == "Benchmark execution failed: password=****"
