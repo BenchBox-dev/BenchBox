@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import anyio
@@ -10,6 +11,7 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import CallToolResult, TextContent
 
 from benchbox.mcp.security import (
+    AdmissionLease,
     AdmissionLimits,
     DurableSecurityStore,
     Principal,
@@ -78,6 +80,22 @@ def test_authorization_rejects_platform_benchmark_and_scale_outside_policy(tmp_p
         )
 
 
+@pytest.mark.parametrize("field", ["allowed_platforms", "allowed_benchmarks"])
+def test_empty_remote_execution_allowlists_deny_all(tmp_path: Path, field: str) -> None:
+    path = write_security_config(tmp_path, tokens={"token": ("tenant-a", ("benchbox:execute",))})
+    policy = json.loads(path.read_text(encoding="utf-8"))
+    policy[field] = []
+    path.write_text(json.dumps(policy), encoding="utf-8")
+    config = load_remote_security_config(path)
+    middleware = RemoteSecurityMiddleware(config, DurableSecurityStore(config.state_db, config.admission))
+    principal = Principal("a" * 32, "client", "issuer", "a", frozenset({"benchbox:execute"}))
+
+    with pytest.raises(MCPError, match="authorized"):
+        middleware._authorize(
+            principal, "run_benchmark", {"platform": "duckdb", "benchmark": "tpch", "scale_factor": 0.01}
+        )
+
+
 def test_durable_admission_is_shared_between_store_instances(tmp_path: Path) -> None:
     limits = AdmissionLimits(global_concurrency=1, principal_concurrency=1, queue_limit=0)
     first = DurableSecurityStore(tmp_path / "state.sqlite3", limits)
@@ -90,6 +108,97 @@ def test_durable_admission_is_shared_between_store_instances(tmp_path: Path) -> 
         first.release(lease)
         second_lease = await second.admit("principal-b")
         second.release(second_lease)
+
+    anyio.run(exercise)
+
+
+def test_admission_promotes_oldest_waiter_with_principal_capacity(tmp_path: Path) -> None:
+    limits = AdmissionLimits(global_concurrency=2, principal_concurrency=1, queue_limit=2)
+    store = DurableSecurityStore(tmp_path / "state.sqlite3", limits)
+    active_a = store._enqueue("principal-a")
+    active_c = store._enqueue("principal-c")
+    waiting_a = store._enqueue("principal-a")
+    waiting_b = store._enqueue("principal-b")
+
+    store.release(AdmissionLease(active_c, "principal-c"))
+
+    assert not store._try_promote(waiting_a, "principal-a")
+    assert store._try_promote(waiting_b, "principal-b")
+
+    store.release(AdmissionLease(active_a, "principal-a"))
+
+
+def test_admission_state_resets_after_os_restart(monkeypatch, tmp_path: Path) -> None:
+    from benchbox.mcp import security
+
+    monkeypatch.setattr(security, "_boot_identity", lambda: "boot-a")
+    first = DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
+    first._enqueue("principal-a")
+
+    monkeypatch.setattr(security, "_boot_identity", lambda: "boot-b")
+    restarted = DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
+    with restarted._connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM mcp_admission_tickets").fetchone()[0] == 0
+        assert connection.execute("SELECT COUNT(*) FROM mcp_rate_windows").fetchone()[0] == 0
+
+
+def test_concurrent_activity_during_store_startup_is_preserved(monkeypatch, tmp_path: Path) -> None:
+    from benchbox.mcp import security
+
+    monkeypatch.setattr(security, "_boot_identity", lambda: "same-boot")
+    first = DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
+    ticket_id = first._enqueue("principal-a")
+
+    # A later monotonic timestamp in the shared database is ordinary activity,
+    # not evidence of an OS restart.
+    monkeypatch.setattr(security, "mono_time", lambda: 1.0)
+    DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
+
+    with first._connect() as connection:
+        assert (
+            connection.execute(
+                "SELECT ticket_id FROM mcp_admission_tickets WHERE ticket_id = ?", (ticket_id,)
+            ).fetchone()
+            is not None
+        )
+
+
+def test_lost_admission_lease_cancels_running_request(tmp_path: Path) -> None:
+    config = load_remote_security_config(
+        write_security_config(tmp_path, tokens={"token": ("tenant-a", ("benchbox:read",))})
+    )
+
+    class LostLeaseStore:
+        limits = AdmissionLimits(lease_seconds=0.003)
+
+        def __init__(self) -> None:
+            self.released = False
+
+        async def admit(self, principal_id: str) -> AdmissionLease:
+            return AdmissionLease("ticket", principal_id)
+
+        def renew(self, lease: AdmissionLease) -> bool:
+            return False
+
+        def release(self, lease: AdmissionLease) -> None:
+            self.released = True
+
+        def audit(self, **_kwargs: object) -> None:
+            return None
+
+    async def exercise() -> None:
+        store = LostLeaseStore()
+        middleware = RemoteSecurityMiddleware(config, store)  # type: ignore[arg-type]
+        principal = Principal("a" * 32, "client", "issuer", "a", frozenset({"benchbox:read"}))
+
+        async def call_next(_ctx: object) -> object:
+            await anyio.sleep_forever()
+
+        with pytest.raises(MCPError, match="lease was lost"):
+            await middleware._call_admitted(  # type: ignore[arg-type]
+                principal, "tools/list", object(), call_next
+            )
+        assert store.released
 
     anyio.run(exercise)
 

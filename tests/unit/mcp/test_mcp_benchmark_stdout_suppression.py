@@ -64,7 +64,9 @@ def test_generate_data_impl_suppresses_transitive_stdout(tmp_path: Path) -> None
     try:
         sys.stdout = captured
         with patch("benchbox.mcp.tools.benchmark.get_benchmark_runs_datagen_path", return_value=tmp_path):
-            response = _generate_data_impl("tpch", DummyBenchmark, 0.01, "mcp_test_id", mono_time())
+            response = _generate_data_impl(
+                "tpch", DummyBenchmark, 0.01, "mcp_test_id", mono_time(), results_dir=tmp_path
+            )
         assert response["mcp_metadata"]["status"] == "completed"
         assert captured.getvalue() == ""
     finally:

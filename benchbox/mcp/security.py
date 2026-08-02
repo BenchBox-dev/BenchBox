@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import anyio
+import psutil
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.provider import AccessToken, TokenVerifier, principal_components
 from mcp.server.auth.settings import AuthSettings
@@ -30,6 +31,11 @@ ADMISSION_ERROR = -32004
 READ_SCOPE = "benchbox:read"
 EXECUTE_SCOPE = "benchbox:execute"
 WRITE_SCOPE = "benchbox:write"
+
+
+def _boot_identity() -> str:
+    """Return a stable identifier shared by processes in the current OS boot."""
+    return repr(psutil.boot_time())
 
 
 class TokenIdentity(BaseModel):
@@ -304,8 +310,30 @@ class DurableSecurityStore:
                     execution_id TEXT,
                     artifact_ref TEXT
                 );
+                CREATE TABLE IF NOT EXISTS mcp_runtime_metadata (
+                    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                    boot_id TEXT NOT NULL
+                );
                 """
             )
+            boot_id = _boot_identity()
+            self._begin(connection)
+            metadata = connection.execute("SELECT boot_id FROM mcp_runtime_metadata WHERE singleton = 1").fetchone()
+            if metadata is None:
+                # Preserve live state when migrating an existing database. Once
+                # recorded, later boots can be identified without timestamp races.
+                connection.execute(
+                    "INSERT INTO mcp_runtime_metadata (singleton, boot_id) VALUES (1, ?)",
+                    (boot_id,),
+                )
+            elif metadata["boot_id"] != boot_id:
+                connection.execute("DELETE FROM mcp_admission_tickets")
+                connection.execute("DELETE FROM mcp_rate_windows")
+                connection.execute(
+                    "UPDATE mcp_runtime_metadata SET boot_id = ? WHERE singleton = 1",
+                    (boot_id,),
+                )
+            connection.commit()
 
     def _begin(self, connection: sqlite3.Connection) -> None:
         connection.execute("BEGIN IMMEDIATE")
@@ -343,7 +371,7 @@ class DurableSecurityStore:
 
     def _enqueue(self, principal_id: str) -> str:
         ticket_id = uuid.uuid4().hex
-        now = utc_now().timestamp()
+        now = mono_time()
         with self._connect() as connection:
             self._begin(connection)
             self._cleanup_expired(connection, now)
@@ -367,7 +395,7 @@ class DurableSecurityStore:
         return ticket_id
 
     def _try_promote(self, ticket_id: str, principal_id: str) -> bool:
-        now = utc_now().timestamp()
+        now = mono_time()
         with self._connect() as connection:
             self._begin(connection)
             self._cleanup_expired(connection, now)
@@ -382,7 +410,19 @@ class DurableSecurityStore:
                 connection.commit()
                 return True
             first_waiting = connection.execute(
-                "SELECT ticket_id FROM mcp_admission_tickets WHERE state = 'waiting' ORDER BY created_at, ticket_id LIMIT 1"
+                """SELECT waiting.ticket_id
+                   FROM mcp_admission_tickets AS waiting
+                   LEFT JOIN (
+                       SELECT principal_id, COUNT(*) AS active_count
+                       FROM mcp_admission_tickets
+                       WHERE state = 'active'
+                       GROUP BY principal_id
+                   ) AS active ON active.principal_id = waiting.principal_id
+                   WHERE waiting.state = 'waiting'
+                     AND COALESCE(active.active_count, 0) < ?
+                   ORDER BY waiting.created_at, waiting.ticket_id
+                   LIMIT 1""",
+                (self.limits.principal_concurrency,),
             ).fetchone()
             if (
                 first_waiting is not None
@@ -423,7 +463,7 @@ class DurableSecurityStore:
             cursor = connection.execute(
                 """UPDATE mcp_admission_tickets SET lease_expires_at = ?
                    WHERE ticket_id = ? AND principal_id = ? AND state = 'active'""",
-                (utc_now().timestamp() + self.limits.lease_seconds, lease.ticket_id, lease.principal_id),
+                (mono_time() + self.limits.lease_seconds, lease.ticket_id, lease.principal_id),
             )
         return cursor.rowcount == 1
 
@@ -511,9 +551,9 @@ class RemoteSecurityMiddleware:
             scale_factor = float(arguments.get("scale_factor", 0.01))
         except (TypeError, ValueError) as exc:
             raise MCPError(AUTHORIZATION_ERROR, "Invalid benchmark scale factor") from exc
-        if self.config.allowed_platforms and platform not in self.config.allowed_platforms:
+        if platform not in self.config.allowed_platforms:
             raise MCPError(AUTHORIZATION_ERROR, "Platform is not authorized")
-        if self.config.allowed_benchmarks and benchmark not in self.config.allowed_benchmarks:
+        if benchmark not in self.config.allowed_benchmarks:
             raise MCPError(AUTHORIZATION_ERROR, "Benchmark is not authorized")
         if not math.isfinite(scale_factor) or scale_factor <= 0:
             raise MCPError(AUTHORIZATION_ERROR, "Benchmark scale factor must be finite and positive")
@@ -593,8 +633,9 @@ class RemoteSecurityMiddleware:
             lease = await self.store.admit(principal.principal_id)
             dispatch_error: Exception | None = None
             result: HandlerResult | None = None
+            lease_lost = anyio.Event()
             async with anyio.create_task_group() as task_group:
-                task_group.start_soon(self._renew_lease, lease)
+                task_group.start_soon(self._renew_lease, lease, task_group.cancel_scope, lease_lost)
                 try:
                     result = await call_next(ctx)
                 except Exception as exc:
@@ -603,6 +644,8 @@ class RemoteSecurityMiddleware:
                     dispatch_error = exc
                 finally:
                     task_group.cancel_scope.cancel()
+            if lease_lost.is_set():
+                raise MCPError(ADMISSION_ERROR, "Admission lease was lost during request execution")
             if dispatch_error is not None:
                 raise dispatch_error
             assert result is not None
@@ -625,12 +668,19 @@ class RemoteSecurityMiddleware:
             if lease is not None:
                 await anyio.to_thread.run_sync(self.store.release, lease)
 
-    async def _renew_lease(self, lease: AdmissionLease) -> None:
+    async def _renew_lease(
+        self,
+        lease: AdmissionLease,
+        request_scope: anyio.CancelScope,
+        lease_lost: anyio.Event,
+    ) -> None:
         """Heartbeat one active request without process-local authority."""
-        interval = max(0.05, min(self.store.limits.lease_seconds / 3, 30.0))
+        interval = max(0.001, min(self.store.limits.lease_seconds / 3, 30.0))
         while True:
             await anyio.sleep(interval)
             if not await anyio.to_thread.run_sync(self.store.renew, lease):
+                lease_lost.set()
+                request_scope.cancel()
                 return
 
     async def _audit(
