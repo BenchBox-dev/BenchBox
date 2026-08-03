@@ -359,7 +359,7 @@ function defaultImpl(
 ): QueryRowsImpl {
   return async (sql: string) => {
     const s = String(sql).replace(/\s+/g, " ").trim();
-    if (s.startsWith("SELECT DISTINCT") && s.includes("FROM bench.results")) {
+    if (s.startsWith("SELECT DISTINCT benchmark FROM bench.results")) {
       const slugs = availableBenchmarks
         ? [...availableBenchmarks]
         : [...new Set(rows.map((row) => String(row.benchmark)))].sort();
@@ -566,7 +566,7 @@ describe("BenchmarkIndex", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
-      if (s.startsWith("SELECT DISTINCT") && s.includes("FROM bench.results")) {
+      if (s.startsWith("SELECT DISTINCT benchmark FROM bench.results")) {
         throw new Error("simulated snapshot failure");
       }
       if (s.includes("FROM bench.results")) return [...RESULT_ROWS];
@@ -783,7 +783,7 @@ describe("BenchmarkIndex", () => {
       .mocked(queryRows)
       .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().includes("FROM bench.results WHERE"));
     const resultSql = String(resultCall?.[0]);
-    expect(resultSql).toContain("CASE WHEN benchmark = 'star_schema' THEN 'ssb'");
+    expect(resultSql).toContain("benchmark IN (?)");
     expect(resultSql).toContain("(platform IN (?) OR platform_id IN (?))");
     expect(resultSql).toContain("deployment_class IN (?)");
     expect(resultSql).toContain("cost_status IN (?)");

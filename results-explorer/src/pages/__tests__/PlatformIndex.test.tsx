@@ -297,11 +297,11 @@ describe("PlatformIndex - sortable table headers", () => {
     }));
     expect(benchmarkOptions).toEqual([
       { value: "all", label: "All benchmarks" },
-      { value: "ssb", label: "SSB" },
-      { value: "star_schema", label: "SSB (legacy slug)" },
+      { value: "ssb", label: "SSB (legacy slug)" },
+      { value: "star_schema", label: "SSB" },
     ]);
-    expect(within(benchmarkSelect).getByRole("option", { name: "SSB" })).toHaveValue("ssb");
-    expect(within(benchmarkSelect).getByRole("option", { name: "SSB (legacy slug)" })).toHaveValue("star_schema");
+    expect(within(benchmarkSelect).getByRole("option", { name: "SSB" })).toHaveValue("star_schema");
+    expect(within(benchmarkSelect).getByRole("option", { name: "SSB (legacy slug)" })).toHaveValue("ssb");
   });
 
   it("locks the cohort signature after the first compare selection", async () => {

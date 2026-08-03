@@ -24,11 +24,7 @@ EXPLORER_BUILD_CONTRACT_VERSION = "6"
 #     column and the detail projection now selects it unconditionally, so a v5
 #     snapshot would hit a DuckDB binder error instead of the intended rebuild
 #     message.
-# v7: cohort/ranking identity now derives the canonical benchmark alias
-#     (`star_schema` -> `ssb`) and explicit `unknown` phase instead of guessing
-#     missing test_type as `power`. Existing snapshots must be rebuilt so their
-#     ranking and cohort tables cannot be queried under the new semantics.
-EXPLORER_READ_MODEL_VERSION = 7
+EXPLORER_READ_MODEL_VERSION = 6
 
 EXPLORER_BUILD_CONTRACT = {
     "version": EXPLORER_BUILD_CONTRACT_VERSION,

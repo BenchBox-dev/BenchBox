@@ -9,7 +9,6 @@ import {
   type FacetKey,
   type FacetState,
 } from "@/lib/facetModel";
-import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
 
 // Re-exported so existing consumers (TuningBadge, tests) keep importing the
 // not-recorded/legacy tuning tokens from here - facetModel.ts is the single
@@ -99,11 +98,11 @@ export function matchesDateWindow(runDate: string | null | undefined, value: Dat
 function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: FacetKey, now?: Date): boolean {
   switch (key) {
     case "benchmark":
-      return matchesRequired(row.benchmark ? canonicalBenchmarkSlug(row.benchmark) : row.benchmark, facets.benchmark.map(canonicalBenchmarkSlug));
+      return matchesRequired(row.benchmark, facets.benchmark);
     case "scale_factor":
       return matchesRequired(row.scale_factor === undefined || row.scale_factor === null ? null : String(row.scale_factor), facets.scale_factor);
     case "phase":
-      return matchesOptional(canonicalPhase(row.test_type ?? row.phase), facets.phase);
+      return matchesOptional(row.test_type ?? row.phase, facets.phase);
     case "platform":
       return matchesPlatform(row, facets.platform);
     case "execution_mode":

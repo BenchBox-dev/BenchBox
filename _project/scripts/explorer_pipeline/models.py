@@ -37,29 +37,6 @@ def unavailable_normalized_cost_payload() -> dict[str, Any]:
 # Platform identity helpers
 # ---------------------------------------------------------------------------
 
-# Raw bundle slugs remain on ManifestEntry/DetailResult for auditability. These
-# aliases are only used for derived cohort/ranking identity; they do not rewrite
-# the submitted evidence or result IDs.
-CANONICAL_BENCHMARK_ALIASES: dict[str, str] = {
-    "star_schema": "ssb",
-}
-
-
-def canonical_benchmark_slug(raw: str) -> str:
-    """Return the stable benchmark family slug used by cohort/ranking keys."""
-    normalized = raw.strip().lower()
-    return CANONICAL_BENCHMARK_ALIASES.get(normalized, normalized)
-
-
-def canonical_phase(raw: str | None) -> str:
-    """Return an explicit phase identity without guessing missing provenance.
-
-    A missing test type is legacy/unknown evidence, not proof that a run is a
-    power test. Keeping it in its own cohort prevents accidental aggregation.
-    """
-    normalized = (raw or "").strip().lower()
-    return normalized if normalized else "unknown"
-
 # Provenance suffixes appended to platform.name that are NOT part of the
 # canonical engine identity (trust source, not platform variant).
 # Only strip the "-trust-{source}" provenance suffix pattern. The original
@@ -693,7 +670,6 @@ class MetaRank(BaseModel):
 
 __all__ = [
     "BenchmarkSummary",
-    "CANONICAL_BENCHMARK_ALIASES",
     "DetailResult",
     "ManifestEntry",
     "PercentileStats",
@@ -708,8 +684,6 @@ __all__ = [
     "TimingEligibility",
     "display_timing_is_valid",
     "get_ranking_config",
-    "canonical_benchmark_slug",
-    "canonical_phase",
     "is_ranking_eligible",
     "MetaRank",
     "ranking_exclusion_reason",

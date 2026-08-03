@@ -1,4 +1,4 @@
-import { canonicalBenchmarkSlug, canonicalPhase, formatBenchmarkLabel } from "@/lib/displayLabels";
+import { formatBenchmarkLabel } from "@/lib/displayLabels";
 
 /**
  * Extract the trailing short-hash token from a result id for a11y disambiguation.
@@ -47,9 +47,9 @@ function asText(value: unknown): string {
  */
 export function compareCohortSignatureForRow(row: CompareCohortRow): CompareCohortSignature {
   return {
-    benchmark: canonicalBenchmarkSlug(asText(row.benchmark)),
+    benchmark: asText(row.benchmark),
     scaleFactor: asText(row.scale_factor),
-    phase: canonicalPhase(asText(row.phase ?? row.test_type)),
+    phase: asText(row.phase ?? row.test_type),
     primaryMetric: asText(row.primary_metric) || null,
   };
 }

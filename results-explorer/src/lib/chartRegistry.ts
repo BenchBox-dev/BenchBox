@@ -17,7 +17,6 @@
  */
 
 import type { BenchmarkSummary, DetailResult, PlatformRow } from "@/types";
-import { canonicalPhase } from "@/lib/displayLabels";
 import {
   isTimingDisplayable,
   isValidTimingValue,
@@ -363,7 +362,7 @@ function buildDetailSummary(
   return {
     benchmark: detail.benchmark,
     scale_factor: detail.scale_factor,
-    phase: canonicalPhase(detail.test_type),
+    phase: detail.test_type ?? "power",
     query_ids: detail.display_timings.map((timing) => timing.query_id),
     platforms: [detailToPlatformRow(detail)],
     cell_reduction: "median",
@@ -387,7 +386,7 @@ function buildCompareSummary(
   return {
     benchmark: results[0]!.benchmark,
     scale_factor: results[0]!.scale_factor,
-    phase: canonicalPhase(results[0]!.test_type),
+    phase: results[0]!.test_type ?? "power",
     query_ids: queryIds,
     platforms: results.map(detailToPlatformRow),
     cell_reduction: "median",

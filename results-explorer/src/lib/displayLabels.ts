@@ -91,24 +91,16 @@ export function formatEnumLabel(raw: string): string {
   return raw.replace(/[_-]+/g, " ").trim();
 }
 
-/** Stable identity used by cohort/ranking surfaces. Raw slugs remain on rows. */
-export function canonicalBenchmarkSlug(raw: string): string {
-  const normalized = raw.trim().toLowerCase();
-  return normalized === "star_schema" ? "ssb" : normalized;
-}
-
-/** Stable phase identity; missing provenance is explicit and never guessed. */
-export function canonicalPhase(raw: string | null | undefined): string {
-  const normalized = (raw ?? "").trim().toLowerCase();
-  return normalized || "unknown";
-}
-
 /**
- * Render a benchmark slug for facet/listing contexts. The canonical SSB slug
- * is `ssb`; the historical `star_schema` value remains visibly identifiable
- * when it is encountered in raw evidence or a legacy route.
+ * Render a benchmark slug for facet/listing contexts where two slugs may
+ * humanize to the same label. The Star Schema Benchmark currently has both
+ * `star_schema` (canonical) and `ssb` (legacy) slugs in `BENCHMARK_LABELS`;
+ * `humanizeBenchmark` returns "SSB" for both, which produces two
+ * indistinguishable choices in benchmark facets and Home's Browse list.
+ * We keep `star_schema` rendering as the plain label and tag the legacy
+ * `ssb` slug so users can pick the right one before navigation/filtering.
  */
 export function formatBenchmarkLabel(slug: string): string {
-  if (slug === "star_schema") return "SSB (legacy slug)";
+  if (slug === "ssb") return "SSB (legacy slug)";
   return humanizeBenchmark(slug);
 }
