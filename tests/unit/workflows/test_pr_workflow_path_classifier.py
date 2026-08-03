@@ -300,11 +300,22 @@ def test_explorer_vitest_job_declares_clean_runner_python_and_uv_setup() -> None
     assert install_python["run"] == "uv sync --group dev"
 
     npm_install_index = next(i for i, step in enumerate(steps) if step.get("name") == "Install explorer dependencies")
-    assert all(
-        i < npm_install_index
+    vitest_index = next(i for i, step in enumerate(steps) if step.get("name") == "Run Explorer Vitest suite")
+    prerequisite_indexes = [
+        i
         for i, step in enumerate(steps)
         if step.get("name") in {"Set up Python", "Install uv", "Install Python dependencies"}
-    )
+    ]
+    assert len(prerequisite_indexes) == 3
+
+    # Anchor the ordering to the Vitest step, not just to `npm ci`. Specs such as
+    # db-remediation-pin.test.ts and tuningModeVocabulary.test.ts spawn `uv`, so
+    # moving the suite ahead of the Python/uv setup group breaks a clean runner
+    # even while `npm ci` still trails it - which the npm-only guard below, and
+    # the exact-command test above, would both still wave through.
+    assert all(i < vitest_index for i in prerequisite_indexes)
+    assert all(i < npm_install_index for i in prerequisite_indexes)
+    assert npm_install_index < vitest_index
     assert all("continue-on-error" not in step for step in steps)
 
 

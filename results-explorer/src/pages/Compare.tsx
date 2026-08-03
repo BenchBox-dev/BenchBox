@@ -762,7 +762,11 @@ function severeCohortMismatchReason(results: DetailResult[]) {
   if (new Set(results.map((result) => result.scale_factor)).size > 1) {
     reasons.push("scale factors differ");
   }
-  if (new Set(results.map((result) => result.test_type ?? "")).size > 1) {
+  // Canonicalize exactly as the cohort builder and selection lock do. Comparing
+  // raw values would flag `POWER` against `power` as a severe mismatch and
+  // suppress winner/ranking claims for results the builder admitted into one
+  // canonical cohort.
+  if (new Set(results.map((result) => canonicalPhase(result.test_type))).size > 1) {
     reasons.push("phases differ");
   }
   return reasons.length > 0 ? reasons.join(" and ") : null;
