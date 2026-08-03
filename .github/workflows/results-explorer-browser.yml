@@ -60,6 +60,10 @@ jobs:
         run: npm ci
         working-directory: results-explorer
 
+      - name: Audit frontend dependencies
+        run: npm run audit:high
+        working-directory: results-explorer
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:

@@ -393,6 +393,11 @@ jobs:
         run: npm ci
         working-directory: results-explorer
 
+      - name: Audit frontend dependencies
+        if: steps.explorer.outputs.present == 'true'
+        run: npm run audit:high
+        working-directory: results-explorer
+
       - name: Verify parity fixtures match Python source
         if: steps.explorer.outputs.present == 'true'
         run: make parity-check
