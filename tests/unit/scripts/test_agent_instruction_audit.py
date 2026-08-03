@@ -15,6 +15,22 @@ from path_filter_decision import classify_paths, load_rules
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
+
+@pytest.fixture(autouse=True)
+def _isolate_git_identity_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force identity to resolve from config alone.
+
+    `git var` prefers GIT_AUTHOR_* / GIT_COMMITTER_* / EMAIL over any config
+    file, so an ambient value in the invoking shell decides these assertions
+    instead of the fixture repo. A cloud session that exports GIT_AUTHOR_* to
+    satisfy [COMMIT-IDENTITY-001] does exactly that, and it turned the
+    negative identity tests green against a repo configured as an agent.
+    Tests that want an ambient identity set it themselves, after this runs.
+    """
+    for name in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "EMAIL"):
+        monkeypatch.delenv(name, raising=False)
+
+
 ROOT = Path(__file__).resolve().parents[3]
 CORPUS = json.loads((ROOT / "_project/evals/agent-instructions/scenarios.json").read_text())
 
