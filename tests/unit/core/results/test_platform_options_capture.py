@@ -261,6 +261,54 @@ def test_uri_userinfo_credentials_are_redacted_without_touching_public_values() 
     assert sanitized["sort_key"] == "o_orderkey"
 
 
+def test_uri_userinfo_redaction_consumes_an_unescaped_at_in_the_password() -> None:
+    """Review follow-up: a password may legally contain an unescaped '@'.
+
+    urlparse reads ``postgres://user:pa@ss@host/db`` as password ``pa@ss``, but a
+    pattern that stopped at the FIRST '@' exported ``postgres://****@ss@host/db``
+    -- still leaking the tail of the credential into result metadata. Redaction
+    must run through the authority's LAST userinfo delimiter.
+    """
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options(
+        {
+            "database_path": "postgres://user:pa@ss@host/db",
+            # The authority ends at '?', so a later '@' in the query string must
+            # not drag the host into the redaction.
+            "output_location": "postgres://user:pw@host?opt=a@b",
+        }
+    )
+
+    assert sanitized["database_path"] == "postgres://****@host/db"
+    assert "ss@host" not in sanitized["database_path"]
+    assert sanitized["output_location"] == "postgres://****@host?opt=a@b"
+
+
+@pytest.mark.parametrize(
+    "uri",
+    [
+        "abfss://container@account.dfs.core.windows.net/path",
+        "abfs://container@account.dfs.core.windows.net/path",
+        "wasbs://container@account.blob.core.windows.net/path",
+        "wasb://container@account.blob.core.windows.net/path",
+        "ABFSS://Container@account.dfs.core.windows.net/path",
+    ],
+)
+def test_azure_storage_container_authority_is_preserved(uri: str) -> None:
+    """Review follow-up: ``container@account`` is ABFS/WASB authority syntax, not
+    credentials, so redacting it would strip the container (or Fabric workspace)
+    identifier out of exported provenance while protecting nothing -- those
+    schemes carry their secret in a separate account_key/sas option, which the
+    key-name redaction already covers.
+    """
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options({"staging_root": uri})
+
+    assert sanitized["staging_root"] == uri
+
+
 def test_lifecycle_run_config_persists_sanitized_platform_options_with_provenance() -> None:
     benchmark_config = BenchmarkConfig(
         name="tpch",
