@@ -132,7 +132,7 @@ or declaration appears unused.
 | `pyyaml` | C | `benchbox/cli/**`, `benchbox/core/**`, `scripts/`, `benchbox/security/**`, tests | 23 | KEEP |
 | `rich` | CL | `benchbox/cli/**`, `benchbox/core/**`, `benchbox/platforms/**`, `benchbox/utils/**` | 146 | KEEP |
 | `sqlglot` | C | `benchbox/base.py`, `benchbox/core/**`, `benchbox/platforms/**`, `benchbox/utils/**`, tests | 16 | KEEP |
-| `textcharts` | C | `benchbox/core/visualization/ascii/**`, `benchbox/monitoring/**` | 20 | KEEP |
+| `textcharts` | C | `benchbox/core/visualization/ascii/**`, `benchbox/monitoring/**` | 20 | KEEP — retained by ADR follow-up; removing it would break supported ASCII shims and monitoring imports |
 | `tomli` | C | `benchbox/utils/dependency_validation.py`, `benchbox/utils/version.py`, `scripts/`, tests | 9 | KEEP - guarded by `python_version < '3.11'`; stdlib `tomllib` covers 3.11+ |
 | `zstandard` | C | `benchbox/core/primitives/**`, `benchbox/utils/**`, tests | 9 | KEEP |
 | `azure-identity` | CSP | `benchbox/platforms/azure/**` | 9 | KEEP |

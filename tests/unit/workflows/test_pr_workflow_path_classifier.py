@@ -284,6 +284,30 @@ def test_explorer_vitest_job_uses_contract_filter_and_exact_command() -> None:
     assert aggregate["env"]["EXPLORER_VITEST_RESULT"] == "${{ needs.explorer-vitest.result }}"
 
 
+def test_explorer_vitest_job_declares_clean_runner_python_and_uv_setup() -> None:
+    workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    job = workflow_yaml["jobs"]["explorer-vitest"]
+    steps = job["steps"]
+
+    setup_python = next(step for step in steps if step.get("name") == "Set up Python")
+    assert setup_python["uses"] == "actions/setup-python@v5"
+    assert setup_python["with"]["python-version"] == "3.12"
+
+    setup_uv = next(step for step in steps if step.get("name") == "Install uv")
+    assert setup_uv["uses"] == "astral-sh/setup-uv@v4"
+
+    install_python = next(step for step in steps if step.get("name") == "Install Python dependencies")
+    assert install_python["run"] == "uv sync --group dev"
+
+    npm_install_index = next(i for i, step in enumerate(steps) if step.get("name") == "Install explorer dependencies")
+    assert all(
+        i < npm_install_index
+        for i, step in enumerate(steps)
+        if step.get("name") in {"Set up Python", "Install uv", "Install Python dependencies"}
+    )
+    assert all("continue-on-error" not in step for step in steps)
+
+
 def test_ci_paths_job_outputs_declare_every_path_filter_group() -> None:
     # Incident pin (PR #952 → fixed in PR #955 commit 8652d135): the classify
     # step wrote `packaging-needed`/`viz-needed` to GITHUB_OUTPUT and the
