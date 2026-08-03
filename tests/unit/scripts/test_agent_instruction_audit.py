@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,7 @@ CANONICAL_REVIEW_SKILL = agent_instruction_audit.CANONICAL_REVIEW_SKILL
 CANONICAL_COMMIT_SKILL = agent_instruction_audit.CANONICAL_COMMIT_SKILL
 audit = agent_instruction_audit.audit
 audit_git_identity = agent_instruction_audit.audit_git_identity
+audit_commit_range = agent_instruction_audit.audit_commit_range
 
 
 def _candidate(tmp_path: Path) -> Path:
@@ -251,3 +253,85 @@ def test_explicit_task_local_agent_identity_override_passes(tmp_path: Path, monk
     project = _git_configured_repo(tmp_path, "Claude", "noreply@anthropic.com")
     monkeypatch.setenv("BENCHBOX_ALLOW_AGENT_GIT_IDENTITY", "1")
     assert audit_git_identity(project) == []
+
+
+def test_signing_service_committer_behind_human_author_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A signing service may hold the committer slot when the author is human."""
+    project = _git_configured_repo(tmp_path, "Claude", "noreply@anthropic.com")
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "Joe Harris")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "joeharris76@gmail.com")
+    assert audit_git_identity(project) == []
+
+
+def test_signing_service_committer_without_human_author_fails(tmp_path: Path) -> None:
+    """The allowance is conditional: an agent author is never acceptable."""
+    project = _git_configured_repo(tmp_path, "Claude", "noreply@anthropic.com")
+    errors = audit_git_identity(project)
+    assert any("author identity resolves to known agent/service" in error for error in errors)
+
+
+def _git_commit(project: Path, message: str, name: str, email: str) -> None:
+    (project / "file.txt").write_text(message, encoding="utf-8")
+    subprocess.run(["git", "-C", str(project), "add", "file.txt"], check=True)
+    subprocess.run(
+        ["git", "-C", str(project), "commit", "-q", "-m", message],
+        check=True,
+        env={
+            **os.environ,
+            "GIT_AUTHOR_NAME": name,
+            "GIT_AUTHOR_EMAIL": email,
+            "GIT_COMMITTER_NAME": name,
+            "GIT_COMMITTER_EMAIL": email,
+        },
+    )
+
+
+def _git_range_repo(tmp_path: Path) -> Path:
+    project = _git_configured_repo(tmp_path, "Joe Harris", "joeharris76@gmail.com")
+    _git_commit(project, "base", "Joe Harris", "joeharris76@gmail.com")
+    subprocess.run(["git", "-C", str(project), "branch", "-q", "base-ref"], check=True)
+    return project
+
+
+def test_commit_range_accepts_human_authorship(tmp_path: Path) -> None:
+    project = _git_range_repo(tmp_path)
+    _git_commit(project, "feat: human work", "Joe Harris", "joeharris76@gmail.com")
+    assert audit_commit_range(project, "base-ref") == []
+
+
+def test_commit_range_rejects_agent_authorship(tmp_path: Path) -> None:
+    project = _git_range_repo(tmp_path)
+    _git_commit(project, "feat: agent work", "Claude", "noreply@anthropic.com")
+    errors = audit_commit_range(project, "base-ref")
+    assert any("authored by known agent/service Claude <noreply@anthropic.com>" in error for error in errors)
+
+
+def test_commit_range_rejects_agent_coauthor_trailer(tmp_path: Path) -> None:
+    project = _git_range_repo(tmp_path)
+    _git_commit(
+        project,
+        "feat: work\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>",
+        "Joe Harris",
+        "joeharris76@gmail.com",
+    )
+    errors = audit_commit_range(project, "base-ref")
+    assert any("carries agent Co-Authored-By trailer" in error for error in errors)
+
+
+def test_commit_range_rejects_agent_session_trailer(tmp_path: Path) -> None:
+    project = _git_range_repo(tmp_path)
+    _git_commit(
+        project,
+        "feat: work\n\nClaude-Session: https://claude.ai/code/session_abc",
+        "Joe Harris",
+        "joeharris76@gmail.com",
+    )
+    errors = audit_commit_range(project, "base-ref")
+    assert any("carries agent session trailer" in error for error in errors)
+
+
+def test_commit_range_reports_unresolvable_base_ref(tmp_path: Path) -> None:
+    """A missing base ref must surface, never silently pass as 'no findings'."""
+    project = _git_range_repo(tmp_path)
+    errors = audit_commit_range(project, "origin/does-not-exist")
+    assert any("unable to inspect commit range" in error for error in errors)

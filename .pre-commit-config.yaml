@@ -3,7 +3,7 @@
 #                               via default_install_hook_types below)
 # Run manually: pre-commit run --all-files
 
-default_install_hook_types: [pre-commit, pre-push]
+default_install_hook_types: [pre-commit, pre-push, commit-msg]
 default_stages: [pre-commit]
 
 repos:
@@ -140,6 +140,15 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+
+      # commit-msg stage: the trailer only exists once a message has been
+      # written, so this cannot ride along with the pre-commit hook above.
+      - id: agent-attribution-trailers
+        name: reject agent Co-Authored-By/session trailers
+        entry: sh scripts/check_agent_trailers.sh
+        language: system
+        always_run: true
+        stages: [commit-msg]
 
   # Code formatting with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
