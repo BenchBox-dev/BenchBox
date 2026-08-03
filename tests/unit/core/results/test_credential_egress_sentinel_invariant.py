@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from benchbox.core.exceptions import ConfigurationError
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.database import ResultDatabase
 from benchbox.core.results.exporter import ResultExporter
@@ -129,7 +130,17 @@ def test_registered_adapter_result_payload_redacts_credential_sentinels(platform
     adapter_class = PlatformRegistry.get_adapter_class(platform_name)
     try:
         adapter = adapter_class(**config)
-    except ImportError as exc:
+    except (ImportError, ConfigurationError) as exc:
+        # Adapters are inconsistent about which exception carries a missing
+        # optional dependency: most raise ImportError, but the Spark-family
+        # adapters (dataproc, dataproc-serverless, fabric-spark,
+        # snowpark-connect, synapse-spark) raise ConfigurationError with the
+        # same get_dependency_error_message() text. `uv sync --group dev` -- the
+        # environment the required medium-test job builds -- installs neither
+        # extra, so keying the skip on ImportError alone errored those five
+        # adapters out before they reached any assertion. Gate on the shared
+        # message so a genuine ConfigurationError (a real misconfiguration this
+        # test should catch) still fails loudly.
         if "Missing dependencies" in str(exc):
             pytest.skip(f"optional adapter dependency is not installed: {exc}")
         raise
