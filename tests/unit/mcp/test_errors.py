@@ -17,6 +17,7 @@ from benchbox.mcp.errors import (
     make_not_found_error,
     make_platform_error,
     make_validation_error,
+    scrub_secret_material,
 )
 
 pytestmark = [
@@ -56,6 +57,19 @@ class TestErrorCode:
         """Test that internal error codes are defined."""
         assert ErrorCode.INTERNAL_ERROR.value == "INTERNAL_ERROR"
         assert ErrorCode.INTERNAL_TIMEOUT.value == "INTERNAL_TIMEOUT"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("password: 'hunter2'", "password: ****"),
+        ('token: "secret-value"', "token: ****"),
+        ("password is hunter2", "password is ****"),
+        ("token was abc123", "token was ****"),
+    ],
+)
+def test_scrub_secret_material_covers_quoted_colon_and_prose_values(text: str, expected: str) -> None:
+    assert scrub_secret_material(text) == expected
 
 
 class TestErrorCategory:

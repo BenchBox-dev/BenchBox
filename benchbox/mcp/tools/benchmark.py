@@ -88,6 +88,44 @@ def _get_platform_adapter(platform: str, mode: str | None = None, **config):
         return get_platform_adapter(platform_lower, **config)
 
 
+def _prepare_adapter_platform_options(platform: str, options: Mapping[str, object]) -> dict[str, object]:
+    """Translate MCP option names to the adapter and tuning contracts."""
+    normalized = dict(options)
+    platform_name = platform.lower().removesuffix("-df")
+
+    if platform_name == "duckdb" and "threads" in normalized:
+        normalized["thread_limit"] = normalized.pop("threads")
+
+    if platform_name == "databricks" and (
+        "databricks_clustering_strategy" in normalized or "liquid_clustering_columns" in normalized
+    ):
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+        tuning_config = UnifiedTuningConfiguration()
+        platform_optimizations = tuning_config.platform_optimizations
+        strategy = normalized.pop("databricks_clustering_strategy", None)
+        if strategy is not None:
+            strategy = str(strategy).lower()
+            platform_optimizations.databricks_clustering_strategy = strategy
+            platform_optimizations.liquid_clustering_enabled = strategy in {
+                "liquid_clustering",
+                "liquid_clustering_auto",
+            }
+            platform_optimizations.physical_rendering_id = None
+        columns = normalized.pop("liquid_clustering_columns", None)
+        if columns is not None:
+            parsed_columns = [column.strip() for column in str(columns).split(",") if column.strip()]
+            platform_optimizations.liquid_clustering_columns = parsed_columns
+            platform_optimizations.liquid_clustering_enabled = bool(parsed_columns)
+            if parsed_columns and strategy is None:
+                platform_optimizations.databricks_clustering_strategy = "liquid_clustering"
+        platform_optimizations.__post_init__()
+        normalized["tuning_config"] = tuning_config
+        normalized["tuning_enabled"] = True
+
+    return normalized
+
+
 def _validate_and_resolve_mode(platform: str, mode: str | None) -> tuple[str, dict | None]:
     """Validate mode against platform capabilities, resolve default if not specified."""
     from benchbox.core.platform_registry import PlatformRegistry
@@ -410,7 +448,7 @@ def _run_benchmark_impl(
                 mode=resolved_mode,
                 benchmark=benchmark_lower,
                 scale_factor=scale_factor,
-                **normalized_platform_options,
+                **_prepare_adapter_platform_options(platform, normalized_platform_options),
             )
         except (ValueError, ImportError) as e:
             return _make_failed_response(
