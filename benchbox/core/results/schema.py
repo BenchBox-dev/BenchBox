@@ -547,7 +547,11 @@ def _build_platform_section(
                 if getattr(result, "platform_raw_metadata", None) is not None
                 else getattr(result, "platform_metadata", None)
             ),
-            sanitize_raw_config=sanitize_platform_secrets,
+            # Credential redaction is a boundary invariant for every exported
+            # result, including explicitly private/internal artifacts. The
+            # flag still controls public anonymization elsewhere, but it must
+            # not turn a raw adapter config into a credential egress channel.
+            sanitize_raw_config=True,
         )
     )
 
