@@ -12,8 +12,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 import shutil
+import tempfile
+import uuid
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -36,6 +39,7 @@ from _project.scripts.explorer_pipeline.transformer import (
     _applied_receipt,
     _platform_percentile_stats,
 )
+from _project.scripts.results_explorer_snapshot_invariants import check_snapshot
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
 from benchbox.core.results.canonical_json import canonical_json_bytes
 from benchbox.validation.bundle import discover_bundles
@@ -50,6 +54,54 @@ COMMUNITY_TRUST_LABEL = "community-submission"
 VENDOR_TRUST_LABEL = "vendor-supplied"
 VENDOR_VISIBILITY = "public-vendor-reported"
 VENDOR_SUBTREE_COMPONENT = "vendor"
+
+
+def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
+    """Publish validated bundles then atomically replace the browser DB.
+
+    The existing DB remains the browser's source of truth until the final
+    ``os.replace``. Candidate bundle files are copied through exact temporary
+    paths first, so an interrupted build cannot expose a partial DB or a
+    half-written JSON file.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    target_bundles = output_dir / "bundles"
+    target_bundles.mkdir(parents=True, exist_ok=True)
+    staged_bundles = staged_dir / "bundles"
+    candidate_names = {path.name for path in staged_bundles.iterdir() if path.is_file()}
+
+    for source in sorted(staged_bundles.iterdir()):
+        if not source.is_file():
+            continue
+        target = target_bundles / source.name
+        temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            shutil.copyfile(source, temporary)
+            os.replace(temporary, target)
+        finally:
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
+
+    candidate_db = staged_dir / "results.duckdb"
+    os.replace(candidate_db, output_dir / "results.duckdb")
+
+    # Stale generated artifacts cannot affect the now-active DB, so cleanup is
+    # intentionally after the atomic DB promotion and is best effort.
+    for child in list(target_bundles.iterdir()):
+        if child.is_file() and child.name.endswith(".json") and child.name not in candidate_names:
+            try:
+                child.unlink()
+            except OSError:
+                logger.warning("Could not remove stale published bundle %s", child)
+    for legacy_name in ("benchmarks", "details", "compare"):
+        shutil.rmtree(output_dir / legacy_name, ignore_errors=True)
+    for legacy_file in ("manifest.json", "meta_leaderboard.json", "short_ids.json", "results_schema.json"):
+        try:
+            (output_dir / legacy_file).unlink()
+        except FileNotFoundError:
+            pass
 
 
 def _is_vendor_subtree(bundle_path: Path, bundles_dir: Path) -> bool:
@@ -457,35 +509,21 @@ class ExplorerPipeline:
             bundle_files = discover_bundles(bundles_dir)
             logger.info("Found %d bundle(s) in %s", len(bundle_files), bundles_dir)
 
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir = output_dir.resolve()
+        output_dir.parent.mkdir(parents=True, exist_ok=True)
+        staging_dir = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.", dir=output_dir.parent))
 
         # All copied public JSON passes through one manager so the same stable
         # pseudonyms are used across a primary bundle and its companions.
         public_anonymizer = AnonymizationManager()
 
-        out_bundles_dir = output_dir / "bundles"
-        if out_bundles_dir.exists():
-            shutil.rmtree(out_bundles_dir)
+        out_bundles_dir = staging_dir / "bundles"
         out_bundles_dir.mkdir(parents=True)
 
         # Drop derived directories and files from earlier pipeline versions
         # that emitted per-cohort / per-result / manifest JSON artifacts. The
         # DuckDB browser store replaces them; leaving them behind would mask
         # stale data.
-        for legacy_name in ("benchmarks", "details", "compare"):
-            legacy_dir = output_dir / legacy_name
-            if legacy_dir.exists():
-                shutil.rmtree(legacy_dir)
-        for legacy_file in (
-            "manifest.json",
-            "meta_leaderboard.json",
-            "short_ids.json",
-            "results_schema.json",
-        ):
-            legacy_path = output_dir / legacy_file
-            if legacy_path.exists():
-                legacy_path.unlink()
-
         manifest_entries: list[ManifestEntry] = []
         # Accumulator for benchmark summary artifacts (zero extra I/O - reuses
         # already-loaded bundle data from the single pass).
@@ -626,25 +664,31 @@ class ExplorerPipeline:
             len(meta["platforms"]),
         )
 
-        duckdb_path = output_dir / "results.duckdb"
-        self._duckdb_builder.build_full(
-            entries=manifest_entries,
-            details_map=details_map,
-            summaries=summaries,
-            short_id_map=short_id_map,
-            full_to_short=full_to_short,
-            meta=meta,
-            bundle_url_prefix=bundle_url_prefix,
-            output_path=duckdb_path,
-        )
-        logger.info("Wrote full DuckDB browser store to %s", duckdb_path)
-
-        return BuildStats(
-            processed=len(manifest_entries),
-            skipped=skipped_bundles,
-            cohorts=len(summaries),
-            output_dir=output_dir,
-        )
+        duckdb_path = staging_dir / "results.duckdb"
+        try:
+            self._duckdb_builder.build_full(
+                entries=manifest_entries,
+                details_map=details_map,
+                summaries=summaries,
+                short_id_map=short_id_map,
+                full_to_short=full_to_short,
+                meta=meta,
+                bundle_url_prefix=bundle_url_prefix,
+                output_path=duckdb_path,
+            )
+            invariant_errors = check_snapshot(duckdb_path)
+            if invariant_errors:
+                raise ValueError("snapshot invariants failed: " + "; ".join(invariant_errors))
+            _promote_staged_output(staging_dir, output_dir)
+            logger.info("Promoted validated DuckDB browser store to %s", output_dir / "results.duckdb")
+            return BuildStats(
+                processed=len(manifest_entries),
+                skipped=skipped_bundles,
+                cohorts=len(summaries),
+                output_dir=output_dir,
+            )
+        finally:
+            shutil.rmtree(staging_dir, ignore_errors=True)
 
 
 __all__ = ["BuildStats", "ExplorerPipeline"]

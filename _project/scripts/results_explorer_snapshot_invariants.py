@@ -78,6 +78,10 @@ def check_snapshot(db_path: Path) -> list[str]:
         raise SystemExit("duckdb is required to validate Results Explorer snapshot invariants") from exc
 
     errors: list[str] = []
+    wal_path = db_path.with_name(db_path.name + ".wal")
+    if wal_path.exists():
+        errors.append(f"snapshot is not self-contained: WAL sidecar exists at {wal_path.name}")
+        return errors
     with duckdb.connect(str(db_path), read_only=True) as con:
         errors.extend(_required_column_errors(con))
         if errors:
