@@ -166,6 +166,18 @@ class TestValidateBundle:
         assert vr.ok
         assert len(vr.errors) == 0
 
+    def test_public_private_path_is_rejected_by_cli_boundary(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+        bundle_path = tmp_path / "tpch_result.json"
+        payload = _minimal_bundle()
+        payload["platform"]["working_dir"] = "/Users/alice/private-run"
+        bundle_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        assert main([str(bundle_path)]) == 1
+        output = capsys.readouterr().out
+        assert "FAIL" in output
+        assert "Users/alice" not in output
+        assert "working_dir" in output
+
     def test_missing_top_level_keys(self):
         data = {"version": "2.1"}  # Missing everything else
         vr = ValidationResult("test")
@@ -838,3 +850,29 @@ class TestMain:
         bad = tmp_path / "bad.json"
         bad.write_text(json.dumps({"version": "1.0"}), encoding="utf-8")
         assert main([str(bad)]) == 1
+
+    def test_malformed_public_companion_fails_closed(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+        bundle = tmp_path / "tpch_result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        bundle.with_name("tpch_result.plans.json").write_text(
+            '{"plan": "/Users/alice/private" not-json',
+            encoding="utf-8",
+        )
+
+        assert main([str(bundle)]) == 1
+        assert "Malformed public companion JSON" in capsys.readouterr().out
+
+    def test_case_insensitive_companion_name_is_privacy_scanned(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ):
+        bundle = tmp_path / "tpch_result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        bundle.with_name("tpch_result.PLANS.JSON").write_text(
+            json.dumps({"path": "/Users/alice/private"}),
+            encoding="utf-8",
+        )
+
+        assert main([str(bundle)]) == 1
+        output = capsys.readouterr().out
+        assert "PLANS.JSON" in output
+        assert "private absolute paths" in output

@@ -11,6 +11,8 @@ from pydantic import ValidationError as PydanticValidationError
 from benchbox.mcp.schemas import (
     MAX_QUERY_ID_LENGTH,
     MAX_QUERY_IDS,
+    MCP_PLATFORM_OPTION_ALLOWLIST,
+    MCP_PLATFORM_OPTION_CONTRACT,
     CompareResultsInput,
     DryRunInput,
     ExportSummaryInput,
@@ -23,6 +25,7 @@ from benchbox.mcp.schemas import (
     validate_benchmark_name,
     validate_filename,
     validate_platform_name,
+    validate_platform_options,
     validate_query_id,
     validate_query_list,
     validate_scale_factor,
@@ -250,6 +253,61 @@ class TestRunBenchmarkInput:
         """Test invalid scale factor is rejected."""
         with pytest.raises(PydanticValidationError):
             RunBenchmarkInput(platform="duckdb", benchmark="tpch", scale_factor=-1)
+
+    def test_platform_options_are_typed_and_normalized(self):
+        inp = RunBenchmarkInput(
+            platform="duckdb",
+            benchmark="tpch",
+            platform_options={"threads": 4, "memory_limit": "2GB"},
+        )
+        assert inp.platform_options == {"threads": 4, "memory_limit": "2GB"}
+
+    def test_every_allowlisted_option_has_an_explicit_contract(self):
+        """The value allow-list cannot grow without a reviewed consumer matrix."""
+        assert set(MCP_PLATFORM_OPTION_ALLOWLIST) == set(MCP_PLATFORM_OPTION_CONTRACT)
+        for platform, specs in MCP_PLATFORM_OPTION_ALLOWLIST.items():
+            contracts = MCP_PLATFORM_OPTION_CONTRACT[platform]
+            assert set(specs) == set(contracts)
+            for option_name, contract in contracts.items():
+                assert contract.consumer
+                assert contract.security_class in {"execution", "resource", "device", "layout", "connection"}
+                assert all(alias != option_name for alias in contract.aliases)
+
+    def test_option_without_contract_is_rejected_fail_closed(self, monkeypatch):
+        monkeypatch.delitem(MCP_PLATFORM_OPTION_CONTRACT["duckdb"], "threads")
+        with pytest.raises(MCPValidationError, match="not authorized"):
+            validate_platform_options("duckdb", {"threads": 2})
+
+    def test_secret_and_unknown_platform_options_are_rejected(self):
+        with pytest.raises(PydanticValidationError):
+            RunBenchmarkInput(platform="duckdb", benchmark="tpch", platform_options={"password": "secret"})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("snowflake", {"warehouse": "secret"})
+
+    def test_platform_option_bounds_and_types_are_rejected(self):
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("duckdb", {"threads": 0})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("duckdb", {"threads": "4"})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("duckdb", {"memory_limit": "/tmp/secret"})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("sqlite", {"timeout": float("nan")})
+
+    def test_dataframe_aliases_and_identifier_options_are_bounded(self):
+        assert validate_platform_options("polars-df", {"streaming": True}) == {"streaming": True}
+        assert validate_platform_options("databricks", {"liquid_clustering_columns": "event_time,customer_id"}) == {
+            "liquid_clustering_columns": "event_time,customer_id"
+        }
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("databricks", {"liquid_clustering_columns": "event_time;DROP"})
+
+    def test_mcp_platform_choices_match_adapter_contracts(self):
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("velox", {"deployment": "docker"})
+        assert validate_platform_options("velox", {"deployment": "remote"}) == {"deployment": "remote"}
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("modin", {"engine": "pandas"})
 
 
 class TestDryRunInput:

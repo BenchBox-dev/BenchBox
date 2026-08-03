@@ -66,6 +66,7 @@ EXPECTED_RUN_PARAMS = {
     "capture_plans": {"type": "boolean", "required": False, "default": False},
     "dry_run": {"type": "boolean", "required": False, "default": False},
     "validate_only": {"type": "boolean", "required": False, "default": False},
+    "platform_options": {"type": "object or null", "required": False, "default": None},
 }
 
 OMITTED_CLI_OPTIONS = {

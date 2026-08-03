@@ -21,7 +21,12 @@ from urllib.parse import urlparse
 
 import yaml
 
-from benchbox.core.results.platform_options import _SECRET_KEY_PARTS, is_secret_option_key
+from benchbox.core.results import platform_options as _platform_options
+
+is_secret_option_key = _platform_options.is_secret_option_key
+# Compatibility export for callers/tests that compare the shared classifier's
+# source list; behavior goes through ``is_secret_option_key`` below.
+_SECRET_KEY_PARTS = _platform_options._SECRET_KEY_PARTS
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +40,11 @@ def _load_anonymization_specs() -> dict[str, Any]:
 
 _ANONYMIZATION_SPECS = _load_anonymization_specs()
 
-# Secret-key matching is shared with the internal capture path: both consumers
-# read platform_options._SECRET_KEY_PARTS (imported above) so the lists cannot
-# diverge again. The spec file deliberately no longer carries its own copy -
-# the two hand-synced lists drifted within a month of #1346 ('keyid' was added
-# to platform_options only), which left *_key_id values unredacted on this
-# public path.
+# Secret-key matching is shared with the internal capture path through
+# ``is_secret_option_key`` so the lists cannot diverge again. The spec file
+# deliberately no longer carries its own copy - the two hand-synced lists
+# drifted within a month of #1346 (``keyid`` was added to platform_options
+# only), which left ``*_key_id`` values unredacted on this public path.
 _IDENTIFIER_KEYS = dict(_ANONYMIZATION_SPECS["identifier_keys"])
 _ENDPOINT_KEYS = set(_ANONYMIZATION_SPECS["endpoint_keys"])
 _PATH_KEYS = set(_ANONYMIZATION_SPECS["path_keys"])
@@ -51,7 +55,7 @@ _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
 
 _MESSAGE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])("
-    r"(?:~|/Users|/home|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+    r"(?:~|/Users|/home|/root|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
     r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
     r")"
 )
@@ -62,6 +66,17 @@ _TUNING_SOURCE_REFERENCE_RE = re.compile(
 _MESSAGE_URL_RE = re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s'\",;)]*", flags=re.IGNORECASE)
 _MESSAGE_SECRET_ASSIGNMENT_RE = re.compile(
     r"\b([a-z0-9][a-z0-9_.-]*)=[^&\s,;)]*",
+    flags=re.IGNORECASE,
+)
+# Public bundles may contain path-like values below generic metadata keys
+# (for example ``working_dir`` or a nested ``raw_config`` entry).  Keep this
+# detector deliberately narrower than a generic slash matcher: URL paths,
+# SQL literals, and repository-relative tuning references must remain intact.
+_PRIVATE_LOCAL_PATH_RE = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"(?:~|/Users|/home|/root|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"
+    r"|[A-Za-z]:\\Users\\[^\s'\",;)]*"
+    r")",
     flags=re.IGNORECASE,
 )
 
@@ -344,9 +359,11 @@ class AnonymizationManager:
         working.pop("source_file", None)
 
         requested = working.get("requested")
+        constraints = None
         table_tunings = None
         if isinstance(requested, dict):
             requested = dict(requested)
+            constraints = requested.get("constraints")
             table_tunings = requested.pop("table_tunings", None)
             working["requested"] = requested
 
@@ -357,10 +374,13 @@ class AnonymizationManager:
                 if self._is_normalized_tuning_source_reference(source_file)
                 else self._hash_public_identifier(str(source_file), "path")
             )
-        if table_tunings is not None:
+        if constraints is not None or table_tunings is not None:
             anonymized_requested = anonymized.setdefault("requested", {})
             if isinstance(anonymized_requested, dict):
-                anonymized_requested["table_tunings"] = self._anonymize_tuning_table_tunings(table_tunings)
+                if isinstance(constraints, dict):
+                    anonymized_requested["constraints"] = self._anonymize_tuning_constraints(constraints)
+                if table_tunings is not None:
+                    anonymized_requested["table_tunings"] = self._anonymize_tuning_table_tunings(table_tunings)
         return anonymized
 
     @staticmethod
@@ -370,6 +390,67 @@ class AnonymizationManager:
             return False
         reference = value.rpartition(":")[0] if ":" in value else value
         return bool(reference) and all(part not in {"", ".", ".."} for part in reference.split("/"))
+
+    def _anonymize_tuning_constraints(self, value: Any) -> Any:
+        """Anonymize table/column identifiers nested in constraint settings."""
+        if isinstance(value, dict):
+            anonymized: dict[str, Any] = {}
+            for key, child in value.items():
+                if key in {"table", "table_name", "referenced_table", "referenced_table_name"}:
+                    anonymized[key] = self._hash_public_identifier(str(child), "table")
+                elif key in {
+                    "column",
+                    "column_name",
+                    "name",
+                    "referenced_column",
+                    "referenced_column_name",
+                }:
+                    anonymized[key] = self._hash_public_identifier(str(child), "column")
+                elif key in {"tables", "table_names", "referenced_tables"}:
+                    anonymized[key] = self._anonymize_constraint_identifier_collection(child, "table")
+                elif key in {"columns", "column_names", "referenced_columns", "referenced_column_names"}:
+                    anonymized[key] = self._anonymize_constraint_identifier_collection(child, "column")
+                else:
+                    anonymized[key] = (
+                        self._anonymize_tuning_constraints(child)
+                        if isinstance(child, (dict, list, tuple))
+                        else self._anonymize_public_value({str(key): child}, ())[str(key)]
+                    )
+            return anonymized
+        if isinstance(value, list):
+            return [self._anonymize_tuning_constraints(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._anonymize_tuning_constraints(item) for item in value]
+        return value
+
+    def _anonymize_constraint_identifier_collection(self, value: Any, prefix: str) -> Any:
+        """Hash identifier collections while preserving their container shape."""
+        if isinstance(value, dict):
+            return {
+                self._hash_public_identifier(str(key), prefix): self._anonymize_constraint_columns(child)
+                for key, child in value.items()
+            }
+        if isinstance(value, list):
+            return [
+                self._hash_public_identifier(str(item), prefix) if isinstance(item, str) else item for item in value
+            ]
+        if isinstance(value, tuple):
+            return [
+                self._hash_public_identifier(str(item), prefix) if isinstance(item, str) else item for item in value
+            ]
+        if isinstance(value, str):
+            return self._hash_public_identifier(value, prefix)
+        return value
+
+    def _anonymize_constraint_columns(self, value: Any) -> Any:
+        """Hash column lists stored as values under a table identifier."""
+        if isinstance(value, (list, tuple)):
+            return [
+                self._hash_public_identifier(str(item), "column") if isinstance(item, str) else item for item in value
+            ]
+        if isinstance(value, dict):
+            return self._anonymize_tuning_constraints(value)
+        return value
 
     def _anonymize_tuning_table_tunings(self, value: Any) -> Any:
         if isinstance(value, dict):
@@ -431,6 +512,17 @@ class AnonymizationManager:
         if isinstance(value, str) and self._is_message_metadata_key(key_path):
             return self._sanitize_public_message(value)
 
+        if isinstance(value, str):
+            # Key-aware path handling covers the normal schema fields, while
+            # this recursive value check protects generic/nested metadata that
+            # a producer can add without first adding a field-name allowlist.
+            # Replace only the private path token so surrounding diagnostic
+            # text remains useful and URLs/SQL are not blanket-redacted.
+            value = _PRIVATE_LOCAL_PATH_RE.sub(
+                lambda match: self._hash_public_identifier(match.group(0), "path"),
+                value,
+            )
+
         prefix = self._identifier_prefix_for_key_path(key_path)
         if prefix is not None:
             if prefix == "host" and isinstance(value, str) and self._is_local_endpoint_value(value):
@@ -443,8 +535,7 @@ class AnonymizationManager:
         return value
 
     def _is_secret_metadata_key(self, key_path: tuple[str, ...]) -> bool:
-        key = _compact_key(key_path[-1]) if key_path else ""
-        return any(part in key for part in _SECRET_KEY_PARTS)
+        return bool(key_path) and is_secret_option_key(key_path[-1])
 
     def _is_message_metadata_key(self, key_path: tuple[str, ...]) -> bool:
         key = _compact_key(key_path[-1]) if key_path else ""
@@ -471,7 +562,16 @@ class AnonymizationManager:
             return "host" if key in {"host", "hostname", "server", "enginehost"} else "endpoint"
         if key.endswith("url") or key.endswith("endpoint"):
             return "endpoint"
-        if key.endswith("path") or key.endswith("directory") or key.endswith("file") or key in _PATH_KEYS:
+        if (
+            key.endswith("path")
+            or key.endswith("directory")
+            or key.endswith("dir")
+            or key.endswith("folder")
+            or key.endswith("root")
+            or key.endswith("file")
+            or key.endswith("executable")
+            or key in _PATH_KEYS
+        ):
             return "path"
         return None
 
@@ -799,3 +899,37 @@ class AnonymizationManager:
         validation["is_valid"] = len(validation["errors"]) == 0
 
         return validation
+
+
+def find_public_path_leaks(value: Any, key_path: tuple[str, ...] = ()) -> list[str]:
+    """Return dotted paths containing private absolute paths in public JSON.
+
+    The detector is intentionally value-redacting: callers can report the
+    offending field path without echoing a user's home directory or other
+    machine-local material.  It is shared by submission validation and the
+    Explorer publication boundary so both surfaces enforce the same contract.
+    """
+
+    leaks: list[str] = []
+
+    if isinstance(value, dict):
+        for key, child in value.items():
+            leaks.extend(find_public_path_leaks(child, (*key_path, str(key))))
+        return leaks
+
+    if isinstance(value, (list, tuple, set, frozenset)):
+        for index, child in enumerate(value):
+            leaks.extend(find_public_path_leaks(child, (*key_path, str(index))))
+        return leaks
+
+    if isinstance(value, str) and _PRIVATE_LOCAL_PATH_RE.search(value):
+        leaks.append(".".join(key_path) or "<root>")
+    return leaks
+
+
+__all__ = [
+    "PUBLIC_REDACTED_VALUE",
+    "AnonymizationConfig",
+    "AnonymizationManager",
+    "find_public_path_leaks",
+]

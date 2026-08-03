@@ -138,6 +138,89 @@ class TestRunBenchmarkTool:
         assert "load" in phases_to_run
         assert "power" in phases_to_run
 
+    def test_platform_options_are_forwarded_only_after_validation(self, tmp_path: Path):
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+
+        class DummyBenchmark:
+            def __init__(self, scale_factor: float) -> None:
+                self.scale_factor = scale_factor
+
+            def run_with_platform(self, *_args, **_kwargs):
+                return None
+
+        adapter = Mock()
+        with (
+            patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
+            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=DummyBenchmark),
+            patch.object(benchmark_tools, "_get_platform_adapter", return_value=adapter) as get_adapter,
+        ):
+            response = benchmark_tools._run_benchmark_impl(
+                "duckdb",
+                "tpch",
+                0.01,
+                None,
+                "load,power",
+                "sql",
+                platform_options={"threads": 4},
+                results_dir=tmp_path,
+            )
+
+        assert response["mcp_metadata"]["status"] == "no_results"
+        assert get_adapter.call_args.kwargs["thread_limit"] == 4
+
+    def test_databricks_layout_options_build_unified_tuning_config(self):
+        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+        options = _prepare_adapter_platform_options(
+            "databricks",
+            {"databricks_clustering_strategy": "liquid_clustering", "liquid_clustering_columns": "event_time,id"},
+        )
+
+        tuning = options["tuning_config"]
+        assert options["tuning_enabled"] is True
+        assert "databricks_clustering_strategy" not in options
+        assert tuning.platform_optimizations.databricks_clustering_strategy == "liquid_clustering"
+        assert tuning.platform_optimizations.liquid_clustering_columns == ["event_time", "id"]
+
+    def test_databricks_columns_infer_liquid_clustering_strategy(self):
+        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+        options = _prepare_adapter_platform_options("databricks", {"liquid_clustering_columns": "customer_id,order_id"})
+
+        tuning = options["tuning_config"]
+        assert options["tuning_enabled"] is True
+        assert tuning.platform_optimizations.databricks_clustering_strategy == "liquid_clustering"
+        assert tuning.platform_optimizations.liquid_clustering_columns == ["customer_id", "order_id"]
+
+    def test_every_matrix_option_reaches_effective_preparation(self):
+        """Each reviewed option reaches a concrete adapter-facing setting."""
+        from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST, validate_platform_options
+        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+        for platform, specs in MCP_PLATFORM_OPTION_ALLOWLIST.items():
+            for option_name, spec in specs.items():
+                if spec.kind == "bool":
+                    value: object = False
+                elif spec.kind == "int":
+                    value = spec.minimum if spec.minimum is not None else 1
+                elif spec.kind == "float":
+                    value = spec.minimum if spec.minimum is not None else 1.0
+                elif spec.choices:
+                    value = spec.choices[0]
+                elif option_name == "liquid_clustering_columns":
+                    value = "id"
+                else:
+                    value = "1GB"
+
+                normalized = validate_platform_options(platform, {option_name: value})
+                prepared = _prepare_adapter_platform_options(platform, normalized)
+                if platform == "duckdb" and option_name == "threads":
+                    assert prepared == {"thread_limit": value}
+                elif platform == "databricks":
+                    assert "tuning_config" in prepared
+                else:
+                    assert prepared[option_name] == value
+
 
 class TestGetQueryDetailsTool:
     """Tests for get_query_details tool functionality."""

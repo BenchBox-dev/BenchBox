@@ -14,7 +14,12 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
 
-from benchbox.core.results.anonymization import PUBLIC_REDACTED_VALUE, AnonymizationConfig, AnonymizationManager
+from benchbox.core.results.anonymization import (
+    PUBLIC_REDACTED_VALUE,
+    AnonymizationConfig,
+    AnonymizationManager,
+    find_public_path_leaks,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -792,6 +797,31 @@ class TestPublicPayloadApiKeyAndAccountKey:
         assert "AZKEY-SENTINEL" not in out
 
 
+class TestPublicPayloadCredentialAliases:
+    """The public anonymizer must share exact alias handling with capture."""
+
+    def test_aliases_are_redacted_while_preserving_tuning_keys_and_path_contract(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {
+                "platform_metadata": {
+                    "platform_raw_config": {
+                        "passwd": "PASSWD_SECRET",
+                        "pwd": "PWD_SECRET",
+                        "pat": "PAT_SECRET",
+                        "path": "/tmp/data",
+                        "sort_key": "o_orderkey",
+                    }
+                }
+            }
+        )["platform_metadata"]["platform_raw_config"]
+
+        assert out["passwd"] == PUBLIC_REDACTED_VALUE
+        assert out["pwd"] == PUBLIC_REDACTED_VALUE
+        assert out["pat"] == PUBLIC_REDACTED_VALUE
+        assert out["path"].startswith("path_")
+        assert out["sort_key"] == "o_orderkey"
+
+
 class TestPublicPayloadSslRootCert:
     """The libpq sslrootcert spelling ends in neither path nor file, so the
     raw local path (leaking the home-dir username) passed through."""
@@ -852,6 +882,60 @@ class TestPublicPayloadTupleRecursion:
 
 
 class TestTuningPayloadAnonymization:
+    def test_unknown_constraint_fields_use_generic_public_sanitization(self):
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "foreign_keys": {
+                            "password": "CONSTRAINT-PASSWORD",
+                            "owner_email": "owner@example.com",
+                            "endpoint": "https://warehouse.example.com",
+                            "path": "/Users/alice/private-run",
+                        }
+                    }
+                }
+            }
+        )
+
+        serialized = json.dumps(out)
+        assert "CONSTRAINT-PASSWORD" not in serialized
+        assert "owner@example.com" not in serialized
+        assert "warehouse.example.com" not in serialized
+        assert "/Users/alice" not in serialized
+
+    def test_constraint_table_and_column_identifiers_are_pseudonymized(self):
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "primary_keys": {
+                            "enabled": True,
+                            "tables": {"orders": ["o_orderkey"]},
+                        },
+                        "foreign_keys": {
+                            "enabled": True,
+                            "tables": {
+                                "lineitem": {
+                                    "columns": ["l_orderkey"],
+                                    "referenced_table": "orders",
+                                    "referenced_columns": ["o_orderkey"],
+                                }
+                            },
+                        },
+                    }
+                }
+            }
+        )
+
+        serialized = json.dumps(out)
+        assert all(identifier not in serialized for identifier in ("orders", "lineitem", "o_orderkey", "l_orderkey"))
+        constraints = out["requested"]["constraints"]
+        assert next(iter(constraints["primary_keys"]["tables"])).startswith("table_")
+        assert constraints["primary_keys"]["tables"][next(iter(constraints["primary_keys"]["tables"]))][0].startswith(
+            "column_"
+        )
+
     def test_table_and_column_identifiers_are_pseudonymized_but_source_is_preserved(self):
         manager = AnonymizationManager()
         out = manager.anonymize_tuning_payload(
@@ -972,3 +1056,41 @@ class TestPublicPayloadSecretMessages:
         assert "API-SENTINEL" not in serialized
         assert "AZ-SENTINEL" not in serialized
         assert "AZ-CONNECTION-SENTINEL" not in serialized
+
+
+class TestPublicPayloadPathPrivacy:
+    def test_generic_working_directory_is_hashed(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"working_dir": "/Users/alice/benchbox/run"}}
+        )
+        serialized = json.dumps(out, default=str)
+        assert "/Users/alice" not in serialized
+        assert out["platform_metadata"]["working_dir"].startswith("path_")
+
+    def test_nested_generic_metadata_paths_are_hashed_without_field_allowlist(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {"platform_metadata": {"raw_config": {"runtime": {"path_value": "/home/alice/cache"}}}}
+        )
+        assert "/home/alice" not in json.dumps(out, default=str)
+        assert out["platform_metadata"]["raw_config"]["runtime"]["path_value"].startswith("path_")
+
+    def test_relative_references_and_urls_are_not_false_positives(self):
+        payload = {
+            "source_ref": "examples/tunings/custom.yaml:0123456789abcdef",
+            "url": "https://example.com/home/alice/reference",
+        }
+        assert find_public_path_leaks(payload) == []
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        assert out["source_ref"] == payload["source_ref"]
+        assert out["url"].startswith("endpoint_")
+
+    def test_detector_reports_field_paths_without_echoing_values(self):
+        leaks = find_public_path_leaks({"nested": [{"working_dir": "/Users/alice/private"}]})
+        assert leaks == ["nested.0.working_dir"]
+
+    def test_root_owned_home_paths_are_private_even_under_generic_keys(self):
+        payload = {"raw_config": {"location": "/root/private-run"}}
+
+        assert find_public_path_leaks(payload)
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        assert "/root/private-run" not in json.dumps(out, default=str)

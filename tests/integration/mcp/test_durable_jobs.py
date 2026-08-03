@@ -11,6 +11,7 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import TextContent
 
 from benchbox.mcp.jobs import DurableJobRepository, DurableJobWorker
+from benchbox.mcp.schemas import validate_platform_options
 from benchbox.mcp.security import JobLimits, TenantWorkspaceProvider
 from tests.integration.mcp._security import authenticated_http_client, write_security_config
 
@@ -79,6 +80,18 @@ def test_tenant_cannot_observe_or_cancel_another_job(tmp_path: Path) -> None:
     assert repository.get_owned(submitted.execution_id, "tenant-a") is not None
 
 
+def test_normalized_platform_options_survive_repository_round_trip(tmp_path: Path) -> None:
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    options = validate_platform_options("duckdb", {"threads": 4})
+
+    submitted, created = repository.submit("tenant-a", {**_request(), "platform_options": options})
+
+    assert created is True
+    persisted = repository.get_owned(submitted.execution_id, "tenant-a")
+    assert persisted is not None
+    assert persisted.request["platform_options"] == {"threads": 4}
+
+
 def test_tenant_job_tools_are_remote_only_and_cross_tenant_fail_closed(tmp_path: Path, monkeypatch) -> None:
     token_a = "tenant-a-job-token"
     token_b = "tenant-b-job-token"
@@ -102,6 +115,7 @@ def test_tenant_job_tools_are_remote_only_and_cross_tenant_fail_closed(tmp_path:
                     "platform": "duckdb",
                     "benchmark": "tpch",
                     "scale_factor": 0.01,
+                    "platform_options": {"threads": 2},
                     "idempotency_key": "acceptance-1",
                 },
             )
@@ -124,6 +138,17 @@ def test_tenant_job_tools_are_remote_only_and_cross_tenant_fail_closed(tmp_path:
                 "run_benchmark", {"platform": "duckdb", "benchmark": "tpch", "scale_factor": 0.01}
             )
             assert "requires start_benchmark" in synchronous.content[0].text
+
+            with pytest.raises(MCPError, match="not authorized") as rejected:
+                await client_a.call_tool(
+                    "start_benchmark",
+                    {
+                        "platform": "duckdb",
+                        "benchmark": "tpch",
+                        "platform_options": {"password": "SECRET_SENTINEL"},
+                    },
+                )
+            assert "SECRET_SENTINEL" not in str(rejected.value)
 
         async with authenticated_http_client(config, token_b) as (client_b, _):
             for tool_name in ("get_benchmark_status", "cancel_benchmark", "get_benchmark_result"):

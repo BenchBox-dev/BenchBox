@@ -192,7 +192,7 @@ CLI result bundles, but MCP does not claim option parity with `benchbox run`.
 | `get_query_plan` | analytics | No | Read captured query plans from a result bundle. |
 | `validate_results` | analytics | No | Validate result JSON integrity, completeness, and believability. |
 | `suggest_charts` | visualization | No | Suggest useful chart types for one or more result files. |
-| `generate_chart` | visualization | Yes | Generate ASCII chart output from result files. |
+| `generate_chart` | visualization | No | Generate ASCII chart output from result files. |
 
 Authenticated remote mode additionally registers:
 
@@ -227,6 +227,7 @@ modes remain available because they do not hold the request for execution.
 | `capture_plans` | boolean | No | `false` | Capture query plans where the selected platform supports them. |
 | `dry_run` | boolean | No | `false` | Preview the run plan without executing queries. |
 | `validate_only` | boolean | No | `false` | Validate platform, benchmark, scale, and mode without executing. |
+| `platform_options` | object or null | No | `null` | Typed, bounded, non-secret settings approved for the selected platform; credentials, endpoints, paths, and package-install controls are rejected. |
 
 **Behavior**
 
@@ -238,6 +239,19 @@ modes remain available because they do not hold the request for execution.
 - `mode=data_only` generates benchmark data without running queries.
 - `phases` applies to normal execution and maps to the benchmark execution type
   used by `BaseBenchmark.run_with_platform()`.
+- `platform_options` is normalized and validated before any adapter is built.
+  The allow-list is intentionally narrower than the CLI's
+  `--platform-option` surface: only bounded execution settings such as
+  DuckDB `memory_limit`/`threads`, DataFusion partition settings, and selected
+  DataFrame toggles are accepted. Unknown keys, credentials, DSNs, hosts,
+  filesystem paths, unbounded values, and driver auto-install/version controls
+  fail closed. Authenticated durable jobs persist only this normalized object,
+  so retries and worker restarts cannot reintroduce raw request mappings.
+- The authoritative option-to-consumer, security-class, alias, and rejection
+  matrix is maintained in
+  `docs/development/mcp-platform-option-contract.md`. Every allow-listed key
+  must have a matching matrix entry; a missing entry fails closed before
+  adapter construction or durable-job persistence.
 - Normal execution uses `BaseBenchmark.run_with_platform()` through public
   benchmark and adapter APIs.
 - MCP execution intentionally suppresses console output and returns structured
@@ -252,7 +266,7 @@ or a shared non-CLI execution service below both CLI and MCP.
 | CLI surface | MCP status | Reason |
 |---|---|---|
 | `--output` | Omitted | MCP result roots are server configuration (`--results-dir`, env vars). |
-| `--platform-option` | Omitted | Platform-specific key/value plumbing is CLI orchestration surface. |
+| `--platform-option` | Narrow MCP subset | MCP accepts only its typed, non-secret allow-list; the full CLI key/value surface remains CLI-only. |
 | `--benchmark-option` | Omitted | Benchmark-specific key/value plumbing is CLI orchestration surface. |
 | `--tuning`, `--table-mode`, `--sorted-ingestion-*` | Omitted | Tuning/table layout workflows are CLI-equivalent scope. |
 | `--force` | Omitted | Regeneration/upload forcing needs broader lifecycle service semantics. |
@@ -387,8 +401,15 @@ its tools remain a separate raw rendering namespace.
 | `result_files` | string | Yes | - | Comma-separated result filenames. |
 | `chart_type` | string | No | `performance_bar` | Chart type for single-chart output. |
 | `template` | string or null | No | `null` | Template name for multi-chart output. |
-| `output_dir` | string or null | No | `null` | Output directory relative to charts dir. |
-| `format` | string | No | `ascii` | Output format; current MCP output is ASCII. |
+| `output_dir` | string or null | No | `null` | Must remain `null`; MCP chart output is intentionally inline-only and caller-selected file paths are rejected. |
+| `format` | string | No | `ascii` | Must be `ascii`; other formats are rejected until a tenant-scoped artifact contract is approved. |
+
+Chart generation is intentionally inline-only. `generate_chart` returns the
+ASCII content in the MCP response and does not create a caller-selected file.
+This keeps chart output inside the response boundary while a future artifact
+contract is designed for tenant ownership, path containment, overwrite and
+retention semantics. Requests that set `output_dir` or choose another format
+fail closed with a structured validation error.
 
 Available `chart_type` values and template names are derived from the
 visualization registries and are discoverable with `list_available(category="charts")`.
@@ -398,6 +419,14 @@ visualization registries and are discoverable with `list_available(category="cha
 ## Prompts
 
 Prompts are reusable templates for AI analysis. Invoke via slash commands in Claude Code.
+The same prompt catalog is available through both supported transports: use
+`prompts/list` to discover the seven names and argument schemas, then
+`prompts/get` with a prompt name and string-valued arguments to render one
+prompt. Stdio and sessionless Streamable HTTP return the same prompt metadata
+and rendered text; HTTP requests do not require or receive an `Mcp-Session-Id`.
+The landing quickstart catalog references three of these prompts for guided
+benchmark flows; the four remaining prompts are still first-class MCP prompts
+and are discoverable at runtime.
 
 ### `analyze_results`
 

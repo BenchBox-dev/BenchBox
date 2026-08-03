@@ -144,6 +144,38 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(getRowOrder(container)).toEqual(["r-tpch-fast", "r-ssb-mid", "r-tpch-slow", "r-null-geo"]);
   });
 
+  it("canonicalizes the explicit clickhouse_local route alias", async () => {
+    const preactRouter = await import("preact-router");
+    const routeMock = vi.mocked(preactRouter.route);
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      ...ROWS,
+      makeRow({ result_id: "r-clickhouse", platform_id: "clickhouse-local", platform: "ClickHouse Local" }),
+    ]);
+
+    render(<PlatformIndex platform="clickhouse_local" />);
+    await waitFor(() => expect(screen.getByText("ClickHouse Local Results")).toBeTruthy());
+
+    await waitFor(() => expect(routeMock).toHaveBeenCalledWith("/results/p/clickhouse-local/", true));
+    const switcher = screen.getByTestId("platform-switcher") as HTMLSelectElement;
+    expect(switcher.value).toBe("clickhouse-local");
+    expect(within(switcher).queryByRole("option", { name: "clickhouse_local" })).toBeNull();
+  });
+
+  it("preserves query parameters while canonicalizing platform aliases", async () => {
+    const preactRouter = await import("preact-router");
+    const routeMock = vi.mocked(preactRouter.route);
+    window.history.replaceState(null, "", "/results/p/clickhouse_local/?tuning=notuning");
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      ...ROWS,
+      makeRow({ result_id: "r-clickhouse", platform_id: "clickhouse-local", platform: "ClickHouse Local" }),
+    ]);
+
+    render(<PlatformIndex platform="clickhouse_local" />);
+    await waitFor(() => expect(screen.getByText("ClickHouse Local Results")).toBeTruthy());
+
+    await waitFor(() => expect(routeMock).toHaveBeenCalledWith("/results/p/clickhouse-local/?tuning=notuning", true));
+  });
+
   it("retries a transient empty platform index before rendering a terminal empty state", async () => {
     vi.mocked(getPlatformIndexRows).mockResolvedValueOnce([]).mockResolvedValueOnce(ROWS);
 

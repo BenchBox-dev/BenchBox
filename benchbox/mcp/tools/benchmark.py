@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,7 @@ from benchbox.mcp.errors import (
     make_not_found_error,
     make_unsupported_mode_error,
 )
+from benchbox.mcp.schemas import MCPValidationError, validate_platform_options
 from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
@@ -84,6 +86,44 @@ def _get_platform_adapter(platform: str, mode: str | None = None, **config):
         return get_dataframe_adapter(platform_lower, **df_config)
     else:
         return get_platform_adapter(platform_lower, **config)
+
+
+def _prepare_adapter_platform_options(platform: str, options: Mapping[str, object]) -> dict[str, object]:
+    """Translate MCP option names to the adapter and tuning contracts."""
+    normalized = dict(options)
+    platform_name = platform.lower().removesuffix("-df")
+
+    if platform_name == "duckdb" and "threads" in normalized:
+        normalized["thread_limit"] = normalized.pop("threads")
+
+    if platform_name == "databricks" and (
+        "databricks_clustering_strategy" in normalized or "liquid_clustering_columns" in normalized
+    ):
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+        tuning_config = UnifiedTuningConfiguration()
+        platform_optimizations = tuning_config.platform_optimizations
+        strategy = normalized.pop("databricks_clustering_strategy", None)
+        if strategy is not None:
+            strategy = str(strategy).lower()
+            platform_optimizations.databricks_clustering_strategy = strategy
+            platform_optimizations.liquid_clustering_enabled = strategy in {
+                "liquid_clustering",
+                "liquid_clustering_auto",
+            }
+            platform_optimizations.physical_rendering_id = None
+        columns = normalized.pop("liquid_clustering_columns", None)
+        if columns is not None:
+            parsed_columns = [column.strip() for column in str(columns).split(",") if column.strip()]
+            platform_optimizations.liquid_clustering_columns = parsed_columns
+            platform_optimizations.liquid_clustering_enabled = bool(parsed_columns)
+            if parsed_columns and strategy is None:
+                platform_optimizations.databricks_clustering_strategy = "liquid_clustering"
+        platform_optimizations.__post_init__()
+        normalized["tuning_config"] = tuning_config
+        normalized["tuning_enabled"] = True
+
+    return normalized
 
 
 def _validate_and_resolve_mode(platform: str, mode: str | None) -> tuple[str, dict | None]:
@@ -165,6 +205,7 @@ def register_benchmark_tools(
         capture_plans: bool = False,
         dry_run: bool = False,
         validate_only: bool = False,
+        platform_options: dict[str, object] | None = None,
     ) -> dict[str, Any]:
         """Run a benchmark on a database platform.
 
@@ -178,22 +219,27 @@ def register_benchmark_tools(
             capture_plans: Capture query execution plans (3-8%% overhead). Supported: DuckDB, PostgreSQL, DataFusion.
             dry_run: Preview execution plan without running
             validate_only: Validate configuration without running
+            platform_options: Bounded, non-secret platform settings approved for the selected platform.
 
         Returns:
             Benchmark results, dry-run preview, or validation status.
 
-        Platform options (passed via the CLI --platform-option KEY=VALUE flag):
-            driver_version: Pin the Python driver package to a specific version (e.g. "1.2.0").
-                Available for all platforms.
-            driver_auto_install: Auto-install the requested driver version via uv if not already
-                installed ("true"/"false"). Available for all platforms.
-            engine_version: Select the Spark engine version for Athena Spark
-                (e.g. "PySpark engine version 3"). Athena Spark only; auto-probed on other platforms.
+        Platform options are a deliberately smaller MCP contract than the CLI
+        ``--platform-option`` surface. Only bounded, non-secret execution
+        settings are accepted; credentials, endpoints, paths, and package
+        installation controls must remain server configuration.
 
         JoinOrder note:
             The public joinorder benchmark downloads and verifies the canonical IMDb 2013
             Parquet archive on first use, then reuses BENCHBOX_OUTPUT_DIR/benchmark_runs/datagen/joinorder_sf1/.
         """
+        try:
+            normalized_platform_options = validate_platform_options(platform, platform_options)
+        except MCPValidationError as exc:
+            response = make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform})
+            response["status"] = "failed"
+            return response
+
         # Handle validate_only mode
         if validate_only:
             return _validate_config_impl(platform, benchmark, scale_factor, mode)
@@ -220,6 +266,7 @@ def register_benchmark_tools(
             phases,
             mode,
             capture_plans,
+            platform_options=normalized_platform_options,
             results_dir=resolve_path_provider(results_dir),
         )
 
@@ -350,6 +397,7 @@ def _run_benchmark_impl(
     mode: str | None,
     capture_plans: bool = False,
     *,
+    platform_options: Mapping[str, object] | None = None,
     results_dir: Path,
     execution_id: str | None = None,
 ) -> dict[str, Any]:
@@ -358,6 +406,7 @@ def _run_benchmark_impl(
     start_time = mono_time()
 
     try:
+        normalized_platform_options = validate_platform_options(platform, platform_options)
         benchmark_lower = benchmark.lower()
         all_benchmarks = get_all_benchmarks()
 
@@ -395,7 +444,11 @@ def _run_benchmark_impl(
 
         try:
             adapter = _get_platform_adapter(
-                platform, mode=resolved_mode, benchmark=benchmark_lower, scale_factor=scale_factor
+                platform,
+                mode=resolved_mode,
+                benchmark=benchmark_lower,
+                scale_factor=scale_factor,
+                **_prepare_adapter_platform_options(platform, normalized_platform_options),
             )
         except (ValueError, ImportError) as e:
             return _make_failed_response(

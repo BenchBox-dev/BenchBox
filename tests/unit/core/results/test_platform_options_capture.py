@@ -217,6 +217,30 @@ def test_sanitize_redacts_key_id_end_to_end_without_touching_sort_keys() -> None
     assert sanitized["partition_key"] == "l_orderkey"
 
 
+def test_credential_aliases_are_redacted_without_touching_paths_or_tuning_keys() -> None:
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options(
+        {
+            "passwd": "PASSWD_SECRET",
+            "pwd": "PWD_SECRET",
+            "pat": "PAT_SECRET",
+            "path": "/tmp/data",
+            "sort_key": "o_orderkey",
+            "partition_key": "id",
+            "primary_key": "id",
+        }
+    )
+
+    assert sanitized["passwd"] == REDACTED_VALUE
+    assert sanitized["pwd"] == REDACTED_VALUE
+    assert sanitized["pat"] == REDACTED_VALUE
+    assert sanitized["path"] == "/tmp/data"
+    assert sanitized["sort_key"] == "o_orderkey"
+    assert sanitized["partition_key"] == "id"
+    assert sanitized["primary_key"] == "id"
+
+
 def test_lifecycle_run_config_persists_sanitized_platform_options_with_provenance() -> None:
     benchmark_config = BenchmarkConfig(
         name="tpch",
