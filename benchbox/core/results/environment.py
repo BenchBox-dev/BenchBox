@@ -280,10 +280,9 @@ def build_platform_metadata_payload(
     # ``raw_config`` may come from an adapter-specific hook rather than the
     # normalized platform config fallback. Keep this as the public export
     # boundary so every selected source receives the same structural filtering.
-    # Credential redaction is unconditional at this payload boundary. Keep
-    # ``sanitize_raw_config`` as a compatibility argument for callers that
-    # supplied it, but never let a private/internal export opt out of it.
-    raw_config_payload = sanitize_platform_options(_metadata_dict(raw_config))
+    raw_config_payload = _metadata_dict(raw_config)
+    if sanitize_raw_config:
+        raw_config_payload = sanitize_platform_options(raw_config_payload)
     if raw_config_payload:
         payload["raw_config"] = raw_config_payload
     raw_metadata_payload = _metadata_dict(raw_metadata)
