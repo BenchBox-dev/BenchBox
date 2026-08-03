@@ -203,6 +203,14 @@
     [data-surface="hero"] *:focus-visible {
         outline-color: var(--bb-focus-ring-on-dark);
     }
+
+    /* Keep the leaderboard display controls inside the viewport when browser
+       zoom makes their compact button group wider than the wrapping header. */
+    [aria-labelledby="meta-leaderboard-title"] > .mb-4.flex > div[role="group"] {
+        min-width: 0;
+        max-width: 100%;
+        overflow-x: auto;
+    }
 }
 
 @layer components {
@@ -477,6 +485,15 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: 0.01ms !important;
+        }
+
         .bb-skeleton,
         .bb-skeleton-dark {
             animation: none;

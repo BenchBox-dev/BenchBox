@@ -30,7 +30,7 @@ import {
   toggleFacetValue,
   toDateWindowFacet,
 } from "@/lib/facetMatching";
-import { formatCount } from "@/lib/copyFormatters";
+import { formatCount, formatCountWithVerb } from "@/lib/copyFormatters";
 import { normalizedCostLabel, normalizedCostValue } from "@/lib/costDisplay";
 import { formatFacetDisplayValue } from "@/lib/facetDisplay";
 import { stringSerde, useUrlState } from "@/lib/useUrlState";
@@ -299,11 +299,13 @@ export function Home(_: RoutableProps) {
   const visibleRankedLeaderboardPlatformCount =
     filteredMetaLeaderboard?.platforms.filter((platform) => platform.n_cohorts > 0).length ?? 0;
   const tuningSummary = summarizeTuningModes(results);
-  const tuningOptions = [
-    "all",
-    ...(tuningSummary.unlabelledCount > 0 ? [UNLABELLED_TUNING_VALUE] : []),
-    ...tuningSummary.labelledOptions,
-  ];
+  const tuningOptions = tuningSummaryBucketCount(tuningSummary) > 1
+    ? [
+        "all",
+        ...(tuningSummary.unlabelledCount > 0 ? [UNLABELLED_TUNING_VALUE] : []),
+        ...tuningSummary.labelledOptions,
+      ]
+    : [];
 
   function buildCohortHref(cohort: MetaCohort): string {
     const params = new URLSearchParams();
@@ -423,15 +425,24 @@ export function Home(_: RoutableProps) {
                   Advanced filters
                 </summary>
                 <div class="mt-3 grid gap-3 md:grid-cols-3">
-                  <SingleFilterGroup
-                    label="Tuning"
-                    options={tuningOptions}
-                    current={tuningFilter}
-                    onSelect={(value) => setFacet("tuning_mode", value === "all" ? [] : [value])}
-                    format={(value) => formatTuningModeOption(value)}
-                    optionTitle={(value) => tuningModeOptionTitle(value, tuningSummary)}
-                    description={tuningFilterDescription(tuningSummary)}
-                  />
+                  {tuningOptions.length > 0 ? (
+                    <SingleFilterGroup
+                      label="Tuning"
+                      options={tuningOptions}
+                      current={tuningFilter}
+                      onSelect={(value) => setFacet("tuning_mode", value === "all" ? [] : [value])}
+                      format={(value) => formatTuningModeOption(value)}
+                      optionTitle={(value) => tuningModeOptionTitle(value, tuningSummary)}
+                      description={tuningFilterDescription(tuningSummary)}
+                    />
+                  ) : (
+                    <div data-testid="tuning-filter-unavailable">
+                      <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">Tuning</div>
+                      <p class="text-[11px] leading-snug text-[var(--bb-fg-muted)]">
+                        Tuning filter unavailable: this view has only one tuning metadata state. {tuningFilterDescription(tuningSummary)}
+                      </p>
+                    </div>
+                  )}
                   <SingleFilterGroup
                     label="Trust"
                     options={trustOptions}
@@ -794,11 +805,11 @@ function LeaderboardScopeSummary({
 }) {
   const hiddenBenchmarkCopy =
     publicBenchmarksOutsideLeaderboard.length > 0
-      ? `${publicBenchmarksOutsideLeaderboard.length.toLocaleString()} public benchmark ${plural(publicBenchmarksOutsideLeaderboard.length, "has", "have")} results but no ranked leaderboard: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`
+      ? `${formatCountWithVerb(publicBenchmarksOutsideLeaderboard.length, "public benchmark", "has", "have")} results but no ranked leaderboard: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`
       : "Every public benchmark with results has a ranked leaderboard.";
   const publicOnlyPlatformCopy =
     publicPlatformIdsOutsideLeaderboard > 0
-      ? `${publicPlatformIdsOutsideLeaderboard.toLocaleString()} public platform ${plural(publicPlatformIdsOutsideLeaderboard, "ID is", "IDs are")} outside the current leaderboard scope.`
+      ? `${formatCountWithVerb(publicPlatformIdsOutsideLeaderboard, "public platform ID", "is", "are")} outside the current leaderboard scope.`
       : "Every public platform ID has evidence in the leaderboard scope.";
   const visiblePublishedUnrankedPlatformCount = Math.max(
     0,
@@ -910,7 +921,7 @@ function benchmarkFilterDescription(publicBenchmarksOutsideLeaderboard: readonly
   if (publicBenchmarksOutsideLeaderboard.length === 0) {
     return "Only benchmarks with ranked leaderboards appear here.";
   }
-  return `${publicBenchmarksOutsideLeaderboard.length.toLocaleString()} public benchmark ${plural(publicBenchmarksOutsideLeaderboard.length, "has", "have")} results but no ranked leaderboard: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`;
+  return `${formatCountWithVerb(publicBenchmarksOutsideLeaderboard.length, "public benchmark", "has", "have")} results but no ranked leaderboard: ${publicBenchmarksOutsideLeaderboard.map(formatBenchmarkLabel).join(", ")}.`;
 }
 
 function formatTuningModeOption(value: string): string {
@@ -922,7 +933,7 @@ function formatTuningModeOption(value: string): string {
 function tuningModeOptionTitle(value: string, summary: TuningModeSummary): string {
   if (value === "all") return "Include recorded and not-recorded tuning metadata.";
   if (value === UNLABELLED_TUNING_VALUE) {
-    return `${summary.unlabelledCount.toLocaleString()} public result ${plural(summary.unlabelledCount, "has", "have")} no recorded tuning mode.`;
+    return `${formatCountWithVerb(summary.unlabelledCount, "public result", "has", "have")} no recorded tuning mode.`;
   }
   return `Filter to tuning label: ${formatFacetDisplayValue("tuning_mode", value)}.`;
 }
@@ -930,9 +941,13 @@ function tuningModeOptionTitle(value: string, summary: TuningModeSummary): strin
 function tuningFilterDescription(summary: TuningModeSummary): string {
   if (summary.unlabelledCount === 0) return "All public results in this view have a recorded tuning mode.";
   if (summary.labelledOptions.length === 0) {
-    return `${summary.unlabelledCount.toLocaleString()} public result ${plural(summary.unlabelledCount, "has", "have")} no recorded tuning mode.`;
+    return `${formatCountWithVerb(summary.unlabelledCount, "public result", "has", "have")} no recorded tuning mode.`;
   }
   return `${summary.unlabelledCount.toLocaleString()} of ${summary.totalCount.toLocaleString()} public ${plural(summary.totalCount, "result", "results")} ${plural(summary.unlabelledCount, "is", "are")} not recorded for tuning.`;
+}
+
+function tuningSummaryBucketCount(summary: TuningModeSummary): number {
+  return summary.labelledOptions.length + (summary.unlabelledCount > 0 ? 1 : 0);
 }
 
 function plural(count: number, singular: string, pluralValue: string): string {

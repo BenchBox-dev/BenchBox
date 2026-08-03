@@ -38,6 +38,29 @@ test.describe("ResultDetail", () => {
     await expect(header).toContainText("↓");
   });
 
+  test("sortable headers expose state and native Space activation does not scroll", async ({ page }) => {
+    await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
+    await waitForDataLoaded(page, /Query Timings/);
+
+    const medianHeader = page.locator('th[aria-sort]').filter({ hasText: "Median latency" }).first();
+    await expect(medianHeader).toHaveAttribute("aria-sort", "none");
+    const medianButton = medianHeader.getByRole("button");
+    await medianButton.click();
+    await expect(medianHeader).toHaveAttribute("aria-sort", "ascending");
+
+    const scrollBeforeSpace = await page.evaluate(() => window.scrollY);
+    await medianButton.press("Space");
+    await expect(medianHeader).toHaveAttribute("aria-sort", "descending");
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrollBeforeSpace);
+
+    await page.getByText(/Individual samples \(/).click();
+    const durationHeader = page.locator('th[aria-sort]').filter({ hasText: "Duration" }).first();
+    await expect(durationHeader.locator('[role="button"]')).toHaveCount(0);
+    await expect(durationHeader).toHaveAttribute("aria-sort", "none");
+    await durationHeader.getByRole("button").click();
+    await expect(durationHeader).toHaveAttribute("aria-sort", "ascending");
+  });
+
   test("'Compare this result' opens the compare builder with the result pinned", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
     await waitForDataLoaded(page, /Query Timings/);
