@@ -441,9 +441,9 @@ describe("Home", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
-    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" })).toBeTruthy();
     expect(
-      screen.getByText("Reproducible OLAP benchmark rankings, with public corpus browse below."),
+      screen.getByText("Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below."),
     ).toBeTruthy();
 
     const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
@@ -643,7 +643,7 @@ describe("Home", () => {
     render(<Home />);
     await waitFor(() => expect(screen.getByText("Cross-Benchmark Leaderboard")).toBeTruthy());
 
-    const headline = screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" });
+    const headline = screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" });
     const activeSummary = screen.getByRole("region", { name: "Active leaderboard filters" });
     const leaderboard = screen.getByRole("region", { name: "Cross-Benchmark Leaderboard" });
     const selector = screen.getByRole("region", { name: "Leaderboard ranking selector" });
@@ -779,7 +779,7 @@ describe("Home", () => {
     const resultCall = vi
       .mocked(queryRows)
       .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().includes("FROM bench.results WHERE"));
-    expect(String(resultCall?.[0])).toContain("benchmark IN (?)");
+    expect(String(resultCall?.[0])).toContain("CASE WHEN benchmark = 'star_schema' THEN 'ssb'");
     expect(String(resultCall?.[0])).toContain("scale_factor IN (?)");
     expect(String(resultCall?.[0])).toContain("test_type IN (?)");
     expect(String(resultCall?.[0])).toContain("(platform IN (?) OR platform_id IN (?))");

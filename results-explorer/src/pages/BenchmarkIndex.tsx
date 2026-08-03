@@ -37,6 +37,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
 
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
@@ -90,17 +91,15 @@ function trustAbbrev(label: string): string {
 
 function benchmarkContextNote(benchmark: string): string | null {
   if (benchmark === "star_schema" || benchmark === "ssb") {
-    return "Star Schema Benchmark (SSB): the route keeps the canonical star_schema slug while the published benchmark label uses SSB.";
+    return "Star Schema Benchmark (SSB): raw star_schema evidence is retained, while cohort and ranking identity uses canonical ssb.";
   }
   return null;
 }
 
 /**
- * Distinct benchmark slugs paired with display labels for the in-page
- * sibling switcher. Same-label aliases (`star_schema` and `ssb`, for
- * example) coexist for legacy routes, but the switcher only exposes the
- * slug that actually has public results so it cannot pivot into an empty
- * detail page through a populated sibling alias.
+ * Distinct canonical benchmark families paired with display labels for the
+ * in-page sibling switcher. Raw aliases remain reachable as legacy routes,
+ * but the switcher exposes one value per canonical family.
  */
 function uniqueBenchmarkOptions(availableBenchmarks: ReadonlySet<string> | null): { value: string; label: string }[] {
   if (availableBenchmarks === null) return [];
@@ -136,7 +135,8 @@ function isResultTimingDisplayable(row: ResultRow): boolean {
 }
 
 export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
-  const title = humanizeBenchmark(benchmark);
+  const canonicalBenchmark = canonicalBenchmarkSlug(benchmark);
+  const title = humanizeBenchmark(canonicalBenchmark);
   const [results, setResults] = useState<ResultRow[] | null>(null);
   const [summary, setSummary] = useState<BenchmarkSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -165,7 +165,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         // users pivot into no-result dead ends. Log once so observability
         // can pick up persistent snapshot failures.
         console.warn("listBenchmarksWithPublicResults failed; switcher will show only the current benchmark", err);
-        setAvailableBenchmarks(new Set(benchmark ? [benchmark] : []));
+        setAvailableBenchmarks(new Set(canonicalBenchmark ? [canonicalBenchmark] : []));
       });
     return () => {
       cancelled = true;
@@ -182,7 +182,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     () =>
       facetsToWhereClause({
         ...facets,
-        benchmark: benchmark ? [benchmark] : [],
+        benchmark: canonicalBenchmark ? [canonicalBenchmark] : [],
         scale_factor: [],
         phase: [],
         tuning_mode: [],
@@ -190,6 +190,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       }),
     [
       benchmark,
+      canonicalBenchmark,
       facets.cloud_provider,
       facets.cloud_region,
       facets.cost_status,
@@ -240,8 +241,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   }, [benchmarkResultWhere]);
 
   // Derive available scale factors and phases from the loaded rows.
-  const benchmarkResults = results?.filter((r) => r.benchmark === benchmark) ?? [];
-  const benchmarkNotFound = results !== null && benchmarkResults.length === 0 && !isKnownBenchmark(benchmark);
+  const benchmarkResults = results?.filter((r) => canonicalBenchmarkSlug(r.benchmark) === canonicalBenchmark) ?? [];
+  const benchmarkNotFound = results !== null && benchmarkResults.length === 0 && !isKnownBenchmark(canonicalBenchmark);
   useDocumentTitle(benchmarkNotFound ? "Not found · BenchBox Results" : `${title} · BenchBox Results`);
 
   const scaleFactors = [
@@ -266,7 +267,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     ...new Set(
       benchmarkResults
         .filter((r) => String(r.scale_factor) === effectiveSf)
-        .map((r) => r.test_type ?? "power")
+        .map((r) => canonicalPhase(r.test_type))
         .filter(Boolean),
     ),
   ].sort();
@@ -418,7 +419,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const rankGateReason = filteredSummary ? formatCohortExclusion(filteredSummary) : null;
   const historicalEntries = benchmarkResults.filter((result) => {
     if (String(result.scale_factor) !== effectiveSf) return false;
-    if ((result.test_type ?? "power") !== effectivePhase) return false;
+    if (canonicalPhase(result.test_type) !== effectivePhase) return false;
     if (!isResultTimingDisplayable(result)) return false;
     return matchesFacetRow(result, facets, { keys: BENCHMARK_ROW_FACET_KEYS });
   });
@@ -442,7 +443,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // always reachable through the fallback option below, so direct links to
   // no-result benchmark routes still recover gracefully.
   const benchmarkOptions = uniqueBenchmarkOptions(availableBenchmarks);
-  const hasCurrentBenchmarkOption = benchmarkOptions.some((option) => option.value === benchmark);
+  const hasCurrentBenchmarkOption = benchmarkOptions.some(
+    (option) => canonicalBenchmarkSlug(option.value) === canonicalBenchmark,
+  );
   const contextNote = benchmarkContextNote(benchmark);
   const selectedComparableCount = selectedCompareRows.length;
   const compareGuidance = benchmarkCompareGuidanceMessage(selectedComparableCount, title, effectiveSf, effectivePhase);
@@ -478,7 +481,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               id="benchmark-switcher"
               data-testid="benchmark-switcher"
               class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-              value={benchmark}
+              value={canonicalBenchmark}
               onChange={(event) => {
                 const next = (event.target as HTMLSelectElement).value;
                 if (next === benchmark) return;

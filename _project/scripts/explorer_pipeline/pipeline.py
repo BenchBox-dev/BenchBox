@@ -27,6 +27,8 @@ from typing import Any
 from _project.scripts.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder
 from _project.scripts.explorer_pipeline.models import (
     BenchmarkSummary,
+    canonical_benchmark_slug,
+    canonical_phase,
     DetailResult,
     ManifestEntry,
     PlatformRow,
@@ -620,9 +622,11 @@ class ExplorerPipeline:
                 # manifest row without its corresponding detail record.
                 manifest_entries.append(entry)
 
-                # Accumulate for benchmark summary artifacts.
-                phase = detail.test_type or "power"
-                summary_key: _SummaryKey = (entry.benchmark, entry.scale_factor, phase)
+                # Accumulate for benchmark summary artifacts. Raw benchmark
+                # slug and test_type stay on the result/detail rows; only the
+                # derived cohort key uses the explicit canonical identity.
+                phase = canonical_phase(detail.test_type)
+                summary_key: _SummaryKey = (canonical_benchmark_slug(entry.benchmark), entry.scale_factor, phase)
                 summary_accum[summary_key].append((entry, detail))
                 details_map[entry.result_id] = detail
 

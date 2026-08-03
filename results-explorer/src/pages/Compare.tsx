@@ -12,7 +12,7 @@ import {
   type ResultRow,
 } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean } from "@/utils";
-import { formatBenchmarkLabel } from "@/lib/displayLabels";
+import { canonicalBenchmarkSlug, canonicalPhase, formatBenchmarkLabel } from "@/lib/displayLabels";
 import { buildCompareUrl, resultDetailHref, visibleResultIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import {
   compareCohortLockReason,
@@ -756,7 +756,7 @@ function CompareGuardrailSummary({
 
 function severeCohortMismatchReason(results: DetailResult[]) {
   const reasons: string[] = [];
-  if (new Set(results.map((result) => result.benchmark)).size > 1) {
+  if (new Set(results.map((result) => canonicalBenchmarkSlug(result.benchmark))).size > 1) {
     reasons.push("benchmarks differ");
   }
   if (new Set(results.map((result) => result.scale_factor)).size > 1) {
@@ -792,9 +792,9 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
         if (pinnedId) {
           const pinned = rows.find((row) => row.result_id === pinnedId);
           if (pinned) {
-            setBenchmarkFilter(pinned.benchmark);
+            setBenchmarkFilter(canonicalBenchmarkSlug(pinned.benchmark));
             setScaleFilter(String(pinned.scale_factor));
-            setPhaseFilter(pinned.test_type ?? "");
+            setPhaseFilter(canonicalPhase(pinned.test_type));
           }
         }
       })
@@ -818,7 +818,7 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
     return {
       benchmark: first.benchmark,
       scale_factor: first.scale_factor,
-      test_type: first.test_type ?? "",
+      test_type: canonicalPhase(first.test_type),
     };
   }, [candidates, selectedIds]);
 
@@ -835,12 +835,12 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
 
   const benchmarkOptions = useMemo(() => {
     if (candidates === null) return [];
-    return Array.from(new Set(candidates.map((row) => row.benchmark))).sort();
+    return Array.from(new Set(candidates.map((row) => canonicalBenchmarkSlug(row.benchmark)))).sort();
   }, [candidates]);
   const scaleOptions = useMemo(() => {
     if (candidates === null) return [];
     const filtered = benchmarkFilter
-      ? candidates.filter((row) => row.benchmark === benchmarkFilter)
+      ? candidates.filter((row) => canonicalBenchmarkSlug(row.benchmark) === benchmarkFilter)
       : candidates;
     return Array.from(new Set(filtered.map((row) => String(row.scale_factor)))).sort();
   }, [candidates, benchmarkFilter]);
@@ -848,16 +848,16 @@ function CompareBuilder({ pinnedId, notice }: { pinnedId: string | null; notice:
     if (candidates === null) return [];
     const filtered = candidates.filter(
       (row) =>
-        (!benchmarkFilter || row.benchmark === benchmarkFilter) &&
+        (!benchmarkFilter || canonicalBenchmarkSlug(row.benchmark) === benchmarkFilter) &&
         (!scaleFilter || String(row.scale_factor) === scaleFilter),
     );
-    return Array.from(new Set(filtered.map((row) => row.test_type ?? ""))).filter(Boolean).sort();
+    return Array.from(new Set(filtered.map((row) => canonicalPhase(row.test_type)))).sort();
   }, [candidates, benchmarkFilter, scaleFilter]);
 
   function matchesBuilderFilters(row: ResultRow): boolean {
-    if (benchmarkFilter && row.benchmark !== benchmarkFilter) return false;
+    if (benchmarkFilter && canonicalBenchmarkSlug(row.benchmark) !== benchmarkFilter) return false;
     if (scaleFilter && String(row.scale_factor) !== scaleFilter) return false;
-    if (phaseFilter && (row.test_type ?? "") !== phaseFilter) return false;
+    if (phaseFilter && canonicalPhase(row.test_type) !== phaseFilter) return false;
     return true;
   }
 

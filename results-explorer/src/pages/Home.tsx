@@ -10,7 +10,7 @@ import type {
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getMetaLeaderboardData, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, fmtScoreCompact, fmtScoreExact, fmtGeomean, errMsg } from "@/utils";
-import { formatBenchmarkLabel } from "@/lib/displayLabels";
+import { canonicalBenchmarkSlug, formatBenchmarkLabel } from "@/lib/displayLabels";
 import { MetaLeaderboardSkeleton, SkeletonBlock } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
@@ -182,7 +182,10 @@ export function Home(_: RoutableProps) {
         return result !== undefined && matchesFacetRow(result, facets);
       }),
     })).filter((cohort) => {
-      if (benchmarkFilters.length > 0 && !benchmarkFilters.includes(cohort.benchmark)) return false;
+      if (
+        benchmarkFilters.length > 0 &&
+        !benchmarkFilters.map(canonicalBenchmarkSlug).includes(canonicalBenchmarkSlug(cohort.benchmark))
+      ) return false;
       if (scaleFilters.length > 0 && !scaleFilters.includes(String(cohort.scale_factor))) return false;
       if (phaseFilter !== "all" && cohort.phase !== phaseFilter) return false;
 
@@ -256,7 +259,7 @@ export function Home(_: RoutableProps) {
 
   const mode: MetaLeaderboardMode =
     modeRaw === "ranks" || modeRaw === "speedup" ? modeRaw : "times";
-  const benchmarks = [...new Set(results.map((result) => result.benchmark))].sort();
+  const benchmarks = [...new Set(results.map((result) => canonicalBenchmarkSlug(result.benchmark)))].sort();
   const platformIdToName = new Map(
     (metaLeaderboard?.platforms ?? []).map((platform) => [platform.platform_id, platform.platform]),
   );
@@ -288,7 +291,7 @@ export function Home(_: RoutableProps) {
   const visibleLeaderboardCohortCount = filteredMetaLeaderboard?.cohorts.length ?? 0;
   const visibleLeaderboardPlatformCount = filteredMetaLeaderboard?.platforms.length ?? 0;
   const leaderboardBenchmarkSet = new Set(benchmarkOptions);
-  const publicBenchmarksOutsideLeaderboard = benchmarks.filter((benchmark) => !leaderboardBenchmarkSet.has(benchmark));
+  const publicBenchmarksOutsideLeaderboard = benchmarks.filter((benchmark) => !leaderboardBenchmarkSet.has(canonicalBenchmarkSlug(benchmark)));
   const leaderboardEvidencePlatformIds = new Set(
     (metaLeaderboard?.cohorts ?? []).flatMap((cohort) =>
       (cohort.platforms ?? []).map((platform) => platform.platform_id),
@@ -346,9 +349,9 @@ export function Home(_: RoutableProps) {
       >
         <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-7 lg:px-8">
           <div class="max-w-4xl">
-            <h1 class="text-2xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
+            <h1 class="text-2xl font-bold sm:text-4xl">BenchBox Curated Results Preview</h1>
             <p class="mt-2 max-w-3xl text-sm text-[var(--bb-fg-muted)] sm:mt-3 sm:text-lg">
-              Reproducible OLAP benchmark rankings, with public corpus browse below.
+              Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.
             </p>
           </div>
 
