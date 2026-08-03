@@ -69,6 +69,36 @@ def test_empty_diff_routes_to_full_ci(rules: dict[str, list[str]]) -> None:
     assert decision["needs_code_ci"] is True
 
 
+def test_explorer_vitest_group_covers_the_full_contract(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths(
+        [
+            "results-explorer/src/pages/Home.tsx",
+            "results-explorer/package-lock.json",
+            "_project/scripts/explorer_pipeline/contract.py",
+            "results-data/corpus-inventory.json",
+            "scripts/generate_corpus_inventory.py",
+            ".github/workflows/results-explorer-browser.yml",
+        ],
+        rules,
+    )
+
+    assert decision["explorer_vitest_needed"] is True
+    assert set(decision["explorer_vitest_paths"]) == {
+        "results-explorer/src/pages/Home.tsx",
+        "results-explorer/package-lock.json",
+        "_project/scripts/explorer_pipeline/contract.py",
+        "results-data/corpus-inventory.json",
+        "scripts/generate_corpus_inventory.py",
+        ".github/workflows/results-explorer-browser.yml",
+    }
+
+
+def test_unrelated_python_change_skips_explorer_vitest(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths(["benchbox/cli/run.py"], rules)
+    assert decision["explorer_vitest_needed"] is False
+    assert decision["explorer_vitest_paths"] == []
+
+
 # F2 regression: docs/** glob originally treated all of docs/ as safe-content,
 # bypassing lint/test for Sphinx Python and config files. The narrowed rules
 # must keep prose safe but route Sphinx code through full CI.

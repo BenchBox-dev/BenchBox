@@ -512,6 +512,7 @@ READ_ONLY_TOOLS = frozenset(
         "get_query_plan",
         "validate_results",
         "suggest_charts",
+        "generate_chart",
         "get_benchmark_status",
         "get_benchmark_result",
     }

@@ -51,3 +51,30 @@ Extract the ASCII charting package into a standalone library called `textcharts`
 - The charting code becomes independently usable, testable, and releasable
 - Migration requires a compatibility shim period (one release cycle minimum)
 - Internal BenchBox callers must go through `ascii_api.py` facade (no direct submodule imports)
+
+## Follow-up dependency decision (2026-08-02)
+
+**Status**: Accepted — retain the direct `textcharts>=0.1.0` core dependency.
+
+The extraction is complete, but it did not make `textcharts` optional. The
+runtime still imports the package from the ASCII compatibility shims and from
+`benchbox.monitoring.report`; the dependency audit records 20 production
+import sites. Removing the declaration would make a normal BenchBox install
+fail while importing supported visualization or monitoring paths, and would
+also break the documented legacy shim imports.
+
+Replacement, vendoring, and deprecation were compared:
+
+- **Replacement** would require reimplementing or adopting another renderer and
+  re-establishing byte-for-byte output and shim compatibility.
+- **Vendoring** would duplicate the standalone package, create two ownership
+  and security-update paths, and still require a migration for existing imports.
+- **Deprecating the shims** would be a public API break without a release and
+  migration window; it would not remove the monitoring import path by itself.
+
+Retention is therefore the lowest-risk supported choice for this release. The
+manifest, lockfile, generated dependency audit, ASCII shims, and MCP semantic
+chart boundary remain coupled and must move together in any future migration.
+Revisit after a replacement renderer and a separately approved compatibility
+and package-install plan exist; no MCP server registration is implied by this
+Python dependency.

@@ -35,6 +35,7 @@ from _project.scripts.explorer_pipeline.models import (
 from _project.scripts.explorer_pipeline.ranking import RankedCohort, rank_platforms
 from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
+    _applied_receipt,
     _platform_percentile_stats,
 )
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
@@ -81,6 +82,34 @@ def _find_submission_manifest(bundle_path: Path) -> Path | None:
     if legacy.is_file():
         return legacy
     return None
+
+
+def _public_applied_receipt(bundle_path: Path, anonymizer: AnonymizationManager) -> str | None:
+    """Return the bounded applied receipt after public-path sanitization."""
+    receipt_json = _applied_receipt(bundle_path)
+    if receipt_json is None:
+        return None
+    try:
+        public_receipt = anonymizer.anonymize_result_payload(json.loads(receipt_json))
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"could not sanitize applied receipt {bundle_path.name}: {exc}") from exc
+    leaks = find_public_path_leaks(public_receipt)
+    if leaks:
+        raise ValueError("public applied receipt privacy check failed for fields: " + ", ".join(sorted(set(leaks))))
+    return canonical_json_bytes(public_receipt).decode("utf-8")
+
+
+def _public_bundle_data(
+    bundle_path: Path,
+    bundle_data: dict[str, Any],
+    anonymizer: AnonymizationManager,
+) -> tuple[dict[str, Any], str | None]:
+    """Sanitize a bundle and its companion before creating public read-model rows."""
+    public_bundle = anonymizer.anonymize_result_payload(bundle_data)
+    public_leaks = find_public_path_leaks(public_bundle)
+    if public_leaks:
+        raise ValueError("public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks))))
+    return public_bundle, _public_applied_receipt(bundle_path, anonymizer)
 
 
 # Type alias for the summary accumulator: (benchmark, scale_factor, phase) → rows
@@ -493,13 +522,16 @@ class ExplorerPipeline:
                         effective_trust,
                     )
 
+                public_bundle, public_receipt = _public_bundle_data(bundle_path, bundle_data, public_anonymizer)
+
                 entry = self._transformer.to_manifest_entry(
                     bundle_path,
                     trust_label=effective_trust,
                     visibility=effective_visibility,
                     result_id=result_id,
-                    data=bundle_data,
+                    data=public_bundle,
                 )
+                entry = entry.model_copy(update={"applied_receipt": public_receipt})
 
                 detail = self._transformer.to_detail_result(
                     bundle_path,
@@ -507,8 +539,9 @@ class ExplorerPipeline:
                     trust_label=effective_trust,
                     visibility=effective_visibility,
                     bundle_download_url=bundle_download_url,
-                    data=bundle_data,
+                    data=public_bundle,
                 )
+                detail = detail.model_copy(update={"applied_receipt": public_receipt})
 
                 dest_bundle = (out_bundles_dir / f"{result_id}.json").resolve()
                 if not dest_bundle.is_relative_to(out_bundles_dir.resolve()):
@@ -519,12 +552,6 @@ class ExplorerPipeline:
                         result_id,
                     )
                     continue
-                public_bundle = public_anonymizer.anonymize_result_payload(bundle_data)
-                public_leaks = find_public_path_leaks(public_bundle)
-                if public_leaks:
-                    raise ValueError(
-                        "public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks)))
-                    )
                 dest_bundle.write_bytes(canonical_json_bytes(public_bundle))
 
                 # Publish the plans sidecar alongside the bundle when present

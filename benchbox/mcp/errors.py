@@ -21,18 +21,89 @@ from typing import Any
 # secret-assignment patterns and URL userinfo before the text leaves the
 # server; key-list redaction cannot help here because the secret is already
 # embedded in a value.
+# Keep the key vocabulary in one pattern so JSON, assignment, and prose forms
+# cannot drift apart.
+_SECRET_KEY_PATTERN = (
+    r"(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|account[_-]?key|"
+    r"key[_-]?id|credential)[a-z0-9_-]*"
+)
 _SECRET_ASSIGNMENT_RE = re.compile(
-    r"((?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|account[_-]?key|"
-    r"key[_-]?id|credential)[a-z0-9_-]*\s*[=:]\s*)"
+    rf"(({_SECRET_KEY_PATTERN})\s*=\s*)"
     r"(?:'[^']*'|\"[^\"]*\"|[^&\s,;'\")]+)",
     flags=re.IGNORECASE,
+)
+_SECRET_QUOTED_ASSIGNMENT_RE = re.compile(
+    rf"""(?P<prefix>["']{_SECRET_KEY_PATTERN}["']\s*:\s*)(?P<quote>["'])(?P<value>(?:\\.|(?!(?P=quote)).)*(?P=quote))""",
+    flags=re.IGNORECASE,
+)
+_SECRET_COLON_ASSIGNMENT_RE = re.compile(
+    rf"(?P<prefix>{_SECRET_KEY_PATTERN}\s*:\s*)(?P<value>'[^']*'|\"[^\"]*\"|[^&\s,;]+)",
+    flags=re.IGNORECASE,
+)
+_SECRET_PROSE_CONNECTOR_RE = re.compile(
+    rf"(?P<prefix>\b{_SECRET_KEY_PATTERN}\s+(?:is|was|equals?|set\s+to|configured\s+as)\s+)"
+    r"(?P<value>[^\s,;:()]+)",
+    flags=re.IGNORECASE,
+)
+_SECRET_PROSE_RE = re.compile(
+    rf"(?P<prefix>\b{_SECRET_KEY_PATTERN}\s+)(?P<value>[^\s,;:()]+)",
+    flags=re.IGNORECASE,
+)
+_NON_SECRET_SECRET_WORDS = frozenset(
+    {
+        "blank",
+        "configured",
+        "empty",
+        "expired",
+        "failed",
+        "field",
+        "found",
+        "invalid",
+        "is",
+        "lookup",
+        "missing",
+        "must",
+        "not",
+        "null",
+        "present",
+        "provided",
+        "required",
+        "set",
+        "setting",
+        "should",
+        "store",
+        "undefined",
+        "value",
+        "was",
+    }
 )
 _URL_USERINFO_RE = re.compile(r"(://)[^/@\s]+@")
 
 
 def scrub_secret_material(text: str) -> str:
     """Mask secret-assignment values and URL userinfo in free text."""
-    return _URL_USERINFO_RE.sub(r"\1****@", _SECRET_ASSIGNMENT_RE.sub(r"\1****", text))
+
+    def replace_quoted(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}{match.group('quote')}****{match.group('quote')}"
+
+    def replace_colon(match: re.Match[str]) -> str:
+        value = match.group("value")
+        if value.lower() in _NON_SECRET_SECRET_WORDS:
+            return match.group(0)
+        return f"{match.group('prefix')}****"
+
+    def replace_prose(match: re.Match[str]) -> str:
+        value = match.group("value")
+        if value.lower() in _NON_SECRET_SECRET_WORDS:
+            return match.group(0)
+        return f"{match.group('prefix')}****"
+
+    scrubbed = _SECRET_QUOTED_ASSIGNMENT_RE.sub(replace_quoted, text)
+    scrubbed = _SECRET_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
+    scrubbed = _SECRET_COLON_ASSIGNMENT_RE.sub(replace_colon, scrubbed)
+    scrubbed = _SECRET_PROSE_CONNECTOR_RE.sub(replace_prose, scrubbed)
+    scrubbed = _SECRET_PROSE_RE.sub(replace_prose, scrubbed)
+    return _URL_USERINFO_RE.sub(r"\1****@", scrubbed)
 
 
 class ErrorCode(str, Enum):

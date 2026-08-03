@@ -1086,6 +1086,7 @@ function FlywheelStrip() {
             <a
               key={step.href}
               href={step.href}
+              data-native={step.href.startsWith("/docs/") ? "true" : undefined}
               aria-label={step.label}
               class="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-3 text-sm font-medium text-[var(--bb-data-fg-primary)] no-underline hover:border-[var(--bb-accent)] hover:bg-[var(--bb-tone-info-bg)] hover:text-[var(--bb-accent-hover)]"
             >

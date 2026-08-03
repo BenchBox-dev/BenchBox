@@ -290,6 +290,15 @@ def test_unknown_mcp_prompt_is_rejected(gen, catalog):
     assert any("prompt_that_does_not_exist" in e for e in errors)
 
 
+def test_mcp_prompt_catalog_matches_registered_prompt_surface(catalog):
+    from benchbox.mcp import create_server
+    from tests.unit.mcp.public_api import list_prompt_names
+
+    configured = catalog["mcp"]["prompts"]
+    assert set(configured) == {"analyze_results", "benchmark_run", "compare_platforms"}
+    assert set(configured.values()) <= list_prompt_names(create_server())
+
+
 def test_credential_platforms_declare_safety_terms(browser_catalog):
     for platform in browser_catalog["platforms"]:
         if platform.get("credential_deployments"):

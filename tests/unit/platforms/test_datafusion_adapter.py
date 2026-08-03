@@ -141,6 +141,51 @@ class TestDataFusionAdapter:
                         mock_config.with_repartition_joins.assert_called_once_with(True)
                         mock_config.with_batch_size.assert_called_once_with(16384)
 
+    def test_create_connection_honors_optimization_flags(self):
+        """MCP-supplied DataFusion optimization flags must reach SessionConfig."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mock_config = Mock()
+            mock_config.with_target_partitions.return_value = mock_config
+            mock_config.with_parquet_pruning.return_value = mock_config
+            mock_config.with_repartition_joins.return_value = mock_config
+            mock_config.with_repartition_aggregations.return_value = mock_config
+            mock_config.with_repartition_windows.return_value = mock_config
+            mock_config.with_information_schema.return_value = mock_config
+            mock_config.with_batch_size.return_value = mock_config
+            mock_config.set.side_effect = Exception("Config not supported")
+
+            mock_runtime_builder = Mock()
+            mock_runtime_builder.build.return_value = Mock()
+
+            with patch("benchbox.platforms.datafusion.SessionConfig", return_value=mock_config):
+                with patch("benchbox.platforms.datafusion.SessionContext"):
+                    with patch("benchbox.platforms.datafusion.RuntimeEnv", return_value=mock_runtime_builder):
+                        adapter = DataFusionAdapter(
+                            working_dir=tmpdir,
+                            parquet_pushdown=False,
+                            repartition_joins=False,
+                        )
+
+                        with patch.object(adapter, "handle_existing_database"):
+                            adapter.create_connection()
+
+            mock_config.with_parquet_pruning.assert_called_once_with(False)
+            mock_config.with_repartition_joins.assert_called_once_with(False)
+
+    def test_from_config_forwards_optimization_flags(self, tmp_path):
+        """Unified configuration must preserve DataFusion optimization flags."""
+        with patch.object(DataFusionAdapter, "__init__", return_value=None) as init:
+            DataFusionAdapter.from_config(
+                {
+                    "working_dir": str(tmp_path),
+                    "parquet_pushdown": False,
+                    "repartition_joins": False,
+                }
+            )
+
+        assert init.call_args.kwargs["parquet_pushdown"] is False
+        assert init.call_args.kwargs["repartition_joins"] is False
+
     def test_parse_memory_limit(self):
         """Test memory limit parsing."""
         with patch("benchbox.platforms.datafusion.SessionContext"), tempfile.TemporaryDirectory() as tmpdir:

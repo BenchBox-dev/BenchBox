@@ -192,7 +192,7 @@ CLI result bundles, but MCP does not claim option parity with `benchbox run`.
 | `get_query_plan` | analytics | No | Read captured query plans from a result bundle. |
 | `validate_results` | analytics | No | Validate result JSON integrity, completeness, and believability. |
 | `suggest_charts` | visualization | No | Suggest useful chart types for one or more result files. |
-| `generate_chart` | visualization | Yes | Generate ASCII chart output from result files. |
+| `generate_chart` | visualization | No | Generate ASCII chart output from result files. |
 
 Authenticated remote mode additionally registers:
 
@@ -247,6 +247,11 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
+- The authoritative option-to-consumer, security-class, alias, and rejection
+  matrix is maintained in
+  `docs/development/mcp-platform-option-contract.md`. Every allow-listed key
+  must have a matching matrix entry; a missing entry fails closed before
+  adapter construction or durable-job persistence.
 - Normal execution uses `BaseBenchmark.run_with_platform()` through public
   benchmark and adapter APIs.
 - MCP execution intentionally suppresses console output and returns structured
@@ -414,6 +419,14 @@ visualization registries and are discoverable with `list_available(category="cha
 ## Prompts
 
 Prompts are reusable templates for AI analysis. Invoke via slash commands in Claude Code.
+The same prompt catalog is available through both supported transports: use
+`prompts/list` to discover the seven names and argument schemas, then
+`prompts/get` with a prompt name and string-valued arguments to render one
+prompt. Stdio and sessionless Streamable HTTP return the same prompt metadata
+and rendered text; HTTP requests do not require or receive an `Mcp-Session-Id`.
+The landing quickstart catalog references three of these prompts for guided
+benchmark flows; the four remaining prompts are still first-class MCP prompts
+and are discoverable at runtime.
 
 ### `analyze_results`
 

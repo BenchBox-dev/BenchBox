@@ -850,3 +850,29 @@ class TestMain:
         bad = tmp_path / "bad.json"
         bad.write_text(json.dumps({"version": "1.0"}), encoding="utf-8")
         assert main([str(bad)]) == 1
+
+    def test_malformed_public_companion_fails_closed(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
+        bundle = tmp_path / "tpch_result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        bundle.with_name("tpch_result.plans.json").write_text(
+            '{"plan": "/Users/alice/private" not-json',
+            encoding="utf-8",
+        )
+
+        assert main([str(bundle)]) == 1
+        assert "Malformed public companion JSON" in capsys.readouterr().out
+
+    def test_case_insensitive_companion_name_is_privacy_scanned(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ):
+        bundle = tmp_path / "tpch_result.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        bundle.with_name("tpch_result.PLANS.JSON").write_text(
+            json.dumps({"path": "/Users/alice/private"}),
+            encoding="utf-8",
+        )
+
+        assert main([str(bundle)]) == 1
+        output = capsys.readouterr().out
+        assert "PLANS.JSON" in output
+        assert "private absolute paths" in output

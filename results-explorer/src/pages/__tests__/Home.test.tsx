@@ -682,18 +682,16 @@ describe("Home", () => {
 
     expect(screen.getByText("Run -> Compare -> Submit")).toBeTruthy();
     const workflow = screen.getByRole("navigation", { name: "Result contribution workflow" });
-    expect(within(workflow).getByRole("link", { name: "Run a benchmark" })).toHaveAttribute(
-      "href",
-      "/docs/usage/installation.html",
-    );
+    const runLink = within(workflow).getByRole("link", { name: "Run a benchmark" });
+    expect(runLink).toHaveAttribute("href", "/docs/usage/installation.html");
+    expect(runLink).toHaveAttribute("data-native", "true");
     expect(within(workflow).getByRole("link", { name: "Compare your result" })).toHaveAttribute(
       "href",
       "/results/compare",
     );
-    expect(within(workflow).getByRole("link", { name: "Submit a bundle" })).toHaveAttribute(
-      "href",
-      "/docs/contributing-results.html",
-    );
+    const submitLink = within(workflow).getByRole("link", { name: "Submit a bundle" });
+    expect(submitLink).toHaveAttribute("href", "/docs/contributing-results.html");
+    expect(submitLink).toHaveAttribute("data-native", "true");
     expect(screen.queryByText("Run BenchBox on your platform and submit your results")).toBeNull();
   });
 

@@ -90,10 +90,10 @@ VIZ_READONLY_ANNOTATIONS = ToolAnnotations(
     open_world_hint=False,
 )
 
-# Tool annotations for chart generation (creates files)
+# Tool annotations for inline chart generation
 VIZ_GENERATE_ANNOTATIONS = ToolAnnotations(
-    title="Generate visualization",
-    read_only_hint=False,
+    title="Generate inline visualization",
+    read_only_hint=True,
     destructive_hint=False,
     idempotent_hint=True,
     open_world_hint=False,

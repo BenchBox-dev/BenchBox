@@ -76,6 +76,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "PACKAGE_SMOKE_RESULT": "skipped",
         "DEPENDENCY_AUDIT_RESULT": "skipped",
         "PARITY_CHECK_RESULT": "skipped",
+        "EXPLORER_VITEST_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
         "NEEDS_CODE_CI": "false",
         "SAFE_CONTENT_ONLY": "true",
@@ -133,6 +134,39 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
 
     assert result.returncode == 1
     assert "explorer-tokens=failure" in result.stdout
+
+
+def test_ci_required_result_fails_on_explorer_vitest_failure() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+        EXPLORER_VITEST_RESULT="failure",
+    )
+
+    assert result.returncode == 1
+    assert "explorer-vitest=failure" in result.stdout
+
+
+def test_ci_required_result_treats_explorer_vitest_skipped_as_success() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+        EXPLORER_VITEST_RESULT="skipped",
+    )
+
+    assert result.returncode == 0
 
 
 def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
@@ -231,6 +265,47 @@ def test_ci_required_result_required_jobs_in_needs() -> None:
     # result silently disappears from the gate.
     assert "package-smoke" in needs
     assert "dependency-audit" in needs
+    assert "explorer-vitest" in needs
+
+
+def test_explorer_vitest_job_uses_contract_filter_and_exact_command() -> None:
+    workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    job = workflow_yaml["jobs"]["explorer-vitest"]
+    assert job["if"] == "${{ needs.ci-paths.outputs.explorer-vitest-needed == 'true' }}"
+    run_steps = [step for step in job["steps"] if step.get("name") == "Run Explorer Vitest suite"]
+    assert len(run_steps) == 1
+    assert run_steps[0]["run"] == "npm test -- --run"
+    assert run_steps[0]["working-directory"] == "results-explorer"
+    aggregate = next(
+        step
+        for step in workflow_yaml["jobs"]["ci-required-result"]["steps"]
+        if step.get("name") == "Aggregate required result"
+    )
+    assert aggregate["env"]["EXPLORER_VITEST_RESULT"] == "${{ needs.explorer-vitest.result }}"
+
+
+def test_explorer_vitest_job_declares_clean_runner_python_and_uv_setup() -> None:
+    workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    job = workflow_yaml["jobs"]["explorer-vitest"]
+    steps = job["steps"]
+
+    setup_python = next(step for step in steps if step.get("name") == "Set up Python")
+    assert setup_python["uses"] == "actions/setup-python@v5"
+    assert setup_python["with"]["python-version"] == "3.12"
+
+    setup_uv = next(step for step in steps if step.get("name") == "Install uv")
+    assert setup_uv["uses"] == "astral-sh/setup-uv@v4"
+
+    install_python = next(step for step in steps if step.get("name") == "Install Python dependencies")
+    assert install_python["run"] == "uv sync --group dev"
+
+    npm_install_index = next(i for i, step in enumerate(steps) if step.get("name") == "Install explorer dependencies")
+    assert all(
+        i < npm_install_index
+        for i, step in enumerate(steps)
+        if step.get("name") in {"Set up Python", "Install uv", "Install Python dependencies"}
+    )
+    assert all("continue-on-error" not in step for step in steps)
 
 
 def test_ci_paths_job_outputs_declare_every_path_filter_group() -> None:
