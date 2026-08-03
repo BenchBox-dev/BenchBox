@@ -11,6 +11,7 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import CallToolResult, TextContent
 
 from benchbox.mcp.security import (
+    READ_ONLY_TOOLS,
     AdmissionLease,
     AdmissionLimits,
     DurableSecurityStore,
@@ -22,6 +23,10 @@ from benchbox.mcp.security import (
 from tests.integration.mcp._security import write_security_config
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+
+def test_inline_chart_generation_is_read_only() -> None:
+    assert "generate_chart" in READ_ONLY_TOOLS
 
 
 def test_auth_config_contains_only_digests_and_verifies_identity(tmp_path: Path) -> None:
