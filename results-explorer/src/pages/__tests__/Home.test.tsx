@@ -781,7 +781,7 @@ describe("Home", () => {
       .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().includes("FROM bench.results WHERE"));
     expect(String(resultCall?.[0])).toContain("CASE WHEN benchmark = 'star_schema' THEN 'ssb'");
     expect(String(resultCall?.[0])).toContain("scale_factor IN (?)");
-    expect(String(resultCall?.[0])).toContain("test_type IN (?)");
+    expect(String(resultCall?.[0])).toContain("THEN 'unknown' ELSE trim(lower(test_type)) END IN (?)");
     expect(String(resultCall?.[0])).toContain("(platform IN (?) OR platform_id IN (?))");
     expect(String(resultCall?.[0])).toContain("deployment_class IN (?)");
     expect(String(resultCall?.[0])).toContain("cost_status IN (?)");

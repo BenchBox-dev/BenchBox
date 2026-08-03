@@ -302,7 +302,12 @@ export function Home(_: RoutableProps) {
   const visibleRankedLeaderboardPlatformCount =
     filteredMetaLeaderboard?.platforms.filter((platform) => platform.n_cohorts > 0).length ?? 0;
   const tuningSummary = summarizeTuningModes(results);
-  const tuningOptions = tuningSummaryBucketCount(tuningSummary) > 1
+  // An active tuning filter means `results` was already loaded with that
+  // predicate applied, so the summary necessarily collapses to one bucket.
+  // Dropping the selector then would strand the user on the filtered view with
+  // no control to return to "All tuning labels", so keep it whenever a filter
+  // is active regardless of the narrowed cardinality.
+  const tuningOptions = tuningSummaryBucketCount(tuningSummary) > 1 || tuningFilter !== "all"
     ? [
         "all",
         ...(tuningSummary.unlabelledCount > 0 ? [UNLABELLED_TUNING_VALUE] : []),

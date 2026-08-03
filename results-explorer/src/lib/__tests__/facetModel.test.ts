@@ -6,11 +6,13 @@ import {
   FACET_URL_KEYS,
   FACET_URL_SERDES,
   facetsToWhereClause,
+  normalizeFacetState,
   readFacetParam,
   useFacetField,
   type FacetKey,
   type FacetState,
 } from "@/lib/facetModel";
+import { matchesFacetRow } from "@/lib/facetMatching";
 import { useUrlState, type UrlSerde } from "@/lib/useUrlState";
 
 const SAMPLE_VALUES: { [K in FacetKey]: FacetState[K] } = {
@@ -168,7 +170,7 @@ describe("facetsToWhereClause", () => {
 
     expect(sql).toContain("CASE WHEN benchmark = 'star_schema' THEN 'ssb'");
     expect(sql).toContain("scale_factor IN (?)");
-    expect(sql).toContain("test_type IN (?)");
+    expect(sql).toContain("THEN 'unknown' ELSE trim(lower(test_type)) END IN (?)");
     expect(sql).toContain("(platform IN (?) OR platform_id IN (?))");
     expect(sql).toContain("deployment_class IN (?, ?)");
     expect(sql).toContain("instance_or_warehouse IN (?)");
@@ -203,5 +205,35 @@ describe("facetsToWhereClause", () => {
 
     expect(sql).toContain("(tuning_mode IN (?) OR tuning_mode IS NULL)");
     expect(params).toEqual(["auto"]);
+  });
+
+  // The `unknown` phase cohort is user-selectable, and `matchesFacetRow` folds a
+  // null/blank `test_type` into it. A raw `test_type IN ('unknown')` predicate
+  // matched no null-phase row, so the cohort that produced the facet returned an
+  // empty leaderboard.
+  it("folds null and blank test_type into the unknown phase cohort", () => {
+    const { sql, params } = facetsToWhereClause({ phase: ["unknown"] });
+
+    expect(sql).toContain("coalesce(test_type, '')");
+    expect(sql).toContain("THEN 'unknown'");
+    expect(params).toEqual(["unknown"]);
+
+    const rowMatches = matchesFacetRow({ test_type: null }, normalizeFacetState({ phase: ["unknown"] }), {
+      keys: ["phase"],
+    });
+    expect(rowMatches).toBe(true);
+  });
+
+  it("canonicalizes phase casing on both the SQL and in-memory sides", () => {
+    const { params } = facetsToWhereClause({ phase: ["POWER", "power", " Power "] });
+
+    // canonicalPhase() trims and lowercases, so the three spellings collapse to
+    // one bound parameter rather than three literals that miss stored casing.
+    expect(params).toEqual(["power"]);
+
+    const rowMatches = matchesFacetRow({ test_type: "POWER" }, normalizeFacetState({ phase: ["power"] }), {
+      keys: ["phase"],
+    });
+    expect(rowMatches).toBe(true);
   });
 });

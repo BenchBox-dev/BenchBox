@@ -10,6 +10,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from _project.scripts.explorer_pipeline import pipeline as pipeline_module
 from _project.scripts.explorer_pipeline.pipeline import (
     COMMUNITY_TRUST_LABEL,
     SUBMISSION_MANIFEST_FILENAME,
@@ -739,3 +740,47 @@ class TestExplorerPipelineRun:
                 assert resolved == result_id, (
                     f"short_id {short_id!r} in benchmark_rankings must resolve to {result_id!r}"
                 )
+
+
+# ---------------------------------------------------------------------------
+# Staged-output publication guards (PR #1483 review follow-ups)
+# ---------------------------------------------------------------------------
+
+
+class TestStagedOutputGuards:
+    def test_symlinked_bundles_destination_is_rejected(self, data_dir: Path, tmp_path: Path) -> None:
+        """A symlinked `bundles/` must not be published into.
+
+        `mkdir(exist_ok=True)` accepts a symlink to a directory, so without an
+        explicit check every copy and the post-promotion stale sweep would
+        follow the link and delete unrelated `*.json` in the target.
+        """
+        output = tmp_path / "out"
+        output.mkdir()
+        unrelated = tmp_path / "unrelated"
+        unrelated.mkdir()
+        bystander = unrelated / "keep-me.json"
+        bystander.write_text('{"keep": true}', encoding="utf-8")
+        (output / "bundles").symlink_to(unrelated, target_is_directory=True)
+
+        with pytest.raises(ValueError, match="must be a real directory"):
+            ExplorerPipeline().run(data_dir, output)
+
+        assert bystander.exists(), "A build must never sweep files inside a symlink target"
+
+    def test_staging_dir_is_removed_when_a_pre_build_step_fails(
+        self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An uncaught error before the DB build must not strand the staging tree."""
+        output = tmp_path / "out"
+
+        def _boom(*_args: object, **_kwargs: object) -> None:
+            raise OSError("input vanished mid-build")
+
+        monkeypatch.setattr(pipeline_module, "_build_short_ids", _boom)
+
+        with pytest.raises(OSError, match="input vanished"):
+            ExplorerPipeline().run(data_dir, output)
+
+        leftovers = [p.name for p in output.parent.iterdir() if p.name.startswith(f".{output.name}.")]
+        assert leftovers == [], f"Staging directory leaked after a pre-build failure: {leftovers}"

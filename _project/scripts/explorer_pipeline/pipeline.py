@@ -68,6 +68,13 @@ def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     target_bundles = output_dir / "bundles"
+    # `mkdir(exist_ok=True)` accepts a symlink that resolves to a directory, and
+    # every copy below - plus the stale-file sweep after promotion - would then
+    # follow the link, overwriting matching files and unlinking unrelated
+    # `*.json` outside `output_dir`. The pre-staging `shutil.rmtree` path refused
+    # to operate on a directory symlink; keep that guarantee explicit here.
+    if target_bundles.is_symlink():
+        raise ValueError(f"published bundles path must be a real directory, not a symlink: {target_bundles}")
     target_bundles.mkdir(parents=True, exist_ok=True)
     staged_bundles = staged_dir / "bundles"
     candidate_names = {path.name for path in staged_bundles.iterdir() if path.is_file()}
@@ -104,6 +111,11 @@ def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
             (output_dir / legacy_file).unlink()
         except FileNotFoundError:
             pass
+        except OSError:
+            # The new DB is already live at this point, so a stubborn legacy
+            # path (a directory, a deletion-denying ACL) must not turn a
+            # successful publish into a reported failure and an ambiguous retry.
+            logger.warning("Could not remove legacy artifact %s", output_dir / legacy_file)
 
 
 def _is_vendor_subtree(bundle_path: Path, bundles_dir: Path) -> bool:
@@ -514,162 +526,169 @@ class ExplorerPipeline:
         output_dir = output_dir.resolve()
         output_dir.parent.mkdir(parents=True, exist_ok=True)
         staging_dir = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.", dir=output_dir.parent))
+        # The staging directory is populated from here through bundle processing,
+        # so the cleanup guard must start now: an uncaught I/O error before the DB
+        # build would otherwise strand a hidden `.out.*` tree next to the output,
+        # and repeated retries would accumulate stale copies of it.
+        try:
+            # All copied public JSON passes through one manager so the same stable
+            # pseudonyms are used across a primary bundle and its companions.
+            public_anonymizer = AnonymizationManager()
 
-        # All copied public JSON passes through one manager so the same stable
-        # pseudonyms are used across a primary bundle and its companions.
-        public_anonymizer = AnonymizationManager()
+            out_bundles_dir = staging_dir / "bundles"
+            out_bundles_dir.mkdir(parents=True)
 
-        out_bundles_dir = staging_dir / "bundles"
-        out_bundles_dir.mkdir(parents=True)
+            # Drop derived directories and files from earlier pipeline versions
+            # that emitted per-cohort / per-result / manifest JSON artifacts. The
+            # DuckDB browser store replaces them; leaving them behind would mask
+            # stale data.
+            manifest_entries: list[ManifestEntry] = []
+            # Accumulator for benchmark summary artifacts (zero extra I/O - reuses
+            # already-loaded bundle data from the single pass).
+            summary_accum: _SummaryAccum = defaultdict(list)
+            # Keyed by result_id; populated alongside manifest_entries so build_full()
+            # has per-result detail data without a second I/O pass.
+            details_map: dict[str, DetailResult] = {}
+            skipped_bundles = 0
 
-        # Drop derived directories and files from earlier pipeline versions
-        # that emitted per-cohort / per-result / manifest JSON artifacts. The
-        # DuckDB browser store replaces them; leaving them behind would mask
-        # stale data.
-        manifest_entries: list[ManifestEntry] = []
-        # Accumulator for benchmark summary artifacts (zero extra I/O - reuses
-        # already-loaded bundle data from the single pass).
-        summary_accum: _SummaryAccum = defaultdict(list)
-        # Keyed by result_id; populated alongside manifest_entries so build_full()
-        # has per-result detail data without a second I/O pass.
-        details_map: dict[str, DetailResult] = {}
-        skipped_bundles = 0
+            for bundle_path in bundle_files:
+                try:
+                    bundle_data, bundle_raw = self._transformer.load_bundle_full(bundle_path)
+                    result_id = self._transformer.result_id_from_bundle(bundle_path, data=bundle_data, raw=bundle_raw)
+                    prefix = bundle_url_prefix.rstrip("/")
+                    bundle_download_url = f"{prefix}/{result_id}.json"
 
-        for bundle_path in bundle_files:
-            try:
-                bundle_data, bundle_raw = self._transformer.load_bundle_full(bundle_path)
-                result_id = self._transformer.result_id_from_bundle(bundle_path, data=bundle_data, raw=bundle_raw)
-                prefix = bundle_url_prefix.rstrip("/")
-                bundle_download_url = f"{prefix}/{result_id}.json"
+                    # Per-bundle trust label. Precedence: a bundle under the
+                    # maintainer-controlled top-level vendor/ subtree is
+                    # vendor-supplied; else a submission-manifest sidecar marks it
+                    # community-submitted; else the pipeline default.
+                    effective_trust = trust_label
+                    effective_visibility = visibility
+                    if _is_vendor_subtree(bundle_path, bundles_dir):
+                        effective_trust = VENDOR_TRUST_LABEL
+                        effective_visibility = VENDOR_VISIBILITY
+                        logger.debug(
+                            "Vendor subtree bundle %s - using trust_label=%r", bundle_path.name, effective_trust
+                        )
+                    elif _find_submission_manifest(bundle_path) is not None:
+                        effective_trust = COMMUNITY_TRUST_LABEL
+                        logger.debug(
+                            "Found submission manifest for %s - using trust_label=%r",
+                            bundle_path.name,
+                            effective_trust,
+                        )
 
-                # Per-bundle trust label. Precedence: a bundle under the
-                # maintainer-controlled top-level vendor/ subtree is
-                # vendor-supplied; else a submission-manifest sidecar marks it
-                # community-submitted; else the pipeline default.
-                effective_trust = trust_label
-                effective_visibility = visibility
-                if _is_vendor_subtree(bundle_path, bundles_dir):
-                    effective_trust = VENDOR_TRUST_LABEL
-                    effective_visibility = VENDOR_VISIBILITY
-                    logger.debug("Vendor subtree bundle %s - using trust_label=%r", bundle_path.name, effective_trust)
-                elif _find_submission_manifest(bundle_path) is not None:
-                    effective_trust = COMMUNITY_TRUST_LABEL
-                    logger.debug(
-                        "Found submission manifest for %s - using trust_label=%r",
-                        bundle_path.name,
-                        effective_trust,
+                    public_bundle, public_receipt = _public_bundle_data(bundle_path, bundle_data, public_anonymizer)
+
+                    entry = self._transformer.to_manifest_entry(
+                        bundle_path,
+                        trust_label=effective_trust,
+                        visibility=effective_visibility,
+                        result_id=result_id,
+                        data=public_bundle,
                     )
+                    entry = entry.model_copy(update={"applied_receipt": public_receipt})
 
-                public_bundle, public_receipt = _public_bundle_data(bundle_path, bundle_data, public_anonymizer)
-
-                entry = self._transformer.to_manifest_entry(
-                    bundle_path,
-                    trust_label=effective_trust,
-                    visibility=effective_visibility,
-                    result_id=result_id,
-                    data=public_bundle,
-                )
-                entry = entry.model_copy(update={"applied_receipt": public_receipt})
-
-                detail = self._transformer.to_detail_result(
-                    bundle_path,
-                    result_id,
-                    trust_label=effective_trust,
-                    visibility=effective_visibility,
-                    bundle_download_url=bundle_download_url,
-                    data=public_bundle,
-                )
-                detail = detail.model_copy(update={"applied_receipt": public_receipt})
-
-                dest_bundle = (out_bundles_dir / f"{result_id}.json").resolve()
-                if not dest_bundle.is_relative_to(out_bundles_dir.resolve()):
-                    skipped_bundles += 1
-                    logger.warning(
-                        "Skipping bundle copy for %s - result_id %r escapes bundles directory",
+                    detail = self._transformer.to_detail_result(
                         bundle_path,
                         result_id,
+                        trust_label=effective_trust,
+                        visibility=effective_visibility,
+                        bundle_download_url=bundle_download_url,
+                        data=public_bundle,
                     )
-                    continue
-                dest_bundle.write_bytes(canonical_json_bytes(public_bundle))
+                    detail = detail.model_copy(update={"applied_receipt": public_receipt})
 
-                # Publish the plans sidecar alongside the bundle when present
-                # and set ``plans_published`` on the detail so the explorer UI
-                # only renders a download link for plans that actually exist
-                # at the published URL. Without this wire-up, the consumer-side
-                # gate (results-explorer/src/components/RunReceipt.tsx) sees
-                # ``plans_published=undefined`` and never renders a link, so
-                # the feature stays dark even when plans are available.
-                plans_src = bundle_path.with_name(f"{bundle_path.stem}.plans.json")
-                if plans_src.exists():
-                    plans_dest = (out_bundles_dir / f"{result_id}.plans.json").resolve()
-                    if plans_dest.is_relative_to(out_bundles_dir.resolve()):
-                        try:
-                            plans_payload = json.loads(plans_src.read_text(encoding="utf-8"))
-                            public_plans = public_anonymizer.anonymize_result_payload(plans_payload)
-                            plans_leaks = find_public_path_leaks(public_plans)
-                            if plans_leaks:
-                                raise ValueError(
-                                    "public plans privacy check failed for fields: "
-                                    + ", ".join(sorted(set(plans_leaks)))
+                    dest_bundle = (out_bundles_dir / f"{result_id}.json").resolve()
+                    if not dest_bundle.is_relative_to(out_bundles_dir.resolve()):
+                        skipped_bundles += 1
+                        logger.warning(
+                            "Skipping bundle copy for %s - result_id %r escapes bundles directory",
+                            bundle_path,
+                            result_id,
+                        )
+                        continue
+                    dest_bundle.write_bytes(canonical_json_bytes(public_bundle))
+
+                    # Publish the plans sidecar alongside the bundle when present
+                    # and set ``plans_published`` on the detail so the explorer UI
+                    # only renders a download link for plans that actually exist
+                    # at the published URL. Without this wire-up, the consumer-side
+                    # gate (results-explorer/src/components/RunReceipt.tsx) sees
+                    # ``plans_published=undefined`` and never renders a link, so
+                    # the feature stays dark even when plans are available.
+                    plans_src = bundle_path.with_name(f"{bundle_path.stem}.plans.json")
+                    if plans_src.exists():
+                        plans_dest = (out_bundles_dir / f"{result_id}.plans.json").resolve()
+                        if plans_dest.is_relative_to(out_bundles_dir.resolve()):
+                            try:
+                                plans_payload = json.loads(plans_src.read_text(encoding="utf-8"))
+                                public_plans = public_anonymizer.anonymize_result_payload(plans_payload)
+                                plans_leaks = find_public_path_leaks(public_plans)
+                                if plans_leaks:
+                                    raise ValueError(
+                                        "public plans privacy check failed for fields: "
+                                        + ", ".join(sorted(set(plans_leaks)))
+                                    )
+                                plans_dest.write_bytes(canonical_json_bytes(public_plans))
+                                detail.plans_published = True
+                            except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+                                logger.warning(
+                                    "Skipping plans companion %s - %s: %s", plans_src, type(exc).__name__, exc
                                 )
-                            plans_dest.write_bytes(canonical_json_bytes(public_plans))
-                            detail.plans_published = True
-                        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
-                            logger.warning("Skipping plans companion %s - %s: %s", plans_src, type(exc).__name__, exc)
 
-                # Add the entry only after the public bundle has been copied
-                # successfully.  A privacy rejection must not leave a
-                # manifest row without its corresponding detail record.
-                manifest_entries.append(entry)
+                    # Add the entry only after the public bundle has been copied
+                    # successfully.  A privacy rejection must not leave a
+                    # manifest row without its corresponding detail record.
+                    manifest_entries.append(entry)
 
-                # Accumulate for benchmark summary artifacts. Raw benchmark
-                # slug and test_type stay on the result/detail rows; only the
-                # derived cohort key uses the explicit canonical identity.
-                phase = canonical_phase(detail.test_type)
-                summary_key: _SummaryKey = (canonical_benchmark_slug(entry.benchmark), entry.scale_factor, phase)
-                summary_accum[summary_key].append((entry, detail))
-                details_map[entry.result_id] = detail
+                    # Accumulate for benchmark summary artifacts. Raw benchmark
+                    # slug and test_type stay on the result/detail rows; only the
+                    # derived cohort key uses the explicit canonical identity.
+                    phase = canonical_phase(detail.test_type)
+                    summary_key: _SummaryKey = (canonical_benchmark_slug(entry.benchmark), entry.scale_factor, phase)
+                    summary_accum[summary_key].append((entry, detail))
+                    details_map[entry.result_id] = detail
 
-                logger.debug("Processed bundle %s → %s", bundle_path.name, result_id)
+                    logger.debug("Processed bundle %s → %s", bundle_path.name, result_id)
 
-            except (json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:
-                skipped_bundles += 1
-                logger.warning("Skipping bundle %s - %s: %s", bundle_path, type(exc).__name__, exc)
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError) as exc:
+                    skipped_bundles += 1
+                    logger.warning("Skipping bundle %s - %s: %s", bundle_path, type(exc).__name__, exc)
 
-        generated_at = datetime.now(tz=timezone.utc).isoformat()
-        logger.info("Processed %d bundle(s)", len(manifest_entries))
-        if skipped_bundles:
-            logger.warning("Skipped %d bundle(s) due to processing errors", skipped_bundles)
+            generated_at = datetime.now(tz=timezone.utc).isoformat()
+            logger.info("Processed %d bundle(s)", len(manifest_entries))
+            if skipped_bundles:
+                logger.warning("Skipped %d bundle(s) due to processing errors", skipped_bundles)
 
-        # Build short ID lookup table (short → full result_id).
-        all_result_ids = [e.result_id for e in manifest_entries]
-        short_id_map = _build_short_ids(all_result_ids)  # short → full
-        full_to_short = {v: k for k, v in short_id_map.items()}  # full → short
+            # Build short ID lookup table (short → full result_id).
+            all_result_ids = [e.result_id for e in manifest_entries]
+            short_id_map = _build_short_ids(all_result_ids)  # short → full
+            full_to_short = {v: k for k, v in short_id_map.items()}  # full → short
 
-        # Build per-(benchmark, scale, phase) summaries for DuckDB population.
-        # The JSON emission was removed when BenchmarkIndex migrated to DuckDB
-        # (W4 slice 3); `_build_benchmark_summaries` still seeds the
-        # `benchmark_matrix_cells` and `benchmark_rankings` DuckDB tables via
-        # `_DuckDBBuilder`.
-        summaries = _build_benchmark_summaries(summary_accum, full_to_short)
-        logger.info(
-            "Built %d benchmark summary(ies) for DuckDB population",
-            len(summaries),
-        )
+            # Build per-(benchmark, scale, phase) summaries for DuckDB population.
+            # The JSON emission was removed when BenchmarkIndex migrated to DuckDB
+            # (W4 slice 3); `_build_benchmark_summaries` still seeds the
+            # `benchmark_matrix_cells` and `benchmark_rankings` DuckDB tables via
+            # `_DuckDBBuilder`.
+            summaries = _build_benchmark_summaries(summary_accum, full_to_short)
+            logger.info(
+                "Built %d benchmark summary(ies) for DuckDB population",
+                len(summaries),
+            )
 
-        # Build the cross-benchmark meta-leaderboard for DuckDB population.
-        # The JSON emission was removed when Home migrated to DuckDB (W4 slice 1);
-        # the `meta` dict below still seeds the `cohort_metadata` and
-        # `meta_leaderboard` DuckDB tables via `_DuckDBBuilder`.
-        meta = _build_meta_leaderboard(summaries, generated_at, full_to_short)
-        logger.info(
-            "Built meta-leaderboard (%d cohorts, %d platforms) for DuckDB population",
-            len(meta["cohorts"]),
-            len(meta["platforms"]),
-        )
+            # Build the cross-benchmark meta-leaderboard for DuckDB population.
+            # The JSON emission was removed when Home migrated to DuckDB (W4 slice 1);
+            # the `meta` dict below still seeds the `cohort_metadata` and
+            # `meta_leaderboard` DuckDB tables via `_DuckDBBuilder`.
+            meta = _build_meta_leaderboard(summaries, generated_at, full_to_short)
+            logger.info(
+                "Built meta-leaderboard (%d cohorts, %d platforms) for DuckDB population",
+                len(meta["cohorts"]),
+                len(meta["platforms"]),
+            )
 
-        duckdb_path = staging_dir / "results.duckdb"
-        try:
+            duckdb_path = staging_dir / "results.duckdb"
             self._duckdb_builder.build_full(
                 entries=manifest_entries,
                 details_map=details_map,

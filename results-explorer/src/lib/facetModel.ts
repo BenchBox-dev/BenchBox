@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import type { UrlSerde } from "@/lib/useUrlState";
-import { canonicalBenchmarkSlug } from "@/lib/displayLabels";
+import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
 
 export const FACET_KEYS = [
   "benchmark",
@@ -361,7 +361,7 @@ export function facetsToWhereClause(
 
   addCanonicalBenchmarkClause(facets.benchmark, clauses, params);
   addNumericListClause("scale_factor", facets.scale_factor, clauses, params);
-  addListClause("test_type", facets.phase, clauses, params);
+  addCanonicalPhaseClause(facets.phase, clauses, params);
   addPlatformClause(facets.platform, clauses, params);
   addListClause("execution_mode", facets.execution_mode, clauses, params);
   addNullableSentinelClause("tuning_mode", facets.tuning_mode, NULL_TUNING_MODE_SENTINELS, clauses, params);
@@ -394,6 +394,24 @@ function addCanonicalBenchmarkClause(values: readonly string[], clauses: string[
       canonicalValues.map(() => "?").join(", ") +
       ")",
   );
+  params.push(...canonicalValues);
+}
+
+/**
+ * SQL mirror of `canonicalPhase()`: trim + lowercase, with null/blank folded
+ * into the `unknown` token. `matchesFacetKey` canonicalizes `test_type` in
+ * memory, so a raw `test_type IN (?)` predicate here would silently disagree -
+ * selecting the exposed `unknown` cohort would match no null-phase row, and a
+ * `POWER`/`power` casing difference would drop rows the matcher accepts,
+ * leaving the leaderboard empty or inconsistent with its own facet counts.
+ */
+const CANONICAL_PHASE_SQL =
+  "CASE WHEN trim(lower(coalesce(test_type, ''))) = '' THEN 'unknown' ELSE trim(lower(test_type)) END";
+
+function addCanonicalPhaseClause(values: readonly string[], clauses: string[], params: unknown[]) {
+  if (values.length === 0) return;
+  const canonicalValues = [...new Set(values.map(canonicalPhase))];
+  clauses.push(`${CANONICAL_PHASE_SQL} IN (${canonicalValues.map(() => "?").join(", ")})`);
   params.push(...canonicalValues);
 }
 
