@@ -581,6 +581,8 @@ class TestFalsifiabilityGrandfathering:
         conn.execute("UPDATE items SET created_at = '2026-01-01T00:00:00Z' WHERE id = 'good-legacy-item'")
         todo_db.set_config(conn, "tester", "lint.require_falsifiable_rung", "on")
         assert not [n for n in todo_db.lint_item_notes(conn, "good-legacy-item") if "grandfathered" in n]
+
+
 def _downgrade(db_path, version):
     """Rewrite the recorded schema version, simulating a clone that never pulled."""
     raw = sqlite3.connect(db_path)
