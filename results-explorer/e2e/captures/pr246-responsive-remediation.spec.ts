@@ -10,6 +10,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { expect, test, type Page } from "@playwright/test";
+import { fixtureIds } from "../support/fixtures";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
@@ -22,9 +23,9 @@ const OUT = path.join(
   `results-explorer-pr246-responsive-remediation-${TODAY}`,
 );
 
-const SHORT_DUCKDB = "ba6a8c83";
-const SHORT_DATAFUSION = "5e6c5eba";
-const DETAIL_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
+const SHORT_DUCKDB = fixtureIds.shortDuckdb;
+const SHORT_DATAFUSION = fixtureIds.shortDatafusion;
+const DETAIL_ID = fixtureIds.detailId;
 const WIDTHS = [390, 768] as const;
 
 interface CaptureRoute {

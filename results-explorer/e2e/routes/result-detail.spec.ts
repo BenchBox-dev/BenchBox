@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 // Stable full-form result IDs from the deterministic generated fixture corpus.
-const TPCH_DUCKDB_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
+const TPCH_DUCKDB_ID = fixtureIds.detailId;
 const TPCH_DATAFUSION_ID = "tpch-datafusion-sf0.01-20260403-a6bb8a70";
 
 test.describe("ResultDetail", () => {

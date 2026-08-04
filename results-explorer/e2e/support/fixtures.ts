@@ -1,3 +1,7 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
@@ -6,6 +10,52 @@ import { expect, type Locator, type Page } from "@playwright/test";
  * Kept deliberately small - tests should read like user stories. Put
  * anything here that becomes duplicated across two or more specs.
  */
+
+/**
+ * Result identifiers for the generated fixture corpus.
+ *
+ * These are content-addressed: `result_id` ends in a SHA prefix of the
+ * published bundle bytes, and `short_id` is a SHA prefix of `result_id`. Both
+ * therefore move whenever fixture content OR anonymization output changes.
+ *
+ * Specs used to hardcode them, and they drifted: the literals checked in
+ * (`ba6a8c83`, `5e6c5eba`, `tpch-duckdb-sf0.01-20260403-010ee756`) matched
+ * neither the pre- nor the post-#1512 build, so the "blocking" Chromium suite
+ * was failing on every PR that ran it. `generate-browser-fixtures.mjs` now
+ * emits `fixture-ids.json` alongside the read model; read it here so the specs
+ * are always pinned to whatever this build actually produced.
+ */
+type FixtureIds = {
+  detailId: string;
+  duckdbId: string;
+  datafusionId: string;
+  shortDuckdb: string;
+  shortDatafusion: string;
+  shortIdLength: number;
+  allResultIds: string[];
+};
+
+const FIXTURE_IDS_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "test-fixtures",
+  ".generated",
+  "data",
+  "fixture-ids.json",
+);
+
+export const fixtureIds: FixtureIds = (() => {
+  try {
+    return JSON.parse(readFileSync(FIXTURE_IDS_PATH, "utf8")) as FixtureIds;
+  } catch (cause) {
+    throw new Error(
+      `Could not read ${FIXTURE_IDS_PATH}. Run \`npm run test:e2e:fixtures\` first - ` +
+        "the browser suite needs the generated fixture corpus.",
+      { cause },
+    );
+  }
+})();
 
 /**
  * Wait until the explorer's initial Preact bundle has mounted. We pick

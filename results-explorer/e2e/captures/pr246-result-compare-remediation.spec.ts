@@ -10,6 +10,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { expect, test } from "@playwright/test";
+import { fixtureIds } from "../support/fixtures";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
@@ -22,7 +23,7 @@ const OUT = path.join(
   `results-explorer-pr246-result-compare-remediation-${TODAY}`,
 );
 
-const DUCKDB_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
+const DUCKDB_ID = fixtureIds.duckdbId;
 const AWS_ID = "tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce";
 const DUCKDB_SF01_ID = "0820b170";
 const WIDTHS = [390, 768, 1280, 1600];

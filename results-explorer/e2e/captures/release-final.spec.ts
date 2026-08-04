@@ -16,7 +16,7 @@ import { mkdirSync, appendFileSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { test } from "@playwright/test";
-import { waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
@@ -48,13 +48,13 @@ const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
   { slug: "platform-polars", url: "/results/p/polars/", readyText: /Polars Results/ },
   {
     slug: "result-detail-tpch-duckdb",
-    url: "/results/r/tpch-duckdb-sf0.01-20260403-010ee756",
+    url: `/results/r/${fixtureIds.detailId}`,
     readyText: /Query Timings/,
   },
-  { slug: "compare-same-cohort", url: "/results/compare?ids=ba6a8c83,5e6c5eba", readyText: /TPC-H Comparison/ },
+  { slug: "compare-same-cohort", url: `/results/compare?ids=${fixtureIds.shortDuckdb},${fixtureIds.shortDatafusion}`, readyText: /TPC-H Comparison/ },
   {
     slug: "compare-mismatch-benchmark",
-    url: "/results/compare?ids=ba6a8c83,0f0add9f",
+    url: `/results/compare?ids=${fixtureIds.shortDuckdb},0f0add9f`,
     readyText: /Mixed Benchmark Comparison/,
   },
   {

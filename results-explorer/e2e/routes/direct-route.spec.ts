@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { waitForDataElement, waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { fixtureIds, waitForDataElement, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
-const SHORT_DUCKDB = "ba6a8c83";
-const SHORT_DATAFUSION = "5e6c5eba";
+const SHORT_DUCKDB = fixtureIds.shortDuckdb;
+const SHORT_DATAFUSION = fixtureIds.shortDatafusion;
 const SHORT_DUCKDB_TUNED = "009ee9fd";
 
 async function visibleRowCount(page: Page): Promise<number> {

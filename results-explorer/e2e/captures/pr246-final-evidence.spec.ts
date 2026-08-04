@@ -12,7 +12,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { expect, test, type Page } from "@playwright/test";
 import { assertEvidenceCaptureMatchesDevelop } from "../../src/lib/evidenceGit";
-import { waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
@@ -27,7 +27,7 @@ const OUT = path.join(
 const LOG = path.join(OUT, `console-network-${TODAY}.log`);
 const MANIFEST = path.join(OUT, "screenshot-manifest.json");
 
-const DUCKDB_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
+const DUCKDB_ID = fixtureIds.duckdbId;
 const AWS_ID = "tpch-fixture-aws-sql-sf0.01-20260403-e73da6ce";
 const DUCKDB_SF01_ID = "0820b170";
 const WIDTHS = [390, 768, 1280, 1600] as const;

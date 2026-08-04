@@ -19,6 +19,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,6 +35,8 @@ const genRoot = join(projectRoot, "test-fixtures", ".generated");
 const genSourceRoot = join(genRoot, "source");
 const genBundlesDir = join(genSourceRoot, "bundles");
 const genDataDir = join(genRoot, "data");
+
+const sha256Hex = (value) => createHash("sha256").update(value).digest("hex");
 
 const assertExplorerBuildContract = () => {
   const contract = readExplorerBuildContract();
@@ -499,6 +502,71 @@ const runPipeline = (contract) => {
   }
 };
 
+/**
+ * Emit `fixture-ids.json` next to the read model.
+ *
+ * `result_id` ends in a SHA prefix of the published bundle bytes and
+ * `short_id` is a SHA prefix of `result_id`, so both move whenever fixture
+ * content or anonymization output changes. Specs used to hardcode them, which
+ * meant an unrelated anonymizer change silently reddened the whole browser
+ * suite (the IDs in the specs matched neither the pre- nor post-#1512 build).
+ * Emitting them here keeps the specs pinned to whatever this build actually
+ * produced.
+ *
+ * Short IDs mirror `_build_short_ids` in `_project/scripts/explorer_pipeline/
+ * pipeline.py`: a sha256 prefix of `result_id`, widened by 2 until unique.
+ */
+const writeFixtureIds = () => {
+  const rows = readdirSync(join(genDataDir, "bundles"))
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => name.slice(0, -".json".length));
+
+  let length = 8;
+  for (; length <= 64; length += 2) {
+    const seen = new Set(rows.map((rid) => sha256Hex(rid).slice(0, length)));
+    if (seen.size === rows.length) break;
+  }
+  const shortOf = (rid) => sha256Hex(rid).slice(0, length);
+
+  // Filename prefix alone is ambiguous: the tuned and community variants share
+  // it with the bundle they derive from. Every variant suffixes `run.id`, so
+  // the canonical result is the one whose run id still matches a verbatim
+  // source bundle.
+  const sourceRunIds = new Set(
+    readdirSync(sourceBundlesDir)
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => JSON.parse(readFileSync(join(sourceBundlesDir, name), "utf8"))?.run?.id)
+      .filter(Boolean),
+  );
+  const runIdOf = (rid) =>
+    JSON.parse(readFileSync(join(genDataDir, "bundles", `${rid}.json`), "utf8"))?.run?.id;
+
+  const canonical = (platform) => {
+    const prefix = `tpch-${platform}-sf0.01-`;
+    const matches = rows.filter((rid) => rid.startsWith(prefix) && sourceRunIds.has(runIdOf(rid)));
+    if (matches.length !== 1) {
+      throw new Error(
+        `expected exactly one canonical ${platform} fixture, found ${matches.length}: ${matches.join(", ")}`,
+      );
+    }
+    return matches[0];
+  };
+
+  const duckdb = canonical("duckdb");
+  const datafusion = canonical("datafusion");
+  const payload = {
+    detailId: duckdb,
+    duckdbId: duckdb,
+    datafusionId: datafusion,
+    shortDuckdb: shortOf(duckdb),
+    shortDatafusion: shortOf(datafusion),
+    shortIdLength: length,
+    allResultIds: rows.sort(),
+  };
+  writeFileSync(join(genDataDir, "fixture-ids.json"), `${JSON.stringify(payload, null, 2)}\n`);
+  log(`wrote fixture-ids.json (detailId=${payload.detailId}, shortDuckdb=${payload.shortDuckdb})`);
+};
+
 const main = () => {
   log(`sourceRoot=${sourceRoot}`);
   log(`genRoot=${genRoot}`);
@@ -513,6 +581,7 @@ const main = () => {
   if (!existsSync(duckdbPath)) {
     throw new Error(`pipeline did not produce ${duckdbPath}`);
   }
+  writeFixtureIds();
   log(`generated ${duckdbPath}`);
 };
 
