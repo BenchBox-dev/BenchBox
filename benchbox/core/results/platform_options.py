@@ -10,6 +10,26 @@ REDACTED_VALUE = "<redacted>"
 
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
 
+# Azure storage URIs put the CONTAINER (or Fabric workspace) in the userinfo
+# position -- abfss://container@account.dfs.core.windows.net/path -- so the text
+# before "@" is provenance, not a credential. Redacting it would strip a useful
+# identifier out of exported results (Databricks `staging_root`, Fabric
+# lakehouse paths) while protecting nothing: these schemes keep their secret in
+# a SEPARATE option (account_key, sas), which _SECRET_KEY_PARTS already redacts
+# by key name.
+_AUTHORITY_USERINFO_SCHEMES = frozenset({"abfs", "abfss", "wasb", "wasbs"})
+
+# The userinfo run is matched greedily up to the LAST "@" in the authority: a
+# password may legally contain an unescaped "@" (urlparse reads
+# postgres://user:pa@ss@host/db as password "pa@ss"), and a pattern that stopped
+# at the FIRST "@" left the remainder of the credential in the exported value.
+# The authority ends at "/", "?" or "#" per RFC 3986, so those terminators bound
+# the run and keep a later "@" in a path or query string from over-redacting.
+_URI_USERINFO_RE = re.compile(
+    r"(?P<scheme>[a-z][a-z0-9+.-]*)(?P<sep>://)(?P<userinfo>[^/?#\s]+)@",
+    flags=re.IGNORECASE,
+)
+
 
 def _normalize_secret_key(key: str) -> str:
     """Lowercase ``key`` and strip non-alphanumerics so ``sessionToken``,
@@ -69,6 +89,18 @@ _USERNAME_KEYS = frozenset({"user", "username", "userid", "pguser", "dbuser", "s
 
 def _is_username_key(key: str) -> bool:
     return _normalize_secret_key(key) in _USERNAME_KEYS
+
+
+def _redact_uri_userinfo_match(match: re.Match[str]) -> str:
+    """Redact one URI's userinfo, preserving Azure storage container authorities."""
+    if match.group("scheme").lower() in _AUTHORITY_USERINFO_SCHEMES:
+        return match.group(0)
+    return f"{match.group('scheme')}{match.group('sep')}****@"
+
+
+def _scrub_uri_userinfo(value: str) -> str:
+    """Replace credential-bearing URI userinfo without changing ordinary values."""
+    return _URI_USERINFO_RE.sub(_redact_uri_userinfo_match, value)
 
 
 _INTERNAL_OPTION_KEYS = {
@@ -189,6 +221,8 @@ def _iter_public_options(options: Mapping[str, Any] | None):
 
 
 def _sanitize_option_value(value: Any, *, exclude_internal: bool = False, redact_usernames: bool = True) -> Any:
+    if isinstance(value, str):
+        return _scrub_uri_userinfo(value)
     if isinstance(value, Mapping):
         return sanitize_platform_options(
             value,
