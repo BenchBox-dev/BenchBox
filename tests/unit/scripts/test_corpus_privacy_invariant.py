@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from benchbox.core.results.anonymization import find_public_path_leaks
+from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
 
 pytestmark = [
     pytest.mark.unit,
@@ -105,6 +105,42 @@ def test_code_test_is_gated_by_ci_required_result() -> None:
     workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/pr.yml").read_text(encoding="utf-8"))
     needs = workflow["jobs"]["ci-required-result"]["needs"]
     assert "code-test" in needs, "ci-required-result no longer gates on code-test"
+
+
+def _anonymize(payload: dict, path: Path, manager: AnonymizationManager) -> dict:
+    """Route one corpus file through the entry point its publisher would use."""
+    if path.name.endswith(".tuning.json"):
+        return manager.anonymize_tuning_payload(payload)
+    return manager.anonymize_result_payload(payload)
+
+
+def test_anonymizing_the_corpus_twice_matches_anonymizing_it_once() -> None:
+    """Publication must be a fixed point over every curated bundle.
+
+    The corpus is stored already-anonymized, so the Explorer boundary
+    anonymizes these payloads a second time. If that second pass re-hashes the
+    pseudonyms, a curated bundle and a fresh submission from the *same machine*
+    publish different ``machine_id`` values and the Explorer groups them apart.
+    Nothing raises when this regresses - only the grouping is wrong - so scan
+    the real corpus rather than a fixture.
+    """
+    manager = AnonymizationManager()
+    unstable: list[str] = []
+    scanned = 0
+
+    for path in _corpus_json_files():
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            continue
+        scanned += 1
+        once = _anonymize(payload, path, manager)
+        if _anonymize(once, path, manager) != once:
+            unstable.append(str(path.relative_to(REPO_ROOT)))
+
+    assert scanned, "no corpus mappings scanned - the fixed-point gate would be vacuous"
+    assert not unstable, f"{len(unstable)} corpus file(s) change under a second anonymization pass:\n" + "\n".join(
+        unstable[:20]
+    )
 
 
 def test_detector_still_flags_a_planted_leak() -> None:

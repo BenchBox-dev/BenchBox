@@ -13,7 +13,6 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import sys
 import tempfile
 from pathlib import Path
@@ -33,7 +32,6 @@ DEFAULT_MANIFEST = BUNDLES_DIR / "path-privacy-migration.manifest.json"
 COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json")
 MANIFEST_SUFFIX = ".manifest.json"
 STRUCTURAL_MANIFEST_KEYS = frozenset({"bundle_file", "bundle_hash", "companion_hashes"})
-_PUBLIC_HASH_RE = re.compile(r"^(?:machine|host|path|endpoint|bucket|prefix|arn|table|column|database)_[0-9a-f]{8,64}$")
 
 
 def _sha256(raw: bytes) -> str:
@@ -70,19 +68,8 @@ def _load_json(path: Path) -> tuple[Any, bytes]:
 
 def _public_companion_payload(path: Path, payload: Any, manager: AnonymizationManager) -> Any:
     if path.name.endswith(".tuning.json") and isinstance(payload, dict):
-        return _preserve_public_hashes(payload, manager.anonymize_tuning_payload(payload))
-    return _preserve_public_hashes(payload, manager.anonymize_result_payload(payload))  # type: ignore[arg-type]
-
-
-def _preserve_public_hashes(original: Any, anonymized: Any) -> Any:
-    """Keep already-public identifier hashes stable across repeated migrations."""
-    if isinstance(original, dict) and isinstance(anonymized, dict):
-        return {key: _preserve_public_hashes(original.get(key), value) for key, value in anonymized.items()}
-    if isinstance(original, list) and isinstance(anonymized, list):
-        return [_preserve_public_hashes(old, new) for old, new in zip(original, anonymized, strict=False)]
-    if isinstance(original, str) and _PUBLIC_HASH_RE.fullmatch(original):
-        return original
-    return anonymized
+        return manager.anonymize_tuning_payload(payload)
+    return manager.anonymize_result_payload(payload)  # type: ignore[arg-type]
 
 
 def _manifest_path(bundle_path: Path) -> Path | None:
@@ -136,7 +123,7 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
         data, raw = _load_json(bundle_path)
         if not isinstance(data, dict):
             raise ValueError(f"primary bundle must be an object: {bundle_path}")
-        public_data = _preserve_public_hashes(data, manager.anonymize_result_payload(data))
+        public_data = manager.anonymize_result_payload(data)
         if _semantic_signature(data) != _semantic_signature(public_data):
             raise ValueError(f"semantic fields changed during privacy migration: {bundle_path}")
         public_raw = canonical_json_bytes(public_data)
@@ -169,7 +156,7 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
             manifest_data, manifest_raw = _load_json(manifest)
             if not isinstance(manifest_data, dict):
                 raise ValueError(f"submission manifest must be an object: {manifest}")
-            public_manifest = _preserve_public_hashes(manifest_data, _sanitize_manifest(manifest_data, manager))
+            public_manifest = _sanitize_manifest(manifest_data, manager)
             public_manifest["bundle_hash"] = _sha256(public_raw)
             hashes = public_manifest.get("companion_hashes")
             if isinstance(hashes, dict):
