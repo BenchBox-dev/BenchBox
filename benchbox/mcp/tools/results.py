@@ -20,6 +20,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
+from benchbox.core.constants import EXPORT_FORMATS, MCP_RESULT_FORMATS
 from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
 from benchbox.mcp.errors import ErrorCode, make_error
 from benchbox.mcp.security import PathProvider, resolve_path_provider
@@ -88,7 +89,7 @@ def register_results_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None
         format_lower = format.lower()
         if format_lower == "details":
             return results
-        elif format_lower in ("json", "csv", "html"):
+        elif format_lower in EXPORT_FORMATS:
             return _export_results_impl(results, result_file, format_lower, output_path, configured_results_dir)
         elif format_lower in ("text", "markdown"):
             return _export_summary_impl(results, format_lower)
@@ -96,7 +97,7 @@ def register_results_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None
             return make_error(
                 ErrorCode.VALIDATION_INVALID_FORMAT,
                 f"Invalid format: {format}",
-                details={"valid_formats": ["list", "details", "json", "csv", "html", "text", "markdown"]},
+                details={"valid_formats": list(MCP_RESULT_FORMATS)},
             )
 
 

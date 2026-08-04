@@ -19,7 +19,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.shared.exceptions import MCPError
 from mcp.types import ToolAnnotations
 
-from benchbox.mcp.schemas import MCPValidationError, validate_platform_options
+from benchbox.mcp.schemas import MCPValidationError, validate_phases, validate_platform_options
 from benchbox.mcp.security import (
     AUTHORIZATION_ERROR,
     JobLimits,
@@ -831,6 +831,7 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         principal = authenticated_principal()
         try:
             normalized_platform_options = validate_platform_options(platform, platform_options)
+            phases = validate_phases(phases)
         except MCPValidationError as exc:
             raise MCPError(-32602, str(exc)) from exc
         request = {

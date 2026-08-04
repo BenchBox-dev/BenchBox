@@ -26,6 +26,7 @@ from benchbox.core.benchmark_registry import (
     get_benchmark_surface,
     get_public_benchmark_class,
 )
+from benchbox.core.constants import QUERY_PHASES, VALID_PHASES
 from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.schema import build_result_payload
 from benchbox.core.schemas import ExecutionContext
@@ -40,6 +41,7 @@ from benchbox.mcp.schemas import (
     MCPValidationError,
     build_databricks_clustering_intent,
     resolve_clickhouse_connection_profile,
+    validate_phases,
     validate_platform_options,
 )
 from benchbox.mcp.security import PathProvider, resolve_path_provider
@@ -165,7 +167,7 @@ def _validate_and_resolve_mode(platform: str, mode: str | None) -> tuple[str, di
 def _map_phases_to_test_execution_type(phases: list[str]) -> str:
     """Map benchmark phases to test execution type."""
     phases_set = set(phases)
-    query_phases = {"power", "throughput", "maintenance"}
+    query_phases = set(QUERY_PHASES)
 
     if phases_set & query_phases:
         if "power" in phases_set and "throughput" in phases_set and "maintenance" in phases_set:
@@ -249,6 +251,15 @@ def register_benchmark_tools(
             normalized_platform_options = validate_platform_options(platform, platform_options)
         except MCPValidationError as exc:
             response = make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform})
+            response["status"] = "failed"
+            return response
+
+        try:
+            phases = validate_phases(phases)
+        except MCPValidationError as exc:
+            response = make_error(
+                ErrorCode.VALIDATION_INVALID_PHASE, str(exc), details={"valid_phases": list(VALID_PHASES)}
+            )
             response["status"] = "failed"
             return response
 
