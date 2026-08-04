@@ -1103,6 +1103,20 @@ class TestPublicPayloadPathPrivacy:
         leaks = find_public_path_leaks({"/Users/alice/db": 1})
         assert leaks == ["<key>"]
 
+    def test_leaking_key_is_elided_from_descendant_field_paths(self):
+        """Reporting a nested leak must not splice the parent key back in.
+
+        These diagnostics are surfaced in submission PR comments and Explorer
+        exceptions, so a raw key in a child's path discloses the private path
+        precisely when the detector is doing its job.
+        """
+        leaks = find_public_path_leaks({"/Users/alice/secret": {"working_dir": "/home/bob/private"}})
+        joined = " ".join(leaks)
+        assert "<key>.working_dir" in leaks
+        assert "alice" not in joined
+        assert "secret" not in joined
+        assert "bob" not in joined
+
     def test_ordinary_keys_are_not_flagged(self):
         """Relative and non-path keys stay clean - no blanket key rejection."""
         payload = {"queries": {"q1": 1.0, "tpch/q2": 2.0}, "platform": {"name": "DuckDB"}}

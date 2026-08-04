@@ -921,9 +921,15 @@ def find_public_path_leaks(value: Any, key_path: tuple[str, ...] = ()) -> list[s
 
     if isinstance(value, dict):
         for key, child in value.items():
+            # A leaking key is elided in its own report *and* in the path of
+            # everything beneath it: recursing with the raw key would put the
+            # private path back into a descendant's diagnostic, which is the
+            # one place these strings are surfaced (PR comments, exceptions).
+            label = str(key)
             if isinstance(key, str) and _PRIVATE_LOCAL_PATH_RE.search(key):
-                leaks.append(".".join((*key_path, "<key>")))
-            leaks.extend(find_public_path_leaks(child, (*key_path, str(key))))
+                label = "<key>"
+                leaks.append(".".join((*key_path, label)))
+            leaks.extend(find_public_path_leaks(child, (*key_path, label)))
         return leaks
 
     if isinstance(value, (list, tuple, set, frozenset)):
