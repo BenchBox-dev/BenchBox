@@ -6,11 +6,16 @@ test.describe("Home", () => {
     await page.goto("/results/");
     await waitForShell(page);
 
-    await expect(page.getByRole("heading", { name: "BenchBox Database Leaderboards" })).toBeVisible();
-
     // Recent Results table header - a stable landmark that only renders
     // once the DuckDB snapshot has attached and listResults() resolves.
     await waitForDataLoaded(page, /Recent Results/i);
+
+    // Assert the headline only AFTER the data wait. The loading skeleton and
+    // the loaded hero deliberately share one headline, so asserting before the
+    // wait would resolve against the skeleton and prove nothing about the
+    // loaded page - which is exactly how this test passed while never once
+    // exercising loaded Home content.
+    await expect(page.getByRole("heading", { name: "BenchBox Curated Results Preview" })).toBeVisible();
 
     const summary = page.getByRole("region", { name: "Corpus summary" });
     // Corpus Summary labels are count-aware: when the fixture corpus has
