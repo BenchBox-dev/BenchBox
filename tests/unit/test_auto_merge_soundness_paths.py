@@ -38,6 +38,13 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/sql_compat/resolver.py",
         "benchbox/sql_compat/decision.py",
         "benchbox/sql_compat/rules/_registration.py",
+        # Publication privacy: the anonymizer decides every published byte and
+        # the public pseudonym identity. Both failure modes are silent, and
+        # PR #1512 auto-merged a change to all of them before this widening.
+        # The specs YAML is included because it defines which keys are hashed:
+        # dropping an entry there is a silent leak with no code diff to review.
+        "benchbox/core/results/anonymization.py",
+        "benchbox/core/results/anonymization_specs.yaml",
         # Self-protection: the review-gate machinery and the PyPI-publishing
         # workflow. In-workflow checks are attacker-controlled for same-repo
         # PRs; the CODEOWNERS/ruleset layer this feeds is the durable control.
@@ -71,6 +78,10 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         # A sibling file that merely starts with the same basename must not
         # false-positive against the exact-file entries above.
         "benchbox/platforms/base/result_capture_helpers.py",
+        # The anonymizer entries are exact files, not the results package:
+        # exporter.py and schema.py stay auto-mergeable.
+        "benchbox/core/results/exporter.py",
+        "benchbox/core/results/schema.py",
     ],
 )
 def test_soundness_predicate_ignores_fast_default_paths(path: str) -> None:
