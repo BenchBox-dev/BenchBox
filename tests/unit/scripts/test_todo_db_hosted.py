@@ -1002,6 +1002,49 @@ class TestHostedBulkImport:
         finally:
             check.close()
 
+    def test_deferral_ids_are_never_reassigned(self, staging, tmp_path):
+        """A rowid alias is NOT automatically disposable.
+
+        `deferrals.id` is written into `events.detail` as `deferral_id` and
+        embedded in promoted item descriptions ("Promoted from deferral #N").
+        Nothing declares a foreign key, so reassigning it would not fail -- the
+        transferred audit rows would silently point at whatever deferral already
+        occupied that id in the target. Copying it verbatim means a genuine
+        collision aborts loudly instead.
+        """
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        staged = [(r["id"], r["from_item"]) for r in staging.execute("SELECT id, from_item FROM deferrals ORDER BY id")]
+        assert staged, "fixture must stage at least one deferral"
+        # Occupy the staged ids in the target. Without this the transfer lands
+        # on an empty table and reassignment is invisible -- the same blind spot
+        # that hid the original collision bug.
+        seed = sqlite3.connect(primary.path)
+        seed.execute(
+            "INSERT INTO items (id, title, worktree, priority, state, description, created_at) VALUES ('sitting', 'Sitting item title', 'main', 'medium', 'planning', 'A description longer than ten characters.', '2026-01-01T00:00:00Z')"
+        )
+        for staged_id, _ in staged:
+            seed.execute(
+                "INSERT INTO deferrals (id, from_item, summary, reason, created_at) VALUES (?, 'sitting', 'occupied', 'r', '2026-01-01T00:00:00Z')",
+                (staged_id,),
+            )
+        seed.commit()
+        seed.close()
+
+        # Loud abort is the CORRECT outcome: silently renumbering would leave
+        # the transferred audit rows pointing at the target's pre-existing
+        # deferral. Failing here is what protects the references.
+        with pytest.raises(todo_db.TodoError, match="UNIQUE constraint failed: deferrals.id"):
+            todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post)
+
+    def test_reassignable_pk_allowlist_excludes_deferrals(self, staging):
+        """Pin the allowlist itself: adding `deferrals` back is the regression."""
+        assert "deferrals" not in todo_db._REASSIGNABLE_PK
+        info = list(staging.execute("PRAGMA table_info(deferrals)"))
+        assert todo_db._reassignable_pk("deferrals", info) is None
+        events_info = list(staging.execute("PRAGMA table_info(events)"))
+        assert todo_db._reassignable_pk("events", events_info) == "seq"
+
     def test_bulk_transfer_wraps_in_one_transaction_with_baton(self, staging, tmp_path):
         primary = FakePrimary(tmp_path / "primary.sqlite")
         sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)

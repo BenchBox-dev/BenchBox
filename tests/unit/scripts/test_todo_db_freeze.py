@@ -686,3 +686,37 @@ class TestTheWedgeIsExplained:
         out = capsys.readouterr().out
         assert f"expected v{todo_db.SCHEMA_VERSION}" in out
         assert "run `todo migrate`" in out
+
+
+class TestFalsifiabilityEpochIsTheCommitInstantInUTC:
+    """The epoch must be d5aa8f3982's committer timestamp expressed in UTC.
+
+    It was originally written as that commit's -0400 LOCAL wall time but
+    labelled `Z`. Since `created_at` is stored in UTC, the four-hour gap made
+    items authored inside it read as post-rule -- a hard finding instead of a
+    grandfathered note, inviting a terminal drop+recreate that is not needed.
+    """
+
+    EPOCH_UNIX = 1785547106  # `git show -s --format=%ct d5aa8f3982`
+
+    def test_epoch_matches_the_rule_commit_in_utc(self):
+        expected = datetime.fromtimestamp(self.EPOCH_UNIX, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        assert expected == todo_db._FALSIFIABILITY_RULE_EPOCH
+
+    def test_an_item_inside_the_local_vs_utc_gap_is_grandfathered(self, conn):
+        """The boundary case the mislabelling got wrong: after the local wall
+        time, before the true UTC instant."""
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="gap-item",
+            title="Gap item title",
+            worktree="main",
+            priority="medium",
+            description="A description longer than ten characters.",
+            verifications=[{"seq": 1, "description": "it works", "command": "make check", "expected": "exit 0"}],
+        )
+        conn.execute("UPDATE items SET created_at = '2026-07-31T23:00:00Z' WHERE id = 'gap-item'")
+        todo_db.set_config(conn, "tester", "lint.require_falsifiable_rung", "on")
+        assert not [f for f in todo_db.lint_item(conn, "gap-item") if "no falsifiability" in f]
+        assert [n for n in todo_db.lint_item_notes(conn, "gap-item") if "grandfathered" in n]

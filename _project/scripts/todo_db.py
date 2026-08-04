@@ -1080,19 +1080,49 @@ def _pipeline_execute(
     return response
 
 
-def _rowid_alias_pk(table_info: list) -> str | None:
-    """The column name of a single-column INTEGER PRIMARY KEY, else None.
+# Tables whose rowid-alias primary key may be reassigned on an additive
+# transfer, with the reason each is safe. This is an ALLOWLIST on purpose: being
+# a rowid alias is necessary but NOT sufficient, because a bare integer key can
+# still be referenced by value from somewhere SQLite does not police.
+#
+# `deferrals.id` is the counter-example and is deliberately absent. It is a
+# rowid alias, but `defer_work`, `promote_deferral` and `dismiss_deferral` all
+# write it into `events.detail` as `deferral_id`, and `promote_deferral` embeds
+# it in the promoted item's description ("Promoted from deferral #N"). Nothing
+# declares a foreign key, so reassigning it would not fail -- the transferred
+# audit rows would silently point at whatever deferral already held that id in
+# the target. A loud abort is the correct behaviour until those references are
+# remapped; see `bulk-transfer-deferral-id-reference-remap`.
+#
+# Each entry below was checked for `REFERENCES`, for a `<name>_id` reader, and
+# for string interpolation into prose. Re-run those three checks before adding
+# a table here.
+_REASSIGNABLE_PK: dict[str, str] = {
+    # Append-only audit ordering; carries no cross-row identity. `write_activity`
+    # reads max(seq) as a fingerprint, which is order-sensitive, not value-bound.
+    "events": "seq",
+    # Findings leaf rows, keyed by finding id; no reader references these values.
+    "finding_evidence": "id",
+    "finding_links": "id",
+    "finding_sections": "id",
+    "finding_events": "seq",
+}
 
-    Only a rowid alias may be reassigned. A composite key (work_units'
-    item_id+wid) and a TEXT key (items.id) both carry meaning that other rows
-    reference, so they are always copied verbatim -- reassigning either would
-    silently break foreign keys rather than collide loudly.
+
+def _reassignable_pk(table: str, table_info: list) -> str | None:
+    """The PK of `table` if it may be reassigned on an additive transfer.
+
+    Allowlisted AND still a single-column INTEGER primary key: the schema check
+    is kept so that turning one of these into a composite or TEXT key makes the
+    reassignment stop rather than silently corrupt.
     """
-    pk_columns = [row for row in table_info if row["pk"]]
-    if len(pk_columns) != 1:
+    pk = _REASSIGNABLE_PK.get(table)
+    if pk is None:
         return None
-    column = pk_columns[0]
-    return column["name"] if (column["type"] or "").strip().upper() == "INTEGER" else None
+    pk_columns = [row for row in table_info if row["pk"]]
+    if len(pk_columns) != 1 or pk_columns[0]["name"] != pk:
+        return None
+    return pk if (pk_columns[0]["type"] or "").strip().upper() == "INTEGER" else None
 
 
 def bulk_transfer(
@@ -1138,7 +1168,7 @@ def bulk_transfer(
         # relative order -- the only thing the append-only tables actually mean
         # -- is preserved. `--replace` empties the target first, so it keeps
         # copying ids verbatim and stays byte-for-byte what it was.
-        skip = None if replace else _rowid_alias_pk(info)
+        skip = None if replace else _reassignable_pk(table, info)
         insert_columns = [c for c in columns if c != skip] if skip else columns
         placeholders = ", ".join("?" for _ in insert_columns)
         insert = f"INSERT INTO {table} ({', '.join(insert_columns)}) VALUES ({placeholders})"
@@ -2965,7 +2995,12 @@ _FALSIFIABILITY_EXEMPT_CATEGORIES = frozenset({"flake", "validation"})
 # after the rule, which are real defects. The established practice of fixing a
 # stale ladder by drop+recreate when you touch the item (three sessions have
 # done exactly this) drains the tail without a mass migration.
-_FALSIFIABILITY_RULE_EPOCH = "2026-07-31T21:18:26Z"
+# d5aa8f3982's committer timestamp is 1785547106 = 2026-08-01T01:18:26Z. The
+# `2026-07-31T21:18:26` this used to read is that instant's -0400 LOCAL wall
+# time, which was then labelled `Z`. Because `created_at` is stored in UTC, the
+# four-hour gap made items authored in it look post-rule, turning a grandfathered
+# note into a hard finding and inviting an unnecessary terminal drop+recreate.
+_FALSIFIABILITY_RULE_EPOCH = "2026-08-01T01:18:26Z"
 
 
 def _falsifiability_grandfathered(conn: sqlite3.Connection, item: dict) -> bool:
