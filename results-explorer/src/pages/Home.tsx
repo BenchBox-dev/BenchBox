@@ -602,7 +602,10 @@ function HomeLoadingSkeleton() {
   return (
     <div>
       <section class="surface-hero border-b border-[var(--bb-border-default)]">
-        <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+        {/* Mirrors the loaded hero's lg:py-4 exactly. If these diverge the hero
+            visibly jumps when data arrives, which is the same skeleton-vs-loaded
+            drift that made heading assertions timing-dependent. */}
+        <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-4">
           <div class="max-w-4xl">
             <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Curated Results Preview</h1>
             <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
