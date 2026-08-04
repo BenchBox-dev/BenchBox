@@ -8,3 +8,4 @@ Architecture Decision Records
 - [ADR: Move Explorer Publishing Out of the BenchBox CLI](adr-explorer-cli-surface.md)
 - [ADR: published-results as a Slim Corpus-Only Branch](adr-published-results-slim-corpus-branch.md)
 - [ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias](adr-ducklake-maturity-and-publishability.md)
+- [ADR: One Engine, Scoped Surfaces — CLI and MCP over a Shared Core](adr-one-engine-scoped-surfaces.md)

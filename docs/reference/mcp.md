@@ -166,16 +166,19 @@ benchbox-mcp --transport streamable-http --host ::1
 ## Tools
 
 Tools are executable actions that can be invoked by AI assistants. BenchBox MCP
-is a **beta-public smoke/control-plane surface**, not a CLI-equivalent
-execution surface. It exposes a documented subset of benchmark execution,
-validation, dry-run preview, result reads, analytics, and chart generation
-through public BenchBox APIs. MCP must not import `benchbox.cli` command
-internals.
+is a **beta-public scoped surface over the shared BenchBox engine**: all
+benchmark business logic lives in `benchbox.core` below both CLI and MCP, and
+each surface exposes a deliberately scoped subset of it. Surface asymmetry is
+deliberate and ledgered, never a parity backlog. MCP must not import
+`benchbox.cli` command internals. See
+[ADR: One Engine, Scoped Surfaces](../development/adr/adr-one-engine-scoped-surfaces.md).
 
 MCP run results are exported through `ResultExporter` as normal result JSON
 bundles and include `execution_context.entry_point = "mcp"` when the result
-object supports execution context metadata. They are schema-level comparable to
-CLI result bundles, but MCP does not claim option parity with `benchbox run`.
+object supports execution context metadata. Because both surfaces compute
+results with the same core implementation, MCP numbers are comparable to CLI
+numbers by construction; the bundles are schema-level comparable to CLI result
+bundles.
 
 ### Actual Tool Inventory
 
@@ -185,7 +188,7 @@ CLI result bundles, but MCP does not claim option parity with `benchbox run`.
 | `get_benchmark_info` | discovery | No | Return benchmark metadata, queries, schema, and scale-factor information. |
 | `system_profile` | discovery | No | Return CPU, memory, disk, Python, package, and BenchBox environment facts. |
 | `check_dependencies` | discovery | No | Report platform dependency availability and install guidance. |
-| `run_benchmark` | execution | Yes | Run, dry-run, or validate a benchmark through the MCP control-plane subset. |
+| `run_benchmark` | execution | Yes | Run, dry-run, or validate a benchmark through the MCP-scoped subset of the shared engine. |
 | `get_query_details` | execution aid | No | Return SQL or DataFrame query details for a benchmark/query/platform. |
 | `get_results` | results | Optional | List result files, read one result, or export a result in another format. |
 | `analyze_results` | analytics | No | Compare result files, detect regressions, calculate trends, or aggregate runs. |
@@ -294,25 +297,51 @@ modes remain available because they do not hold the request for execution.
 - MCP execution intentionally suppresses console output and returns structured
   JSON for agent clients.
 
-**Intentionally omitted CLI-only controls**
+**Scoped-surface omission ledger**
 
-These `benchbox run` options are currently product-scope omissions, not
-undocumented MCP parameters. Adding any of them requires a new contract decision
-or a shared non-CLI execution service below both CLI and MCP.
+These `benchbox run` controls are not MCP parameters. Each entry carries exactly
+one ratified tier reason, defined in
+[ADR: One Engine, Scoped Surfaces](../development/adr/adr-one-engine-scoped-surfaces.md):
 
-| CLI surface | MCP status | Reason |
-|---|---|---|
-| `--output` | Omitted | MCP result roots are server configuration (`--results-dir`, env vars). |
-| `--platform-option` | Narrow MCP subset | MCP accepts only its typed, non-secret allow-list; the full CLI key/value surface remains CLI-only. |
-| `--benchmark-option` | Omitted | Benchmark-specific key/value plumbing is CLI orchestration surface. |
-| `--tuning`, `--table-mode`, `--sorted-ingestion-*` | Omitted | Tuning/table layout workflows are CLI-equivalent scope. |
-| `--force` | Omitted | Regeneration/upload forcing needs broader lifecycle service semantics. |
-| `--official`, `--seed`, `--iterations` | Omitted | TPC compliance and repeated measurement policy remain CLI scope. |
-| `--compression`, `--table-format`, `--presort` | Omitted | Output/data-format policy is not exposed through MCP run control. |
-| `--validation`, `--plan-config` | Omitted | MCP exposes only `validate_only` and `capture_plans` booleans. |
-| `--no-monitoring`, `--no-progress`, `--quiet`, `--verbose` | Omitted | MCP already runs as structured, quiet server-side execution. |
-| `--global-cache`, `--publish`, `--publish-target`, `--publish-label` | Omitted | Cache and publication workflows are not MCP run controls. |
-| interactive prompts and `--non-interactive` | Omitted | MCP requests are non-interactive by protocol. |
+- **security-scoped** — permanent. Admitting the control would let a request
+  name credentials, endpoints, filesystem or cloud destinations, or unbounded
+  resources, or would trigger destructive or publishing side effects. Parity
+  never applies to these. A bounded, typed, server-validated allow-list entry is
+  a new narrow control, not a promotion of the CLI flag.
+- **interaction-scoped** — permanent. The control governs terminal interaction
+  or presentation and has no meaning in a structured request/response protocol.
+- **not-yet-demanded** — provisional. Nothing about security or interaction
+  blocks it; no MCP client has demanded it. Promotion is demand-driven and is
+  recorded as a deferral on the `one-engine-parity-ledger` tracker item.
+
+An omission that is absent from this ledger is a defect, not a decision.
+
+| CLI surface | MCP status | Tier | Reason |
+|---|---|---|---|
+| `--output` | Omitted | security-scoped | Result roots are server configuration (`--results-dir`, env vars). A request must not name a local or cloud write destination. |
+| `--platform-option` | Narrow MCP subset | security-scoped | MCP accepts only its typed, non-secret allow-list; the full CLI key/value surface can carry credentials, DSNs, hosts, and paths. |
+| `--benchmark-option` | Omitted | security-scoped | Unbounded key/value plumbing into benchmark internals has no typed, fail-closed admission model. |
+| `--force` | Omitted | security-scoped | Forced regeneration and upload overwrite server-owned data outside the requesting tenant's lifecycle. |
+| `--global-cache` | Omitted | security-scoped | Redirects writes to a shared `~/.benchbox/datagen/` root outside the server's configured result tree. |
+| `--publish` | Omitted | security-scoped | Publication writes to an external destination; MCP requests do not carry publish authority. |
+| `--publish-target` | Omitted | security-scoped | Names an external local or cloud destination (`s3://`, `gs://`, `abfss://`). |
+| `--publish-label` | Omitted | security-scoped | Trust labelling is a maintainer attestation, not a request-supplied field. |
+| `--non-interactive` | Omitted | interaction-scoped | MCP requests are non-interactive by protocol; interactive prompts are never issued, so the flag has no effect to expose. |
+| `--no-progress` | Omitted | interaction-scoped | Progress bars are terminal presentation; MCP returns structured JSON. |
+| `--quiet` | Omitted | interaction-scoped | Console verbosity control; MCP already suppresses console output. |
+| `--verbose` | Omitted | interaction-scoped | Console verbosity control; MCP response detail is governed by tool schemas. |
+| `--iterations` | Omitted | not-yet-demanded | Repeated power-test measurement is expressible over MCP; no client has demanded it. |
+| `--seed` | Omitted | not-yet-demanded | RNG seed for query parameter generation; bounded integer, no client demand yet. |
+| `--official` | Omitted | not-yet-demanded | TPC-compliant mode is a bounded boolean; it additionally requires `--seed`, so both promote together. |
+| `--compression` | Omitted | not-yet-demanded | Bounded codec enum; no client demand yet. |
+| `--table-format` | Omitted | not-yet-demanded | Bounded table-format spec; no client demand yet. |
+| `--presort` | Omitted | not-yet-demanded | Bounded pre-sort enum; no client demand yet. |
+| `--tuning` | Omitted | not-yet-demanded | Promotion must be enum-only (`tuned`, `notuning`, `auto`); the CLI's YAML-path spelling is security-scoped and stays CLI-only. |
+| `--table-mode` | Omitted | not-yet-demanded | Bounded `native`/`external` enum; no client demand yet. |
+| `--sorted-ingestion-*` | Omitted | not-yet-demanded | Bounded ingestion-ordering controls; no client demand yet. |
+| `--validation` | Omitted | not-yet-demanded | MCP exposes only the `validate_only` boolean; the validation-strictness enum is promotable. |
+| `--plan-config` | Omitted | not-yet-demanded | MCP exposes only the `capture_plans` boolean; per-query plan-capture selection is promotable. |
+| `--no-monitoring` | Omitted | not-yet-demanded | Metrics-collection toggle; bounded boolean, no client demand yet. |
 
 ### Discovery Tools
 
