@@ -225,23 +225,34 @@ with `Rosetta is not installed`) the develop tree fails **10 of 16** WebKit
 the same tree passes 16/16.
 
 That looks like a reproduction and is not one. The emulated run took
-**10.5 minutes** against **58 seconds** on arm64 — roughly **11x slower**. Every
-failure is a data-bound wait exhausting its 10s + 8s + 8s budget, which is what
-an 11x slowdown produces regardless of cause. GitHub's runners are *native*
-amd64, not emulated, and the WebKit lane is green there.
+**10.5 minutes** (630s) against **58 seconds** on arm64.
+
+Do not read that as an 11x slowdown: the 630s *includes the ten failures being
+explained*. Each failed data wait deliberately burns its full 10s + 8s + 8s
+budget plus up to two bounded re-navigations, so the failures alone account for
+at least 260s of intentional waiting. Netting that off leaves at most ~370s of
+actual work against 58s — **on the order of 6x, not 11x** — and even that is an
+upper bound, since the remainder still contains the six passing tests. The
+honest statement is "several times slower, magnitude not established", which is
+all this arm can support.
+
+The direction is what matters regardless of the multiplier: every failure is a
+data-bound wait exhausting its budget, which any large slowdown produces
+regardless of cause. GitHub's runners are *native* amd64, not emulated, and the
+WebKit lane is green there.
 
 So the architecture hypothesis is **not supported**: native amd64 passes in CI,
 and the emulated failures are a timing artifact of the emulator.
 
 | Hypothesis | Test | Result |
 |---|---|---|
-| Architecture (arm64 harness vs amd64 CI) | develop tree under emulated `linux/amd64` | **Confounded, not supported** — 10/16 fail but the run is ~11x slower; native amd64 is green in CI |
+| Architecture (arm64 harness vs amd64 CI) | develop tree under emulated `linux/amd64` | **Confounded, not supported** — 10/16 fail, but the run is several times slower and native amd64 is green in CI |
 
 What the arm does establish is a robustness fact worth keeping: the data-bound
-budgets have little headroom. An ~11x slowdown is extreme, but it shows these
-waits fail by timeout under load rather than degrading, so a genuinely slow
-runner is a plausible trigger for the original failures even though CPU
-starvation at 2 cores was not enough to produce one.
+budgets have little headroom, and these waits fail by timeout under load rather
+than degrading. A genuinely slow runner therefore stays a plausible trigger for
+the original failures, even though CPU starvation at 2 cores was not enough to
+produce one.
 
 **Do not run the emulated amd64 arm again** — its result is known and
 uninformative. The next real step is a *native* amd64 reproduction, which means
