@@ -27,11 +27,11 @@ from typing import Any
 from _project.scripts.explorer_pipeline.duckdb_builder import DuckDBSnapshotBuilder
 from _project.scripts.explorer_pipeline.models import (
     BenchmarkSummary,
-    canonical_benchmark_slug,
-    canonical_phase,
     DetailResult,
     ManifestEntry,
     PlatformRow,
+    canonical_benchmark_slug,
+    canonical_phase,
     get_ranking_config,
     is_ranking_eligible,
 )
@@ -554,9 +554,6 @@ class ExplorerPipeline:
             for bundle_path in bundle_files:
                 try:
                     bundle_data, bundle_raw = self._transformer.load_bundle_full(bundle_path)
-                    result_id = self._transformer.result_id_from_bundle(bundle_path, data=bundle_data, raw=bundle_raw)
-                    prefix = bundle_url_prefix.rstrip("/")
-                    bundle_download_url = f"{prefix}/{result_id}.json"
 
                     # Per-bundle trust label. Precedence: a bundle under the
                     # maintainer-controlled top-level vendor/ subtree is
@@ -579,6 +576,16 @@ class ExplorerPipeline:
                         )
 
                     public_bundle, public_receipt = _public_bundle_data(bundle_path, bundle_data, public_anonymizer)
+                    # Publication anonymization can change already-public values
+                    # (for example, an existing path hash).  Derive the result ID
+                    # from the exact bytes that will be published so filenames,
+                    # DuckDB rows, and download URLs remain reproducible.
+                    public_raw = canonical_json_bytes(public_bundle)
+                    result_id = self._transformer.result_id_from_bundle(
+                        bundle_path, data=public_bundle, raw=public_raw
+                    )
+                    prefix = bundle_url_prefix.rstrip("/")
+                    bundle_download_url = f"{prefix}/{result_id}.json"
 
                     entry = self._transformer.to_manifest_entry(
                         bundle_path,
@@ -608,7 +615,7 @@ class ExplorerPipeline:
                             result_id,
                         )
                         continue
-                    dest_bundle.write_bytes(canonical_json_bytes(public_bundle))
+                    dest_bundle.write_bytes(public_raw)
 
                     # Publish the plans sidecar alongside the bundle when present
                     # and set ``plans_published`` on the detail so the explorer UI

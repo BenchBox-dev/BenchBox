@@ -18,6 +18,8 @@ from _project.scripts.explorer_pipeline.pipeline import (
     _build_short_ids,
 )
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
+from benchbox.core.results.anonymization import AnonymizationManager
+from benchbox.core.results.canonical_json import canonical_json_bytes
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
@@ -185,6 +187,29 @@ class TestExplorerPipelineRun:
         published = (output / "bundles" / f"{result_id}.json").read_text(encoding="utf-8")
         assert "/Users/alice" not in published
         assert "path_" in published
+
+    def test_result_id_and_bundle_filename_use_public_bytes(self, tmp_path: Path) -> None:
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle = json.loads(json.dumps(MINIMAL_BUNDLE))
+        bundle["platform"]["working_dir"] = "/Users/alice/private-run"
+        source = bundles_dir / "private_path.json"
+        source.write_text(json.dumps(bundle), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        raw = source.read_bytes()
+        public_bundle = AnonymizationManager().anonymize_result_payload(bundle)
+        private_result_id = transformer.result_id_from_bundle(source, data=bundle, raw=raw)
+        public_result_id = transformer.result_id_from_bundle(
+            source, data=public_bundle, raw=canonical_json_bytes(public_bundle)
+        )
+        assert public_result_id != private_result_id
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        assert (output / "bundles" / f"{public_result_id}.json").exists()
+        assert not (output / "bundles" / f"{private_result_id}.json").exists()
 
     def test_applied_receipt_is_sanitized_before_duckdb_publication(self, tmp_path: Path) -> None:
         bundles_dir = tmp_path / "data" / "bundles"

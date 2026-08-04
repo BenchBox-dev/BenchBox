@@ -57,6 +57,12 @@ def _atomic_write(path: Path, payload: bytes) -> None:
             pass
 
 
+def _queue_write(path: Path, payload: bytes, pending_writes: list[tuple[Path, bytes]], *, write: bool) -> None:
+    """Queue a write so an existing-manifest refusal cannot partially mutate inputs."""
+    if write:
+        pending_writes.append((path, payload))
+
+
 def _load_json(path: Path) -> tuple[Any, bytes]:
     raw = path.read_bytes()
     return json.loads(raw), raw
@@ -124,6 +130,7 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
     manager = AnonymizationManager()
     transformer = BundleTransformer()
     entries: list[dict[str, Any]] = []
+    pending_writes: list[tuple[Path, bytes]] = []
 
     for bundle_path in discover_bundles(bundles_dir):
         data, raw = _load_json(bundle_path)
@@ -154,8 +161,7 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
                         "new_sha256": _sha256(public_companion_raw),
                     }
                 )
-                if write:
-                    _atomic_write(companion, public_companion_raw)
+                _queue_write(companion, public_companion_raw, pending_writes, write=write)
 
         manifest = _manifest_path(bundle_path)
         manifest_change: dict[str, str] | None = None
@@ -177,11 +183,10 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
                     "old_sha256": _sha256(manifest_raw),
                     "new_sha256": _sha256(public_manifest_raw),
                 }
-                if write:
-                    _atomic_write(manifest, public_manifest_raw)
+                _queue_write(manifest, public_manifest_raw, pending_writes, write=write)
 
-        if raw != public_raw and write:
-            _atomic_write(bundle_path, public_raw)
+        if raw != public_raw:
+            _queue_write(bundle_path, public_raw, pending_writes, write=write)
 
         entries.append(
             {
@@ -222,6 +227,8 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
                 )
         else:
             _atomic_write(manifest_path, canonical_json_bytes(manifest))
+        for path, payload in pending_writes:
+            _atomic_write(path, payload)
     return manifest
 
 

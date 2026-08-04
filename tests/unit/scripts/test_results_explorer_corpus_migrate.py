@@ -6,7 +6,11 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 from _project.scripts.results_explorer_corpus_migrate import _semantic_signature, migrate
+
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def _bundle() -> dict[str, object]:
@@ -87,6 +91,18 @@ def test_second_dry_run_is_a_noop_after_write(tmp_path: Path) -> None:
 
     assert result["summary"]["changed_bundles"] == 0
     assert result["summary"]["manifest_changes"] == 0
+
+
+def test_existing_migration_manifest_refuses_before_mutating_inputs(tmp_path: Path) -> None:
+    bundle, companion, manifest = _write_fixture(tmp_path)
+    migration_manifest = tmp_path / "migration.manifest.json"
+    migration_manifest.write_text('{"migration": "results-explorer-public-path-privacy-v1"}', encoding="utf-8")
+    before = {path: path.read_bytes() for path in (bundle, companion, manifest, migration_manifest)}
+
+    with pytest.raises(FileExistsError, match="requires a new --manifest path"):
+        migrate(bundles_dir=tmp_path, write=True, manifest_path=migration_manifest)
+
+    assert {path: path.read_bytes() for path in before} == before
 
 
 def test_companion_hash_uses_sanitized_bytes_in_dry_run(tmp_path: Path) -> None:
