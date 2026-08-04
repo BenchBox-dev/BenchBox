@@ -1088,6 +1088,40 @@ class TestPublicPayloadPathPrivacy:
         leaks = find_public_path_leaks({"nested": [{"working_dir": "/Users/alice/private"}]})
         assert leaks == ["nested.0.working_dir"]
 
+    def test_detector_flags_private_paths_encoded_as_object_keys(self):
+        """Scanning values alone called this payload clean."""
+        leaks = find_public_path_leaks({"per_path_timings": {"/Users/alice/db": 1.2}})
+        assert leaks == ["per_path_timings.<key>"]
+
+    def test_key_leak_report_does_not_echo_the_key(self):
+        """The offending key *is* the private path, so it must stay redacted."""
+        leaks = find_public_path_leaks({"metadata": {"/Users/alice/secret-project": True}})
+        assert leaks and "alice" not in " ".join(leaks)
+        assert "secret-project" not in " ".join(leaks)
+
+    def test_detector_flags_a_leaking_key_at_the_root(self):
+        leaks = find_public_path_leaks({"/Users/alice/db": 1})
+        assert leaks == ["<key>"]
+
+    def test_leaking_key_is_elided_from_descendant_field_paths(self):
+        """Reporting a nested leak must not splice the parent key back in.
+
+        These diagnostics are surfaced in submission PR comments and Explorer
+        exceptions, so a raw key in a child's path discloses the private path
+        precisely when the detector is doing its job.
+        """
+        leaks = find_public_path_leaks({"/Users/alice/secret": {"working_dir": "/home/bob/private"}})
+        joined = " ".join(leaks)
+        assert "<key>.working_dir" in leaks
+        assert "alice" not in joined
+        assert "secret" not in joined
+        assert "bob" not in joined
+
+    def test_ordinary_keys_are_not_flagged(self):
+        """Relative and non-path keys stay clean - no blanket key rejection."""
+        payload = {"queries": {"q1": 1.0, "tpch/q2": 2.0}, "platform": {"name": "DuckDB"}}
+        assert find_public_path_leaks(payload) == []
+
     def test_root_owned_home_paths_are_private_even_under_generic_keys(self):
         payload = {"raw_config": {"location": "/root/private-run"}}
 

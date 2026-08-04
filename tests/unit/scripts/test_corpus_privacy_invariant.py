@@ -116,3 +116,15 @@ def test_detector_still_flags_a_planted_leak() -> None:
     """
     planted = {"metadata": {"working_dir": "/Users/someone/benchbox"}}
     assert find_public_path_leaks(planted), "detector no longer flags a private home path"
+
+
+def test_detector_still_flags_a_leak_encoded_as_an_object_key() -> None:
+    """The whole-file claim covers keys, not just values.
+
+    A payload can carry a private path as a mapping key, and a value-only
+    detector would report this corpus as clean while publishing the path.
+    """
+    planted = {"metadata": {"/Users/someone/benchbox": True}}
+    leaks = find_public_path_leaks(planted)
+    assert leaks, "detector no longer flags a private path encoded as an object key"
+    assert "someone" not in " ".join(leaks), "key leaks must stay redacted in the report"

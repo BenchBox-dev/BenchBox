@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from _project.scripts.results_explorer_corpus_migrate import _semantic_signature, migrate
+from benchbox.core.results.canonical_json import canonical_json_bytes
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -100,6 +101,37 @@ def test_existing_migration_manifest_refuses_before_mutating_inputs(tmp_path: Pa
     before = {path: path.read_bytes() for path in (bundle, companion, manifest, migration_manifest)}
 
     with pytest.raises(FileExistsError, match="requires a new --manifest path"):
+        migrate(bundles_dir=tmp_path, write=True, manifest_path=migration_manifest)
+
+    assert {path: path.read_bytes() for path in before} == before
+
+
+def test_existing_manifest_refuses_companion_only_changes(tmp_path: Path) -> None:
+    """A clean bundle with a dirty companion still mutates the corpus.
+
+    The guard used to consider `changed_bundles` alone, so this case fell
+    through: the companion was rewritten while the stale manifest was kept,
+    leaving the mutation with no audit entry for its old/new hashes.
+    """
+    bundle = tmp_path / "run.json"
+    companion = tmp_path / "run.tuning.json"
+    clean = _bundle()
+    # Already canonical and path-free, so the migration leaves it byte-identical
+    # and `changed_bundles` stays 0 - which is the case being exercised.
+    clean["metadata"] = {"note": "clean"}
+    bundle.write_bytes(canonical_json_bytes(clean))
+    companion.write_text(json.dumps({"source_file": "/Users/alice/private/tuning.json"}), encoding="utf-8")
+
+    migration_manifest = tmp_path / "migration.manifest.json"
+    migration_manifest.write_text('{"migration": "results-explorer-public-path-privacy-v1"}', encoding="utf-8")
+    before = {path: path.read_bytes() for path in (bundle, companion, migration_manifest)}
+
+    # Precondition: this is the bundles-unchanged / companions-changed shape.
+    preview = migrate(bundles_dir=tmp_path, write=False, manifest_path=tmp_path / "unused.json")
+    assert preview["summary"]["changed_bundles"] == 0
+    assert preview["summary"]["companion_changes"] == 1
+
+    with pytest.raises(FileExistsError, match="companion_changes=1"):
         migrate(bundles_dir=tmp_path, write=True, manifest_path=migration_manifest)
 
     assert {path: path.read_bytes() for path in before} == before
