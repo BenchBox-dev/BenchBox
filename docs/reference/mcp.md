@@ -247,6 +247,13 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
+- Modin `engine` accepts only `ray` and `dask` over MCP. The adapter itself also
+  supports `unidist`, which stays documented for CLI and Python-API callers but
+  is deliberately outside the MCP surface while it is experimental. `pandas` is
+  rejected everywhere: it resembles a valid Modin engine name but is not a
+  supported BenchBox backend, and accepting it would create a public contract
+  that fails late. A pre-set `MODIN_ENGINE` still takes precedence, but it is
+  validated against the same reviewed set rather than trusted.
 - DuckDB `threads` is the public option name and maps to the adapter's
   `thread_limit`, which becomes a `SET threads` statement on the connection. The
   public name is unchanged; only the internal mapping is documented here.
