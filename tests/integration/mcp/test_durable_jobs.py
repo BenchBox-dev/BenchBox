@@ -98,6 +98,33 @@ def test_normalized_platform_options_survive_repository_round_trip(tmp_path: Pat
     assert persisted.request["platform_options"] == {"threads": 4}
 
 
+def test_durable_replay_applies_duckdb_threads_to_the_real_adapter(tmp_path: Path) -> None:
+    """A replayed request must still change DuckDB execution, not just forward a key."""
+    from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+    from benchbox.platforms.duckdb import DuckDBAdapter
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    options = validate_platform_options("duckdb", {"threads": 5})
+    submitted, _ = repository.submit("tenant-a", {**_request(), "platform_options": options})
+
+    persisted = repository.get_owned(submitted.execution_id, "tenant-a")
+    assert persisted is not None
+    assert persisted.request["platform_options"] == {"threads": 5}
+
+    # Replay the persisted request exactly as the worker would.
+    prepared = _prepare_adapter_platform_options("duckdb", persisted.request["platform_options"])
+    adapter = DuckDBAdapter.from_config(
+        {
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "database_path": str(tmp_path / "replay.duckdb"),
+            **prepared,
+        }
+    )
+
+    assert adapter.thread_limit == 5
+
+
 def test_durable_admission_refuses_contradictory_databricks_clustering(tmp_path: Path) -> None:
     """A request that can never succeed must not occupy a durable queue slot."""
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())

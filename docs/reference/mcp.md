@@ -247,6 +247,9 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
+- DuckDB `threads` is the public option name and maps to the adapter's
+  `thread_limit`, which becomes a `SET threads` statement on the connection. The
+  public name is unchanged; only the internal mapping is documented here.
 - Databricks clustering options are translated into effective tuning before the
   adapter is built. `databricks_clustering_strategy` and
   `liquid_clustering_columns` become a `PlatformOptimizationConfiguration` that
