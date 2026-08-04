@@ -133,3 +133,24 @@ def test_auto_merge_partial_stack_detector_uses_the_pushed_allowlist() -> None:
     assert "ref" not in checkout.get("with", {}), (
         "detector pins a checkout ref, so a push cannot be judged by its own allowlist"
     )
+
+
+def test_auto_merge_partial_stack_backstop_runs_at_least_daily() -> None:
+    """The schedule is the only cover for orphans pushed to stale branches.
+
+    For a `push` event GitHub runs the workflow file from the pushed commit, so
+    an orphaning push to a branch created before the all-branch trigger landed -
+    and never rebased - runs that branch's older workflow and detects nothing.
+    Only the scheduled run, which reads develop's workflow and allowlist and
+    scans every branch, catches those. A weekly cadence left them invisible for
+    up to seven days.
+    """
+    schedule = _triggers(_load(DETECTOR_WORKFLOW))["schedule"]
+    crons = [entry["cron"] for entry in schedule]
+    assert crons, "detector has no scheduled backstop"
+    for cron in crons:
+        day_of_week = cron.split()[4]
+        day_of_month = cron.split()[2]
+        assert day_of_week == "*" and day_of_month == "*", (
+            f"backstop cron {cron!r} runs less often than daily; a stale-branch orphan stays invisible until it fires"
+        )
