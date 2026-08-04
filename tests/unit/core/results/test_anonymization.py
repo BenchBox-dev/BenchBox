@@ -13,6 +13,7 @@ import json
 import re
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
@@ -1091,6 +1092,26 @@ class TestLegacyAnonymizationSchemeIsGone:
         truncations = re.findall(r"hexdigest\(\)\[:[^\]]+\]", source)
         assert len(truncations) == 2, f"unexpected digest truncations: {truncations}"
 
+    def test_no_sibling_module_mints_a_pseudonym_behind_the_boundary(self):
+        """Widen the check past this one module.
+
+        The rung above reads only ``anonymization.py``, so a second emitter
+        added in a sibling under ``benchbox/core/results/`` would satisfy it
+        while reintroducing exactly the split this class exists to prevent.
+        Scan the package and require that anything minting a ``<prefix>_<hex>``
+        token does it through the shared salted helper.
+        """
+        package = Path(inspect.getfile(sys.modules[AnonymizationManager.__module__])).parent
+        emitter = re.compile(r"f\"[a-z_]+_\{[^}]*hexdigest\(\)")
+        offenders = []
+        for path in sorted(package.glob("*.py")):
+            text = path.read_text(encoding="utf-8")
+            if path.name == "anonymization.py":
+                continue
+            if emitter.search(text):
+                offenders.append(path.name)
+        assert not offenders, f"pseudonym emitters outside the shared helper: {offenders}"
+
     def test_public_surface_is_only_the_salted_boundary(self):
         public = {
             name for name, _ in inspect.getmembers(AnonymizationManager, inspect.isfunction) if not name.startswith("_")
@@ -1101,6 +1122,29 @@ class TestLegacyAnonymizationSchemeIsGone:
             "anonymize_tuning_payload",
             "remove_pii",
         }, public
+
+    def test_salt_does_not_reach_an_already_anonymized_value(self):
+        """Pin the salt/pass-through interaction, including its downside.
+
+        The pass-through is checked BEFORE the salt is applied, so a value that
+        is already a pseudonym survives verbatim no matter whose salt is in
+        play. That is required for idempotence, but it means changing the salt
+        does not re-pseudonymize a stored corpus: new captures adopt the new
+        salt while stored bundles keep the old pseudonyms, splitting one
+        machine across two identities. Rotating the salt requires re-deriving
+        the corpus from pre-anonymization originals. Documented under
+        "Salt rotation" in docs/reference/result-formats.md.
+        """
+        a = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-A"))
+        b = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-B"))
+        raw = {"machine_id": "machine_0123456789abcdef"}
+
+        published_by_a = a.anonymize_result_payload(raw)["machine_id"]
+        published_by_b = b.anonymize_result_payload(raw)["machine_id"]
+        assert published_by_a != published_by_b, "salt must scope pseudonyms derived from raw values"
+
+        reanonymized = b.anonymize_result_payload({"machine_id": published_by_a})["machine_id"]
+        assert reanonymized == published_by_a, "already-anonymized values are salt-independent by design"
 
     def test_no_public_method_returns_a_private_path_verbatim(self):
         """The concrete defect: sanitize_path('/Users/alice/bench') used to

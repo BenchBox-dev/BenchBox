@@ -465,8 +465,9 @@ from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.anonymization import AnonymizationConfig
 
 config = AnonymizationConfig(
-    # Scopes every pseudonym to your organization, so the same machine
-    # publishes different pseudonyms under different salts.
+    # Scopes pseudonyms derived from raw values to your organization, so the
+    # same machine publishes different pseudonyms under different salts.
+    # See the salt-rotation note below for what this does *not* cover.
     machine_id_salt="your-org-salt",
     # Extra regexes stripped from free-text fields, on top of the built-in
     # IP / email / SSN patterns.
@@ -475,6 +476,30 @@ config = AnonymizationConfig(
 
 exporter = ResultExporter(anonymize=True, anonymization_config=config)
 ```
+
+#### Salt rotation
+
+The salt applies when a **raw** value is hashed. A value that is already a
+pseudonym passes through unchanged — that is what makes anonymization
+idempotent — and the pass-through happens *before* the salt is consulted:
+
+```python
+a = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-A"))
+b = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-B"))
+
+a.anonymize_result_payload({"machine_id": raw})   # machine_9ba319f754a5
+b.anonymize_result_payload({"machine_id": raw})   # machine_ac228f1f75af  (differs)
+
+# But B re-anonymizing A's already-published bundle:
+b.anonymize_result_payload({"machine_id": "machine_9ba319f754a5"})
+# -> machine_9ba319f754a5   (unchanged; B's salt is never applied)
+```
+
+So changing the salt does **not** re-pseudonymize an already-anonymized corpus.
+New captures adopt the new salt while stored bundles keep the old pseudonyms,
+which splits one machine across two identities. Rotating the salt therefore
+means re-deriving the corpus from the pre-anonymization originals, not just
+changing the config.
 
 ### Disable Anonymization
 
