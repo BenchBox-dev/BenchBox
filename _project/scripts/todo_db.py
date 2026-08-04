@@ -292,11 +292,18 @@ CONFIG_KEYS: dict[str, tuple[str, ...]] = {
     # database inheriting them.
     "lint.require_falsifiable_rung": ("on", "off"),
     "lint.require_scope_test_files": ("on", "off"),
+    # Items authored before the falsifiability rule existed cannot be judged by
+    # it: their ladders are create-time-only, so the only "fix" is drop+recreate,
+    # which cascades through dependents. Grandfathering keeps them VISIBLE as
+    # notes instead of drowning the actionable signal. Turn OFF to audit the
+    # full backlog.
+    "lint.grandfather_falsifiability": ("on", "off"),
 }
 
 _CONFIG_DEFAULTS: dict[str, str] = {
     "lint.require_falsifiable_rung": "off",
     "lint.require_scope_test_files": "off",
+    "lint.grandfather_falsifiability": "on",
 }
 
 
@@ -2915,6 +2922,34 @@ _GATING_EXPECTED_RE = re.compile(
 # confirmation runs whose rungs describe acceptance, not a defect gate.
 _FALSIFIABILITY_EXEMPT_CATEGORIES = frozenset({"flake", "validation"})
 
+# The falsifiability rule landed in d5aa8f3982 (PR #1385). Items authored before
+# it cannot be judged by it: verification ladders are create-time-only, so the
+# only way to "fix" one is drop+recreate, which is terminal, reserves the id
+# forever, and cascades through every dependent. 118 of the 138 items tripping
+# the rule predate it.
+#
+# Category exemption was evaluated and rejected as the lever here: `category` is
+# free text and the affected items carry 57 distinct values ("Core
+# Functionality", "correctness", "Bug Fixes", ...), so it cannot express a
+# coherent policy.
+#
+# Grandfathered items are still REPORTED, as notes rather than findings -- the
+# backlog stays visible and countable without drowning the 20 items authored
+# after the rule, which are real defects. The established practice of fixing a
+# stale ladder by drop+recreate when you touch the item (three sessions have
+# done exactly this) drains the tail without a mass migration.
+_FALSIFIABILITY_RULE_EPOCH = "2026-07-31T21:18:26Z"
+
+
+def _falsifiability_grandfathered(conn: sqlite3.Connection, item: dict) -> bool:
+    """True when this item predates the falsifiability rule and grandfathering is on."""
+    if get_config(conn, "lint.grandfather_falsifiability") != "on":
+        return False
+    created = (item.get("created_at") or "").strip()
+    # An item with no creation stamp is NOT grandfathered: unknown provenance
+    # must not buy an exemption, or clearing the field becomes a way to opt out.
+    return bool(created) and created < _FALSIFIABILITY_RULE_EPOCH
+
 
 def _has_falsifiable_rung(item: dict) -> bool:
     unrunnable = {seq for seq, _reason, _command in _unrunnable_verifications(item)}
@@ -3013,6 +3048,22 @@ def lint_item_notes(conn: sqlite3.Connection, item_id: str, *, item: dict[str, A
             f"note: falsifiability check skipped - category '{item['category']}' is exempt "
             "(tripwires/acceptance runs legitimately pass on the current tree)"
         )
+    # Deliberately avoids the phrase the finding uses, so a caller grepping for
+    # the finding does not match a grandfathered item and read the backlog as
+    # unfixed.
+    if (
+        get_config(conn, "lint.require_falsifiable_rung") == "on"
+        and item["state"] in ("planning", "active")
+        and (item.get("category") or "") not in _FALSIFIABILITY_EXEMPT_CATEGORIES
+        and any((v.get("command") or "").strip() for v in item["verifications"])
+        and not _has_falsifiable_rung(item)
+        and _falsifiability_grandfathered(conn, item)
+    ):
+        notes.append(
+            f"note: unfalsifiable ladder, grandfathered - created {item['created_at']}, "
+            f"before the rule landed {_FALSIFIABILITY_RULE_EPOCH}. Ladders are create-time-only; "
+            "fix by drop+recreate when you next claim this item"
+        )
     return notes
 
 
@@ -3057,6 +3108,7 @@ def lint_item(conn: sqlite3.Connection, item_id: str, *, item: dict[str, Any] | 
         and (item.get("category") or "") not in _FALSIFIABILITY_EXEMPT_CATEGORIES
         and any((v.get("command") or "").strip() for v in item["verifications"])
         and not _has_falsifiable_rung(item)
+        and not _falsifiability_grandfathered(conn, item)
     ):
         findings.append(
             "no falsifiability: every rung's expected text reads as passing on the unfixed tree "
