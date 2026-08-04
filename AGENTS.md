@@ -24,13 +24,14 @@ before committing. Repository-local values override the user's global identity
 but are not automatically intentional, and every linked worktree inherits them.
 This binds authorship: reject known agent/service identities as author unless
 the user explicitly requests that exact identity for the current task. A
-commit-signing service may hold the committer slot behind a human author, so
-signatures stay verifiable without misattributing the work.
+signing service may hold the committer slot behind a human author.
 Do not add an agent/service `Co-Authored-By` trailer or equivalent attribution
 unless the current task explicitly requests that exact trailer; a stale request,
 tool convention, or claim of agent contribution is not authorization.
 `make agent-write-preflight` asserts this at claim time, and `ci-lint` rejects
-agent authorship both in config and across `origin/develop..HEAD`.
+agent authorship in config and across `origin/develop..HEAD`. The same bar binds
+comments, reviews, and pull request bodies, which post as the owner: no standing
+attribution footer. See `docs/development/agent-attribution-surfaces.md`.
 
 ## Authorization boundary
 
