@@ -88,6 +88,13 @@ benchmark_metadata:
     display_name: TPC-H
     description: Decision Support Benchmark
     category: TPC
+    # Default sort keys for `benchbox run --presort`. Which column a benchmark
+    # sorts on is benchmark knowledge, not CLI knowledge; it lived as a literal
+    # in cli/commands/run.py before one-engine-core-run-service w5.
+    presort_table_configs:
+      lineitem:
+      - name: l_shipdate
+        order: asc
     support_status: stable
     num_queries: 22
     query_description: 22 analytical queries
@@ -117,6 +124,10 @@ benchmark_metadata:
     supports_statistics_phase: true
   tpcds:
     display_name: TPC-DS
+    presort_table_configs:
+      store_sales:
+      - name: ss_sold_date_sk
+        order: asc
     description: Decision Support Benchmark
     category: TPC
     support_status: stable

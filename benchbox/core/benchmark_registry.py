@@ -464,6 +464,28 @@ def validate_scale_factor(
         raise ValueError(f"{benchmark_id.upper()} requires scale_factor >= {min_scale} (got {scale_factor}).")
 
 
+def get_presort_table_configs(benchmark_id: str) -> dict[str, Any] | None:
+    """Return a benchmark's default presort sort keys, or None.
+
+    A benchmark supports `benchbox run --presort` exactly when it declares
+    `presort_table_configs` in the registry. These lived as hardcoded column
+    literals in benchbox/cli/commands/run.py; which column to sort on is
+    benchmark knowledge, not CLI knowledge.
+    """
+    meta = get_benchmark_metadata(benchmark_id)
+    if meta is None:
+        return None
+    configs = meta.get("presort_table_configs")
+    return dict(configs) if configs else None
+
+
+def presort_capable_benchmarks() -> tuple[str, ...]:
+    """Return every benchmark id that declares presort defaults."""
+    return tuple(
+        sorted(bid for bid, meta in _registry().benchmark_metadata.items() if meta.get("presort_table_configs"))
+    )
+
+
 def get_benchmark_surface(benchmark_id: str) -> str:
     """Return the registry-declared surface visibility for a benchmark.
 
@@ -489,6 +511,8 @@ __all__ = sorted(
         "get_all_benchmarks",
         "get_benchmark_class",
         "get_benchmark_class_name",
+        "get_presort_table_configs",
+        "presort_capable_benchmarks",
         "get_benchmark_default_scale",
         "get_benchmark_id_for_class_name",
         "get_benchmark_metadata",

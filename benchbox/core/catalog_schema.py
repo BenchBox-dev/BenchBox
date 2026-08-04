@@ -36,6 +36,15 @@ class CatalogSchemaError(ValueError):
     """Raised when a migrated catalog fails schema validation."""
 
 
+class PresortColumn(BaseModel):
+    """One sort key in a benchmark's presort defaults."""
+
+    model_config = _STRICT_MODEL_CONFIG
+
+    name: str
+    order: Literal["asc", "desc"] = "asc"
+
+
 class BenchmarkMeta(BaseModel):
     """Per-benchmark metadata entry in ``benchmark_registry.yaml``."""
 
@@ -61,6 +70,11 @@ class BenchmarkMeta(BaseModel):
     # Opt-in: the runner inserts an explicit statistics phase between load and
     # query for this benchmark when the user requests --phases ...,statistics.
     supports_statistics_phase: bool = False
+    # Default sort keys for `benchbox run --presort`, keyed by table name.
+    # Declaring this is what makes a benchmark presort-capable; the CLI used to
+    # hardcode the columns. Validated rather than free-form so a typo fails at
+    # load time instead of producing a silently unsorted run.
+    presort_table_configs: dict[str, list[PresortColumn]] | None = None
 
     @field_validator("estimated_time_range")
     @classmethod
