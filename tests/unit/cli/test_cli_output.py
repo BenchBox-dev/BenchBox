@@ -717,17 +717,17 @@ class TestResultExporter:
 
     @patch("benchbox.cli.output.console")
     def test_export_with_anonymization(self, mock_console):
-        """Test export with anonymization enabled."""
-        # Create exporter with anonymization
+        """Test export with anonymization enabled.
+
+        Runs the real anonymizer. This used to patch anonymize_execution_metadata
+        and validate_anonymization, but the exporter never called either -- they
+        were part of a legacy API with no production caller, since removed -- so
+        the mocks asserted nothing and only masked which code path ran.
+        """
         anon_exporter = ResultExporter(output_dir=Path(self.temp_dir), anonymize=True)
         result = self.create_cli_result()
 
-        with patch.object(anon_exporter.anonymization_manager, "anonymize_execution_metadata") as mock_anonymize:
-            with patch.object(anon_exporter.anonymization_manager, "validate_anonymization") as mock_validate:
-                mock_anonymize.return_value = {"anonymized": "data"}
-                mock_validate.return_value = {"is_valid": True, "warnings": []}
-
-                exported = anon_exporter.export_result(result, formats=["json"])
+        exported = anon_exporter.export_result(result, formats=["json"])
 
         json_path = exported["json"]
         with open(json_path, encoding="utf-8") as f:
