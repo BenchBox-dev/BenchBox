@@ -208,6 +208,17 @@ def test_lint_job_guards_run_in_ci_lint() -> None:
     )
 
 
+def test_ci_lint_identity_check_supplies_runner_identity() -> None:
+    """The CI runner has no Git config for the resolved-config audit."""
+    recipe = _ci_lint_recipe_text()
+    assert 'if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then' in recipe
+    assert "export GIT_CONFIG_COUNT=2" in recipe
+    assert "GIT_CONFIG_VALUE_0='BenchBox CI'" in recipe
+    assert "GIT_CONFIG_VALUE_1=ci@benchbox.invalid" in recipe
+    assert "unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0" in recipe
+    assert recipe.count('if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then') == 2
+
+
 def test_excluded_steps_still_exist() -> None:
     """EXCLUDED_STEPS must only reference lint-job steps that still exist,
     under their current name -- otherwise a rename/removal could silently

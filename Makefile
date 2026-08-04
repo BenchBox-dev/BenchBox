@@ -891,6 +891,9 @@ guards-fix:
 # check after each guard is what keeps this one shell session (the whole
 # recipe is one logical line via `\` continuations) going past a failing
 # guard instead of `make` aborting at the first nonzero exit.
+# The ephemeral GitHub runner has no user.* config. The ci-lint recipe supplies
+# a synthetic human identity only for the resolved-config audit; the
+# commit-range guard remains authoritative for branch authorship.
 ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
@@ -917,8 +920,14 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed artifact-hygiene"; \
 	$(MAKE) agent-instructions-check; \
 	[ $$? -eq 0 ] || failed="$$failed agent-instructions"; \
+	if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then \
+		export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='BenchBox CI' GIT_CONFIG_KEY_1=user.email GIT_CONFIG_VALUE_1=ci@benchbox.invalid; \
+	fi; \
 	$(MAKE) agent-identity-check; \
 	[ $$? -eq 0 ] || failed="$$failed agent-identity"; \
+	if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then \
+		unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1; \
+	fi; \
 	$(MAKE) agent-commit-range-check; \
 	[ $$? -eq 0 ] || failed="$$failed agent-commit-range"; \
 	$(MAKE) skill-sync-check; \
