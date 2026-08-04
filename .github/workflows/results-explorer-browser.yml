@@ -2,7 +2,11 @@ name: Results Explorer browser tests
 
 on:
   push:
-    branches: [ release ]
+    # `develop` is included so the lane runs on the integration branch itself,
+    # not only on PRs into it. Without it a squash-merge could land a
+    # combination no PR ever exercised and develop would stay silently red
+    # until the next explorer PR happened to rebuild.
+    branches: [ release, develop ]
     paths:
       - 'results-explorer/**'
       - '_project/scripts/explorer_pipeline/**'
