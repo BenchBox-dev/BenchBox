@@ -44,7 +44,7 @@ from _project.scripts.explorer_pipeline.transformer import (
 from _project.scripts.results_explorer_snapshot_invariants import check_snapshot
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
 from benchbox.core.results.canonical_json import canonical_json_bytes
-from benchbox.validation.bundle import discover_bundles
+from benchbox.validation.bundle import COMPANION_SUFFIXES, discover_bundles
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +129,50 @@ def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
             # path (a directory, a deletion-denying ACL) must not turn a
             # successful publish into a reported failure and an ambiguous retry.
             logger.warning("Could not remove legacy artifact %s", output_dir / legacy_file)
+
+
+# Bounded read size for companion hashing; keeps memory flat regardless of
+# how large a corpus-controlled companion file is.
+_DIGEST_CHUNK_BYTES = 1024 * 1024
+
+
+def _publication_digest(bundle_path: Path, public_raw: bytes) -> str:
+    """Digest everything a result publishes under its ``result_id``.
+
+    The duplicate-id guard uses this to decide whether two bundles are the same
+    evidence twice or a genuine collision. Hashing only the primary bundle is
+    not enough: companions publish as ``{result_id}.plans.json``, keyed by the
+    same id, so two byte-identical primaries whose sidecars differ - one
+    carrying plans, the other not - would look identical here while actually
+    publishing different evidence. Skipping the second would silently drop its
+    sidecar, the same class of loss the guard exists to stop, one file over.
+
+    Companions are read raw. This digest is an identity check, never a published
+    artifact, so it needs no sanitizing - and reading raw means a companion
+    differing only in private, later-redacted content still marks the two
+    bundles distinct, which fails safe.
+
+    Companions are hashed **incrementally**. ``read_bytes()`` would materialize
+    a whole corpus-controlled file, which for an oversized legacy
+    ``.applied.json`` bypasses the ``APPLIED_COMPANION_MAX_BYTES`` guard in
+    ``_applied_receipt`` - that path deliberately stats the file and returns a
+    truncation marker without reading it, so slurping here could exhaust memory
+    on a corpus that previously built fine.
+    """
+    hasher = hashlib.sha256()
+    hasher.update(public_raw)
+    for suffix in COMPANION_SUFFIXES:
+        companion = bundle_path.with_name(f"{bundle_path.stem}{suffix}")
+        hasher.update(suffix.encode())
+        try:
+            with companion.open("rb") as handle:
+                for chunk in iter(lambda handle=handle: handle.read(_DIGEST_CHUNK_BYTES), b""):
+                    hasher.update(chunk)
+        except OSError:
+            # Absent (or unreadable) is part of the identity: a bundle with no
+            # plans must not digest the same as one that has them.
+            hasher.update(b"-")
+    return hasher.hexdigest()
 
 
 def _is_vendor_subtree(bundle_path: Path, bundles_dir: Path) -> bool:
@@ -650,7 +694,7 @@ class ExplorerPipeline:
                     # competing for one public URL - that is silent evidence
                     # loss, and the corpus needs a human, so fail closed rather
                     # than pick a winner.
-                    public_digest = hashlib.sha256(public_raw).hexdigest()
+                    public_digest = _publication_digest(bundle_path, public_raw)
                     previous = seen_result_ids.get(result_id)
                     if previous is not None:
                         previous_path, previous_digest = previous
