@@ -55,10 +55,27 @@ def test_auto_merge_partial_stack_detector_runs_on_every_develop_push() -> None:
     itself, leaving the weekly schedule as the only real coverage - up to seven
     days in which develop is silently missing a change everyone believes landed.
     """
-    push = _triggers(_load(DETECTOR_WORKFLOW))["push"]
-    assert "develop" in push["branches"], f"detector does not run on develop pushes: {push.get('branches')}"
+    triggers = _triggers(_load(DETECTOR_WORKFLOW))
+    assert "push" in triggers, "detector has no push trigger at all"
+    push = triggers["push"] or {}
     assert "paths" not in push, (
-        "detector's develop push trigger is path-filtered, so it only runs when the detector itself changes"
+        "detector's push trigger is path-filtered, so it only runs when the detector itself changes"
+    )
+
+
+def test_auto_merge_partial_stack_detector_watches_feature_branch_pushes() -> None:
+    """A develop-only trigger is structurally too early to catch this race.
+
+    The stranding sequence is: PR merges (develop push) -> *then* the later
+    commit is pushed to the feature branch. At the moment the develop push runs,
+    the orphan does not exist, so the run that looks best-placed to catch it
+    cannot. The push that creates the orphan is the one to the feature branch.
+    """
+    push = _triggers(_load(DETECTOR_WORKFLOW))["push"] or {}
+    branches = push.get("branches")
+    assert not branches, (
+        f"detector's push trigger is limited to {branches}; a post-merge push to a feature branch "
+        "would not be seen, which is exactly the event that creates the orphan"
     )
 
 
@@ -98,4 +115,21 @@ def test_auto_merge_partial_stack_soundness_revocation_is_unchanged() -> None:
     assert any("--disable-auto" in command for command in commands), "soundness revocation step is gone"
     assert any("--auto --squash" in command for command in commands), (
         "hands-free auto-merge for ordinary PRs is gone - the common case must stay hands-free"
+    )
+
+
+def test_auto_merge_partial_stack_detector_uses_the_pushed_allowlist() -> None:
+    """The detector must judge a push by that push's own allowlist.
+
+    It reads the allowlist from the checkout but compares branches against the
+    remote, so the checkout ref decides only which allowlist is in force.
+    Pinning `ref: develop` meant a branch that acknowledges an orphan was still
+    judged by develop's older allowlist, so it could never make its own run
+    pass - the check stayed red until after it merged.
+    """
+    workflow = _load(DETECTOR_WORKFLOW)
+    steps = workflow["jobs"]["detect"]["steps"]
+    checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
+    assert "ref" not in checkout.get("with", {}), (
+        "detector pins a checkout ref, so a push cannot be judged by its own allowlist"
     )
