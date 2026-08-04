@@ -499,3 +499,85 @@ class TestFreezeCoversBulkWritePaths:
         todo_db.connect(db).close()
         _run(db, "import-yaml", "--replace", actor="bob")
         assert "frozen for maintenance" not in capsys.readouterr().err
+
+
+class TestFalsifiabilityGrandfathering:
+    """Items authored before the falsifiability rule are reported as NOTES, not
+    findings (see `_FALSIFIABILITY_RULE_EPOCH`).
+
+    Ladders are create-time-only, so the only fix is a terminal drop+recreate
+    that cascades through dependents. 118 of 138 affected items predate the
+    rule; grandfathering keeps them visible without drowning the 20 that do not.
+    """
+
+    def _item_with_unfalsifiable_ladder(self, conn, item_id, created_at):
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id=item_id,
+            title=f"Item {item_id} title",
+            worktree="main",
+            priority="medium",
+            description="A description longer than ten characters.",
+            verifications=[{"seq": 1, "description": "it works", "command": "make check", "expected": "exit 0"}],
+        )
+        conn.execute("UPDATE items SET created_at = ? WHERE id = ?", (created_at, item_id))
+        todo_db.set_config(conn, "tester", "lint.require_falsifiable_rung", "on")
+        return item_id
+
+    def _old(self, conn, item_id="legacy-item"):
+        return self._item_with_unfalsifiable_ladder(conn, item_id, "2026-01-01T00:00:00Z")
+
+    def _new(self, conn, item_id="recent-item"):
+        return self._item_with_unfalsifiable_ladder(conn, item_id, "2026-12-01T00:00:00Z")
+
+    def test_a_pre_rule_item_is_not_a_finding(self, conn):
+        item = self._old(conn)
+        assert not [f for f in todo_db.lint_item(conn, item) if "falsifiability" in f]
+
+    def test_a_pre_rule_item_is_still_reported_as_a_note(self, conn):
+        """Grandfathered must mean visible, not invisible."""
+        item = self._old(conn)
+        notes = [n for n in todo_db.lint_item_notes(conn, item) if "grandfathered" in n]
+        assert len(notes) == 1
+        # The note must not collide with the finding's own wording, or a caller
+        # grepping for the finding reads a cleared backlog as unfixed.
+        assert "no falsifiability" not in notes[0]
+
+    def test_a_post_rule_item_is_still_a_finding(self, conn):
+        item = self._new(conn)
+        assert [f for f in todo_db.lint_item(conn, item) if "no falsifiability" in f]
+
+    def test_grandfathering_can_be_switched_off_to_audit_the_backlog(self, conn):
+        item = self._old(conn)
+        todo_db.set_config(conn, "tester", "lint.grandfather_falsifiability", "off")
+        assert [f for f in todo_db.lint_item(conn, item) if "no falsifiability" in f]
+
+    def test_a_missing_creation_stamp_buys_no_exemption(self, conn):
+        """Otherwise clearing created_at becomes an opt-out."""
+        item = self._old(conn, "undated-item")
+        conn.execute("UPDATE items SET created_at = '' WHERE id = ?", (item,))
+        assert [f for f in todo_db.lint_item(conn, item) if "no falsifiability" in f]
+
+    def test_a_pre_rule_item_with_a_good_ladder_gets_no_note(self, conn):
+        """Grandfathering reports only items that would otherwise trip."""
+        todo_db.create_item(
+            conn,
+            "tester",
+            item_id="good-legacy-item",
+            title="Good legacy item title",
+            worktree="main",
+            priority="medium",
+            description="A description longer than ten characters.",
+            verifications=[
+                {
+                    "seq": 1,
+                    "description": "it fails first",
+                    "command": "make check",
+                    "expected": "exits 1 on an unfixed tree",
+                }
+            ],
+        )
+        conn.execute("UPDATE items SET created_at = '2026-01-01T00:00:00Z' WHERE id = 'good-legacy-item'")
+        todo_db.set_config(conn, "tester", "lint.require_falsifiable_rung", "on")
+        assert not [n for n in todo_db.lint_item_notes(conn, "good-legacy-item") if "grandfathered" in n]
