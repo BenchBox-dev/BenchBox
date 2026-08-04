@@ -364,21 +364,142 @@ def _validate_clickhouse_options(platform: str, normalized: Mapping[str, object]
     resolve_clickhouse_connection_profile(str(profile))
 
 
-def _validate_memory_limit(name: str, value: str) -> str:
-    """Validate a bounded memory-size option without accepting paths or expressions."""
+def _memory_size_bytes(value: str) -> float | None:
+    """Return a bounded memory-size string in bytes, or None if it is not one."""
     if not MEMORY_LIMIT_PATTERN.fullmatch(value):
-        raise MCPValidationError(f"Platform option '{name}' must use a bounded memory size")
+        return None
     number, unit = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([A-Za-z]+)", value).groups()  # type: ignore[union-attr]
     multipliers = {"B": 1, "KB": 1 << 10, "MB": 1 << 20, "GB": 1 << 30, "TB": 1 << 40}
-    if float(number) * multipliers[unit.upper()] > MAX_MEMORY_LIMIT_BYTES:
+    return float(number) * multipliers[unit.upper()]
+
+
+def _validate_memory_limit(name: str, value: str) -> str:
+    """Validate a bounded memory-size option without accepting paths or expressions."""
+    size = _memory_size_bytes(value)
+    if size is None:
+        raise MCPValidationError(f"Platform option '{name}' must use a bounded memory size")
+    if size > MAX_MEMORY_LIMIT_BYTES:
         raise MCPValidationError(f"Platform option '{name}' exceeds the permitted memory limit")
     return value
 
 
+@dataclass(frozen=True, slots=True)
+class DaskResourceEnvelope:
+    """Server-owned aggregate ceiling for one MCP-requested Dask cluster.
+
+    Dask's per-field maxima bound each knob in isolation, but the pressure a
+    request actually puts on the host is the *product* of the worker count and
+    the per-worker thread and memory limits.  This record is the aggregate
+    budget that product must fit inside.
+    """
+
+    max_workers: int
+    max_total_threads: int
+    max_total_memory_bytes: float
+
+
+# Effective adapter defaults for fields the request leaves unset.  These mirror
+# the conservative local caps in benchbox/platforms/dataframe/dask_df.py, so an
+# omitted field can never contribute more than the adapter would actually apply.
+_DASK_DEFAULT_WORKERS = 2
+_DASK_DEFAULT_THREADS_PER_WORKER = 2
+_DASK_DEFAULT_MEMORY_PER_WORKER_BYTES = float(2 << 30)
+
+# Server-owned aggregate budget.  Deliberately far below the per-field maxima:
+# n_workers=256 x threads_per_worker=256 would otherwise admit a 65,536-thread
+# cluster advertising 256 TB of memory from a single request.
+MCP_DASK_MAX_WORKERS_ENV = "BENCHBOX_MCP_DASK_MAX_WORKERS"
+MCP_DASK_MAX_TOTAL_THREADS_ENV = "BENCHBOX_MCP_DASK_MAX_TOTAL_THREADS"
+MCP_DASK_MAX_TOTAL_MEMORY_ENV = "BENCHBOX_MCP_DASK_MAX_TOTAL_MEMORY"
+_DASK_DEFAULT_MAX_WORKERS = 16
+_DASK_DEFAULT_MAX_TOTAL_THREADS = 64
+_DASK_DEFAULT_MAX_TOTAL_MEMORY = "64GB"
+# A units slip or an extra digit ("999999TB") is syntactically valid, so the
+# memory override needs the same out-of-range guard the integer budgets have --
+# otherwise a typo silently disables the aggregate memory ceiling entirely.
+_DASK_MAX_TOTAL_MEMORY_CEILING_BYTES = float(16 << 40)
+
+
+def _envelope_int(env_name: str, default: int, *, maximum: int) -> int:
+    """Read one operator-supplied integer budget, falling back when unusable."""
+    raw = os.environ.get(env_name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.error("Ignoring malformed %s: value is not an integer", env_name)
+        return default
+    if not 1 <= value <= maximum:
+        logger.error("Ignoring out-of-range %s: value must be in 1-%d", env_name, maximum)
+        return default
+    return value
+
+
+def load_dask_resource_envelope() -> DaskResourceEnvelope:
+    """Return the server-owned aggregate Dask budget for this process."""
+    raw_memory = os.environ.get(MCP_DASK_MAX_TOTAL_MEMORY_ENV, "").strip()
+    memory_bytes = _memory_size_bytes(raw_memory) if raw_memory else None
+    if raw_memory and memory_bytes is None:
+        logger.error("Ignoring malformed %s: value is not a bounded memory size", MCP_DASK_MAX_TOTAL_MEMORY_ENV)
+    if memory_bytes is not None and memory_bytes > _DASK_MAX_TOTAL_MEMORY_CEILING_BYTES:
+        logger.error(
+            "Ignoring out-of-range %s: value must not exceed %dTB",
+            MCP_DASK_MAX_TOTAL_MEMORY_ENV,
+            int(_DASK_MAX_TOTAL_MEMORY_CEILING_BYTES) >> 40,
+        )
+        memory_bytes = None
+    if memory_bytes is None:
+        memory_bytes = _memory_size_bytes(_DASK_DEFAULT_MAX_TOTAL_MEMORY)
+    assert memory_bytes is not None
+    return DaskResourceEnvelope(
+        max_workers=_envelope_int(MCP_DASK_MAX_WORKERS_ENV, _DASK_DEFAULT_MAX_WORKERS, maximum=256),
+        max_total_threads=_envelope_int(
+            MCP_DASK_MAX_TOTAL_THREADS_ENV, _DASK_DEFAULT_MAX_TOTAL_THREADS, maximum=65_536
+        ),
+        max_total_memory_bytes=memory_bytes,
+    )
+
+
+def _validate_dask_options(normalized: Mapping[str, object]) -> None:
+    """Reject a Dask request whose aggregate footprint exceeds the host budget.
+
+    Runs before adapter construction: ``DaskDataFrameAdapter.__init__`` builds
+    the ``LocalCluster`` itself, so a guard placed any later would have to start
+    the oversized cluster to discover it was oversized.
+    """
+    envelope = load_dask_resource_envelope()
+
+    workers = normalized.get("n_workers", _DASK_DEFAULT_WORKERS)
+    threads_per_worker = normalized.get("threads_per_worker", _DASK_DEFAULT_THREADS_PER_WORKER)
+    assert isinstance(workers, int) and isinstance(threads_per_worker, int)
+
+    if workers > envelope.max_workers:
+        raise MCPValidationError("Dask 'n_workers' exceeds the server's worker budget")
+
+    total_threads = workers * threads_per_worker
+    if total_threads > envelope.max_total_threads:
+        # The product, not either field alone, is the CPU pressure on the host.
+        raise MCPValidationError("Dask 'n_workers' x 'threads_per_worker' exceeds the server's total thread budget")
+
+    memory_limit = normalized.get("memory_limit")
+    per_worker_bytes = (
+        _memory_size_bytes(str(memory_limit)) if memory_limit is not None else _DASK_DEFAULT_MEMORY_PER_WORKER_BYTES
+    )
+    assert per_worker_bytes is not None  # already bounded by _validate_memory_limit
+    if workers * per_worker_bytes > envelope.max_total_memory_bytes:
+        # memory_limit is per worker, so the advertised total scales with n_workers.
+        raise MCPValidationError("Dask 'n_workers' x 'memory_limit' exceeds the server's total memory budget")
+
+
 def validate_platform_options(platform: str, options: Mapping[str, object] | None) -> dict[str, object]:
     """Return canonical, bounded MCP platform options or fail closed."""
+    # An omitted request and an empty one must validate identically.  Returning
+    # early for None would skip the cross-field policy, so a request that names
+    # no options at all would escape the server's resource envelope and run on
+    # adapter defaults that may exceed it.
     if options is None:
-        return {}
+        options = {}
     if not isinstance(options, Mapping):
         raise MCPValidationError("platform_options must be an object")
     if len(options) > MAX_PLATFORM_OPTIONS:
@@ -421,6 +542,8 @@ def _validate_cross_field_policy(platform_name: str, normalized: Mapping[str, ob
     """Apply per-platform rules that individual value bounds cannot express."""
     if platform_name in {"clickhouse", "clickhouse-server"}:
         _validate_clickhouse_options(platform_name, normalized)
+    elif platform_name == "dask":
+        _validate_dask_options(normalized)
 
 
 def validate_query_id(query_id: str) -> str:
