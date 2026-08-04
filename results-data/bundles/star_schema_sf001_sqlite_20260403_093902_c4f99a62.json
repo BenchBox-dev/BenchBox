@@ -15,7 +15,7 @@
   "environment": {
     "arch": "arm64",
     "cpu_count": 10,
-    "machine_id": "machine_45d1a3ef31a1728d",
+    "machine_id": "machine_3d46427037d2",
     "memory_gb": 16,
     "os": "Darwin 25.3.0",
     "python": "3.12.11"
@@ -74,7 +74,7 @@
     "config": {
       "check_same_thread": false,
       "connection_mode": "file",
-      "database_path": "/Users/joe/Developer/BenchBox/.claude/worktrees/agent-acabb4a7/benchmark_runs/databases/ssb_sf001/ssb_sf001_notuning_uniq_check.sqlite",
+      "database_path": "path_e28646960fe6",
       "driver_runtime_strategy": "current-process",
       "execution_mode": "sql",
       "timeout": 30.0

@@ -83,7 +83,7 @@
       "family": "expression",
       "rechunk": true,
       "streaming": false,
-      "working_dir": "/Users/joe/Developer/BenchBox"
+      "working_dir": "path_26077f837912"
     },
     "name": "Polars",
     "version": "1.39.3"

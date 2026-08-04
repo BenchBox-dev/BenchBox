@@ -1,12 +1,12 @@
 {
   "benchmark": "TPC-Havoc",
   "bundle_file": "tpchavoc_sf01_polars_df_20260502_211336_7281b720.json",
-  "bundle_hash": "e9acc839fd7436b2905ebe44c1e5bd932d1cb66568aff4be8818b3ecd19db0f2",
+  "bundle_hash": "441d9027a052274f449c786d195b6264b1df2bcccf0e4acab29265e6d6f3d94c",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.1,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:52:39.021478+00:00",
   "submitted_by": "BenchBox UAT"
