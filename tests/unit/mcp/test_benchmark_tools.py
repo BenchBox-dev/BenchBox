@@ -653,12 +653,33 @@ class TestBenchmarkResultExportPath:
             exporter = exporter_cls.return_value
             exporter.export_result.return_value = {"json": exported_json}
 
-            result_file_path, result_payload = _export_and_build_payload(result, execution_id, tmp_path)
+            result_file_path, result_payload = _export_and_build_payload(
+                result, execution_id, tmp_path, anonymize=False
+            )
 
         assert result.execution_id == execution_id
         assert result_file_path == str(exported_json)
         assert result_payload == {}
         assert exporter_cls.call_args.kwargs["output_dir"] == tmp_path
+
+    @pytest.mark.parametrize("anonymize", [False, True])
+    def test_export_honours_the_requested_anonymization(self, tmp_path: Path, anonymize: bool):
+        """The exporter is constructed with the caller's trust-boundary decision."""
+        from benchbox.mcp.tools.benchmark import _export_and_build_payload
+
+        result = SimpleNamespace(execution_id=None)
+        exported_json = tmp_path / "tpch_test.json"
+        exported_json.write_text("{}", encoding="utf-8")
+
+        with (
+            patch("benchbox.mcp.tools.benchmark.ResultExporter") as exporter_cls,
+            patch("benchbox.mcp.tools.benchmark.build_result_payload", return_value={"ok": True}),
+        ):
+            exporter_cls.return_value.export_result.return_value = {"json": exported_json}
+
+            _export_and_build_payload(result, "mcp_test_002", tmp_path, anonymize=anonymize)
+
+        assert exporter_cls.call_args.kwargs["anonymize"] is anonymize
 
 
 class TestPopulateSqlQueryDetails:

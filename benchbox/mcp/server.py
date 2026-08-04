@@ -186,6 +186,7 @@ Then inspect plans: get_query_plan(result_file="...", query_id="19")
         mcp,
         results_dir=results_provider,
         allow_synchronous_execution=remote_security is None,
+        anonymize_results=remote_security is not None,
     )
     if job_runtime is not None:
         from benchbox.mcp.jobs import register_durable_job_tools
@@ -196,7 +197,11 @@ Then inspect plans: get_query_plan(result_file="...", query_id="19")
     register_results_tools(mcp, results_dir=results_provider)
 
     logger.info("Registering analytics tools...")
-    register_analytics_tools(mcp, results_dir=results_provider)
+    register_analytics_tools(
+        mcp,
+        results_dir=results_provider,
+        anonymize_results=remote_security is not None,
+    )
 
     logger.info("Registering visualization tools...")
     register_visualization_tools(

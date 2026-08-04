@@ -380,9 +380,13 @@ def register_visualization_tools(
             - Comparison: generate_chart(result_files="duckdb.json,polars.json", chart_type="query_heatmap", format="ascii")
 
         ASCII charts are rendered inline and returned in the 'content' field. They include:
-            - ANSI colors for terminal display (copy-paste preserves formatting)
             - Unicode box-drawing characters for clean visualization
             - Best/worst highlighting, legends, and scale indicators
+
+        Output is deliberately ANSI-color-free. MCP responses are protocol
+        payloads consumed by non-terminal clients, where escape sequences are
+        noise rather than formatting, so the renderer is always constructed with
+        ``ChartOptions(use_color=False)``.
         """
         file_list = [f.strip() for f in result_files.split(",") if f.strip()]
         if not file_list:
