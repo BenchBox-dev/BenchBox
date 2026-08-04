@@ -106,6 +106,34 @@ execution time, so withdrawing a profile immediately fails closed for queued
 retries. Rejections never echo the requested profile name, so a caller cannot
 use validation errors to enumerate configured profiles.
 
+## Dask aggregate resource envelope
+
+Dask's per-field bounds constrain each knob in isolation, but the pressure a
+request puts on the host is their product. Without an aggregate ceiling,
+`n_workers: 256` combined with `threads_per_worker: 256` describes a
+65,536-thread `LocalCluster` advertising 256 TB of memory from a single request.
+
+Every MCP-requested Dask cluster must therefore fit inside a server-owned
+aggregate budget, checked before the adapter is constructed — the adapter builds
+its `LocalCluster` in `__init__`, so a later guard would have to start the
+oversized cluster to discover it was oversized.
+
+| Budget | Env var | Default |
+|---|---|---|
+| Worker count | `BENCHBOX_MCP_DASK_MAX_WORKERS` | `16` |
+| `n_workers` x `threads_per_worker` | `BENCHBOX_MCP_DASK_MAX_TOTAL_THREADS` | `64` |
+| `n_workers` x `memory_limit` | `BENCHBOX_MCP_DASK_MAX_TOTAL_MEMORY` | `64GB` |
+
+`memory_limit` is per worker, so the advertised total scales with `n_workers`.
+Fields the request omits are scored using the adapter's own conservative local
+caps (2 workers, 2 threads per worker, 2 GB per worker), so an omitted field
+never contributes more than the adapter would actually apply. A malformed or
+out-of-range override is ignored in favour of the reviewed default rather than
+being partially trusted.
+
+This envelope is an additional per-run guard. The server-wide and per-principal
+concurrency limits in `admission` remain enforced independently.
+
 ## Durable remote benchmark jobs
 
 Remote clients should use `start_benchmark` instead of holding a

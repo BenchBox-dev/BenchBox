@@ -14,6 +14,9 @@ from benchbox.mcp.schemas import (
     MAX_QUERY_ID_LENGTH,
     MAX_QUERY_IDS,
     MCP_CLICKHOUSE_PROFILE_ENV,
+    MCP_DASK_MAX_TOTAL_MEMORY_ENV,
+    MCP_DASK_MAX_TOTAL_THREADS_ENV,
+    MCP_DASK_MAX_WORKERS_ENV,
     MCP_PLATFORM_OPTION_ALLOWLIST,
     MCP_PLATFORM_OPTION_CONTRACT,
     CompareResultsInput,
@@ -25,6 +28,7 @@ from benchbox.mcp.schemas import (
     MCPValidationError,
     RunBenchmarkInput,
     ValidateConfigInput,
+    load_dask_resource_envelope,
     resolve_clickhouse_connection_profile,
     validate_benchmark_name,
     validate_filename,
@@ -312,6 +316,85 @@ class TestRunBenchmarkInput:
         assert validate_platform_options("velox", {"deployment": "remote"}) == {"deployment": "remote"}
         with pytest.raises(MCPValidationError):
             validate_platform_options("modin", {"engine": "pandas"})
+
+
+class TestDaskResourceEnvelope:
+    """One request must not be able to size a cluster the host cannot run."""
+
+    def test_independent_maxima_cannot_be_multiplied_into_a_thread_bomb(self):
+        """n_workers=256 x threads_per_worker=256 is 65,536 threads."""
+        with pytest.raises(MCPValidationError, match="total thread budget"):
+            validate_platform_options("dask", {"n_workers": 16, "threads_per_worker": 256})
+
+    def test_worker_count_alone_is_bounded(self):
+        with pytest.raises(MCPValidationError, match="worker budget"):
+            validate_platform_options("dask", {"n_workers": 256})
+
+    def test_per_worker_memory_is_multiplied_by_the_worker_count(self):
+        """memory_limit is per worker, so the advertised total scales with it."""
+        assert validate_platform_options("dask", {"n_workers": 8, "memory_limit": "8GB"}) == {
+            "n_workers": 8,
+            "memory_limit": "8GB",
+        }
+        with pytest.raises(MCPValidationError, match="total memory budget"):
+            validate_platform_options("dask", {"n_workers": 8, "memory_limit": "9GB"})
+
+    @pytest.mark.parametrize(
+        ("options", "expected"),
+        [
+            ({"n_workers": 16, "threads_per_worker": 4}, True),
+            ({"n_workers": 16, "threads_per_worker": 5}, False),
+            ({"n_workers": 17, "threads_per_worker": 1}, False),
+            ({"n_workers": 1, "threads_per_worker": 64}, True),
+            ({"n_workers": 1, "threads_per_worker": 65}, False),
+        ],
+    )
+    def test_aggregate_boundaries_are_exact(self, options, expected):
+        if expected:
+            assert validate_platform_options("dask", options) == options
+        else:
+            with pytest.raises(MCPValidationError):
+                validate_platform_options("dask", options)
+
+    def test_omitted_fields_use_the_adapters_own_conservative_caps(self):
+        """An unset field contributes no more than the adapter would apply."""
+        assert validate_platform_options("dask", {"threads_per_worker": 32}) == {"threads_per_worker": 32}
+        with pytest.raises(MCPValidationError, match="total thread budget"):
+            validate_platform_options("dask", {"threads_per_worker": 33})
+
+    def test_dataframe_alias_is_covered_by_the_same_envelope(self):
+        with pytest.raises(MCPValidationError, match="worker budget"):
+            validate_platform_options("dask-df", {"n_workers": 256})
+
+    def test_operator_can_widen_or_narrow_the_budget(self, monkeypatch):
+        monkeypatch.setenv(MCP_DASK_MAX_WORKERS_ENV, "4")
+        monkeypatch.setenv(MCP_DASK_MAX_TOTAL_THREADS_ENV, "8")
+        monkeypatch.setenv(MCP_DASK_MAX_TOTAL_MEMORY_ENV, "8GB")
+        envelope = load_dask_resource_envelope()
+        assert envelope.max_workers == 4
+        assert envelope.max_total_threads == 8
+        assert envelope.max_total_memory_bytes == float(8 << 30)
+        with pytest.raises(MCPValidationError, match="worker budget"):
+            validate_platform_options("dask", {"n_workers": 5})
+
+    @pytest.mark.parametrize(
+        ("env_name", "value"),
+        [
+            (MCP_DASK_MAX_WORKERS_ENV, "not-a-number"),
+            (MCP_DASK_MAX_WORKERS_ENV, "0"),
+            (MCP_DASK_MAX_WORKERS_ENV, "-5"),
+            (MCP_DASK_MAX_WORKERS_ENV, "100000"),
+            (MCP_DASK_MAX_TOTAL_THREADS_ENV, "nonsense"),
+            (MCP_DASK_MAX_TOTAL_MEMORY_ENV, "/etc/passwd"),
+            (MCP_DASK_MAX_TOTAL_MEMORY_ENV, "lots"),
+        ],
+    )
+    def test_malformed_operator_budget_falls_back_to_the_reviewed_default(self, monkeypatch, env_name, value):
+        monkeypatch.setenv(env_name, value)
+        envelope = load_dask_resource_envelope()
+        assert envelope.max_workers == 16
+        assert envelope.max_total_threads == 64
+        assert envelope.max_total_memory_bytes == float(64 << 30)
 
 
 CLICKHOUSE_PLATFORM_SPELLINGS = ("clickhouse", "clickhouse-server")

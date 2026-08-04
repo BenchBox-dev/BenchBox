@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import anyio
 import pytest
@@ -13,6 +14,7 @@ from mcp.types import TextContent
 from benchbox.mcp.jobs import DurableJobRepository, DurableJobWorker
 from benchbox.mcp.schemas import (
     MCP_CLICKHOUSE_PROFILE_ENV,
+    MCP_DASK_MAX_TOTAL_THREADS_ENV,
     MCPValidationError,
     validate_platform_options,
 )
@@ -94,6 +96,39 @@ def test_normalized_platform_options_survive_repository_round_trip(tmp_path: Pat
     persisted = repository.get_owned(submitted.execution_id, "tenant-a")
     assert persisted is not None
     assert persisted.request["platform_options"] == {"threads": 4}
+
+
+def test_durable_admission_refuses_an_oversized_dask_envelope(tmp_path: Path) -> None:
+    """An over-envelope request must never reach the queue, let alone a worker."""
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+
+    with pytest.raises(MCPValidationError, match="thread budget"):
+        validate_platform_options("dask", {"n_workers": 16, "threads_per_worker": 256})
+
+    with repository._connect() as connection:
+        queued = connection.execute("SELECT COUNT(*) FROM mcp_benchmark_jobs").fetchone()[0]
+    assert queued == 0
+
+
+def test_durable_worker_replay_re_enforces_the_dask_envelope(tmp_path: Path, monkeypatch) -> None:
+    """A budget tightened after submission is applied on replay, not bypassed."""
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    options = validate_platform_options("dask", {"n_workers": 8, "threads_per_worker": 4})
+    submitted, _ = repository.submit(
+        "tenant-a", {**_request(), "platform": "dask-df", "mode": "dataframe", "platform_options": options}
+    )
+
+    # The operator narrows the budget while the job is still queued.
+    monkeypatch.setenv(MCP_DASK_MAX_TOTAL_THREADS_ENV, "8")
+
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+    with patch("benchbox.mcp.tools.benchmark._get_platform_adapter") as get_adapter:
+        response = DurableJobWorker._execute_benchmark(claimed, tmp_path / "staging")
+
+    assert response["status"] == "failed"
+    get_adapter.assert_not_called()
+    assert repository.get(submitted.execution_id) is not None
 
 
 def test_durable_clickhouse_requests_never_persist_a_connection_tuple(tmp_path: Path, monkeypatch) -> None:

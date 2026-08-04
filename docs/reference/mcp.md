@@ -247,6 +247,11 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
+- Dask cluster sizing is bounded in aggregate, not only per field. A request's
+  `n_workers`, `n_workers` x `threads_per_worker`, and `n_workers` x
+  `memory_limit` must all fit inside a server-owned budget, enforced before the
+  adapter builds its `LocalCluster` (see
+  [MCP remote security](../operations/mcp-remote-security.md)).
 - ClickHouse connection destinations are server-owned. A request cannot set
   `port` or `secure`; both are rejected for every ClickHouse spelling. A
   non-default port or TLS setting is reachable only through
