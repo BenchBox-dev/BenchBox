@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -121,6 +122,21 @@ class Metrics:
 
 def _read(project: Path, relative: str) -> str:
     return (project / relative).read_text(encoding="utf-8")
+
+
+def _tag(check: str, errors: Iterable[str]) -> list[str]:
+    """Prefix each message with the check that produced it."""
+    return [f"{check}: {error}" for error in errors]
+
+
+def failing_checks(errors: Iterable[str]) -> list[str]:
+    """Distinct check names present in *errors*, in first-seen order."""
+    seen: list[str] = []
+    for error in errors:
+        check = error.split(":", 1)[0]
+        if check not in seen:
+            seen.append(check)
+    return seen
 
 
 def collect_metrics(project: Path) -> Metrics:
@@ -441,34 +457,70 @@ def audit_scenarios(scenarios: list[dict[str, Any]], policy_text: str) -> list[s
     return errors
 
 
+# Fraction of a budget at which the surface is reported as nearly full. #1541
+# added 88 bytes to a 16000-byte ceiling and reddened develop for everyone with
+# no prior signal; a headroom band turns "over budget" from a cliff into a slope.
+HEADROOM_WARNING_RATIO = 0.97
+
+
+def budget_headroom_warnings(metrics: Metrics, budgets: dict[str, Any]) -> list[str]:
+    """Warn when a budgeted metric is close to its ceiling but not yet over it.
+
+    Deliberately a warning, never an error: the budget itself stays the gate.
+    A second failing threshold would just be a lower budget, and the point is to
+    give the next docs change lead time, not to move the wall in.
+    """
+    warnings: list[str] = []
+    measured = [
+        ("active instruction bytes", metrics.active_bytes, budgets["active_bytes"]),
+        ("AGENTS.md lines", metrics.agents_lines, budgets["agents_lines"]),
+        *((f"{name} bytes", size, budgets["adapter_bytes"]) for name, size in metrics.adapter_bytes.items()),
+    ]
+    for label, value, ceiling in measured:
+        if ceiling and value <= ceiling and value >= ceiling * HEADROOM_WARNING_RATIO:
+            warnings.append(f"{label} {value} is within {ceiling - value} of the {ceiling} budget")
+    return warnings
+
+
 def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
+    """Run every non-Git check and return its errors tagged with the check name.
+
+    Each message is prefixed `<check>: ` so a caller - in particular the
+    pre-commit hook, which invokes this through one entry point - can say which
+    check failed. Before that, a byte-budget failure surfaced under a hook named
+    "reject stale agent Git identity", which sent at least one investigation
+    after a Git config problem that did not exist.
+    """
     errors: list[str] = []
     metrics = collect_metrics(project)
     budgets = corpus["budgets"]
     baseline = corpus["baseline"]
 
+    budget_errors: list[str] = []
     if metrics.active_bytes > budgets["active_bytes"]:
-        errors.append(f"active instruction bytes {metrics.active_bytes} exceed budget {budgets['active_bytes']}")
+        budget_errors.append(f"active instruction bytes {metrics.active_bytes} exceed budget {budgets['active_bytes']}")
     if metrics.active_bytes >= baseline["active_bytes"]:
-        errors.append("active instruction surface did not improve on the recorded baseline")
+        budget_errors.append("active instruction surface did not improve on the recorded baseline")
     if metrics.agents_lines > budgets["agents_lines"]:
-        errors.append(f"AGENTS.md lines {metrics.agents_lines} exceed budget {budgets['agents_lines']}")
+        budget_errors.append(f"AGENTS.md lines {metrics.agents_lines} exceed budget {budgets['agents_lines']}")
     for name, size in metrics.adapter_bytes.items():
         if size > budgets["adapter_bytes"]:
-            errors.append(f"{name} bytes {size} exceed adapter budget {budgets['adapter_bytes']}")
+            budget_errors.append(f"{name} bytes {size} exceed adapter budget {budgets['adapter_bytes']}")
         adapter = _read(project, name)
         if "AGENTS.md" not in adapter:
-            errors.append(f"{name} does not point to AGENTS.md")
+            budget_errors.append(f"{name} does not point to AGENTS.md")
+    errors.extend(_tag("budget", budget_errors))
 
     active = "\n".join(_read(project, path) for path in ACTIVE_TEXT)
     command_text = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted((project / ".claude/commands").glob("*.md"))
     )
+    surface_errors: list[str] = []
     if LEGACY_REVIEW_DOC in command_text:
-        errors.append(f"a .claude/commands surface binds to the superseded {LEGACY_REVIEW_DOC}")
+        surface_errors.append(f"a .claude/commands surface binds to the superseded {LEGACY_REVIEW_DOC}")
     settings = json.loads(_read(project, ".claude/settings.json"))
     if settings.get("hooks"):
-        errors.append(".claude/settings.json contains executable hooks; use explicit gates")
+        surface_errors.append(".claude/settings.json contains executable hooks; use explicit gates")
     forbidden_active = {
         "imposed Claude co-author": "Co-Authored-By: Claude",
         "imposed Claude author": "author Claude",
@@ -479,17 +531,18 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     }
     for label, needle in forbidden_active.items():
         if needle.casefold() in (active + "\n" + command_text).casefold():
-            errors.append(f"{label} pattern remains: {needle}")
+            surface_errors.append(f"{label} pattern remains: {needle}")
     settings_text = _read(project, ".claude/settings.json")
     for label, needle in forbidden_settings.items():
         if needle.casefold() in settings_text.casefold():
-            errors.append(f"{label} pattern remains in project settings: {needle}")
+            surface_errors.append(f"{label} pattern remains in project settings: {needle}")
+    errors.extend(_tag("surface", surface_errors))
 
     policy_text = _read(project, "AGENTS.md") + "\n" + _read(project, "docs/development/agent-review-protocol.md")
-    errors.extend(audit_review_policy(project))
-    errors.extend(audit_commit_policy(project))
+    errors.extend(_tag("review-policy", audit_review_policy(project)))
+    errors.extend(_tag("commit-policy", audit_commit_policy(project)))
 
-    errors.extend(audit_scenarios(corpus["scenarios"], policy_text))
+    errors.extend(_tag("scenarios", audit_scenarios(corpus["scenarios"], policy_text)))
 
     return metrics, errors
 
@@ -510,15 +563,24 @@ def main() -> int:
     metrics, errors = audit(args.project.resolve(), corpus)
     warnings: list[str] = []
     if args.check_git_identity:
-        errors.extend(audit_git_identity(args.project.resolve()))
-        warnings.extend(audit_identity_overrides(args.project.resolve()))
+        errors.extend(_tag("git-identity", audit_git_identity(args.project.resolve())))
+        warnings.extend(_tag("git-identity", audit_identity_overrides(args.project.resolve())))
     if args.check_commit_range:
-        errors.extend(audit_commit_range(args.project.resolve(), args.check_commit_range))
-    result = {"ok": not errors, "metrics": asdict(metrics), "errors": errors, "warnings": warnings}
+        errors.extend(_tag("commit-range", audit_commit_range(args.project.resolve(), args.check_commit_range)))
+    warnings.extend(_tag("budget", budget_headroom_warnings(metrics, corpus["budgets"])))
+    checks = failing_checks(errors)
+    result = {
+        "ok": not errors,
+        "metrics": asdict(metrics),
+        "errors": errors,
+        "warnings": warnings,
+        "failing_checks": checks,
+    }
     if args.as_json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        print(f"agent-instructions: {'PASS' if not errors else 'FAIL'}")
+        summary = "PASS" if not errors else f"FAIL ({', '.join(checks)})"
+        print(f"agent-instructions: {summary}")
         print(f"active_bytes={metrics.active_bytes} agents_lines={metrics.agents_lines}")
         for name, size in metrics.adapter_bytes.items():
             print(f"{name}={size} bytes")

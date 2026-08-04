@@ -495,3 +495,78 @@ def test_unresolvable_identity_skip_does_not_weaken_the_agent_check(tmp_path: Pa
     errors = audit_git_identity(project)
     assert len(errors) == 2
     assert all("known agent/service Codex <codex@openai.com>" in error for error in errors)
+
+
+# ---------------------------------------------------------------------------
+# Check attribution and budget headroom.
+#
+# The pre-commit hook runs the whole audit through one entry point, so before
+# these landed a byte-budget failure was reported under a hook named "reject
+# stale agent Git identity" and sent an investigation after a Git config problem
+# that did not exist.
+# ---------------------------------------------------------------------------
+
+
+def test_every_error_names_the_check_that_produced_it(tmp_path: Path) -> None:
+    """A caller must be able to say which check failed, not just that one did."""
+    project = _candidate(tmp_path)
+    (project / "AGENTS.md").write_text("Co-Authored-By: Claude\n", encoding="utf-8")
+    _, errors = audit(project, CORPUS)
+    assert errors, "the mutated candidate must fail, or this asserts nothing"
+    known = {"budget", "surface", "review-policy", "commit-policy", "scenarios", "git-identity", "commit-range"}
+    unattributed = [error for error in errors if error.split(":", 1)[0] not in known]
+    assert not unattributed, f"errors with no check name: {unattributed}"
+
+
+def test_a_budget_failure_is_attributed_to_budget_not_identity(tmp_path: Path) -> None:
+    """The exact misreport this guards: over-budget must not read as identity."""
+    project = _candidate(tmp_path)
+    corpus = json.loads(json.dumps(CORPUS))
+    corpus["budgets"]["active_bytes"] = 1
+    _, errors = audit(project, corpus)
+    over = [error for error in errors if "exceed budget" in error]
+    assert over, "shrinking the budget must produce an over-budget error"
+    assert all(error.startswith("budget: ") for error in over)
+    assert agent_instruction_audit.failing_checks(errors)[0] == "budget"
+
+
+def test_failing_checks_lists_each_check_once_in_first_seen_order() -> None:
+    assert agent_instruction_audit.failing_checks(["budget: a", "scenarios: b", "budget: c"]) == [
+        "budget",
+        "scenarios",
+    ]
+
+
+def test_headroom_warns_near_the_ceiling_and_stays_a_warning() -> None:
+    """A near-full surface warns; only exceeding the ceiling is an error."""
+    metrics, _ = audit(ROOT, CORPUS)
+    budgets = dict(CORPUS["budgets"], active_bytes=metrics.active_bytes + 1)
+    warnings = agent_instruction_audit.budget_headroom_warnings(metrics, budgets)
+    assert any("active instruction bytes" in warning for warning in warnings)
+    # The same near-full state must not be an error - the budget is the gate.
+    _, errors = audit(ROOT, dict(CORPUS, budgets=budgets))
+    assert not [error for error in errors if "exceed budget" in error]
+
+
+def test_headroom_is_silent_with_room_to_spare() -> None:
+    metrics, _ = audit(ROOT, CORPUS)
+    budgets = dict(CORPUS["budgets"], active_bytes=metrics.active_bytes * 10)
+    warnings = agent_instruction_audit.budget_headroom_warnings(metrics, budgets)
+    assert not [warning for warning in warnings if "active instruction bytes" in warning]
+
+
+def test_the_precommit_hook_name_does_not_claim_a_single_check() -> None:
+    """The hook runs the full audit, so its name must not promise only identity.
+
+    Pinning the name is the only mechanical guard available here: pre-commit
+    prints the hook name, not the command, when a hook fails.
+    """
+    import yaml
+
+    config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    hooks = [hook for repo in config["repos"] for hook in repo.get("hooks", [])]
+    hook = next(hook for hook in hooks if hook["id"] == "agent-git-identity")
+    assert "agent-identity-check" in hook["entry"], "this test tracks the full-audit entry point"
+    assert "instruction" in hook["name"].casefold(), (
+        f"hook name {hook['name']!r} names only the identity check while running the whole audit"
+    )
