@@ -142,6 +142,80 @@ to change `src/**`. Until that lands, expect residual flake at any data-bound
 assertion that still waits single-shot, and treat the coverage gap above as
 live.
 
+## WebKit `/results/tpch/` data-bind failure (2026-08-03 investigation)
+
+The failure signature is the harness's own message:
+
+```text
+Data-bound wait failed after 3 attempts (budgets 10s + 8s + 8s, 26.2s elapsed)
+on http://127.0.0.1:4319/results/tpch/. Re-navigation ... did not help, so this
+is NOT the cold-snapshot zero-row race that budget is sized for -- do not "fix"
+it by widening the budget.
+```
+
+That distinction still holds: this is not the zero-row race in the section
+above, and widening `DATA_ATTEMPT_BUDGETS_MS` is not a fix for either.
+
+**Status: not reproducible, and not observed on any tree that contains #1484.**
+Recorded here so the next occurrence starts from evidence rather than from
+scratch.
+
+### What the CI history actually shows
+
+Every `/results/tpch/` occurrence landed on a branch that predates #1484
+(`chore: enforce results explorer dependency audit`, merged 2026-08-03 12:47
+UTC), which bumped `@playwright/test` from `^1.49.0` to `^1.62.1`:
+`feat/results-explorer-cohort-identity-contract` and
+`feat/results-explorer-corpus-sanitization`. Every run on a tree containing
+#1484 has a green WebKit job. The one post-#1484 WebKit failure
+(run 30864773163) is a different, fully explained cause: PR #1496 renamed the
+Home headline and `home.spec.ts` still asserted the old string.
+
+Correlation is not causation here — see the refuted hypotheses below.
+
+### Reproducing Linux WebKit locally
+
+macOS WebKit is a different build and passes where CI fails, so a local macOS
+run is not evidence. Use a Linux container. Build the fixtures and `dist/` on
+the host first — fixture generation shells out to `uv`/Python, which the
+Playwright image does not carry:
+
+```bash
+cd results-explorer && npm run test:e2e:fixtures && npm run build
+rsync -a --exclude node_modules --exclude playwright-report \
+  --exclude test-results results-explorer/ /tmp/linux-wk/results-explorer/
+mocker run -d -m 8g --cpus 4 -v /tmp/linux-wk:/work \
+  mcr.microsoft.com/playwright:v1.62.1-noble \
+  sh -c 'exec > /work/run.log 2>&1
+    cp -a /work/results-explorer /app && cd /app && rm -rf node_modules
+    npm ci --no-audit --no-fund
+    CI=1 npx playwright test --project=webkit --workers=1 --retries=0 \
+      --reporter=line'
+```
+
+Two container gotchas cost real time; both are worked around above:
+
+- **Run detached (`-d`) and write logs into the mount.** An attached
+  `mocker run` is torn down after roughly 30 seconds — it returns exit 0 with
+  the work unfinished, which reads exactly like a passing run.
+- **Match the image tag to the tree's `@playwright/test` pin.** A mismatch
+  fails with `Executable doesn't exist at /ms-playwright/webkit-<n>`, not with
+  a data-bind error.
+
+### Hypotheses tested and refuted
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| Fixed on develop by the #1496–#1500 batch | develop tree, Linux WebKit, full `@smoke` | 16/16 pass — consistent, but does not isolate a cause |
+| Caused by the older Playwright/WebKit build | Known-bad tree at its own 1.59.1 pin | **Refuted** — passes |
+| Fixed by the 1.62.1 bump | Same known-bad tree upgraded to 1.62.1 | **Refuted** — passes at both versions |
+| CPU/memory starvation on shared runners | develop tree at 2 cores / 2 GB, 3 consecutive runs | **Refuted** — 3/3 pass (10.0s, 9.0s, 8.7s) |
+
+The uncontrolled variable that remains is **architecture**: the reproduction
+above runs `linux/arm64`, while GitHub's `ubuntu-latest` is `linux/amd64`.
+Anyone picking this up should start by re-running the harness under
+`--platform linux/amd64` before opening any other line of inquiry.
+
 ## Triage rule
 
 **Firefox is green in recent CI history; do not dismiss WebKit failures as
