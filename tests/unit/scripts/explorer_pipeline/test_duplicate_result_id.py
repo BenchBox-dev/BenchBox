@@ -107,6 +107,27 @@ def test_duplicate_result_id_with_identical_content_publishes_once(
     assert published == [f"{COLLIDING_ID}.json"]
 
 
+def test_duplicate_result_id_identical_primaries_with_differing_companions_fail(
+    tmp_path: Path,
+    force_id_collision: None,
+) -> None:
+    """Byte-identical primaries are not identical results if their sidecars differ.
+
+    Companions publish as `{result_id}.plans.json`, keyed by the same id. If the
+    guard hashed only the primary bundle, a copy carrying plans that the first
+    lacked would be treated as redundant and skipped, silently dropping that
+    evidence - the same loss the guard exists to prevent, one file over.
+    """
+    data_dir = tmp_path / "data"
+    bundles = data_dir / "bundles"
+    _write_bundle(bundles, "first.json", total_duration_ms=45000)
+    second = _write_bundle(bundles / "nested", "second.json", total_duration_ms=45000)
+    second.with_name("second.plans.json").write_text(json.dumps({"q1": "PLAN"}), encoding="utf-8")
+
+    with pytest.raises(DuplicateResultIdError):
+        ExplorerPipeline().run(data_dir, tmp_path / "out")
+
+
 def test_duplicate_result_id_guard_leaves_the_normal_path_untouched(tmp_path: Path) -> None:
     """Distinct ids still publish one file each.
 
