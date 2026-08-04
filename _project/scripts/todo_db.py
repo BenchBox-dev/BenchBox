@@ -1080,6 +1080,21 @@ def _pipeline_execute(
     return response
 
 
+def _rowid_alias_pk(table_info: list) -> str | None:
+    """The column name of a single-column INTEGER PRIMARY KEY, else None.
+
+    Only a rowid alias may be reassigned. A composite key (work_units'
+    item_id+wid) and a TEXT key (items.id) both carry meaning that other rows
+    reference, so they are always copied verbatim -- reassigning either would
+    silently break foreign keys rather than collide loudly.
+    """
+    pk_columns = [row for row in table_info if row["pk"]]
+    if len(pk_columns) != 1:
+        return None
+    column = pk_columns[0]
+    return column["name"] if (column["type"] or "").strip().upper() == "INTEGER" else None
+
+
 def bulk_transfer(
     staging: sqlite3.Connection,
     url: str,
@@ -1114,9 +1129,21 @@ def bulk_transfer(
             stmts.append((f"DELETE FROM {table}", []))
     rows_total = 0
     for table in transfer_tables:
-        columns = [row["name"] for row in staging.execute(f"PRAGMA table_info({table})")]
-        insert = f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})"
-        for row in staging.execute(f"SELECT {', '.join(columns)} FROM {table}"):
+        info = list(staging.execute(f"PRAGMA table_info({table})"))
+        columns = [row["name"] for row in info]
+        # Additive transfers must NOT carry rowid-alias primary keys: the target
+        # already holds rows at those ids (production had `finding_events.seq=1`
+        # from an earlier sync), and one collision aborts the entire transfer.
+        # Omitting the column lets SQLite assign fresh ids in INSERT order, so
+        # relative order -- the only thing the append-only tables actually mean
+        # -- is preserved. `--replace` empties the target first, so it keeps
+        # copying ids verbatim and stays byte-for-byte what it was.
+        skip = None if replace else _rowid_alias_pk(info)
+        insert_columns = [c for c in columns if c != skip] if skip else columns
+        placeholders = ", ".join("?" for _ in insert_columns)
+        insert = f"INSERT INTO {table} ({', '.join(insert_columns)}) VALUES ({placeholders})"
+        order = f" ORDER BY {skip}" if skip else ""
+        for row in staging.execute(f"SELECT {', '.join(insert_columns)} FROM {table}{order}"):
             stmts.append((insert, list(row)))
             rows_total += 1
     batches = [stmts[i : i + batch_size] for i in range(0, len(stmts), batch_size)]

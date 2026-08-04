@@ -908,6 +908,100 @@ class TestHostedBulkImport:
         assert summary["rows"] > 0
         assert summary["batches"] >= 1
 
+    def test_additive_transfer_into_a_target_holding_the_same_ids(self, staging, tmp_path):
+        """An additive (non---replace) transfer must survive a target that already
+        holds rows at the ids the staging database uses.
+
+        An EMPTY target is exactly what hid this: a full scratch-Turso rehearsal
+        passed because nothing occupied the ids. Production held
+        `finding_events.seq = 1` from an earlier sync, which would have aborted
+        the whole transfer.
+        """
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        seed = sqlite3.connect(primary.path)
+        # Occupy events.seq = 1..N, the same rowids the staged events carry.
+        for n in range(3):
+            seed.execute("INSERT INTO events (at, actor, item_id, action) VALUES ('t', 'a', NULL, 'config')")
+        seed.commit()
+        before = seed.execute("SELECT count(*) FROM events").fetchone()[0]
+        staged = staging.execute("SELECT count(*) FROM events").fetchone()[0]
+        seed.close()
+
+        todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post)
+
+        check = sqlite3.connect(primary.path)
+        try:
+            assert check.execute("SELECT count(*) FROM events").fetchone()[0] == before + staged
+        finally:
+            check.close()
+
+    def test_additive_transfer_preserves_append_only_order(self, staging, tmp_path):
+        """finding_events/events are append-only audit trails: reassigning ids is
+        only safe if RELATIVE ORDER survives, because order carries the meaning."""
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        seed = sqlite3.connect(primary.path)
+        seed.execute("INSERT INTO events (at, actor, item_id, action) VALUES ('t', 'a', NULL, 'config')")
+        seed.commit()
+        seed.close()
+        staged_order = [
+            (r["at"], r["actor"], r["action"]) for r in staging.execute("SELECT * FROM events ORDER BY seq")
+        ]
+
+        todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post)
+
+        check = sqlite3.connect(primary.path)
+        check.row_factory = sqlite3.Row
+        try:
+            landed = [
+                (r["at"], r["actor"], r["action"])
+                for r in check.execute("SELECT * FROM events WHERE action != 'config' ORDER BY seq")
+            ]
+        finally:
+            check.close()
+        assert landed == staged_order
+
+    def test_replace_still_copies_ids_verbatim(self, staging, tmp_path):
+        """must-preserve: the --replace path is unchanged, ids included.
+
+        Replace empties the target first, so there is nothing to collide with
+        and the ids carry over exactly. Uses a NON-contiguous staged id so a
+        reassign-from-1 would be visible.
+        """
+        staging.execute("UPDATE events SET seq = 900 WHERE seq = (SELECT max(seq) FROM events)")
+        staging.commit()
+        staged_ids = [r["seq"] for r in staging.execute("SELECT seq FROM events ORDER BY seq")]
+        assert 900 in staged_ids
+
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        todo_db.bulk_transfer(staging, HOSTED_URL, "tok", replace=True, post=primary.post)
+
+        check = sqlite3.connect(primary.path)
+        try:
+            landed = [r[0] for r in check.execute("SELECT seq FROM events ORDER BY seq")]
+        finally:
+            check.close()
+        assert landed == staged_ids
+
+    def test_text_and_composite_keys_are_never_reassigned(self, staging, tmp_path):
+        """Only a rowid alias may be reassigned. items.id is TEXT and
+        work_units is keyed (item_id, wid) -- other rows reference both, so
+        reassigning either would break foreign keys silently."""
+        primary = FakePrimary(tmp_path / "primary.sqlite")
+        sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
+        todo_db.bulk_transfer(staging, HOSTED_URL, "tok", post=primary.post)
+
+        check = sqlite3.connect(primary.path)
+        try:
+            assert sorted(r[0] for r in check.execute("SELECT id FROM items")) == ["bulk-one", "bulk-two"]
+            assert sorted(tuple(r) for r in check.execute("SELECT item_id, wid FROM work_units")) == sorted(
+                tuple(r) for r in staging.execute("SELECT item_id, wid FROM work_units")
+            )
+        finally:
+            check.close()
+
     def test_bulk_transfer_wraps_in_one_transaction_with_baton(self, staging, tmp_path):
         primary = FakePrimary(tmp_path / "primary.sqlite")
         sqlite3.connect(primary.path).executescript(todo_db.SCHEMA_SQL)
