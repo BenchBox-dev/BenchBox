@@ -396,6 +396,36 @@ class TestDaskResourceEnvelope:
         assert envelope.max_total_threads == 64
         assert envelope.max_total_memory_bytes == float(64 << 30)
 
+    @pytest.mark.parametrize("value", ["999999TB", "17TB", "1000000GB"])
+    def test_an_out_of_range_memory_override_cannot_disable_the_ceiling(self, monkeypatch, value):
+        """A units slip must not silently remove the aggregate memory guard."""
+        monkeypatch.setenv(MCP_DASK_MAX_TOTAL_MEMORY_ENV, value)
+        assert load_dask_resource_envelope().max_total_memory_bytes == float(64 << 30)
+        with pytest.raises(MCPValidationError, match="total memory budget"):
+            validate_platform_options("dask", {"n_workers": 16, "memory_limit": "1024GB"})
+
+    def test_an_in_range_memory_override_is_still_honoured(self, monkeypatch):
+        monkeypatch.setenv(MCP_DASK_MAX_TOTAL_MEMORY_ENV, "16TB")
+        assert load_dask_resource_envelope().max_total_memory_bytes == float(16 << 40)
+
+    def test_an_omitted_request_is_held_to_the_same_envelope_as_an_empty_one(self, monkeypatch):
+        """None and {} must validate identically.
+
+        `start_benchmark` drops an empty `platform_options` from the persisted
+        request, so the durable worker replays `None`. If `None` short-circuited
+        validation, an ordinary optionless request would start the adapter's
+        default cluster while ignoring a tighter operator budget.
+        """
+        monkeypatch.setenv(MCP_DASK_MAX_WORKERS_ENV, "1")
+        for omitted in (None, {}):
+            with pytest.raises(MCPValidationError, match="worker budget"):
+                validate_platform_options("dask", omitted)
+
+    def test_an_optionless_request_still_passes_under_the_default_budget(self):
+        """The uniform check must not reject ordinary optionless runs."""
+        assert validate_platform_options("dask", None) == {}
+        assert validate_platform_options("duckdb", None) == {}
+
 
 CLICKHOUSE_PLATFORM_SPELLINGS = ("clickhouse", "clickhouse-server")
 CLICKHOUSE_UNCONFIGURED_SPELLINGS = ("clickhouse-local", "clickhouse-cloud", "chdb", "clickhouse_server")

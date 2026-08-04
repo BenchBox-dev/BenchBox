@@ -414,6 +414,10 @@ MCP_DASK_MAX_TOTAL_MEMORY_ENV = "BENCHBOX_MCP_DASK_MAX_TOTAL_MEMORY"
 _DASK_DEFAULT_MAX_WORKERS = 16
 _DASK_DEFAULT_MAX_TOTAL_THREADS = 64
 _DASK_DEFAULT_MAX_TOTAL_MEMORY = "64GB"
+# A units slip or an extra digit ("999999TB") is syntactically valid, so the
+# memory override needs the same out-of-range guard the integer budgets have --
+# otherwise a typo silently disables the aggregate memory ceiling entirely.
+_DASK_MAX_TOTAL_MEMORY_CEILING_BYTES = float(16 << 40)
 
 
 def _envelope_int(env_name: str, default: int, *, maximum: int) -> int:
@@ -438,6 +442,13 @@ def load_dask_resource_envelope() -> DaskResourceEnvelope:
     memory_bytes = _memory_size_bytes(raw_memory) if raw_memory else None
     if raw_memory and memory_bytes is None:
         logger.error("Ignoring malformed %s: value is not a bounded memory size", MCP_DASK_MAX_TOTAL_MEMORY_ENV)
+    if memory_bytes is not None and memory_bytes > _DASK_MAX_TOTAL_MEMORY_CEILING_BYTES:
+        logger.error(
+            "Ignoring out-of-range %s: value must not exceed %dTB",
+            MCP_DASK_MAX_TOTAL_MEMORY_ENV,
+            int(_DASK_MAX_TOTAL_MEMORY_CEILING_BYTES) >> 40,
+        )
+        memory_bytes = None
     if memory_bytes is None:
         memory_bytes = _memory_size_bytes(_DASK_DEFAULT_MAX_TOTAL_MEMORY)
     assert memory_bytes is not None
@@ -483,8 +494,12 @@ def _validate_dask_options(normalized: Mapping[str, object]) -> None:
 
 def validate_platform_options(platform: str, options: Mapping[str, object] | None) -> dict[str, object]:
     """Return canonical, bounded MCP platform options or fail closed."""
+    # An omitted request and an empty one must validate identically.  Returning
+    # early for None would skip the cross-field policy, so a request that names
+    # no options at all would escape the server's resource envelope and run on
+    # adapter defaults that may exceed it.
     if options is None:
-        return {}
+        options = {}
     if not isinstance(options, Mapping):
         raise MCPValidationError("platform_options must be an object")
     if len(options) > MAX_PLATFORM_OPTIONS:

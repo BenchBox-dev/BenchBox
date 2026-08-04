@@ -127,9 +127,15 @@ oversized cluster to discover it was oversized.
 `memory_limit` is per worker, so the advertised total scales with `n_workers`.
 Fields the request omits are scored using the adapter's own conservative local
 caps (2 workers, 2 threads per worker, 2 GB per worker), so an omitted field
-never contributes more than the adapter would actually apply. A malformed or
-out-of-range override is ignored in favour of the reviewed default rather than
-being partially trusted.
+never contributes more than the adapter would actually apply. A request that
+omits `platform_options` entirely is held to the same envelope as an empty one,
+so an optionless run cannot escape a budget tighter than those defaults.
+
+A malformed or out-of-range override is ignored in favour of the reviewed
+default rather than being partially trusted. Every override is bounded:
+`..._MAX_WORKERS` at 256, `..._MAX_TOTAL_THREADS` at 65536, and
+`..._MAX_TOTAL_MEMORY` at 16 TB — so a units slip such as `999999TB` falls back
+to the default instead of silently disabling the memory ceiling.
 
 This envelope is an additional per-run guard. The server-wide and per-principal
 concurrency limits in `admission` remain enforced independently.
