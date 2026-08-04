@@ -1,7 +1,7 @@
 {
   "benchmark": "CoffeeShop",
   "bundle_file": "coffeeshop_sf1_datafusion_df_20260502_223323_0eb2e311.json",
-  "bundle_hash": "9dfb0609e44cb7abe17f24773920933b7f4821ab298060ac886eff9cabf41600",
+  "bundle_hash": "74087e01a2d1e992967cc157acf029fb492aa0610aca600d7c2ce6b815de48b3",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

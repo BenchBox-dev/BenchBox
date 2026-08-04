@@ -45,7 +45,7 @@
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_98ad2357e52d",
+      "engine_host": "host_cdcdbfd28c05",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -56,7 +56,7 @@
       "type": "zstd"
     },
     "driver_package": "pyspark",
-    "driver_runtime_python_executable": "path_6fb6be771501",
+    "driver_runtime_python_executable": "path_038ec9964b12",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "4.1.1",
     "driver_version_resolved": "4.1.1",
@@ -132,14 +132,14 @@
     "config": {
       "adaptive_enabled": true,
       "connection_mode": "local",
-      "database": "database_8e3fa21b8f22",
+      "database": "database_c5c78d90ec56",
       "driver_memory": "4g",
       "driver_package": "pyspark",
-      "driver_runtime_python_executable": "path_6fb6be771501",
+      "driver_runtime_python_executable": "path_038ec9964b12",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "4.1.1",
       "driver_version_resolved": "4.1.1",
-      "endpoint": "endpoint_95bf81c0e324",
+      "endpoint": "endpoint_78ad5714880e",
       "execution_mode": "sql",
       "sail_mode": "local",
       "shuffle_partitions": 200,
@@ -159,14 +159,14 @@
     "name": "LakeSail",
     "raw_config": {
       "adaptive_enabled": true,
-      "database": "database_8e3fa21b8f22",
+      "database": "database_c5c78d90ec56",
       "driver_memory": "4g",
       "sail_mode": "local",
       "shuffle_partitions": 200,
       "table_format": "parquet"
     },
     "raw_metadata": {
-      "endpoint": "endpoint_95bf81c0e324"
+      "endpoint": "endpoint_78ad5714880e"
     },
     "storage": {
       "collection_status": "partial",

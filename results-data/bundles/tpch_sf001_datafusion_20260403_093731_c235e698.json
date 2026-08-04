@@ -22,7 +22,7 @@
   },
   "execution": {
     "driver_package": "datafusion",
-    "driver_runtime_python_executable": "path_2891a231af24",
+    "driver_runtime_python_executable": "path_ea3a8ec6f65d",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "51.0.0",
     "driver_version_resolved": "51.0.0",
@@ -80,7 +80,7 @@
       "connection_mode": "in-memory",
       "data_format": "parquet",
       "driver_package": "datafusion",
-      "driver_runtime_python_executable": "path_2891a231af24",
+      "driver_runtime_python_executable": "path_ea3a8ec6f65d",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "51.0.0",
       "driver_version_resolved": "51.0.0",
@@ -88,7 +88,7 @@
       "memory_limit": "12GB",
       "result_cache_enabled": false,
       "target_partitions": 10,
-      "working_dir": "path_bf12b74e8ec8"
+      "working_dir": "path_d70c5090d1b5"
     },
     "driver_actual_version": "51.0.0",
     "driver_package": "datafusion",

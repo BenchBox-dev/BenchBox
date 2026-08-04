@@ -1,7 +1,7 @@
 {
   "benchmark": "Star Schema",
   "bundle_file": "ssb_sf01_sqlite_sql_20260502_195217_56c36ca1.json",
-  "bundle_hash": "e359e51b36d6941bb2c23174672ad350c4f2c381ebce43d62c0d47f11a03f6ef",
+  "bundle_hash": "28a38af7e1a9d4a8cc5ceb7c043bf03d506b778176adaded1d6859edcdfc9b45",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

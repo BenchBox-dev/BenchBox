@@ -1,7 +1,7 @@
 {
   "benchmark": "AMPLab Big Data",
   "bundle_file": "amplab_sf1_sqlite_sql_20260502_195746_4da72bce.json",
-  "bundle_hash": "67a9646d14cee0e2876adc5c5a60ebb7e741e32e908224fe0f5c7b59ba3ac594",
+  "bundle_hash": "ccff28e5a864ea8848b903072fe61668449659bd3efdae0af431a5e42171311b",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

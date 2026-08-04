@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-Havoc",
   "bundle_file": "tpchavoc_sf01_datafusion_df_20260502_223414_b035e313.json",
-  "bundle_hash": "e7804621b14536b04ec46e32f5fa94d9901580ac276bd963dbf766c35c78951c",
+  "bundle_hash": "384b7bafaa978be4c2e2a2e33bc59955e5d261d41583460d8f07fde12b663909",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

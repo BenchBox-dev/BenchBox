@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-H Data Vault",
   "bundle_file": "datavault_sf1_pyspark_df_20260502_215903_105a29f7.json",
-  "bundle_hash": "6f75a81af18aa88175a2fd654e212bca2c10405705f62aed26c5beb44d20b907",
+  "bundle_hash": "b3bcfe0e8de4009d40631383db67117ec819e1ba99f888cd269635912fc3cf5f",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",
