@@ -95,6 +95,64 @@ OMITTED_CLI_OPTIONS = {
     "--verbose": "verbose",
 }
 
+# Ratified tier reasons from
+# docs/development/adr/adr-one-engine-scoped-surfaces.md. Every ledgered
+# omission carries exactly one.
+RATIFIED_OMISSION_TIERS = {
+    "security-scoped",
+    "interaction-scoped",
+    "not-yet-demanded",
+}
+
+# The ledger covers every omitted `benchbox run` option plus the grouped
+# sorted-ingestion family, which has no single flag spelling.
+LEDGERED_CLI_SURFACES = set(OMITTED_CLI_OPTIONS) | {"--sorted-ingestion-*"}
+
+EXPECTED_OMISSION_TIERS = {
+    "--benchmark-option": "security-scoped",
+    "--force": "security-scoped",
+    "--global-cache": "security-scoped",
+    "--output": "security-scoped",
+    "--platform-option": "security-scoped",
+    "--publish": "security-scoped",
+    "--publish-label": "security-scoped",
+    "--publish-target": "security-scoped",
+    "--non-interactive": "interaction-scoped",
+    "--no-progress": "interaction-scoped",
+    "--quiet": "interaction-scoped",
+    "--verbose": "interaction-scoped",
+    "--compression": "not-yet-demanded",
+    "--iterations": "not-yet-demanded",
+    "--no-monitoring": "not-yet-demanded",
+    "--official": "not-yet-demanded",
+    "--plan-config": "not-yet-demanded",
+    "--presort": "not-yet-demanded",
+    "--seed": "not-yet-demanded",
+    "--sorted-ingestion-*": "not-yet-demanded",
+    "--table-format": "not-yet-demanded",
+    "--table-mode": "not-yet-demanded",
+    "--tuning": "not-yet-demanded",
+    "--validation": "not-yet-demanded",
+}
+
+
+def _omission_ledger(text: str) -> dict[str, dict[str, str]]:
+    """Parse the scoped-surface omission ledger table from the MCP reference."""
+    section = _section(text, "**Scoped-surface omission ledger**", "### Discovery Tools")
+    ledger: dict[str, dict[str, str]] = {}
+    for line in section.splitlines():
+        if not line.startswith("| `"):
+            continue
+        columns = [column.strip() for column in line.strip("|").split("|")]
+        if len(columns) < 4:
+            continue
+        ledger[columns[0].strip("`")] = {
+            "status": columns[1],
+            "tier": columns[2],
+            "reason": columns[3],
+        }
+    return ledger
+
 
 def _registered_tools() -> dict[str, Any]:
     from benchbox.mcp import create_server
@@ -205,14 +263,21 @@ def _schema_params(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 class TestMCPDocsContract:
-    def test_docs_identify_mcp_as_control_plane_not_cli_equivalent(self):
+    def test_docs_identify_mcp_as_scoped_surface_over_shared_core(self):
         text = _doc_text()
         normalized = " ".join(text.split())
 
-        assert "beta-public smoke/control-plane surface" in normalized
-        assert "not a CLI-equivalent execution surface" in normalized
+        assert "beta-public scoped surface over the shared BenchBox engine" in normalized
+        assert "all benchmark business logic lives in `benchbox.core` below both CLI and MCP" in normalized
+        assert "Surface asymmetry is deliberate and ledgered, never a parity backlog." in normalized
         assert "schema-level comparable to CLI result bundles" in normalized
-        assert "shared non-CLI execution service" in normalized
+
+    def test_docs_retire_the_superseded_anti_parity_framing(self):
+        normalized = " ".join(_doc_text().split())
+
+        assert "smoke/control-plane" not in normalized
+        assert "not a CLI-equivalent execution surface" not in normalized
+        assert "shared non-CLI execution service" not in normalized
 
     def test_docs_tool_inventory_matches_registered_tools(self):
         tools = _registered_tools()
@@ -261,11 +326,71 @@ class TestMCPDocsContract:
             assert option in text
         assert "--sorted-ingestion-*" in text
 
+    def test_omission_ledger_covers_every_omitted_cli_surface(self):
+        ledger = _omission_ledger(_doc_text())
+
+        assert set(ledger) == LEDGERED_CLI_SURFACES
+
+    def test_every_ledgered_omission_carries_one_ratified_tier(self):
+        ledger = _omission_ledger(_doc_text())
+
+        for surface, entry in sorted(ledger.items()):
+            assert entry["tier"] in RATIFIED_OMISSION_TIERS, surface
+            assert entry["reason"], surface
+
+    def test_ledgered_omission_tiers_match_the_ratified_classification(self):
+        ledger = _omission_ledger(_doc_text())
+
+        assert {surface: entry["tier"] for surface, entry in ledger.items()} == EXPECTED_OMISSION_TIERS
+
+    def test_ledger_documents_the_three_ratified_tier_definitions(self):
+        normalized = " ".join(_doc_text().split())
+
+        for tier in sorted(RATIFIED_OMISSION_TIERS):
+            assert f"**{tier}**" in normalized
+        assert "An omission that is absent from this ledger is a defect, not a decision." in normalized
+
+    def test_security_scoped_omissions_are_never_promotable(self):
+        """Credential/destination controls must stay permanently omitted."""
+        ledger = _omission_ledger(_doc_text())
+        security_scoped = {surface for surface, entry in ledger.items() if entry["tier"] == "security-scoped"}
+
+        # These are the controls that can name a destination, carry secrets, or
+        # overwrite server-owned data. Parity never applies to them.
+        assert {
+            "--output",
+            "--platform-option",
+            "--benchmark-option",
+            "--force",
+            "--global-cache",
+            "--publish",
+            "--publish-target",
+            "--publish-label",
+        } <= security_scoped
+
     def test_docs_do_not_keep_stale_standalone_tool_sections(self):
         text = _doc_text()
         documented_headings = set(re.findall(r"^#### `([^`]+)`", text, flags=re.MULTILINE))
 
         assert not (STALE_TOOL_NAMES & documented_headings)
+
+
+class TestScopedSurfaceADR:
+    def test_adr_supersedes_the_smoke_control_plane_decision(self):
+        adr = (REPO_ROOT / "docs/development/adr/adr-one-engine-scoped-surfaces.md").read_text(encoding="utf-8")
+        normalized = " ".join(adr.split())
+
+        assert "mcp-product-surface-and-shared-run-service-decision" in normalized
+        assert "Supersedes" in normalized
+        for tier in sorted(RATIFIED_OMISSION_TIERS):
+            assert tier in normalized
+
+    def test_adr_keeps_the_import_boundaries_that_make_one_engine_possible(self):
+        adr = (REPO_ROOT / "docs/development/adr/adr-one-engine-scoped-surfaces.md").read_text(encoding="utf-8")
+        normalized = " ".join(adr.split())
+
+        assert "`benchbox.core` must not import `benchbox.platforms` or `benchbox.cli`" in normalized
+        assert "`benchbox.mcp` must not import `benchbox.cli`" in normalized
 
 
 class TestMCPImplementationBoundary:
