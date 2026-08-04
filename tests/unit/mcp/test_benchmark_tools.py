@@ -169,6 +169,44 @@ class TestRunBenchmarkTool:
         assert response["mcp_metadata"]["status"] == "no_results"
         assert get_adapter.call_args.kwargs["thread_limit"] == 4
 
+    def test_modin_engine_reaches_the_effective_backend(self, tmp_path: Path):
+        """Forwarding can succeed while the effective backend is unchanged."""
+        from benchbox.mcp.schemas import validate_platform_options
+        from benchbox.platforms.dataframe import modin_df
+
+        normalized = validate_platform_options("modin", {"engine": "dask"})
+        assert normalized == {"engine": "dask"}
+
+        with (
+            patch.object(modin_df, "MODIN_AVAILABLE", True),
+            patch.object(modin_df, "PANDAS_AVAILABLE", True),
+            patch.object(modin_df.ModinDataFrameAdapter, "_configure_engine"),
+        ):
+            adapter = modin_df.ModinDataFrameAdapter(working_dir=tmp_path, **normalized)
+
+        assert adapter.engine == "dask"
+
+    def test_modin_unsupported_engine_fails_closed_through_the_run_surface(self, tmp_path: Path):
+        """The schema rejects `pandas`; the factory must reject it too."""
+        from benchbox.mcp.schemas import MCPValidationError, validate_platform_options
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("modin", {"engine": "pandas"})
+
+        # Even bypassing the schema, the adapter must not accept it.
+        response = benchmark_tools._run_benchmark_impl(
+            "modin-df",
+            "tpch",
+            0.01,
+            None,
+            "load,power",
+            "dataframe",
+            platform_options={"engine": "pandas"},
+            results_dir=tmp_path,
+        )
+        assert response["status"] == "failed"
+
     def test_oversized_dask_request_never_builds_a_cluster(self, tmp_path: Path):
         """Proving rejection by starting a 65,536-thread cluster would be the attack."""
         from benchbox.mcp.tools import benchmark as benchmark_tools

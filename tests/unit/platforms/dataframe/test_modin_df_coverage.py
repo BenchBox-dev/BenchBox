@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -172,3 +173,46 @@ class TestModinCoverage:
         assert info["platform"] == "Modin"
         assert info["engine"] == "ray"
         assert info["version"] == "0.30"
+
+
+class TestSupportedEngineIsFailClosed:
+    """An accepted-but-unsupported backend is an unreliable public contract."""
+
+    def test_pandas_is_rejected_rather_than_resembling_a_valid_engine(self):
+        with pytest.raises(ValueError, match="Unsupported Modin engine 'pandas'"):
+            mod.ModinDataFrameAdapter._validate_engine("pandas")
+
+    @pytest.mark.parametrize("engine", ["python", "unidist", "native", "", "ray;dask"])
+    def test_unreviewed_backends_are_rejected(self, engine):
+        with pytest.raises(ValueError, match="Unsupported Modin engine"):
+            mod.ModinDataFrameAdapter._validate_engine(engine)
+
+    @pytest.mark.parametrize(
+        ("engine", "expected"), [("ray", "ray"), ("dask", "dask"), ("RAY", "ray"), (" dask ", "dask")]
+    )
+    def test_reviewed_backends_are_accepted_and_normalized(self, engine, expected):
+        assert mod.ModinDataFrameAdapter._validate_engine(engine) == expected
+
+    def test_the_reviewed_set_matches_the_mcp_contract(self):
+        """The adapter and the MCP allow-list must not drift apart."""
+        from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST
+
+        assert set(MCP_PLATFORM_OPTION_ALLOWLIST["modin"]["engine"].choices) == set(mod.SUPPORTED_MODIN_ENGINES)
+
+    def test_constructor_rejects_before_touching_the_modin_environment(self, monkeypatch):
+        """Validation must run before MODIN_ENGINE is written."""
+        monkeypatch.delenv("MODIN_ENGINE", raising=False)
+        monkeypatch.setattr(mod, "MODIN_AVAILABLE", True)
+        monkeypatch.setattr(mod, "PANDAS_AVAILABLE", True)
+
+        with pytest.raises(ValueError, match="Unsupported Modin engine 'pandas'"):
+            mod.ModinDataFrameAdapter(engine="pandas")
+
+        assert "MODIN_ENGINE" not in os.environ
+
+    def test_tuning_engine_affinity_shares_the_reviewed_set(self):
+        """engine_affinity must not become a second, drifting allow-list."""
+        import inspect
+
+        source = inspect.getsource(mod.ModinDataFrameAdapter._apply_tuning)
+        assert "SUPPORTED_MODIN_ENGINES" in source

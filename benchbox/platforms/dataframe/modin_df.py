@@ -135,6 +135,11 @@ logger = logging.getLogger(__name__)
 # Type alias for Modin DataFrame (when available)
 ModinDF = mpd.DataFrame if MODIN_AVAILABLE else Any
 
+# Backends BenchBox has reviewed for resource, lifecycle, and security behavior.
+# Modin itself accepts more names, but support here is a deliberate decision, not
+# a reflection of whatever an installed dependency happens to allow.
+SUPPORTED_MODIN_ENGINES = frozenset({"ray", "dask"})
+
 
 class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
     """Modin adapter for Pandas-family DataFrame benchmarking.
@@ -185,8 +190,12 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
             tuning_config=tuning_config,
         )
 
-        # Default value (may be overridden by tuning config)
-        self.engine = engine
+        # Fail closed before the engine can reach MODIN_ENGINE.  An unsupported
+        # name is not merely unsupported here: `_configure_engine` writes it into
+        # the process environment, where it either fails deep inside Modin or
+        # silently selects a backend BenchBox has not reviewed for resource,
+        # lifecycle, and security behavior.
+        self.engine = self._validate_engine(engine)
 
         # Validate and apply tuning configuration (before configuring engine)
         self._validate_and_apply_tuning()
@@ -210,8 +219,9 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         """
         config = self._tuning_config
 
-        # Apply engine_affinity setting (maps to Modin engine)
-        if config.execution.engine_affinity is not None and config.execution.engine_affinity in ("ray", "dask"):
+        # Apply engine_affinity setting (maps to Modin engine).  Shares the
+        # reviewed backend set with the constructor so the two cannot drift.
+        if config.execution.engine_affinity is not None and config.execution.engine_affinity in SUPPORTED_MODIN_ENGINES:
             self.engine = config.execution.engine_affinity
             self._log_verbose(f"Set engine={self.engine} from tuning configuration")
 
@@ -219,6 +229,23 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         if config.parallelism.worker_count is not None:
             os.environ["MODIN_CPUS"] = str(config.parallelism.worker_count)
             self._log_verbose(f"Set MODIN_CPUS={config.parallelism.worker_count} from tuning configuration")
+
+    @classmethod
+    def _validate_engine(cls, engine: object) -> str:
+        """Return a reviewed Modin backend name, or fail closed.
+
+        `pandas` is deliberately absent.  It resembles a valid Modin engine name
+        but is not a supported BenchBox backend, and accepting it would create a
+        public contract that fails late.
+
+        Raises:
+            ValueError: If the engine is not a reviewed backend.
+        """
+        normalized = str(engine).strip().lower()
+        if normalized not in SUPPORTED_MODIN_ENGINES:
+            supported = ", ".join(sorted(SUPPORTED_MODIN_ENGINES))
+            raise ValueError(f"Unsupported Modin engine '{normalized}'. Supported engines: {supported}")
+        return normalized
 
     def _configure_engine(self) -> None:
         """Configure the Modin execution engine."""

@@ -247,6 +247,10 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
+- Modin `engine` accepts only the reviewed `ray` and `dask` backends, enforced
+  in both the allow-list and the adapter. `pandas` is rejected: it resembles a
+  valid Modin engine name but is not a supported BenchBox backend, and accepting
+  it would create a public contract that fails late.
 - DuckDB `threads` is the public option name and maps to the adapter's
   `thread_limit`, which becomes a `SET threads` statement on the connection. The
   public name is unchanged; only the internal mapping is documented here.
