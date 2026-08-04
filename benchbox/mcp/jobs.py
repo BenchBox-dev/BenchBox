@@ -587,6 +587,9 @@ class DurableJobWorker:
             platform_options=request.get("platform_options"),
             results_dir=staging,
             execution_id=job.execution_id,
+            # Durable jobs only exist under a remote security policy, so the
+            # consumer is always a remote tenant.
+            anonymize=True,
         )
 
     async def run(self) -> None:

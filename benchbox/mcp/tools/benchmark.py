@@ -191,8 +191,20 @@ def register_benchmark_tools(
     *,
     results_dir: PathProvider,
     allow_synchronous_execution: bool = True,
+    anonymize_results: bool = False,
 ) -> None:
-    """Register benchmark execution tools with the MCP server."""
+    """Register benchmark execution tools with the MCP server.
+
+    Args:
+        mcp: Server to register on.
+        results_dir: Provider for the server-owned result root.
+        allow_synchronous_execution: False in remote mode, where normal runs
+            must go through ``start_benchmark``.
+        anonymize_results: True when the server runs under a remote security
+            policy. Local stdio serves a same-trust-boundary agent and keeps
+            real paths and hostnames; a remote tenant is a different trust
+            boundary, so exported bundles are anonymized.
+    """
 
     @mcp.tool(annotations=RUN_BENCHMARK_ANNOTATIONS)
     def run_benchmark(
@@ -268,6 +280,7 @@ def register_benchmark_tools(
             capture_plans,
             platform_options=normalized_platform_options,
             results_dir=resolve_path_provider(results_dir),
+            anonymize=anonymize_results,
         )
 
     @mcp.tool(annotations=QUERY_DETAILS_ANNOTATIONS)
@@ -341,20 +354,29 @@ def _export_and_build_payload(
     result: Any,
     execution_id: str,
     results_dir: Path,
+    *,
+    anonymize: bool,
 ) -> tuple[str | None, dict[str, Any] | None]:
-    """Export benchmark result to JSON and build payload dict."""
+    """Export benchmark result to JSON and build payload dict.
+
+    Args:
+        anonymize: True under a remote security policy. Local stdio serves a
+            same-trust-boundary agent that needs real paths and hostnames to act
+            on results, so it stays False there; a remote tenant is a different
+            trust boundary and receives an anonymized bundle.
+    """
     result_file_path = None
     result_payload: dict[str, Any] | None = None
     try:
         result.execution_id = execution_id
-        # egress-reviewed: MCP serves a local, same-trust-boundary agent that
+        # egress-reviewed: local stdio serves a same-trust-boundary agent that
         # needs real paths/hostnames to act on results; secrets are already
         # redacted at capture time by sanitize_platform_options, and exception
-        # text is scrubbed in mcp/errors.py. Full anonymization would break
-        # path-based workflows without closing a live channel.
+        # text is scrubbed in mcp/errors.py. Remote/tenant mode is a different
+        # trust boundary, so the caller sets anonymize=True there.
         exporter = ResultExporter(
             output_dir=results_dir,
-            anonymize=False,  # egress-reviewed: local consumer, see comment above
+            anonymize=anonymize,
             console=get_quiet_console(),
         )
         exported_files = exporter.export_result(result, formats=["json"])
@@ -400,8 +422,21 @@ def _run_benchmark_impl(
     platform_options: Mapping[str, object] | None = None,
     results_dir: Path,
     execution_id: str | None = None,
+    anonymize: bool = False,
 ) -> dict[str, Any]:
-    """Core implementation for running benchmarks."""
+    """Core implementation for running benchmarks.
+
+    Args:
+        platform_options: Re-admitted here even when the caller already ran
+            ``validate_platform_options``. This is the last gate before an
+            adapter is constructed, and some adapters act in ``__init__`` -- the
+            Dask adapter builds its ``LocalCluster`` there -- so a request that
+            reaches this function unadmitted would be executed, not merely
+            accepted. It is also the only gate on the durable-job worker path,
+            where the request mapping is re-read from persistent storage.
+        anonymize: Passed through to the result exporter; see
+            ``_export_and_build_payload``.
+    """
     execution_id = execution_id or f"mcp_{uuid.uuid4().hex[:8]}"
     start_time = mono_time()
 
@@ -516,7 +551,9 @@ def _run_benchmark_impl(
         execution_time = elapsed_seconds(start_time)
 
         result_file_path, result_payload = (
-            _export_and_build_payload(result, execution_id, results_dir) if result else (None, None)
+            _export_and_build_payload(result, execution_id, results_dir, anonymize=anonymize)
+            if result
+            else (None, None)
         )
 
         response: dict[str, Any] = result_payload or {}

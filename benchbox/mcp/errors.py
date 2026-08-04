@@ -321,6 +321,7 @@ def make_not_found_error(
     resource_type: str,
     resource_id: str,
     available: list[str] | None = None,
+    suggestion: str | None = None,
 ) -> dict[str, Any]:
     """Create a resource not found error response.
 
@@ -328,6 +329,9 @@ def make_not_found_error(
         resource_type: Type of resource (e.g., "benchmark", "platform")
         resource_id: ID/name that was not found
         available: List of available options
+        suggestion: Recovery hint. The default is derived from ``resource_type``
+            and only names a real tool for resource types whose listing tool is
+            ``list_<type>s``; pass an explicit hint for anything else.
 
     Returns:
         Standardized error response with suggestions.
@@ -339,7 +343,8 @@ def make_not_found_error(
     if available:
         details["available"] = available
 
-    suggestion = f"Use list_{resource_type}s() to see available options" if resource_type else None
+    if suggestion is None and resource_type:
+        suggestion = f"Use list_{resource_type}s() to see available options"
 
     return make_error(
         ErrorCode.RESOURCE_NOT_FOUND,

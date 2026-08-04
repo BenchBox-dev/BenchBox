@@ -54,8 +54,20 @@ def _resolve_validation_directory(directory: str, results_dir: Path, *, tenant_s
     return candidate
 
 
-def register_analytics_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None:
-    """Register analytics tools with the MCP server."""
+def register_analytics_tools(
+    mcp: MCPServer,
+    *,
+    results_dir: PathProvider,
+    anonymize_results: bool = False,
+) -> None:
+    """Register analytics tools with the MCP server.
+
+    Args:
+        mcp: Server to register on.
+        results_dir: Provider for the server-owned result root.
+        anonymize_results: True when the server runs under a remote security
+            policy; see ``register_benchmark_tools``.
+    """
     tenant_scoped = not isinstance(results_dir, Path)
 
     @mcp.tool(annotations=ANALYTICS_READONLY_ANNOTATIONS)
@@ -96,7 +108,9 @@ def register_analytics_tools(mcp: MCPServer, *, results_dir: PathProvider) -> No
                     "compare analysis requires file1 and file2 parameters",
                     suggestion="Provide both file1 and file2 for comparison",
                 )
-            return _compare_results_impl(file1, file2, threshold_percent, configured_results_dir)
+            return _compare_results_impl(
+                file1, file2, threshold_percent, configured_results_dir, anonymize=anonymize_results
+            )
 
         elif analysis_lower == "regressions":
             return _detect_regressions_impl(platform, benchmark, threshold_percent, limit, configured_results_dir)
@@ -192,7 +206,11 @@ def register_analytics_tools(mcp: MCPServer, *, results_dir: PathProvider) -> No
         if result_file:
             file_path = resolve_result_file_path(result_file, configured_results_dir)
             if file_path is None or not file_path.exists():
-                return make_not_found_error(result_file, configured_results_dir)
+                return make_not_found_error(
+                    "result_file",
+                    result_file,
+                    suggestion='Use get_results(format="list") to see available result files',
+                )
             report = _validate_file(file_path)
             checks = [
                 {
@@ -336,7 +354,12 @@ def _get_query_plan_impl(file_path: Path, result_file: str, query_id: str, forma
 
     if not query_exec:
         available_ids = [str(q.get("id", "")) for q in data.get("queries", []) if q.get("id")]
-        return make_not_found_error("query", query_id, available=sorted(set(available_ids))[:20])
+        return make_not_found_error(
+            "query",
+            query_id,
+            available=sorted(set(available_ids))[:20],
+            suggestion="Use get_query_details() with a query ID from `details.available`",
+        )
 
     plans_path = _resolve_plans_path(file_path)
     query_info = {"runtime_ms": query_exec.get("ms"), "status": query_exec.get("status")}
@@ -365,15 +388,22 @@ def _get_query_plan_impl(file_path: Path, result_file: str, query_id: str, forma
     return _format_plan_response(query_plan_entry["plan"], format_lower, normalized_id, query_exec.get("ms"))
 
 
-def _compare_results_impl(file1: str, file2: str, threshold_percent: float, results_dir: Path) -> dict[str, Any]:
+def _compare_results_impl(
+    file1: str,
+    file2: str,
+    threshold_percent: float,
+    results_dir: Path,
+    *,
+    anonymize: bool = False,
+) -> dict[str, Any]:
     """Compare two benchmark runs."""
-    # egress-reviewed: MCP serves a local, same-trust-boundary agent that
+    # egress-reviewed: local stdio serves a same-trust-boundary agent that
     # needs real paths/hostnames to act on results; secrets are already
     # redacted at capture time by sanitize_platform_options, and exception
-    # text is scrubbed in mcp/errors.py. Full anonymization would break
-    # path-based workflows without closing a live channel.
+    # text is scrubbed in mcp/errors.py. Remote/tenant mode is a different
+    # trust boundary, so the caller sets anonymize=True there.
     exporter = ResultExporter(
-        anonymize=False,  # egress-reviewed: local consumer, see comment above
+        anonymize=anonymize,
         console=get_quiet_console(),
     )
     path1 = resolve_result_file_path(file1, results_dir)

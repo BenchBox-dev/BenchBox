@@ -296,6 +296,11 @@ modes remain available because they do not hold the request for execution.
   benchmark and adapter APIs.
 - MCP execution intentionally suppresses console output and returns structured
   JSON for agent clients.
+- Exported result bundles are anonymized when, and only when, the server runs
+  under a remote security policy. Local stdio serves a same-trust-boundary agent
+  that needs real paths and hostnames to act on results; a remote tenant is a
+  different trust boundary, so `run_benchmark`, durable job publication, and
+  `analyze_results` comparisons all export with anonymization enabled there.
 
 **Scoped-surface omission ledger**
 
