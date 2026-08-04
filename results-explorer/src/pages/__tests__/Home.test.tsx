@@ -387,7 +387,11 @@ describe("Home", () => {
 
     await waitFor(() => expect(resultCalls).toBe(1));
     await waitFor(() => expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy());
-    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Database Leaderboards" })).toBeTruthy();
+    // The skeleton and the loaded hero deliberately share one headline, so this
+    // assertion is time-invariant. Loading state is still pinned by the
+    // snapshot-init text above, the aria-busy region below, and the absence of
+    // "Recent Results" - none of which survive into the loaded page.
+    expect(screen.getByRole("heading", { level: 1, name: "BenchBox Curated Results Preview" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
       "aria-busy",
       "true",
