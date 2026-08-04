@@ -43,19 +43,31 @@ CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-CAPTURE-001": ("Projects provide storage locations/specs", "protocol governs behavior"),
     "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "canonical skill wins"),
 }
+# The author/committer anchors are load-bearing: the audit previously pinned
+# only the trailer semantics, so the canonical skill could require a human
+# *committer* while the shipped gate allowed a signing service there, and
+# `agent-instructions-check` would still report the surface as valid.
 CANONICAL_COMMIT_ANCHORS = {
     "COMMIT-IDENTITY-001": (
         "Co-Authored-By",
         "explicitly requests that exact trailer",
         "stale author request",
         "is not authorization",
+        "human author identity",
+        "committer slot behind a human author",
     )
 }
-PROJECT_COMMIT_ANCHORS = {"COMMIT-IDENTITY-001": ("Co-Authored-By", "exact trailer", "not authorization")}
-PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling review and remediation")}
-AGENT_REVIEW_ANCHORS = {
-    "REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")
+PROJECT_COMMIT_ANCHORS = {
+    "COMMIT-IDENTITY-001": (
+        "Co-Authored-By",
+        "exact trailer",
+        "not authorization",
+        "identities as author",
+        "committer slot behind a human author",
+    )
 }
+PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling review and remediation")}
+AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
 AUTHORITY_CLASSES = {"task", "repository", "mechanical", "recommendation"}
 EVALUATION_ACTIONS = {
     "commit_with_human_identity",
@@ -78,6 +90,23 @@ LEGACY_REVIEW_DOC = "docs/development/review-protocol.md"
 AUTHORITY_CONFLICT_MARKERS = ("this file wins", "canonical, unabridged", "conflicts resolve in favor of this")
 AGENT_NAMES = {"chatgpt", "claude", "codex", "gemini", "openai"}
 AGENT_EMAILS = {"noreply@anthropic.com", "noreply@openai.com"}
+# [COMMIT-IDENTITY-001] binds authorship. A commit-signing service may hold the
+# committer slot -- cloud agent sessions SSH-sign with a key registered to this
+# address, and a committer email that does not match it makes the signature
+# unverifiable -- but only behind a human author, so attribution stays honest.
+SIGNING_SERVICE_EMAILS = {"noreply@anthropic.com"}
+# Trailers that attribute authorship to an agent. The trailer identity is parsed
+# and run through the same name-or-email predicate used for authors: matching on
+# the vendor address alone let `Co-Authored-By: Claude <claude@example.com>`
+# through both this guard and the commit-msg hook, which is precisely the
+# attribution [COMMIT-IDENTITY-001] exists to reject.
+AGENT_TRAILER_RE = re.compile(r"^[ \t]*co-authored-by:[ \t]*(.+)$", re.IGNORECASE | re.MULTILINE)
+# `Display Name <address>`; the address is optional so a malformed trailer still
+# resolves to a name rather than silently parsing as neither.
+TRAILER_IDENTITY_RE = re.compile(r"^(?P<name>[^<]*?)\s*(?:<(?P<email>[^>]*)>)?\s*$")
+AGENT_SESSION_TRAILER_RE = re.compile(
+    r"^[ \t]*(claude|codex|gemini|chatgpt)-session:[ \t]*(.+)$", re.IGNORECASE | re.MULTILINE
+)
 
 
 @dataclass(frozen=True)
@@ -193,26 +222,103 @@ def _resolved_git_identity(project: Path, role: str) -> tuple[str, str]:
     return match.groups() if match else ("", "")
 
 
+def _is_agent_identity(name: str, email: str) -> bool:
+    return name.strip().casefold() in AGENT_NAMES or email.strip().casefold() in AGENT_EMAILS
+
+
+def _trailer_is_agent(trailer: str) -> bool:
+    """Apply the author name-or-email predicate to a `Co-Authored-By` value.
+
+    An agent that signs with a non-vendor address (`Claude <claude@example.com>`)
+    is recognised by name, exactly as it would be in the author slot.
+    """
+    match = TRAILER_IDENTITY_RE.match(trailer.strip())
+    if match is None:
+        return False
+    return _is_agent_identity(match.group("name") or "", match.group("email") or "")
+
+
+def _identity_origins(project: Path) -> str:
+    return subprocess.run(
+        ["git", "-C", str(project), "config", "--show-origin", "--get-regexp", r"^user\.(name|email)$"],
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
 def audit_git_identity(project: Path) -> list[str]:
     if os.environ.get("BENCHBOX_ALLOW_AGENT_GIT_IDENTITY") == "1":
         return []
 
+    identities = {role: _resolved_git_identity(project, role) for role in ("author", "committer")}
+    author_name, author_email = identities["author"]
+    author_is_human = bool(author_name and author_email) and not _is_agent_identity(author_name, author_email)
+
     errors: list[str] = []
-    for role in ("author", "committer"):
-        name, email = _resolved_git_identity(project, role)
+    for role, (name, email) in identities.items():
         if not name or not email:
             errors.append(f"unable to resolve Git {role} identity")
             continue
-        if name.strip().casefold() in AGENT_NAMES or email.strip().casefold() in AGENT_EMAILS:
-            origins = subprocess.run(
-                ["git", "-C", str(project), "config", "--show-origin", "--get-regexp", r"^user\.(name|email)$"],
-                check=False,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
+        if not _is_agent_identity(name, email):
+            continue
+        # A signing service behind a human author keeps signatures verifiable
+        # without misattributing the work; an agent author is never acceptable.
+        if role == "committer" and author_is_human and email.strip().casefold() in SIGNING_SERVICE_EMAILS:
+            continue
+        errors.append(
+            f"Git {role} identity resolves to known agent/service {name} <{email}>; "
+            f"inspect config origins and use the human identity. "
+            f"Origins: {_identity_origins(project) or '<none>'}"
+        )
+    return errors
+
+
+def audit_commit_range(project: Path, base_ref: str) -> list[str]:
+    """Merge-time guard over the commits a branch actually carries.
+
+    `audit_git_identity` reads the resolved config, which on a CI runner is the
+    runner's own identity and says nothing about what the branch contains. This
+    walks `base_ref..HEAD` instead, so an agent-authored commit produced in some
+    other session cannot reach a protected branch unnoticed.
+    """
+    if os.environ.get("BENCHBOX_ALLOW_AGENT_GIT_IDENTITY") == "1":
+        return []
+
+    # Separators are written as git's own %xNN escapes: a literal NUL cannot be
+    # passed through argv, and commit messages may contain anything else.
+    unit, record = "\x1f", "\x00"
+    result = subprocess.run(
+        ["git", "-C", str(project), "log", "--format=%H%x1f%an%x1f%ae%x1f%B%x00", f"{base_ref}..HEAD"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return [f"unable to inspect commit range {base_ref}..HEAD: {result.stderr.strip() or '<no detail>'}"]
+
+    errors: list[str] = []
+    for raw in result.stdout.split(record):
+        fields = raw.strip("\n").split(unit)
+        if len(fields) < 4:
+            continue
+        sha, name, email, body = fields[0], fields[1], fields[2], fields[3]
+        if _is_agent_identity(name, email):
             errors.append(
-                f"Git {role} identity resolves to known agent/service {name} <{email}>; "
-                f"inspect config origins and use the human identity. Origins: {origins or '<none>'}"
+                f"commit {sha[:12]} is authored by known agent/service {name} <{email}>; "
+                f"reauthor it with the human identity before merging"
+            )
+        for match in AGENT_TRAILER_RE.finditer(body):
+            trailer = match.group(1).strip()
+            if _trailer_is_agent(trailer):
+                errors.append(
+                    f"commit {sha[:12]} carries agent Co-Authored-By trailer '{trailer}'; "
+                    f"[COMMIT-IDENTITY-001] forbids it unless the task requested that exact trailer"
+                )
+        for match in AGENT_SESSION_TRAILER_RE.finditer(body):
+            errors.append(
+                f"commit {sha[:12]} carries agent session trailer '{match.group(0).strip()}'; "
+                f"[COMMIT-IDENTITY-001] treats it as equivalent agent attribution"
             )
     return errors
 
@@ -325,11 +431,18 @@ def main() -> int:
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--check-git-identity", action="store_true")
+    parser.add_argument(
+        "--check-commit-range",
+        metavar="BASE_REF",
+        help="reject agent authorship/attribution on commits in BASE_REF..HEAD (merge-time guard)",
+    )
     args = parser.parse_args()
     corpus = json.loads(args.corpus.read_text(encoding="utf-8"))
     metrics, errors = audit(args.project.resolve(), corpus)
     if args.check_git_identity:
         errors.extend(audit_git_identity(args.project.resolve()))
+    if args.check_commit_range:
+        errors.extend(audit_commit_range(args.project.resolve(), args.check_commit_range))
     result = {"ok": not errors, "metrics": asdict(metrics), "errors": errors}
     if args.as_json:
         print(json.dumps(result, indent=2, sort_keys=True))

@@ -315,6 +315,29 @@ jobs:
         continue-on-error: true
         run: make agent-instructions-check
 
+      - name: Validate Git identity is not an agent/service
+        id: guard-agent-identity
+        continue-on-error: true
+        # GitHub's ephemeral checkout has no user.* config. Inject a
+        # non-agent identity only for this read-only resolution check; the
+        # commit-range guard below remains authoritative for PR authorship.
+        env:
+          GIT_CONFIG_COUNT: '2'
+          GIT_CONFIG_KEY_0: user.name
+          GIT_CONFIG_VALUE_0: BenchBox CI
+          GIT_CONFIG_KEY_1: user.email
+          GIT_CONFIG_VALUE_1: ci@benchbox.invalid
+        run: make agent-identity-check
+
+      # Merge-time guard. The step above reads the resolved config, which here
+      # is the runner's own identity; this one inspects the commits the PR
+      # actually carries, which is the only check that can keep agent
+      # authorship off develop.
+      - name: Validate no agent authorship or attribution in PR commits
+        id: guard-agent-commit-range
+        continue-on-error: true
+        run: make agent-commit-range-check
+
       - name: Timing policy (wall-clock allowlist)
         id: guard-timing-policy
         continue-on-error: true

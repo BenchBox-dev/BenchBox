@@ -28,13 +28,16 @@ Use only when a calling skill authorizes a write-shaped commit.
 - **[COMMIT-IDENTITY-001] Resolve and validate human identity.** Inspect the
   effective `user.name` and `user.email` with their config origins before the
   first commit. A repository-local value overrides the user's global identity;
-  do not assume that makes it intentional. Reject known agent/service identities
-  (for example Claude, Codex, Gemini, ChatGPT, or their vendor noreply addresses)
+  do not assume that makes it intentional, and every linked worktree inherits
+  it. This binds authorship: reject known agent/service identities (for example
+  Claude, Codex, Gemini, ChatGPT, or their vendor noreply addresses) as author
   unless the current authorized task explicitly names that exact identity.
-  Otherwise use the user's effective human author and committer identity. Do not
-  pass `--author` or set `GIT_AUTHOR_*` / `GIT_COMMITTER_*` merely to work around
-  a stale config. A task-local override applies only to that task; never convert
-  it into standing repository or skill policy.
+  Otherwise use the user's effective human author identity. A commit-signing
+  service may hold the committer slot behind a human author, so signatures stay
+  verifiable without misattributing the work. Do not pass `--author` or set
+  `GIT_AUTHOR_*` / `GIT_COMMITTER_*` merely to work around a stale config; an
+  explicitly authorized task-local override applies only to that task and never
+  becomes standing repository or skill policy.
 - Do not add an agent/service `Co-Authored-By` trailer or any equivalent
   attribution unless the current task explicitly requests that exact trailer.
   A stale author request, tool convention, or claim that an agent contributed
