@@ -27,6 +27,10 @@ def percentile_ms(times_ms: Sequence[float], p: float) -> float:
     """Return the p-th percentile of ``times_ms`` using the nearest-rank method.
 
     ``p`` is a fraction in ``[0, 1]``: ``percentile_ms(times, 0.95)`` is p95.
+    A ``p`` outside that range raises ``ValueError`` rather than being clamped.
+    The surface-local implementations this function replaced took ``p`` on a
+    0-100 scale, so ``percentile_ms(times, 95)`` is the likely porting mistake;
+    clamping it would silently return ``max(times_ms)`` and call it a p95.
 
     BenchBox uses nearest-rank -- rank ``ceil(n * p)``, clamped to ``[1, n]`` --
     as its single percentile definition, for two reasons:
@@ -40,7 +44,13 @@ def percentile_ms(times_ms: Sequence[float], p: float) -> float:
        adopting it repo-wide changes no archived number.
 
     Returns 0.0 for an empty sequence.
+
+    Raises:
+        ValueError: If ``p`` is outside ``[0, 1]``.
     """
+    if not 0.0 <= p <= 1.0:
+        raise ValueError(f"percentile must be a fraction in [0, 1], got {p!r} (use 0.95 for p95, not 95)")
+
     sorted_times = sorted(times_ms)
     n = len(sorted_times)
     if n == 0:

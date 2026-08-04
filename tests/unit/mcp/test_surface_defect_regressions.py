@@ -183,6 +183,26 @@ class TestRemoteModeAnonymization:
 
         assert exporter_cls.call_args.kwargs["anonymize"] is True
 
+    @pytest.mark.parametrize(
+        ("module_path", "function_name"),
+        [
+            ("benchbox.mcp.tools.benchmark", "_run_benchmark_impl"),
+            ("benchbox.mcp.tools.benchmark", "_export_and_build_payload"),
+            ("benchbox.mcp.tools.analytics", "_compare_results_impl"),
+        ],
+    )
+    def test_anonymize_has_no_permissive_default(self, module_path: str, function_name: str):
+        """A default would make "forgot the kwarg" look like "chose local"."""
+        import importlib
+        import inspect
+
+        parameter = inspect.signature(getattr(importlib.import_module(module_path), function_name)).parameters[
+            "anonymize"
+        ]
+
+        assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        assert parameter.default is inspect.Parameter.empty
+
 
 class TestChartOutputContract:
     """Defect 3: the docstring promised ANSI colors the renderer never emits."""

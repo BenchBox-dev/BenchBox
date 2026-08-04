@@ -39,7 +39,14 @@ def test_run_benchmark_impl_suppresses_transitive_stdout() -> None:
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter", return_value=object()),
         ):
             response = _run_benchmark_impl(
-                "duckdb", "tpch", 0.01, None, "load,power", "sql", results_dir=Path("benchmark_runs/results")
+                "duckdb",
+                "tpch",
+                0.01,
+                None,
+                "load,power",
+                "sql",
+                results_dir=Path("benchmark_runs/results"),
+                anonymize=False,
             )
         assert response["mcp_metadata"]["status"] in {"completed", "no_results"}
         assert captured.getvalue() == ""
