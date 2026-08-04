@@ -32,7 +32,14 @@ const AUDITED_ROUTES = [
   { path: "/results/query", ready: /matching result bundle/ },
 ] as const;
 
-test.describe.configure({ mode: "serial" });
+// Deliberately NOT serial. Every test here takes its own `page` fixture and
+// shares no state, so serial mode bought nothing - but it made the first
+// failure abort the whole block. On develop@3af42e29b a single stale-headline
+// assertion suppressed 23 downstream tests, reported only as
+// "1 failed ... 23 did not run", and it hid a real desktop/wide above-the-fold
+// regression for the entire time it was red. Independent viewport assertions
+// must fail independently.
+test.describe.configure({ mode: "parallel" });
 
 test.describe("responsive explorer assertions", () => {
   for (const viewport of VIEWPORTS) {
