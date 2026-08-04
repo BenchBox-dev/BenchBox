@@ -544,6 +544,56 @@ def _validate_cross_field_policy(platform_name: str, normalized: Mapping[str, ob
         _validate_clickhouse_options(platform_name, normalized)
     elif platform_name == "dask":
         _validate_dask_options(normalized)
+    elif platform_name == "databricks":
+        # Building the intent is the validation: contradictory layout requests
+        # only reveal themselves once both fields are resolved together.
+        build_databricks_clustering_intent(normalized)
+
+
+def build_databricks_clustering_intent(normalized: Mapping[str, object]):
+    """Translate normalized MCP clustering options into effective tuning.
+
+    Returns ``None`` when the request carries no clustering intent.  Both the
+    admission gate and adapter preparation call this, so a combination that is
+    rejected at admission cannot be reconstructed later by a durable replay, and
+    the object the resolver consumes is the one that was validated.
+
+    Raises:
+        MCPValidationError: If the requested layout fields contradict each other.
+    """
+    strategy = normalized.get("databricks_clustering_strategy")
+    columns = normalized.get("liquid_clustering_columns")
+    if strategy is None and columns is None:
+        return None
+
+    from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+    tuning_config = UnifiedTuningConfiguration()
+    platform_optimizations = tuning_config.platform_optimizations
+
+    if strategy is not None:
+        strategy = str(strategy).lower()
+        platform_optimizations.databricks_clustering_strategy = strategy
+        platform_optimizations.liquid_clustering_enabled = strategy in {
+            "liquid_clustering",
+            "liquid_clustering_auto",
+        }
+        platform_optimizations.physical_rendering_id = None
+    if columns is not None:
+        parsed_columns = [column.strip() for column in str(columns).split(",") if column.strip()]
+        platform_optimizations.liquid_clustering_columns = parsed_columns
+        platform_optimizations.liquid_clustering_enabled = bool(parsed_columns)
+        if parsed_columns and strategy is None:
+            platform_optimizations.databricks_clustering_strategy = "liquid_clustering"
+
+    try:
+        platform_optimizations.__post_init__()
+    except ValueError as exc:
+        # Surface layout conflicts as a structured validation error at admission
+        # instead of an execution failure discovered by a worker.  The message
+        # is generated from allow-listed option names, not from caller text.
+        raise MCPValidationError(f"Databricks clustering options conflict: {exc}") from exc
+    return tuning_config
 
 
 def validate_query_id(query_id: str) -> str:

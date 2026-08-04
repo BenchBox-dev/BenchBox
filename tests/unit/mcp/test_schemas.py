@@ -28,6 +28,7 @@ from benchbox.mcp.schemas import (
     MCPValidationError,
     RunBenchmarkInput,
     ValidateConfigInput,
+    build_databricks_clustering_intent,
     load_dask_resource_envelope,
     resolve_clickhouse_connection_profile,
     validate_benchmark_name,
@@ -316,6 +317,51 @@ class TestRunBenchmarkInput:
         assert validate_platform_options("velox", {"deployment": "remote"}) == {"deployment": "remote"}
         with pytest.raises(MCPValidationError):
             validate_platform_options("modin", {"engine": "pandas"})
+
+
+class TestDatabricksClusteringOptions:
+    """Contradictory layout intent must fail at admission, not in a worker."""
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"databricks_clustering_strategy": "z_order", "liquid_clustering_columns": "a,b"},
+            {"databricks_clustering_strategy": "liquid_clustering_auto", "liquid_clustering_columns": "a"},
+            {"databricks_clustering_strategy": "none", "liquid_clustering_columns": "a"},
+        ],
+    )
+    def test_contradictory_layout_combinations_are_rejected(self, options):
+        with pytest.raises(MCPValidationError, match="clustering options conflict"):
+            validate_platform_options("databricks", options)
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"databricks_clustering_strategy": "liquid_clustering", "liquid_clustering_columns": "a,b"},
+            {"liquid_clustering_columns": "a,b"},
+            {"databricks_clustering_strategy": "z_order"},
+            {"databricks_clustering_strategy": "liquid_clustering_auto"},
+            {"databricks_clustering_strategy": "none"},
+        ],
+    )
+    def test_coherent_layout_combinations_are_accepted(self, options):
+        assert validate_platform_options("databricks", options) == options
+
+    def test_intent_translation_is_shared_with_adapter_preparation(self):
+        """Admission validates the same object preparation later hands over."""
+        normalized = validate_platform_options(
+            "databricks",
+            {"databricks_clustering_strategy": "liquid_clustering", "liquid_clustering_columns": "a,b"},
+        )
+        tuning_config = build_databricks_clustering_intent(normalized)
+        assert tuning_config is not None
+        platform_opts = tuning_config.platform_optimizations
+        assert platform_opts.databricks_clustering_strategy == "liquid_clustering"
+        assert platform_opts.liquid_clustering_columns == ["a", "b"]
+        assert platform_opts.liquid_clustering_enabled is True
+
+    def test_no_clustering_request_builds_no_intent(self):
+        assert build_databricks_clustering_intent({}) is None
 
 
 class TestDaskResourceEnvelope:
