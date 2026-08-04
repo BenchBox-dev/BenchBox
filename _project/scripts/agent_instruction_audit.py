@@ -43,19 +43,31 @@ CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-CAPTURE-001": ("Projects provide storage locations/specs", "protocol governs behavior"),
     "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "canonical skill wins"),
 }
+# The author/committer anchors are load-bearing: the audit previously pinned
+# only the trailer semantics, so the canonical skill could require a human
+# *committer* while the shipped gate allowed a signing service there, and
+# `agent-instructions-check` would still report the surface as valid.
 CANONICAL_COMMIT_ANCHORS = {
     "COMMIT-IDENTITY-001": (
         "Co-Authored-By",
         "explicitly requests that exact trailer",
         "stale author request",
         "is not authorization",
+        "human author identity",
+        "committer slot behind a human author",
     )
 }
-PROJECT_COMMIT_ANCHORS = {"COMMIT-IDENTITY-001": ("Co-Authored-By", "exact trailer", "not authorization")}
-PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling review and remediation")}
-AGENT_REVIEW_ANCHORS = {
-    "REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")
+PROJECT_COMMIT_ANCHORS = {
+    "COMMIT-IDENTITY-001": (
+        "Co-Authored-By",
+        "exact trailer",
+        "not authorization",
+        "identities as author",
+        "committer slot behind a human author",
+    )
 }
+PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling review and remediation")}
+AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
 AUTHORITY_CLASSES = {"task", "repository", "mechanical", "recommendation"}
 EVALUATION_ACTIONS = {
     "commit_with_human_identity",
@@ -83,10 +95,18 @@ AGENT_EMAILS = {"noreply@anthropic.com", "noreply@openai.com"}
 # address, and a committer email that does not match it makes the signature
 # unverifiable -- but only behind a human author, so attribution stays honest.
 SIGNING_SERVICE_EMAILS = {"noreply@anthropic.com"}
-# Trailers that attribute authorship to an agent. Matched on the vendor address
-# rather than the display name, which is the reliable signal.
+# Trailers that attribute authorship to an agent. The trailer identity is parsed
+# and run through the same name-or-email predicate used for authors: matching on
+# the vendor address alone let `Co-Authored-By: Claude <claude@example.com>`
+# through both this guard and the commit-msg hook, which is precisely the
+# attribution [COMMIT-IDENTITY-001] exists to reject.
 AGENT_TRAILER_RE = re.compile(r"^[ \t]*co-authored-by:[ \t]*(.+)$", re.IGNORECASE | re.MULTILINE)
-AGENT_SESSION_TRAILER_RE = re.compile(r"^[ \t]*(claude|codex|gemini|chatgpt)-session:[ \t]*(.+)$", re.IGNORECASE | re.MULTILINE)
+# `Display Name <address>`; the address is optional so a malformed trailer still
+# resolves to a name rather than silently parsing as neither.
+TRAILER_IDENTITY_RE = re.compile(r"^(?P<name>[^<]*?)\s*(?:<(?P<email>[^>]*)>)?\s*$")
+AGENT_SESSION_TRAILER_RE = re.compile(
+    r"^[ \t]*(claude|codex|gemini|chatgpt)-session:[ \t]*(.+)$", re.IGNORECASE | re.MULTILINE
+)
 
 
 @dataclass(frozen=True)
@@ -206,6 +226,18 @@ def _is_agent_identity(name: str, email: str) -> bool:
     return name.strip().casefold() in AGENT_NAMES or email.strip().casefold() in AGENT_EMAILS
 
 
+def _trailer_is_agent(trailer: str) -> bool:
+    """Apply the author name-or-email predicate to a `Co-Authored-By` value.
+
+    An agent that signs with a non-vendor address (`Claude <claude@example.com>`)
+    is recognised by name, exactly as it would be in the author slot.
+    """
+    match = TRAILER_IDENTITY_RE.match(trailer.strip())
+    if match is None:
+        return False
+    return _is_agent_identity(match.group("name") or "", match.group("email") or "")
+
+
 def _identity_origins(project: Path) -> str:
     return subprocess.run(
         ["git", "-C", str(project), "config", "--show-origin", "--get-regexp", r"^user\.(name|email)$"],
@@ -278,7 +310,7 @@ def audit_commit_range(project: Path, base_ref: str) -> list[str]:
             )
         for match in AGENT_TRAILER_RE.finditer(body):
             trailer = match.group(1).strip()
-            if any(agent in trailer.casefold() for agent in AGENT_EMAILS):
+            if _trailer_is_agent(trailer):
                 errors.append(
                     f"commit {sha[:12]} carries agent Co-Authored-By trailer '{trailer}'; "
                     f"[COMMIT-IDENTITY-001] forbids it unless the task requested that exact trailer"

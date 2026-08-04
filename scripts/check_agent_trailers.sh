@@ -28,8 +28,13 @@ fi
 # template mentioning the trailer must not fail the commit.
 body=$(grep -v '^[ \t]*#' "$message_file" || true)
 
+# Name-or-email, mirroring _is_agent_identity() in agent_instruction_audit.py.
+# Matching the vendor address alone let `Co-Authored-By: Claude <claude@example.com>`
+# through. The name arm anchors on the display-name slot (trailer start, up to
+# the address) and requires a whole-word match, so a human called
+# "Claudia Gemini-Lopez" is not caught.
 coauthor=$(printf '%s\n' "$body" |
-  grep -inE '^[ \t]*co-authored-by:.*(noreply@anthropic\.com|noreply@openai\.com)' || true)
+  grep -inE '^[ \t]*co-authored-by:(.*(noreply@anthropic\.com|noreply@openai\.com)|[ \t]*(chatgpt|claude|codex|gemini|openai)[ \t]*<)' || true)
 session=$(printf '%s\n' "$body" |
   grep -inE '^[ \t]*(claude|codex|gemini|chatgpt)-session:' || true)
 

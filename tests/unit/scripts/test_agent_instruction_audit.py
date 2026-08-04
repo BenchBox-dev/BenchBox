@@ -334,6 +334,36 @@ def test_commit_range_rejects_agent_coauthor_trailer(tmp_path: Path) -> None:
     assert any("carries agent Co-Authored-By trailer" in error for error in errors)
 
 
+def test_commit_range_rejects_agent_coauthor_by_name_with_non_vendor_address(tmp_path: Path) -> None:
+    """An agent that signs with its own address is still an agent.
+
+    Matching only the vendor address let this exact trailer through both the
+    merge-time guard and the commit-msg hook, which is the attribution
+    [COMMIT-IDENTITY-001] exists to reject.
+    """
+    project = _git_range_repo(tmp_path)
+    _git_commit(
+        project,
+        "feat: work\n\nCo-Authored-By: Claude <claude@example.com>",
+        "Joe Harris",
+        "joeharris76@gmail.com",
+    )
+    errors = audit_commit_range(project, "base-ref")
+    assert any("carries agent Co-Authored-By trailer" in error for error in errors)
+
+
+def test_commit_range_accepts_human_coauthor_named_like_a_vendor(tmp_path: Path) -> None:
+    """The name arm matches the whole display name, not a substring of it."""
+    project = _git_range_repo(tmp_path)
+    _git_commit(
+        project,
+        "feat: work\n\nCo-Authored-By: Claudia Gemini-Lopez <claudia@example.com>",
+        "Joe Harris",
+        "joeharris76@gmail.com",
+    )
+    assert audit_commit_range(project, "base-ref") == []
+
+
 def test_commit_range_rejects_agent_session_trailer(tmp_path: Path) -> None:
     project = _git_range_repo(tmp_path)
     _git_commit(
