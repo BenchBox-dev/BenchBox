@@ -608,8 +608,13 @@ function HomeLoadingSkeleton() {
         <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8 lg:py-4">
           <div class="max-w-4xl">
             <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Curated Results Preview</h1>
-            <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
-              Reproducible OLAP benchmark rankings, with public corpus browse below.
+            {/* Copy AND classes mirror the loaded hero subtitle exactly. The
+                classes matter as much as the words: mt-3/text-base here against
+                mt-2/text-sm sm:mt-3/sm:text-lg there made the subtitle shift and
+                reflow the moment data arrived, the same skeleton-vs-loaded drift
+                as the headline and the hero padding above. */}
+            <p class="mt-2 max-w-3xl text-sm text-[var(--bb-fg-muted)] sm:mt-3 sm:text-lg">
+              Reproducible OLAP benchmark evidence with explicitly scoped rankings and public corpus browse below.
             </p>
           </div>
 
