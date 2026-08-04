@@ -13,7 +13,7 @@ permission to expose the underlying adapter's full configuration surface.
 | Platform | Option(s) | Consumer | Security class | Compatibility alias / rejected alternatives |
 |---|---|---|---|---|
 | ClickHouse | `deployment_mode` | `ClickHouseAdapter.from_config` | execution | Connection destinations and transport policy remain server-owned. |
-| ClickHouse | `port`, `secure` | Current adapter fields; removal tracked separately | connection | Reject arbitrary ports, destinations, and TLS downgrade controls. |
+| ClickHouse | `connection_profile` | `ClickHouseAdapter.from_config(port, secure)` resolved from `BENCHBOX_MCP_CLICKHOUSE_PROFILES` | connection | Reject caller-supplied `port`/`secure`, arbitrary destinations, and TLS downgrade. Only the profile name is accepted and persisted. |
 | cuDF | `device_id`, `spill_to_host` | cuDF runtime and memory policy | device/resource | Reject device paths, scheduler endpoints, and package controls. |
 | Dask | `memory_limit`, `n_workers`, `threads_per_worker` | LocalCluster resource envelope | resource | Enforce aggregate limits; reject scheduler endpoints and spill paths. |
 | Dask | `use_distributed` | Dask execution-mode selector | execution | Reject external scheduler selection. |

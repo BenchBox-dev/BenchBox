@@ -36,7 +36,11 @@ from benchbox.mcp.errors import (
     make_not_found_error,
     make_unsupported_mode_error,
 )
-from benchbox.mcp.schemas import MCPValidationError, validate_platform_options
+from benchbox.mcp.schemas import (
+    MCPValidationError,
+    resolve_clickhouse_connection_profile,
+    validate_platform_options,
+)
 from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
@@ -92,6 +96,15 @@ def _prepare_adapter_platform_options(platform: str, options: Mapping[str, objec
     """Translate MCP option names to the adapter and tuning contracts."""
     normalized = dict(options)
     platform_name = platform.lower().removesuffix("-df")
+
+    if platform_name in {"clickhouse", "clickhouse-server"} and "connection_profile" in normalized:
+        # The request carries only a profile name.  Port and TLS policy are read
+        # from server configuration here, at execution time, so a durable retry
+        # re-resolves against current policy instead of replaying a persisted
+        # destination.
+        profile = resolve_clickhouse_connection_profile(str(normalized.pop("connection_profile")))
+        normalized["port"] = profile["port"]
+        normalized["secure"] = profile["secure"]
 
     if platform_name == "duckdb" and "threads" in normalized:
         normalized["thread_limit"] = normalized.pop("threads")
@@ -442,13 +455,23 @@ def _run_benchmark_impl(
 
         benchmark_instance = benchmark_class(scale_factor=scale_factor)
 
+        # Resolved separately from adapter construction so a policy rejection is
+        # reported as a validation error rather than an unsupported platform.
+        try:
+            adapter_options = _prepare_adapter_platform_options(platform, normalized_platform_options)
+        except MCPValidationError as exc:
+            return _make_failed_response(
+                make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform}),
+                execution_id,
+            )
+
         try:
             adapter = _get_platform_adapter(
                 platform,
                 mode=resolved_mode,
                 benchmark=benchmark_lower,
                 scale_factor=scale_factor,
-                **_prepare_adapter_platform_options(platform, normalized_platform_options),
+                **adapter_options,
             )
         except (ValueError, ImportError) as e:
             return _make_failed_response(

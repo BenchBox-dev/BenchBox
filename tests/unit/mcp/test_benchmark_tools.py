@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -168,6 +169,86 @@ class TestRunBenchmarkTool:
         assert response["mcp_metadata"]["status"] == "no_results"
         assert get_adapter.call_args.kwargs["thread_limit"] == 4
 
+    @pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-server"])
+    def test_clickhouse_port_override_is_refused_before_any_adapter_is_built(self, platform, tmp_path: Path):
+        """A request must not be able to point ClickHouse at another listener."""
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+
+        with patch.object(benchmark_tools, "_get_platform_adapter") as get_adapter:
+            response = benchmark_tools._run_benchmark_impl(
+                platform,
+                "tpch",
+                0.01,
+                None,
+                "load,power",
+                "sql",
+                platform_options={"port": 9001, "secure": False},
+                results_dir=tmp_path,
+            )
+
+        assert response["status"] == "failed"
+        get_adapter.assert_not_called()
+
+    def test_clickhouse_profile_resolves_to_the_server_owned_connection_tuple(self, monkeypatch, tmp_path: Path):
+        """The adapter sees the operator's port/TLS, never the caller's."""
+        import json
+
+        from benchbox.mcp.schemas import MCP_CLICKHOUSE_PROFILE_ENV
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+
+        monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"reviewed": {"port": 9440, "secure": True}}))
+
+        class DummyBenchmark:
+            def __init__(self, scale_factor: float) -> None:
+                self.scale_factor = scale_factor
+
+            def run_with_platform(self, *_args, **_kwargs):
+                return None
+
+        with (
+            patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
+            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=DummyBenchmark),
+            patch.object(benchmark_tools, "_get_platform_adapter", return_value=Mock()) as get_adapter,
+        ):
+            benchmark_tools._run_benchmark_impl(
+                "clickhouse-server",
+                "tpch",
+                0.01,
+                None,
+                "load,power",
+                "sql",
+                platform_options={"connection_profile": "reviewed"},
+                results_dir=tmp_path,
+            )
+
+        kwargs = get_adapter.call_args.kwargs
+        assert kwargs["port"] == 9440
+        assert kwargs["secure"] is True
+        assert "connection_profile" not in kwargs
+
+    def test_clickhouse_profile_withdrawn_by_the_operator_fails_closed(self, monkeypatch, tmp_path: Path):
+        """A replayed request cannot outlive the profile that authorized it."""
+        from benchbox.mcp.schemas import MCP_CLICKHOUSE_PROFILE_ENV
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+
+        monkeypatch.delenv(MCP_CLICKHOUSE_PROFILE_ENV, raising=False)
+
+        with patch.object(benchmark_tools, "_get_platform_adapter") as get_adapter:
+            response = benchmark_tools._run_benchmark_impl(
+                "clickhouse-server",
+                "tpch",
+                0.01,
+                None,
+                "load,power",
+                "sql",
+                platform_options={"connection_profile": "reviewed"},
+                results_dir=tmp_path,
+            )
+
+        assert response["status"] == "failed"
+        assert "reviewed" not in json.dumps(response)
+        get_adapter.assert_not_called()
+
     def test_databricks_layout_options_build_unified_tuning_config(self):
         from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
 
@@ -192,10 +273,18 @@ class TestRunBenchmarkTool:
         assert tuning.platform_optimizations.databricks_clustering_strategy == "liquid_clustering"
         assert tuning.platform_optimizations.liquid_clustering_columns == ["customer_id", "order_id"]
 
-    def test_every_matrix_option_reaches_effective_preparation(self):
+    def test_every_matrix_option_reaches_effective_preparation(self, monkeypatch):
         """Each reviewed option reaches a concrete adapter-facing setting."""
-        from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST, validate_platform_options
+        import json
+
+        from benchbox.mcp.schemas import (
+            MCP_CLICKHOUSE_PROFILE_ENV,
+            MCP_PLATFORM_OPTION_ALLOWLIST,
+            validate_platform_options,
+        )
         from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+        monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"reviewed": {"port": 9440, "secure": True}}))
 
         for platform, specs in MCP_PLATFORM_OPTION_ALLOWLIST.items():
             for option_name, spec in specs.items():
@@ -209,15 +298,27 @@ class TestRunBenchmarkTool:
                     value = spec.choices[0]
                 elif option_name == "liquid_clustering_columns":
                     value = "id"
+                elif option_name == "connection_profile":
+                    value = "reviewed"
                 else:
                     value = "1GB"
 
-                normalized = validate_platform_options(platform, {option_name: value})
+                request: dict[str, object] = {option_name: value}
+                if platform == "clickhouse" and option_name == "connection_profile":
+                    # A profile only applies to server deployments; local mode is in-process.
+                    request["deployment_mode"] = "server"
+
+                normalized = validate_platform_options(platform, request)
                 prepared = _prepare_adapter_platform_options(platform, normalized)
                 if platform == "duckdb" and option_name == "threads":
                     assert prepared == {"thread_limit": value}
                 elif platform == "databricks":
                     assert "tuning_config" in prepared
+                elif option_name == "connection_profile":
+                    # The caller's profile name is replaced by the server-owned tuple.
+                    assert "connection_profile" not in prepared
+                    assert prepared["port"] == 9440
+                    assert prepared["secure"] is True
                 else:
                     assert prepared[option_name] == value
 

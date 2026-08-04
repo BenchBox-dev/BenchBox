@@ -5,12 +5,15 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import json
+
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
 from benchbox.mcp.schemas import (
     MAX_QUERY_ID_LENGTH,
     MAX_QUERY_IDS,
+    MCP_CLICKHOUSE_PROFILE_ENV,
     MCP_PLATFORM_OPTION_ALLOWLIST,
     MCP_PLATFORM_OPTION_CONTRACT,
     CompareResultsInput,
@@ -22,6 +25,7 @@ from benchbox.mcp.schemas import (
     MCPValidationError,
     RunBenchmarkInput,
     ValidateConfigInput,
+    resolve_clickhouse_connection_profile,
     validate_benchmark_name,
     validate_filename,
     validate_platform_name,
@@ -308,6 +312,97 @@ class TestRunBenchmarkInput:
         assert validate_platform_options("velox", {"deployment": "remote"}) == {"deployment": "remote"}
         with pytest.raises(MCPValidationError):
             validate_platform_options("modin", {"engine": "pandas"})
+
+
+CLICKHOUSE_PLATFORM_SPELLINGS = ("clickhouse", "clickhouse-server")
+CLICKHOUSE_UNCONFIGURED_SPELLINGS = ("clickhouse-local", "clickhouse-cloud", "chdb", "clickhouse_server")
+
+
+class TestClickHouseConnectionBoundary:
+    """A caller must never name a ClickHouse destination or transport policy."""
+
+    @pytest.mark.parametrize("platform", CLICKHOUSE_PLATFORM_SPELLINGS)
+    @pytest.mark.parametrize("options", [{"port": 9001}, {"secure": False}, {"port": 9001, "secure": True}])
+    def test_port_and_tls_overrides_are_rejected(self, platform, options):
+        """Port is part of a destination and secure is transport policy."""
+        with pytest.raises(MCPValidationError, match="not authorized"):
+            validate_platform_options(platform, options)
+
+    @pytest.mark.parametrize("platform", CLICKHOUSE_UNCONFIGURED_SPELLINGS)
+    def test_other_clickhouse_spellings_expose_no_options(self, platform):
+        with pytest.raises(MCPValidationError, match="not authorized"):
+            validate_platform_options(platform, {"port": 9001})
+
+    def test_run_benchmark_input_rejects_port_override(self):
+        with pytest.raises(PydanticValidationError):
+            RunBenchmarkInput(platform="clickhouse-server", benchmark="tpch", platform_options={"port": 9001})
+
+    def test_unknown_profile_is_rejected_and_is_not_a_probe_oracle(self, monkeypatch):
+        """An unconfigured profile fails closed without echoing the request."""
+        monkeypatch.delenv(MCP_CLICKHOUSE_PROFILE_ENV, raising=False)
+        with pytest.raises(MCPValidationError) as excinfo:
+            validate_platform_options("clickhouse-server", {"connection_profile": "analytics"})
+        assert "analytics" not in str(excinfo.value)
+
+    def test_configured_profile_admits_only_its_name(self, monkeypatch):
+        """The persisted request carries the name, never the resolved tuple."""
+        monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"analytics": {"port": 9440, "secure": True}}))
+        normalized = validate_platform_options("clickhouse-server", {"connection_profile": "analytics"})
+        assert normalized == {"connection_profile": "analytics"}
+
+    def test_local_deployment_cannot_acquire_a_network_path(self, monkeypatch):
+        """chDB local mode is in-process; a profile must not give it a socket."""
+        monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"analytics": {"port": 9440, "secure": True}}))
+        with pytest.raises(MCPValidationError, match="deployment_mode='server'"):
+            validate_platform_options("clickhouse", {"connection_profile": "analytics"})
+        with pytest.raises(MCPValidationError, match="deployment_mode='server'"):
+            validate_platform_options("clickhouse", {"connection_profile": "analytics", "deployment_mode": "local"})
+        assert validate_platform_options(
+            "clickhouse", {"connection_profile": "analytics", "deployment_mode": "server"}
+        ) == {"connection_profile": "analytics", "deployment_mode": "server"}
+
+    @pytest.mark.parametrize(
+        "registry",
+        [
+            "not json",
+            json.dumps(["analytics"]),
+            json.dumps({"Analytics": {"port": 9440}}),
+            json.dumps({"analytics": {"port": 0}}),
+            json.dumps({"analytics": {"port": 70000}}),
+            json.dumps({"analytics": {"port": True}}),
+            json.dumps({"analytics": {"port": "9440"}}),
+            json.dumps({"analytics": {"port": 9440, "secure": "yes"}}),
+            json.dumps({"analytics": {"port": 9440, "host": "10.0.0.5"}}),
+            json.dumps({"analytics": {"port": 9440, "password": "hunter2"}}),
+        ],
+    )
+    def test_malformed_server_registry_fails_closed(self, monkeypatch, registry):
+        """A malformed or over-broad profile is never partially trusted."""
+        monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, registry)
+        with pytest.raises(MCPValidationError, match="not configured"):
+            validate_platform_options("clickhouse-server", {"connection_profile": "analytics"})
+
+    def test_profile_name_shape_is_bounded(self, monkeypatch):
+        monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"analytics": {"port": 9440}}))
+        for bad_name in ("Analytics", "../etc/passwd", "a" * 65, "9analytics", ""):
+            with pytest.raises(MCPValidationError):
+                validate_platform_options("clickhouse-server", {"connection_profile": bad_name})
+
+    def test_dataframe_alias_fallback_does_not_bypass_the_policy(self, monkeypatch):
+        """A '-df' spelling inherits the base records, so it inherits the rules."""
+        monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"analytics": {"port": 9440, "secure": True}}))
+        with pytest.raises(MCPValidationError, match="not authorized"):
+            validate_platform_options("clickhouse-df", {"port": 9001})
+        with pytest.raises(MCPValidationError, match="deployment_mode='server'"):
+            validate_platform_options("clickhouse-df", {"connection_profile": "analytics"})
+
+    def test_resolution_returns_the_server_owned_tuple(self, monkeypatch):
+        monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"analytics": {"port": 9440, "secure": True}}))
+        assert resolve_clickhouse_connection_profile("analytics") == {"port": 9440, "secure": True}
+
+    def test_profile_defaults_to_plaintext_only_when_the_operator_says_so(self, monkeypatch):
+        monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"plain": {"port": 9000}}))
+        assert resolve_clickhouse_connection_profile("plain") == {"port": 9000, "secure": False}
 
 
 class TestDryRunInput:
