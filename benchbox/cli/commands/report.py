@@ -17,6 +17,7 @@ from benchbox.core.results.database import (
     RankingConfig,
     ResultDatabase,
 )
+from benchbox.core.results.regression_policy import is_meaningful_improvement
 
 
 @click.group("report")
@@ -191,7 +192,7 @@ def trends(
 
         if t.is_regression:
             status = "[red]REGRESSION[/red]"
-        elif t.change_pct is not None and t.change_pct < -5:
+        elif is_meaningful_improvement(t.change_pct):
             status = "[green]IMPROVED[/green]"
         else:
             status = "[blue]STABLE[/blue]"

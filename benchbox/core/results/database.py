@@ -19,13 +19,14 @@ import logging
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_options import sanitize_platform_options
+from benchbox.core.results.regression_policy import is_regression
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +157,7 @@ class PerformanceTrend:
     max_geometric_mean_ms: float
     sample_count: int
     change_pct: float | None  # Change from previous period
-    is_regression: bool  # True if >10% slowdown
+    is_regression: bool  # Per benchbox.core.results.regression_policy
 
 
 @dataclass
@@ -894,7 +895,7 @@ class ResultDatabase:
                     max_geometric_mean_ms=current.max_geometric_mean_ms,
                     sample_count=current.sample_count,
                     change_pct=change,
-                    is_regression=change > 10,  # >10% slowdown
+                    is_regression=is_regression(change),
                 )
 
         return trends
@@ -937,8 +938,16 @@ class ResultDatabase:
                     trends = self.get_performance_trends(platform, benchmark, sf, periods=2, period_days=lookback_days)
 
                     for trend in trends:
-                        if trend.is_regression and trend.change_pct and trend.change_pct > threshold_pct:
-                            regressions.append(trend)
+                        # Evaluate against the caller's threshold only.
+                        # Previously this also required trend.is_regression,
+                        # which get_performance_trends computes at the default
+                        # 10% -- so any threshold below 10 was silently inert
+                        # (a 7% slowdown could never be reported at
+                        # --threshold 5). is_regression is recomputed here so
+                        # the returned records agree with the filter that
+                        # selected them.
+                        if is_regression(trend.change_pct, threshold_pct):
+                            regressions.append(replace(trend, is_regression=True))
 
         return regressions
 

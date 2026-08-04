@@ -21,6 +21,12 @@ from mcp.types import ToolAnnotations
 from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.metrics import calculate_named_metric, percentile_ms, sample_stdev_ms
 from benchbox.core.results.query_normalizer import normalize_query_id
+from benchbox.core.results.regression_policy import (
+    classify_change,
+    classify_severity,
+    classify_trend,
+    percent_change,
+)
 from benchbox.mcp.errors import ErrorCode, make_error, make_not_found_error
 from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
@@ -534,9 +540,12 @@ def _classify_query_changes(
             continue
 
         delta_ms = new_time - old_time
-        delta_pct = (delta_ms / old_time) * 100
+        delta_pct = percent_change(old_time, new_time)
+        if delta_pct is None:
+            continue
 
-        if delta_pct > threshold_percent:
+        change_class = classify_change(delta_pct, threshold_percent)
+        if change_class == "regression":
             regressions.append(
                 {
                     "query_id": qid,
@@ -544,10 +553,10 @@ def _classify_query_changes(
                     "current_ms": round(new_time, 2),
                     "delta_ms": round(delta_ms, 2),
                     "delta_percent": round(delta_pct, 1),
-                    "severity": _classify_regression_severity(delta_pct),
+                    "severity": classify_severity(delta_pct),
                 }
             )
-        elif delta_pct < -threshold_percent:
+        elif change_class == "improvement":
             improvements.append(
                 {
                     "query_id": qid,
@@ -649,24 +658,6 @@ def _resolve_timestamp_str(timestamp: Any, file_path: Path) -> str:
     return datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
 
 
-def _compute_trend_direction(runs: list[dict[str, Any]]) -> tuple[str, float]:
-    """Compute trend direction and percentage from ordered data points."""
-    if len(runs) < 2:
-        return "insufficient_data", 0
-
-    first_value = runs[0]["value"]
-    last_value = runs[-1]["value"]
-    if first_value <= 0:
-        return "unknown", 0
-
-    trend_pct = ((last_value - first_value) / first_value) * 100
-    if trend_pct < -5:
-        return "improving", trend_pct
-    elif trend_pct > 5:
-        return "degrading", trend_pct
-    return "stable", trend_pct
-
-
 def _load_trend_data_point(
     file_path: Path,
     platform: str | None,
@@ -748,7 +739,7 @@ def _get_performance_trends_impl(
         }
 
     runs.reverse()
-    trend_direction, trend_pct = _compute_trend_direction(runs)
+    trend_direction, trend_pct = classify_trend([run["value"] for run in runs])
 
     return {
         "status": "success",
@@ -949,15 +940,3 @@ def _format_plan_tree(plan: dict, indent: int = 0) -> str:
             lines.append(_format_plan_tree(children, indent + 1))
 
     return "\n".join(lines)
-
-
-def _classify_regression_severity(delta_pct: float) -> str:
-    """Classify regression severity based on percentage change."""
-    if delta_pct >= 100:
-        return "critical"
-    elif delta_pct >= 50:
-        return "high"
-    elif delta_pct >= 25:
-        return "medium"
-    else:
-        return "low"
