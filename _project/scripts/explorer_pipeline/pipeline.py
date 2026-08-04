@@ -48,6 +48,19 @@ from benchbox.validation.bundle import discover_bundles
 
 logger = logging.getLogger(__name__)
 
+
+class DuplicateResultIdError(Exception):
+    """Two distinct published bundles derived the same ``result_id``.
+
+    Intentionally not a ``ValueError``. The publication loop wraps each bundle
+    in ``except (json.JSONDecodeError, KeyError, ValueError, TypeError)`` and
+    downgrades anything it catches to a skip plus a warning, so a collision
+    raised as ``ValueError`` would let the build finish green having published
+    only one of the two results. A collision is a corpus problem for a human to
+    resolve, not a bundle to drop.
+    """
+
+
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 COMMUNITY_TRUST_LABEL = "community-submission"
@@ -206,8 +219,14 @@ def _build_short_ids(result_ids: list[str]) -> dict[str, str]:
         # If every entry is unique the dict has as many keys as inputs.
         if len(candidate) == len(result_ids):
             return candidate
-    # sha256 is 64 hex chars; we never get here, but satisfy the type checker.
-    raise RuntimeError("Could not build collision-free short IDs (sha256 limit reached)")
+    # Unreachable for *distinct* inputs, which is the only kind that gets here:
+    # the publication loop rejects a repeated result_id via
+    # DuplicateResultIdError before this is called. That guard is what makes
+    # this branch dead. Passing a list containing the same id twice reaches it
+    # immediately - the dict collapses to one key and no length ever matches -
+    # and the message below then blames sha256 for what is really duplicate
+    # input, naming neither offending bundle.
+    raise RuntimeError(f"Could not build collision-free short IDs from {len(result_ids)} result_id(s) (duplicates?)")
 
 
 def _platform_row_sort_key(benchmark: str) -> Callable[[PlatformRow], tuple[bool, float]]:
@@ -550,6 +569,15 @@ class ExplorerPipeline:
             # has per-result detail data without a second I/O pass.
             details_map: dict[str, DetailResult] = {}
             skipped_bundles = 0
+            # result_id → (source bundle path, sha256 of the published bytes).
+            # The loop below writes `{result_id}.json` and assigns
+            # `details_map[result_id]`, so without this a second bundle deriving
+            # the same id would replace the first in both places: one result
+            # would vanish from the published corpus and the read model with no
+            # error and no count mismatch. `result_id` carries only 8 hex chars
+            # (32 bits) of sha256, so the birthday bound is far below what the
+            # id's length suggests.
+            seen_result_ids: dict[str, tuple[Path, str]] = {}
 
             for bundle_path in bundle_files:
                 try:
@@ -581,9 +609,7 @@ class ExplorerPipeline:
                     # from the exact bytes that will be published so filenames,
                     # DuckDB rows, and download URLs remain reproducible.
                     public_raw = canonical_json_bytes(public_bundle)
-                    result_id = self._transformer.result_id_from_bundle(
-                        bundle_path, data=public_bundle, raw=public_raw
-                    )
+                    result_id = self._transformer.result_id_from_bundle(bundle_path, data=public_bundle, raw=public_raw)
                     prefix = bundle_url_prefix.rstrip("/")
                     bundle_download_url = f"{prefix}/{result_id}.json"
 
@@ -615,6 +641,40 @@ class ExplorerPipeline:
                             result_id,
                         )
                         continue
+
+                    # Two bundles that derive the same id are either the same
+                    # evidence twice or a genuine collision, and the two need
+                    # opposite handling. Identical published bytes are a
+                    # redundant copy: publishing it once is correct, so skip it
+                    # and say so. Differing bytes mean two distinct results are
+                    # competing for one public URL - that is silent evidence
+                    # loss, and the corpus needs a human, so fail closed rather
+                    # than pick a winner.
+                    public_digest = hashlib.sha256(public_raw).hexdigest()
+                    previous = seen_result_ids.get(result_id)
+                    if previous is not None:
+                        previous_path, previous_digest = previous
+                        if previous_digest != public_digest:
+                            # Deliberately NOT a ValueError. The per-bundle
+                            # handler below catches ValueError and downgrades it
+                            # to `skipped_bundles += 1` plus a warning, which is
+                            # precisely the silent drop this guard exists to
+                            # stop - the build would go green having published
+                            # one of the two colliding results.
+                            raise DuplicateResultIdError(
+                                f"duplicate result_id {result_id!r} with differing published content: "
+                                f"{previous_path} and {bundle_path}"
+                            )
+                        skipped_bundles += 1
+                        logger.warning(
+                            "Skipping bundle %s - result_id %r already published from %s with identical content",
+                            bundle_path,
+                            result_id,
+                            previous_path,
+                        )
+                        continue
+                    seen_result_ids[result_id] = (bundle_path, public_digest)
+
                     dest_bundle.write_bytes(public_raw)
 
                     # Publish the plans sidecar alongside the bundle when present
