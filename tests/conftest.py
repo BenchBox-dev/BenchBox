@@ -30,6 +30,7 @@ from typing import Any
 
 import pytest
 
+from benchbox.utils.config_interface import set_config_provider
 from benchbox.utils.printing import set_quiet
 
 # Sphinx 11 deprecations in third-party extensions (sphinx_tags, myst_parser, ablog, napoleon).
@@ -344,6 +345,32 @@ def _reset_global_quiet_state():
     """
     yield
     set_quiet(False)
+
+
+@pytest.fixture(autouse=True)
+def _reset_global_config_provider():
+    """Never let the CLI's config provider leak across tests.
+
+    benchbox.utils.config_interface keeps a process-global provider that the
+    CLI installs from its group callback (install_cli_config_provider, added
+    with the utils -> cli dependency inversion in #1556). Any test that invokes
+    a CLI subcommand therefore makes CLIConfigProvider -- backed by a real
+    ConfigManager reading ~/.benchbox/config.yaml -- the provider for every
+    LATER test in the same xdist worker. A test that then builds an
+    ExecutionConfigHelper() or an execution manager without passing
+    config_manager silently reads the developer's real config instead of
+    SimpleConfigProvider's documented defaults, and does so only when it
+    happens to be scheduled after a CLI test on that worker.
+
+    Resetting AFTER each test (post-yield) mirrors _reset_global_quiet_state
+    and contains the blast radius to the leaking test itself.
+
+    ``set_config_provider`` is imported at module scope for the same reason
+    that fixture documents: this teardown runs after EVERY test, including
+    tests that monkeypatch ``builtins.__import__`` for their own duration.
+    """
+    yield
+    set_config_provider(None)
 
 
 def pytest_runtest_setup(item) -> None:
