@@ -15,8 +15,18 @@ name: Orphaned Commit Detector
 
 on:
   schedule:
-    # Weekly, Monday 07:00 UTC (after the submission-validator drift check).
-    - cron: "0 7 * * 1"
+    # Daily, 07:00 UTC. Deliberately not weekly.
+    #
+    # The push trigger below cannot cover every case: for a `push` event GitHub
+    # runs the workflow file *from the pushed commit*, so an orphaning push to a
+    # branch created before that trigger landed - and never rebased - runs the
+    # branch's own older workflow and detects nothing. Those orphans are only
+    # ever caught here.
+    #
+    # This run is the one that reads develop's workflow and allowlist and scans
+    # every branch, so it is the true backstop. Weekly left a stale-branch
+    # orphan invisible for up to seven days; daily bounds it to one.
+    - cron: "0 7 * * *"
   workflow_dispatch: {}
   # Run on EVERY develop push, not just changes to the detector itself.
   #
