@@ -137,8 +137,15 @@ ModinDF = mpd.DataFrame if MODIN_AVAILABLE else Any
 
 # Backends BenchBox has reviewed for resource, lifecycle, and security behavior.
 # Modin itself accepts more names, but support here is a deliberate decision, not
-# a reflection of whatever an installed dependency happens to allow.
-SUPPORTED_MODIN_ENGINES = frozenset({"ray", "dask"})
+# a reflection of whatever an installed dependency happens to allow.  This set is
+# the adapter's public contract and matches docs/platforms/modin-dataframe.md and
+# benchbox/cli/platform_readiness.py; the MCP allow-list is deliberately narrower
+# still (ray/dask only) because unidist is documented as experimental.
+SUPPORTED_MODIN_ENGINES = frozenset({"ray", "dask", "unidist"})
+
+# Modin reads this at initialization, so it -- not the constructor argument -- is
+# what actually selects the backend.
+MODIN_ENGINE_ENV = "MODIN_ENGINE"
 
 
 class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
@@ -200,6 +207,13 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
         # Validate and apply tuning configuration (before configuring engine)
         self._validate_and_apply_tuning()
 
+        # Reconcile with the environment BEFORE any backend is started.  A
+        # pre-set MODIN_ENGINE is what Modin actually reads, so validating only
+        # the constructor argument would let an unreviewed backend run while
+        # self.engine reported something else -- and would initialize Ray on the
+        # way there.
+        self.engine = self._resolve_effective_engine()
+
         # Initialize Ray for local execution if using Ray backend.
         # This must happen BEFORE any Modin DataFrame operations to prevent
         # Modin from auto-initializing Ray with heavyweight defaults.
@@ -214,7 +228,7 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
 
         This method applies tuning settings from the configuration to the Modin
         runtime environment. Settings include:
-        - engine_affinity (ray or dask backend)
+        - engine_affinity (any reviewed backend: ray, dask, or unidist)
         - worker_count for number of partitions
         """
         config = self._tuning_config
@@ -247,10 +261,32 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
             raise ValueError(f"Unsupported Modin engine '{normalized}'. Supported engines: {supported}")
         return normalized
 
+    def _resolve_effective_engine(self) -> str:
+        """Return the backend Modin will actually use, or fail closed.
+
+        A pre-set ``MODIN_ENGINE`` wins over the constructor argument, because
+        ``_configure_engine`` uses ``setdefault`` and Modin reads the variable
+        directly.  That precedence is preserved -- an operator's environment
+        still decides -- but the value it names must be a reviewed backend, so
+        an unreviewed one is rejected instead of silently taking effect.
+
+        Raises:
+            ValueError: If ``MODIN_ENGINE`` names an unsupported backend.
+        """
+        environment_engine = os.environ.get(MODIN_ENGINE_ENV, "").strip()
+        if not environment_engine:
+            return self.engine
+        resolved = self._validate_engine(environment_engine)
+        if resolved != self.engine:
+            self._log_verbose(f"Using engine={resolved} from {MODIN_ENGINE_ENV} (requested {self.engine})")
+        return resolved
+
     def _configure_engine(self) -> None:
         """Configure the Modin execution engine."""
-        # Set the engine before any Modin operations
-        os.environ.setdefault("MODIN_ENGINE", self.engine)
+        # Assign rather than setdefault: self.engine has already been reconciled
+        # with any pre-set MODIN_ENGINE, so this keeps the attribute and the
+        # variable Modin reads from disagreeing.
+        os.environ[MODIN_ENGINE_ENV] = self.engine
 
         if self.verbose:
             logger.info(f"Modin engine configured: {self.engine}")
