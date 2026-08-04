@@ -8,7 +8,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import json
 
 import pytest
-from pydantic import ValidationError as PydanticValidationError
 
 from benchbox.mcp.schemas import (
     MAX_QUERY_ID_LENGTH,
@@ -19,15 +18,7 @@ from benchbox.mcp.schemas import (
     MCP_DASK_MAX_WORKERS_ENV,
     MCP_PLATFORM_OPTION_ALLOWLIST,
     MCP_PLATFORM_OPTION_CONTRACT,
-    CompareResultsInput,
-    DryRunInput,
-    ExportSummaryInput,
-    GetBenchmarkInfoInput,
-    GetResultsInput,
-    ListRecentRunsInput,
     MCPValidationError,
-    RunBenchmarkInput,
-    ValidateConfigInput,
     build_databricks_clustering_intent,
     load_dask_resource_envelope,
     resolve_clickhouse_connection_profile,
@@ -226,50 +217,14 @@ class TestValidateScaleFactor:
             validate_scale_factor(20000)
 
 
-class TestRunBenchmarkInput:
-    """Tests for RunBenchmarkInput Pydantic model."""
-
-    def test_valid_input(self):
-        """Test valid input is accepted."""
-        inp = RunBenchmarkInput(platform="duckdb", benchmark="tpch")
-        assert inp.platform == "duckdb"
-        assert inp.benchmark == "tpch"
-        assert inp.scale_factor == 0.01  # Default
-        assert inp.queries is None
-        assert inp.phases is None
-
-    def test_valid_input_with_all_fields(self):
-        """Test valid input with all fields."""
-        inp = RunBenchmarkInput(
-            platform="DuckDB",
-            benchmark="TPCH",
-            scale_factor=1.0,
-            queries="1,2,3",
-            phases="load,power",
-        )
-        assert inp.platform == "duckdb"  # Lowercased
-        assert inp.benchmark == "tpch"  # Lowercased
-        assert inp.scale_factor == 1.0
-        assert inp.queries == "1,2,3"
-        assert inp.phases == "load,power"
-
-    def test_invalid_platform_rejected(self):
-        """Test invalid platform is rejected."""
-        with pytest.raises(PydanticValidationError):
-            RunBenchmarkInput(platform="invalid@platform", benchmark="tpch")
-
-    def test_invalid_scale_factor_rejected(self):
-        """Test invalid scale factor is rejected."""
-        with pytest.raises(PydanticValidationError):
-            RunBenchmarkInput(platform="duckdb", benchmark="tpch", scale_factor=-1)
+class TestPlatformOptionAdmission:
+    """Tests for the live ``validate_platform_options`` admission path."""
 
     def test_platform_options_are_typed_and_normalized(self):
-        inp = RunBenchmarkInput(
-            platform="duckdb",
-            benchmark="tpch",
-            platform_options={"threads": 4, "memory_limit": "2GB"},
-        )
-        assert inp.platform_options == {"threads": 4, "memory_limit": "2GB"}
+        assert validate_platform_options("duckdb", {"threads": 4, "memory_limit": "2GB"}) == {
+            "threads": 4,
+            "memory_limit": "2GB",
+        }
 
     def test_every_allowlisted_option_has_an_explicit_contract(self):
         """The value allow-list cannot grow without a reviewed consumer matrix."""
@@ -288,8 +243,8 @@ class TestRunBenchmarkInput:
             validate_platform_options("duckdb", {"threads": 2})
 
     def test_secret_and_unknown_platform_options_are_rejected(self):
-        with pytest.raises(PydanticValidationError):
-            RunBenchmarkInput(platform="duckdb", benchmark="tpch", platform_options={"password": "secret"})
+        with pytest.raises(MCPValidationError, match="not authorized"):
+            validate_platform_options("duckdb", {"password": "secret"})
         with pytest.raises(MCPValidationError):
             validate_platform_options("snowflake", {"warehouse": "secret"})
 
@@ -492,10 +447,6 @@ class TestClickHouseConnectionBoundary:
         with pytest.raises(MCPValidationError, match="not authorized"):
             validate_platform_options(platform, {"port": 9001})
 
-    def test_run_benchmark_input_rejects_port_override(self):
-        with pytest.raises(PydanticValidationError):
-            RunBenchmarkInput(platform="clickhouse-server", benchmark="tpch", platform_options={"port": 9001})
-
     def test_unknown_profile_is_rejected_and_is_not_a_probe_oracle(self, monkeypatch):
         """An unconfigured profile fails closed without echoing the request."""
         monkeypatch.delenv(MCP_CLICKHOUSE_PROFILE_ENV, raising=False)
@@ -562,129 +513,3 @@ class TestClickHouseConnectionBoundary:
     def test_profile_defaults_to_plaintext_only_when_the_operator_says_so(self, monkeypatch):
         monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"plain": {"port": 9000}}))
         assert resolve_clickhouse_connection_profile("plain") == {"port": 9000, "secure": False}
-
-
-class TestDryRunInput:
-    """Tests for DryRunInput Pydantic model."""
-
-    def test_valid_input(self):
-        """Test valid input is accepted."""
-        inp = DryRunInput(platform="duckdb", benchmark="tpch")
-        assert inp.platform == "duckdb"
-        assert inp.benchmark == "tpch"
-
-    def test_with_query_subset(self):
-        """Test input with query subset."""
-        inp = DryRunInput(platform="duckdb", benchmark="tpch", queries="1,6,17")
-        assert inp.queries == "1,6,17"
-
-
-class TestValidateConfigInput:
-    """Tests for ValidateConfigInput Pydantic model."""
-
-    def test_valid_input(self):
-        """Test valid input is accepted."""
-        inp = ValidateConfigInput(platform="duckdb", benchmark="tpch")
-        assert inp.platform == "duckdb"
-        assert inp.benchmark == "tpch"
-        assert inp.scale_factor == 1.0  # Different default
-
-
-class TestGetBenchmarkInfoInput:
-    """Tests for GetBenchmarkInfoInput Pydantic model."""
-
-    def test_valid_input(self):
-        """Test valid input is accepted."""
-        inp = GetBenchmarkInfoInput(benchmark="tpch")
-        assert inp.benchmark == "tpch"
-
-    def test_normalizes_case(self):
-        """Test benchmark name is normalized to lowercase."""
-        inp = GetBenchmarkInfoInput(benchmark="TPCDS")
-        assert inp.benchmark == "tpcds"
-
-
-class TestListRecentRunsInput:
-    """Tests for ListRecentRunsInput Pydantic model."""
-
-    def test_valid_input_with_defaults(self):
-        """Test valid input with defaults."""
-        inp = ListRecentRunsInput()
-        assert inp.limit == 10
-        assert inp.platform is None
-        assert inp.benchmark is None
-
-    def test_valid_input_with_filters(self):
-        """Test valid input with filters."""
-        inp = ListRecentRunsInput(limit=5, platform="duckdb", benchmark="tpch")
-        assert inp.limit == 5
-        assert inp.platform == "duckdb"
-        assert inp.benchmark == "tpch"
-
-    def test_limit_bounds(self):
-        """Test limit is bounded."""
-        with pytest.raises(PydanticValidationError):
-            ListRecentRunsInput(limit=0)
-        with pytest.raises(PydanticValidationError):
-            ListRecentRunsInput(limit=101)
-
-
-class TestGetResultsInput:
-    """Tests for GetResultsInput Pydantic model."""
-
-    def test_valid_input(self):
-        """Test valid input is accepted."""
-        inp = GetResultsInput(result_file="test.json")
-        assert inp.result_file == "test.json"
-        assert inp.include_queries is True  # Default
-
-    def test_path_traversal_rejected(self):
-        """Test path traversal is rejected."""
-        with pytest.raises(PydanticValidationError):
-            GetResultsInput(result_file="../secret.json")
-
-
-class TestCompareResultsInput:
-    """Tests for CompareResultsInput Pydantic model."""
-
-    def test_valid_input(self):
-        """Test valid input is accepted."""
-        inp = CompareResultsInput(file1="run1.json", file2="run2.json")
-        assert inp.file1 == "run1.json"
-        assert inp.file2 == "run2.json"
-        assert inp.threshold_percent == 10.0  # Default
-
-    def test_custom_threshold(self):
-        """Test custom threshold is accepted."""
-        inp = CompareResultsInput(file1="run1.json", file2="run2.json", threshold_percent=5.0)
-        assert inp.threshold_percent == 5.0
-
-    def test_threshold_bounds(self):
-        """Test threshold is bounded."""
-        with pytest.raises(PydanticValidationError):
-            CompareResultsInput(file1="a.json", file2="b.json", threshold_percent=-1)
-        with pytest.raises(PydanticValidationError):
-            CompareResultsInput(file1="a.json", file2="b.json", threshold_percent=101)
-
-
-class TestExportSummaryInput:
-    """Tests for ExportSummaryInput Pydantic model."""
-
-    def test_valid_input(self):
-        """Test valid input is accepted."""
-        inp = ExportSummaryInput(result_file="test.json")
-        assert inp.result_file == "test.json"
-        assert inp.format == "text"  # Default
-
-    def test_valid_formats(self):
-        """Test valid formats are accepted."""
-        inp = ExportSummaryInput(result_file="test.json", format="markdown")
-        assert inp.format == "markdown"
-
-        inp = ExportSummaryInput(result_file="test.json", format="json")
-        assert inp.format == "json"
-
-    def test_invalid_format_rejected(self):
-        """Test invalid format is rejected."""
-        with pytest.raises(PydanticValidationError):
-            ExportSummaryInput(result_file="test.json", format="xml")

@@ -219,8 +219,8 @@ running jobs are recovered, and no artifact crosses tenant roots.
 Scale workers only after the alternating-worker acceptance test passes against
 the same storage class used in production. Watch queue depth, admission wait,
 lease loss, retry count, failure rate, and artifact publication latency in
-shared telemetry. `MetricsCollector` is process-local diagnostics only; it is
-not cross-worker truth and resets on restart.
+shared telemetry. Any process-local counter is diagnostics only; it is not
+cross-worker truth and resets on restart.
 
 Rollback uses the previous application revision with a readiness document
 generated for that exact revision. Before rollback, stop new publication at
