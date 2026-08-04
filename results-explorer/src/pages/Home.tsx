@@ -600,7 +600,7 @@ function HomeLoadingSkeleton() {
       <section class="surface-hero border-b border-[var(--bb-border-default)]">
         <div class="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
           <div class="max-w-4xl">
-            <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Database Leaderboards</h1>
+            <h1 class="text-3xl font-bold sm:text-4xl">BenchBox Curated Results Preview</h1>
             <p class="mt-3 max-w-3xl text-base text-[var(--bb-fg-muted)] sm:text-lg">
               Reproducible OLAP benchmark rankings, with public corpus browse below.
             </p>
