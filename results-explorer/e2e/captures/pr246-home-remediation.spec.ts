@@ -53,8 +53,14 @@ test.describe("@pr246-capture Home remediation", () => {
           const targetUrl = url(mode);
           await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
           await page.waitForLoadState("load", { timeout: 10_000 }).catch(() => {});
-          await expect(page.getByRole("heading", { name: "BenchBox Database Leaderboards" })).toBeVisible();
+          // Wait on the data-bound grid FIRST. The loading skeleton and the
+          // loaded hero deliberately share one headline, so a heading assertion
+          // placed ahead of this resolves against the skeleton and would let a
+          // screenshot be taken of the loading state. Same ordering trap that
+          // made e2e/routes/home.spec.ts pass without ever exercising loaded
+          // Home content.
           await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
+          await expect(page.getByRole("heading", { name: "BenchBox Curated Results Preview" })).toBeVisible();
           await expect(page.locator("body")).not.toContainText(/Binder Error|Stack trace|Results snapshot incomplete/i);
           await page.waitForTimeout(800);
           const shot = filename(mode, width);
