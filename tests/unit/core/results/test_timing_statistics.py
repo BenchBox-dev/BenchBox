@@ -159,7 +159,22 @@ class TestCanonicalPercentile:
 
         assert percentile_ms(times, 0.0) == 10.0
         assert percentile_ms(times, 1.0) == 30.0
-        assert percentile_ms(times, 2.0) == 30.0
+
+    @pytest.mark.parametrize("p", [95, 50, 99, 100, 1.01, -0.01, -1])
+    def test_out_of_range_percentile_is_rejected_not_clamped(self, p: float):
+        """The deleted implementations took p on a 0-100 scale.
+
+        Clamping `percentile_ms(times, 95)` would silently return max(times)
+        and label it a p95, which is the exact porting mistake this migration
+        makes easy to write.
+        """
+        with pytest.raises(ValueError, match=r"\[0, 1\]"):
+            percentile_ms([10.0, 20.0, 30.0], p)
+
+    def test_the_range_guard_runs_before_the_empty_shortcut(self):
+        """An empty sequence must not mask a bad percentile argument."""
+        with pytest.raises(ValueError):
+            percentile_ms([], 95)
 
     def test_input_order_does_not_matter(self):
         assert percentile_ms([30.0, 10.0, 20.0], 0.95) == percentile_ms([10.0, 20.0, 30.0], 0.95)

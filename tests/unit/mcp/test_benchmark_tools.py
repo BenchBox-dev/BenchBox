@@ -164,6 +164,7 @@ class TestRunBenchmarkTool:
                 "sql",
                 platform_options={"threads": 4},
                 results_dir=tmp_path,
+                anonymize=False,
             )
 
         assert response["mcp_metadata"]["status"] == "no_results"
@@ -204,6 +205,7 @@ class TestRunBenchmarkTool:
             "dataframe",
             platform_options={"engine": "pandas"},
             results_dir=tmp_path,
+            anonymize=False,
         )
         assert response["status"] == "failed"
 
@@ -221,6 +223,7 @@ class TestRunBenchmarkTool:
                 "dataframe",
                 platform_options={"n_workers": 256, "threads_per_worker": 256},
                 results_dir=tmp_path,
+                anonymize=False,
             )
 
         assert response["status"] == "failed"
@@ -261,6 +264,7 @@ class TestRunBenchmarkTool:
                 "dataframe",
                 platform_options={"n_workers": 256, "threads_per_worker": 256},
                 results_dir=tmp_path,
+                anonymize=False,
             )
 
         local_cluster.assert_not_called()
@@ -290,6 +294,7 @@ class TestRunBenchmarkTool:
                 "dataframe",
                 platform_options={"n_workers": 4, "threads_per_worker": 4, "memory_limit": "4GB"},
                 results_dir=tmp_path,
+                anonymize=False,
             )
 
         kwargs = get_adapter.call_args.kwargs
@@ -312,6 +317,7 @@ class TestRunBenchmarkTool:
                 "sql",
                 platform_options={"port": 9001, "secure": False},
                 results_dir=tmp_path,
+                anonymize=False,
             )
 
         assert response["status"] == "failed"
@@ -347,6 +353,7 @@ class TestRunBenchmarkTool:
                 "sql",
                 platform_options={"connection_profile": "reviewed"},
                 results_dir=tmp_path,
+                anonymize=False,
             )
 
         kwargs = get_adapter.call_args.kwargs
@@ -371,6 +378,7 @@ class TestRunBenchmarkTool:
                 "sql",
                 platform_options={"connection_profile": "reviewed"},
                 results_dir=tmp_path,
+                anonymize=False,
             )
 
         assert response["status"] == "failed"

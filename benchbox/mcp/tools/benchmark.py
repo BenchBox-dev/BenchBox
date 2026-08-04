@@ -422,7 +422,7 @@ def _run_benchmark_impl(
     platform_options: Mapping[str, object] | None = None,
     results_dir: Path,
     execution_id: str | None = None,
-    anonymize: bool = False,
+    anonymize: bool,
 ) -> dict[str, Any]:
     """Core implementation for running benchmarks.
 
@@ -435,7 +435,10 @@ def _run_benchmark_impl(
             accepted. It is also the only gate on the durable-job worker path,
             where the request mapping is re-read from persistent storage.
         anonymize: Passed through to the result exporter; see
-            ``_export_and_build_payload``.
+            ``_export_and_build_payload``. Required rather than defaulted: it
+            governs a trust boundary, and a default would make "the caller
+            forgot" indistinguishable from "the caller chose local", failing
+            open on exactly the remote path that needs it.
     """
     execution_id = execution_id or f"mcp_{uuid.uuid4().hex[:8]}"
     start_time = mono_time()

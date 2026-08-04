@@ -394,9 +394,13 @@ def _compare_results_impl(
     threshold_percent: float,
     results_dir: Path,
     *,
-    anonymize: bool = False,
+    anonymize: bool,
 ) -> dict[str, Any]:
-    """Compare two benchmark runs."""
+    """Compare two benchmark runs.
+
+    ``anonymize`` is required rather than defaulted: it governs a trust
+    boundary, and a permissive default fails open on the remote path.
+    """
     # egress-reviewed: local stdio serves a same-trust-boundary agent that
     # needs real paths/hostnames to act on results; secrets are already
     # redacted at capture time by sanitize_platform_options, and exception
