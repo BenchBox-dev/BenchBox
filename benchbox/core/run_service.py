@@ -11,8 +11,9 @@ interactive prompt -- arrives as a resolved input or an injected factory. That
 is why :func:`resolve_run_config` takes an already-computed ``database_path``
 instead of a ``DirectoryManager``: the manager is CLI-layer, the path is data.
 
-This first increment covers request/plan types and configuration resolution
-only. Execution orchestration follows in a later work unit.
+This module covers request/plan types, configuration resolution, and execution
+orchestration. Everything that needs a console, an interactive prompt, or a
+concrete adapter class stays in the surface layer.
 """
 
 from __future__ import annotations
@@ -25,10 +26,22 @@ from benchbox.core.config import BenchmarkConfig, RunConfig
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
+    QUERY_PHASES,
+)
+from benchbox.core.platform_registry import PlatformRegistry
+from benchbox.core.results.driver_metadata import apply_driver_metadata
+from benchbox.core.runner.dataframe_runner import is_dataframe_execution
+from benchbox.core.runner.runner import (
+    LifecyclePhases,
+    ValidationOptions,
+    run_benchmark_lifecycle,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    from benchbox.core.results.models import BenchmarkResults
+    from benchbox.core.schemas import ExecutionContext
 
 
 class VerbosityLike(Protocol):
@@ -157,10 +170,151 @@ def resolve_run_config(
     )
 
 
+class AdapterFactory(Protocol):
+    """Builds the platform adapter for one run.
+
+    This is the injection point the layering contract forces. Constructing an
+    adapter means importing ``benchbox.platforms``, which core sits below, so
+    the surface supplies a callable instead. The CLI passes a closure over its
+    console and verbosity; MCP will pass one over its own adapter resolution.
+
+    Returning None is meaningful: a data-only run has no database to adapt.
+    """
+
+    def __call__(
+        self,
+        *,
+        execution_mode: str | None,
+        output_root: Any,
+        phases: LifecyclePhases,
+    ) -> Any | None: ...
+
+
+def resolve_lifecycle_phases(phases_to_run: list[str] | None) -> LifecyclePhases:
+    """Map a requested phase list onto the runner's lifecycle flags.
+
+    ``None`` means the standard lifecycle -- generate, load, execute -- with the
+    statistics phase staying opt-in.
+    """
+    if not phases_to_run:
+        return LifecyclePhases(generate=True, load=True, execute=True)
+
+    return LifecyclePhases(
+        generate="generate" in phases_to_run,
+        load="load" in phases_to_run,
+        execute=any(phase in phases_to_run for phase in ("warmup", *QUERY_PHASES)),
+        statistics="statistics" in phases_to_run,
+    )
+
+
+def resolve_validation_options(options: Mapping[str, Any] | None) -> ValidationOptions:
+    """Read the three validation toggles out of a benchmark's options."""
+    opts = options or {}
+    return ValidationOptions(
+        enable_preflight_validation=bool(opts.get("enable_preflight_validation")),
+        enable_postgen_manifest_validation=bool(opts.get("enable_postgen_manifest_validation", False)),
+        enable_postload_validation=bool(opts.get("enable_postload_validation", False)),
+    )
+
+
+def resolve_execution_mode(database_config: Any) -> str | None:
+    """Determine the execution mode for a run, or None with no database.
+
+    An explicit ``execution_mode`` on the database config wins. Otherwise the
+    platform registry's default applies, upgraded to ``dataframe`` when the
+    config describes a DataFrame execution.
+    """
+    if database_config is None:
+        return None
+
+    execution_mode = getattr(database_config, "execution_mode", None)
+    if execution_mode is not None:
+        return execution_mode
+
+    execution_mode = PlatformRegistry.get_default_mode(database_config.type)
+    if is_dataframe_execution(database_config):
+        execution_mode = "dataframe"
+    return execution_mode
+
+
+def stamp_requested_phases(config: BenchmarkConfig, phases_to_run: list[str] | None) -> None:
+    """Record the exact phases requested on the config's options.
+
+    Combined mode reads this downstream to run only what was asked for, rather
+    than everything the execution type implies.
+    """
+    if not phases_to_run:
+        return
+    options = dict(getattr(config, "options", {}) or {})
+    options["requested_phases"] = list(phases_to_run)
+    config.options = options
+
+
+def execute_run(
+    *,
+    config: BenchmarkConfig,
+    benchmark_instance: Any,
+    database_config: Any,
+    system_profile: Any,
+    platform_config: Mapping[str, Any] | None,
+    output_root: Any,
+    phases_to_run: list[str] | None,
+    adapter_factory: AdapterFactory,
+    verbosity: VerbosityLike,
+    monitor: Any = None,
+    execution_context: ExecutionContext | None = None,
+) -> BenchmarkResults:
+    """Run one benchmark through the core lifecycle.
+
+    Every input is already resolved by the surface: the benchmark instance, the
+    platform config, and the output root all arrive built. The adapter is the
+    one thing this function asks for, through ``adapter_factory``, because
+    building it requires ``benchbox.platforms``.
+
+    Moved from ``BenchmarkOrchestrator.execute_benchmark``. What did NOT move is
+    everything interaction-scoped: console output, the cloud-platform
+    load-phase warning, and the credential-setup retry all stay in the CLI,
+    which is where the new contract puts them.
+    """
+    stamp_requested_phases(config, phases_to_run)
+
+    phases = resolve_lifecycle_phases(phases_to_run)
+    validation = resolve_validation_options(getattr(config, "options", None))
+    execution_mode = resolve_execution_mode(database_config)
+
+    adapter = adapter_factory(execution_mode=execution_mode, output_root=output_root, phases=phases)
+
+    result = run_benchmark_lifecycle(
+        benchmark_config=config,
+        database_config=database_config,
+        system_profile=system_profile,
+        platform_config=platform_config,
+        phases=phases,
+        validation_opts=validation,
+        output_root=output_root,
+        benchmark_instance=benchmark_instance,
+        platform_adapter=adapter,
+        verbosity=verbosity,
+        monitor=monitor,
+        enable_resource_monitoring=False,
+        execution_context=execution_context,
+    )
+
+    # Canonical runtime metadata enrichment for every run path.
+    apply_driver_metadata(result, database_config=database_config, platform_adapter=adapter)
+    return result
+
+
 __all__ = [
+    "AdapterFactory",
     "RunPlan",
     "RunRequest",
     "SilentVerbosity",
     "VerbosityLike",
+    "execute_run",
+    "resolve_execution_mode",
+    "resolve_lifecycle_phases",
     "resolve_run_config",
+    "resolve_validation_options",
+    "stamp_requested_phases",
 ]

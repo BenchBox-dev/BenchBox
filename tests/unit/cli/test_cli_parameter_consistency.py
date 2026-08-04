@@ -290,7 +290,7 @@ class TestCLIParameterConsistency:
         orchestrator = BenchmarkOrchestrator()
 
         # Mock the orchestrator-local lifecycle import used by execute_benchmark().
-        with patch("benchbox.cli.orchestrator.run_benchmark_lifecycle") as mock_lifecycle:
+        with patch("benchbox.core.run_service.run_benchmark_lifecycle") as mock_lifecycle:
             mock_result = MagicMock()
             mock_lifecycle.return_value = mock_result
 

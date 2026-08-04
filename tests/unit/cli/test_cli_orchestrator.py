@@ -52,7 +52,7 @@ class TestBenchmarkOrchestrator:
         self.orchestrator.set_custom_output_dir(test_dir)
         assert self.orchestrator.custom_output_dir == test_dir
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch("benchbox.cli.orchestrator.console")
     def test_execute_benchmark_standard_mode(self, mock_console, mock_get_adapter, mock_lifecycle):
@@ -137,7 +137,7 @@ class TestBenchmarkOrchestrator:
         # Verify platform adapter was called
         mock_get_adapter.assert_called_once()
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     def test_execute_benchmark_enriches_driver_metadata_on_canonical_path(self, mock_get_adapter, mock_lifecycle):
         """Driver metadata is propagated on orchestrator/lifecycle path."""
@@ -508,7 +508,7 @@ class TestBenchmarkOrchestrator:
         assert run_config.connection is not None
         assert "database_path" in run_config.connection
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     def test_execute_data_only_mode_success(self, mock_lifecycle):
         """Test data-only mode execution success using lifecycle path."""
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="data_only")
@@ -538,7 +538,7 @@ class TestBenchmarkOrchestrator:
         assert isinstance(result, BenchmarkResults)
         assert result.test_execution_type == "data_only"
 
-    @patch("benchbox.cli.orchestrator.run_benchmark_lifecycle")
+    @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     def test_execute_data_only_mode_error(self, mock_lifecycle):
         """Test data-only mode execution error using lifecycle path."""
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="data_only")
