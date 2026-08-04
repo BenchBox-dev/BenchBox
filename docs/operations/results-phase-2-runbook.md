@@ -96,6 +96,35 @@ git commit -m "chore: refresh corpus inventory"
 
 If you are fixing the contributor branch yourself, explain that in the PR before pushing.
 
+## 4b. Corpus Path Privacy
+
+Every JSON file under `results-data/` must be free of private absolute paths.
+`tests/unit/scripts/test_corpus_privacy_invariant.py` scans the whole corpus on
+every code CI run, not just the files a PR touched. #1467 cleaned the corpus;
+this gate is what stops it regressing. A changed-files scan cannot do that job:
+a bundle merged before the scan existed is invisible to it permanently.
+
+The gate is marked `fast`, so it runs inside `code-test`, which
+`ci-required-result` gates on. A corpus-only diff still routes to `code-test`;
+the same test file pins both facts so the gate cannot become decorative.
+
+To re-migrate after importing legacy bundles:
+
+```bash
+uv run -- python _project/scripts/results_explorer_corpus_migrate.py
+```
+
+Dry run by default; add `--write` to apply. It reuses the canonical
+`AnonymizationManager` and preserves values that are already public hashes, so
+re-running it on the current corpus is a verified no-op (207 unchanged). It
+writes an audit trail to
+`results-data/bundles/path-privacy-migration.manifest.json` recording old/new
+hashes and result IDs — never a private value.
+
+Migrating rewrites `result_id` for every changed bundle. The Explorer derives
+result IDs from the *published* bytes, so regenerate the inventory afterwards
+(§4) and expect detail URLs to move.
+
 ## 5. Rolling Back a Bad Merge
 
 Use a fresh branch off the affected target branch. Set `REMOTE` to the repo you are
