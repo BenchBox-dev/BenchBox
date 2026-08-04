@@ -116,3 +116,20 @@ def test_auto_merge_partial_stack_soundness_revocation_is_unchanged() -> None:
     assert any("--auto --squash" in command for command in commands), (
         "hands-free auto-merge for ordinary PRs is gone - the common case must stay hands-free"
     )
+
+
+def test_auto_merge_partial_stack_detector_uses_the_pushed_allowlist() -> None:
+    """The detector must judge a push by that push's own allowlist.
+
+    It reads the allowlist from the checkout but compares branches against the
+    remote, so the checkout ref decides only which allowlist is in force.
+    Pinning `ref: develop` meant a branch that acknowledges an orphan was still
+    judged by develop's older allowlist, so it could never make its own run
+    pass - the check stayed red until after it merged.
+    """
+    workflow = _load(DETECTOR_WORKFLOW)
+    steps = workflow["jobs"]["detect"]["steps"]
+    checkout = next(s for s in steps if str(s.get("uses", "")).startswith("actions/checkout"))
+    assert "ref" not in checkout.get("with", {}), (
+        "detector pins a checkout ref, so a push cannot be judged by its own allowlist"
+    )

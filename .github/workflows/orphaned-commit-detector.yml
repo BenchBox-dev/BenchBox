@@ -55,9 +55,17 @@ jobs:
     name: Detect orphaned commits on dead branches
     runs-on: ubuntu-latest
     steps:
+      # Check out the pushed commit, NOT a hardcoded develop.
+      #
+      # The detector reads its allowlist and its own source from the checkout,
+      # but compares branches against the remote, so the ref only decides
+      # *which version of the allowlist* is in force. Pinning develop meant a
+      # push that adds an allowlist entry was still judged by develop's older
+      # allowlist - so a branch acknowledging an orphan could never make its own
+      # run pass, and the check stayed red until after it merged. On the
+      # schedule trigger this resolves to develop's head anyway.
       - uses: actions/checkout@v4
         with:
-          ref: develop
           fetch-depth: 0
 
       - name: Fetch all remote branches

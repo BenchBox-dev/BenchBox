@@ -52,3 +52,12 @@ b5c56ea998eb92b1a636b42205bd059cd19793d5
 # SHAs, so the originals stay unreachable from develop by construction.
 ef0fde5b6b697eafd9c7ca59a1554edad63ee627
 bff13a3a20597c47a2fa4170406730717d36ced3
+
+# Pre-existing, on the live branch test/freeze-bulk-path-coverage. Not this
+# session's work and not re-landed: cc01856f's ADR text was verified already
+# present on develop, and 43fd39fe is a merge of origin/develop into that
+# branch, so neither carries unique content. Acknowledged so a genuinely new
+# orphan is not buried under a permanently red run; tracked for confirmation
+# with the branch owner as orphan-detector-freeze-branch-residual-20260804.
+cc01856f9da6f3dc815c0810936a88e3897132e7
+43fd39fe4d990d6906dfcbb1fd4f914595114b2c
