@@ -171,23 +171,94 @@ class TestNoSurfaceKeepsALocalPolicy:
 
 
 class TestReportThresholdIsNoLongerInert:
-    """Characterizes the one deliberate behavior change in this migration."""
+    """Characterizes the one deliberate behavior change in this migration.
 
-    def test_a_sub_default_threshold_now_selects_regressions(self):
-        """Previously `detect_regressions(5.0)` could not report a 7% slowdown.
+    These drive ResultDatabase.detect_regressions itself. An earlier version of
+    this class compared a locally-defined lambda against is_regression, which
+    proved only that two expressions in the test file disagree -- restoring the
+    superseded filter in database.py left every test green.
+    """
+
+    @staticmethod
+    def _trend(change_pct: float | None, *, is_regression_flag: bool):
+        from datetime import datetime, timezone
+
+        from benchbox.core.results.database import PerformanceTrend
+
+        moment = datetime(2026, 8, 4, tzinfo=timezone.utc)
+        return PerformanceTrend(
+            platform="duckdb",
+            benchmark="tpch",
+            scale_factor=1.0,
+            period_start=moment,
+            period_end=moment,
+            avg_geometric_mean_ms=100.0,
+            min_geometric_mean_ms=90.0,
+            max_geometric_mean_ms=110.0,
+            sample_count=3,
+            change_pct=change_pct,
+            is_regression=is_regression_flag,
+        )
+
+    def _detect(self, tmp_path, trend, threshold: float):
+        from unittest.mock import patch
+
+        from benchbox.core.results.database import ResultDatabase
+
+        db = ResultDatabase(tmp_path / "results.db")
+        with (
+            patch.object(ResultDatabase, "get_platforms", return_value=["duckdb"]),
+            patch.object(ResultDatabase, "get_benchmarks", return_value=["tpch"]),
+            patch.object(ResultDatabase, "get_performance_trends", return_value=[trend]),
+            patch.object(db, "_connection") as connection,
+        ):
+            cursor = connection.return_value.__enter__.return_value.cursor.return_value
+            cursor.fetchall.return_value = [(1.0,)]
+            return db.detect_regressions(threshold_pct=threshold)
+
+    def test_a_sub_default_threshold_now_selects_regressions(self, tmp_path):
+        """A 7% slowdown was unreportable at --threshold 5.
 
         get_performance_trends set is_regression at the fixed 10% policy, and
         detect_regressions required BOTH that flag and change_pct > threshold,
-        so any threshold below 10 was silently inert.
+        so the flag vetoed every threshold below 10.
         """
-        superseded = lambda change, threshold: (change > 10) and (change > threshold)  # noqa: E731
+        trend = self._trend(7.0, is_regression_flag=False)
 
-        assert superseded(7.0, 5.0) is False
-        assert is_regression(7.0, 5.0) is True
+        found = self._detect(tmp_path, trend, threshold=5.0)
 
-    def test_thresholds_at_or_above_the_default_are_unchanged(self):
+        assert len(found) == 1
+        assert found[0].change_pct == 7.0
+
+    def test_the_returned_record_agrees_with_the_filter(self, tmp_path):
+        """A row selected as a regression must not report is_regression False."""
+        trend = self._trend(7.0, is_regression_flag=False)
+
+        found = self._detect(tmp_path, trend, threshold=5.0)
+
+        assert found[0].is_regression is True
+
+    def test_a_change_under_the_threshold_is_still_excluded(self, tmp_path):
+        trend = self._trend(3.0, is_regression_flag=False)
+
+        assert self._detect(tmp_path, trend, threshold=5.0) == []
+
+    def test_the_default_threshold_is_unchanged(self, tmp_path):
+        """At the default, selection matches the superseded filter exactly."""
+        assert self._detect(tmp_path, self._trend(12.0, is_regression_flag=True), threshold=10.0)
+        assert self._detect(tmp_path, self._trend(7.0, is_regression_flag=False), threshold=10.0) == []
+
+    def test_a_missing_change_is_not_a_regression(self, tmp_path):
+        """change_pct is None for the oldest period in a window."""
+        trend = self._trend(None, is_regression_flag=False)
+
+        assert self._detect(tmp_path, trend, threshold=5.0) == []
+
+    def test_thresholds_at_or_above_the_default_are_unchanged(self, tmp_path):
         superseded = lambda change, threshold: (change > 10) and (change > threshold)  # noqa: E731
 
         for change in (0.0, 5.0, 7.0, 11.0, 25.0, 120.0):
             for threshold in (10.0, 15.0, 20.0):
-                assert superseded(change, threshold) is is_regression(change, threshold)
+                trend = self._trend(change, is_regression_flag=change > 10)
+                selected = bool(self._detect(tmp_path, trend, threshold=threshold))
+                assert selected is superseded(change, threshold), (change, threshold)
