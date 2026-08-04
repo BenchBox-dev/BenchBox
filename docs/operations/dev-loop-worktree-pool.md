@@ -174,7 +174,7 @@ local pre-push hook lock doesn't bottleneck it.
 | `make worktree-pool-disk-clean` | Strip pytest/coverage/ruff caches across all slots. |
 | `make worktree-list` | `git worktree list` passthrough. |
 | `make worktree-prune` | Legacy non-pool worktree cleanup; explicitly skips pool slots. |
-| `make branch-prune-merged` | Delete local branches with a MERGED PR into `develop` but no worktree attached (e.g. plain `git checkout -b` leftovers). Requires `gh`. |
+| `make branch-prune-merged [DRY_RUN=1]` | Delete local branches with a MERGED PR into `develop` but no worktree attached (e.g. plain `git checkout -b` leftovers), and only while the local tip is still the exact commit GitHub merged. Requires `gh`. |
 
 ## Invariants
 
@@ -196,11 +196,16 @@ on them:
   Git forbids the same branch in two worktrees.
 - **`worktree-prune` skips pool slots.** Routine end-of-session prune
   is no longer needed — slots are released, not removed.
-- **`branch-prune-merged` skips any branch attached to a worktree**
-  (pool slot or legacy), and never touches `develop`, `main`, `release`,
-  `published-results`, or the branch currently checked out. It trusts
-  `gh pr view`/`gh pr list` state, not commit ancestry, since PRs merge
-  via squash and a merged branch's tip is not an ancestor of `develop`.
+- **`branch-prune-merged` never deletes on branch name alone.** It trusts
+  `gh pr list` state, not commit ancestry, since PRs merge via squash and a
+  merged branch's tip is not an ancestor of `develop`. On top of MERGED
+  state it requires the local tip to still equal the PR's `headRefOid` — the
+  exact commit GitHub merged. A branch re-created under an old merged
+  branch's name, or carrying commits pushed after the merge, is reported and
+  kept, so `git branch -D` can never discard unmerged local work. It also
+  skips any branch attached to a worktree (pool slot or legacy) and never
+  touches `develop`, `main`, `release`, `published-results`, or the branch
+  currently checked out.
 
 ## See also
 

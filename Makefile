@@ -2297,37 +2297,70 @@ worktree-prune:
 		done
 	@git worktree prune
 
-# Remove local branches whose PR has already merged into develop but that
-# have no worktree attached. worktree-prune only sweeps branches tied to a
-# worktree, so plain `git checkout -b` leftovers in a long-lived clone never
-# get cleaned by it. Requires `gh`: PRs merge via squash, so branch ancestry
-# can't tell a merged branch from a diverged one -- PR state is the only
-# reliable signal (same approach as worktree-pool-sweep-stale).
+## branch-prune-merged: delete local branches whose PR already merged into
+## develop but that have no worktree attached. worktree-prune only sweeps
+## branches tied to a worktree, so plain `git checkout -b` leftovers in a
+## long-lived clone are never cleaned by it.
+##
+## Requires `gh`. PRs squash-merge, so a merged branch's tip is never an
+## ancestor of develop and ancestry cannot tell merged from diverged; PR
+## state is the only reliable signal (same as worktree-pool-sweep-stale).
+##
+## Deletes only when the local tip is still the exact commit GitHub merged
+## (headRefOid). A branch re-created under an old merged branch's name, or
+## carrying commits pushed after the merge, is reported and kept rather
+## than force-deleted -- name alone is not proof the local work merged.
+## A local branch left behind the merged head is likewise kept.
+##
+## Run with DRY_RUN=1 to preview without deleting anything.
 branch-prune-merged:
 	@command -v gh >/dev/null 2>&1 || { echo "gh CLI required for branch-prune-merged" >&2; exit 1; }
-	@git fetch origin develop --quiet
 	@pr_table=$$(gh pr list --state all --base develop --limit 1000 \
-		--json headRefName,state \
-		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' 2>/dev/null); \
+		--json headRefName,state,headRefOid \
+		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\t"}}{{.headRefOid}}{{"\n"}}{{end}}' 2>/dev/null); \
 	if [ -z "$$pr_table" ]; then \
 		echo "gh pr list returned no data; refusing to prune without PR-state visibility" >&2; \
 		exit 1; \
 	fi; \
 	current=$$(git branch --show-current); \
 	worktree_branches=$$(git worktree list --porcelain | awk '/^branch /{print $$2}'); \
-	git for-each-ref --format='%(refname:short)' refs/heads | \
-		while read -r br; do \
-			case "$$br" in develop|main|release|published-results) continue ;; esac; \
-			[ "$$br" = "$$current" ] && continue; \
-			case "$$worktree_branches" in *"refs/heads/$$br"*) echo "Skipping $$br (attached to a worktree; use worktree-prune)"; continue ;; esac; \
-			pr_state=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$br" '$$1 == b {print $$2; exit}'); \
-			if [ -z "$$pr_state" ]; then \
-				pr_state=$$(gh pr view "$$br" --json state --jq .state 2>/dev/null || true); \
-			fi; \
-			[ "$$pr_state" = "MERGED" ] || continue; \
-			echo "Deleting merged branch: $$br"; \
-			git branch -D "$$br"; \
-		done
+	deleted=0; kept=0; \
+	for br in $$(git for-each-ref --format='%(refname:short)' refs/heads); do \
+		case "$$br" in develop|main|release|published-results) continue ;; esac; \
+		[ "$$br" = "$$current" ] && continue; \
+		if printf '%s\n' "$$worktree_branches" | grep -qxF "refs/heads/$$br"; then \
+			echo "skip $$br: attached to a worktree (use worktree-release / worktree-prune)"; \
+			continue; \
+		fi; \
+		row=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$br" '$$1 == b {print; exit}'); \
+		if [ -z "$$row" ]; then \
+			row=$$(gh pr list --head "$$br" --state all --base develop --limit 1 \
+				--json headRefName,state,headRefOid \
+				--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\t"}}{{.headRefOid}}{{"\n"}}{{end}}' 2>/dev/null); \
+		fi; \
+		[ -n "$$row" ] || continue; \
+		pr_state=$$(printf '%s\n' "$$row" | cut -f2); \
+		merged_oid=$$(printf '%s\n' "$$row" | cut -f3); \
+		[ "$$pr_state" = "MERGED" ] || continue; \
+		local_oid=$$(git rev-parse --verify --quiet "refs/heads/$$br") || continue; \
+		if [ "$$local_oid" != "$$merged_oid" ]; then \
+			echo "keep $$br: local tip $$(printf "%.8s" "$$local_oid") is not the merged head $$(printf "%.8s" "$$merged_oid") (re-created or diverged)"; \
+			kept=$$((kept + 1)); \
+			continue; \
+		fi; \
+		if [ "$(DRY_RUN)" = "1" ]; then \
+			echo "would delete $$br (PR MERGED at $$(printf "%.8s" "$$merged_oid"))"; \
+		else \
+			echo "delete $$br (PR MERGED at $$(printf "%.8s" "$$merged_oid"))"; \
+			git branch -D "$$br" >/dev/null; \
+		fi; \
+		deleted=$$((deleted + 1)); \
+	done; \
+	if [ "$(DRY_RUN)" = "1" ]; then \
+		echo "Dry run: would delete $$deleted branch(es); $$kept kept (not the merged head)."; \
+	else \
+		echo "Deleted $$deleted branch(es); $$kept kept (not the merged head)."; \
+	fi
 
 # Blind-spot finding triage (file-first capture; see _project/blind-spots/README.md).
 blind-spots-list:
@@ -2657,7 +2690,7 @@ help:
 	@echo "Legacy / non-pool worktree utilities (pool path via worktree-claim is preferred):"
 	@echo "  make worktree-list             List active worktrees"
 	@echo "  make worktree-prune            Remove legacy non-pool worktrees whose branches are gone on origin"
-	@echo "  make branch-prune-merged       Delete local branches whose PR merged into develop but have no worktree (requires gh)"
+	@echo "  make branch-prune-merged [DRY_RUN=1]  Delete worktree-less local branches still at their merged PR head (requires gh)"
 	@echo ""
 	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
 	@echo "  make blind-spots-list   List open findings (one row each)"

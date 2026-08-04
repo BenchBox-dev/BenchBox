@@ -94,7 +94,8 @@ The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto
 
    ```bash
    make worktree-prune         # removes worktrees whose branches are gone on origin
-   make branch-prune-merged    # removes plain local branches (no worktree) whose PR merged into develop
+   make branch-prune-merged    # removes plain local branches (no worktree) still at their merged PR head
+   make branch-prune-merged DRY_RUN=1   # preview first; branches that moved since the merge are kept
    ```
 
    Inspect open PRs at any time with `make pr-status`.
