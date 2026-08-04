@@ -1,7 +1,7 @@
 {
   "benchmark": "CoffeeShop",
   "bundle_file": "coffeeshop_sf1_sqlite_sql_20260502_195145_a6ad02d6.json",
-  "bundle_hash": "3b9db8f143c7ac1be986af25a8b383910966230f107b6e79ebd499d5879dea6a",
+  "bundle_hash": "8392f09c33f221803635eaa84451b7ba84a3f3cd232aabf0108e6fe57c0c5b3b",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

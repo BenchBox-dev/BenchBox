@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
+from benchbox.core.results.canonical_json import canonical_json_bytes
 
 pytestmark = [
     pytest.mark.unit,
@@ -28,6 +29,8 @@ pytestmark = [
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RESULTS_DATA = REPO_ROOT / "results-data"
+COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json")
+MIGRATION_MANIFEST = "path-privacy-migration.manifest.json"
 
 
 def _corpus_json_files() -> list[Path]:
@@ -140,6 +143,50 @@ def test_anonymizing_the_corpus_twice_matches_anonymizing_it_once() -> None:
     assert scanned, "no corpus mappings scanned - the fixed-point gate would be vacuous"
     assert not unstable, f"{len(unstable)} corpus file(s) change under a second anonymization pass:\n" + "\n".join(
         unstable[:20]
+    )
+
+
+def test_rederived_corpus_publishes_byte_identically_to_what_is_stored() -> None:
+    """Stored bytes and published bytes must be the same bytes.
+
+    Stronger than the fixed-point gate above, which only says publication
+    stabilizes after one pass. This says the corpus is ALREADY at that fixed
+    point, so publishing rewrites nothing: the stored file and the file the
+    Explorer serves are byte-identical under the canonical encoder, and a
+    result ID computed from either is the same ID.
+
+    That is the property the re-derivation established. It also fails closed on
+    the way a corpus most plausibly regresses - someone re-importing bundles
+    that were never run through the public boundary, or run through a different
+    one - because those would differ here while still passing the idempotence
+    gate (anything already pseudonym-shaped is stable on a second pass whether
+    or not it was correct on the first).
+
+    What this canNOT check is how many passes produced the stored value: a
+    once-hashed and a twice-hashed pseudonym are indistinguishable without the
+    pre-anonymization original. That is inherently a one-time migration
+    property, verified against the pre-#1467 originals in the PR that
+    re-derived the corpus, not a recurring invariant.
+    """
+    manager = AnonymizationManager()
+    drifted: list[str] = []
+    scanned = 0
+
+    for path in sorted((RESULTS_DATA / "bundles").rglob("*.json")):
+        if path.name.endswith(COMPANION_SUFFIXES) or path.name == MIGRATION_MANIFEST:
+            continue
+        stored = path.read_bytes()
+        payload = json.loads(stored.decode("utf-8"))
+        if not isinstance(payload, dict):
+            continue
+        scanned += 1
+        if canonical_json_bytes(manager.anonymize_result_payload(payload)) != stored:
+            drifted.append(str(path.relative_to(REPO_ROOT)))
+
+    assert scanned, "no primary bundles scanned - this gate would be vacuous"
+    assert not drifted, (
+        f"{len(drifted)} bundle(s) are not stored at the publication fixed point; "
+        "publishing would rewrite them and change their result IDs:\n" + "\n".join(drifted[:20])
     )
 
 

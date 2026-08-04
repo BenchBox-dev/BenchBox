@@ -1,7 +1,7 @@
 {
   "benchmark": "SSB",
   "bundle_file": "ssb_sf1_datafusion_df_20260502_223330_2b2f5243.json",
-  "bundle_hash": "3e5588dd8319a310a0d842597c82dac8b7fcc252b57e320c5041a3b0b5fee5bb",
+  "bundle_hash": "84c1b8db4c0436cf5cf0acdefe43930a0f19c4948d06cf774bacfef3a137500e",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

@@ -1,0 +1,81 @@
+name: Corpus Drift Check
+
+# Canary for the public results corpus.
+#
+# `sync-results-data-to-published.yml` mirrors develop's `results-data/` onto
+# `published-results` on push. That is the only thing keeping the public corpus
+# current, and it failed silently once already: on 2026-08-03 GitHub delivered
+# no push events for three consecutive develop merges (045a6c90fc, 37370ce5e4,
+# 703a269f7a) -- not even `Develop post-merge`, which fires on every push. One
+# of those was #1467, the commit that sanitized the corpus. The mirror never
+# opened, nothing alerted, and `published-results` served 183 bundles carrying
+# private absolute paths for a day until an unrelated review found it.
+#
+# Every drift guard in this repo is push-triggered, so every one of them shares
+# that failure mode. This canary is deliberately SCHEDULED: a cron run does not
+# depend on the delivery of any particular push event, so it still fires for a
+# commit whose push was dropped.
+#
+# It only reports. Opening the mirror stays a human step
+# (`gh workflow run sync-results-data-to-published.yml`) so a stale public
+# corpus is loud without this workflow gaining write access to a public branch.
+
+on:
+  schedule:
+    # Daily, offset from the other canaries to spread scheduler load.
+    - cron: "37 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: corpus-drift-check
+  cancel-in-progress: false
+
+jobs:
+  corpus-drift:
+    name: Compare develop vs published-results corpus
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Compare the mirrored corpus paths
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin published-results
+
+          # Fail clearly rather than silently passing an empty comparison.
+          if ! git cat-file -e FETCH_HEAD:results-data 2>/dev/null; then
+            echo "::error::published-results has no results-data/ tree"
+            exit 2
+          fi
+
+          # Same path set the sync workflow mirrors.
+          DRIFT=$(git diff --name-only FETCH_HEAD HEAD -- \
+            'results-data/bundles' \
+            'results-data/corpus-inventory.json' \
+            'results-data/CORPUS_NOTES.md' \
+            'results-data/SEED_CORPUS_SPEC.md' \
+            'results-data/README.md' \
+            'results-data/validate_corpus.py')
+
+          if [[ -z "${DRIFT}" ]]; then
+            echo "Corpus is in sync between develop and published-results."
+            exit 0
+          fi
+
+          COUNT=$(printf '%s\n' "${DRIFT}" | wc -l | tr -d ' ')
+          echo "::error::published-results corpus is ${COUNT} path(s) behind develop."
+          echo "The public corpus is stale. If develop has since sanitized or"
+          echo "corrected bundles, the public branch is still serving the old"
+          echo "content. Mirror it with:"
+          echo "  gh workflow run sync-results-data-to-published.yml --ref develop"
+          echo ""
+          echo "Drifted paths (first 40):"
+          printf '%s\n' "${DRIFT}" | head -40
+          exit 1

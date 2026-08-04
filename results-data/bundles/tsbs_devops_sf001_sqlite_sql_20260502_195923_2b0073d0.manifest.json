@@ -1,7 +1,7 @@
 {
   "benchmark": "TSBS DevOps",
   "bundle_file": "tsbs_devops_sf001_sqlite_sql_20260502_195923_2b0073d0.json",
-  "bundle_hash": "2e072dcd49b0b8937c42ce89808dc6756df7240c3ce085f361b21312d941faa4",
+  "bundle_hash": "5cd42f6c597e2755030d50d1944a4e1da1790ece6788a0cc8633d2a537936941",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

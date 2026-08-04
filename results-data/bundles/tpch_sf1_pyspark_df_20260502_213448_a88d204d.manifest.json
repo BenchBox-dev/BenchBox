@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-H",
   "bundle_file": "tpch_sf1_pyspark_df_20260502_213448_a88d204d.json",
-  "bundle_hash": "bbe1f2bbfd42e04104e5dee189a2889d6e033a0fdf3d0da484230de8c953fa5a",
+  "bundle_hash": "3ad424fdb406cad80b7a948f9c9efecdcd98558ed2744522b789362f0b99f706",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",

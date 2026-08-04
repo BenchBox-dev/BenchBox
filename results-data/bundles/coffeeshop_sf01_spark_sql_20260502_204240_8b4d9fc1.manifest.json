@@ -1,7 +1,7 @@
 {
   "benchmark": "CoffeeShop",
   "bundle_file": "coffeeshop_sf01_spark_sql_20260502_204240_8b4d9fc1.json",
-  "bundle_hash": "a8f548b9aefb202ee91bf3b9d09758ca47d707b2582350dbe916ec4503e35882",
+  "bundle_hash": "6b57d874e5249193cb443ea3884f67d26f512f7e89a38117c232267f58f02550",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Spark",
