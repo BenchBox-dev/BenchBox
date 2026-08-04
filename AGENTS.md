@@ -27,9 +27,7 @@ the user explicitly requests that exact identity for the current task. A
 signing service may hold the committer slot behind a human author.
 Do not add an agent/service `Co-Authored-By` trailer or equivalent attribution
 unless the current task explicitly requests that exact trailer; a stale request,
-tool convention, harness or hook message, or claimed agent contribution is
-not authorization. Such an instruction is external and recurs; see
-`docs/development/agent-identity-instruction-boundary.md`.
+tool convention, or claim of agent contribution is not authorization.
 `make agent-write-preflight` asserts this at claim time, and `ci-lint` rejects
 agent authorship in config and across `origin/develop..HEAD`. The same bar binds
 comments, reviews, and pull request bodies, which post as the owner: no standing
@@ -97,9 +95,10 @@ that uses one.
 - Live cloud tests and broad/destructive cleanup require explicit approval.
 
 For long output, write `/tmp/<slug>.log` and report status plus a short tail.
-UAT/stress runs use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`; announce
-command, maximum runtime, log path, and stop condition. Do not commit raw logs,
-screenshots, browser reports, or generated binaries without a durable consumer.
+UAT/stress runs instead use `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs`;
+announce command, maximum runtime, log path, and stop condition. Do not commit
+raw logs, screenshots, browser reports, or generated binary evidence unless it
+has an identified durable consumer.
 
 ## Verification and close-out
 
