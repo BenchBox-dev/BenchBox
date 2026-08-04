@@ -347,7 +347,11 @@ export function Home(_: RoutableProps) {
         data-testid="home-hero-filter-band"
         data-surface="hero"
       >
-        <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-7 lg:px-8">
+        {/* lg:py-4 trims hero vertical cost at desktop and wide only. Those two
+            viewports budget the fold at 900px, and the taller hero pushed the
+            second leaderboard row past it (see responsive.spec.ts). Tablet and
+            mobile keep the roomier padding; their fold budget is 1200px. */}
+        <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-7 lg:px-8 lg:py-4">
           <div class="max-w-4xl">
             <h1 class="text-2xl font-bold sm:text-4xl">BenchBox Curated Results Preview</h1>
             <p class="mt-2 max-w-3xl text-sm text-[var(--bb-fg-muted)] sm:mt-3 sm:text-lg">

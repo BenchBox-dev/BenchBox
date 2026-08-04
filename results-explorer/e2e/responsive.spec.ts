@@ -56,7 +56,7 @@ test.describe("responsive explorer assertions", () => {
       await waitForDataLoaded(page, /Recent Results/i);
 
       await expectTopWithin(
-        page.getByRole("heading", { name: "BenchBox Database Leaderboards" }),
+        page.getByRole("heading", { name: "BenchBox Curated Results Preview" }),
         viewport.maxY,
         "home headline",
       );
