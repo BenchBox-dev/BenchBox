@@ -12,9 +12,9 @@ The MCP server exposes BenchBox functionality through:
 
 - **server**: Main server creation and configuration
 - **errors**: Structured error handling with error codes and categories
-- **schemas**: Pydantic input validation models
-- **observability**: Structured logging and metrics collection
-- **execution**: Async execution tracking for long-running benchmarks
+- **schemas**: Platform-option admission and input validation
+- **jobs**: Durable job queue for authenticated remote execution
+- **telemetry**: Server-side telemetry for remote deployments
 
 ## Example Usage
 
@@ -75,13 +75,6 @@ __all__ = [
     "ErrorCategory",
     "MCPError",
     "make_error",
-    # Observability
-    "ToolCallContext",
-    "get_metrics_collector",
-    # Execution
-    "ExecutionStatus",
-    "ExecutionState",
-    "get_execution_tracker",
 ]
 
 
@@ -165,16 +158,4 @@ def __getattr__(name: str):
         return {"ErrorCode": ErrorCode, "ErrorCategory": ErrorCategory, "MCPError": MCPError, "make_error": make_error}[
             name
         ]
-    elif name in ("ToolCallContext", "get_metrics_collector"):
-        from benchbox.mcp.observability import ToolCallContext, get_metrics_collector
-
-        return {"ToolCallContext": ToolCallContext, "get_metrics_collector": get_metrics_collector}[name]
-    elif name in ("ExecutionStatus", "ExecutionState", "get_execution_tracker"):
-        from benchbox.mcp.execution import ExecutionState, ExecutionStatus, get_execution_tracker
-
-        return {
-            "ExecutionStatus": ExecutionStatus,
-            "ExecutionState": ExecutionState,
-            "get_execution_tracker": get_execution_tracker,
-        }[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
