@@ -908,12 +908,21 @@ def find_public_path_leaks(value: Any, key_path: tuple[str, ...] = ()) -> list[s
     offending field path without echoing a user's home directory or other
     machine-local material.  It is shared by submission validation and the
     Explorer publication boundary so both surfaces enforce the same contract.
+
+    Object *keys* are checked as well as values.  A payload can encode a path
+    as a mapping key -- ``{"per_path_timings": {"/Users/alice/db": 1.2}}`` is
+    the shape that occurs in practice -- and scanning values alone would call
+    that clean.  Such a key is reported at ``<parent>.<key>`` with the key
+    itself elided, because the offending string *is* the private path and
+    naming it would break the redaction contract above.
     """
 
     leaks: list[str] = []
 
     if isinstance(value, dict):
         for key, child in value.items():
+            if isinstance(key, str) and _PRIVATE_LOCAL_PATH_RE.search(key):
+                leaks.append(".".join((*key_path, "<key>")))
             leaks.extend(find_public_path_leaks(child, (*key_path, str(key))))
         return leaks
 

@@ -221,9 +221,20 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
             existing = json.loads(manifest_path.read_text(encoding="utf-8"))
             if not isinstance(existing, dict) or existing.get("migration") != manifest["migration"]:
                 raise FileExistsError(f"refusing to overwrite an existing migration manifest: {manifest_path}")
-            if manifest["summary"]["changed_bundles"]:
+            # All three counts, not just bundles: a re-migration that rewrites
+            # only companions or only sidecar manifests still mutates the
+            # corpus, and gating on `changed_bundles` alone let that happen
+            # while the stale manifest was kept -- leaving the mutation with no
+            # audit entry recording its old/new hashes.
+            summary = manifest["summary"]
+            changed_counts = {
+                name: summary[name] for name in ("changed_bundles", "companion_changes", "manifest_changes")
+            }
+            if any(changed_counts.values()):
+                detail = ", ".join(f"{name}={count}" for name, count in changed_counts.items() if count)
                 raise FileExistsError(
-                    f"existing migration manifest requires a new --manifest path for changed input: {manifest_path}"
+                    f"existing migration manifest requires a new --manifest path for changed input "
+                    f"({detail}): {manifest_path}"
                 )
         else:
             _atomic_write(manifest_path, canonical_json_bytes(manifest))
