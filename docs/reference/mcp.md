@@ -247,6 +247,12 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
+- Velox `deployment` accepts only `local` and `remote`, enumerated in both the
+  allow-list and the adapter. Unknown values are rejected rather than treated as
+  remote, so a request can never redirect execution to an endpoint it did not
+  name. `docker` is rejected: the `docker/velox/` tree is packaging
+  infrastructure for local development, not a deployment mode with its own
+  lifecycle, endpoint, isolation, and cleanup contract.
 - Modin `engine` accepts only `ray` and `dask` over MCP. The adapter itself also
   supports `unidist`, which stays documented for CLI and Python-API callers but
   is deliberately outside the MCP surface while it is experimental. `pandas` is

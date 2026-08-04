@@ -69,6 +69,12 @@ except ImportError:
 _GLUTEN_PLUGIN_CLASS = "org.apache.gluten.GlutenPlugin"
 _COLUMNAR_SHUFFLE_MANAGER = "org.apache.spark.shuffle.sort.ColumnarShuffleManager"
 
+# The only deployments the adapter implements.  "docker" is deliberately absent:
+# the docker/velox/ tree is packaging infrastructure for local development, not a
+# deployment mode with its own lifecycle, endpoint, isolation, and cleanup
+# contract.  Treating it as one would silently mean "remote".
+SUPPORTED_VELOX_DEPLOYMENTS = frozenset({"local", "remote"})
+
 
 class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
     """Apache Gluten + Velox Spark acceleration platform adapter.
@@ -101,6 +107,25 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     _df_caching_supported: bool = False
     _catalog_clear_cache_supported: bool = False
 
+    @classmethod
+    def _validate_deployment(cls, deployment: object) -> str:
+        """Return a supported deployment name, or fail closed.
+
+        Raises:
+            ValueError: If the deployment is not one the adapter implements.
+        """
+        normalized = str(deployment).strip().lower()
+        if normalized not in SUPPORTED_VELOX_DEPLOYMENTS:
+            supported = ", ".join(sorted(SUPPORTED_VELOX_DEPLOYMENTS))
+            hint = ""
+            if normalized == "docker":
+                hint = (
+                    " Docker is packaging infrastructure for local development, not a deployment mode;"
+                    " use deployment='local' inside the container."
+                )
+            raise ValueError(f"Unsupported Velox deployment '{normalized}'. Supported deployments: {supported}.{hint}")
+        return normalized
+
     def __init__(self, **config):
         super().__init__(**config)
 
@@ -112,8 +137,13 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
         self._dialect = "spark"
 
-        # Deployment mode: "local" | "remote"
-        self.deployment = config.get("deployment") or config.get("deployment_mode") or "local"
+        # Deployment mode: "local" | "remote".  Enumerated rather than compared
+        # against "local", because every downstream branch is `if local: ... else:
+        # <remote>`; an unrecognized value would otherwise route execution to a
+        # Spark-Connect endpoint the caller never asked for.
+        self.deployment = self._validate_deployment(
+            config.get("deployment") or config.get("deployment_mode") or "local"
+        )
 
         if self.deployment == "local":
             self._df_caching_supported = True
