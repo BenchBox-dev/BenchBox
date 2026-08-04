@@ -37,3 +37,10 @@ cf394466a1422db63ea93546ef1d870d6d90c28a
 # "{query_id}#{stream_id}:{test_type}" scheme landed through #976/#979/#989,
 # with a regression test in tests/unit/core/results/test_loader.py.
 ee072b2c98c62671229876c075039a723732c3ea
+
+# Resolved: PR #1503 auto-merged carrying only its first commit while this
+# commit was still being written, so the "Results Explorer browser gate" job
+# its own PR body described never landed. Content was re-landed verbatim via
+# PR #1504 (cherry-pick onto a fresh branch off develop). Kept here because the
+# original SHA is still unreachable from develop by construction.
+b5c56ea998eb92b1a636b42205bd059cd19793d5
