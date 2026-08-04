@@ -131,6 +131,11 @@ def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
             logger.warning("Could not remove legacy artifact %s", output_dir / legacy_file)
 
 
+# Bounded read size for companion hashing; keeps memory flat regardless of
+# how large a corpus-controlled companion file is.
+_DIGEST_CHUNK_BYTES = 1024 * 1024
+
+
 def _publication_digest(bundle_path: Path, public_raw: bytes) -> str:
     """Digest everything a result publishes under its ``result_id``.
 
@@ -146,6 +151,13 @@ def _publication_digest(bundle_path: Path, public_raw: bytes) -> str:
     artifact, so it needs no sanitizing - and reading raw means a companion
     differing only in private, later-redacted content still marks the two
     bundles distinct, which fails safe.
+
+    Companions are hashed **incrementally**. ``read_bytes()`` would materialize
+    a whole corpus-controlled file, which for an oversized legacy
+    ``.applied.json`` bypasses the ``APPLIED_COMPANION_MAX_BYTES`` guard in
+    ``_applied_receipt`` - that path deliberately stats the file and returns a
+    truncation marker without reading it, so slurping here could exhaust memory
+    on a corpus that previously built fine.
     """
     hasher = hashlib.sha256()
     hasher.update(public_raw)
@@ -153,7 +165,9 @@ def _publication_digest(bundle_path: Path, public_raw: bytes) -> str:
         companion = bundle_path.with_name(f"{bundle_path.stem}{suffix}")
         hasher.update(suffix.encode())
         try:
-            hasher.update(hashlib.sha256(companion.read_bytes()).hexdigest().encode())
+            with companion.open("rb") as handle:
+                for chunk in iter(lambda handle=handle: handle.read(_DIGEST_CHUNK_BYTES), b""):
+                    hasher.update(chunk)
         except OSError:
             # Absent (or unreadable) is part of the identity: a bundle with no
             # plans must not digest the same as one that has them.

@@ -18,7 +18,12 @@ from pathlib import Path
 
 import pytest
 
-from _project.scripts.explorer_pipeline.pipeline import DuplicateResultIdError, ExplorerPipeline
+from _project.scripts.explorer_pipeline.pipeline import (
+    _DIGEST_CHUNK_BYTES,
+    DuplicateResultIdError,
+    ExplorerPipeline,
+    _publication_digest,
+)
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
 from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
@@ -144,3 +149,33 @@ def test_duplicate_result_id_guard_leaves_the_normal_path_untouched(tmp_path: Pa
 
     published = sorted(p.name for p in (output / "bundles").glob("*.json"))
     assert len(published) == 2, f"expected both bundles published, got {published}"
+
+
+def test_duplicate_result_id_digest_streams_companions_larger_than_one_chunk(tmp_path: Path) -> None:
+    """A companion bigger than the read chunk must still hash correctly.
+
+    Companions are hashed incrementally rather than via `read_bytes()`, because
+    slurping a corpus-controlled file bypasses the APPLIED_COMPANION_MAX_BYTES
+    guard in `_applied_receipt` - that path stats the file and returns a
+    truncation marker without reading it, so a whole-file read here could
+    exhaust memory on a corpus that previously built fine. Chunking is only
+    correct if it covers the entire file, so pin that a multi-chunk companion
+    changes the digest rather than being silently truncated at one chunk.
+    """
+    bundles = tmp_path / "bundles"
+    bundle = _write_bundle(bundles, "big.json", total_duration_ms=45000)
+    public_raw = bundle.read_bytes()
+
+    baseline = _publication_digest(bundle, public_raw)
+
+    plans = bundle.with_name("big.plans.json")
+    plans.write_bytes(b"a" * (_DIGEST_CHUNK_BYTES + 512))
+    with_companion = _publication_digest(bundle, public_raw)
+    assert with_companion != baseline
+
+    # Flip a byte past the first chunk boundary: if hashing stopped at one
+    # chunk this would be indistinguishable from the file above.
+    payload = bytearray(b"a" * (_DIGEST_CHUNK_BYTES + 512))
+    payload[_DIGEST_CHUNK_BYTES + 100] = ord("b")
+    plans.write_bytes(bytes(payload))
+    assert _publication_digest(bundle, public_raw) != with_companion
