@@ -61,3 +61,10 @@ bff13a3a20597c47a2fa4170406730717d36ced3
 # with the branch owner as orphan-detector-freeze-branch-residual-20260804.
 cc01856f9da6f3dc815c0810936a88e3897132e7
 43fd39fe4d990d6906dfcbb1fd4f914595114b2c
+# Resolved: pushed to claude/git-identity-cloud-rca-maiixe after PR #1494
+# squash-merged and closed, so no pull_request event ever carried them to
+# develop. Re-landed verbatim via PR #1527 (cherry-pick onto a fresh branch).
+# The originals stay listed because a cherry-pick mints new SHAs - these two
+# remain unreachable from develop by construction, exactly like b5c56ea9 above.
+670fc009f932fe75110cb0ff5cb01cbd8b7648a0
+62fa013178bc620c21fbbc5a6991703a32af2766
