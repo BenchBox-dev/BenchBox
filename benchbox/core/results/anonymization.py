@@ -85,6 +85,26 @@ def _compact_key(key: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", key.lower())
 
 
+# Width of the digest carried by a public pseudonym. Shared by the emitter and
+# the recognizer below so the two cannot drift into a non-idempotent pair.
+_PUBLIC_HASH_WIDTH = 12
+_PUBLIC_HASH_DIGITS = frozenset("0123456789abcdef")
+
+
+def _is_public_pseudonym(value: str, prefix: str) -> bool:
+    """Return whether *value* is already the pseudonym ``prefix`` would emit.
+
+    Deliberately scoped to one prefix and to the exact emitted digest width
+    rather than matching any pseudonym-shaped token: see
+    ``AnonymizationManager._hash_public_identifier``.
+    """
+    marker = f"{prefix}_"
+    if not value.startswith(marker):
+        return False
+    digest = value[len(marker) :]
+    return len(digest) == _PUBLIC_HASH_WIDTH and all(char in _PUBLIC_HASH_DIGITS for char in digest)
+
+
 @dataclass
 class AnonymizationConfig:
     """Configuration for result anonymization."""
@@ -576,8 +596,29 @@ class AnonymizationManager:
         return None
 
     def _hash_public_identifier(self, value: str, prefix: str) -> str:
+        """Hash one identifier into a stable public pseudonym.
+
+        Anonymization has to reach a fixed point. Curated bundles are stored
+        already-anonymized, so the Explorer publication boundary re-anonymizes
+        values this method produced; hashing them a second time would mint a
+        different pseudonym for the same machine than a freshly submitted run
+        gets, and pseudonym stability is what lets the Explorer group results
+        by machine at all. A value already carrying *this* prefix's pseudonym
+        shape therefore passes through untouched.
+
+        The pass-through is scoped to ``prefix`` and to the exact emitted
+        digest width, not to pseudonym shape in general. That keeps a
+        capture-side ``machine_<16 hex>`` hashed, so internal and public
+        identities stay decoupled, and stops a ``host_`` token from surviving
+        verbatim inside a ``path_`` field. A submitter can still hand-craft a
+        value of this shape to pick their own pseudonym, so a pseudonym is a
+        grouping key only - never a provenance or trust signal. Provenance is
+        carried by trust labels.
+        """
+        if _is_public_pseudonym(value, prefix):
+            return value
         salt = self.config.machine_id_salt or ""
-        digest = hashlib.sha256(f"{salt}|{prefix}|{value}".encode()).hexdigest()[:12]
+        digest = hashlib.sha256(f"{salt}|{prefix}|{value}".encode()).hexdigest()[:_PUBLIC_HASH_WIDTH]
         return f"{prefix}_{digest}"
 
     @staticmethod

@@ -15,9 +15,11 @@ from unittest.mock import MagicMock, Mock, mock_open, patch
 import pytest
 
 from benchbox.core.results.anonymization import (
+    _IDENTIFIER_KEYS,
     PUBLIC_REDACTED_VALUE,
     AnonymizationConfig,
     AnonymizationManager,
+    _is_public_pseudonym,
     find_public_path_leaks,
 )
 
@@ -1128,3 +1130,107 @@ class TestPublicPayloadPathPrivacy:
         assert find_public_path_leaks(payload)
         out = AnonymizationManager().anonymize_result_payload(payload)
         assert "/root/private-run" not in json.dumps(out, default=str)
+
+
+class TestPublicPseudonymFixedPoint:
+    """Anonymization must reach a fixed point.
+
+    Curated bundles are stored already-anonymized, so the Explorer publication
+    boundary anonymizes values this module produced. Hashing a pseudonym again
+    mints a second token for the same machine, so the corpus and a freshly
+    submitted run from that machine would group apart. Nothing fails when this
+    breaks - the grouping is just silently wrong - so it is pinned here.
+    """
+
+    PAYLOAD = {
+        "environment": {"machine_id": "machine_0123456789ab", "platform_runtime": {"engine_host": "db.internal"}},
+        "platform": {
+            "config": {
+                "working_dir": "/Users/alice/benchbox",
+                "database": "analytics",
+                "endpoint": "https://example.invalid/warehouse",
+                "s3_bucket": "alice-results",
+                "role_arn": "arn:aws:iam::1234:role/bench",
+            }
+        },
+        "config": {"platform_options": {"account_id": "acct-1", "cluster_id": "c-1", "schema_name": "public"}},
+    }
+
+    def test_result_payload_anonymization_is_idempotent(self):
+        manager = AnonymizationManager()
+        once = manager.anonymize_result_payload(self.PAYLOAD)
+        assert manager.anonymize_result_payload(once) == once
+
+    def test_tuning_payload_anonymization_is_idempotent(self):
+        """Tuning hashes table/column names into mapping *keys*, so re-walking
+        an already-anonymized companion re-hashes the keys as well as values.
+        """
+        manager = AnonymizationManager()
+        payload = {
+            "source_file": "examples/tunings/custom.yaml",
+            "requested": {
+                "table_tunings": {"lineitem": {"columns": [{"name": "l_orderkey"}]}},
+                "constraints": {"primary_key": {"table": "orders", "columns": ["o_orderkey"]}},
+            },
+        }
+        once = manager.anonymize_tuning_payload(payload)
+        assert manager.anonymize_tuning_payload(once) == once
+
+    def test_pseudonym_survives_a_second_pass_unchanged(self):
+        manager = AnonymizationManager()
+        once = manager.anonymize_result_payload(self.PAYLOAD)
+        twice = manager.anonymize_result_payload(once)
+        assert twice["environment"]["machine_id"] == once["environment"]["machine_id"]
+        assert twice["platform"]["config"]["working_dir"] == once["platform"]["config"]["working_dir"]
+
+    def test_every_emitted_pseudonym_is_recognized_as_one(self):
+        """Pin the emitter against the recognizer.
+
+        These are two halves of one contract - the ``[:12]`` slice and the
+        width the pass-through accepts. Widening one alone silently restores
+        the double-hash bug, and no payload-level test would notice.
+        """
+        manager = AnonymizationManager()
+        for prefix in sorted(set(_IDENTIFIER_KEYS.values()) | {"path", "host", "endpoint", "table", "column"}):
+            emitted = manager._hash_public_identifier("some-private-value", prefix)
+            assert _is_public_pseudonym(emitted, prefix), f"{prefix}: emitted {emitted!r} is not recognized"
+            assert manager._hash_public_identifier(emitted, prefix) == emitted
+
+    def test_capture_side_machine_id_is_still_hashed(self):
+        """The pass-through must not decouple-proof internal identity.
+
+        ``get_anonymous_machine_id`` emits a 16-hex token; the public boundary
+        re-hashes it to a 12-hex one so the internal id is never published. A
+        width-agnostic pass-through would publish the internal id verbatim.
+        """
+        manager = AnonymizationManager()
+        internal = manager.get_anonymous_machine_id()
+        published = manager.anonymize_result_payload({"machine_id": internal})["machine_id"]
+        assert published != internal
+        assert _is_public_pseudonym(published, "machine")
+
+    def test_pass_through_does_not_cross_prefixes(self):
+        """A token only survives in the field family that would mint it.
+
+        Without prefix scoping, a ``host_``-shaped value would survive verbatim
+        inside a path field, letting a submitted payload carry a chosen token
+        into a namespace the anonymizer never assigned it to.
+        """
+        manager = AnonymizationManager()
+        out = manager.anonymize_result_payload({"working_dir": "host_0123456789ab"})
+        assert out["working_dir"] != "host_0123456789ab"
+        assert _is_public_pseudonym(out["working_dir"], "path")
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "path_0123456789",  # too short
+            "path_0123456789abc",  # too long
+            "path_0123456789zz",  # not hex
+            "path_",  # no digest
+            "pathx_0123456789ab",  # prefix is not an exact match
+        ],
+    )
+    def test_only_the_exact_pseudonym_shape_passes_through(self, value):
+        assert not _is_public_pseudonym(value, "path")
+        assert AnonymizationManager().anonymize_result_payload({"working_dir": value})["working_dir"] != value
