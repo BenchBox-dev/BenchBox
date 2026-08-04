@@ -7,9 +7,13 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import dataclasses
+import inspect
 import json
+import re
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, mock_open, patch
 
 import pytest
@@ -467,107 +471,37 @@ class TestAnonymizationConfig:
         """Test default configuration values."""
         config = AnonymizationConfig()
 
-        assert config.include_machine_id is True
         assert config.machine_id_salt is None
-        assert config.anonymize_paths is True
-        assert config.include_system_profile is True
-        assert config.anonymize_hostnames is True
-        assert config.anonymize_usernames is True
+        assert config.pii_patterns
+        assert config.custom_sanitizers == {}
 
     def test_custom_config(self):
         """Test custom configuration values."""
-        config = AnonymizationConfig(
-            include_machine_id=False,
-            machine_id_salt="custom_salt",
-            anonymize_paths=False,
-        )
+        config = AnonymizationConfig(machine_id_salt="custom_salt")
 
-        assert config.include_machine_id is False
         assert config.machine_id_salt == "custom_salt"
-        assert config.anonymize_paths is False
 
+    def test_no_flag_promises_privacy_it_does_not_deliver(self):
+        """Every remaining field must actually reach published output.
 
-class TestAnonymizeSystemProfile:
-    """Test anonymize_system_profile method."""
-
-    def test_returns_dict_with_expected_keys(self):
-        manager = AnonymizationManager()
-        profile = manager.anonymize_system_profile()
-        assert isinstance(profile, dict)
-        assert "os_type" in profile
-        assert "cpu_count" in profile
-        assert "python_version" in profile
-
-    def test_hostname_is_anonymized(self):
-        config = AnonymizationConfig(anonymize_hostnames=True)
-        manager = AnonymizationManager(config)
-        profile = manager.anonymize_system_profile()
-        assert profile["hostname"].startswith("host_")
-
-    def test_hostname_not_anonymized_when_disabled(self):
-        config = AnonymizationConfig(anonymize_hostnames=False)
-        manager = AnonymizationManager(config)
-        profile = manager.anonymize_system_profile()
-        assert not profile["hostname"].startswith("host_")
-
-    def test_username_anonymized_when_enabled(self):
-        config = AnonymizationConfig(anonymize_usernames=True)
-        manager = AnonymizationManager(config)
-        profile = manager.anonymize_system_profile()
-        username = profile.get("username", "")
-        assert username.startswith("user_") or username == "anonymous"
-
-    def test_include_system_profile_false_returns_empty(self):
-        config = AnonymizationConfig(include_system_profile=False)
-        manager = AnonymizationManager(config)
-        profile = manager.anonymize_system_profile()
-        assert profile == {}
-
-    def test_hostname_is_cached_consistently(self):
-        manager = AnonymizationManager()
-        p1 = manager.anonymize_system_profile()
-        p2 = manager.anonymize_system_profile()
-        assert p1["hostname"] == p2["hostname"]
-
-
-class TestSanitizePath:
-    """Test path sanitization."""
-
-    def test_allowed_prefix_path_unchanged(self):
-        manager = AnonymizationManager()
-        result = manager.sanitize_path("/tmp/benchmark/results.json")
-        assert result == "/tmp/benchmark/results.json"
-
-    def test_path_anonymization_disabled(self):
-        config = AnonymizationConfig(anonymize_paths=False)
-        manager = AnonymizationManager(config)
-        result = manager.sanitize_path("/home/user/secret/data.parquet")
-        assert result == "/home/user/secret/data.parquet"
-
-    def test_long_path_component_hashed(self):
-        manager = AnonymizationManager()
-        # A path component with more than 20 chars should be hashed
-        result = manager.sanitize_path("/some/averylongdirectorynamewithmanychars/file.parquet")
-        assert "averylongdirectorynamewithmanychars" not in result
-        assert "dir_" in result
-
-    def test_path_cache_returns_same_result(self):
-        manager = AnonymizationManager()
-        p = "/home/alice/project/data.csv"
-        r1 = manager.sanitize_path(p)
-        r2 = manager.sanitize_path(p)
-        assert r1 == r2
-
-    def test_common_system_dirs_kept(self):
-        manager = AnonymizationManager()
-        result = manager.sanitize_path("/home/foo")
-        assert "home" in result
-
-    def test_numeric_component_hashed(self):
-        manager = AnonymizationManager()
-        result = manager.sanitize_path("/data/user123/file.parquet")
-        # "user123" has a digit so should be hashed
-        assert "user123" not in result
+        The retired flags (include_machine_id, anonymize_paths,
+        allowed_path_prefixes, include_system_profile, anonymize_hostnames,
+        anonymize_usernames) fed only the deleted legacy API. They read as
+        privacy controls but gated nothing on the publication path, which is
+        the worst kind of config: a caller could set anonymize_paths=False
+        and see no change, or leave it True and assume paths were protected
+        by it. Keep the surface honest.
+        """
+        retired = {
+            "include_machine_id",
+            "anonymize_paths",
+            "allowed_path_prefixes",
+            "include_system_profile",
+            "anonymize_hostnames",
+            "anonymize_usernames",
+        }
+        present = {f.name for f in dataclasses.fields(AnonymizationConfig)}
+        assert not (present & retired), f"dead privacy flags are back: {sorted(present & retired)}"
 
 
 class TestRemovePII:
@@ -605,127 +539,6 @@ class TestRemovePII:
         manager = AnonymizationManager()
         clean = "Benchmark finished in 3.5 seconds"
         assert manager.remove_pii(clean) == clean
-
-
-class TestAnonymizeQueryMetadata:
-    """Test query metadata anonymization."""
-
-    def test_safe_fields_preserved(self):
-        manager = AnonymizationManager()
-        meta = {"query_id": "Q1", "execution_time": 1.5, "rows_returned": 100, "status": "ok"}
-        result = manager.anonymize_query_metadata(meta)
-        assert result["query_id"] == "Q1"
-        assert result["execution_time"] == 1.5
-        assert result["rows_returned"] == 100
-
-    def test_sql_text_pii_removed(self):
-        manager = AnonymizationManager()
-        meta = {"sql_text": "SELECT * FROM t WHERE email = 'user@example.com'"}
-        result = manager.anonymize_query_metadata(meta)
-        assert "user@example.com" not in result["sql_text"]
-
-    def test_file_path_sanitized(self):
-        manager = AnonymizationManager()
-        meta = {"file_path": "/tmp/data.parquet"}
-        result = manager.anonymize_query_metadata(meta)
-        assert result["file_path"] == "/tmp/data.parquet"
-
-    def test_nested_dict_recursed(self):
-        manager = AnonymizationManager()
-        meta = {"nested": {"sql_text": "SELECT 1"}}
-        result = manager.anonymize_query_metadata(meta)
-        assert "nested" in result
-
-    def test_list_values_processed(self):
-        manager = AnonymizationManager()
-        meta = {"tags": ["fast", "192.168.1.1"]}
-        result = manager.anonymize_query_metadata(meta)
-        assert isinstance(result["tags"], list)
-        joined = " ".join(result["tags"])
-        assert "192.168.1.1" not in joined
-
-    def test_empty_dict_returns_empty(self):
-        manager = AnonymizationManager()
-        assert manager.anonymize_query_metadata({}) == {}
-
-
-class TestAnonymizeExecutionMetadata:
-    """Test execution metadata anonymization."""
-
-    def test_safe_benchmark_fields_preserved(self):
-        manager = AnonymizationManager()
-        meta = {
-            "benchmark_name": "tpch",
-            "platform": "duckdb",
-            "scale_factor": 1.0,
-            "execution_id": "run-001",
-        }
-        result = manager.anonymize_execution_metadata(meta)
-        assert result["benchmark_name"] == "tpch"
-        assert result["platform"] == "duckdb"
-
-    def test_machine_id_replaced_with_anonymous(self):
-        manager = AnonymizationManager()
-        meta = {"machine_id": "real-machine-id-12345"}
-        result = manager.anonymize_execution_metadata(meta)
-        assert "anonymous_machine_id" in result
-        assert result["anonymous_machine_id"].startswith("machine_")
-
-    def test_system_profile_included(self):
-        manager = AnonymizationManager()
-        meta = {"system_profile": {"hostname": "myhost", "os_type": "Linux"}}
-        result = manager.anonymize_execution_metadata(meta)
-        assert "system_profile" in result
-
-    def test_data_path_sanitized(self):
-        manager = AnonymizationManager()
-        meta = {"data_directory": "/tmp/bench_data"}
-        result = manager.anonymize_execution_metadata(meta)
-        assert result["data_directory"] == "/tmp/bench_data"
-
-    def test_query_results_list_anonymized(self):
-        manager = AnonymizationManager()
-        meta = {
-            "query_results": [
-                {"query_id": "Q1", "execution_time": 1.0},
-                {"query_id": "Q2", "execution_time": 2.0},
-            ]
-        }
-        result = manager.anonymize_execution_metadata(meta)
-        assert isinstance(result["query_results"], list)
-        assert len(result["query_results"]) == 2
-
-    def test_empty_metadata_returns_empty(self):
-        manager = AnonymizationManager()
-        assert manager.anonymize_execution_metadata({}) == {}
-
-
-class TestValidateAnonymization:
-    """Test anonymization validation."""
-
-    def test_valid_anonymized_data_passes(self):
-        manager = AnonymizationManager()
-        meta = {"benchmark_name": "tpch", "machine_id": "x"}
-        anonymized = manager.anonymize_execution_metadata(meta)
-        validation = manager.validate_anonymization(meta, anonymized)
-        assert validation["is_valid"] is True
-        assert isinstance(validation["checks_performed"], list)
-
-    def test_pii_in_anonymized_data_generates_warning(self):
-        manager = AnonymizationManager()
-        original = {}
-        # Manually inject IP into otherwise clean data
-        anonymized = {"result": "connected to 10.0.0.1"}
-        validation = manager.validate_anonymization(original, anonymized)
-        warnings = " ".join(validation["warnings"])
-        assert "IP" in warnings or "ip" in warnings.lower()
-
-    def test_missing_machine_id_generates_error(self):
-        config = AnonymizationConfig(include_machine_id=True)
-        manager = AnonymizationManager(config)
-        validation = manager.validate_anonymization({}, {"result": "ok"})
-        assert any("machine" in e.lower() for e in validation["errors"])
-        assert validation["is_valid"] is False
 
 
 class TestPublicPayloadSecretKeys:
@@ -1234,3 +1047,113 @@ class TestPublicPseudonymFixedPoint:
     def test_only_the_exact_pseudonym_shape_passes_through(self, value):
         assert not _is_public_pseudonym(value, "path")
         assert AnonymizationManager().anonymize_result_payload({"working_dir": value})["working_dir"] != value
+
+
+class TestLegacyAnonymizationSchemeIsGone:
+    """One salted scheme, no second weaker one.
+
+    The module used to carry a parallel legacy API - sanitize_path,
+    anonymize_query_metadata, anonymize_execution_metadata,
+    anonymize_system_profile, validate_anonymization - that hashed with
+    UNSALTED md5 truncated to 8 hex and, in sanitize_path's case, returned
+    private paths completely unchanged. It had no production caller, so it
+    leaked nothing in practice, but it sat in the same module as the real
+    boundary where a future caller could reasonably have trusted it.
+    """
+
+    LEGACY_METHODS = (
+        "sanitize_path",
+        "anonymize_query_metadata",
+        "anonymize_execution_metadata",
+        "anonymize_system_profile",
+        "validate_anonymization",
+    )
+
+    @pytest.mark.parametrize("name", LEGACY_METHODS)
+    def test_legacy_method_is_gone(self, name):
+        assert not hasattr(AnonymizationManager, name), f"{name} is back on the public surface"
+
+    def test_no_unsalted_md5_pseudonym_scheme_remains(self):
+        """md5 is unsalted and 8 hex here - trivially reversible for a
+        username or hostname. The public boundary uses salted sha256.
+        """
+        source = inspect.getsource(sys.modules[AnonymizationManager.__module__])
+        assert "md5" not in source, "an md5 pseudonym scheme is back in the anonymizer"
+
+    def test_every_pseudonym_emitter_uses_the_shared_salted_helper(self):
+        """Catch a second emitter even if it reaches for sha256.
+
+        The bug was two schemes, not md5 specifically. Any new
+        f"prefix_{...hexdigest()[:n]}" that bypasses _hash_public_identifier
+        would reintroduce it, so pin that the module truncates a digest in
+        exactly the two places that are supposed to.
+        """
+        source = inspect.getsource(sys.modules[AnonymizationManager.__module__])
+        truncations = re.findall(r"hexdigest\(\)\[:[^\]]+\]", source)
+        assert len(truncations) == 2, f"unexpected digest truncations: {truncations}"
+
+    def test_no_sibling_module_mints_a_pseudonym_behind_the_boundary(self):
+        """Widen the check past this one module.
+
+        The rung above reads only ``anonymization.py``, so a second emitter
+        added in a sibling under ``benchbox/core/results/`` would satisfy it
+        while reintroducing exactly the split this class exists to prevent.
+        Scan the package and require that anything minting a ``<prefix>_<hex>``
+        token does it through the shared salted helper.
+        """
+        package = Path(inspect.getfile(sys.modules[AnonymizationManager.__module__])).parent
+        emitter = re.compile(r"f\"[a-z_]+_\{[^}]*hexdigest\(\)")
+        offenders = []
+        for path in sorted(package.glob("*.py")):
+            text = path.read_text(encoding="utf-8")
+            if path.name == "anonymization.py":
+                continue
+            if emitter.search(text):
+                offenders.append(path.name)
+        assert not offenders, f"pseudonym emitters outside the shared helper: {offenders}"
+
+    def test_public_surface_is_only_the_salted_boundary(self):
+        public = {
+            name for name, _ in inspect.getmembers(AnonymizationManager, inspect.isfunction) if not name.startswith("_")
+        }
+        assert public == {
+            "get_anonymous_machine_id",
+            "anonymize_result_payload",
+            "anonymize_tuning_payload",
+            "remove_pii",
+        }, public
+
+    def test_salt_does_not_reach_an_already_anonymized_value(self):
+        """Pin the salt/pass-through interaction, including its downside.
+
+        The pass-through is checked BEFORE the salt is applied, so a value that
+        is already a pseudonym survives verbatim no matter whose salt is in
+        play. That is required for idempotence, but it means changing the salt
+        does not re-pseudonymize a stored corpus: new captures adopt the new
+        salt while stored bundles keep the old pseudonyms, splitting one
+        machine across two identities. Rotating the salt requires re-deriving
+        the corpus from pre-anonymization originals. Documented under
+        "Salt rotation" in docs/reference/result-formats.md.
+        """
+        a = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-A"))
+        b = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-B"))
+        raw = {"machine_id": "machine_0123456789abcdef"}
+
+        published_by_a = a.anonymize_result_payload(raw)["machine_id"]
+        published_by_b = b.anonymize_result_payload(raw)["machine_id"]
+        assert published_by_a != published_by_b, "salt must scope pseudonyms derived from raw values"
+
+        reanonymized = b.anonymize_result_payload({"machine_id": published_by_a})["machine_id"]
+        assert reanonymized == published_by_a, "already-anonymized values are salt-independent by design"
+
+    def test_no_public_method_returns_a_private_path_verbatim(self):
+        """The concrete defect: sanitize_path('/Users/alice/bench') used to
+        return that string unchanged, and find_public_path_leaks flagged its
+        own module's output as a leak.
+        """
+        manager = AnonymizationManager()
+        private = "/Users/alice/bench"
+        for payload in ({"working_dir": private}, {"database_path": private}, {"note": private}):
+            out = manager.anonymize_result_payload(payload)
+            assert find_public_path_leaks(out) == [], f"{payload} leaked: {out}"
+            assert "alice" not in json.dumps(out)

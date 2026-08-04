@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "migrations": [
     {
       "revision": 2,
@@ -18,6 +18,15 @@
       "statement_count": 8,
       "summary": "Preserve legacy finding capture fields and deferrable item links",
       "deployment_order": "The hosted primary was migrated to revision 4 before revision-4-only tracker writes resumed.",
+      "deployment_evidence": "_project/decisions/todo-db-cutover-write-freeze-2026-08-01.md"
+    },
+    {
+      "revision": 5,
+      "statement_count": 0,
+      "kind": "fence",
+      "fence_rationale": "The maintenance freeze is advisory: it lives in meta rows that a clone which never pulled does not read, so a stale clone writes straight through a live freeze and its writes are destroyed by restore-legacy --replace. Moving SCHEMA_VERSION is the only enforcement that reaches such a clone. There was no schema delta to attach the bump to, and inventing DDL purely to justify the number would have been worse.",
+      "summary": "Write fence against stale clones; carries no DDL",
+      "deployment_order": "Fence code must ship BEFORE the cutover freeze is taken: a clone that pulls after the freeze starts can neither read nor migrate until the freeze lifts.",
       "deployment_evidence": "_project/decisions/todo-db-cutover-write-freeze-2026-08-01.md"
     }
   ]

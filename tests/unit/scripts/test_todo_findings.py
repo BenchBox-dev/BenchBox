@@ -1028,7 +1028,8 @@ class TestV4MigrationEquivalence:
         raw.commit()
         raw.close()
 
-        assert todo_db.migrate_db(migrated_path) == [4]
+        # Relative to MIGRATIONS so a later fence/bump does not need this edited.
+        assert todo_db.migrate_db(migrated_path) == [r for r in sorted(todo_db.MIGRATIONS) if r > 3]
         migrated = todo_db.connect(migrated_path)
         assert self._schema(migrated) == self._schema(fresh)
 
@@ -1082,7 +1083,8 @@ class TestV4MigrationEquivalence:
         conn.commit()
         conn.close()
 
-        assert todo_db.migrate_db(migrated_path) == [4]
+        # Relative to MIGRATIONS so a later fence/bump does not need this edited.
+        assert todo_db.migrate_db(migrated_path) == [r for r in sorted(todo_db.MIGRATIONS) if r > 3]
         conn = todo_db.connect(migrated_path)
         finding = todo_findings.get_finding(conn, "2026-01-02-030405-kept")
         assert finding["disposition"] == "promoted"
