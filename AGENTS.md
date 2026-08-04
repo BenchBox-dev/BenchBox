@@ -1,8 +1,7 @@
 # BenchBox Agent Guide
 
 This file is the project authority for agent work. Keep it compact: detailed
-operations belong in the linked docs, and generated skill mirrors belong to
-`/Users/joe/.skill-sync/skills`.
+operations belong in the linked docs.
 
 ## Authority and provenance
 
@@ -35,8 +34,8 @@ agent authorship in config and across `origin/develop..HEAD`. The same bar binds
 comments, reviews, and pull request bodies, which post as the owner: no standing
 attribution footer. See `docs/development/agent-attribution-surfaces.md`.
 `make agent-identity-check` also warns, without failing, on any `user.*` that
-displaces your global identity. That is detection, not prevention: it reports
-drift already present and cannot stop a concurrent write.
+displaces your global identity: detection, not prevention. It reports existing
+drift and cannot stop a concurrent write.
 
 ## Authorization boundary
 
@@ -57,7 +56,7 @@ found. `[REVIEW-CAPTURE-001]` In-review findings capture is local-only under
 
 The active BenchBox binding and examples are in
 `docs/development/agent-review-protocol.md`. It supersedes the legacy
-`docs/development/review-protocol.md` document.
+`docs/development/review-protocol.md`.
 
 ## Worktree and change safety
 
@@ -82,9 +81,8 @@ stage only authorized paths; never `git add -A`.
 
 A disposable clone — a remote agent session, a CI runner — has no canonical
 clone to protect and no pool to claim from, so it declares
-`BENCHBOX_EPHEMERAL_CLONE=1` instead of the emergency override. That declaration
-is ignored wherever a pool exists, so it cannot weaken the guard on a machine
-that uses one.
+`BENCHBOX_EPHEMERAL_CLONE=1` instead of the emergency override. It is ignored
+wherever a pool exists, so it cannot weaken the guard on a machine that uses one.
 
 ## Tooling and implementation
 
@@ -145,9 +143,9 @@ claimable items).
 - Green focused/fast tests are not UAT or production certification.
 
 Apple/macOS notes: `make test-correctness-gate` uses Linux-generated digests;
-use `make ci-linux` for parity. Mocker is local-only and unsuitable for the
-known multi-service stacks; follow `docs/operations/uat-framework.md` for
-container lifecycle and cleanup. Never globally prune without approval.
+use `make ci-linux` for parity. Mocker is local-only and unsuitable for known
+multi-service stacks; see `docs/operations/uat-framework.md` for container
+lifecycle and cleanup. Never globally prune without approval.
 
 ## Skills and generated mirrors
 
