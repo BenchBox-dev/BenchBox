@@ -29,9 +29,22 @@ on:
   #
   # The job is read-only and finishes in ~1 minute; running it per merge is the
   # difference between catching a stranded commit in one build and in one week.
+  # Every branch, not just develop.
+  #
+  # A develop-only trigger cannot catch this race, and that is worth spelling
+  # out because it looks like it should. The stranding sequence is: PR merges
+  # (develop push fires here) -> THEN the later commit is pushed to the feature
+  # branch. At the moment the develop push runs, the orphan does not exist yet,
+  # so the run that looks best-placed to catch it is structurally too early.
+  # The push that creates the orphan is the push to the feature branch, so that
+  # is the event to watch.
+  #
+  # The develop push is still useful - it catches orphans stranded by an
+  # earlier merge - so both are covered by simply not filtering branches.
+  #
+  # Cost: a read-only ~1 minute job per push. That is the price of catching a
+  # stranded commit at the moment it is created rather than up to a week later.
   push:
-    branches:
-      - develop
 
 permissions:
   contents: read

@@ -44,3 +44,11 @@ ee072b2c98c62671229876c075039a723732c3ea
 # PR #1504 (cherry-pick onto a fresh branch off develop). Kept here because the
 # original SHA is still unreachable from develop by construction.
 b5c56ea998eb92b1a636b42205bd059cd19793d5
+
+# Resolved: both are review fixes pushed to their branch after auto-merge had
+# already landed the PR's first commit - the same race, recurring on the very
+# PRs that address it (#1521 fixes the detector trigger, #1531 withdraws an
+# unsupported figure). Re-landed verbatim via PR #1534. Cherry-picks mint new
+# SHAs, so the originals stay unreachable from develop by construction.
+ef0fde5b6b697eafd9c7ca59a1554edad63ee627
+bff13a3a20597c47a2fa4170406730717d36ced3
