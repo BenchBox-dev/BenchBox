@@ -49,6 +49,12 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/convert.py",
     "benchbox/cli/commands/df_tuning.py",
     "benchbox/cli/commands/publish.py",
+    # one-engine-unify-regression-policy: the trends table's hardcoded -5%
+    # IMPROVED cutoff now calls
+    # benchbox.core.results.regression_policy.is_meaningful_improvement, so the
+    # display constant lives with the rest of the policy. No click decorator,
+    # command signature, or column changed.
+    "benchbox/cli/commands/report.py",
     "benchbox/cli/commands/run.py",
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/submit.py",

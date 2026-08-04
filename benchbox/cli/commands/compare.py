@@ -35,6 +35,7 @@ from benchbox.core.results.loader import (
     iter_query_results,
     load_result_file,
 )
+from benchbox.core.results.regression_policy import is_regression
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 
@@ -1350,23 +1351,23 @@ def _parse_threshold(threshold_str: str) -> float | None:
 
 
 def _check_regression(comparison: dict[str, Any], threshold: float) -> bool:
-    """Check if any query or overall performance regressed beyond threshold."""
-    # Check overall performance changes
+    """Check if any query or overall performance regressed beyond threshold.
+
+    ``threshold`` is a decimal fraction (``--fail-on-regression 10%`` parses to
+    0.1); the shared policy takes percent, so it is scaled here at the boundary.
+    """
+    threshold_percent = threshold * 100
+
     perf_changes = comparison.get("performance_changes", {})
     for _metric_name, metric_data in perf_changes.items():
         if not isinstance(metric_data, dict):
             continue
-        change_pct = metric_data.get("change_percent", 0)
-        # Positive change = slower = regression
-        if change_pct > (threshold * 100):
+        if is_regression(metric_data.get("change_percent", 0), threshold_percent):
             return True
 
-    # Check per-query regressions
     query_comparisons = comparison.get("query_comparisons", [])
     for query in query_comparisons:
-        change_pct = query.get("change_percent", 0)
-        # Positive change = slower = regression
-        if change_pct > (threshold * 100):
+        if is_regression(query.get("change_percent", 0), threshold_percent):
             return True
 
     return False

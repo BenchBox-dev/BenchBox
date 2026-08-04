@@ -204,8 +204,8 @@ class TestAnalyticsHelperFunctions:
         assert 2.8 < result < 2.9
 
     def test_classify_regression_severity(self):
-        """Test regression severity classification."""
-        from benchbox.mcp.tools.analytics import _classify_regression_severity
+        """Severity comes from the shared core policy."""
+        from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(150) == "critical"
         assert _classify_regression_severity(75) == "high"

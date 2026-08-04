@@ -1266,28 +1266,28 @@ class TestAnalyticsHelpers:
 
     def test_classify_regression_severity_critical(self):
         """>=100% delta is critical."""
-        from benchbox.mcp.tools.analytics import _classify_regression_severity
+        from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(100.0) == "critical"
         assert _classify_regression_severity(200.0) == "critical"
 
     def test_classify_regression_severity_high(self):
         """50-99% delta is high."""
-        from benchbox.mcp.tools.analytics import _classify_regression_severity
+        from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(50.0) == "high"
         assert _classify_regression_severity(99.0) == "high"
 
     def test_classify_regression_severity_medium(self):
         """25-49% delta is medium."""
-        from benchbox.mcp.tools.analytics import _classify_regression_severity
+        from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(25.0) == "medium"
         assert _classify_regression_severity(49.0) == "medium"
 
     def test_classify_regression_severity_low(self):
         """<25% delta is low."""
-        from benchbox.mcp.tools.analytics import _classify_regression_severity
+        from benchbox.core.results.regression_policy import classify_severity as _classify_regression_severity
 
         assert _classify_regression_severity(10.0) == "low"
         assert _classify_regression_severity(24.0) == "low"
