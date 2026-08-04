@@ -5,6 +5,8 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from typing import Any
+
 import click
 from rich.markup import escape
 from rich.panel import Panel
@@ -125,50 +127,10 @@ def _list_platforms(cred_manager: CredentialManager):
     """List all supported platforms with setup instructions."""
     console.print("\n[bold]Cloud Platforms Requiring Credentials:[/bold]\n")
 
-    platforms_info = [
-        {
-            "name": "Databricks",
-            "key": "databricks",
-            "description": "Lakehouse platform with Unity Catalog",
-            "required": ["server_hostname", "http_path", "access_token"],
-        },
-        {
-            "name": "Snowflake",
-            "key": "snowflake",
-            "description": "Cloud data warehouse",
-            "required": ["account", "user", "password", "warehouse"],
-        },
-        {
-            "name": "BigQuery",
-            "key": "bigquery",
-            "description": "Google Cloud data warehouse",
-            "required": ["project_id", "credentials_file"],
-        },
-        {
-            "name": "Redshift",
-            "key": "redshift",
-            "description": "Amazon data warehouse",
-            "required": ["host", "port", "database", "user", "password"],
-        },
-        {
-            "name": "Athena",
-            "key": "athena",
-            "description": "AWS serverless query-on-S3",
-            "required": ["s3_staging_dir", "region"],
-        },
-        {
-            "name": "MotherDuck",
-            "key": "motherduck",
-            "description": "Serverless DuckDB cloud",
-            "required": ["MOTHERDUCK_TOKEN", "database"],
-        },
-        {
-            "name": "SingleStore",
-            "key": "singlestore",
-            "description": "Distributed SQL database",
-            "required": ["host", "port", "database", "username", "password"],
-        },
-    ]
+    # Platform list and required credential fields are derived from the
+    # platform registry, which owns that knowledge; setup.py keeps only its own
+    # short display copy. The previous hardcoded table duplicated both.
+    platforms_info = credential_platforms()
 
     # Get current status
     current_platforms = cred_manager.list_platforms()
@@ -190,6 +152,61 @@ def _list_platforms(cred_manager: CredentialManager):
         console.print(f"{status_icon} [bold]{platform_info['name']}[/bold] - {platform_info['description']}")
         console.print(f"   Required: {', '.join(platform_info['required'])}")
         console.print(f"   Setup: [cyan]benchbox setup --platform {key}[/cyan]\n")
+
+
+# Short display copy for the credential setup table. This is presentation text,
+# not platform metadata: the registry owns display_name and required_credentials,
+# and these one-liners stay here so the table reads the way it always has.
+CREDENTIAL_PLATFORM_BLURBS = {
+    "databricks": "Lakehouse platform with Unity Catalog",
+    "snowflake": "Cloud data warehouse",
+    "bigquery": "Google Cloud data warehouse",
+    "redshift": "Amazon data warehouse",
+    "athena": "AWS serverless query-on-S3",
+    "motherduck": "Serverless DuckDB cloud",
+    "singlestore": "Distributed SQL database",
+}
+
+# Display names the setup table uses. The registry's display_name is the
+# canonical product name ("Databricks SQL", "Google BigQuery"); the setup table
+# has always used the shorter platform name.
+CREDENTIAL_PLATFORM_NAMES = {
+    "databricks": "Databricks",
+    "snowflake": "Snowflake",
+    "bigquery": "BigQuery",
+    "redshift": "Redshift",
+    "athena": "Athena",
+    "motherduck": "MotherDuck",
+    "singlestore": "SingleStore",
+}
+
+
+def credential_platforms() -> list[dict[str, Any]]:
+    """Return the credential-requiring platforms, derived from the registry.
+
+    A platform appears here because it declares `required_credentials` in
+    benchbox.core.platform_registry -- not because it was typed into a list in
+    this file. Adding a credentialed platform to the registry adds it here.
+    """
+    from benchbox.core.platform_registry import PlatformRegistry
+
+    platforms = []
+    for key, metadata in PlatformRegistry.get_all_platform_metadata().items():
+        required = metadata.get("required_credentials")
+        if not required:
+            continue
+        platforms.append(
+            {
+                "name": CREDENTIAL_PLATFORM_NAMES.get(key, metadata.get("display_name", key)),
+                "key": key,
+                "description": CREDENTIAL_PLATFORM_BLURBS.get(key, metadata.get("description", "")),
+                "required": list(required),
+            }
+        )
+    # Alphabetical rather than registry insertion order: derived output must be
+    # deterministic, and insertion order is an implementation detail of the
+    # metadata blob.
+    return sorted(platforms, key=lambda platform: platform["name"])
 
 
 def _show_credential_status(cred_manager: CredentialManager):

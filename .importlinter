@@ -37,10 +37,6 @@ ignore_imports =
     ; that benchbox.core.runtime_paths computes - genuine existing coupling,
     ; not fixed by this TODO (detection only, see must_preserve).
     benchbox.utils.path_utils -> benchbox.core.runtime_paths
-    ; --- utils -> cli ----------------------------------------------------
-    ; benchbox.utils.config_interface lazily imports benchbox.cli.config to
-    ; reuse the CLI's config manager - pre-existing coupling.
-    benchbox.utils.config_interface -> benchbox.cli.config
     ; --- utils -> platforms ----------------------------------------------
     ; benchbox.utils.format_selection needs platform format-capability
     ; metadata to pick a default output format - pre-existing coupling.

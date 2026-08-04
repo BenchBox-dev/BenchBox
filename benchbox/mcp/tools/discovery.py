@@ -76,37 +76,81 @@ def _collect_benchmark_queries_and_tables(benchmark_lower: str) -> tuple[list[di
     return queries, tables
 
 
-def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
+# Discovery tools and MCP resources serve the same registry data. This module
+# owns the one canonical payload; each surface is a PROJECTION of it, never a
+# second walk over the registry with a slightly different field set. Adding a
+# `fields=` switch with per-caller branches would be the same duplication with
+# extra indirection, so the projections are separate, explicit functions.
+BENCHMARK_QUERY_ID_TOOL_LIMIT = 30
+
+
+def build_benchmark_payload(benchmark: str) -> dict[str, Any]:
+    """Build the canonical benchmark payload, or a not-found marker.
+
+    Returns every field any MCP surface needs. Callers project.
+    """
     benchmark_lower = benchmark.lower()
     meta = get_benchmark_metadata(benchmark_lower)
     if meta is None or get_benchmark_surface(benchmark_lower) != "public":
         return {
-            "error": f"Benchmark '{benchmark}' not found",
-            "available_benchmarks": list_public_benchmark_ids(),
+            "found": False,
+            "requested": benchmark,
+            "available": list_public_benchmark_ids(),
         }
 
     queries, tables = _collect_benchmark_queries_and_tables(benchmark_lower)
+    query_ids = [q["id"] for q in queries]
 
     return {
+        "found": True,
         "name": benchmark_lower,
         "display_name": meta.get("display_name", benchmark_lower),
         "description": meta.get("description", f"{benchmark} benchmark"),
         "category": meta.get("category", "unknown"),
         "support_status": meta["support_status"],
-        "queries": {
-            "count": meta.get("num_queries", len(queries)),
-            "ids": [q["id"] for q in queries][:30],
-            "truncated": len(queries) > 30,
-        },
-        "schema": {"tables": tables, "table_count": len(tables)},
+        "query_count": meta.get("num_queries", len(queries)),
+        "query_ids": query_ids,
+        "tables": tables,
         "scale_factors": {
             "default": meta.get("default_scale", 0.01),
             "options": meta.get("scale_options", [0.01, 0.1, 1, 10]),
             "minimum": meta.get("min_scale", 0.01),
         },
         "complexity": meta.get("complexity", "Medium"),
+        "estimated_time_minutes": meta.get("estimated_time_range", (1, 5)),
         "supports_streams": meta.get("supports_streams", False),
         "dataframe_support": meta.get("supports_dataframe", False),
+    }
+
+
+def _get_benchmark_info_impl(benchmark: str) -> dict[str, Any]:
+    """Projection of the canonical payload for the get_benchmark_info tool."""
+    payload = build_benchmark_payload(benchmark)
+    if not payload["found"]:
+        return {
+            "error": f"Benchmark '{payload['requested']}' not found",
+            "available_benchmarks": payload["available"],
+        }
+
+    query_ids = payload["query_ids"]
+    tables = payload["tables"]
+
+    return {
+        "name": payload["name"],
+        "display_name": payload["display_name"],
+        "description": payload["description"],
+        "category": payload["category"],
+        "support_status": payload["support_status"],
+        "queries": {
+            "count": payload["query_count"],
+            "ids": query_ids[:BENCHMARK_QUERY_ID_TOOL_LIMIT],
+            "truncated": len(query_ids) > BENCHMARK_QUERY_ID_TOOL_LIMIT,
+        },
+        "schema": {"tables": tables, "table_count": len(tables)},
+        "scale_factors": payload["scale_factors"],
+        "complexity": payload["complexity"],
+        "supports_streams": payload["supports_streams"],
+        "dataframe_support": payload["dataframe_support"],
     }
 
 
@@ -298,11 +342,12 @@ def register_discovery_tools(mcp: MCPServer) -> None:
         return _check_dependencies_impl(platform, verbose)
 
 
-def _list_platforms_impl() -> dict[str, Any]:
-    """List all available database platforms."""
-    from benchbox.core.platform_registry import PlatformRegistry
+ADOPTION_ORDER = {"mainstream": 0, "established": 1, "emerging": 2, "niche": 3}
 
-    ADOPTION_ORDER = {"mainstream": 0, "established": 1, "emerging": 2, "niche": 3}
+
+def build_platform_payloads() -> list[dict[str, Any]]:
+    """Build the canonical per-platform payloads, adoption-then-name ordered."""
+    from benchbox.core.platform_registry import PlatformRegistry
 
     platforms = []
     all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -311,19 +356,26 @@ def _list_platforms_impl() -> dict[str, Any]:
         capabilities = metadata.get("capabilities", {})
         info = PlatformRegistry.get_platform_info(name)
 
-        platform_data = {
-            "name": name,
-            "display_name": metadata.get("display_name", name),
-            "category": metadata.get("category", "unknown"),
-            "available": info.available if info else False,
-            "adoption": metadata.get("adoption", "niche"),
-            "supports_sql": capabilities.get("supports_sql", False),
-            "supports_dataframe": capabilities.get("supports_dataframe", False),
-            "default_mode": capabilities.get("default_mode", "sql"),
-        }
-        platforms.append(platform_data)
+        platforms.append(
+            {
+                "name": name,
+                "display_name": metadata.get("display_name", name),
+                "category": metadata.get("category", "unknown"),
+                "available": info.available if info else False,
+                "adoption": metadata.get("adoption", "niche"),
+                "supports_sql": capabilities.get("supports_sql", False),
+                "supports_dataframe": capabilities.get("supports_dataframe", False),
+                "default_mode": capabilities.get("default_mode", "sql"),
+            }
+        )
 
     platforms.sort(key=lambda p: (ADOPTION_ORDER.get(p["adoption"], 99), p["name"]))
+    return platforms
+
+
+def _list_platforms_impl() -> dict[str, Any]:
+    """List all available database platforms."""
+    platforms = build_platform_payloads()
 
     return {
         "platforms": platforms,

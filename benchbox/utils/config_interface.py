@@ -70,29 +70,29 @@ def get_default_config_provider() -> ConfigInterface:
     return SimpleConfigProvider()
 
 
-def create_cli_config_adapter():
-    """Create adapter that uses CLI ConfigManager if available, otherwise falls back to simple provider."""
+# Registered by whichever layer owns user configuration. utils sits at the
+# bottom of the layering contract (utils < core < platforms < cli), so it must
+# not reach up for a richer provider -- the richer layer pushes one down. This
+# module previously imported benchbox.cli.config directly, which is the
+# violation .importlinter carried as an ignore entry.
+_config_provider: ConfigInterface | None = None
 
-    def _create_adapter():
-        try:
-            from benchbox.cli.config import ConfigManager
 
-            class CLIConfigAdapter(ConfigInterface):
-                """Adapter that wraps CLI ConfigManager."""
+def set_config_provider(provider: ConfigInterface | None) -> None:
+    """Register the process-wide configuration provider.
 
-                def __init__(self):
-                    self._config_manager = ConfigManager()
+    Called by the CLI during startup to make its ConfigManager the source for
+    utils-level consumers. Passing None restores the built-in defaults, which
+    is what test teardown wants.
+    """
+    global _config_provider
+    _config_provider = provider
 
-                def get(self, key: str, default: Any = None) -> Any:
-                    return self._config_manager.get(key, default)
 
-                def set(self, key: str, value: Any) -> None:
-                    self._config_manager.set(key, value)
+def get_config_provider() -> ConfigInterface:
+    """Return the registered provider, or the built-in defaults.
 
-            return CLIConfigAdapter()
-
-        except ImportError:
-            # CLI module not available, use simple provider
-            return get_default_config_provider()
-
-    return _create_adapter()
+    Falling back rather than raising keeps library and MCP callers working
+    without a CLI: they get SimpleConfigProvider's documented defaults.
+    """
+    return _config_provider if _config_provider is not None else get_default_config_provider()

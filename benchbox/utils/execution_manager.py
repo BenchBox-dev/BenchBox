@@ -189,9 +189,9 @@ class PowerRunExecutor:
             resource_config: Resource limits configuration (optional)
         """
         if config_manager is None:
-            from benchbox.utils.config_interface import create_cli_config_adapter
+            from benchbox.utils.config_interface import get_config_provider
 
-            self.config_manager = create_cli_config_adapter()
+            self.config_manager = get_config_provider()
         else:
             self.config_manager = config_manager
         self.logger = logger or logging.getLogger(__name__)
@@ -512,9 +512,9 @@ class ConcurrentQueryExecutor:
             resource_config: Resource limits configuration (optional)
         """
         if config_manager is None:
-            from benchbox.utils.config_interface import create_cli_config_adapter
+            from benchbox.utils.config_interface import get_config_provider
 
-            self.config_manager = create_cli_config_adapter()
+            self.config_manager = get_config_provider()
         else:
             self.config_manager = config_manager
         self.logger = logger or logging.getLogger(__name__)

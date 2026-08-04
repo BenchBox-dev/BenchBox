@@ -26,6 +26,7 @@ from benchbox.core.tuning.interface import (
     TuningType,
     UnifiedTuningConfiguration,
 )
+from benchbox.utils.config_interface import ConfigInterface, set_config_provider
 from benchbox.utils.database_naming import generate_database_filename
 from benchbox.utils.printing import quiet_console
 from benchbox.utils.scale_factor import format_scale_factor
@@ -1027,3 +1028,29 @@ class DirectoryManager:
             "databases": get_dir_size(self.databases_dir),
             "total": get_dir_size(self.base_dir),
         }
+
+
+class CLIConfigProvider(ConfigInterface):
+    """Expose the CLI's ConfigManager through the utils-level config seam.
+
+    This adapter lives in the CLI layer, not in benchbox.utils, so the import
+    edge points DOWN (cli -> utils) instead of up. benchbox.utils.config_interface
+    used to import benchbox.cli.config itself, which is the layering violation
+    .importlinter carried as an ignore entry.
+    """
+
+    def __init__(self, config_manager: "ConfigManager | None" = None):
+        self._config_manager = config_manager or ConfigManager()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self._config_manager.get(key, default)
+
+    def set(self, key: str, value: Any) -> None:
+        self._config_manager.set(key, value)
+
+
+def install_cli_config_provider(config_manager: "ConfigManager | None" = None) -> CLIConfigProvider:
+    """Make the CLI's configuration the process-wide provider."""
+    provider = CLIConfigProvider(config_manager)
+    set_config_provider(provider)
+    return provider

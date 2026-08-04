@@ -19,6 +19,12 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # at benchbox.cli.app:main, so this changes import behavior, not Click's
     # command surface.
     "benchbox/cli/__init__.py",
+    # one-engine-residual-dedup: the CLI group callback now pushes its
+    # ConfigManager down to the utils-level config seam
+    # (install_cli_config_provider), inverting the utils -> cli import that
+    # .importlinter carried as an ignore entry. Callback body only; no click
+    # decorator or command signature changed.
+    "benchbox/cli/app.py",
     # relocate-cli-hook-registries: these two are now thin back-compat
     # re-export shims; the real registries live in benchbox/core/hooks/
     # (outside the CLI surface this guard protects).
