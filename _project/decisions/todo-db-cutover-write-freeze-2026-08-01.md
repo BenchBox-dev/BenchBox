@@ -137,6 +137,32 @@ last hyphenated component assuming `<db>-<org>`. A wrong parse makes
 `--confirm-target` unmatchable — it fails *safe* (refuses), but the bulk path
 becomes unusable until corrected.
 
+### Assessed and cleared: `bulk_transfer` PK collision
+
+`bulk_transfer` copies every column verbatim, primary keys included, so an
+*additive* transfer into a non-empty target collides. This was raised as a
+cutover risk. **Assessed 2026-08-01: it does not gate the cutover.**
+
+- Only two items-domain tables have rowid-alias PKs that can collide:
+  **`deferrals.id`** and **`events.seq`**. Every other `TRANSFER_TABLE` has a
+  natural composite or text key, which collides only on a genuine duplicate —
+  a different situation, and one that errors correctly.
+- The items-domain caller passes `replace=args.replace,
+  require_empty=not args.replace`. The two modes are exhaustive and both safe:
+  `--replace` deletes first and frees every id; without it the guard refuses a
+  non-empty target *inside* the same `BEGIN IMMEDIATE`. **There is no reachable
+  additive-into-non-empty transfer for items** — immunity by construction, not
+  by accident.
+- The cutover restore itself runs todo-db's `restore-legacy --replace`, a
+  different codebase, and `--replace` is the safe mode regardless.
+
+**Residual, tracked, not blocking**: a *future* caller passing
+`replace=False, require_empty=False` into a non-empty items target would
+collide. That is exactly what the findings caller does, and it is safe only
+because `offset_staging_pks` runs first. Tracked as
+`bulk-transfer-pk-collision-safety` (todo-db worktree). Do not re-derive this
+assessment — extend it.
+
 ### Rollback
 
 Trigger rollback on any per-table count mismatch, any audit-verify failure, or
