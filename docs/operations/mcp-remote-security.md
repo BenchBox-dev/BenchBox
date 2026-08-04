@@ -72,6 +72,40 @@ The scope contract is:
   `cancel_benchmark`, still constrained by platform, benchmark, and
   maximum-scale policy.
 
+## Server-owned ClickHouse connection profiles
+
+A request can never set a ClickHouse `port` or `secure` value: a port is part of
+a destination and `secure` is transport policy, so accepting either would let an
+authenticated caller reach another listener on the host or downgrade
+server-owned TLS. Both are rejected for every ClickHouse platform spelling.
+
+To reach a non-default port or TLS setting, define named profiles in the server
+process environment. Only the operator sets this; callers may name a profile but
+never describe one.
+
+```bash
+export BENCHBOX_MCP_CLICKHOUSE_PROFILES='{"analytics": {"port": 9440, "secure": true}}'
+```
+
+Profile names are lowercase snake_case. Each entry accepts only `port`
+(1-65535) and `secure` (boolean, default `false`); a malformed entry, or one
+carrying hosts, credentials, or paths, is discarded and its profile becomes
+unavailable rather than partially trusted.
+
+Callers select a profile with `platform_options`:
+
+```json
+{"platform": "clickhouse-server", "platform_options": {"connection_profile": "analytics"}}
+```
+
+On the `clickhouse` platform a profile additionally requires
+`deployment_mode: "server"` — local mode runs chDB in-process and must not gain
+a network path. Requests, including persisted durable jobs, carry only the
+profile name; the port and TLS policy are resolved from this environment at
+execution time, so withdrawing a profile immediately fails closed for queued
+retries. Rejections never echo the requested profile name, so a caller cannot
+use validation errors to enumerate configured profiles.
+
 ## Durable remote benchmark jobs
 
 Remote clients should use `start_benchmark` instead of holding a

@@ -11,7 +11,11 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import TextContent
 
 from benchbox.mcp.jobs import DurableJobRepository, DurableJobWorker
-from benchbox.mcp.schemas import validate_platform_options
+from benchbox.mcp.schemas import (
+    MCP_CLICKHOUSE_PROFILE_ENV,
+    MCPValidationError,
+    validate_platform_options,
+)
 from benchbox.mcp.security import JobLimits, TenantWorkspaceProvider
 from tests.integration.mcp._security import authenticated_http_client, write_security_config
 
@@ -90,6 +94,31 @@ def test_normalized_platform_options_survive_repository_round_trip(tmp_path: Pat
     persisted = repository.get_owned(submitted.execution_id, "tenant-a")
     assert persisted is not None
     assert persisted.request["platform_options"] == {"threads": 4}
+
+
+def test_durable_clickhouse_requests_never_persist_a_connection_tuple(tmp_path: Path, monkeypatch) -> None:
+    """A retry replays the profile name, so it re-resolves against current policy."""
+    monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"reviewed": {"port": 9440, "secure": True}}))
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    options = validate_platform_options("clickhouse-server", {"connection_profile": "reviewed"})
+
+    submitted, _ = repository.submit(
+        "tenant-a", {**_request(), "platform": "clickhouse-server", "platform_options": options}
+    )
+
+    persisted = repository.get_owned(submitted.execution_id, "tenant-a")
+    assert persisted is not None
+    assert persisted.request["platform_options"] == {"connection_profile": "reviewed"}
+    assert "port" not in persisted.request["platform_options"]
+    assert "secure" not in persisted.request["platform_options"]
+
+
+@pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-server"])
+def test_durable_admission_refuses_clickhouse_port_and_tls_overrides(platform: str) -> None:
+    """Both ClickHouse spellings fail closed before a job can be persisted."""
+    for options in ({"port": 9001}, {"secure": False}):
+        with pytest.raises(MCPValidationError, match="not authorized"):
+            validate_platform_options(platform, options)
 
 
 def test_tenant_job_tools_are_remote_only_and_cross_tenant_fail_closed(tmp_path: Path, monkeypatch) -> None:

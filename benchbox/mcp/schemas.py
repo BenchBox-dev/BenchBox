@@ -11,13 +11,18 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import json
+import logging
 import math
+import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+logger = logging.getLogger(__name__)
 
 # Validation constants
 MAX_QUERY_IDS = 100  # Maximum number of query IDs per request (DoS protection)
@@ -29,6 +34,13 @@ FILENAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+$")  # Safe filename characters
 PLATFORM_OPTION_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 MEMORY_LIMIT_PATTERN = re.compile(r"^(?:[1-9]\d{0,5}(?:\.\d{1,2})?)(?:B|KB|MB|GB|TB)$", re.IGNORECASE)
 IDENTIFIER_LIST_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*(?:,[a-zA-Z_][a-zA-Z0-9_]*)*$")
+CLICKHOUSE_PROFILE_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+# Server-owned ClickHouse connection profiles, as JSON:
+#   {"analytics": {"port": 9440, "secure": true}}
+# Only the operator sets this; MCP callers may name a profile but never describe
+# a destination or a transport policy.
+MCP_CLICKHOUSE_PROFILE_ENV = "BENCHBOX_MCP_CLICKHOUSE_PROFILES"
 
 MAX_PLATFORM_OPTIONS = 16
 MAX_PLATFORM_OPTION_VALUE_LENGTH = 256
@@ -113,13 +125,11 @@ class MCPPlatformOptionContract:
 # or other tenant-owned connection state through request arguments.
 MCP_PLATFORM_OPTION_ALLOWLIST: dict[str, dict[str, MCPPlatformOptionSpec]] = {
     "clickhouse": {
+        "connection_profile": _MCP_OPTION("string"),
         "deployment_mode": _MCP_OPTION("string", choices=("local", "server")),
-        "port": _MCP_OPTION("int", minimum=1, maximum=65_535),
-        "secure": _MCP_OPTION("bool"),
     },
     "clickhouse-server": {
-        "port": _MCP_OPTION("int", minimum=1, maximum=65_535),
-        "secure": _MCP_OPTION("bool"),
+        "connection_profile": _MCP_OPTION("string"),
     },
     "cudf": {
         "device_id": _MCP_OPTION("int", minimum=0, maximum=255),
@@ -189,34 +199,28 @@ def _contract(
     )
 
 
+_CLICKHOUSE_PROFILE_CONTRACT = _contract(
+    "ClickHouseAdapter.from_config(port, secure) resolved from server configuration",
+    "connection",
+    rejected_alternatives=(
+        "caller-supplied port",
+        "caller-supplied secure/TLS policy",
+        "arbitrary destination selection",
+        "transport downgrade",
+    ),
+)
+
+
 # Canonical option-to-consumer matrix.  Keep this map explicit instead of
 # deriving it from the allow-list: an accepted option must have a reviewed
 # consumer and security classification before it can cross the MCP boundary.
 MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = {
     "clickhouse": {
+        "connection_profile": _CLICKHOUSE_PROFILE_CONTRACT,
         "deployment_mode": _contract("ClickHouseAdapter.from_config(deployment_mode)", "execution"),
-        "port": _contract(
-            "ClickHouseAdapter.from_config(port)",
-            "connection",
-            rejected_alternatives=("server-owned port", "arbitrary destination selection"),
-        ),
-        "secure": _contract(
-            "ClickHouseAdapter.from_config(secure)",
-            "connection",
-            rejected_alternatives=("server-owned TLS policy", "transport downgrade"),
-        ),
     },
     "clickhouse-server": {
-        "port": _contract(
-            "ClickHouseAdapter.from_config(port)",
-            "connection",
-            rejected_alternatives=("server-owned port", "arbitrary destination selection"),
-        ),
-        "secure": _contract(
-            "ClickHouseAdapter.from_config(secure)",
-            "connection",
-            rejected_alternatives=("server-owned TLS policy", "transport downgrade"),
-        ),
+        "connection_profile": _CLICKHOUSE_PROFILE_CONTRACT,
     },
     "cudf": {
         "device_id": _contract("cuDF runtime device selection", "device"),
@@ -277,6 +281,89 @@ MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = 
 }
 
 
+def _load_clickhouse_connection_profiles() -> dict[str, dict[str, object]]:
+    """Return the operator-defined ClickHouse connection profiles.
+
+    Profiles are the only supported way to reach a non-default ClickHouse port
+    or a non-default TLS setting from MCP.  The mapping is read from server
+    process configuration, never from request arguments, so a caller can name a
+    reviewed destination but can never describe one.  A malformed registry
+    yields no profiles rather than a partially trusted one.
+    """
+    raw = os.environ.get(MCP_CLICKHOUSE_PROFILE_ENV, "").strip()
+    if not raw:
+        return {}
+    try:
+        decoded = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.error("Ignoring malformed %s: value is not valid JSON", MCP_CLICKHOUSE_PROFILE_ENV)
+        return {}
+    if not isinstance(decoded, dict):
+        logger.error("Ignoring malformed %s: value is not a JSON object", MCP_CLICKHOUSE_PROFILE_ENV)
+        return {}
+
+    profiles: dict[str, dict[str, object]] = {}
+    for name, entry in decoded.items():
+        if not isinstance(name, str) or not CLICKHOUSE_PROFILE_NAME_PATTERN.fullmatch(name):
+            logger.error("Ignoring a %s entry whose profile name is not snake_case", MCP_CLICKHOUSE_PROFILE_ENV)
+            continue
+        if not isinstance(entry, Mapping):
+            logger.error("Ignoring %s profile '%s': value is not an object", MCP_CLICKHOUSE_PROFILE_ENV, name)
+            continue
+        unknown = set(entry) - {"port", "secure"}
+        if unknown:
+            # Fail closed rather than silently dropping operator intent: a
+            # profile carrying hosts, credentials, or paths is a policy error.
+            logger.error(
+                "Ignoring %s profile '%s': only 'port' and 'secure' are supported", MCP_CLICKHOUSE_PROFILE_ENV, name
+            )
+            continue
+        port = entry.get("port")
+        if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65_535:
+            logger.error(
+                "Ignoring %s profile '%s': 'port' must be an integer in 1-65535", MCP_CLICKHOUSE_PROFILE_ENV, name
+            )
+            continue
+        secure = entry.get("secure", False)
+        if not isinstance(secure, bool):
+            logger.error("Ignoring %s profile '%s': 'secure' must be a boolean", MCP_CLICKHOUSE_PROFILE_ENV, name)
+            continue
+        profiles[name] = {"port": port, "secure": secure}
+    return profiles
+
+
+def resolve_clickhouse_connection_profile(name: str) -> dict[str, object]:
+    """Resolve a named profile to its server-owned connection settings.
+
+    Raises:
+        MCPValidationError: If no such profile is configured on this server.
+    """
+    profile = _load_clickhouse_connection_profiles().get(name)
+    if profile is None:
+        # Deliberately does not echo the requested name or list configured
+        # profiles: that would turn a validation error into a probe oracle.
+        raise MCPValidationError("Platform option 'connection_profile' is not configured on this server")
+    return dict(profile)
+
+
+def _validate_clickhouse_options(platform: str, normalized: Mapping[str, object]) -> None:
+    """Fail closed on ClickHouse connection intent that MCP must not grant."""
+    profile = normalized.get("connection_profile")
+    if profile is None:
+        return
+    if not CLICKHOUSE_PROFILE_NAME_PATTERN.fullmatch(str(profile)):
+        raise MCPValidationError("Platform option 'connection_profile' must be a lowercase snake_case profile name")
+    if platform == "clickhouse" and normalized.get("deployment_mode") != "server":
+        # Local mode runs chDB in-process.  Accepting a connection profile there
+        # would hand local runs a network path they do not otherwise have.
+        raise MCPValidationError("Platform option 'connection_profile' requires deployment_mode='server'")
+    # Existence is checked at admission so an unknown profile is rejected before
+    # a durable job is persisted.  The resolved port/TLS values are deliberately
+    # NOT merged into the normalized request: only the profile name is persisted,
+    # so a retry re-resolves from current server configuration.
+    resolve_clickhouse_connection_profile(str(profile))
+
+
 def _validate_memory_limit(name: str, value: str) -> str:
     """Validate a bounded memory-size option without accepting paths or expressions."""
     if not MEMORY_LIMIT_PATTERN.fullmatch(value):
@@ -298,14 +385,14 @@ def validate_platform_options(platform: str, options: Mapping[str, object] | Non
         raise MCPValidationError(f"Too many platform options (maximum {MAX_PLATFORM_OPTIONS})")
 
     platform_name = validate_platform_name(platform)
-    specs = MCP_PLATFORM_OPTION_ALLOWLIST.get(platform_name)
-    if specs is None and platform_name.endswith("-df"):
-        specs = MCP_PLATFORM_OPTION_ALLOWLIST.get(platform_name[:-3])
-    specs = specs or {}
-    contracts = MCP_PLATFORM_OPTION_CONTRACT.get(platform_name)
-    if contracts is None and platform_name.endswith("-df"):
-        contracts = MCP_PLATFORM_OPTION_CONTRACT.get(platform_name[:-3])
-    contracts = contracts or {}
+    # A "-df" request falls back to the base platform's records, so the policy
+    # key must fall back with it: resolving the fallback once keeps the value
+    # specs, the contract matrix, and the cross-field rules on the same platform.
+    policy_name = platform_name
+    if platform_name not in MCP_PLATFORM_OPTION_ALLOWLIST and platform_name.endswith("-df"):
+        policy_name = platform_name[:-3]
+    specs = MCP_PLATFORM_OPTION_ALLOWLIST.get(policy_name) or {}
+    contracts = MCP_PLATFORM_OPTION_CONTRACT.get(policy_name) or {}
     normalized: dict[str, object] = {}
     for raw_name, raw_value in options.items():
         if not isinstance(raw_name, str) or not PLATFORM_OPTION_NAME_PATTERN.fullmatch(raw_name):
@@ -321,7 +408,19 @@ def validate_platform_options(platform: str, options: Mapping[str, object] | Non
         if name == "liquid_clustering_columns" and not IDENTIFIER_LIST_PATTERN.fullmatch(str(parsed)):
             raise MCPValidationError(f"Platform option '{name}' contains invalid identifiers")
         normalized[name] = parsed
+
+    # Cross-field policy runs after every value is bounded, so it sees the whole
+    # request.  Every admission path (synchronous run_benchmark, durable
+    # start_benchmark, and durable worker replay) reaches this one function, so a
+    # rejected combination can never be persisted or reintroduced by a retry.
+    _validate_cross_field_policy(policy_name, normalized)
     return normalized
+
+
+def _validate_cross_field_policy(platform_name: str, normalized: Mapping[str, object]) -> None:
+    """Apply per-platform rules that individual value bounds cannot express."""
+    if platform_name in {"clickhouse", "clickhouse-server"}:
+        _validate_clickhouse_options(platform_name, normalized)
 
 
 def validate_query_id(query_id: str) -> str:

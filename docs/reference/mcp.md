@@ -247,6 +247,14 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
+- ClickHouse connection destinations are server-owned. A request cannot set
+  `port` or `secure`; both are rejected for every ClickHouse spelling. A
+  non-default port or TLS setting is reachable only through
+  `connection_profile`, which names a profile the operator defined in
+  `BENCHBOX_MCP_CLICKHOUSE_PROFILES` (see
+  [MCP remote security](../operations/mcp-remote-security.md)). Requests carry
+  and persist only the profile name; the port and TLS policy are resolved from
+  server configuration at execution time.
 - The authoritative option-to-consumer, security-class, alias, and rejection
   matrix is maintained in
   `docs/development/mcp-platform-option-contract.md`. Every allow-listed key
