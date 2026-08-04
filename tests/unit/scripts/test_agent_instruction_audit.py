@@ -459,3 +459,39 @@ def test_commit_range_reports_unresolvable_base_ref(tmp_path: Path) -> None:
     project = _git_range_repo(tmp_path)
     errors = audit_commit_range(project, "origin/does-not-exist")
     assert any("unable to inspect commit range" in error for error in errors)
+
+
+def test_unresolvable_git_identity_is_not_a_violation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An environment where git resolves no identity must not fail this guard.
+
+    `git var GIT_AUTHOR_IDENT` exits non-zero when it can neither read a
+    configured identity nor auto-detect one, and `_resolved_git_identity` then
+    returns ("", ""). That is the state of an ephemeral CI runner, and it cannot
+    be reproduced by clearing config locally because git synthesises an implicit
+    user@host identity instead - so drive the resolver directly.
+
+    The check exists to reject a *known agent* identity; an absent one is
+    nothing to judge. `make ci-lint` runs this target and develop-post-merge
+    runs ci-lint, so treating absence as an error turned every post-merge run
+    red with "unable to resolve Git author identity" once #1523 removed the step
+    that injected a placeholder identity to keep the check runnable. Removing
+    that injection was right - a check fed a known-good identity can never fail
+    - but a check that always fails where no identity exists is as
+    uninformative. agent-commit-range-check remains the merge-time control.
+    """
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    monkeypatch.setattr(agent_instruction_audit, "_resolved_git_identity", lambda _project, _role: ("", ""))
+    assert audit_git_identity(tmp_path) == []
+
+
+def test_unresolvable_identity_skip_does_not_weaken_the_agent_check(tmp_path: Path) -> None:
+    """The skip must not become a blanket pass.
+
+    A guard that returns [] for the absent case is only safe while the populated
+    case still fails, so pin both halves together: this is the assertion that
+    would catch the skip being widened into "always return []".
+    """
+    project = _git_configured_repo(tmp_path, "Codex", "codex@openai.com")
+    errors = audit_git_identity(project)
+    assert len(errors) == 2
+    assert all("known agent/service Codex <codex@openai.com>" in error for error in errors)

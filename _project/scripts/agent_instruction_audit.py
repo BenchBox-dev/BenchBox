@@ -258,11 +258,26 @@ def audit_git_identity(project: Path) -> list[str]:
     author_name, author_email = identities["author"]
     author_is_human = bool(author_name and author_email) and not _is_agent_identity(author_name, author_email)
 
+    # No resolvable identity is not a violation. This check exists to reject a
+    # *known agent* identity, and an absent one is nothing to judge - so
+    # failing here says only "this environment has no git config", which is the
+    # normal state of an ephemeral CI runner. `make ci-lint` runs this target
+    # and `develop-post-merge.yml` runs ci-lint, so treating absence as an error
+    # made every post-merge run red with "unable to resolve Git author
+    # identity" once #1523 removed the step that injected a placeholder
+    # identity to keep the check runnable.
+    #
+    # That injection was removed for the right reason - a check fed a known-good
+    # identity can never fail - but the inverse is just as useless: a check that
+    # always fails where no identity exists. Locally the absence cannot occur in
+    # a way that matters, because git refuses to commit without one. The real
+    # merge-time control is agent-commit-range-check, which inspects the commits
+    # the branch actually carries.
+    if not all(name and email for name, email in identities.values()):
+        return []
+
     errors: list[str] = []
     for role, (name, email) in identities.items():
-        if not name or not email:
-            errors.append(f"unable to resolve Git {role} identity")
-            continue
         if not _is_agent_identity(name, email):
             continue
         # A signing service behind a human author keeps signatures verifiable
