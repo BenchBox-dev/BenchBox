@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -20,6 +19,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 from benchbox.core.results.exporter import ResultExporter
+from benchbox.core.results.metrics import calculate_named_metric, percentile_ms, sample_stdev_ms
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.mcp.errors import ErrorCode, make_error, make_not_found_error
 from benchbox.mcp.security import PathProvider, resolve_path_provider
@@ -660,7 +660,7 @@ def _load_trend_data_point(
     if not timings:
         return None
 
-    metric_value = _calculate_metric(timings, metric_lower)
+    metric_value = calculate_named_metric(timings, metric_lower)
     timestamp_str = _resolve_timestamp_str(data.get("run", {}).get("timestamp"), file_path)
 
     return {
@@ -768,15 +768,15 @@ def _compute_group_stats(runs: list[dict[str, Any]]) -> dict[str, Any]:
         "total_queries": len(all_timings),
         "query_stats": {
             "mean_ms": round(sum(all_timings) / len(all_timings), 2) if all_timings else 0,
-            "std_ms": round(_std_dev(all_timings), 2) if len(all_timings) > 1 else 0,
+            "std_ms": round(sample_stdev_ms(all_timings), 2) if len(all_timings) > 1 else 0,
             "min_ms": round(min(all_timings), 2) if all_timings else 0,
             "max_ms": round(max(all_timings), 2) if all_timings else 0,
-            "p50_ms": round(_percentile(all_timings, 50), 2) if all_timings else 0,
-            "p95_ms": round(_percentile(all_timings, 95), 2) if all_timings else 0,
+            "p50_ms": round(percentile_ms(all_timings, 0.50), 2) if all_timings else 0,
+            "p95_ms": round(percentile_ms(all_timings, 0.95), 2) if all_timings else 0,
         },
         "run_stats": {
             "mean_total_ms": round(sum(total_times) / len(total_times), 2) if total_times else 0,
-            "std_total_ms": round(_std_dev(total_times), 2) if len(total_times) > 1 else 0,
+            "std_total_ms": round(sample_stdev_ms(total_times), 2) if len(total_times) > 1 else 0,
             "min_total_ms": round(min(total_times), 2) if total_times else 0,
             "max_total_ms": round(max(total_times), 2) if total_times else 0,
         },
@@ -927,45 +927,3 @@ def _classify_regression_severity(delta_pct: float) -> str:
         return "medium"
     else:
         return "low"
-
-
-def _calculate_metric(timings: list[float], metric: str) -> float:
-    """Calculate the specified performance metric from query timings."""
-    if not timings:
-        return 0
-
-    if metric == "geometric_mean":
-        log_sum = sum(math.log(t) for t in timings if t > 0)
-        return math.exp(log_sum / len(timings)) if timings else 0
-    elif metric == "p50":
-        return _percentile(timings, 50)
-    elif metric == "p95":
-        return _percentile(timings, 95)
-    elif metric == "p99":
-        return _percentile(timings, 99)
-    elif metric == "total_time":
-        return sum(timings)
-    else:
-        return sum(timings) / len(timings)
-
-
-def _percentile(data: list[float], p: float) -> float:
-    """Calculate the p-th percentile of the data."""
-    if not data:
-        return 0
-    sorted_data = sorted(data)
-    k = (len(sorted_data) - 1) * (p / 100)
-    f = int(k)
-    c = f + 1 if f + 1 < len(sorted_data) else f
-    if f == c:
-        return sorted_data[f]
-    return sorted_data[f] * (c - k) + sorted_data[c] * (k - f)
-
-
-def _std_dev(data: list[float]) -> float:
-    """Calculate standard deviation."""
-    if len(data) < 2:
-        return 0
-    mean = sum(data) / len(data)
-    variance = sum((x - mean) ** 2 for x in data) / (len(data) - 1)
-    return math.sqrt(variance)

@@ -40,7 +40,15 @@ from .environment import (
     PlatformRuntimeEnvironment,
     PlatformStorageMetadata,
 )
-from .metrics import TimingStatsCalculator, TPCMetricsCalculator
+from .metrics import (
+    NAMED_METRICS,
+    TimingStatsCalculator,
+    TPCMetricsCalculator,
+    calculate_named_metric,
+    geometric_mean_ms,
+    percentile_ms,
+    sample_stdev_ms,
+)
 from .platform_info import (
     PlatformInfoInput,
     build_platform_info,
@@ -92,6 +100,11 @@ __all__ = [
     "PlatformStorageMetadata",
     # Metrics
     "TPCMetricsCalculator",
+    "calculate_named_metric",
+    "geometric_mean_ms",
+    "percentile_ms",
+    "sample_stdev_ms",
+    "NAMED_METRICS",
     "TimingStatsCalculator",
     # Platform Info
     "PlatformInfoInput",
