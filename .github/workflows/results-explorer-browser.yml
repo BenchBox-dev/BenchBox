@@ -14,13 +14,15 @@ on:
       - 'results-data/**'
       - '.github/workflows/results-explorer-browser.yml'
   pull_request:
+    # Deliberately NO `paths:` filter. `Results Explorer browser gate` is a
+    # required status check, and GitHub keeps a PR unmergeable forever waiting
+    # on a required check that never reports. A path-filtered workflow simply
+    # does not run, so it never reports, so every PR that touched nothing under
+    # results-explorer/ would deadlock. The filtering moved into the
+    # `explorer-changes` job below: the workflow always starts, the expensive
+    # browser jobs skip when nothing relevant changed, and the gate job always
+    # reports.
     branches: [ release, develop ]
-    paths:
-      - 'results-explorer/**'
-      - '_project/scripts/explorer_pipeline/**'
-      - '_project/scripts/explorer_publish.py'
-      - 'results-data/**'
-      - '.github/workflows/results-explorer-browser.yml'
   workflow_dispatch:
 
 permissions:
@@ -32,10 +34,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Replaces the `on.pull_request.paths` filter this workflow used to carry.
+  # Same allowlist, evaluated as a job so the workflow always starts and the
+  # required gate job below can always report a conclusion.
+  explorer-changes:
+    name: explorer-changes
+    runs-on: ubuntu-latest
+    outputs:
+      needed: ${{ steps.detect.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect explorer-relevant changes
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          # Anything that is not a pull_request (push, workflow_dispatch)
+          # already passed the `on.push.paths` filter or was requested by hand,
+          # so it always runs the suite.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$BASE_SHA"...HEAD -- \
+            'results-explorer/**' \
+            '_project/scripts/explorer_pipeline/**' \
+            '_project/scripts/explorer_publish.py' \
+            'results-data/**' \
+            '.github/workflows/results-explorer-browser.yml')
+          if [ -n "$changed" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "explorer-relevant changed paths:"
+          echo "${changed:-<none>}"
+
   # Blocking gate: Chromium runs the full suite. Every acceptance path
   # asserted in `results-explorer/e2e/` must stay green for the PR to merge.
   chromium:
     name: Chromium (full suite, blocking)
+    needs: explorer-changes
+    if: needs.explorer-changes.outputs.needed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -99,6 +143,8 @@ jobs:
   # once flake data supports it (tracked by w9 of the parent TODO).
   firefox-smoke:
     name: Firefox (@smoke, non-blocking)
+    needs: explorer-changes
+    if: needs.explorer-changes.outputs.needed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
@@ -159,6 +205,8 @@ jobs:
   # once flake data supports it (tracked by w9 of the parent TODO).
   webkit-smoke:
     name: WebKit (@smoke, non-blocking)
+    needs: explorer-changes
+    if: needs.explorer-changes.outputs.needed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
@@ -214,3 +262,55 @@ jobs:
             results-explorer/test-results
           if-no-files-found: ignore
           retention-days: 3
+
+  # The single required status check for this workflow.
+  #
+  # It exists because the browser jobs are conditional: a required check that
+  # never reports leaves a PR permanently unmergeable, so the thing GitHub
+  # gates on must always run and always reach a conclusion. Chromium's own job
+  # cannot do that - it is skipped on PRs that touch nothing relevant.
+  #
+  # Firefox and WebKit are deliberately absent from `needs`. They are advisory
+  # (`continue-on-error: true`) and graduate individually per
+  # docs/operations/browser-ci.md; wiring them here would promote them to
+  # blocking as a silent side effect.
+  browser-required-result:
+    name: Results Explorer browser gate
+    needs: [ explorer-changes, chromium ]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate browser gate result
+        env:
+          CHANGES_RESULT: ${{ needs.explorer-changes.result }}
+          CHROMIUM_RESULT: ${{ needs.chromium.result }}
+          NEEDED: ${{ needs.explorer-changes.outputs.needed }}
+        run: |
+          set -euo pipefail
+          echo "explorer-changes: ${CHANGES_RESULT} (needed=${NEEDED:-unset})"
+          echo "chromium:         ${CHROMIUM_RESULT}"
+
+          # Fail closed. If change detection itself broke we cannot know
+          # whether the suite was needed, so do not wave the PR through.
+          if [ "${CHANGES_RESULT}" != "success" ]; then
+            echo "::error::explorer-changes did not succeed (${CHANGES_RESULT}); refusing to pass the gate."
+            exit 1
+          fi
+
+          case "${CHROMIUM_RESULT}" in
+            success)
+              echo "Chromium suite passed."
+              ;;
+            skipped)
+              # Only legitimate when detection said the suite was not needed.
+              if [ "${NEEDED}" = "true" ]; then
+                echo "::error::Chromium was skipped even though explorer files changed."
+                exit 1
+              fi
+              echo "No explorer-relevant changes; Chromium suite not required."
+              ;;
+            *)
+              echo "::error::Chromium suite result was '${CHROMIUM_RESULT}'."
+              exit 1
+              ;;
+          esac

@@ -53,6 +53,7 @@ Required status checks:
 
 ```text
 - ci-required-result
+- Results Explorer browser gate
 ```
 
 `ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
@@ -61,6 +62,17 @@ that aggregates the required-lane jobs: `ci-paths`, `content-guard`,
 `medium-test` (added 2026-07-11, #1139 — the medium tier now gates code
 PRs pre-merge via the same umbrella, no ruleset change needed),
 `explorer-tokens`, `audit-sha`, `package-smoke`, and `dependency-audit`.
+
+`Results Explorer browser gate` (added 2026-08-03) is the umbrella job in
+`.github/workflows/results-explorer-browser.yml`. It is required because the
+Chromium full-suite job's own name has claimed to block since it was written,
+while the ruleset required only `ci-required-result` — so the full `e2e/` suite
+gated nothing. The gate job, not the Chromium job, holds the required context:
+the browser jobs are conditional, and GitHub keeps a PR unmergeable forever
+waiting on a required check that never reports. The gate runs `if: always()`,
+passes when Chromium succeeded or when no explorer-relevant path changed, and
+fails closed if change detection itself broke. Firefox and WebKit stay advisory
+and are deliberately absent from its `needs`.
 Branch protection deliberately keys off the umbrella so the path-aware
 classifier can skip subordinate jobs without making the protected check
 disappear. The classifier fails closed: any path not on the

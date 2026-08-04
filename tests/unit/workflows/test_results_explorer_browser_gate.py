@@ -24,7 +24,12 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "results-explorer-browser.yml"
 
 CHROMIUM_JOB = "chromium"
+GATE_JOB = "browser-required-result"
 ADVISORY_JOBS = ("firefox-smoke", "webkit-smoke")
+
+# The status-check context GitHub sees, and therefore the exact string that
+# must appear in the develop ruleset. It is the job's `name:`, not its id.
+GATE_CONTEXT = "Results Explorer browser gate"
 
 
 @pytest.fixture(scope="module")
@@ -53,6 +58,17 @@ def test_lane_runs_on_develop_pushes(workflow: dict[str, Any]) -> None:
     """
     push_branches = _triggers(workflow)["push"]["branches"]
     assert "develop" in push_branches, f"browser lane does not run on develop pushes: {push_branches}"
+
+
+def test_gate_context_matches_the_documented_required_check(workflow: dict[str, Any]) -> None:
+    """The ruleset pins a context string; renaming the job silently breaks it.
+
+    A required context that no job reports leaves every PR unmergeable, so the
+    job name, the admin runbook, and the live ruleset have to agree.
+    """
+    assert workflow["jobs"][GATE_JOB]["name"] == GATE_CONTEXT
+    runbook = (REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text(encoding="utf-8")
+    assert GATE_CONTEXT in runbook, "required gate context is not recorded in the repo admin runbook"
 
 
 def test_lane_still_runs_on_pull_requests_into_develop(workflow: dict[str, Any]) -> None:
@@ -92,6 +108,51 @@ def test_advisory_browsers_are_not_silently_promoted(workflow: dict[str, Any]) -
         job = workflow["jobs"][job_id]
         assert job.get("continue-on-error") is True, f"{job_id} was promoted to blocking without an explicit decision"
         assert "non-blocking" in job["name"].lower(), f"{job_id} name no longer marks it advisory"
+
+
+def test_pull_request_trigger_has_no_paths_filter(workflow: dict[str, Any]) -> None:
+    """The required gate must report on *every* PR, so the workflow must start.
+
+    This is the deadlock guard. `Results Explorer browser gate` is a required
+    status check, and GitHub leaves a PR permanently unmergeable while a
+    required check has not reported. A path-filtered workflow does not run at
+    all, so it never reports - which would block every PR that happens to touch
+    nothing under `results-explorer/`. Filtering belongs in `explorer-changes`,
+    not in the trigger.
+    """
+    pull_request = _triggers(workflow)["pull_request"]
+    assert "paths" not in pull_request, (
+        "pull_request has a paths filter; the required gate would never report on unrelated PRs"
+    )
+
+
+def test_expensive_browser_jobs_are_gated_on_change_detection(workflow: dict[str, Any]) -> None:
+    """Dropping the trigger filter must not run a 25-minute suite on every PR."""
+    for job_id in (CHROMIUM_JOB, *ADVISORY_JOBS):
+        job = workflow["jobs"][job_id]
+        assert job.get("if") == "needs.explorer-changes.outputs.needed == 'true'", (
+            f"{job_id} is not gated on explorer-changes; it would run on every PR"
+        )
+
+
+def test_required_gate_job_always_runs_and_gates_on_chromium(workflow: dict[str, Any]) -> None:
+    """The required check must always reach a conclusion, and reflect Chromium."""
+    gate = workflow["jobs"][GATE_JOB]
+    assert gate.get("if") == "always()", "gate job does not always run; a skipped Chromium would leave it unreported"
+    assert CHROMIUM_JOB in gate["needs"], "gate job does not depend on Chromium"
+    assert "explorer-changes" in gate["needs"], "gate job cannot distinguish 'not needed' from 'skipped in error'"
+
+
+def test_required_gate_does_not_silently_promote_advisory_browsers(workflow: dict[str, Any]) -> None:
+    """Firefox and WebKit must stay out of the required gate's dependencies.
+
+    Adding either to `needs` would make it merge-blocking without the explicit
+    per-browser graduation decision that `docs/operations/browser-ci.md`
+    requires.
+    """
+    gate_needs = workflow["jobs"][GATE_JOB]["needs"]
+    for job_id in ADVISORY_JOBS:
+        assert job_id not in gate_needs, f"{job_id} was promoted to blocking via the required gate's needs"
 
 
 def test_chromium_runs_the_full_suite_entrypoint(workflow: dict[str, Any]) -> None:
