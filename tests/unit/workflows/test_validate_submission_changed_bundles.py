@@ -194,3 +194,46 @@ def test_companion_pairing_preserves_stem_case(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().splitlines() == ["results-data/bundles/foo.json"]
+
+
+@pytest.mark.parametrize("companion_suffix", [".plans.json", ".tuning.json"])
+def test_plans_or_tuning_only_change_discovers_paired_primary_bundle(tmp_path: Path, companion_suffix: str) -> None:
+    """A plans- or tuning-only edit must still invoke primary-bundle validation.
+
+    ``.manifest.json`` and ``.applied.json`` each have an explicit back-mapping
+    block, but ``.plans.json`` and ``.tuning.json`` are filtered out of CHANGED
+    with no equivalent. A companion-only PR would therefore skip bundle
+    validation, public path scanning, companion hash validation, and corpus
+    inventory validation - and the public privacy scanner explicitly targets
+    exactly these two suffixes.
+    """
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    primary = tmp_path / "results-data" / "bundles" / "result.json"
+    primary.parent.mkdir(parents=True)
+    primary.write_text("{}\n", encoding="utf-8")
+    _git(tmp_path, "add", str(primary.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "base")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    companion = primary.with_name(f"result{companion_suffix}")
+    companion.write_text('{"note": "companion only"}\n', encoding="utf-8")
+    _git(tmp_path, "add", str(companion.relative_to(tmp_path)))
+    _git(tmp_path, "commit", "--quiet", "-m", "companion only")
+
+    skip_without_posix_shell()
+    env = os.environ.copy()
+    env["BASE_SHA"] = base_sha
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().splitlines() == ["results-data/bundles/result.json"]

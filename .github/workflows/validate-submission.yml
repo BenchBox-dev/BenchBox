@@ -177,6 +177,44 @@ jobs:
             done <<< "$CHANGED_APPLIED"
           fi
 
+          # Detect changed plans/tuning companions separately. These two
+          # suffixes are filtered out of CHANGED above, so without this block a
+          # companion-only PR leaves CHANGED empty and skips bundle validation,
+          # public path scanning, companion hash validation, and corpus
+          # inventory validation. That is the opposite of what is wanted: the
+          # public privacy scanner in scripts/validate_submission.py explicitly
+          # targets .plans.json and .tuning.json, so those are exactly the files
+          # that must not reach a public branch unscanned. Derive the paired
+          # primary bundle so the existing validation step covers them, matching
+          # the manifest and applied handling above. Include deletions (D): a
+          # removed companion is still a contract change while its bundle
+          # exists.
+          CHANGED_COMPANIONS=$(git diff --no-renames --name-only --diff-filter=ACMRD \
+            ${{ github.event.pull_request.base.sha }}...HEAD -- \
+            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -iE '\.(plans|tuning)\.json$' \
+            || true)
+          if [ -n "$CHANGED_COMPANIONS" ]; then
+            while IFS= read -r companion; do
+              # Suffix length varies, so pick it from the lowercased name to stay
+              # case-insensitive the way bundle discovery is.
+              lower=$(printf '%s' "$companion" | tr '[:upper:]' '[:lower:]')
+              case "$lower" in
+                *.plans.json) strip=11 ;;
+                *.tuning.json) strip=12 ;;
+                *) continue ;;
+              esac
+              stem="${companion:0:$(( ${#companion} - strip ))}"
+              bundle=$(git ls-tree -r --name-only HEAD -- results-data/bundles \
+                | awk -v stem="$stem" 'substr($0, 1, length($0) - 5) == stem && tolower(substr($0, length($0) - 4)) == ".json" { print; exit }')
+              # Only add if the paired bundle exists and is not already in CHANGED.
+              if git cat-file -e "HEAD:${bundle}" 2>/dev/null \
+                  && ! printf '%s\n' "$CHANGED" | grep -qxF "$bundle"; then
+                CHANGED="${CHANGED:+${CHANGED}$'\n'}${bundle}"
+              fi
+            done <<< "$CHANGED_COMPANIONS"
+          fi
+
           if [ -z "$CHANGED" ]; then
             echo "No bundle files changed."
             echo "has_bundles=false" >> "$GITHUB_OUTPUT"
