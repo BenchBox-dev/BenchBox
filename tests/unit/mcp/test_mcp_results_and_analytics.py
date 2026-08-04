@@ -1294,53 +1294,51 @@ class TestAnalyticsHelpers:
 
     def test_calculate_metric_geometric_mean(self):
         """geometric_mean calculates correctly."""
-        from benchbox.mcp.tools.analytics import _calculate_metric
+        from benchbox.core.results.metrics import calculate_named_metric
 
         # geometric mean of [4, 9] = sqrt(36) = 6
-        result = _calculate_metric([4.0, 9.0], "geometric_mean")
+        result = calculate_named_metric([4.0, 9.0], "geometric_mean")
         assert abs(result - 6.0) < 0.01
 
     def test_calculate_metric_p50(self):
-        """p50 returns median value."""
-        from benchbox.mcp.tools.analytics import _calculate_metric
+        """p50 returns the middle value for an odd count under nearest-rank."""
+        from benchbox.core.results.metrics import calculate_named_metric
 
-        result = _calculate_metric([10.0, 20.0, 30.0, 40.0, 50.0], "p50")
+        result = calculate_named_metric([10.0, 20.0, 30.0, 40.0, 50.0], "p50")
         assert result == 30.0
 
     def test_calculate_metric_total_time(self):
         """total_time returns sum."""
-        from benchbox.mcp.tools.analytics import _calculate_metric
+        from benchbox.core.results.metrics import calculate_named_metric
 
-        result = _calculate_metric([10.0, 20.0, 30.0], "total_time")
+        result = calculate_named_metric([10.0, 20.0, 30.0], "total_time")
         assert result == 60.0
 
     def test_percentile_empty_list(self):
         """Percentile of empty list returns 0."""
-        from benchbox.mcp.tools.analytics import _percentile
+        from benchbox.core.results.metrics import percentile_ms
 
-        assert _percentile([], 50) == 0
+        assert percentile_ms([], 0.50) == 0
 
     def test_percentile_single_element(self):
         """Percentile of single element returns that element."""
-        from benchbox.mcp.tools.analytics import _percentile
+        from benchbox.core.results.metrics import percentile_ms
 
-        assert _percentile([42.0], 50) == 42.0
-        assert _percentile([42.0], 95) == 42.0
+        assert percentile_ms([42.0], 0.50) == 42.0
+        assert percentile_ms([42.0], 0.95) == 42.0
 
     def test_std_dev_single_element(self):
         """Std dev of single element returns 0."""
-        from benchbox.mcp.tools.analytics import _std_dev
+        from benchbox.core.results.metrics import sample_stdev_ms
 
-        assert _std_dev([42.0]) == 0
+        assert sample_stdev_ms([42.0]) == 0
 
     def test_std_dev_known_values(self):
         """Std dev of known values is correct."""
-        import math
-
-        from benchbox.mcp.tools.analytics import _std_dev
+        from benchbox.core.results.metrics import sample_stdev_ms
 
         # std dev of [2, 4, 4, 4, 5, 5, 7, 9] = 2.138...
-        result = _std_dev([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0])
+        result = sample_stdev_ms([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0])
         assert abs(result - 2.138) < 0.01
 
     def test_extract_plan_summary(self):

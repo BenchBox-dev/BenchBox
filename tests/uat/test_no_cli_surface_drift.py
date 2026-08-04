@@ -25,6 +25,13 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/benchmark_hooks.py",
     "benchbox/cli/platform_hooks.py",
     "benchbox/cli/benchmarks.py",
+    # one-engine-unify-statistics: `aggregate` now computes its geometric mean
+    # and percentiles with benchbox.core.results.metrics instead of a private
+    # copy, so CLI and MCP report the same numbers. The @click.command and
+    # @click.option decorators, the aggregate() signature, and the CSV column
+    # list are untouched; only the p50/p95/p99 values change (nearest-rank
+    # instead of median + statistics.quantiles).
+    "benchbox/cli/commands/aggregate.py",
     "benchbox/cli/commands/__init__.py",
     "benchbox/cli/commands/calculate_qphh.py",
     # tighten-dependencies-phase-3-extras-deprecation: repoints check-deps'

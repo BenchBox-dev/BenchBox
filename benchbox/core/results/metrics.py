@@ -17,6 +17,86 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+# Metric names accepted by :func:`calculate_named_metric`. This vocabulary is
+# shared by every surface, so a name means the same thing in a CLI aggregate
+# CSV, an MCP trends response, and a result bundle.
+NAMED_METRICS = ("geometric_mean", "p50", "p95", "p99", "total_time", "mean")
+
+
+def percentile_ms(times_ms: Sequence[float], p: float) -> float:
+    """Return the p-th percentile of ``times_ms`` using the nearest-rank method.
+
+    ``p`` is a fraction in ``[0, 1]``: ``percentile_ms(times, 0.95)`` is p95.
+
+    BenchBox uses nearest-rank -- rank ``ceil(n * p)``, clamped to ``[1, n]`` --
+    as its single percentile definition, for two reasons:
+
+    1. It returns an actually-observed measurement. An interpolated percentile
+       reports a duration no query ever took, and with small query counts the
+       interpolating methods drift far: over 22 TPC-H timings, the exclusive
+       method that ``statistics.quantiles(n=20)[18]`` implements returned a p95
+       of 293.5 ms when the second-slowest query took 200 ms.
+    2. It is what every published BenchBox result bundle already reports, so
+       adopting it repo-wide changes no archived number.
+
+    Returns 0.0 for an empty sequence.
+    """
+    sorted_times = sorted(times_ms)
+    n = len(sorted_times)
+    if n == 0:
+        return 0.0
+    rank = min(max(1, math.ceil(n * p)), n)
+    return sorted_times[rank - 1]
+
+
+def geometric_mean_ms(times_ms: Sequence[float]) -> float:
+    """Return the geometric mean of the strictly positive values in ``times_ms``.
+
+    Non-positive timings have no logarithm and are excluded rather than
+    poisoning the result. Returns 0.0 when nothing positive remains.
+    """
+    positive = [t for t in times_ms if t > 0]
+    if not positive:
+        return 0.0
+    return statistics.geometric_mean(positive)
+
+
+def sample_stdev_ms(times_ms: Sequence[float]) -> float:
+    """Return the sample standard deviation, or 0.0 for fewer than two values."""
+    times_list = list(times_ms)
+    if len(times_list) < 2:
+        return 0.0
+    return statistics.stdev(times_list)
+
+
+def calculate_named_metric(times_ms: Sequence[float], metric: str) -> float:
+    """Return one named summary metric over ``times_ms``.
+
+    Args:
+        times_ms: Execution times in milliseconds.
+        metric: One of :data:`NAMED_METRICS`. Any other name falls back to the
+            arithmetic mean, preserving the behavior of the surface-local
+            implementations this function replaced.
+
+    Returns:
+        The metric value, or 0.0 when ``times_ms`` is empty.
+    """
+    times_list = list(times_ms)
+    if not times_list:
+        return 0.0
+
+    if metric == "geometric_mean":
+        return geometric_mean_ms(times_list)
+    if metric == "p50":
+        return percentile_ms(times_list, 0.50)
+    if metric == "p95":
+        return percentile_ms(times_list, 0.95)
+    if metric == "p99":
+        return percentile_ms(times_list, 0.99)
+    if metric == "total_time":
+        return sum(times_list)
+    return statistics.mean(times_list)
+
 
 class TPCMetricsCalculator:
     """Calculate TPC-compliant benchmark metrics.
@@ -123,14 +203,7 @@ class TPCMetricsCalculator:
         Returns:
             Geometric mean of times, or 0.0 if not calculable
         """
-        if not times:
-            return 0.0
-
-        valid_times = [t for t in times if t > 0]
-        if not valid_times:
-            return 0.0
-
-        return statistics.geometric_mean(valid_times)
+        return geometric_mean_ms(times)
 
 
 class TimingStatsCalculator:
@@ -160,33 +233,18 @@ class TimingStatsCalculator:
             return {}
 
         times_list = list(times_ms)
-        sorted_times = sorted(times_list)
-        n = len(sorted_times)
-
-        def percentile(p: float) -> float:
-            """Calculate percentile using nearest-rank method."""
-            if n == 0:
-                return 0.0
-            k = max(1, math.ceil(n * p))
-            k = min(k, n)  # Clamp to valid rank
-            k -= 1  # Convert rank to 0-based index
-            return sorted_times[k]
-
-        # Calculate geometric mean (only for positive values)
-        positive_times = [t for t in times_list if t > 0]
-        geom_mean = statistics.geometric_mean(positive_times) if positive_times else 0.0
 
         return {
             "total_ms": sum(times_list),
             "avg_ms": statistics.mean(times_list),
             "min_ms": min(times_list),
             "max_ms": max(times_list),
-            "geometric_mean_ms": geom_mean,
-            "stdev_ms": statistics.stdev(times_list) if n > 1 else 0.0,
-            "p50_ms": percentile(0.50),
-            "p90_ms": percentile(0.90),
-            "p95_ms": percentile(0.95),
-            "p99_ms": percentile(0.99),
+            "geometric_mean_ms": geometric_mean_ms(times_list),
+            "stdev_ms": sample_stdev_ms(times_list),
+            "p50_ms": percentile_ms(times_list, 0.50),
+            "p90_ms": percentile_ms(times_list, 0.90),
+            "p95_ms": percentile_ms(times_list, 0.95),
+            "p99_ms": percentile_ms(times_list, 0.99),
         }
 
     @staticmethod

@@ -159,45 +159,48 @@ class TestAnalyticsHelperFunctions:
     """Tests for analytics helper functions."""
 
     def test_percentile_calculation(self):
-        """Test percentile calculation helper."""
-        from benchbox.mcp.tools.analytics import _percentile
+        """Analytics percentiles come from core, which is nearest-rank.
+
+        The deleted local `_percentile` interpolated and returned 5.5 here.
+        """
+        from benchbox.core.results.metrics import percentile_ms
 
         data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-        assert _percentile(data, 50) == 5.5
-        assert _percentile(data, 0) == 1
-        assert _percentile(data, 100) == 10
+        assert percentile_ms(data, 0.50) == 5
+        assert percentile_ms(data, 0.0) == 1
+        assert percentile_ms(data, 1.0) == 10
 
     def test_percentile_empty_data(self):
         """Test percentile with empty data."""
-        from benchbox.mcp.tools.analytics import _percentile
+        from benchbox.core.results.metrics import percentile_ms
 
-        assert _percentile([], 50) == 0
+        assert percentile_ms([], 0.50) == 0
 
     def test_std_dev_calculation(self):
         """Test standard deviation calculation helper."""
-        from benchbox.mcp.tools.analytics import _std_dev
+        from benchbox.core.results.metrics import sample_stdev_ms
 
         data = [2, 4, 4, 4, 5, 5, 7, 9]
-        std = _std_dev(data)
+        std = sample_stdev_ms(data)
 
         # Sample standard deviation should be approximately 2.14
         assert 2.1 < std < 2.2
 
     def test_std_dev_single_value(self):
         """Test standard deviation with single value."""
-        from benchbox.mcp.tools.analytics import _std_dev
+        from benchbox.core.results.metrics import sample_stdev_ms
 
-        assert _std_dev([5]) == 0
+        assert sample_stdev_ms([5]) == 0
 
     def test_calculate_metric_geometric_mean(self):
         """Test geometric mean calculation."""
-        from benchbox.mcp.tools.analytics import _calculate_metric
+        from benchbox.core.results.metrics import calculate_named_metric
 
         data = [1, 2, 4, 8]
-        result = _calculate_metric(data, "geometric_mean")
+        result = calculate_named_metric(data, "geometric_mean")
 
-        # Geometric mean of 1,2,4,8 = (1*2*4*8)^(1/4) = 64^0.25 ≈ 2.83
+        # Geometric mean of 1,2,4,8 = (1*2*4*8)^(1/4) = 64^0.25 ~= 2.83
         assert 2.8 < result < 2.9
 
     def test_classify_regression_severity(self):
