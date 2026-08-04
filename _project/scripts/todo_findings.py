@@ -1809,8 +1809,12 @@ def _cmd_import_bulk(conn: Any, actor: str, args: argparse.Namespace) -> int:
                 return 1
             print(f"parity OK: {report['stored_records']}/{report['corpus_records']} records, zero diffs")
             return 0
-        # bulk_transfer copies primary keys verbatim, so staged ids must clear the
-        # target's maxima or the first colliding row aborts the whole transfer.
+        # Defence in depth, no longer the load-bearing guard: bulk_transfer now
+        # omits rowid-alias primary keys on an additive transfer (this call is
+        # additive -- no `replace`), so the target assigns fresh ids and cannot
+        # collide. Retained because it is independently tested and costs one
+        # pass over the staged ids; the offsets it reports below are what WOULD
+        # have been needed, not what the transfer applied.
         applied = offset_staging_pks(staging, maxima)
         raw = todo_db.sqlite3.connect(staging)
         raw.row_factory = todo_db.sqlite3.Row
