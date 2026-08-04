@@ -12,7 +12,8 @@ import pytest
 from benchbox.utils.config_interface import (
     ConfigInterface,
     SimpleConfigProvider,
-    create_cli_config_adapter,
+    get_config_provider,
+    set_config_provider,
 )
 
 pytestmark = [
@@ -218,197 +219,100 @@ class TestSimpleConfigProvider:
         assert config.get(("tuple", "key")) == "tuple_key_value"
 
 
-class TestCLIConfigAdapter:
-    """Test CLI config adapter functionality."""
+class TestCLIConfigProvider:
+    """The CLI adapter now lives in the CLI layer and is pushed down.
+
+    `benchbox.utils.config_interface` used to import `benchbox.cli.config`
+    itself, which was the layering violation .importlinter carried as an ignore
+    entry. utils now exposes a registration seam and the CLI fills it, so the
+    import edge points down.
+    """
+
+    def teardown_method(self):
+        set_config_provider(None)
 
     @patch("benchbox.cli.config.ConfigManager")
-    def test_create_cli_config_adapter(self, mock_config_manager_class):
-        """Test creating CLI config adapter."""
-        # Setup mock config manager
-        mock_config_manager = MagicMock()
-        mock_config_manager_class.return_value = mock_config_manager
+    def test_cli_provider_is_a_config_interface(self, mock_config_manager_class):
+        from benchbox.cli.config import CLIConfigProvider
 
-        adapter = create_cli_config_adapter()
+        mock_config_manager_class.return_value = MagicMock()
+        provider = CLIConfigProvider()
 
-        # Should be a ConfigInterface instance
-        assert isinstance(adapter, ConfigInterface)
+        assert isinstance(provider, ConfigInterface)
         mock_config_manager_class.assert_called_once()
 
     @patch("benchbox.cli.config.ConfigManager")
-    def test_cli_adapter_get_method(self, mock_config_manager_class):
-        """Test CLI adapter get method delegation."""
-        mock_config_manager = MagicMock()
-        mock_config_manager.get.return_value = "test_value"
-        mock_config_manager_class.return_value = mock_config_manager
+    def test_cli_provider_get_delegates(self, mock_config_manager_class):
+        from benchbox.cli.config import CLIConfigProvider
 
-        adapter = create_cli_config_adapter()
-        result = adapter.get("test_key")
+        manager = MagicMock()
+        manager.get.return_value = "test_value"
+        mock_config_manager_class.return_value = manager
 
-        assert result == "test_value"
-        mock_config_manager.get.assert_called_once_with("test_key", None)
+        assert CLIConfigProvider().get("test_key") == "test_value"
+        manager.get.assert_called_once_with("test_key", None)
 
     @patch("benchbox.cli.config.ConfigManager")
-    def test_cli_adapter_get_with_default(self, mock_config_manager_class):
-        """Test CLI adapter get method with default value."""
-        mock_config_manager = MagicMock()
-        mock_config_manager.get.return_value = "default_value"
-        mock_config_manager_class.return_value = mock_config_manager
+    def test_cli_provider_get_passes_the_default(self, mock_config_manager_class):
+        from benchbox.cli.config import CLIConfigProvider
 
-        adapter = create_cli_config_adapter()
-        result = adapter.get("missing_key", "default_value")
+        manager = MagicMock()
+        manager.get.return_value = "default_value"
+        mock_config_manager_class.return_value = manager
 
-        assert result == "default_value"
-        mock_config_manager.get.assert_called_once_with("missing_key", "default_value")
+        assert CLIConfigProvider().get("missing_key", "default_value") == "default_value"
+        manager.get.assert_called_once_with("missing_key", "default_value")
 
     @patch("benchbox.cli.config.ConfigManager")
-    def test_cli_adapter_set_method(self, mock_config_manager_class):
-        """Test CLI adapter set method delegation."""
-        mock_config_manager = MagicMock()
-        mock_config_manager_class.return_value = mock_config_manager
+    def test_cli_provider_set_delegates(self, mock_config_manager_class):
+        from benchbox.cli.config import CLIConfigProvider
 
-        adapter = create_cli_config_adapter()
-        adapter.set("test_key", "test_value")
+        manager = MagicMock()
+        mock_config_manager_class.return_value = manager
 
-        mock_config_manager.set.assert_called_once_with("test_key", "test_value")
-
-    @patch("benchbox.cli.config.ConfigManager")
-    def test_cli_adapter_has_method(self, mock_config_manager_class):
-        """Test CLI adapter has method - adapter doesn't have has() method."""
-        mock_config_manager = MagicMock()
-        mock_config_manager_class.return_value = mock_config_manager
-
-        adapter = create_cli_config_adapter()
-
-        # CLIConfigAdapter doesn't implement has() method
-        assert not hasattr(adapter, "has")
+        CLIConfigProvider().set("key", "value")
+        manager.set.assert_called_once_with("key", "value")
 
     @patch("benchbox.cli.config.ConfigManager")
-    def test_cli_adapter_get_all_method(self, mock_config_manager_class):
-        """Test CLI adapter get_all method - adapter doesn't have get_all() method."""
-        mock_config_manager = MagicMock()
-        mock_config_manager_class.return_value = mock_config_manager
+    def test_installing_the_cli_provider_makes_it_the_process_provider(self, mock_config_manager_class):
+        from benchbox.cli.config import CLIConfigProvider, install_cli_config_provider
 
-        adapter = create_cli_config_adapter()
+        mock_config_manager_class.return_value = MagicMock()
+        installed = install_cli_config_provider()
 
-        # CLIConfigAdapter doesn't implement get_all() method
-        assert not hasattr(adapter, "get_all")
-
-    @patch("benchbox.cli.config.ConfigManager")
-    def test_cli_adapter_error_handling(self, mock_config_manager_class):
-        """Test CLI adapter error handling."""
-        mock_config_manager = MagicMock()
-        mock_config_manager.get.side_effect = Exception("Config error")
-        mock_config_manager_class.return_value = mock_config_manager
-
-        adapter = create_cli_config_adapter()
-
-        # Error should be propagated
-        with pytest.raises(Exception, match="Config error"):
-            adapter.get("test_key")
+        assert isinstance(installed, CLIConfigProvider)
+        assert get_config_provider() is installed
 
 
-class TestConfigInterfaceIntegration:
-    """Test integration scenarios between different config implementations."""
+class TestConfigProviderRegistration:
+    def teardown_method(self):
+        set_config_provider(None)
 
-    def test_interface_compatibility(self):
-        """Test that all implementations follow the same interface."""
-        # Test SimpleConfigProvider implements interface correctly
-        simple_config = SimpleConfigProvider({"test": "value"})
+    def test_default_provider_is_the_simple_one(self):
+        assert isinstance(get_config_provider(), SimpleConfigProvider)
 
-        assert hasattr(simple_config, "get")
-        assert hasattr(simple_config, "set")
+    def test_registered_provider_wins(self):
+        provider = SimpleConfigProvider({"execution.timeout_minutes": 7})
+        set_config_provider(provider)
 
-        # Test that methods work as expected
-        assert simple_config.get("test") == "value"
-        assert "test" in simple_config._config
-        assert "missing" not in simple_config._config
+        assert get_config_provider() is provider
 
-        simple_config.set("new_key", "new_value")
-        assert simple_config.get("new_key") == "new_value"
+    def test_clearing_restores_the_default(self):
+        set_config_provider(SimpleConfigProvider())
+        set_config_provider(None)
 
-        # Verify both keys are in config
-        assert "test" in simple_config._config
-        assert "new_key" in simple_config._config
+        assert isinstance(get_config_provider(), SimpleConfigProvider)
+        assert get_config_provider().get("execution.timeout_minutes") == 120
 
-    def test_config_provider_as_interface(self):
-        """Test using SimpleConfigProvider through ConfigInterface."""
+    def test_utils_does_not_import_the_cli_to_find_a_provider(self):
+        """The inverted edge: utils resolves without benchbox.cli loaded."""
+        import ast
+        from pathlib import Path as _Path
 
-        def use_config(config: ConfigInterface):
-            """Function that uses ConfigInterface."""
-            config.set("function_key", "function_value")
-            return config.get("function_key")
-
-        provider = SimpleConfigProvider()
-        result = use_config(provider)
-
-        assert result == "function_value"
-        assert "function_key" in provider._config
-
-    def test_multiple_config_instances(self):
-        """Test multiple independent config instances."""
-        config1 = SimpleConfigProvider({"shared_key": "value1"})
-        config2 = SimpleConfigProvider({"shared_key": "value2"})
-
-        # Instances should be independent
-        assert config1.get("shared_key") == "value1"
-        assert config2.get("shared_key") == "value2"
-
-        # Changes to one shouldn't affect the other
-        config1.set("unique_key", "unique_value")
-        assert "unique_key" in config1._config
-        assert "unique_key" not in config2._config
-
-    def test_config_data_types_preservation(self):
-        """Test that config preserves data types correctly."""
-        config = SimpleConfigProvider()
-
-        test_data = {
-            "string": "hello world",
-            "integer": 42,
-            "float": 3.14159,
-            "boolean_true": True,
-            "boolean_false": False,
-            "list": [1, 2, 3, "four"],
-            "dict": {"nested": {"deep": "value"}},
-            "none": None,
+        source = _Path("benchbox/utils/config_interface.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        imported = {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module} | {
+            alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names
         }
 
-        # Set all values
-        for key, value in test_data.items():
-            config.set(key, value)
-
-        # Verify types are preserved
-        for key, expected_value in test_data.items():
-            actual_value = config.get(key)
-            assert actual_value == expected_value
-            assert type(actual_value) == type(expected_value)
-
-    @patch("benchbox.cli.config.ConfigManager")
-    def test_cli_adapter_integration(self, mock_config_manager_class):
-        """Test CLI adapter integration with different scenarios."""
-        mock_config_manager = MagicMock()
-        mock_config_manager_class.return_value = mock_config_manager
-
-        # Setup mock to behave like a real config
-        config_data = {}
-
-        def mock_get(key, default=None):
-            return config_data.get(key, default)
-
-        def mock_set(key, value):
-            config_data[key] = value
-
-        mock_config_manager.get.side_effect = mock_get
-        mock_config_manager.set.side_effect = mock_set
-
-        # Test adapter works like a normal config
-        adapter = create_cli_config_adapter()
-
-        # Set some values
-        adapter.set("key1", "value1")
-        adapter.set("key2", 42)
-
-        # Verify values
-        assert adapter.get("key1") == "value1"
-        assert adapter.get("key2") == 42
-        assert adapter.get("nonexistent") is None
+        assert not any(module.startswith("benchbox.cli") for module in imported)
