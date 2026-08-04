@@ -31,7 +31,15 @@ def _integer_assignment(module: ast.Module, name: str, source: Path) -> int:
     raise SchemaMigrationError(f"{source}: missing {name} assignment")
 
 
-def _migration_revisions(module: ast.Module, source: Path) -> list[int]:
+def _migration_revisions(module: ast.Module, source: Path) -> tuple[list[int], set[int]]:
+    """Returns the declared revisions and which of them carry no statements.
+
+    An empty migration is no longer rejected outright: a FENCE migration (one
+    that moves SCHEMA_VERSION purely to lock out stale clones, ADR D2/D9) has no
+    DDL by design. It is still rejected unless the inventory declares it as one,
+    so the case this guard actually exists for -- a builder that silently returns
+    [] -- fails exactly as before.
+    """
     for node in module.body:
         targets: list[ast.expr]
         if isinstance(node, ast.Assign):
@@ -45,13 +53,14 @@ def _migration_revisions(module: ast.Module, source: Path) -> list[int]:
         if not isinstance(value, ast.Dict):
             raise SchemaMigrationError(f"{source}: MIGRATIONS must be a dict literal")
         revisions: list[int] = []
+        empty: set[int] = set()
         for key, statements in zip(value.keys, value.values, strict=True):
             if not isinstance(key, ast.Constant) or not isinstance(key.value, int):
                 raise SchemaMigrationError(f"{source}: every MIGRATIONS key must be an integer literal")
             if isinstance(statements, (ast.List, ast.Tuple)) and not statements.elts:
-                raise SchemaMigrationError(f"{source}: migration {key.value} has no statements")
+                empty.add(key.value)
             revisions.append(key.value)
-        return revisions
+        return revisions, empty
     raise SchemaMigrationError(f"{source}: missing MIGRATIONS assignment")
 
 
@@ -72,17 +81,53 @@ def _migration_statement_counts(module: ast.Module, source: Path) -> dict[int, i
         for key, count in zip(value.keys, value.values, strict=True):
             if not isinstance(key, ast.Constant) or not isinstance(key.value, int):
                 raise SchemaMigrationError(f"{source}: every migration-count key must be an integer literal")
-            if not isinstance(count, ast.Constant) or not isinstance(count.value, int) or count.value <= 0:
-                raise SchemaMigrationError(f"{source}: migration {key.value} needs a positive statement count")
+            # 0 is legal only for a fence migration, cross-checked against the
+            # inventory below; a negative or non-integer count is never legal.
+            if not isinstance(count, ast.Constant) or not isinstance(count.value, int) or count.value < 0:
+                raise SchemaMigrationError(f"{source}: migration {key.value} needs a non-negative statement count")
             counts[key.value] = count.value
         return counts
     raise SchemaMigrationError(f"{source}: missing MIGRATION_STATEMENT_COUNTS assignment")
 
 
+def _check_fence_declaration(
+    entry: dict,
+    *,
+    revision: int,
+    expected_count: int,
+    is_empty: bool,
+    inventory: Path,
+) -> None:
+    """A statement-free migration must be an explicit, reasoned fence, and a
+    migration declared as a fence must genuinely carry no DDL.
+
+    Both directions are enforced: the first keeps an accidentally-empty migration
+    failing closed (the case this guard was written for), the second keeps
+    "fence" from becoming a label that ships unreviewed DDL under a claim that
+    there is none.
+    """
+    declared_fence = entry.get("kind") == "fence"
+    if is_empty and not declared_fence:
+        raise SchemaMigrationError(
+            f'{inventory}: revision {revision} has no statements; declare "kind": "fence" '
+            f"with a fence_rationale, or give the migration real DDL"
+        )
+    if not declared_fence:
+        return
+    if not is_empty:
+        raise SchemaMigrationError(
+            f'{inventory}: revision {revision} is declared "kind": "fence" but carries '
+            f"{expected_count} statement(s); a fence must carry no DDL"
+        )
+    rationale = entry.get("fence_rationale")
+    if not isinstance(rationale, str) or not rationale.strip():
+        raise SchemaMigrationError(f"{inventory}: fence revision {revision} needs a non-empty fence_rationale")
+
+
 def validate_contract(*, tracker: Path, wrapper: Path, inventory: Path) -> None:
     module = ast.parse(tracker.read_text(encoding="utf-8"), filename=str(tracker))
     schema_version = _integer_assignment(module, "SCHEMA_VERSION", tracker)
-    revisions = _migration_revisions(module, tracker)
+    revisions, empty_revisions = _migration_revisions(module, tracker)
     statement_counts = _migration_statement_counts(module, tracker)
     expected_revisions = list(range(2, schema_version + 1))
     if revisions != expected_revisions:
@@ -134,6 +179,13 @@ def validate_contract(*, tracker: Path, wrapper: Path, inventory: Path) -> None:
                 f"{inventory}: revision {revision} statement_count={entry.get('statement_count')!r} "
                 f"does not match runtime contract {expected_count}"
             )
+        _check_fence_declaration(
+            entry,
+            revision=revision,
+            expected_count=expected_count,
+            is_empty=revision in empty_revisions or expected_count == 0,
+            inventory=inventory,
+        )
     current = entries[-1]
     evidence = current.get("deployment_evidence")
     if not isinstance(evidence, str) or not evidence.strip():

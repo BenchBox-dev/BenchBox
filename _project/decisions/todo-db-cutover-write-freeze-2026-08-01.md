@@ -34,15 +34,23 @@ on its own so a holder that dies mid-cutover cannot wedge the tracker.
 | ID | Decision | Choice | Reason |
 |---|---|---|---|
 | D1 | What gates the destructive restore | The **leased write freeze**, never a claim check. | Claims do not cover unclaimed writes, which are the majority of tracker mutation. Empirically the dominant write mode. |
-| D2 | Enforce the freeze by bumping `SCHEMA_VERSION` so stale clones hard-fail? | **No.** `SCHEMA_VERSION` stays 4; the freeze remains **advisory** against clones running a pre-#1377 CLI. | See "D2 rationale" below. This is the change's known, accepted weakness. |
+| D2 | Enforce the freeze by bumping `SCHEMA_VERSION` so stale clones hard-fail? | **Yes — reversed 2026-08-04 by Joe.** `SCHEMA_VERSION` moves 4 → 5. The freeze is no longer advisory: a clone that never pulled is fenced out of the tracker entirely until it migrates. | The original "no" traded a permanent cost against a transient window. Joe's ruling: an advisory gate on a *destructive* restore is not a gate. See "D2 rationale" below, retained and annotated so the reversal is auditable rather than silent. |
 | D3 | Consequence of D2 for the runbook | The freeze is **necessary but not sufficient**. The runbook MUST pair it with independently verified quiescence. Neither gate alone authorizes the restore. | A stale clone writes straight through a live freeze. Quiescence alone was never a gate. Both, together, or not at all. |
 | D4 | How quiescence is measured | The `stats["events"]` fingerprint (`count`, `last_seq`, `latest`) compared across a window, by a probe that **fails when it cannot read the fingerprint**. | The previous probe shelled out to `todo stats --json`, which does not exist; it compared two empty strings and passed unconditionally. See "The vacuous rung". |
 | D5 | Freeze TTL bounds | Finite, positive, `<= MAX_FREEZE_TTL_HOURS` (168h); default 2h. Malformed/torn freeze state reads as **live** (fails closed); `freeze` itself stays exempt from the gate so a torn freeze is always liftable. | A freeze is a maintenance window, not a standing state. A safety gate whose degraded state is "unlocked" is the wrong default; one that cannot be lifted is the other wrong default. Both were real defects (PR #1386). |
-| D7 | Fixing create-time-only fields with todo-db 0.3's audited `update` verb, before the cutover | **Not available.** todo-db 0.3 is `SCHEMA_VERSION = 5` and refuses a v4 database outright: *"database contains a different tracker schema (item_deps, items, meta, work_units); use a dedicated todo-db path"*. It fails **safe** — detects the foreign schema, refuses, does not corrupt. | The verb only becomes usable *after* the cutover, and the cutover is gated on a probe that `update` would have fixed. Circular. Verified 2026-08-01 against a local v4 database, never production. |
+| D7 | Fixing create-time-only fields with todo-db 0.3's audited `update` verb, before the cutover | **Not available.** todo-db 0.3 refuses this database outright: *"database contains a different tracker schema (item_deps, items, meta, work_units); use a dedicated todo-db path"*. It fails **safe** — detects the foreign schema, refuses, does not corrupt. | The verb only becomes usable *after* the cutover, and the cutover is gated on a probe that `update` would have fixed. Circular. Verified 2026-08-01 against a local database, never production. **Mechanism corrected 2026-08-04 — see "D7 correction".** |
 | D8 | The vacuous rung on the freeze item | **Superseded, not edited.** The operative quiescence gate is the probe on `cutover-record-corrections-and-quiescence-probe`. Rung 1 of `tracker-cutover-needs-a-write-freeze-not-a-claim-check` is void and MUST NOT be used to certify quiescence. | Ladders are create-time-only and D7 rules out an in-place edit. The freeze item has **zero** dependents, so drop+recreate would be cheap — but its work is already done and merged, and its ladder only matters at completion time. Superseding is proportionate; dropping a live-claimed item to correct a rung is not. |
+| D9 | What migration 5 contains | **Nothing.** v5 is a declared *fence* migration: it moves the version number and carries no DDL. The contract checker was taught to accept a fence only when the inventory declares `"kind": "fence"` with a written `fence_rationale`. | The freeze lives in `meta` rows, so there was no schema delta to hang the bump on, and inventing DDL purely to justify the number would have been worse. The two-way check keeps the guard's real purpose — catching a builder that silently returns `[]` — fully intact, and stops "fence" becoming a label that ships unreviewed DDL. |
+| D10 | A stale clone under a foreign freeze can neither read nor migrate | **Intended.** Fencing stale clones out mid-cutover is the point of D2. `todo doctor` is the deliberate escape hatch: it reports schema mismatch as a check result instead of raising, so the operator can always learn *why* everything stopped. | The alternative — exempting `migrate` from the freeze — reopens the #1386 defect that `migrate` is a bulk write which must not run mid-cutover. The refusal message was corrected at the same time: it told a fenced clone "Reads still work", which D2 had just made false. |
+| D11 | The migration item's stale `must-preserve` rule | **Left in place, superseded by its block reason** (ruled by Joe, 2026-08-04). Not edited, not recreated. | `preserves` is create-time-only — confirmed 2026-08-04 that the new `scope-update` verb covers scope globs *only*. Correcting it means dropping and recreating the item **and all 5 dependents**, since deps are also create-time-only: 6 new ids, 6 terminal `dropped` rows, and every external reference to the old ids goes dead. Disproportionate to a field whose staleness is already documented where a reader will hit it. Same reasoning as D8. |
 | D6 | Rollback storage | A durable local backup **outside** the repo (`~/todo-db-backups/`) plus a 17-table snapshot, both taken immediately before the restore and retained until an audit verify passes against the hosted DB post-cutover. | The prior attempt ran in an ephemeral container that restarted mid-session. Ephemeral disk is not a rollback path. |
 
-### D2 rationale — why `SCHEMA_VERSION` is not bumped
+### D2 rationale — why `SCHEMA_VERSION` was not bumped, and why that reversed
+
+**Status: REVERSED 2026-08-04.** The argument below is retained because it is
+still the correct statement of what the bump costs — the bump was taken *with*
+these costs, not because they were shown to be wrong. Read it as the price paid,
+not as current guidance.
 
 Enforcement lives only in the new `main()`. A session running a pre-#1377
 `todo_db.py` has no gate and writes through a live freeze. Bumping
@@ -61,11 +69,43 @@ but the cost is disqualifying:
   unable to read (schema mismatch) *and* unable to migrate (frozen) until the
   holder lifts the freeze. Correct, but a hard lockout.
 
-**Accepted residual risk**: a stale clone can corrupt a cutover. D3 is the
-mitigation — quiescence is verified independently, so a stale writer is
-*detected* even though it is not *blocked*. If enforcement is ever wanted, the
-right vehicle is `-v2`'s "graceful read-only degradation" option (reads keep
-working across a version gap, writes refuse), not a bare bump.
+**What changed.** Joe reversed this on 2026-08-04. The residual risk the old
+text accepted — "a stale clone can corrupt a cutover", mitigated only by
+*detecting* the stale writer rather than *blocking* it — was judged too weak a
+guarantee for an irreversible `restore-legacy --replace`. D3 still stands:
+quiescence remains a required, independent gate. The bump adds enforcement; it
+does not replace verification.
+
+The third bullet above predicted the hard lockout, and it happens exactly as
+described — confirmed by running it, not by reading the diff. It is now D10, and
+accepted rather than avoided. `todo doctor` is the escape hatch.
+
+Two claims in the original text were **wrong**, and both are corrected below:
+
+- The "graceful read-only degradation" alternative was rejected on 2026-08-04 in
+  favour of a plain bump. Exempting read-only subcommands means every subcommand
+  must be correctly classified read-vs-write forever, and misclassifying one
+  write as a read silently reopens the hole the bump exists to close.
+- D7's stated mechanism was wrong. See below.
+
+### D7 correction — todo-db 0.3 does not refuse on the version number
+
+The original D7 said todo-db 0.3 is `SCHEMA_VERSION = 5` and refuses a v4
+database. Both halves are wrong, verified 2026-08-04 at tag `v0.3.0`, `main`,
+and the working branch:
+
+- todo-db 0.3 is **`SCHEMA_VERSION = 4`**, not 5 (`src/todo_db/database.py:19`).
+- Its refusal is **structural, not a version comparison**. `_migrate()` looks for
+  its own `schema_migrations` table; finding none, it checks for the foreign
+  tables `{items, work_units, item_deps, meta}` and raises `SchemaMismatchError`
+  (`src/todo_db/database.py:617`). It never reads `meta.schema_version` to make
+  that call.
+
+**Why this matters for D2**: the obvious objection to bumping — that BenchBox
+claiming v5 would collide with todo-db's "v5" and turn a fail-safe into a
+fail-open — **does not exist**. A structural check cannot be defeated by a
+version bump. D7's *conclusion* is unchanged and if anything stronger: `update`
+remains unusable pre-cutover, and no version number we choose can change that.
 
 ### The vacuous rung
 
@@ -90,6 +130,11 @@ create-time-only, so the replacement ships on a successor item.
 Each step is a gate. A failure at any step aborts; do not continue and do not
 "verify by success message".
 
+0. **Land and propagate the v5 fence FIRST (D2/D9/D10).** The fence must be on
+   `develop` and every active clone must have run `todo migrate` *before* step 4.
+   A clone that pulls after the freeze is taken can neither read nor migrate
+   until the freeze lifts — intended, but do not discover it mid-cutover. Confirm
+   with `todo doctor` from each active worktree: `schema OK v5`.
 1. **Preconditions.** `todo-db >= 0.3` CLI reachable and at `origin/main`.
    Durable backup dir exists outside the repo. No other session active.
 2. **Backup.** `~/todo-db-backups/benchbox-todo-<UTC>.db` **plus**
