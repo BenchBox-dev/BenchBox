@@ -1615,3 +1615,73 @@ class TestDuckDBAdapter:
         assert any("delta_scan(" in sql for sql in executed_sql)
         assert not any("iceberg_scan(" in sql for sql in executed_sql)
         assert adapter.external_format == "delta"
+
+
+class TestMCPThreadsReachTheEffectiveSetting:
+    """The public MCP `threads` option must change DuckDB execution."""
+
+    @staticmethod
+    def _adapter_from_mcp_request(tmp_path: Path, options: dict):
+        from benchbox.mcp.schemas import validate_platform_options
+        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+        normalized = validate_platform_options("duckdb", options)
+        prepared = _prepare_adapter_platform_options("duckdb", normalized)
+        return DuckDBAdapter.from_config(
+            {
+                "benchmark": "tpch",
+                "scale_factor": 0.01,
+                "database_path": str(tmp_path / "mcp_threads.duckdb"),
+                **prepared,
+            }
+        )
+
+    def test_from_config_preserves_the_translated_thread_limit(self, tmp_path: Path):
+        """`from_config` rebuilds its config from a key list; `threads` must survive it."""
+        adapter = self._adapter_from_mcp_request(tmp_path, {"threads": 7})
+
+        assert adapter.thread_limit == 7
+        assert adapter.get_platform_info()["configuration"]["thread_limit"] == 7
+
+    def test_connection_emits_the_thread_setting(self, tmp_path: Path):
+        """A deterministic connection spy proves the SET statement is issued."""
+        adapter = self._adapter_from_mcp_request(tmp_path, {"threads": 7})
+
+        connection = Mock()
+        with (
+            patch.object(adapter, "_duckdb_module") as duckdb_module,
+            patch.object(adapter, "_detect_connection_version", return_value=None),
+            patch.object(adapter, "handle_existing_database"),
+        ):
+            duckdb_module.connect.return_value = connection
+            adapter.create_connection()
+
+        assert call("SET threads TO 7") in connection.execute.call_args_list
+
+    def test_a_real_connection_reports_the_requested_thread_count(self, tmp_path: Path):
+        """The strongest evidence: DuckDB itself reports the setting."""
+        adapter = self._adapter_from_mcp_request(tmp_path, {"threads": 3})
+
+        connection = adapter.create_connection()
+        try:
+            assert connection.execute("SELECT current_setting('threads')").fetchone()[0] == 3
+        finally:
+            with contextlib.suppress(Exception):
+                connection.close()
+
+    def test_without_the_option_duckdb_keeps_its_own_default(self, tmp_path: Path):
+        """The mapping must not impose a thread limit on requests that omit it."""
+        adapter = self._adapter_from_mcp_request(tmp_path, {})
+
+        assert adapter.thread_limit is None
+
+        connection = Mock()
+        with (
+            patch.object(adapter, "_duckdb_module") as duckdb_module,
+            patch.object(adapter, "_detect_connection_version", return_value=None),
+            patch.object(adapter, "handle_existing_database"),
+        ):
+            duckdb_module.connect.return_value = connection
+            adapter.create_connection()
+
+        assert not any("SET threads" in str(executed) for executed in connection.execute.call_args_list)
