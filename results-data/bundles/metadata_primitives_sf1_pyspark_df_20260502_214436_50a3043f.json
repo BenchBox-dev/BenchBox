@@ -22,12 +22,12 @@
   },
   "environment": {
     "client_host": {
-      "machine_id": "machine_45d1a3ef31a1728d"
+      "machine_id": "machine_3d46427037d2"
     },
-    "machine_id": "machine_45d1a3ef31a1728d",
+    "machine_id": "machine_3d46427037d2",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_0a57d94f05f4",
+      "engine_host": "host_7b55598cd5e5",
       "runtime_type": "dataframe_process",
       "source": "inferred"
     }
@@ -110,7 +110,7 @@
       "family": "expression",
       "master": "local[*]",
       "shuffle_partitions": 10,
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/metadata_primitives_sf1"
+      "working_dir": "path_25415e9b2501"
     },
     "deployment": {
       "collection_status": "partial",
@@ -180,7 +180,7 @@
       "shuffle_partitions": 10,
       "thread_limit": 8,
       "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
-      "working_dir": "/Users/joe/Developer/benchmark_runs/datagen/metadata_primitives_sf1"
+      "working_dir": "path_25415e9b2501"
     },
     "raw_metadata": {
       "driver_runtime_strategy": "current-process"

@@ -1,12 +1,12 @@
 {
   "benchmark": "NYC Taxi",
   "bundle_file": "nyctaxi_sf01_polars_df_20260502_211304_2459ce33.json",
-  "bundle_hash": "833962baf53201844ba5319b8ea9998ad5a399e5fac972c280dfc7d5d6f25112",
+  "bundle_hash": "b34c3078802456e2953bc467c739dbf46d8472432ddb7f3afd5e5f78ec1f8538",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.1,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:49:16.683227+00:00",
   "submitted_by": "BenchBox UAT"

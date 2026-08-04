@@ -45,15 +45,15 @@
     "arch": "x86_64",
     "client_host": {
       "arch": "x86_64",
-      "machine_id": "machine_4ed490d441535f09",
+      "machine_id": "machine_f78e20229fbc",
       "os": "Linux",
       "python": "3.12.13"
     },
-    "machine_id": "machine_4ed490d441535f09",
+    "machine_id": "machine_f78e20229fbc",
     "os": "Linux",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_51e3fb6b450f",
+      "engine_host": "host_7e5bc04be41b",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -65,7 +65,7 @@
       "type": "zstd"
     },
     "driver_package": "datafusion",
-    "driver_runtime_python_executable": "/home/runner/work/BenchBox/BenchBox/.venv/bin/python",
+    "driver_runtime_python_executable": "path_66639665ebda",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "53.0.0",
     "driver_version_resolved": "53.0.0",
@@ -173,7 +173,7 @@
       "connection_mode": "in-memory",
       "data_format": "parquet",
       "driver_package": "datafusion",
-      "driver_runtime_python_executable": "/home/runner/work/BenchBox/BenchBox/.venv/bin/python",
+      "driver_runtime_python_executable": "path_66639665ebda",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "53.0.0",
       "driver_version_resolved": "53.0.0",
@@ -181,7 +181,7 @@
       "memory_limit": "12GB",
       "result_cache_enabled": false,
       "target_partitions": 4,
-      "working_dir": "/home/runner/work/BenchBox/BenchBox/benchmark_runs/databases/ssb_sf001/ssb_sf001_notuning_noconstraints.datafusion"
+      "working_dir": "path_bfb6b871e609"
     },
     "deployment": {
       "collection_status": "partial",
@@ -204,7 +204,7 @@
       "target_partitions": 4,
       "tuning_source": "baseline",
       "type": "datafusion",
-      "working_dir": "/home/runner/work/BenchBox/BenchBox/benchmark_runs/databases/ssb_sf001/ssb_sf001_notuning_noconstraints.datafusion"
+      "working_dir": "path_bfb6b871e609"
     },
     "storage": {
       "collection_status": "unavailable",

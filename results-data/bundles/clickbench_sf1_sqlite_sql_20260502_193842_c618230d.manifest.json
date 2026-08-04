@@ -1,12 +1,12 @@
 {
   "benchmark": "ClickBench",
   "bundle_file": "clickbench_sf1_sqlite_sql_20260502_193842_c618230d.json",
-  "bundle_hash": "8ae68310d810f17ccf8473f879b56c69efd9d43ec150a9999fb2aec4dc2feb25",
+  "bundle_hash": "f2a72cf56a6ea8127da1392afb2eb720db3f1ee2df9878feb195d50cc04682ac",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",
   "scale_factor": 1.0,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:47:07.730013+00:00",
   "submitted_by": "BenchBox UAT"

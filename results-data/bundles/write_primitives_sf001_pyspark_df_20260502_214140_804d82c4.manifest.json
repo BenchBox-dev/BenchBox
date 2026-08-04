@@ -1,12 +1,12 @@
 {
   "benchmark": "Write Primitives",
   "bundle_file": "write_primitives_sf001_pyspark_df_20260502_214140_804d82c4.json",
-  "bundle_hash": "0ceb6d037270aae0b5da45df3f25f578d8ffaf65fccbe256cde3078c7132a3ce",
+  "bundle_hash": "9455a3aae1065f49360765815dfedf8edad8023129601fbd38ac93ce08f7d801",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",
   "scale_factor": 0.01,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:53:40.348009+00:00",
   "submitted_by": "BenchBox UAT"

@@ -1,12 +1,12 @@
 {
   "benchmark": "TPC-H",
   "bundle_file": "tpch_sf001_sqlite_sql_20260502_191208_1df8890c.json",
-  "bundle_hash": "53b68324ecf9433cf885137bcbfedc8ab9ff5eaa7e25049215f91163635e97a3",
+  "bundle_hash": "10ff44e6e9280ed5003b41753b4d26825658bd202b02b723d41f71cac9810804",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",
   "scale_factor": 0.01,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:51:34.267196+00:00",
   "submitted_by": "BenchBox UAT"
