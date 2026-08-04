@@ -1069,7 +1069,7 @@ class TestHostedMigrate:
             todo_db.connect_backend(HOSTED_URL)
         # ... and migrate must fix it in place, applying every pending version
         applied = todo_db.migrate_backend(HOSTED_URL)
-        assert applied == [2, 3, 4]
+        assert applied == sorted(todo_db.MIGRATIONS)
         conn = todo_db.connect_backend(HOSTED_URL)
         cols = [row[1] for row in conn.execute("PRAGMA table_info(work_units)").fetchall()]
         assert "started_at" in cols

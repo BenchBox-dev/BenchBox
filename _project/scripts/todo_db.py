@@ -79,7 +79,7 @@ if _self_module is not None:
 # touches todo_db. See todo_findings.py's header.
 import todo_findings  # noqa: E402
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Applied in order by `todo migrate`. v3 lands the findings domain; v4 adds the
 # lossless homes for legacy capture fields and makes finding_links.target_item
@@ -88,6 +88,15 @@ SCHEMA_VERSION = 4
 # database can still climb through it. That a migrated database ends up identical
 # to a fresh one is pinned by a test rather than by sharing one DDL string, since
 # ALTER-based deltas can never be literally the same text as the CREATEs.
+#
+# v5 carries NO DDL, and that is deliberate (ADR D2/D9). Its only job is to move
+# the version number so a stale clone hard-fails instead of being politely asked
+# not to write: the freeze is advisory, and an un-pulled clone never sees it. The
+# freeze itself lives in `meta` rows, so there was no schema delta to attach the
+# bump to, and inventing one purely to justify the number would have been worse.
+# Consequence to keep in mind when reading this file: from v5 on, the version is
+# a WRITE FENCE as well as a shape descriptor -- v5 and v4 are structurally
+# identical, so never infer shape from the number alone.
 MIGRATIONS: dict[int, list[str]] = {
     2: [
         "ALTER TABLE work_units ADD COLUMN started_at TEXT",
@@ -96,13 +105,16 @@ MIGRATIONS: dict[int, list[str]] = {
     ],
     3: todo_findings.finding_schema_statements(),
     4: todo_findings.finding_migration_v4_statements(),
+    5: [],
 }
 
 # The migration builders are intentionally callable so the findings schema can
 # remain the single DDL source. Keep an explicit statement-count contract next
 # to the runtime map: a future helper cannot silently return an empty or
-# truncated migration without failing immediately at import time.
-MIGRATION_STATEMENT_COUNTS: dict[int, int] = {2: 3, 3: 6, 4: 8}
+# truncated migration without failing immediately at import time. v5's declared
+# 0 is what makes the empty fence migration an assertion rather than a hole --
+# a helper that silently returned [] would still have to be declared here.
+MIGRATION_STATEMENT_COUNTS: dict[int, int] = {2: 3, 3: 6, 4: 8, 5: 0}
 if {revision: len(statements) for revision, statements in MIGRATIONS.items()} != MIGRATION_STATEMENT_COUNTS:
     raise RuntimeError("MIGRATIONS do not match MIGRATION_STATEMENT_COUNTS")
 
@@ -1189,12 +1201,27 @@ def _freeze_refusal(conn: sqlite3.Connection, actor: str, args: argparse.Namespa
     return 2
 
 
-def _freeze_refusal_message(live: dict[str, Any]) -> str:
-    return (
+def _freeze_refusal_message(live: dict[str, Any], *, reads_work: bool = True) -> str:
+    """The freeze refusal. `reads_work` must be False for a clone whose schema is
+    behind SCHEMA_VERSION.
+
+    "Reads still work" is true for a current clone and FALSE for a stale one:
+    since v5 the version check fences every subcommand, so a stale clone under a
+    foreign freeze has no working command at all except `doctor` (which reports
+    rather than raises). Telling that operator reads work would send them to
+    debug a backend that is behaving exactly as designed.
+    """
+    head = (
         f"error: tracker is frozen for maintenance by {live['holder']} since {live['since']}"
         f"{': ' + live['reason'] if live['reason'] else ''}. "
-        f"Reads still work; writes resume when the holder runs `todo freeze --release` "
-        f"or the {live['ttl_hours']}h lease lapses."
+    )
+    lapse = f"the holder runs `todo freeze --release` or the {live['ttl_hours']}h lease lapses"
+    if reads_work:
+        return head + f"Reads still work; writes resume when {lapse}."
+    return head + (
+        f"This clone's schema is also behind, so reads are fenced too until it migrates -- "
+        f"and `migrate` is itself a write. Wait until {lapse}, then re-run `todo migrate`. "
+        f"`todo doctor` works throughout."
     )
 
 
@@ -1215,7 +1242,8 @@ def _premigrate_freeze_refusal(backend: Path | str, actor: str) -> int | None:
         else:
             conn = _hosted_raw_connect(backend, sync_required=True)
         try:
-            if _schema_version(conn) is None:
+            version = _schema_version(conn)
+            if version is None:
                 return None  # fresh/schemaless database: no freeze can be stored
             live = get_freeze(conn)
         finally:
@@ -1228,7 +1256,9 @@ def _premigrate_freeze_refusal(backend: Path | str, actor: str) -> int | None:
         return 2
     if not live or live["holder"] == actor:
         return None
-    print(_freeze_refusal_message(live), file=sys.stderr)
+    # A caller reaching `migrate` with a current schema is a no-op migrator whose
+    # reads genuinely still work; one that is behind is fenced out of everything.
+    print(_freeze_refusal_message(live, reads_work=version >= SCHEMA_VERSION), file=sys.stderr)
     return 2
 
 

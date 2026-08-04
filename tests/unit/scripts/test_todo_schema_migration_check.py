@@ -141,3 +141,60 @@ def test_todo_schema_migration_revision_is_atomic(tmp_path: Path, monkeypatch: p
     conn.close()
     assert version == "3"
     assert probe is None
+
+
+def _inventory_with(tmp_path: Path, mutate) -> Path:
+    record = json.loads(_contract_paths()["inventory"].read_text(encoding="utf-8"))
+    mutate(record)
+    inventory = tmp_path / "migrations.json"
+    inventory.write_text(json.dumps(record), encoding="utf-8")
+    return inventory
+
+
+def _expect(inventory: Path, match: str) -> None:
+    paths = _contract_paths()
+    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match=match):
+        todo_schema_migration_check.validate_contract(
+            tracker=paths["tracker"], wrapper=paths["wrapper"], inventory=inventory
+        )
+
+
+def test_an_empty_migration_is_rejected_unless_declared_a_fence(tmp_path: Path) -> None:
+    """The guard this relaxation must not lose: a migration that ends up empty by
+    accident -- a builder returning [] -- still fails closed."""
+
+    def undeclare(record):
+        record["migrations"][-1].pop("kind")
+
+    _expect(_inventory_with(tmp_path, undeclare), "has no statements")
+
+
+def test_a_fence_may_not_smuggle_ddl(tmp_path: Path) -> None:
+    """The other direction: "fence" must not become a way to ship unreviewed DDL
+    under a label that says there is none."""
+
+    def claim_fence(record):
+        record["migrations"][-2]["kind"] = "fence"
+
+    _expect(_inventory_with(tmp_path, claim_fence), "must carry no DDL")
+
+
+def test_a_fence_needs_a_written_rationale(tmp_path: Path) -> None:
+    def blank_rationale(record):
+        record["migrations"][-1]["fence_rationale"] = "   "
+
+    _expect(_inventory_with(tmp_path, blank_rationale), "fence_rationale")
+
+
+def test_a_negative_statement_count_is_never_legal(tmp_path: Path) -> None:
+    """Relaxing `<= 0` to `< 0` must not have opened the door wider than intended."""
+    tracker = tmp_path / "todo_db.py"
+    tracker.write_text(
+        "SCHEMA_VERSION = 2\nMIGRATIONS = {2: ['a']}\nMIGRATION_STATEMENT_COUNTS = {2: -1}\n",
+        encoding="utf-8",
+    )
+    paths = _contract_paths()
+    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="non-negative"):
+        todo_schema_migration_check.validate_contract(
+            tracker=tracker, wrapper=paths["wrapper"], inventory=paths["inventory"]
+        )
