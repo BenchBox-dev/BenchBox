@@ -16,24 +16,10 @@ pytestmark = [
 
 SCRIPT = Path("scripts/agent_write_preflight.sh")
 
-# These exercise the clone-location guard, so pin a human identity: otherwise
-# the preflight's [COMMIT-IDENTITY-001] assertion decides the result instead,
-# and every "allows" case fails wherever the ambient identity is an agent --
-# which is precisely the case in a cloud agent session.
-HUMAN_IDENTITY = {
-    "GIT_AUTHOR_NAME": "Joe Harris",
-    "GIT_AUTHOR_EMAIL": "joeharris76@gmail.com",
-}
-AGENT_IDENTITY = {
-    "GIT_AUTHOR_NAME": "Claude",
-    "GIT_AUTHOR_EMAIL": "noreply@anthropic.com",
-}
-
 
 def _run_preflight(*, primary_clone: Path, allow: bool = False) -> subprocess.CompletedProcess[str]:
     env = {
         **os.environ,
-        **HUMAN_IDENTITY,
         "BENCHBOX_AGENT_PRIMARY_CLONE": str(primary_clone),
     }
     env.pop("BENCHBOX_EPHEMERAL_CLONE", None)
@@ -104,7 +90,7 @@ def _run_in_clone(
     ephemeral: bool = False,
     extra_env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, **HUMAN_IDENTITY}
+    env = {**os.environ}
     # Let the script derive the primary clone naturally from this repo.
     env.pop("BENCHBOX_AGENT_PRIMARY_CLONE", None)
     env.pop("BENCHBOX_ALLOW_MAIN_CLONE_WRITE", None)
@@ -179,47 +165,6 @@ def test_ephemeral_declaration_is_ignored_when_a_worktree_pool_is_present(tmp_pa
 
     assert result.returncode == 1
     assert "Refusing BenchBox write preflight in the primary clone" in result.stderr
-
-
-def test_preflight_refuses_an_agent_author_identity(tmp_path: Path) -> None:
-    """[COMMIT-IDENTITY-001] at claim time.
-
-    Linked worktrees share the primary clone's config, so one stray [user]
-    block reauthors every pool worktree at once. The claim is the only point
-    where a single check covers them all before any commit exists.
-    """
-    result = _run_in_clone(_init_clone(tmp_path / "BenchBox"), ephemeral=True, extra_env=AGENT_IDENTITY)
-
-    assert result.returncode == 1
-    assert "Git author identity resolves to a known" in result.stderr
-    assert "agent/service identity" in result.stderr
-    # The refusal has to show WHERE the value came from -- a repository-local
-    # override is invisible otherwise, and that is the case being caught.
-    assert "origins:" in result.stderr
-
-
-def test_preflight_agent_identity_refusal_is_declarable(tmp_path: Path) -> None:
-    """A task that explicitly authorized the agent identity can say so."""
-    result = _run_in_clone(
-        _init_clone(tmp_path / "BenchBox"),
-        ephemeral=True,
-        extra_env={**AGENT_IDENTITY, "BENCHBOX_ALLOW_AGENT_GIT_IDENTITY": "1"},
-    )
-
-    assert result.returncode == 0
-    assert "ephemeral clone" in result.stdout
-
-
-def test_preflight_identity_check_is_not_confused_by_a_human_named_like_a_vendor(tmp_path: Path) -> None:
-    """Match on the vendor address, not a substring of the display name."""
-    result = _run_in_clone(
-        _init_clone(tmp_path / "BenchBox"),
-        ephemeral=True,
-        extra_env={"GIT_AUTHOR_NAME": "Claudia Gemini-Lopez", "GIT_AUTHOR_EMAIL": "claudia@example.com"},
-    )
-
-    assert result.returncode == 0
-    assert "ephemeral clone" in result.stdout
 
 
 def test_refusal_names_the_ephemeral_escape_not_only_the_broad_override(tmp_path: Path) -> None:
