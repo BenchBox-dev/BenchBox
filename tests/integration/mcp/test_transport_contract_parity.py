@@ -33,6 +33,7 @@ PROMPT_ARGUMENTS: dict[str, dict[str, str]] = {
         "benchmark": "tpch",
     },
 }
+RAW_TEXTCHARTS_PREFIX = "textcharts_"
 
 
 async def _inventory(client: Client) -> dict[str, list[dict[str, Any]]]:
@@ -108,6 +109,10 @@ def test_stdio_and_streamable_http_publish_identical_contracts(tmp_path: Path) -
     assert stdio_prompts == http_prompts
     assert set(http_prompts) == {prompt["name"] for prompt in http_inventory["prompts"]}
     assert all(payload and all(text.strip() for text in payload) for payload in http_prompts.values())
+    for inventory in (stdio_inventory, http_inventory):
+        tool_names = {tool["name"] for tool in inventory["tools"]}
+        assert {"suggest_charts", "generate_chart"} <= tool_names
+        assert not any(name.startswith(RAW_TEXTCHARTS_PREFIX) for name in tool_names)
     assert len(http_inventory["tools"]) == 12
     assert len(http_inventory["resources"]) == 4
     assert len(http_inventory["resource_templates"]) == 2

@@ -207,6 +207,10 @@ When a user configures both servers, `textcharts_*` tools are a separate raw
 primitive rendering namespace; BenchBox MCP `chart_type` values remain semantic
 IDs from the registry above, and template names come from
 `benchbox.core.visualization.templates`.
+Installing the `textcharts` Python dependency does not change this MCP
+registration boundary. Any future bundle or proxy proposal requires a separate
+product, security, and support decision with its own contract and acceptance
+tests; no client should infer one from the dependency alone.
 
 ## SQL Compatibility Governance Decision
 

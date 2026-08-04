@@ -387,6 +387,12 @@ from `benchbox.core.visualization.chart_types`, such as `performance_bar`,
 `textcharts_*` primitive MCP tools. BenchBox does not register or proxy the
 external `textcharts-mcp` server; if a client configures that server separately,
 its tools remain a separate raw rendering namespace.
+The `textcharts` Python package is an implementation dependency of BenchBox's
+ASCII compatibility layer, not an MCP server registration. Running only
+`benchbox-mcp` therefore publishes the result-aware tools listed below; a
+client that intentionally configures a separate `textcharts-mcp` process sees
+that server under its own namespace and must apply its own support and security
+review.
 
 #### `suggest_charts`
 
