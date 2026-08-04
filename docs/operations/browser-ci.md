@@ -211,10 +211,54 @@ Two container gotchas cost real time; both are worked around above:
 | Fixed by the 1.62.1 bump | Same known-bad tree upgraded to 1.62.1 | **Refuted** — passes at both versions |
 | CPU/memory starvation on shared runners | develop tree at 2 cores / 2 GB, 3 consecutive runs | **Refuted** — 3/3 pass (10.0s, 9.0s, 8.7s) |
 
-The uncontrolled variable that remains is **architecture**: the reproduction
-above runs `linux/arm64`, while GitHub's `ubuntu-latest` is `linux/amd64`.
-Anyone picking this up should start by re-running the harness under
-`--platform linux/amd64` before opening any other line of inquiry.
+### The amd64 arm (2026-08-04)
+
+The architecture variable left open above has now been run. It does not close
+the investigation, and the reason is worth recording so nobody re-runs it
+expecting an answer.
+
+Under `--platform linux/amd64` (Rosetta emulation on Apple silicon; requires
+`softwareupdate --install-rosetta`, otherwise the container fails to bootstrap
+with `Rosetta is not installed`) the develop tree fails **10 of 16** WebKit
+`@smoke` tests, `benchmark-index` 3/3, with the CI signature exactly:
+`waitForDataLoaded` throwing at `e2e/support/fixtures.ts:124`. On `linux/arm64`
+the same tree passes 16/16.
+
+That looks like a reproduction and is not one. The emulated run took
+**10.5 minutes** (630s) against **58 seconds** on arm64.
+
+**No slowdown ratio can be computed from those two numbers, in either
+direction.** The 630s includes ten tests that were *terminated* by their wait
+budgets before completing their normal workload, while the arm64 run completed
+all 16; Playwright's polling also overlaps application processing. Subtracting
+the timeout budgets does not repair that - it leaves work for six completed and
+ten aborted tests, which is not comparable to 58s of sixteen completed ones. An
+earlier revision of this section claimed "~11x", then "~6x upper bound"; both
+were unsupported and have been withdrawn. A defensible figure would need
+matched successful-phase timings, which this arm did not collect.
+
+The direction is all this arm supports, and it is enough: every failure is a
+data-bound wait exhausting its budget, which any large slowdown produces
+regardless of cause. GitHub's runners are *native* amd64, not emulated, and the
+WebKit lane is green there.
+
+So the architecture hypothesis is **not supported**: native amd64 passes in CI,
+and the emulated failures are a timing artifact of the emulator.
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| Architecture (arm64 harness vs amd64 CI) | develop tree under emulated `linux/amd64` | **Confounded, not supported** — 10/16 fail under an emulator of unquantified slowness; native amd64 is green in CI |
+
+What the arm does establish is a robustness fact worth keeping: these waits
+fail by timeout under a slow enough environment rather than degrading
+gracefully. A slow runner therefore stays a plausible trigger for the original
+failures, even though CPU starvation at 2 cores was not enough to produce one.
+How slow is slow enough remains unmeasured.
+
+**Do not run the emulated amd64 arm again** — its result is known and
+uninformative. The next real step is a *native* amd64 reproduction, which means
+running the harness on a GitHub runner (`workflow_dispatch` on
+`results-explorer-browser.yml`) rather than locally.
 
 ## Triage rule
 

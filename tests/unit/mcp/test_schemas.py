@@ -14,6 +14,9 @@ from benchbox.mcp.schemas import (
     MAX_QUERY_ID_LENGTH,
     MAX_QUERY_IDS,
     MCP_CLICKHOUSE_PROFILE_ENV,
+    MCP_DASK_MAX_TOTAL_MEMORY_ENV,
+    MCP_DASK_MAX_TOTAL_THREADS_ENV,
+    MCP_DASK_MAX_WORKERS_ENV,
     MCP_PLATFORM_OPTION_ALLOWLIST,
     MCP_PLATFORM_OPTION_CONTRACT,
     CompareResultsInput,
@@ -25,6 +28,8 @@ from benchbox.mcp.schemas import (
     MCPValidationError,
     RunBenchmarkInput,
     ValidateConfigInput,
+    build_databricks_clustering_intent,
+    load_dask_resource_envelope,
     resolve_clickhouse_connection_profile,
     validate_benchmark_name,
     validate_filename,
@@ -312,6 +317,160 @@ class TestRunBenchmarkInput:
         assert validate_platform_options("velox", {"deployment": "remote"}) == {"deployment": "remote"}
         with pytest.raises(MCPValidationError):
             validate_platform_options("modin", {"engine": "pandas"})
+
+
+class TestDatabricksClusteringOptions:
+    """Contradictory layout intent must fail at admission, not in a worker."""
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"databricks_clustering_strategy": "z_order", "liquid_clustering_columns": "a,b"},
+            {"databricks_clustering_strategy": "liquid_clustering_auto", "liquid_clustering_columns": "a"},
+            {"databricks_clustering_strategy": "none", "liquid_clustering_columns": "a"},
+        ],
+    )
+    def test_contradictory_layout_combinations_are_rejected(self, options):
+        with pytest.raises(MCPValidationError, match="clustering options conflict"):
+            validate_platform_options("databricks", options)
+
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"databricks_clustering_strategy": "liquid_clustering", "liquid_clustering_columns": "a,b"},
+            {"liquid_clustering_columns": "a,b"},
+            {"databricks_clustering_strategy": "z_order"},
+            {"databricks_clustering_strategy": "liquid_clustering_auto"},
+            {"databricks_clustering_strategy": "none"},
+        ],
+    )
+    def test_coherent_layout_combinations_are_accepted(self, options):
+        assert validate_platform_options("databricks", options) == options
+
+    def test_intent_translation_is_shared_with_adapter_preparation(self):
+        """Admission validates the same object preparation later hands over."""
+        normalized = validate_platform_options(
+            "databricks",
+            {"databricks_clustering_strategy": "liquid_clustering", "liquid_clustering_columns": "a,b"},
+        )
+        tuning_config = build_databricks_clustering_intent(normalized)
+        assert tuning_config is not None
+        platform_opts = tuning_config.platform_optimizations
+        assert platform_opts.databricks_clustering_strategy == "liquid_clustering"
+        assert platform_opts.liquid_clustering_columns == ["a", "b"]
+        assert platform_opts.liquid_clustering_enabled is True
+
+    def test_no_clustering_request_builds_no_intent(self):
+        assert build_databricks_clustering_intent({}) is None
+
+
+class TestDaskResourceEnvelope:
+    """One request must not be able to size a cluster the host cannot run."""
+
+    def test_independent_maxima_cannot_be_multiplied_into_a_thread_bomb(self):
+        """n_workers=256 x threads_per_worker=256 is 65,536 threads."""
+        with pytest.raises(MCPValidationError, match="total thread budget"):
+            validate_platform_options("dask", {"n_workers": 16, "threads_per_worker": 256})
+
+    def test_worker_count_alone_is_bounded(self):
+        with pytest.raises(MCPValidationError, match="worker budget"):
+            validate_platform_options("dask", {"n_workers": 256})
+
+    def test_per_worker_memory_is_multiplied_by_the_worker_count(self):
+        """memory_limit is per worker, so the advertised total scales with it."""
+        assert validate_platform_options("dask", {"n_workers": 8, "memory_limit": "8GB"}) == {
+            "n_workers": 8,
+            "memory_limit": "8GB",
+        }
+        with pytest.raises(MCPValidationError, match="total memory budget"):
+            validate_platform_options("dask", {"n_workers": 8, "memory_limit": "9GB"})
+
+    @pytest.mark.parametrize(
+        ("options", "expected"),
+        [
+            ({"n_workers": 16, "threads_per_worker": 4}, True),
+            ({"n_workers": 16, "threads_per_worker": 5}, False),
+            ({"n_workers": 17, "threads_per_worker": 1}, False),
+            ({"n_workers": 1, "threads_per_worker": 64}, True),
+            ({"n_workers": 1, "threads_per_worker": 65}, False),
+        ],
+    )
+    def test_aggregate_boundaries_are_exact(self, options, expected):
+        if expected:
+            assert validate_platform_options("dask", options) == options
+        else:
+            with pytest.raises(MCPValidationError):
+                validate_platform_options("dask", options)
+
+    def test_omitted_fields_use_the_adapters_own_conservative_caps(self):
+        """An unset field contributes no more than the adapter would apply."""
+        assert validate_platform_options("dask", {"threads_per_worker": 32}) == {"threads_per_worker": 32}
+        with pytest.raises(MCPValidationError, match="total thread budget"):
+            validate_platform_options("dask", {"threads_per_worker": 33})
+
+    def test_dataframe_alias_is_covered_by_the_same_envelope(self):
+        with pytest.raises(MCPValidationError, match="worker budget"):
+            validate_platform_options("dask-df", {"n_workers": 256})
+
+    def test_operator_can_widen_or_narrow_the_budget(self, monkeypatch):
+        monkeypatch.setenv(MCP_DASK_MAX_WORKERS_ENV, "4")
+        monkeypatch.setenv(MCP_DASK_MAX_TOTAL_THREADS_ENV, "8")
+        monkeypatch.setenv(MCP_DASK_MAX_TOTAL_MEMORY_ENV, "8GB")
+        envelope = load_dask_resource_envelope()
+        assert envelope.max_workers == 4
+        assert envelope.max_total_threads == 8
+        assert envelope.max_total_memory_bytes == float(8 << 30)
+        with pytest.raises(MCPValidationError, match="worker budget"):
+            validate_platform_options("dask", {"n_workers": 5})
+
+    @pytest.mark.parametrize(
+        ("env_name", "value"),
+        [
+            (MCP_DASK_MAX_WORKERS_ENV, "not-a-number"),
+            (MCP_DASK_MAX_WORKERS_ENV, "0"),
+            (MCP_DASK_MAX_WORKERS_ENV, "-5"),
+            (MCP_DASK_MAX_WORKERS_ENV, "100000"),
+            (MCP_DASK_MAX_TOTAL_THREADS_ENV, "nonsense"),
+            (MCP_DASK_MAX_TOTAL_MEMORY_ENV, "/etc/passwd"),
+            (MCP_DASK_MAX_TOTAL_MEMORY_ENV, "lots"),
+        ],
+    )
+    def test_malformed_operator_budget_falls_back_to_the_reviewed_default(self, monkeypatch, env_name, value):
+        monkeypatch.setenv(env_name, value)
+        envelope = load_dask_resource_envelope()
+        assert envelope.max_workers == 16
+        assert envelope.max_total_threads == 64
+        assert envelope.max_total_memory_bytes == float(64 << 30)
+
+    @pytest.mark.parametrize("value", ["999999TB", "17TB", "1000000GB"])
+    def test_an_out_of_range_memory_override_cannot_disable_the_ceiling(self, monkeypatch, value):
+        """A units slip must not silently remove the aggregate memory guard."""
+        monkeypatch.setenv(MCP_DASK_MAX_TOTAL_MEMORY_ENV, value)
+        assert load_dask_resource_envelope().max_total_memory_bytes == float(64 << 30)
+        with pytest.raises(MCPValidationError, match="total memory budget"):
+            validate_platform_options("dask", {"n_workers": 16, "memory_limit": "1024GB"})
+
+    def test_an_in_range_memory_override_is_still_honoured(self, monkeypatch):
+        monkeypatch.setenv(MCP_DASK_MAX_TOTAL_MEMORY_ENV, "16TB")
+        assert load_dask_resource_envelope().max_total_memory_bytes == float(16 << 40)
+
+    def test_an_omitted_request_is_held_to_the_same_envelope_as_an_empty_one(self, monkeypatch):
+        """None and {} must validate identically.
+
+        `start_benchmark` drops an empty `platform_options` from the persisted
+        request, so the durable worker replays `None`. If `None` short-circuited
+        validation, an ordinary optionless request would start the adapter's
+        default cluster while ignoring a tighter operator budget.
+        """
+        monkeypatch.setenv(MCP_DASK_MAX_WORKERS_ENV, "1")
+        for omitted in (None, {}):
+            with pytest.raises(MCPValidationError, match="worker budget"):
+                validate_platform_options("dask", omitted)
+
+    def test_an_optionless_request_still_passes_under_the_default_budget(self):
+        """The uniform check must not reject ordinary optionless runs."""
+        assert validate_platform_options("dask", None) == {}
+        assert validate_platform_options("duckdb", None) == {}
 
 
 CLICKHOUSE_PLATFORM_SPELLINGS = ("clickhouse", "clickhouse-server")

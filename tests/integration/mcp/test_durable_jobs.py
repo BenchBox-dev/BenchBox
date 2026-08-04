@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import anyio
 import pytest
@@ -13,6 +14,7 @@ from mcp.types import TextContent
 from benchbox.mcp.jobs import DurableJobRepository, DurableJobWorker
 from benchbox.mcp.schemas import (
     MCP_CLICKHOUSE_PROFILE_ENV,
+    MCP_DASK_MAX_TOTAL_THREADS_ENV,
     MCPValidationError,
     validate_platform_options,
 )
@@ -94,6 +96,100 @@ def test_normalized_platform_options_survive_repository_round_trip(tmp_path: Pat
     persisted = repository.get_owned(submitted.execution_id, "tenant-a")
     assert persisted is not None
     assert persisted.request["platform_options"] == {"threads": 4}
+
+
+def test_durable_replay_applies_duckdb_threads_to_the_real_adapter(tmp_path: Path) -> None:
+    """A replayed request must still change DuckDB execution, not just forward a key."""
+    from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+    from benchbox.platforms.duckdb import DuckDBAdapter
+
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    options = validate_platform_options("duckdb", {"threads": 5})
+    submitted, _ = repository.submit("tenant-a", {**_request(), "platform_options": options})
+
+    persisted = repository.get_owned(submitted.execution_id, "tenant-a")
+    assert persisted is not None
+    assert persisted.request["platform_options"] == {"threads": 5}
+
+    # Replay the persisted request exactly as the worker would.
+    prepared = _prepare_adapter_platform_options("duckdb", persisted.request["platform_options"])
+    adapter = DuckDBAdapter.from_config(
+        {
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "database_path": str(tmp_path / "replay.duckdb"),
+            **prepared,
+        }
+    )
+
+    assert adapter.thread_limit == 5
+
+
+def test_durable_admission_refuses_contradictory_databricks_clustering(tmp_path: Path) -> None:
+    """A request that can never succeed must not occupy a durable queue slot."""
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+
+    with pytest.raises(MCPValidationError, match="clustering options conflict"):
+        validate_platform_options(
+            "databricks",
+            {"databricks_clustering_strategy": "z_order", "liquid_clustering_columns": "a,b"},
+        )
+
+    with repository._connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM mcp_benchmark_jobs").fetchone()[0] == 0
+
+
+def test_durable_databricks_requests_persist_only_normalized_intent(tmp_path: Path) -> None:
+    """Replay reconstructs the tuning object; it never replays raw mappings."""
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    options = validate_platform_options(
+        "databricks",
+        {"databricks_clustering_strategy": "liquid_clustering", "liquid_clustering_columns": "a,b"},
+    )
+
+    submitted, _ = repository.submit("tenant-a", {**_request(), "platform": "databricks", "platform_options": options})
+
+    persisted = repository.get_owned(submitted.execution_id, "tenant-a")
+    assert persisted is not None
+    assert persisted.request["platform_options"] == {
+        "databricks_clustering_strategy": "liquid_clustering",
+        "liquid_clustering_columns": "a,b",
+    }
+    # The persisted request survives a JSON round trip and still validates.
+    assert validate_platform_options("databricks", persisted.request["platform_options"]) == options
+
+
+def test_durable_admission_refuses_an_oversized_dask_envelope(tmp_path: Path) -> None:
+    """An over-envelope request must never reach the queue, let alone a worker."""
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+
+    with pytest.raises(MCPValidationError, match="thread budget"):
+        validate_platform_options("dask", {"n_workers": 16, "threads_per_worker": 256})
+
+    with repository._connect() as connection:
+        queued = connection.execute("SELECT COUNT(*) FROM mcp_benchmark_jobs").fetchone()[0]
+    assert queued == 0
+
+
+def test_durable_worker_replay_re_enforces_the_dask_envelope(tmp_path: Path, monkeypatch) -> None:
+    """A budget tightened after submission is applied on replay, not bypassed."""
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    options = validate_platform_options("dask", {"n_workers": 8, "threads_per_worker": 4})
+    submitted, _ = repository.submit(
+        "tenant-a", {**_request(), "platform": "dask-df", "mode": "dataframe", "platform_options": options}
+    )
+
+    # The operator narrows the budget while the job is still queued.
+    monkeypatch.setenv(MCP_DASK_MAX_TOTAL_THREADS_ENV, "8")
+
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+    with patch("benchbox.mcp.tools.benchmark._get_platform_adapter") as get_adapter:
+        response = DurableJobWorker._execute_benchmark(claimed, tmp_path / "staging")
+
+    assert response["status"] == "failed"
+    get_adapter.assert_not_called()
+    assert repository.get(submitted.execution_id) is not None
 
 
 def test_durable_clickhouse_requests_never_persist_a_connection_tuple(tmp_path: Path, monkeypatch) -> None:

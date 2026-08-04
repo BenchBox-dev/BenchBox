@@ -499,3 +499,108 @@ class TestFreezeCoversBulkWritePaths:
         todo_db.connect(db).close()
         _run(db, "import-yaml", "--replace", actor="bob")
         assert "frozen for maintenance" not in capsys.readouterr().err
+
+
+def _downgrade(db_path, version):
+    """Rewrite the recorded schema version, simulating a clone that never pulled."""
+    raw = sqlite3.connect(db_path)
+    raw.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(version),))
+    raw.commit()
+    raw.close()
+
+
+def _shape(db_path):
+    raw = sqlite3.connect(db_path)
+    try:
+        return sorted(raw.execute("SELECT type, name, sql FROM sqlite_master").fetchall())
+    finally:
+        raw.close()
+
+
+class TestSchemaVersionFencesStaleClones:
+    """v5 is a write fence, not a shape change (ADR D2/D9).
+
+    The freeze alone is advisory: a clone that never pulled does not know the
+    freeze exists and writes straight through it. Moving SCHEMA_VERSION is what
+    turns "please don't" into "cannot". The accepted cost is that a stale clone
+    loses reads too, because the version check runs before every subcommand.
+    """
+
+    @pytest.fixture()
+    def stale_db(self, tmp_path):
+        db = tmp_path / "todo.sqlite"
+        connection = todo_db.connect(db)
+        _mk(connection, "existing-item")
+        connection.commit()
+        connection.close()
+        _downgrade(db, todo_db.SCHEMA_VERSION - 1)
+        return db
+
+    # These two are RELATIVE to SCHEMA_VERSION, so they survive reverting the bump
+    # -- verified by mutation. They do not pin v5; they pin that the fence covers
+    # READS as well as writes, which is the design that was chosen over exempting
+    # read-only subcommands. Deleting the read case is the regression to catch.
+    def test_a_stale_clone_cannot_read(self, stale_db, capsys):
+        assert _run(stale_db, "list", actor="bob") == 2
+        assert "run `todo migrate`" in capsys.readouterr().err
+
+    def test_a_stale_clone_cannot_write(self, stale_db, capsys):
+        assert _run(stale_db, "create", "some-new-item", actor="bob") != 0
+        assert "run `todo migrate`" in capsys.readouterr().err
+
+    def test_migrate_lifts_the_fence(self, stale_db, capsys):
+        assert _run(stale_db, "migrate", actor="bob") == 0
+        capsys.readouterr()
+        assert _run(stale_db, "list", actor="bob") == 0
+
+    def test_the_fence_migration_carries_no_ddl(self, tmp_path):
+        """v5 must stay empty: a later DDL statement smuggled into the fence
+        would make a migrated database diverge from a fresh one."""
+        assert todo_db.MIGRATIONS[todo_db.SCHEMA_VERSION] == []
+        migrated = tmp_path / "migrated.sqlite"
+        todo_db.connect(migrated).close()
+        _downgrade(migrated, todo_db.SCHEMA_VERSION - 1)
+        assert todo_db.migrate_db(migrated, actor="tester") == [todo_db.SCHEMA_VERSION]
+        fresh = tmp_path / "fresh.sqlite"
+        todo_db.connect(fresh).close()
+        assert _shape(migrated) == _shape(fresh)
+
+
+class TestTheWedgeIsExplained:
+    """A stale clone under a foreign freeze has no working command but `doctor`.
+
+    That wedge is intended -- fencing stale clones out mid-cutover is the point.
+    What is NOT acceptable is telling that operator "Reads still work", which the
+    refusal did verbatim until the fence landed and made it false.
+    """
+
+    @pytest.fixture()
+    def frozen_db(self, tmp_path):
+        db = tmp_path / "todo.sqlite"
+        connection = todo_db.connect(db)
+        todo_db.set_freeze(connection, "alice", "cutover", ttl_hours=1)
+        connection.commit()
+        connection.close()
+        return db
+
+    def test_a_wedged_clone_is_not_told_that_reads_work(self, frozen_db, capsys):
+        _downgrade(frozen_db, todo_db.SCHEMA_VERSION - 1)
+        assert _run(frozen_db, "migrate", actor="bob") == 2
+        err = capsys.readouterr().err
+        assert "Reads still work" not in err
+        assert "reads are fenced too" in err
+        assert "`todo doctor` works throughout" in err
+
+    def test_a_current_clone_is_still_told_that_reads_work(self, frozen_db, capsys):
+        """Control: the honest message must not be lost for the clone it fits."""
+        assert _run(frozen_db, "migrate", actor="bob") == 2
+        assert "Reads still work" in capsys.readouterr().err
+
+    def test_doctor_survives_the_wedge(self, frozen_db, capsys):
+        """The one command that must keep working, since it is how the operator
+        learns why everything else stopped."""
+        _downgrade(frozen_db, todo_db.SCHEMA_VERSION - 1)
+        _run(frozen_db, "doctor", actor="bob")
+        out = capsys.readouterr().out
+        assert f"expected v{todo_db.SCHEMA_VERSION}" in out
+        assert "run `todo migrate`" in out

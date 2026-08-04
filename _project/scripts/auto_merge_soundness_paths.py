@@ -35,6 +35,21 @@ SOUNDNESS_PREFIXES = (
     "benchbox/sql_compat/resolver.py",
     "benchbox/sql_compat/decision.py",
     "benchbox/sql_compat/rules/_registration.py",
+    # Publication privacy. This is a deliberate widening beyond "what defines a
+    # correct result": the anonymizer decides every byte that leaves the
+    # project and the public pseudonym identity that groups results by machine.
+    # Both of its failure modes are silent -- a missed key publishes a private
+    # path, and a changed hashing rule repartitions public identity without
+    # anything raising. PR #1512 was exactly that: it changed every published
+    # byte and every public result_id, and auto-merged with no review because
+    # this list did not cover it. Same rationale as release.yml above (that one
+    # is here for publishing to PyPI, not for soundness) -- is_soundness_path
+    # means "needs owner review before auto-merge", which is broader than
+    # soundness alone. anonymization_specs.yaml is listed with it because it
+    # DEFINES which keys get hashed -- dropping one entry there silently stops
+    # anonymizing that field, with no code change to review.
+    "benchbox/core/results/anonymization.py",
+    "benchbox/core/results/anonymization_specs.yaml",
     # Self-protection: the review-gate machinery itself. The in-workflow
     # base-ref execution + self-touch override in auto-merge-on-open.yml is
     # best-effort only for same-repo PRs (GitHub runs the PR's OWN copy of a

@@ -315,24 +315,16 @@ jobs:
         continue-on-error: true
         run: make agent-instructions-check
 
-      - name: Validate Git identity is not an agent/service
-        id: guard-agent-identity
-        continue-on-error: true
-        # GitHub's ephemeral checkout has no user.* config. Inject a
-        # non-agent identity only for this read-only resolution check; the
-        # commit-range guard below remains authoritative for PR authorship.
-        env:
-          GIT_CONFIG_COUNT: '2'
-          GIT_CONFIG_KEY_0: user.name
-          GIT_CONFIG_VALUE_0: BenchBox CI
-          GIT_CONFIG_KEY_1: user.email
-          GIT_CONFIG_VALUE_1: ci@benchbox.invalid
-        run: make agent-identity-check
-
-      # Merge-time guard. The step above reads the resolved config, which here
-      # is the runner's own identity; this one inspects the commits the PR
-      # actually carries, which is the only check that can keep agent
-      # authorship off develop.
+      # There is deliberately no CI counterpart to `make agent-identity-check`
+      # (which ci-lint still runs locally). That target resolves identity from
+      # git config, and on an ephemeral runner the config is the runner's own,
+      # so the check can say nothing about what the branch carries. Supplying a
+      # known-good identity to make it runnable only made it incapable of
+      # failing, and a guard that cannot fail is worse than an absent one --
+      # lint-guard-summary reports it as coverage. The commit-range guard below
+      # is the real merge-time control: it reads the commits themselves.
+      # Locally the identity IS the developer's or the agent's, so ci-lint and
+      # the pre-commit hook keep enforcing it where the answer is meaningful.
       - name: Validate no agent authorship or attribution in PR commits
         id: guard-agent-commit-range
         continue-on-error: true

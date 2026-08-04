@@ -247,6 +247,22 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
+- DuckDB `threads` is the public option name and maps to the adapter's
+  `thread_limit`, which becomes a `SET threads` statement on the connection. The
+  public name is unchanged; only the internal mapping is documented here.
+- Databricks clustering options are translated into effective tuning before the
+  adapter is built. `databricks_clustering_strategy` and
+  `liquid_clustering_columns` become a `PlatformOptimizationConfiguration` that
+  the clustering resolver consumes; forwarding the raw names would leave them to
+  be dropped by `from_config` and silently fall back to ZORDER. Contradictory
+  combinations (for example `z_order` with liquid clustering columns) are
+  rejected as validation errors at admission, before a durable job is persisted
+  and before any remote connection.
+- Dask cluster sizing is bounded in aggregate, not only per field. A request's
+  `n_workers`, `n_workers` x `threads_per_worker`, and `n_workers` x
+  `memory_limit` must all fit inside a server-owned budget, enforced before the
+  adapter builds its `LocalCluster` (see
+  [MCP remote security](../operations/mcp-remote-security.md)).
 - ClickHouse connection destinations are server-owned. A request cannot set
   `port` or `secure`; both are rejected for every ClickHouse spelling. A
   non-default port or TLS setting is reachable only through

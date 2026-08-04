@@ -15,13 +15,13 @@ permission to expose the underlying adapter's full configuration surface.
 | ClickHouse | `deployment_mode` | `ClickHouseAdapter.from_config` | execution | Connection destinations and transport policy remain server-owned. |
 | ClickHouse | `connection_profile` | `ClickHouseAdapter.from_config(port, secure)` resolved from `BENCHBOX_MCP_CLICKHOUSE_PROFILES` | connection | Reject caller-supplied `port`/`secure`, arbitrary destinations, and TLS downgrade. Only the profile name is accepted and persisted. |
 | cuDF | `device_id`, `spill_to_host` | cuDF runtime and memory policy | device/resource | Reject device paths, scheduler endpoints, and package controls. |
-| Dask | `memory_limit`, `n_workers`, `threads_per_worker` | LocalCluster resource envelope | resource | Enforce aggregate limits; reject scheduler endpoints and spill paths. |
+| Dask | `memory_limit`, `n_workers`, `threads_per_worker` | LocalCluster resource envelope, bounded in aggregate by `load_dask_resource_envelope()` before adapter construction | resource | Per-field maxima are insufficient: worker count, `n_workers` x `threads_per_worker`, and `n_workers` x `memory_limit` are each capped by a server-owned budget. Reject scheduler endpoints and spill paths. |
 | Dask | `use_distributed` | Dask execution-mode selector | execution | Reject external scheduler selection. |
 | DataFusion | `batch_size`, `memory_limit`, `target_partitions` | DataFusion execution configuration | resource | Reject filesystem paths and unbounded worker controls. |
 | DataFusion | `parquet_pushdown`, `repartition_joins` | DataFusion execution options | execution | Reject arbitrary SQL or datasource configuration. |
 | DuckDB | `memory_limit`, `threads` | DuckDB adapter settings | resource | Public `threads` maps to adapter `thread_limit`; reject raw SQL settings. |
 | Firebolt | `disable_result_cache`, `strict_validation` | Firebolt execution/validation options | execution | Reject credentials, account, database, and endpoint fields. |
-| Databricks | `databricks_clustering_strategy`, `liquid_clustering_columns` | `PlatformOptimizationConfiguration` | layout | Reject raw connection settings and contradictory layout combinations. |
+| Databricks | `databricks_clustering_strategy`, `liquid_clustering_columns` | `PlatformOptimizationConfiguration` via `build_databricks_clustering_intent()`, reaching the resolver as `unified_tuning_configuration` | layout | Raw option names are dropped by `from_config`, so only the translated tuning object counts. Contradictory combinations are rejected at admission. Reject raw connection settings. |
 | Modin | `engine` | Modin dataframe backend selector | execution | Only reviewed `ray`/`dask`; reject unsupported backend names. |
 | pandas | `dtype_backend` | pandas dataframe dtype backend | execution | Reject package installation and arbitrary dtype expressions. |
 | Polars | `n_rows`, `rechunk` | Polars input and memory layout | resource | Reject filesystem paths and unbounded row counts. |

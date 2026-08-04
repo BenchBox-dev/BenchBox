@@ -278,3 +278,82 @@ def test_platform_metadata_includes_clustering_strategy_and_operations(_mock_wor
     assert platform_info["configuration"]["z_order_operations"] == []
     assert platform_info["configuration"]["applied_layout_operations"] == []
     assert platform_info["configuration"]["skipped_layout_operations"] == []
+
+
+@patch("benchbox.platforms.databricks.adapter.databricks_sql")
+def test_mcp_clustering_options_reach_the_effective_resolver(_mock_databricks_sql):
+    """MCP intent must survive `from_config`, not just be forwarded to it.
+
+    `from_config` rebuilds its constructor config from an explicit key list, so
+    raw `databricks_clustering_strategy` / `liquid_clustering_columns` kwargs are
+    dropped. Only the translated `tuning_config` becomes
+    `unified_tuning_configuration`, which is what the resolver reads.
+    """
+    from benchbox.mcp.schemas import validate_platform_options
+    from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+    normalized = validate_platform_options(
+        "databricks",
+        {"databricks_clustering_strategy": "liquid_clustering", "liquid_clustering_columns": "event_time,customer_id"},
+    )
+    prepared = _prepare_adapter_platform_options("databricks", normalized)
+
+    adapter = DatabricksAdapter.from_config(
+        {
+            "benchmark": "tpch",
+            "scale_factor": 1.0,
+            "server_hostname": "test.cloud.databricks.com",
+            "http_path": "/sql/1.0/warehouses/test",
+            "access_token": "test_token",
+            **prepared,
+        }
+    )
+
+    effective = adapter.get_effective_tuning_configuration()
+    assert effective is not None
+    platform_opts = effective.platform_optimizations
+    assert platform_opts.databricks_clustering_strategy == "liquid_clustering"
+    assert platform_opts.liquid_clustering_columns == ["event_time", "customer_id"]
+    assert platform_opts.liquid_clustering_enabled is True
+    assert adapter._resolve_databricks_clustering_strategy() == "liquid_clustering"
+
+
+@patch("benchbox.platforms.databricks.adapter.databricks_sql")
+def test_mcp_columns_alone_infer_liquid_clustering_at_the_resolver(_mock_databricks_sql):
+    from benchbox.mcp.schemas import validate_platform_options
+    from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+    normalized = validate_platform_options("databricks", {"liquid_clustering_columns": "event_time"})
+    prepared = _prepare_adapter_platform_options("databricks", normalized)
+
+    adapter = DatabricksAdapter.from_config(
+        {
+            "benchmark": "tpch",
+            "scale_factor": 1.0,
+            "server_hostname": "test.cloud.databricks.com",
+            "http_path": "/sql/1.0/warehouses/test",
+            "access_token": "test_token",
+            **prepared,
+        }
+    )
+
+    assert adapter._resolve_databricks_clustering_strategy() == "liquid_clustering"
+    assert adapter.get_effective_tuning_configuration().platform_optimizations.liquid_clustering_columns == [
+        "event_time"
+    ]
+
+
+@patch("benchbox.platforms.databricks.adapter.databricks_sql")
+def test_absent_mcp_clustering_options_keep_the_zorder_default(_mock_databricks_sql):
+    """The ZORDER fallback is correct when nothing was requested -- and only then."""
+    adapter = DatabricksAdapter.from_config(
+        {
+            "benchmark": "tpch",
+            "scale_factor": 1.0,
+            "server_hostname": "test.cloud.databricks.com",
+            "http_path": "/sql/1.0/warehouses/test",
+            "access_token": "test_token",
+        }
+    )
+
+    assert adapter._resolve_databricks_clustering_strategy() == "z_order"

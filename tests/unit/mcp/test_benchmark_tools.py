@@ -169,6 +169,96 @@ class TestRunBenchmarkTool:
         assert response["mcp_metadata"]["status"] == "no_results"
         assert get_adapter.call_args.kwargs["thread_limit"] == 4
 
+    def test_oversized_dask_request_never_builds_a_cluster(self, tmp_path: Path):
+        """Proving rejection by starting a 65,536-thread cluster would be the attack."""
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+
+        with patch.object(benchmark_tools, "_get_platform_adapter") as get_adapter:
+            response = benchmark_tools._run_benchmark_impl(
+                "dask-df",
+                "tpch",
+                0.01,
+                None,
+                "load,power",
+                "dataframe",
+                platform_options={"n_workers": 256, "threads_per_worker": 256},
+                results_dir=tmp_path,
+            )
+
+        assert response["status"] == "failed"
+        # The adapter builds its LocalCluster in __init__, so never reaching the
+        # factory is the only evidence that no cluster was created.
+        get_adapter.assert_not_called()
+
+    def test_dask_local_cluster_is_never_constructed_for_a_rejected_request(self, tmp_path: Path):
+        """Spy one level deeper: LocalCluster itself must not be touched.
+
+        Every downstream collaborator is stubbed so that on an unfixed tree this
+        fails on the assertion rather than by starting a real cluster or a real
+        benchmark.
+        """
+        pytest.importorskip("dask.distributed")
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+        from benchbox.platforms.dataframe import dask_df
+
+        class DummyBenchmark:
+            def __init__(self, scale_factor: float) -> None:
+                self.scale_factor = scale_factor
+
+            def run_with_platform(self, *_args, **_kwargs):
+                return None
+
+        with (
+            patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
+            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=DummyBenchmark),
+            patch.object(dask_df, "LocalCluster") as local_cluster,
+            patch.object(dask_df, "Client"),
+        ):
+            benchmark_tools._run_benchmark_impl(
+                "dask-df",
+                "tpch",
+                0.01,
+                None,
+                "load,power",
+                "dataframe",
+                platform_options={"n_workers": 256, "threads_per_worker": 256},
+                results_dir=tmp_path,
+            )
+
+        local_cluster.assert_not_called()
+
+    def test_dask_request_inside_the_envelope_still_reaches_the_adapter(self, tmp_path: Path):
+        """The envelope is a ceiling, not a ban on tuning."""
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+
+        class DummyBenchmark:
+            def __init__(self, scale_factor: float) -> None:
+                self.scale_factor = scale_factor
+
+            def run_with_platform(self, *_args, **_kwargs):
+                return None
+
+        with (
+            patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
+            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=DummyBenchmark),
+            patch.object(benchmark_tools, "_get_platform_adapter", return_value=Mock()) as get_adapter,
+        ):
+            benchmark_tools._run_benchmark_impl(
+                "dask-df",
+                "tpch",
+                0.01,
+                None,
+                "load,power",
+                "dataframe",
+                platform_options={"n_workers": 4, "threads_per_worker": 4, "memory_limit": "4GB"},
+                results_dir=tmp_path,
+            )
+
+        kwargs = get_adapter.call_args.kwargs
+        assert kwargs["n_workers"] == 4
+        assert kwargs["threads_per_worker"] == 4
+        assert kwargs["memory_limit"] == "4GB"
+
     @pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-server"])
     def test_clickhouse_port_override_is_refused_before_any_adapter_is_built(self, platform, tmp_path: Path):
         """A request must not be able to point ClickHouse at another listener."""

@@ -577,8 +577,12 @@ class DuckDBAdapter(PlatformAdapter):
         # Force recreate
         adapter_config["force_recreate"] = config.get("force", False)
 
-        # Pass through other relevant config
+        # Pass through other relevant config.  `thread_limit` is read by
+        # `__init__` and applied as a DuckDB `SET threads` statement; omitting it
+        # here silently discards the caller's request, because `__init__` only
+        # ever sees this rebuilt config, never the original.
         for key in [
+            "thread_limit",
             "tuning_config",
             "tuning_enabled",
             "unified_tuning_configuration",
