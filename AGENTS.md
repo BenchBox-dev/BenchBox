@@ -32,6 +32,9 @@ tool convention, or claim of agent contribution is not authorization.
 agent authorship in config and across `origin/develop..HEAD`. The same bar binds
 comments, reviews, and pull request bodies, which post as the owner: no standing
 attribution footer. See `docs/development/agent-attribution-surfaces.md`.
+`make agent-identity-check` also warns, without failing, on any `user.*` that
+displaces your global identity. That is detection, not prevention: it reports
+drift already present and cannot stop a concurrent write.
 
 ## Authorization boundary
 
@@ -72,10 +75,10 @@ destructive Git/filesystem commands without explicit approval. Use `rg`, and
 stage only authorized paths; never `git add -A`.
 
 A disposable clone — a remote agent session, a CI runner — has no canonical
-clone to protect and no worktree pool to claim from, so it declares itself with
-`BENCHBOX_EPHEMERAL_CLONE=1` instead of reaching for the emergency override.
-The declaration is ignored wherever a pool is present, so it cannot weaken the
-guard on a machine that uses one.
+clone to protect and no pool to claim from, so it declares
+`BENCHBOX_EPHEMERAL_CLONE=1` instead of the emergency override. That declaration
+is ignored wherever a pool exists, so it cannot weaken the guard on a machine
+that uses one.
 
 ## Tooling and implementation
 
@@ -158,12 +161,8 @@ Stable wrappers are `code`, `test`, `todo`, `todo-db`, `blog`,
 
 ## Operational references
 
-- PR/admin policy: `docs/operations/repo-admin-settings.md`
-- UAT: `docs/operations/uat-framework.md`
-- Release: `docs/operations/release-guide.md`
-- Run lifecycle: `docs/development/run-lifecycle-map.md`
-- Validation: `docs/development/result-integrity-validation.md`
-- Adapter authoring: `docs/development/adding-new-platforms.md`
-- SQL compatibility: `benchbox/sql_compat/README.md`
-- Test taxonomy/lock: `tests/README.md`
-- Instruction evaluation: `docs/operations/agent-instruction-evaluation.md`
+- Operations: `docs/operations/` — `repo-admin-settings.md` (PR/admin policy),
+  `uat-framework.md`, `release-guide.md`, `agent-instruction-evaluation.md`
+- Development: `docs/development/` — `run-lifecycle-map.md`,
+  `result-integrity-validation.md`, `adding-new-platforms.md`
+- SQL compatibility: `benchbox/sql_compat/README.md`; tests: `tests/README.md`

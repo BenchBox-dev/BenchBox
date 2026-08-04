@@ -90,6 +90,9 @@ LEGACY_REVIEW_DOC = "docs/development/review-protocol.md"
 AUTHORITY_CONFLICT_MARKERS = ("this file wins", "canonical, unabridged", "conflicts resolve in favor of this")
 AGENT_NAMES = {"chatgpt", "claude", "codex", "gemini", "openai"}
 AGENT_EMAILS = {"noreply@anthropic.com", "noreply@openai.com"}
+# Scopes that legitimately carry the user's own identity. Anything else is an
+# override worth surfacing -- see audit_identity_overrides.
+GLOBAL_IDENTITY_SCOPES = frozenset({"global", "system"})
 # [COMMIT-IDENTITY-001] binds authorship. A commit-signing service may hold the
 # committer slot -- cloud agent sessions SSH-sign with a key registered to this
 # address, and a committer email that does not match it makes the signature
@@ -274,6 +277,57 @@ def audit_git_identity(project: Path) -> list[str]:
     return errors
 
 
+def audit_identity_overrides(project: Path) -> list[str]:
+    """Non-fatal warnings for a Git identity that displaces the user's global one.
+
+    Detection only, and deliberately so. The audit never writes config and runs
+    after configuration may already have changed, so this cannot stop a
+    concurrent session from contaminating a shared clone -- it only makes the
+    contamination visible. Prevention belongs to worktree-scoped identity set at
+    claim time, not here.
+
+    `local` is the scope that bites: from inside a linked worktree, `--local`
+    resolves to the *common* config, so a single write there reauthors the
+    primary clone and every worktree it owns at once. `worktree` and `command`
+    are reported too, because any of them silently displaces the global identity
+    while looking like it came from the user's own settings.
+
+    Human values warn rather than fail: a repo-local human identity is a normal,
+    supported setup, and making it fatal would turn a visibility aid into a
+    compatibility break that also drowns out the known-agent check in
+    `audit_git_identity`, which stays fatal.
+    """
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(project),
+            "config",
+            "--show-scope",
+            "--show-origin",
+            "--get-regexp",
+            r"^user\.(name|email)$",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    warnings: list[str] = []
+    for line in result.stdout.splitlines():
+        scope, _, remainder = line.partition("\t")
+        origin, _, entry = remainder.partition("\t")
+        key, _, value = entry.partition(" ")
+        if not key or scope in GLOBAL_IDENTITY_SCOPES:
+            continue
+        warnings.append(
+            f"repo-local identity override: {key}={value} resolves from the {scope} scope "
+            f"({origin or '<unknown origin>'}) and displaces your global identity. "
+            f"A local-scope value is shared by the primary clone and every linked worktree. "
+            f"Detection only: confirm it is intentional."
+        )
+    return warnings
+
+
 def audit_commit_range(project: Path, base_ref: str) -> list[str]:
     """Merge-time guard over the commits a branch actually carries.
 
@@ -439,11 +493,13 @@ def main() -> int:
     args = parser.parse_args()
     corpus = json.loads(args.corpus.read_text(encoding="utf-8"))
     metrics, errors = audit(args.project.resolve(), corpus)
+    warnings: list[str] = []
     if args.check_git_identity:
         errors.extend(audit_git_identity(args.project.resolve()))
+        warnings.extend(audit_identity_overrides(args.project.resolve()))
     if args.check_commit_range:
         errors.extend(audit_commit_range(args.project.resolve(), args.check_commit_range))
-    result = {"ok": not errors, "metrics": asdict(metrics), "errors": errors}
+    result = {"ok": not errors, "metrics": asdict(metrics), "errors": errors, "warnings": warnings}
     if args.as_json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
@@ -451,8 +507,13 @@ def main() -> int:
         print(f"active_bytes={metrics.active_bytes} agents_lines={metrics.agents_lines}")
         for name, size in metrics.adapter_bytes.items():
             print(f"{name}={size} bytes")
+        for warning in warnings:
+            print(f"WARNING: {warning}")
         for error in errors:
             print(f"ERROR: {error}")
+    # Warnings are deliberately excluded from the exit status: they report a
+    # condition the user may have chosen on purpose, and a gate that fails on
+    # every repo-local human identity would be routinely bypassed.
     return 0 if not errors else 1
 
 

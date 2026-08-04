@@ -52,6 +52,7 @@ CANONICAL_REVIEW_SKILL = agent_instruction_audit.CANONICAL_REVIEW_SKILL
 CANONICAL_COMMIT_SKILL = agent_instruction_audit.CANONICAL_COMMIT_SKILL
 audit = agent_instruction_audit.audit
 audit_git_identity = agent_instruction_audit.audit_git_identity
+audit_identity_overrides = agent_instruction_audit.audit_identity_overrides
 audit_commit_range = agent_instruction_audit.audit_commit_range
 
 
@@ -284,6 +285,83 @@ def test_signing_service_committer_without_human_author_fails(tmp_path: Path) ->
     project = _git_configured_repo(tmp_path, "Claude", "noreply@anthropic.com")
     errors = audit_git_identity(project)
     assert any("author identity resolves to known agent/service" in error for error in errors)
+
+
+def test_repo_local_human_identity_warns_without_failing(tmp_path: Path) -> None:
+    """The drift a human identity causes is real but not an error.
+
+    A repo-local human identity is a supported setup, so it must stay
+    non-fatal -- but it is still inherited by every linked worktree, which is
+    the property worth surfacing.
+    """
+    project = _git_configured_repo(tmp_path, "Some Human", "human@example.invalid")
+    warnings = audit_identity_overrides(project)
+    assert len(warnings) == 2
+    assert all("repo-local identity override" in warning for warning in warnings)
+    assert all("local scope" in warning for warning in warnings)
+    assert all(".git/config" in warning for warning in warnings)
+    assert audit_git_identity(project) == []
+
+
+def test_global_only_identity_produces_no_override_warning(tmp_path: Path) -> None:
+    """Nothing displaces the global identity, so there is nothing to report."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    assert audit_identity_overrides(tmp_path) == []
+
+
+def test_agent_identity_both_warns_and_stays_fatal(tmp_path: Path) -> None:
+    """The warning is additive; it must not soften the known-agent rejection."""
+    project = _git_configured_repo(tmp_path, "Claude", "noreply@anthropic.com")
+    assert len(audit_identity_overrides(project)) == 2
+    errors = audit_git_identity(project)
+    assert len(errors) == 2
+    assert all("known agent/service" in error for error in errors)
+
+
+def test_worktree_scoped_identity_is_reported_as_an_override(tmp_path: Path) -> None:
+    """Worktree scope is an override too, even though it is the safe one.
+
+    Worktree-scoped identity is the prevention mechanism for shared-clone
+    contamination, so it must still be *visible* rather than silently trusted.
+    """
+    project = _git_configured_repo(tmp_path, "Some Human", "human@example.invalid")
+    subprocess.run(["git", "-C", str(project), "config", "extensions.worktreeConfig", "true"], check=True)
+    subprocess.run(
+        ["git", "-C", str(project), "config", "--worktree", "user.email", "scoped@example.invalid"],
+        check=True,
+    )
+    warnings = audit_identity_overrides(project)
+    assert any("worktree scope" in warning and "scoped@example.invalid" in warning for warning in warnings)
+
+
+def test_identity_override_warning_does_not_change_exit_status(tmp_path: Path) -> None:
+    """A warning that failed the gate would be bypassed, not heeded.
+
+    Drives the real CLI rather than the function, because the exit status and
+    the JSON contract are what callers depend on.
+    """
+    project = _candidate(tmp_path)
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    subprocess.run(["git", "-C", str(project), "config", "user.name", "Some Human"], check=True)
+    subprocess.run(["git", "-C", str(project), "config", "user.email", "human@example.invalid"], check=True)
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "_project/scripts/agent_instruction_audit.py"),
+            "--project",
+            str(project),
+            "--check-git-identity",
+            "--json",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+    assert payload["warnings"], payload
+    assert any("repo-local identity override" in warning for warning in payload["warnings"])
+    assert payload["ok"] is True
+    assert result.returncode == 0
 
 
 def _git_commit(project: Path, message: str, name: str, email: str) -> None:
