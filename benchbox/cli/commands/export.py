@@ -8,6 +8,7 @@ import click
 
 from benchbox.cli.output import ResultExporter
 from benchbox.cli.shared import console
+from benchbox.core.constants import EXPORT_FORMATS
 from benchbox.core.results.loader import (
     ResultLoadError,
     UnsupportedSchemaError,
@@ -22,7 +23,7 @@ from benchbox.core.results.loader import (
     "--format",
     "formats",
     multiple=True,
-    type=click.Choice(["json", "csv", "html"], case_sensitive=False),
+    type=click.Choice(list(EXPORT_FORMATS), case_sensitive=False),
     help="Export format(s) - can specify multiple (default: json)",
 )
 @click.option(

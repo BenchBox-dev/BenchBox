@@ -67,6 +67,7 @@ from benchbox.cli.tuning_runtime import (
 )
 from benchbox.core.benchmark_registry import get_benchmark_default_scale
 from benchbox.core.config import DatabaseConfig
+from benchbox.core.constants import QUERY_PHASES, RUN_MODES, VALID_PHASES
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.provenance import FUNDING_SOURCES, RESULT_SOURCES
 from benchbox.core.results.status import result_cli_failure_reason, result_non_clean_reason
@@ -504,7 +505,7 @@ class BenchmarkOptionParamType(click.ParamType):
 
 def _derive_execution_type(phases: list[str]) -> str:
     """Derive benchmark execution type from the requested phase list."""
-    query_phases = {"power", "throughput", "maintenance"}
+    query_phases = set(QUERY_PHASES)
     selected_query_phases = set(phases) & query_phases
     if selected_query_phases:
         # Any mixed query-phase request should use combined mode so the adapter
@@ -837,7 +838,7 @@ def _validate_non_interactive(s: types.SimpleNamespace) -> None:
 
 def _parse_phases_list(s: types.SimpleNamespace) -> None:
     """Parse and validate the --phases list into phases_to_run."""
-    valid_phases = {"generate", "load", "statistics", "warmup", "power", "throughput", "maintenance"}
+    valid_phases = set(VALID_PHASES)
     phase_list = [p.strip() for p in s.phases.split(",") if p.strip()]
 
     invalid_phases = set(phase_list) - valid_phases
@@ -2745,7 +2746,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--phases",
     type=str,
     default="power",
-    help="Phases: generate,load,statistics,warmup,power,throughput,maintenance",
+    help=f"Phases: {','.join(VALID_PHASES)}",
 )
 @click.option(
     "--queries",
@@ -2938,7 +2939,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 )
 @advanced_option(
     "--mode",
-    type=click.Choice(["sql", "dataframe"], case_sensitive=False),
+    type=click.Choice(list(RUN_MODES), case_sensitive=False),
     default=None,
     help="Execution mode: sql or dataframe",
 )

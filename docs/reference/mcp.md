@@ -239,7 +239,22 @@ modes remain available because they do not hold the request for execution.
 - `dry_run=true` uses the core dry-run executor and returns the plan/resources
   preview the MCP subset can model; it currently reports the default
   load/power plan rather than applying the `phases` parameter.
-- `mode=data_only` generates benchmark data without running queries.
+- `mode=data_only` generates benchmark data without running queries. This is a
+  deliberate, ratified asymmetry rather than a ledgered omission, and it runs
+  the other way from the rest of the ledger: MCP accepts a value here that
+  `benchbox run --mode` does not. `sql` and `dataframe` are platform
+  *capabilities*, validated against
+  `benchbox.core.constants.RUN_MODES`; `data_only` is an *execution type*
+  (`benchbox.core.constants.EXECUTION_TYPES`), meaning "run no queries at all".
+  The CLI derives that execution type from `--phases generate`, so it has no
+  reason to name it on `--mode`. MCP's phase surface is a single string with no
+  interactive selection behind it, so it names the execution type directly.
+  `datagen` and `generate` remain accepted spellings of `data_only`.
+- `phases` is validated against
+  `benchbox.core.constants.VALID_PHASES` at admission, on both `run_benchmark`
+  and `start_benchmark`. An unknown phase is rejected with the valid list;
+  previously it was accepted and then silently dropped, so a typo like
+  `load,lodad` ran only the load phase without reporting anything.
 - `phases` applies to normal execution and maps to the benchmark execution type
   used by `BaseBenchmark.run_with_platform()`.
 - `platform_options` is normalized and validated before any adapter is built.

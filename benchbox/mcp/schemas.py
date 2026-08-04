@@ -20,6 +20,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
+from benchbox.core.constants import MCP_DATA_ONLY_ALIASES, MCP_MODE_CHOICES, VALID_PHASES
+
 logger = logging.getLogger(__name__)
 
 # Validation constants
@@ -731,7 +733,9 @@ def validate_filename(filename: str) -> str:
     return filename
 
 
-MODE_CHOICES = ("sql", "dataframe", "data_only")
+# MCP's mode parameter is RUN_MODES plus the data_only execution-type
+# shortcut; see benchbox.core.constants.MCP_MODE_CHOICES.
+MODE_CHOICES = MCP_MODE_CHOICES
 
 
 def validate_mode(mode: str | None) -> str | None:
@@ -750,11 +754,44 @@ def validate_mode(mode: str | None) -> str | None:
         return None
     mode_lower = mode.strip().lower()
     # Normalize aliases
-    if mode_lower in ("datagen", "generate"):
+    if mode_lower in MCP_DATA_ONLY_ALIASES:
         mode_lower = "data_only"
     if mode_lower not in MODE_CHOICES:
-        raise MCPValidationError(f"Invalid mode: {mode}. Must be 'sql', 'dataframe', or 'data_only'")
+        raise MCPValidationError(f"Invalid mode: {mode}. Must be one of: {', '.join(MODE_CHOICES)}")
     return mode_lower
+
+
+def validate_phases(phases: str | None) -> str | None:
+    """Validate a comma-separated phase list against the shared phase vocabulary.
+
+    MCP accepted any string here and passed it through to
+    ``BaseBenchmark.run_with_platform()``, so a typo such as ``"lodad"`` was
+    silently dropped rather than reported. The CLI has always rejected unknown
+    phases; this closes that gap against the same list.
+
+    Args:
+        phases: Comma-separated phase names, or None.
+
+    Returns:
+        The normalized comma-separated phase list, or None if input is None.
+
+    Raises:
+        MCPValidationError: If any phase is not in VALID_PHASES.
+    """
+    if phases is None:
+        return None
+
+    requested = [phase.strip().lower() for phase in phases.split(",") if phase.strip()]
+    if not requested:
+        return None
+
+    unknown = [phase for phase in requested if phase not in VALID_PHASES]
+    if unknown:
+        raise MCPValidationError(
+            f"Invalid phases: {', '.join(sorted(set(unknown)))}. Valid phases: {', '.join(VALID_PHASES)}"
+        )
+
+    return ",".join(requested)
 
 
 def validate_scale_factor(scale_factor: float) -> float:

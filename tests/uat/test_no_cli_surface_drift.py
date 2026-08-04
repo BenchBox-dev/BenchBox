@@ -48,6 +48,11 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/show_plan.py",
     "benchbox/cli/commands/convert.py",
     "benchbox/cli/commands/df_tuning.py",
+    # one-engine-unify-constants: --format's Click Choice is now
+    # list(benchbox.core.constants.EXPORT_FORMATS) instead of an inline
+    # ["json", "csv", "html"] literal. Identical accepted values; the
+    # decorator, the export() signature, and the option name are unchanged.
+    "benchbox/cli/commands/export.py",
     "benchbox/cli/commands/publish.py",
     "benchbox/cli/commands/run.py",
     "benchbox/cli/commands/run_official.py",
@@ -109,6 +114,14 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # results-labels-funding (PR #1021): adds --funding/--notes disclosure options
     # to `submit`, intentionally changing submit()'s signature surface.
     "benchbox/cli/commands/submit.py",
+    # one-engine-unify-constants: this guard snapshots decorator SOURCE TEXT, so
+    # replacing the inline ["json", "csv", "html"] literal with
+    # list(EXPORT_FORMATS) trips it even though the accepted values are
+    # identical -- defining a constant once necessarily rewrites the decorator.
+    # The value set is now checked directly, and more strictly than a source
+    # snapshot can: test_surface_constant_parity.py reads the live Click Choice
+    # off the registered command and asserts it equals EXPORT_FORMATS.
+    "benchbox/cli/commands/export.py",
 }
 ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}
