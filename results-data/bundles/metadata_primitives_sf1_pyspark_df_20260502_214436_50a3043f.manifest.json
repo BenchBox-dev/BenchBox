@@ -1,7 +1,7 @@
 {
   "benchmark": "Metadata",
   "bundle_file": "metadata_primitives_sf1_pyspark_df_20260502_214436_50a3043f.json",
-  "bundle_hash": "3c8e39ec5cd3cc3842ddfe84244b55b3ca79cc8973afc9f725a91362d8db58c3",
+  "bundle_hash": "6548b6ac3ef130e8652b5b60a565b30e6d29f2644b61185967d794ae69ab43d1",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",

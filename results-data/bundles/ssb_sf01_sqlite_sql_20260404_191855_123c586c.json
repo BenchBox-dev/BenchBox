@@ -90,7 +90,7 @@
     "config": {
       "check_same_thread": false,
       "connection_mode": "file",
-      "database_path": "path_160184ed1cdf",
+      "database_path": "path_2e8a9e740c14",
       "driver_runtime_strategy": "current-process",
       "execution_mode": "sql",
       "timeout": 30.0

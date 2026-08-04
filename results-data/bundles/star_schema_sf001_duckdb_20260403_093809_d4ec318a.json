@@ -22,7 +22,7 @@
   },
   "execution": {
     "driver_package": "duckdb",
-    "driver_runtime_python_executable": "path_2891a231af24",
+    "driver_runtime_python_executable": "path_ea3a8ec6f65d",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "1.4.3",
     "driver_version_resolved": "1.4.3",
@@ -77,9 +77,9 @@
     "client_version": "unknown",
     "config": {
       "connection_mode": "file",
-      "database_path": "path_85e913212dbd",
+      "database_path": "path_16a4852d32c7",
       "driver_package": "duckdb",
-      "driver_runtime_python_executable": "path_2891a231af24",
+      "driver_runtime_python_executable": "path_ea3a8ec6f65d",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.4.3",
       "driver_version_resolved": "1.4.3",

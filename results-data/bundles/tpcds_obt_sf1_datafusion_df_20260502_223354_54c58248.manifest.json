@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-DS-OBT",
   "bundle_file": "tpcds_obt_sf1_datafusion_df_20260502_223354_54c58248.json",
-  "bundle_hash": "c39794e5c586754303ba67ead9b0034bf624a5e430f672111a8d95e93f00d37a",
+  "bundle_hash": "f3dd8ce400f1e6e36afb54ee644af9f740d3a88736b2c0ddc846dd6554c76a9e",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

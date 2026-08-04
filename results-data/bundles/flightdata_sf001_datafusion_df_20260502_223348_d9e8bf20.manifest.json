@@ -1,7 +1,7 @@
 {
   "benchmark": "Flight Data",
   "bundle_file": "flightdata_sf001_datafusion_df_20260502_223348_d9e8bf20.json",
-  "bundle_hash": "cd3a3ba9f6afe909affca94db86e1a80d2fdd9818562a7d44e48b222454e1277",
+  "bundle_hash": "9b17e20a374acf15c459ce559d03c952008f05382479b49d3049b9057282155c",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

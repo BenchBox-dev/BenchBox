@@ -1,7 +1,7 @@
 {
   "benchmark": "CoffeeShop",
   "bundle_file": "coffeeshop_sf01_polars_df_20260502_211235_07bd0fff.json",
-  "bundle_hash": "2b6804038f39717db003a1536294733638e0c6339da040ad859b19a3d3253e77",
+  "bundle_hash": "8770982f9b6acb390f3e2b29a336646d869ffd06f41bf0d13481c2a2a7db2145",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",

@@ -1,7 +1,7 @@
 {
   "benchmark": "ClickBench",
   "bundle_file": "clickbench_sf1_spark_sql_20260502_204011_0677f492.json",
-  "bundle_hash": "a2c97d2c77484b4d8274a86e70f1942ce9c75b446c0356f5f59c69bcd36390eb",
+  "bundle_hash": "b99e94dd591f42061a27a249ab38fd0a324712ed9205a0f78c10861c0b4fc31a",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Spark",
