@@ -40,7 +40,10 @@ def test_parse_expected_rulesets_from_admin_runbook() -> None:
     expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())
 
     assert expected["develop-squash-only"].ref == "refs/heads/develop"
-    assert expected["develop-squash-only"].required_checks == ("ci-required-result",)
+    assert expected["develop-squash-only"].required_checks == (
+        "ci-required-result",
+        "Results Explorer browser gate",
+    )
     assert expected["release-only"].ref == "refs/heads/release"
     assert expected["release-only"].required_checks == ("validate-base", "release-required-result")
     assert expected["release-only"].strict_required_status_checks_policy is False
