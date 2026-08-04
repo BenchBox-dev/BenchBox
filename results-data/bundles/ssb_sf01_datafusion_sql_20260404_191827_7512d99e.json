@@ -22,7 +22,7 @@
   "environment": {
     "arch": "arm64",
     "cpu_count": 10,
-    "machine_id": "machine_45d1a3ef31a1728d",
+    "machine_id": "machine_3d46427037d2",
     "memory_gb": 16,
     "os": "Darwin 25.3.0",
     "python": "3.11.12"
@@ -32,7 +32,7 @@
       "type": "zstd"
     },
     "driver_package": "datafusion",
-    "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox/.venv/bin/python3",
+    "driver_runtime_python_executable": "path_2b036483c7f0",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "52.3.0",
     "driver_version_resolved": "52.3.0",
@@ -96,7 +96,7 @@
       "connection_mode": "in-memory",
       "data_format": "parquet",
       "driver_package": "datafusion",
-      "driver_runtime_python_executable": "/Users/joe/Developer/BenchBox/.venv/bin/python3",
+      "driver_runtime_python_executable": "path_2b036483c7f0",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "52.3.0",
       "driver_version_resolved": "52.3.0",
@@ -104,7 +104,7 @@
       "memory_limit": "12GB",
       "result_cache_enabled": false,
       "target_partitions": 10,
-      "working_dir": "/Users/joe/Developer/BenchBox/benchmark_runs/databases/ssb_sf01/ssb_sf01_notuning_uniq_check.datafusion"
+      "working_dir": "path_a09a8d860b12"
     },
     "driver_actual_version": "52.3.0",
     "driver_package": "datafusion",

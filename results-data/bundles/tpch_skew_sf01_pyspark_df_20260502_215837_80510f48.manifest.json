@@ -1,12 +1,12 @@
 {
   "benchmark": "TPC-H Skew",
   "bundle_file": "tpch_skew_sf01_pyspark_df_20260502_215837_80510f48.json",
-  "bundle_hash": "238e8e3863048fbe6ade5c7453dfa2f47697147d6efb9c980838d0bc2dae0b94",
+  "bundle_hash": "291b3814d514a5b76f67a6f87bfb73471faac3a3341f5950fffd7c0c7c599286",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",
   "scale_factor": 0.1,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:52:11.923351+00:00",
   "submitted_by": "BenchBox UAT"

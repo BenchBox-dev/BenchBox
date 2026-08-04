@@ -1,12 +1,12 @@
 {
   "benchmark": "SSB",
   "bundle_file": "ssb_sf01_polars_df_20260502_211243_69643606.json",
-  "bundle_hash": "61ffe2ea999a570988a726cb90be130cd6f4a58d74cf118bd1fc734ca817c8cc",
+  "bundle_hash": "48838767ee94bc2f806999c8f5d67f0f3293fc584352a776d187fb8d3da287ba",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",
   "scale_factor": 0.1,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:50:04.958399+00:00",
   "submitted_by": "BenchBox UAT"

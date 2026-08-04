@@ -1,12 +1,12 @@
 {
   "benchmark": "JoinOrderBenchmark",
   "bundle_file": "joinorder_sf1_lakesail_sql_20260512_225022_528b8c08.json",
-  "bundle_hash": "22044f340c9fb978834b549e11cdc521928e9e25cfea68e7ef7dce5ba9bb49bf",
+  "bundle_hash": "2c2eed64673aa65376325ec1a24081bf8c80afdd1f2b98ec6aa6462cea9509ab",
   "companion_hashes": {},
   "phase": 2,
   "platform": "LakeSail",
   "scale_factor": 1.0,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-13T02:50:56.929672+00:00",
   "submitted_by": "Joe Harris"

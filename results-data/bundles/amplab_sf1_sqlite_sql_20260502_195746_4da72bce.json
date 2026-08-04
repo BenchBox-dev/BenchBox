@@ -17,7 +17,7 @@
     ],
     "platform_option_sources": {
       "check_same_thread": "registered_default",
-      "database_name": "database_46d2cdc497af",
+      "database_name": "database_db02f21cb20c",
       "force_recreate": "saved_config",
       "force_upload": "saved_config",
       "show_query_plans": "saved_config",
@@ -25,7 +25,7 @@
     },
     "platform_options": {
       "check_same_thread": "false",
-      "database_name": "database_5d7b725135a6",
+      "database_name": "database_d26744e2a8c2",
       "force_recreate": false,
       "force_upload": false,
       "show_query_plans": false,
@@ -40,15 +40,15 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
-      "machine_id": "machine_45d1a3ef31a1728d",
+      "machine_id": "machine_3d46427037d2",
       "os": "Darwin",
       "python": "3.12.11"
     },
-    "machine_id": "machine_45d1a3ef31a1728d",
+    "machine_id": "machine_3d46427037d2",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_fd92d8e3e85f",
+      "engine_host": "host_d7232f4db6bb",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -131,7 +131,7 @@
     "config": {
       "check_same_thread": false,
       "connection_mode": "file",
-      "database_path": "path_2aa7ef110ea5",
+      "database_path": "path_1caf72319e3f",
       "driver_runtime_strategy": "current-process",
       "execution_mode": "sql",
       "timeout": 30.0
@@ -147,7 +147,7 @@
     "name": "SQLite",
     "raw_config": {
       "check_same_thread": false,
-      "database_path": "path_2aa7ef110ea5",
+      "database_path": "path_1caf72319e3f",
       "force_recreate": false,
       "timeout": 30.0,
       "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})"

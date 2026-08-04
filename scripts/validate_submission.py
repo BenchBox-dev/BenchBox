@@ -56,11 +56,28 @@ except ImportError:  # pragma: no cover - published-results keeps a slim package
     )
 
     def find_public_path_leaks(value, key_path=()):
-        """Slim-branch fallback for the shared public path privacy contract."""
+        """Slim-branch fallback for the shared public path privacy contract.
+
+        Must stay behaviourally identical to
+        ``benchbox.core.results.anonymization.find_public_path_leaks``. This
+        copy is the one that actually runs on ``published-results``: the
+        slim-branch allowlist in
+        ``.github/workflows/sync-results-data-to-published.yml`` mirrors this
+        file and ``benchbox/validation/bundle.py`` but not the canonical
+        module, so the import above always fails there. A key check added only
+        upstream would leave the real public-corpus gate blind to it.
+        """
         if isinstance(value, dict):
-            return [
-                leak for key, child in value.items() for leak in find_public_path_leaks(child, (*key_path, str(key)))
-            ]
+            leaks = []
+            for key, child in value.items():
+                # Elide a leaking key in its own report and in every
+                # descendant's path; the raw key is itself the private path.
+                label = str(key)
+                if isinstance(key, str) and _PRIVATE_LOCAL_PATH_RE.search(key):
+                    label = "<key>"
+                    leaks.append(".".join((*key_path, label)))
+                leaks.extend(find_public_path_leaks(child, (*key_path, label)))
+            return leaks
         if isinstance(value, (list, tuple)):
             return [
                 leak

@@ -1,12 +1,12 @@
 {
   "benchmark": "TSBS DevOps",
   "bundle_file": "tsbs_devops_sf1_pyspark_df_20260502_214717_7465048e.json",
-  "bundle_hash": "e03c0a9b81f4f83575bcbb88d42b0d754dcef2e88d2f45f09c9e316bf70a6367",
+  "bundle_hash": "27d32d57684847fc9918a08ae59f4bbef3bf39d2fba6de031ef301ab05da70da",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",
   "scale_factor": 1.0,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:53:27.379601+00:00",
   "submitted_by": "BenchBox UAT"

@@ -1,12 +1,12 @@
 {
   "benchmark": "CoffeeShop",
   "bundle_file": "coffeeshop_sf001_datafusion_sql_20260502_182803_8caf558a.json",
-  "bundle_hash": "22409a7648966e2507552d8653c75859ab55a0c459d9a174e2ab3df83e7fedc6",
+  "bundle_hash": "b0cbcf24e8fd7a117af9e0add83de583fd593af51db42b4955d833ce7d9902c2",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",
   "scale_factor": 0.01,
-  "submission_path": "PR-based",
+  "submission_path": "path_30338255ec33",
   "submission_tool_version": "benchbox/0.2.1",
   "submitted_at": "2026-05-03T02:47:12.327918+00:00",
   "submitted_by": "BenchBox UAT"
