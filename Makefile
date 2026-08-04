@@ -1942,6 +1942,8 @@ worktree-claim-attempt:
 			( cd "$$wt" && uv run -- pre-commit install >/dev/null 2>&1 ) \
 				|| echo "note: pre-commit install failed/unavailable in $$wt; codespell etc. won't run at commit time (run \`uv run -- pre-commit install\` manually)" >&2; \
 		fi; \
+		scripts/set_worktree_identity.sh "$$wt" >&2 \
+			|| echo "note: could not pin worktree Git identity in $$wt; commits there resolve identity from the shared config (make agent-write-preflight still refuses an agent author)" >&2; \
 		rm -f "$$marker"; \
 		marker=""; \
 		claim_ok=1; \
