@@ -38,6 +38,7 @@ from benchbox.mcp.errors import (
 )
 from benchbox.mcp.schemas import (
     MCPValidationError,
+    build_databricks_clustering_intent,
     resolve_clickhouse_connection_profile,
     validate_platform_options,
 )
@@ -109,32 +110,18 @@ def _prepare_adapter_platform_options(platform: str, options: Mapping[str, objec
     if platform_name == "duckdb" and "threads" in normalized:
         normalized["thread_limit"] = normalized.pop("threads")
 
-    if platform_name == "databricks" and (
-        "databricks_clustering_strategy" in normalized or "liquid_clustering_columns" in normalized
-    ):
-        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
-
-        tuning_config = UnifiedTuningConfiguration()
-        platform_optimizations = tuning_config.platform_optimizations
-        strategy = normalized.pop("databricks_clustering_strategy", None)
-        if strategy is not None:
-            strategy = str(strategy).lower()
-            platform_optimizations.databricks_clustering_strategy = strategy
-            platform_optimizations.liquid_clustering_enabled = strategy in {
-                "liquid_clustering",
-                "liquid_clustering_auto",
-            }
-            platform_optimizations.physical_rendering_id = None
-        columns = normalized.pop("liquid_clustering_columns", None)
-        if columns is not None:
-            parsed_columns = [column.strip() for column in str(columns).split(",") if column.strip()]
-            platform_optimizations.liquid_clustering_columns = parsed_columns
-            platform_optimizations.liquid_clustering_enabled = bool(parsed_columns)
-            if parsed_columns and strategy is None:
-                platform_optimizations.databricks_clustering_strategy = "liquid_clustering"
-        platform_optimizations.__post_init__()
-        normalized["tuning_config"] = tuning_config
-        normalized["tuning_enabled"] = True
+    if platform_name == "databricks":
+        # Same translation the admission gate ran, so the object the resolver
+        # consumes is the one that was validated.  `tuning_config` is what
+        # PlatformAdapter turns into `unified_tuning_configuration`, which
+        # `get_effective_tuning_configuration()` returns to the clustering
+        # resolver -- the raw option names would be dropped by `from_config`.
+        tuning_config = build_databricks_clustering_intent(normalized)
+        if tuning_config is not None:
+            normalized.pop("databricks_clustering_strategy", None)
+            normalized.pop("liquid_clustering_columns", None)
+            normalized["tuning_config"] = tuning_config
+            normalized["tuning_enabled"] = True
 
     return normalized
 

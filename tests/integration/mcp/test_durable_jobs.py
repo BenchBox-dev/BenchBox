@@ -98,6 +98,40 @@ def test_normalized_platform_options_survive_repository_round_trip(tmp_path: Pat
     assert persisted.request["platform_options"] == {"threads": 4}
 
 
+def test_durable_admission_refuses_contradictory_databricks_clustering(tmp_path: Path) -> None:
+    """A request that can never succeed must not occupy a durable queue slot."""
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+
+    with pytest.raises(MCPValidationError, match="clustering options conflict"):
+        validate_platform_options(
+            "databricks",
+            {"databricks_clustering_strategy": "z_order", "liquid_clustering_columns": "a,b"},
+        )
+
+    with repository._connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM mcp_benchmark_jobs").fetchone()[0] == 0
+
+
+def test_durable_databricks_requests_persist_only_normalized_intent(tmp_path: Path) -> None:
+    """Replay reconstructs the tuning object; it never replays raw mappings."""
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    options = validate_platform_options(
+        "databricks",
+        {"databricks_clustering_strategy": "liquid_clustering", "liquid_clustering_columns": "a,b"},
+    )
+
+    submitted, _ = repository.submit("tenant-a", {**_request(), "platform": "databricks", "platform_options": options})
+
+    persisted = repository.get_owned(submitted.execution_id, "tenant-a")
+    assert persisted is not None
+    assert persisted.request["platform_options"] == {
+        "databricks_clustering_strategy": "liquid_clustering",
+        "liquid_clustering_columns": "a,b",
+    }
+    # The persisted request survives a JSON round trip and still validates.
+    assert validate_platform_options("databricks", persisted.request["platform_options"]) == options
+
+
 def test_durable_admission_refuses_an_oversized_dask_envelope(tmp_path: Path) -> None:
     """An over-envelope request must never reach the queue, let alone a worker."""
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
