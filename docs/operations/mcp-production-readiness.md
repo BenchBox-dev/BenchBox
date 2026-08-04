@@ -47,3 +47,7 @@ diagnostic evidence but never satisfy the gate.
 The publication gate validates evidence freshness, source revision, exact tool
 pins, the evidence-file digest supplied out of band, and every required row.
 Do not weaken or bypass the gate to publish an endpoint.
+
+The exact conformance baseline and its fixture-bound rationale are maintained
+in [MCP conformance baseline](mcp-conformance-baseline.md). A baseline entry
+does not waive a real protocol, security, or tenancy defect.
