@@ -93,7 +93,8 @@ The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto
 5. **After merge**, the remote branch auto-deletes (repo setting `delete_branch_on_merge`). Sweep any stale local branches and worktrees with:
 
    ```bash
-   make worktree-prune    # removes worktrees whose branches are gone on origin
+   make worktree-prune         # removes worktrees whose branches are gone on origin
+   make branch-prune-merged    # removes plain local branches (no worktree) whose PR merged into develop
    ```
 
    Inspect open PRs at any time with `make pr-status`.
