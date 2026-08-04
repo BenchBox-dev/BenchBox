@@ -21,15 +21,12 @@ from benchbox.core.benchmark_loader import (
 
 # Import from common_types to avoid circular imports
 from benchbox.core.config import BenchmarkConfig, RunConfig
-from benchbox.core.constants import (
-    GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
-    GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
-)
 from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 from benchbox.core.platform_config import get_platform_config as _core_get_platform_config
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.run_service import resolve_run_config
 from benchbox.core.runner.dataframe_runner import is_dataframe_execution
 from benchbox.core.runner.runner import (
     LifecyclePhases,
@@ -487,9 +484,13 @@ class BenchmarkOrchestrator:
         return adapter
 
     def _prepare_run_config(self, config: BenchmarkConfig, database_config) -> RunConfig:
-        """Prepare benchmark run configuration using structured dataclass."""
+        """Prepare benchmark run configuration using structured dataclass.
 
-        # Get tuning configuration if available for distinct naming
+        Resolution itself lives in benchbox.core.run_service. What stays here is
+        the part core cannot own: DirectoryManager is CLI-layer, so the CLI
+        computes the database path and hands the service data instead of a
+        directory manager.
+        """
         tuning_config = None
         if config.options:
             tuning_config = config.options.get("unified_tuning_configuration")
@@ -501,36 +502,7 @@ class BenchmarkOrchestrator:
             tuning_config=tuning_config,
         )
 
-        options = config.options or {}
-        iterations = int(
-            options.get("power_iterations", GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS)
-            or GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
-        )
-        warmups = int(
-            options.get("power_warmup_iterations", GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS)
-            or GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS
-        )
-        fail_fast = bool(options.get("power_fail_fast", False))
-
-        return RunConfig(
-            query_subset=config.queries,
-            concurrent_streams=config.concurrency,
-            test_execution_type=getattr(config, "test_execution_type", "standard"),
-            scale_factor=config.scale_factor,
-            capture_plans=config.capture_plans,
-            analyze_plans=getattr(config, "analyze_plans", None),
-            strict_plan_capture=config.strict_plan_capture,
-            seed=int(options.get("seed")) if options.get("seed") is not None else None,
-            connection={"database_path": str(database_path)},
-            verbose=self._verbosity.verbose,
-            verbose_level=self._verbosity.level,
-            verbose_enabled=self._verbosity.verbose_enabled,
-            very_verbose=self._verbosity.very_verbose,
-            quiet=self._verbosity.quiet,
-            iterations=max(1, iterations),
-            warm_up_iterations=max(0, warmups),
-            power_fail_fast=fail_fast,
-        )
+        return resolve_run_config(config, database_path=database_path, verbosity=self._verbosity)
 
     def _should_offer_credential_setup(self, database_config, error: Exception) -> bool:
         """Check if error indicates missing credentials for a cloud platform.
