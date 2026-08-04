@@ -68,6 +68,10 @@ cd <WORKTREE_PATH>
 make agent-write-preflight
 ```
 
+`worktree-claim` pins your identity to the claimed worktree via
+`git config --worktree`; that outranks the shared config, so a later write
+there cannot reauthor it.
+
 Stop if `git rev-parse --show-toplevel` is the primary clone. Emergency writes
 there require explicit user authorization and
 `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`. Preserve unrelated dirty work. Never use
@@ -99,20 +103,14 @@ has an identified durable consumer.
 ## Verification and close-out
 
 Read a claimed TODO's `verification` ladder and run the narrowest proof first.
-Useful local checks:
-
-```bash
-uv run -- python -m pytest -m fast -q
-uv run -- ruff check .
-uv run -- ruff format --check .
-uv run -- ty check
-```
+Useful local checks: `uv run -- python -m pytest -m fast -q`,
+`uv run -- ruff check .`, `uv run -- ruff format --check .`, `uv run -- ty check`.
 
 Before publication, self-review with the `code` skill's review action and fix
 all issues, considerations, and nits unless the user explicitly opts out. Run
-`make pr-preflight` once, then `make pr-open`. Delegate boilerplate gates to a
-low-effort subagent when available; the main agent chooses the command and
-interprets failures. Do not poll CI: pending is a valid terminal state.
+`make pr-preflight` once, then `make pr-open`. Boilerplate gates may go to a
+low-effort subagent; you still choose the command and interpret failures. Do
+not poll CI: pending is a valid terminal state.
 
 Dev PRs target `develop`, use squash merge, and never direct-push protected
 branches. Force-push only feature/pool branches with `--force-with-lease`.
