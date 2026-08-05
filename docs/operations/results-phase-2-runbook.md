@@ -86,6 +86,24 @@ but a future stacked-PR mistake against this branch would still see zero
 checks until this manual port happens. Treat it as tracked debt, not a
 silent gap.
 
+Two honest limits on what the new status does and does not buy, so nobody
+reads more protection into a green badge than is there:
+
+- **It is advisory, not enforcing.** No ruleset targets `published-results` —
+  the repo's rulesets target `develop`, `release`, `v*` branches, and tags — so
+  a maintainer can still flip a mirror PR ready and merge it with the status
+  red. The status makes the verdict *visible*; the maintainer review step the
+  draft state exists for is still what enforces it.
+- **It is self-attested.** The run that builds the mirror content is the run
+  that validates it and posts the verdict, so it catches bad *content*
+  (a bundle that fails schema, hash, or privacy validation; a stale inventory)
+  but not tampering with the mirror branch after the fact. A later
+  `--force-with-lease` push from another run re-posts against the new head SHA,
+  so a stale green status cannot ride on top of new bytes — but a direct manual
+  push to `auto/results-mirror-*` would leave the last status attached to an
+  older SHA, and the PR would show no status for the new one rather than a
+  wrong one.
+
 ### 1.3 Explorer publish path
 
 The static explorer at `benchbox.dev/results/` is intended to build and

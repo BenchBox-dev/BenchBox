@@ -282,12 +282,26 @@ jobs:
         # SHA, is what makes the PR's statusCheckRollup non-empty. It must carry
         # the same condition as "Open or update draft PR" so every mirror PR gets
         # it, not just some.
-        if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
+        #
+        # `always()`: without it, a step-level failure anywhere above (a flaky
+        # `astral-sh/setup-uv`, a `git diff` error inside the validate step —
+        # anything the validate step's own `set -uo pipefail` capture does not
+        # convert into a reported state) skips every later step, so no status
+        # AND no mirror PR. That would be a new way for the corpus mirror to
+        # silently not exist, which is worse than the blind PR this change is
+        # removing: develop's Corpus Drift Check would stay red with nothing
+        # open to explain it. An unreachable verdict is reported as `error`.
+        if: always() && steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STATE: ${{ steps.validate.outputs.state }}
           DESCRIPTION: ${{ steps.validate.outputs.description }}
         run: |
+          # Empty means the validate step never reached its `GITHUB_OUTPUT`
+          # write. Never default this to `success`: an absent verdict is the
+          # one case where the PR carries no evidence either way.
+          STATE="${STATE:-error}"
+          DESCRIPTION="${DESCRIPTION:-Validation did not complete; see the workflow run.}"
           SHA=$(git rev-parse HEAD)
           gh api "repos/${{ github.repository }}/statuses/${SHA}" \
             -f state="${STATE}" \
@@ -296,7 +310,11 @@ jobs:
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       - name: Open or update draft PR
-        if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
+        # `always()` for the same reason as the status step above: the mirror PR
+        # existing is what keeps develop's Corpus Drift Check actionable, so it
+        # must not be collateral damage from a toolchain hiccup in the new
+        # validation steps. Before those steps existed this could not happen.
+        if: always() && steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MIRROR_BRANCH: ${{ steps.build.outputs.mirror_branch }}
@@ -343,9 +361,13 @@ jobs:
         # Runs after the PR/status steps above on purpose: the PR must still
         # exist and carry the failing status for a maintainer to act on, not
         # disappear because this job stopped early.
-        if: steps.validate.outputs.state == 'failure'
+        #
+        # `!= 'success'` rather than `== 'failure'`: an empty state means the
+        # validate step never produced a verdict, and a run that could not
+        # determine whether the corpus is publishable must not be green.
+        if: always() && steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true' && steps.validate.outputs.state != 'success'
         run: |
-          echo "::error::Mirrored corpus content failed validation; see the corpus-mirror/validate-bundles status on the mirror PR for detail."
+          echo "::error::Mirrored corpus content did not pass validation; see the corpus-mirror/validate-bundles status on the mirror PR for detail."
           exit 1
 
       - name: No-op summary

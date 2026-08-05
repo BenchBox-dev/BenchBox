@@ -195,3 +195,56 @@ def test_published_results_base_guard_still_has_no_branch_filter() -> None:
     pull_request = _triggers(_load(guard))["pull_request"] or {}
     assert "branches" not in pull_request
     assert "paths" not in pull_request
+
+
+def test_published_results_base_mirror_survives_a_failure_in_its_own_validation_steps() -> None:
+    """Adding validation must not create a new way for the mirror PR to not exist.
+
+    The status and PR-opening steps come after the new "Install uv" / "Set up
+    Python" / "Validate mirrored corpus content" steps. GitHub skips every
+    later step once one fails, so without ``always()`` a flaky toolchain setup
+    - or any error the validate step's ``set -uo pipefail`` capture does not
+    convert into a reported state - would skip BOTH, leaving no status and no
+    mirror PR at all.
+
+    That is strictly worse than the blind PR this change removes: develop's
+    Corpus Drift Check would stay red with nothing open to explain why, and
+    before these steps existed the PR was always created. Availability of the
+    mirror PR is the property being protected here, not its verdict.
+    """
+    for step_name in (STATUS_STEP_NAME, OPEN_PR_STEP_NAME):
+        condition = _step(step_name).get("if", "")
+        assert "always()" in condition, (
+            f"{step_name!r} does not use always(), so a failure in the validation steps above it "
+            "would skip it and the mirror PR would silently not exist"
+        )
+
+
+def test_published_results_base_mirror_never_reports_success_without_a_verdict() -> None:
+    """An unreachable verdict must not read as a passing check.
+
+    ``always()`` means the status step can run when the validate step never
+    wrote its outputs, so the state can arrive empty. Defaulting that to
+    ``success`` would post a green check for content nothing examined - the
+    original zero-check bug wearing a passing badge, which is worse than the
+    empty rollup because it stops anyone looking.
+    """
+    body = _step(STATUS_STEP_NAME)["run"]
+    assert 'STATE="${STATE:-error}"' in body, (
+        "the status step does not default an absent verdict to `error`; an empty state would be posted as-is "
+        "or, worse, silently treated as success"
+    )
+    assert "STATE:-success" not in body, "an absent verdict defaults to success"
+
+
+def test_published_results_base_mirror_run_is_red_unless_validation_passed() -> None:
+    """The run must fail on a missing verdict, not only on an explicit failure.
+
+    ``state == 'failure'`` alone leaves the empty case green: the workflow
+    would report success having never established whether the corpus it just
+    proposed is publishable.
+    """
+    condition = _step("Fail the run if mirrored content failed validation").get("if", "")
+    assert "!= 'success'" in condition, (
+        f"failure gate is {condition!r}; a run that could not determine the verdict would still be green"
+    )
