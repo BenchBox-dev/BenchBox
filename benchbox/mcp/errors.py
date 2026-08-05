@@ -106,7 +106,37 @@ _NON_SECRET_SECRET_WORDS = frozenset(
         "was",
     }
 )
+# Bare prose after a secret key ("password X", "token Y") over-matches ordinary
+# diagnostic English ("secret sauce", "token refresh", "password reset"). Only
+# scrub bare-prose tokens that look credential-like; connector forms
+# ("password is X") stay aggressive because the connector marks assignment.
+_BARE_PROSE_OPAQUE_ALPHA_MIN = 20
+_BARE_PROSE_ALLCAPS_MIN = 6
 _URL_USERINFO_RE = re.compile(r"(://)[^/@\s]+@")
+
+
+def _is_non_secret_word(value: str) -> bool:
+    """True when *value* is an allowlisted diagnostic word, not a secret."""
+    return value.lower() in _NON_SECRET_SECRET_WORDS
+
+
+def _is_credential_like_bare_prose_value(value: str) -> bool:
+    """True when a bare-prose token after a secret key looks like a secret value.
+
+    Pure short alphabetic English after a key name is diagnostic wording, not
+    credential material. Tokens with digits, underscores, separators, long
+    opaque alpha, or ALL-CAPS identifiers are treated as values.
+    """
+    if _is_non_secret_word(value):
+        return False
+    if not value.isalpha():
+        # Digits, underscores, hyphens, base64 punctuation, etc.
+        return True
+    if value.isupper() and len(value) >= _BARE_PROSE_ALLCAPS_MIN:
+        return True
+    if len(value) >= _BARE_PROSE_OPAQUE_ALPHA_MIN:
+        return True
+    return False
 
 
 def scrub_secret_material(text: str) -> str:
@@ -117,13 +147,23 @@ def scrub_secret_material(text: str) -> str:
 
     def replace_colon(match: re.Match[str]) -> str:
         value = match.group("value")
-        if value.lower() in _NON_SECRET_SECRET_WORDS:
+        if _is_non_secret_word(value):
             return match.group(0)
         return f"{match.group('prefix')}****"
 
-    def replace_prose(match: re.Match[str]) -> str:
+    def replace_connector_prose(match: re.Match[str]) -> str:
+        # "password is X" / "token was Y" — connector marks assignment; scrub
+        # unless the token is an allowlisted diagnostic word.
         value = match.group("value")
-        if value.lower() in _NON_SECRET_SECRET_WORDS:
+        if _is_non_secret_word(value):
+            return match.group(0)
+        return f"{match.group('prefix')}****"
+
+    def replace_bare_prose(match: re.Match[str]) -> str:
+        # "password X" without a connector: only scrub credential-like tokens so
+        # benign phrases (secret sauce, token refresh, password reset) survive.
+        value = match.group("value")
+        if not _is_credential_like_bare_prose_value(value):
             return match.group(0)
         return f"{match.group('prefix')}****"
 
@@ -134,8 +174,8 @@ def scrub_secret_material(text: str) -> str:
     scrubbed = _SECRET_SAS_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
     scrubbed = _SECRET_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
     scrubbed = _SECRET_COLON_ASSIGNMENT_RE.sub(replace_colon, scrubbed)
-    scrubbed = _SECRET_PROSE_CONNECTOR_RE.sub(replace_prose, scrubbed)
-    scrubbed = _SECRET_PROSE_RE.sub(replace_prose, scrubbed)
+    scrubbed = _SECRET_PROSE_CONNECTOR_RE.sub(replace_connector_prose, scrubbed)
+    scrubbed = _SECRET_PROSE_RE.sub(replace_bare_prose, scrubbed)
     return _URL_USERINFO_RE.sub(r"\1****@", scrubbed)
 
 
