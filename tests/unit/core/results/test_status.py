@@ -7,11 +7,15 @@ from types import SimpleNamespace
 import pytest
 
 from benchbox.core.results.status import (
+    CLI_FAILURE_VALIDATION_STATUSES,
+    NON_CLEAN_VALIDATION_STATUSES,
+    UNVALIDATED_VALIDATION_STATUSES,
     bundle_failed_query_count,
     bundle_is_clean_pass,
     result_cli_failure_reason,
     result_failed_query_count,
     result_is_clean_pass,
+    result_unvalidated_reason,
 )
 
 pytestmark = [
@@ -109,3 +113,28 @@ def test_translation_fallback_is_a_cli_failure() -> None:
         execution_metadata={"translation": {"status": "fallback"}},
     )
     assert result_cli_failure_reason(result) == "translation_status=fallback"
+
+
+def test_validation_status_set_partition() -> None:
+    """UNVALIDATED is the derived NON_CLEAN - CLI_FAILURE partition; keep it that way."""
+    assert CLI_FAILURE_VALIDATION_STATUSES < NON_CLEAN_VALIDATION_STATUSES
+    assert UNVALIDATED_VALIDATION_STATUSES == NON_CLEAN_VALIDATION_STATUSES - CLI_FAILURE_VALIDATION_STATUSES
+    assert UNVALIDATED_VALIDATION_STATUSES
+    assert not (UNVALIDATED_VALIDATION_STATUSES & CLI_FAILURE_VALIDATION_STATUSES)
+
+
+@pytest.mark.parametrize("status", sorted(UNVALIDATED_VALIDATION_STATUSES))
+def test_result_unvalidated_reason_for_unvalidated_statuses(status: str) -> None:
+    result = SimpleNamespace(total_queries=1, successful_queries=1, failed_queries=0, validation_status=status)
+    assert result_unvalidated_reason(result) == f"validation_status={status}"
+
+
+def test_result_unvalidated_reason_none_when_query_failed() -> None:
+    result = SimpleNamespace(total_queries=2, successful_queries=1, failed_queries=1, validation_status="not_run")
+    assert result_unvalidated_reason(result) is None
+
+
+@pytest.mark.parametrize("status", sorted(CLI_FAILURE_VALIDATION_STATUSES))
+def test_result_unvalidated_reason_none_for_cli_failure_statuses(status: str) -> None:
+    result = SimpleNamespace(total_queries=1, successful_queries=1, failed_queries=0, validation_status=status)
+    assert result_unvalidated_reason(result) is None

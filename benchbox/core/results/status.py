@@ -15,6 +15,10 @@ NON_CLEAN_TRANSLATION_STATUSES: frozenset[str] = frozenset({"fallback", "failed"
 # executed — DataFrame mode, --validation disabled — is not a failed run.
 # Matches the v0.3.0 exit semantics.
 CLI_FAILURE_VALIDATION_STATUSES: frozenset[str] = frozenset({"failed", "interrupted", "partial", "error"})
+# Derived partition of NON_CLEAN that is not a CLI-level failure: validation
+# never executed (DataFrame mode, --validation disabled, not_run, ...).
+# Keep derived — do not hand-maintain a third literal set.
+UNVALIDATED_VALIDATION_STATUSES: frozenset[str] = NON_CLEAN_VALIDATION_STATUSES - CLI_FAILURE_VALIDATION_STATUSES
 
 
 def normalize_validation_status(value: Any) -> str | None:
@@ -103,6 +107,24 @@ def result_cli_failure_reason(result: Any) -> str | None:
     translation_status = _result_translation_status(result)
     if translation_status in NON_CLEAN_TRANSLATION_STATUSES:
         return f"translation_status={translation_status}"
+    return None
+
+
+def result_unvalidated_reason(result: Any) -> str | None:
+    """Return a reason when a result is unvalidated (validation never executed).
+
+    Distinct from CLI failures and schema/integrity violations: statuses in
+    :data:`UNVALIDATED_VALIDATION_STATUSES` keep the result non-clean for
+    publication but are not schema-violation terminal states. Returns ``None``
+    when there are failed queries (those take precedence) or when the
+    validation status is not in the unvalidated partition.
+    """
+    if result_failed_query_count(result):
+        return None
+
+    status = normalize_validation_status(getattr(result, "validation_status", None))
+    if status in UNVALIDATED_VALIDATION_STATUSES:
+        return f"validation_status={status}"
     return None
 
 

@@ -483,8 +483,18 @@ def test_classify_for_submit_vocabulary_and_clean_result(tmp_path: Path):
         "unofficial",
         "query_failure",
         "schema_violation",
+        "unvalidated",
         "missing_manifest",
     }
+
+
+def test_submit_state_is_cell_failure_excludes_unvalidated() -> None:
+    """Unvalidated cells stay PASSED; only integrity failures downgrade the cell."""
+    assert not runner.submit_state_is_cell_failure("unvalidated")
+    assert not runner.submit_state_is_cell_failure(runner.SubmitTerminalState.unvalidated)
+    assert runner.submit_state_is_cell_failure("schema_violation")
+    assert runner.submit_state_is_cell_failure("query_failure")
+    assert runner.submit_state_is_cell_failure("missing_manifest")
 
 
 def test_classify_for_submit_marks_query_failure_and_run_cell_failed(tmp_path: Path):

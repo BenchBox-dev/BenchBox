@@ -25,7 +25,11 @@ from benchbox.core.results.loader import (
     UnsupportedSchemaError,
     load_result_file,
 )
-from benchbox.core.results.status import result_failed_query_count, result_non_clean_reason
+from benchbox.core.results.status import (
+    result_failed_query_count,
+    result_non_clean_reason,
+    result_unvalidated_reason,
+)
 from benchbox.validation.bundle import CLI_REFUSED_COMPLIANCE_CLASSES
 
 
@@ -36,6 +40,7 @@ class SubmitTerminalState(str, Enum):
     unofficial = "unofficial"
     query_failure = "query_failure"
     schema_violation = "schema_violation"
+    unvalidated = "unvalidated"
     missing_manifest = "missing_manifest"
 
 
@@ -43,10 +48,10 @@ def classify_loaded_result(result: Any) -> SubmitTerminalState:
     """Classify an already-loaded result object (no I/O).
 
     Unofficial TPC-DS compliance classes remain successful but non-submittable;
-    non-clean results are refused, splitting query-level failures from other
-    schema/integrity problems. Compliance is checked before clean-ness so a
-    result that is both unofficial and non-clean classifies as ``unofficial``,
-    matching the CLI's branch order.
+    non-clean results are refused, splitting query-level failures, never-
+    validated runs, and other schema/integrity problems. Compliance is checked
+    before clean-ness so a result that is both unofficial and non-clean
+    classifies as ``unofficial``, matching the CLI's branch order.
     """
     if getattr(result, "compliance_class", None) in CLI_REFUSED_COMPLIANCE_CLASSES:
         return SubmitTerminalState.unofficial
@@ -55,6 +60,8 @@ def classify_loaded_result(result: Any) -> SubmitTerminalState:
     if non_clean_reason:
         if result_failed_query_count(result):
             return SubmitTerminalState.query_failure
+        if result_unvalidated_reason(result):
+            return SubmitTerminalState.unvalidated
         return SubmitTerminalState.schema_violation
     return SubmitTerminalState.submittable
 
