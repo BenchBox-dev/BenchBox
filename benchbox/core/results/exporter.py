@@ -338,39 +338,19 @@ class ResultExporter:
             logger.warning(f"Failed to record plan history: {exc}")
 
     def _apply_anonymization(self, payload: dict[str, Any]) -> None:
-        """Apply public-export anonymization to environment, platform, config, and execution metadata."""
+        """Apply public-export anonymization to environment, platform, config, and execution metadata.
+
+        Unread identifier fields (including ``machine_id``) are omitted by the
+        public walker - see ``adr-published-identifier-field-set``. Do not
+        re-inject capture-side machine ids after the walk: that would publish
+        the internal 16-hex token and undo the drop.
+        """
         if not self.anonymization_manager:
             return
 
         anonymized_payload = self.anonymization_manager.anonymize_result_payload(payload)
         payload.clear()
         payload.update(anonymized_payload)
-
-        # Ensure public exports have a stable grouping key without replacing
-        # any captured client-host or platform-runtime metadata.
-        machine_id = self.anonymization_manager.get_anonymous_machine_id()
-        if not machine_id:
-            return
-
-        env_block = payload.get("environment")
-        if not isinstance(env_block, dict):
-            env_block = {}
-            payload["environment"] = env_block
-
-        client_host = env_block.get("client_host")
-        client_host_block = client_host if isinstance(client_host, dict) else None
-        captured_machine_id = env_block.get("machine_id")
-        if captured_machine_id in (None, "") and client_host_block is not None:
-            captured_machine_id = client_host_block.get("machine_id")
-
-        effective_machine_id = captured_machine_id or machine_id
-        if env_block.get("machine_id") in (None, ""):
-            env_block["machine_id"] = effective_machine_id
-        if client_host_block is not None:
-            if client_host_block.get("machine_id") in (None, ""):
-                client_host_block["machine_id"] = effective_machine_id
-        elif not captured_machine_id:
-            env_block["client_host"] = {"machine_id": effective_machine_id}
 
     def _anonymize_plans_payload(self, plans_payload: dict[str, Any]) -> dict[str, Any]:
         """Strip raw EXPLAIN text from the plans companion for anonymized exports.

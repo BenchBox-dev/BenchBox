@@ -2,6 +2,21 @@
 # capture path and this public anonymization path read the single list in
 # benchbox/core/results/platform_options.py (_SECRET_KEY_PARTS). A second
 # hand-synced copy in this file diverged within a month of being split out.
+#
+# Keys listed here are omitted entirely from public payloads rather than
+# hashed. See docs/development/adr/adr-published-identifier-field-set.md:
+# they have no reader in the publication pipeline, Explorer, or contract,
+# and a pseudonym would still be a confirmation oracle with the empty
+# default salt. Compact forms match ``_compact_key`` (lowercase, non-alnum
+# stripped). Retained identifiers (endpoint, database_name, submission_path)
+# stay under identifier_keys / path / endpoint rules below.
+public_drop_keys:
+- machineid
+- workingdir
+- driverruntimepythonexecutable
+- databasepath
+- datapath
+- enginehost
 identifier_keys:
   account: account
   accountid: account

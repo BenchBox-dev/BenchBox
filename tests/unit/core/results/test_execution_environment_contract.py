@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 
 import pytest
@@ -313,7 +314,7 @@ def test_loader_uses_legacy_flat_host_fields_when_client_host_is_partial() -> No
     assert reconstructed.system_profile["machine_id"] == "nested-machine"
 
 
-def test_anonymized_export_replaces_machine_id_in_flat_and_normalized_client_host(tmp_path) -> None:
+def test_anonymized_export_omits_machine_id_in_flat_and_normalized_client_host(tmp_path) -> None:
     payload = build_result_payload(
         _minimal_result(
             system_profile={
@@ -326,6 +327,6 @@ def test_anonymized_export_replaces_machine_id_in_flat_and_normalized_client_hos
 
     ResultExporter(output_dir=tmp_path, anonymize=True)._apply_anonymization(payload)
 
-    assert payload["environment"]["machine_id"].startswith("machine_")
-    assert payload["environment"]["machine_id"] != "raw-machine-id"
-    assert payload["environment"]["client_host"]["machine_id"] == payload["environment"]["machine_id"]
+    assert "machine_id" not in payload["environment"]
+    assert "machine_id" not in payload["environment"].get("client_host", {})
+    assert "raw-machine-id" not in json.dumps(payload)

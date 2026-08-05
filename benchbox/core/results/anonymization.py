@@ -52,6 +52,9 @@ _MOUNT_COLLECTION_KEYS = set(_ANONYMIZATION_SPECS["mount_collection_keys"])
 _MOUNT_PATH_KEYS = set(_ANONYMIZATION_SPECS["mount_path_keys"])
 _LOCAL_ENDPOINT_VALUES = set(_ANONYMIZATION_SPECS["local_endpoint_values"])
 _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
+# Unread identifier fields: omit at the public boundary rather than publish a
+# confirmable pseudonym. Compact forms; see anonymization_specs.yaml.
+_PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
 
 _MESSAGE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])("
@@ -491,6 +494,11 @@ class AnonymizationManager:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
+                # Drop unread identifier fields at every nesting depth so they
+                # never appear as pseudonyms in public bundles (ADR published
+                # identifier field set).
+                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                    continue
                 child_path = (*key_path, str(key))
                 if self._is_secret_metadata_key(child_path):
                     anonymized[key] = PUBLIC_REDACTED_VALUE if child not in (None, "") else child
