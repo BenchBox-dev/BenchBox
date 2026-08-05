@@ -260,7 +260,14 @@ jobs:
             # waives the sidecar requirement for (same auto/results-mirror-*
             # same-repo signal) — the seed-corpus, sidecar-less path is
             # legitimate here too, not a gap.
-            if ! printf '%s\n' "${CHANGED_BUNDLES}" | xargs -d '\n' uv run --no-project --python 3.11 -- python scripts/validate_submission.py; then
+            #
+            # --allow-partial-validation: the curated seed corpus intentionally
+            # includes summary.validation=partial cohorts for compare depth.
+            # Community submissions still require passed (validate-submission.yml
+            # never passes this flag). Privacy leaks and inventory staleness
+            # still fail closed below.
+            if ! printf '%s\n' "${CHANGED_BUNDLES}" | xargs -d '\n' uv run --no-project --python 3.11 -- \
+              python scripts/validate_submission.py --allow-partial-validation; then
               STATE="failure"
               DESCRIPTION="scripts/validate_submission.py rejected the mirrored bundle content."
             fi
