@@ -38,6 +38,10 @@ AUTO_MERGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "auto-merge-on-open.
 
 ARM_COMMAND = "gh pr merge --auto --squash"
 
+# Exact enable/disable `if:` pins for auto-merge-on-open.yml (collapsed form).
+ENABLE_IF = "steps.soundness.outputs.soundness_path != 'true' && github.event.action == 'ready_for_review'"
+DISABLE_IF = "steps.soundness.outputs.soundness_path == 'true'"
+
 
 def _target_body(name: str) -> str:
     """Return the recipe lines of a Makefile target."""
@@ -71,6 +75,16 @@ def _steps_by_name(job: dict[str, Any]) -> dict[str, dict[str, Any]]:
         if name:
             named[str(name)] = step
     return named
+
+
+def _collapsed_if(step: dict[str, Any]) -> str:
+    """Normalize a step `if:` to a single-line string for exact comparison.
+
+    PyYAML may leave multi-line folded scalars with internal newlines/spaces;
+    collapse whitespace so the pin is the semantic condition, not YAML layout.
+    """
+    raw = str(step.get("if") or "").strip()
+    return re.sub(r"\s+", " ", raw)
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +146,22 @@ def test_auto_merge_enablement_point_preserves_soundness_withholding() -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_auto_merge_workflow_enable_if_is_exact_policy() -> None:
+    """Enable step must arm only for non-soundness ready_for_review.
+
+    Exact pin: opened/reopened/synchronize cannot arm even if someone later
+    rewrites the condition into a looser OR of event actions.
+    """
+    workflow = _load_workflow()
+    steps = _steps_by_name(_enable_job(workflow))
+    enable = steps.get("Enable squash auto-merge")
+    assert enable is not None, "enable step missing from auto-merge-on-open.yml"
+    assert _collapsed_if(enable) == ENABLE_IF, (
+        f"enable step if: drifted from policy pin\n  got:  {_collapsed_if(enable)!r}\n  want: {ENABLE_IF!r}"
+    )
+    assert ARM_COMMAND in str(enable.get("run") or ""), "enable step no longer arms squash auto-merge"
+
+
 def test_auto_merge_workflow_does_not_enable_merely_because_pr_was_opened() -> None:
     """No layer may arm auto-merge solely because a non-draft PR was opened.
 
@@ -141,21 +171,10 @@ def test_auto_merge_workflow_does_not_enable_merely_because_pr_was_opened() -> N
     """
     workflow = _load_workflow()
     steps = _steps_by_name(_enable_job(workflow))
-    enable = steps.get("Enable squash auto-merge")
-    assert enable is not None, "enable step missing from auto-merge-on-open.yml"
-    condition = str(enable.get("if") or "")
-    assert "ready_for_review" in condition, (
-        "enable step must require ready_for_review so opened/reopened/synchronize cannot arm"
-    )
-    assert ARM_COMMAND in str(enable.get("run") or ""), "enable step no longer arms squash auto-merge"
-    # Must not enable for opened / reopened / synchronize (positive exclusion
-    # is hard in YAML `if:`; requiring ready_for_review is the policy pin).
+    condition = _collapsed_if(steps["Enable squash auto-merge"])
+    # Exact policy already asserted above; restate exclusions for the defect.
+    assert condition == ENABLE_IF
     for forbidden in ("opened", "reopened", "synchronize"):
-        # Allow the action name only as the required positive match, not as an
-        # alternate arming path. A condition that ORs in opened would re-open
-        # the race.
-        if forbidden == "ready_for_review":
-            continue
         assert f"== '{forbidden}'" not in condition and f'== "{forbidden}"' not in condition, (
             f"enable step still matches event action {forbidden!r}: {condition!r}"
         )
@@ -180,12 +199,9 @@ def test_auto_merge_workflow_does_not_re_enable_on_synchronize() -> None:
     first post-open push lands, restoring the partial-stack race.
     """
     workflow = _load_workflow()
-    steps = _steps_by_name(_enable_job(workflow))
-    enable = steps["Enable squash auto-merge"]
-    condition = str(enable.get("if") or "")
-    assert "synchronize" not in condition, f"enable step condition still mentions synchronize: {condition!r}"
-    # Only ready_for_review should be the positive arming event in the condition.
-    assert "ready_for_review" in condition
+    condition = _collapsed_if(_steps_by_name(_enable_job(workflow))["Enable squash auto-merge"])
+    assert condition == ENABLE_IF
+    assert "synchronize" not in condition
 
 
 def test_auto_merge_workflow_preserves_soundness_disable() -> None:
@@ -195,5 +211,6 @@ def test_auto_merge_workflow_preserves_soundness_disable() -> None:
     disable = steps.get("Disable auto-merge for soundness PR")
     assert disable is not None, "soundness disable step is gone"
     assert "--disable-auto" in str(disable.get("run") or ""), "soundness disable no longer calls --disable-auto"
-    condition = str(disable.get("if") or "")
-    assert "soundness_path" in condition, "disable step no longer gates on soundness_path"
+    assert _collapsed_if(disable) == DISABLE_IF, (
+        f"disable step if: drifted from policy pin\n  got:  {_collapsed_if(disable)!r}\n  want: {DISABLE_IF!r}"
+    )

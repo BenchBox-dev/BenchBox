@@ -81,15 +81,29 @@ a PR's mergeability — both only alert.
   waiting on the owner's manual review and merge.
 - **Green-unmerged nightly sweep**
   (`_project/scripts/green_unmerged_sweep.py`,
-  `.github/workflows/nightly.yml`) — for PRs that *should* have auto-merge
-  on (non-draft, non-soundness-gated, required lane green) but don't:
-  flags ones stranded more than 2 hours after their head commit was
-  pushed. Note: `auto-merge-on-open.yml` no longer arms on `opened` or
-  `synchronize`; it only arms on `ready_for_review`. Ordinary non-draft PRs
-  still need `make pr-ready` / `READY=1` (or draft→ready) to arm. A green
-  `enable`-job run is not proof the PR's own `auto_merge` field ended up
-  populated — the sweep always re-reads the PR's current field rather than
-  trusting the workflow run's conclusion.
+  `.github/workflows/nightly.yml`) — alerts on non-draft, non-soundness
+  PRs whose required lane is green but auto-merge is still off for more
+  than 2 hours after the head commit.
+
+  After the auto-merge hold, **an intentional non-armed green PR is normal**,
+  not a stuck state. Auto-merge is **not** armed by `opened`, `reopened`, or
+  `synchronize` (a re-push will not flip it on). The only intentional arm
+  signals are:
+
+  - `make pr-ready` (or `make pr-arm-auto-merge`) on a finished branch
+  - `make pr-open READY=1` to open and arm in one step
+  - draft → ready (`ready_for_review` in `auto-merge-on-open.yml`)
+
+  Do **not** remediate a green-unmerged alert by re-pushing "to re-trigger
+  synchronize." That path no longer enables auto-merge. If the branch is
+  final, arm it; if work continues, leave auto-merge off.
+
+  Known follow-up: `green_unmerged_sweep.py` still classifies many of these
+  intentional holds as stranded (false positives). Fixing the classifier is
+  out of the enablement-hold change set (`_project/scripts/`); until then,
+  treat sweep hits as triage signals, not proof of a broken arm path. A green
+  `enable`-job run is also not proof the PR's `auto_merge` field is set —
+  the sweep re-reads the PR field rather than trusting the workflow conclusion.
 
 Both sweeps upsert a single marker-tagged tracking issue while their
 respective queue is non-empty, and patch it to the empty state exactly
