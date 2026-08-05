@@ -351,6 +351,121 @@ class TestExceptionSecretScrubbing:
         result = make_execution_error("failed", exception=Exception("table lineitem not found"))
         assert result["details"]["exception_message"] == "table lineitem not found"
 
+    @pytest.mark.parametrize(
+        ("text", "sentinel"),
+        [
+            ("dsn=DSN_GATE", "DSN_GATE"),
+            ("DSN=DSN_GATE", "DSN_GATE"),
+            ("dsn='DSN_GATE'", "DSN_GATE"),
+            ('dsn="DSN_GATE"', "DSN_GATE"),
+            ("connection_string=CONNECTION_GATE", "CONNECTION_GATE"),
+            ("CONNECTION_STRING=CONNECTION_GATE", "CONNECTION_GATE"),
+            ("connection-string=CONNECTION_GATE", "CONNECTION_GATE"),
+            ("private_key=PRIVATE_GATE", "PRIVATE_GATE"),
+            ("Private_Key=PRIVATE_GATE", "PRIVATE_GATE"),
+            ("private-key=PRIVATE_GATE", "PRIVATE_GATE"),
+            ("sas=SAS_GATE", "SAS_GATE"),
+            ("SAS=SAS_GATE", "SAS_GATE"),
+            ("pat=PAT_GATE", "PAT_GATE"),
+            ("PAT=PAT_GATE", "PAT_GATE"),
+            ("password=EXISTING_SECRET", "EXISTING_SECRET"),
+        ],
+    )
+    def test_credential_assignment_vocabulary_is_scrubbed(self, text: str, sentinel: str) -> None:
+        """Assignment forms for the remaining credential vocabulary must not leak."""
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert sentinel not in blob
+        assert sentinel not in result["message"]
+        assert sentinel not in result["details"]["exception_message"]
+        assert "****" in result["message"]
+        assert "****" in result["details"]["exception_message"]
+
+    def test_pat_does_not_match_path_assignment(self) -> None:
+        """Exact-key ``pat`` must not expand into non-secret ``path``."""
+        text = "path=/var/tmp/data failed to open"
+        result = make_execution_error(text, exception=Exception(text))
+        assert result["details"]["exception_message"] == text
+        assert result["message"] == text
+
+    def test_combined_credential_assignment_vocabulary_is_scrubbed(self) -> None:
+        text = "dsn=DSN_GATE private_key=PK_GATE sas=SAS_GATE pat=PAT_GATE connection_string=CS_GATE"
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        for sentinel in ("DSN_GATE", "PK_GATE", "SAS_GATE", "PAT_GATE", "CS_GATE"):
+            assert sentinel not in blob
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "sas=sv=2020-08-04&sig=SIG_GATE",
+            "SAS=sv=2020-08-04&ss=b&srt=sco&sig=SIG_GATE",
+            "storage_sas_token=sv=2020-08-04&sig=SIG_GATE",
+            "storage-sas-token=sv=2020-08-04&sig=SIG_GATE",
+        ],
+    )
+    def test_sas_querystring_assignment_masks_ampersand_segments(self, text: str) -> None:
+        """SAS values are query-string shaped; ``&sig=...`` must not survive."""
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert "SIG_GATE" not in blob
+        assert "sv=2020-08-04" not in blob
+        assert "****" in result["message"]
+        assert "****" in result["details"]["exception_message"]
+
+    def test_unquoted_multiline_private_key_pem_is_scrubbed(self) -> None:
+        """Unquoted PEM must not leave base64 body lines in MCP error egress.
+
+        PEM armor labels are assembled at runtime so static secret scanners do
+        not treat the test fixture as a real key material sample.
+        """
+        pem_label = " ".join(("RSA", "PRIVATE", "KEY"))
+        begin = f"-----BEGIN {pem_label}-----"
+        end = f"-----END {pem_label}-----"
+        body = "MIIE_GATE_BLOB"
+        text = f"load failed private_key={begin}\n{body}\nmoreBase64Body==\n{end} after"
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert body not in blob
+        assert "moreBase64Body" not in blob
+        assert begin not in blob
+        assert "private_key=****" in result["message"]
+        assert "private_key=****" in result["details"]["exception_message"]
+        # Trailing diagnostic prose after the PEM block remains.
+        assert "after" in result["message"]
+
+    def test_unquoted_multiline_private_key_base64_continuation_is_scrubbed(self) -> None:
+        body = "MIIE_GATE_BLOB"
+        text = f"private_key={body}\ncontinuedBase64Line\nnot_part_of_key=1"
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert body not in blob
+        assert "continuedBase64Line" not in blob
+        assert "private_key=****" in result["details"]["exception_message"]
+
+    def test_truncated_pem_without_end_is_scrubbed(self) -> None:
+        """BEGIN without END must still mask following base64 body lines."""
+        pem_label = " ".join(("RSA", "PRIVATE", "KEY"))
+        begin = f"-----BEGIN {pem_label}-----"
+        body = "MIIE_GATE_BLOB"
+        text = f"private_key={begin}\n{body}\nmoreBase64Body=="
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert body not in blob
+        assert "moreBase64Body" not in blob
+        assert begin not in blob
+        assert "private_key=****" in result["details"]["exception_message"]
+
+    def test_crlf_private_key_base64_continuation_is_scrubbed(self) -> None:
+        """Windows-style CRLF continuations must not leave base64 lines."""
+        body = "MIIE_GATE_BLOB"
+        text = f"private_key={body}\r\ncontinuedBase64Line\r\nnot_part_of_key=1"
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert body not in blob
+        assert "continuedBase64Line" not in blob
+        assert "private_key=****" in result["details"]["exception_message"]
+
 
 class TestMakeExecutionError:
     """Tests for make_execution_error helper function."""

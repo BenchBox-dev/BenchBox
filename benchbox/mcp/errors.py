@@ -23,13 +23,42 @@ from typing import Any
 # embedded in a value.
 # Keep the key vocabulary in one pattern so JSON, assignment, and prose forms
 # cannot drift apart.
+# Expandable keys accept common suffixes (e.g. motherduck_token). Short exact
+# keys (pat) must not expand into longer non-secret words such as "path".
 _SECRET_KEY_PATTERN = (
-    r"(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|account[_-]?key|"
-    r"key[_-]?id|credential)[a-z0-9_-]*"
+    r"(?:(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|account[_-]?key|"
+    r"key[_-]?id|credential|dsn|connection[_-]?string|private[_-]?key|sas)[a-z0-9_-]*|"
+    r"pat)"
 )
 _SECRET_ASSIGNMENT_RE = re.compile(
     rf"(({_SECRET_KEY_PATTERN})\s*=\s*)"
     r"(?:'[^']*'|\"[^\"]*\"|[^&\s,;'\")]+)",
+    flags=re.IGNORECASE,
+)
+# Azure SAS tokens are query-string shaped (sv=...&sig=...); the generic value
+# arm stops at ``&`` and would leave signature segments in the clear.
+_SECRET_SAS_KEY_PATTERN = r"(?:storage[_-]?sas(?:[_-]?token)?|sas)[a-z0-9_-]*"
+_SECRET_SAS_ASSIGNMENT_RE = re.compile(
+    rf"(({_SECRET_SAS_KEY_PATTERN})\s*=\s*)"
+    r"(?:'[^']*'|\"[^\"]*\"|[^\s,;'\")]+)",
+    flags=re.IGNORECASE,
+)
+# Unquoted PEM / multi-line private keys span whitespace; the generic arm only
+# takes the first token and leaves base64 body lines intact. Truncated PEM
+# (BEGIN without END) and CRLF-separated base64 continuations must still mask.
+_SECRET_PRIVATE_KEY_KEY_PATTERN = r"private[_-]?key[a-z0-9_-]*"
+# Body lines are base64-ish; allow ``_`` so truncated PEM / test sentinels are
+# not split mid-token (which re-exposes the remainder after the first mask).
+_SECRET_PRIVATE_KEY_BODY_LINE = r"[A-Za-z0-9+/=_]+"
+_SECRET_PRIVATE_KEY_ASSIGNMENT_RE = re.compile(
+    rf"(({_SECRET_PRIVATE_KEY_KEY_PATTERN})\s*=\s*)"
+    r"(?:"
+    r"'[^']*'"
+    r"|\"[^\"]*\""
+    r"|-----BEGIN[^\n]*-----[\s\S]*?-----END[^\n]*-----"
+    rf"|-----BEGIN[^\n]*-----(?:\r?\n{_SECRET_PRIVATE_KEY_BODY_LINE})*"
+    rf"|[^\s,;'\")]+(?:\r?\n{_SECRET_PRIVATE_KEY_BODY_LINE})*"
+    r")",
     flags=re.IGNORECASE,
 )
 _SECRET_QUOTED_ASSIGNMENT_RE = re.compile(
@@ -99,6 +128,10 @@ def scrub_secret_material(text: str) -> str:
         return f"{match.group('prefix')}****"
 
     scrubbed = _SECRET_QUOTED_ASSIGNMENT_RE.sub(replace_quoted, text)
+    # Specialized arms before the generic assignment so multi-param SAS and
+    # multi-line private keys are not truncated at ``&`` / first whitespace.
+    scrubbed = _SECRET_PRIVATE_KEY_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
+    scrubbed = _SECRET_SAS_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
     scrubbed = _SECRET_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
     scrubbed = _SECRET_COLON_ASSIGNMENT_RE.sub(replace_colon, scrubbed)
     scrubbed = _SECRET_PROSE_CONNECTOR_RE.sub(replace_prose, scrubbed)
