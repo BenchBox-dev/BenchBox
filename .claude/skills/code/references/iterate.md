@@ -27,7 +27,7 @@ Use when the user asks to drive a command, test suite, CI gate, lint/typecheck, 
 ## Rules
 
 - Do not batch unrelated fixes.
-- Do not mark blocked without the debug-framework hard-blocker criteria.
+- Do not mark blocked without the investigation-framework (Debug section) hard-blocker criteria.
 - Do not hide remaining failures after one cluster turns green.
 - Prefer smallest failing repro for edits; always finish by rerunning the original command.
 - For verification-only commits, keep raw stdout in `/tmp`, CI artifacts, or

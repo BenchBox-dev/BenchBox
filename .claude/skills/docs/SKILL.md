@@ -24,8 +24,8 @@ personas. Fall back to repo docs config and the Makefile.
 | `create` | create/add documentation | `references/create.md` |
 | `build` | build/validate docs | `references/build.md` |
 | `review` | review/check docs | `references/review.md` |
-| `compare` | compare documents | `SHARED/compare-framework/SKILL.md` |
-| `shrink` | compress/shrink docs | `SHARED/shrink-framework/SKILL.md` |
+| `compare` | compare documents | `SHARED/investigation-framework/SKILL.md` (Compare section) |
+| `shrink` | compress/shrink docs | `SHARED/investigation-framework/SKILL.md` (Shrink section) |
 | `adversarial` | adversarial/user-perspective review | `references/adversarial.md` |
 | `commit` | commit documentation | `references/commit.md` |
 | `help` | help/list actions | this table |

@@ -1,5 +1,5 @@
 depends:
-  - SHARED/plan-deepening-framework
+  - SHARED/review-protocol
 tags:
   - framework
 category: framework

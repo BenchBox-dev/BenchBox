@@ -151,11 +151,13 @@ container lifecycle and cleanup. Never globally prune without approval.
 ## Skills and generated mirrors
 
 Stable wrappers are `code`, `test`, `todo`, `todo-db`, `blog`,
-`benchbox-workflow`, `skill-sync`, and `tidy-perms`. `todo` authors ideas/specs;
+`benchbox`, `skill-sync`, and `tidy-perms`. `todo` authors ideas/specs;
 `todo-db` owns tracker actions. Skill source is
 `/Users/joe/.skill-sync/skills`; `.claude/skills`, `.codex/skills`,
 `.gemini/skills`, and `.antigravity/skills` are generated mirrors. Run
-`make skill-sync`, never hand-edit a mirror.
+`make skill-sync` to regenerate mirrors, never hand-edit one. Integrity
+comes from PR review of the mirror diff plus the untracked-mirror drift
+guard (`scripts/check_untracked_skill_mirrors.sh`), not a lock-verify step.
 
 ## Operational references
 

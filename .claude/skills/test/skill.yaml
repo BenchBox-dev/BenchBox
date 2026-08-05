@@ -1,9 +1,6 @@
 depends:
-  - SHARED/commit-framework
-  - SHARED/verify-framework
-  - SHARED/research-framework
-  - SHARED/context-guide
-  - SHARED/debug-framework
+  - SHARED/change-framework
+  - SHARED/investigation-framework
 config_inputs:
   - key: test.runner
     type: string

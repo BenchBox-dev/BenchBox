@@ -18,7 +18,7 @@ DEFAULT_CORPUS = ROOT / "_project/evals/agent-instructions/scenarios.json"
 ADAPTERS = ("CLAUDE.md", "GEMINI.md", "ANTIGRAVITY.md")
 ACTIVE_TEXT = ("AGENTS.md", *ADAPTERS, ".claude/commands/pr.md", "docs/development/agent-review-protocol.md")
 CANONICAL_REVIEW_SKILL = ".claude/skills/SHARED/review-protocol/SKILL.md"
-CANONICAL_COMMIT_SKILL = ".claude/skills/SHARED/commit-framework/SKILL.md"
+CANONICAL_COMMIT_SKILL = ".claude/skills/SHARED/change-framework/SKILL.md"
 REQUIRED_POLICY_IDS = {
     "AUTH-PROVENANCE-001",
     "COMMIT-IDENTITY-001",

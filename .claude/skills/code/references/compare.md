@@ -12,7 +12,7 @@ Compare behavioral contracts, not formatting.
 
 ## Compare
 
-Use SHARED/compare-framework/SKILL.md scoring. Mark as breaking when a public contract, error behavior, persistence format, security property, or required dependency changes. Mark as high risk when relationships or registration paths disappear.
+Use SHARED/investigation-framework/SKILL.md (Compare section) scoring. Mark as breaking when a public contract, error behavior, persistence format, security property, or required dependency changes. Mark as high risk when relationships or registration paths disappear.
 
 ## Output
 

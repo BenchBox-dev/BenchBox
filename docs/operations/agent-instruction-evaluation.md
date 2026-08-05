@@ -16,7 +16,7 @@ skills:
 make agent-instructions-check
 make agent-identity-check
 uv run -- python -m pytest tests/unit/scripts/test_agent_instruction_audit.py -q
-make skill-sync-verify
+make skill-sync-check
 ```
 
 The first command reads `_project/evals/agent-instructions/scenarios.json`,

@@ -399,25 +399,6 @@ jobs:
         continue-on-error: true
         run: uv run -- python scripts/check_release_curation.py
 
-      - name: Checkout pinned skill-sync verifier
-        uses: actions/checkout@v4
-        with:
-          repository: joeharris76/skill-sync
-          ref: 7e8926ae3ee03c8b0cc7c0fab498e5ed1917638b
-          path: .ci-tools/skill-sync
-          persist-credentials: false
-
-      - name: skill-sync tracked snapshot verify (cloud/CI integrity gate)
-        # Public tool, pinned by full sha (no token). A separate checkout avoids
-        # npm's GitFetcher packaging path; npm ci runs the tool's prepare build.
-        # Switch to `npx -y skill-sync@<ver>` once published.
-        id: guard-skill-sync-verify
-        continue-on-error: true
-        working-directory: .ci-tools/skill-sync
-        run: |
-          npm ci --no-audit
-          node dist/cli/index.js verify --project ../..
-
       - name: Untracked skill-mirror drift guard (cloud parity)
         # The codex/gemini/antigravity mirrors and the curated-out `blog` skill are
         # deliberately untracked: cloud is Claude-only and `blog` is published
