@@ -13,7 +13,10 @@ uat-sweep-durability-and-signal-teardown:
 from __future__ import annotations
 
 import json
+import os
 import signal
+import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
@@ -22,7 +25,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.uat import _cli as uat_cli, cells_io, docker_assets, orchestrator
+from tests.uat import _cli as uat_cli, cells_io, docker_assets, orchestrator, timeouts
 from tests.uat.config import validate_config
 from tests.uat.phases import execute as exec_phase
 from tests.uat.runner import CellResult
@@ -318,3 +321,67 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
 
     assert "cell" in sequence and "down" in sequence
     assert sequence.index("down") > sequence.index("cell")
+
+
+# --------------------------------------------------------------------- w2/w4 (uat-cell-teardown-orphans-child-processes-20260805)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signal/process-group behavior")
+def test_sweep_cancel_reaps_orphaned_child_no_survivor(tmp_path: Path):
+    """A cancelled sweep leaves no surviving descendant process.
+
+    Uses the real sweep-process SIGTERM shim (`orchestrator._install_sweep_sigterm_shim`,
+    the exact handler `run_sweep` installs) and a real spawned child through
+    `timeouts.run_with_timeout` (the exact wrapper `exec_phase.run_cell` uses) --
+    not a mocked `communicate()`, which could look correct while a real
+    process kept running. Before the fix, `SweepCancelled` (a
+    `KeyboardInterrupt` subclass, not an `Exception`) escaped
+    `run_with_timeout`'s `except subprocess.TimeoutExpired` untouched and the
+    grandchild-capable child survived; this asserts it does not.
+    """
+    pid_file = tmp_path / "child.pid"
+    script = f"""
+import pathlib
+import os
+import time
+
+pathlib.Path({str(pid_file)!r}).write_text(str(os.getpid()), encoding="utf-8")
+time.sleep(30)
+"""
+    phase_holder: list[str | None] = ["execute"]
+    previous_sigterm = orchestrator._install_sweep_sigterm_shim(tmp_path, phase_holder)
+    sigterm_handler = signal.getsignal(signal.SIGTERM)
+
+    def _deliver_cancellation(signum: int, frame: FrameType | None) -> None:
+        # Fire the exact SIGTERM handler the orchestrator installed, from a
+        # SIGALRM tick landing while the main thread is blocked inside
+        # run_with_timeout's communicate() -- the same real scenario an
+        # operator `kill` on the sweep process produces.
+        typed_handler = cast(Callable[[int, FrameType | None], None], sigterm_handler)
+        typed_handler(signal.SIGTERM, frame)
+
+    previous_alarm = signal.signal(signal.SIGALRM, _deliver_cancellation)
+    signal.alarm(1)
+    try:
+        with pytest.raises(orchestrator.SweepCancelled):
+            timeouts.run_with_timeout([sys.executable, "-c", script], timeout_s=0)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous_alarm)
+        orchestrator._restore_sweep_sigterm_shim(previous_sigterm)
+
+    child_pid = int(pid_file.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + 2.0
+    while _pid_exists(child_pid) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not _pid_exists(child_pid)
+
+
+def _pid_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True

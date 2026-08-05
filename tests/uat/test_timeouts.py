@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -141,6 +142,112 @@ def test_kill_process_group_uses_killpg_when_available(monkeypatch):
 
     assert calls == [(999, sigterm), (999, sigkill)]
     mock_proc.kill.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# uat-cell-teardown-orphans-child-processes-20260805 (w0/w1): a sweep
+# cancellation is `SweepCancelled`, a `KeyboardInterrupt` subclass -- NOT an
+# `Exception` -- so it used to propagate straight out of `communicate()`
+# with the child untouched. Both branches of `run_with_timeout` now guard
+# `communicate()` with `except BaseException: kill; raise`.
+# ---------------------------------------------------------------------------
+
+
+def test_run_with_timeout_kills_group_on_base_exception_before_reraising(monkeypatch):
+    """A BaseException (e.g. SweepCancelled) raised while blocked in
+    communicate() must trigger the group-kill ladder BEFORE it escapes
+    run_with_timeout -- not just subprocess.TimeoutExpired."""
+
+    class _Cancelled(KeyboardInterrupt):
+        pass
+
+    class FakeProc:
+        pid = 4242
+        returncode = None
+
+        def communicate(self, timeout=None):
+            raise _Cancelled("simulated sweep cancellation")
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(timeouts.subprocess, "Popen", lambda *a, **k: FakeProc())
+    killpg_calls: list[tuple[int, object]] = []
+    monkeypatch.setattr(timeouts.os, "killpg", lambda pid, sig: killpg_calls.append((pid, sig)))
+
+    with pytest.raises(_Cancelled):
+        timeouts.run_with_timeout([sys.executable, "-c", "pass"], timeout_s=5)
+
+    # killpg fired (SIGTERM, then SIGKILL after the 200ms ladder sleep) before
+    # the cancellation escaped -- proving the kill happens, not just that the
+    # exception eventually propagates.
+    assert killpg_calls[0] == (4242, timeouts.signal.SIGTERM)
+    assert killpg_calls[-1] == (4242, timeouts.signal.SIGKILL)
+
+
+def test_run_with_timeout_zero_timeout_kills_group_on_base_exception(monkeypatch):
+    """The timeout_s == 0 branch must use the same guarded-kill Popen path as
+    the timed branch, not the old bare subprocess.run with no teardown."""
+
+    class _Cancelled(KeyboardInterrupt):
+        pass
+
+    class FakeProc:
+        pid = 4343
+        returncode = None
+
+        def communicate(self, timeout=None):
+            raise _Cancelled("simulated sweep cancellation")
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(timeouts.subprocess, "Popen", lambda *a, **k: FakeProc())
+    killpg_calls: list[tuple[int, object]] = []
+    monkeypatch.setattr(timeouts.os, "killpg", lambda pid, sig: killpg_calls.append((pid, sig)))
+
+    with pytest.raises(_Cancelled):
+        timeouts.run_with_timeout([sys.executable, "-c", "pass"], timeout_s=0)
+
+    assert killpg_calls[0] == (4343, timeouts.signal.SIGTERM)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only kill ladder / SIGALRM")
+def test_run_with_timeout_zero_timeout_kills_real_child_on_cancellation(tmp_path):
+    """Real-process proof for the timeout_s == 0 branch: a genuine spawned
+    grandchild-capable child must not survive a BaseException landing while
+    run_with_timeout blocks in communicate() -- a mocked communicate() could
+    look correct while a real process kept running."""
+    pid_file = tmp_path / "child.pid"
+    script = f"""
+import pathlib
+import os
+import time
+
+pathlib.Path({str(pid_file)!r}).write_text(str(os.getpid()), encoding="utf-8")
+time.sleep(30)
+"""
+
+    class _Cancelled(KeyboardInterrupt):
+        pass
+
+    def _raise_cancel(signum, frame):
+        raise _Cancelled("simulated sweep cancellation")
+
+    previous = signal.signal(signal.SIGALRM, _raise_cancel)
+    signal.alarm(1)
+    try:
+        with pytest.raises(_Cancelled):
+            timeouts.run_with_timeout([sys.executable, "-c", script], timeout_s=0)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+    child_pid = int(pid_file.read_text(encoding="utf-8"))
+    deadline = time.monotonic() + 2.0
+    while _pid_exists(child_pid) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not _pid_exists(child_pid)
 
 
 def _pid_exists(pid: int) -> bool:
