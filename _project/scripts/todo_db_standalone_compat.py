@@ -28,6 +28,7 @@ COMMANDS = frozenset(
         "init",
         "migrate",
         "create",
+        "update",
         "show",
         "claim",
         "renew",

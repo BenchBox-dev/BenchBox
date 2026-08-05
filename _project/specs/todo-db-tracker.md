@@ -228,6 +228,9 @@ package), env-configured via `TODO_DB_URL` (never echoed). All writes stamp
 
 ```
 todo create   --title ... --worktree ... --priority ... [--edit-body]   # opens/accepts structured flags for guardrail rows
+todo update   <id> [--title ...] [--description ...] [--priority ...] [--worktree ...]
+                  [--add-work ...] [--edit-work ...] [--add-verify ...] [--drop-verify N]
+                  [--reason ...]            # audited metadata/work/verify amend; never mutates lifecycle
 todo scope-update <id> --add-only-modify GLOB [--drop-only-modify GLOB] --reason ...
                                             # atomic, audited scope amendment; also supports do-not-modify
 todo show     <id> [--json]                 # full item incl. guardrail rows
@@ -253,6 +256,12 @@ todo admin migrate                          # only schema-migration path; CLI pi
 The `expected` field is human-readable acceptance guidance shown in the work
 order; commands that need output assertions must encode them directly (for
 example with a test assertion or `grep`).
+
+Every `todo update` amendment records one chained `update` event with
+exact from/to diffs for metadata fields, work-unit adds/edits, and
+verification adds/drops. `id`, `state`, and claim identity are immutable
+through this verb; terminal items and `--drop-verify` require `--reason`.
+No-op edits (flag equals current value) fail without writing an event.
 
 Every `todo scope-update` amendment requires `--reason`. The command validates
 all additions and removals before writing, applies them in one transaction, and
