@@ -12,5 +12,4 @@ targets:
 # Machine-readable capability boundary: verbs that exist only in the
 # standalone todo-db CLI, never in legacy project wrappers. SKILL.md rule 4
 # applies; consumer command-contract tests key off this declaration.
-standalone_only_commands:
-  update: ">=0.3.0"
+standalone_only_commands: {}

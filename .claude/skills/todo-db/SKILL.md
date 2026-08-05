@@ -41,8 +41,9 @@ the alert. Auto-remint is only for todo-db >= 0.3 wrappers. Global `--db` /
 (open findings or unsynced drafts); run `todo finding candidates` to triage.
 Banner is stderr-only and zero-suppressed, so stdout stays machine-readable.
 
-Standalone-only actions (`standalone_only_commands` in the skill sidecar,
-currently `update`) exist only in todo-db >= 0.3; rule 4 applies to wrappers.
+Standalone-only actions are declared in the skill sidecar as
+`standalone_only_commands` (currently none for this wrapper); rule 4 applies
+when a future verb is declared.
 
 ## Rules
 

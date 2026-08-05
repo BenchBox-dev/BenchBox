@@ -2078,6 +2078,211 @@ def update_scope_rules(
     return detail
 
 
+def _validate_item_fields(*, title: str, worktree: str, priority: str, description: str) -> None:
+    """Same field constraints create applies (SQL CHECK + explicit messages)."""
+    if not 5 <= len(title) <= 200:
+        raise TodoError("title must be between 5 and 200 characters")
+    if not worktree or not worktree.strip():
+        raise TodoError("worktree must not be empty")
+    if priority not in PRIORITIES:
+        raise TodoError(f"invalid priority {priority!r}; one of {', '.join(PRIORITIES)}")
+    if len(description) < 10:
+        raise TodoError("description must be at least 10 characters")
+
+
+def _parse_work_edits(specs: list[str]) -> dict[str, str]:
+    """Parse ``WID:NEW-SUMMARY`` flags for ``update --edit-work``."""
+    edits: dict[str, str] = {}
+    for spec in specs:
+        if ":" not in spec:
+            raise TodoError(f"--edit-work expects WID:NEW-SUMMARY, got {spec!r}")
+        wid, summary = spec.split(":", 1)
+        if not WID_RE.match(wid):
+            raise TodoError(f"invalid work-unit id {wid!r} (expect w0..w999)")
+        if wid in edits:
+            raise TodoError(f"duplicate --edit-work for {wid}")
+        edits[wid] = summary
+    return edits
+
+
+def _update_metadata_fields(
+    conn: sqlite3.Connection,
+    item: sqlite3.Row,
+    fields: dict[str, str | None],
+) -> dict[str, dict[str, Any]]:
+    """Apply title/description/priority/worktree changes; return from/to map."""
+    changes: dict[str, dict[str, Any]] = {}
+    for field, value in fields.items():
+        if value is None:
+            continue
+        if value == item[field]:
+            raise TodoError(f"--{field} equals the current value on {item['id']!r}; nothing to update")
+        changes[field] = {"from": item[field], "to": value}
+    merged = {field: changes[field]["to"] if field in changes else item[field] for field in fields}
+    _validate_item_fields(
+        title=merged["title"],
+        worktree=merged["worktree"],
+        priority=merged["priority"],
+        description=merged["description"],
+    )
+    if changes:
+        assignments = ", ".join(f"{field} = ?" for field in changes)
+        values = [change["to"] for change in changes.values()]
+        conn.execute(f"UPDATE items SET {assignments} WHERE id = ?", (*values, item["id"]))
+    return changes
+
+
+def _update_edit_work(
+    conn: sqlite3.Connection, item_id: str, edits: dict[str, str]
+) -> dict[str, dict[str, str]]:
+    work_edited: dict[str, dict[str, str]] = {}
+    for wid, summary in edits.items():
+        unit = _require_unit(conn, item_id, wid)
+        if unit["status"] != "pending":
+            raise TodoError(
+                f"cannot edit {item_id}:{wid}: unit is {unit['status']}; only pending units are"
+                " editable (a done unit's evidence attaches to its summary)"
+            )
+        if summary == unit["summary"]:
+            raise TodoError(f"--edit-work {wid} equals the current summary; nothing to update")
+        if not 5 <= len(summary) <= 200:
+            raise TodoError(f"work-unit summary must be between 5 and 200 characters: {item_id}:{wid}")
+        conn.execute(
+            "UPDATE work_units SET summary = ? WHERE item_id = ? AND wid = ?",
+            (summary, item_id, wid),
+        )
+        work_edited[wid] = {"from": unit["summary"], "to": summary}
+    return work_edited
+
+
+def _update_add_work(
+    conn: sqlite3.Connection, item_id: str, adds: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    wid_rows = conn.execute("SELECT wid FROM work_units WHERE item_id = ?", (item_id,))
+    wids = {row["wid"] for row in wid_rows}
+    work_added: list[dict[str, Any]] = []
+    for unit in adds:
+        wid = str(unit.get("id") or unit.get("wid") or "")
+        summary = str(unit.get("summary") or "")
+        if not WID_RE.match(wid):
+            raise TodoError(f"invalid work-unit id {wid!r} on {item_id!r}")
+        if wid in wids:
+            raise TodoError(f"duplicate work-unit id {item_id}:{wid}")
+        if not 5 <= len(summary) <= 200:
+            raise TodoError(f"work-unit summary must be between 5 and 200 characters: {item_id}:{wid}")
+        wids.add(wid)
+        conn.execute(
+            "INSERT INTO work_units (item_id, wid, summary, status) VALUES (?, ?, ?, 'pending')",
+            (item_id, wid, summary),
+        )
+        work_added.append({"id": wid, "summary": summary})
+    for unit, added in zip(adds, work_added, strict=True):
+        needs = [str(needs_wid) for needs_wid in unit.get("needs", ()) or ()]
+        for needs_wid in needs:
+            if needs_wid not in wids:
+                raise TodoError(f"work need {item_id}:{added['id']} -> {needs_wid} references a missing unit")
+            _insert_work_need(conn, item_id, added["id"], needs_wid)
+        if needs:
+            added["needs"] = needs
+    return work_added
+
+
+def _update_verifications(
+    conn: sqlite3.Connection,
+    item_id: str,
+    verify_adds: list[dict[str, str]],
+    verify_drops: list[int],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    next_seq = int(
+        conn.execute(
+            "SELECT COALESCE(max(seq), 0) AS seq FROM verifications WHERE item_id = ?",
+            (item_id,),
+        ).fetchone()["seq"]
+    )
+    verify_added: list[dict[str, Any]] = []
+    for entry in verify_adds:
+        next_seq += 1
+        name = str(entry.get("description") or "(no description)")
+        command = entry.get("command")
+        expected = entry.get("expected")
+        conn.execute(
+            "INSERT INTO verifications (item_id, seq, description, command, expected) VALUES (?, ?, ?, ?, ?)",
+            (item_id, next_seq, name, command, expected),
+        )
+        added_verify: dict[str, Any] = {"seq": next_seq, "name": name, "command": command}
+        if expected is not None:
+            added_verify["expected"] = expected
+        verify_added.append(added_verify)
+    verify_dropped: list[dict[str, Any]] = []
+    for seq in verify_drops:
+        row = conn.execute(
+            "SELECT description, command FROM verifications WHERE item_id = ? AND seq = ?",
+            (item_id, seq),
+        ).fetchone()
+        if row is None:
+            raise TodoError(f"no verification seq={seq} on {item_id!r}")
+        conn.execute("DELETE FROM verifications WHERE item_id = ? AND seq = ?", (item_id, seq))
+        verify_dropped.append({"seq": seq, "name": row["description"], "command": row["command"]})
+    return verify_added, verify_dropped
+
+
+def update_item(
+    conn: sqlite3.Connection,
+    actor: str,
+    item_id: str,
+    *,
+    title: str | None = None,
+    description: str | None = None,
+    priority: str | None = None,
+    worktree: str | None = None,
+    add_work: Iterable[dict[str, Any]] = (),
+    edit_work: dict[str, str] | None = None,
+    add_verify: Iterable[dict[str, str]] = (),
+    drop_verify: Iterable[int] = (),
+    reason: str | None = None,
+) -> dict[str, Any]:
+    """Amend item metadata / work / verifications without touching lifecycle.
+
+    One chained ``update`` audit event carries every from/to diff. ``id``,
+    ``state``, and claim identity are immutable through this verb.
+    """
+    fields = {"title": title, "description": description, "priority": priority, "worktree": worktree}
+    adds = [dict(unit) for unit in add_work]
+    edits = dict(edit_work or {})
+    verify_adds = [dict(entry) for entry in add_verify]
+    verify_drops = [int(seq) for seq in drop_verify]
+    reason = reason.strip() if reason and reason.strip() else None
+    if all(value is None for value in fields.values()) and not (adds or edits or verify_adds or verify_drops):
+        raise TodoError("update requires at least one change flag")
+    if verify_drops and reason is None:
+        raise TodoError("--drop-verify removes recorded verification steps; --reason is required")
+
+    with _write_txn(conn):
+        item = _require_item(conn, item_id)
+        if item["state"] in ("done", "dropped") and reason is None:
+            raise TodoError(f"{item_id!r} is {item['state']}; editing a terminal item requires --reason")
+        changes = _update_metadata_fields(conn, item, fields)
+        work_edited = _update_edit_work(conn, item_id, edits)
+        work_added = _update_add_work(conn, item_id, adds)
+        verify_added, verify_dropped = _update_verifications(conn, item_id, verify_adds, verify_drops)
+        detail: dict[str, Any] = {}
+        if changes:
+            detail["changes"] = changes
+        if work_added:
+            detail["work_added"] = work_added
+        if work_edited:
+            detail["work_edited"] = work_edited
+        if verify_added:
+            detail["verify_added"] = verify_added
+        if verify_dropped:
+            detail["verify_dropped"] = verify_dropped
+        if reason is not None:
+            detail["reason"] = reason
+        log_event(conn, actor, item_id, "update", detail)
+        _touch_lease(conn, actor, item_id)
+    return detail
+
+
 def claim_item(
     conn: sqlite3.Connection,
     actor: str,
@@ -3996,6 +4201,29 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--drop-do-not-modify", action="append", default=[], metavar="GLOB")
     p.add_argument("--reason", required=True)
 
+    p = sub.add_parser(
+        "update",
+        help="amend item metadata, work breakdown, or verifications (fully audited; never mutates lifecycle)",
+        description=(
+            "Amend item metadata, work breakdown, or verifications with a single chained "
+            "audit event (from/to diffs). Fully audited; never mutates lifecycle state, "
+            "id, or claim identity."
+        ),
+    )
+    p.add_argument("id")
+    p.add_argument("--title")
+    p.add_argument("--description")
+    p.add_argument("--priority", choices=PRIORITIES)
+    p.add_argument("--worktree")
+    p.add_argument("--add-work", action="append", default=[], metavar="WID:SUMMARY[:needs=w1,w2]")
+    p.add_argument("--edit-work", action="append", default=[], metavar="WID:NEW-SUMMARY")
+    p.add_argument("--add-verify", action="append", default=[], metavar="DESC[::COMMAND[::EXPECTED]]")
+    p.add_argument("--drop-verify", action="append", default=[], type=int, metavar="SEQ")
+    p.add_argument(
+        "--reason",
+        help="required for any edit to a done/dropped item and for --drop-verify",
+    )
+
     for name, help_text in (
         ("show", "show one item"),
         ("claim", "claim an item and print its work order"),
@@ -4343,7 +4571,7 @@ def _cmd_create(conn, actor, args):
     return 0
 
 
-def _cmd_update(conn, actor, args):
+def _cmd_scope_update(conn, actor, args):
     detail = update_scope_rules(
         conn,
         actor,
@@ -4355,6 +4583,26 @@ def _cmd_update(conn, actor, args):
         args.reason,
     )
     changed = [key for key in ("scope_added", "scope_dropped") if detail[key]]
+    print(f"updated {args.id} ({', '.join(changed)})")
+    return 0
+
+
+def _cmd_item_update(conn, actor, args):
+    detail = update_item(
+        conn,
+        actor,
+        args.id,
+        title=args.title,
+        description=args.description,
+        priority=args.priority,
+        worktree=args.worktree,
+        add_work=_parse_work_flag(args.add_work),
+        edit_work=_parse_work_edits(args.edit_work),
+        add_verify=_parse_verify_flag(args.add_verify),
+        drop_verify=args.drop_verify,
+        reason=args.reason,
+    )
+    changed = sorted(key for key in detail if key != "reason")
     print(f"updated {args.id} ({', '.join(changed)})")
     return 0
 
@@ -4660,7 +4908,8 @@ _HANDLERS = {
     "init": _cmd_init,
     "import-yaml": _cmd_import_yaml,
     "create": _cmd_create,
-    "scope-update": _cmd_update,
+    "scope-update": _cmd_scope_update,
+    "update": _cmd_item_update,
     "show": _cmd_show,
     "claim": _cmd_claim,
     "release": _cmd_release,

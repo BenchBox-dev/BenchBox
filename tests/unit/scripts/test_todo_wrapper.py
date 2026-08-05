@@ -167,7 +167,9 @@ class TestSkillThinness:
         # Without a declaration the boundary must trip — the declaration is the
         # only sanctioned way to document a wrapper-unsupported verb.
         assert _unknown_commands("run `todo frobnicate` then stop", set()) == {"frobnicate"}
-        assert _unknown_commands("`todo update <id>` corrects items", set()) == {"update"}
+        # update is a real wrapper handler; it must not be flagged as unknown
+        # when the declared standalone set is empty.
+        assert _unknown_commands("`todo update <id>` corrects items", set()) == set()
 
     def test_standalone_only_commands_never_presented_as_wrapper_invocations(self):
         # A declared verb must never appear as a project-wrapper invocation and
