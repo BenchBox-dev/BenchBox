@@ -101,6 +101,26 @@ two database secrets are available:
 - `TODO_DB_RO_AUTH_TOKEN` repository secret, passed to the legacy export step
   under its expected variable name but still carrying read-only authority.
 
+### Local auth provisioning
+
+CI supplies `TODO_DB_URL`/`TODO_DB_AUTH_TOKEN` as secrets, but a local checkout
+normally has neither set. `_project/scripts/todo_db.py` handles that case
+itself: when `--db`, `TODO_DB_PATH`, and `TODO_DB_URL` are all unset, it shells
+out to the maintainer's already-logged-in `turso` CLI (`turso db show <name>
+--url` + `turso db tokens create <name> --expiration 1d` (day
+granularity; sub-day values like `30m` are rejected by the Turso CLI),
+db name from
+`TODO_DB_TURSO_DB`, default `benchbox-todo`) and uses the resulting hosted
+backend transparently for that invocation, without ever printing or logging
+the minted URL or token. If `turso` is missing, not logged in, or the mint
+fails for any reason, the CLI falls back to the existing local implicit
+database and its write-refusal error now names all three remediations:
+`turso auth login`, exporting `TODO_DB_URL`/`TODO_DB_AUTH_TOKEN` directly, or
+selecting a backend with `--db`/`TODO_DB_PATH`. Explicit configuration always
+takes precedence over auto-provisioning, and `todo doctor` reports the
+`hosted (auto-provisioned via turso CLI, URL withheld)` backend detail when it
+was used.
+
 `TODO_DB_PACKAGE_VERSION` is an optional repository variable naming an exact,
 approved release. Enabling it also requires `TODO_DB_PACKAGE_URL`, an immutable
 HTTPS wheel URL, and `TODO_DB_PACKAGE_SHA256`, the wheel's lowercase SHA-256

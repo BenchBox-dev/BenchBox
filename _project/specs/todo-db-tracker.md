@@ -822,9 +822,18 @@ TODO tree from an untrusted source would plant shell commands; do not.
     environment. Local access authenticated via the maintainer's
     logged-in `turso` CLI, minting short-lived DB tokens per invocation
     (`turso db tokens create benchbox-todo`), never stored or echoed.
-    Open provisioning item for the maintainer: add the two variables to
-    local `.env` (per the Credentials bullet above) so local sessions
-    don't depend on the turso CLI login.
+    **Local auto-provisioning now exists** (`_project/scripts/todo_db.py`,
+    `_resolve_backend`/`_try_turso_auto_provision`): when none of --db,
+    `TODO_DB_PATH`, or `TODO_DB_URL` is set, the CLI shells out to the
+    logged-in `turso` CLI itself (`turso db show <name> --url` +
+    `turso db tokens create <name> --expiration 1d` (Turso CLI requires
+    day granularity or ``never``; sub-day values are rejected), db name from
+    `TODO_DB_TURSO_DB`, default `benchbox-todo`) and uses the hosted
+    backend transparently, falling back to the local implicit DB (with a
+    refusal-on-write pointing at `turso auth login` /
+    `TODO_DB_URL`+`TODO_DB_AUTH_TOKEN` / `--db`/`TODO_DB_PATH`) if turso is
+    absent, not logged in, or the mint fails. This closes the former open
+    provisioning item without requiring the two variables in local `.env`.
 - **G2 — CLI MVP:** schema DDL + `create/show/claim/start/done/defer/
   promote/dismiss/complete/ready/list/stats/export` + tests. No repo changes
   to the YAML system yet.
