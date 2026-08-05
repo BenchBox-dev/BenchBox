@@ -1005,6 +1005,41 @@ class TestPublicUnreadIdentifierDrop:
         assert out["environment"]["client_host"]["hostname"].startswith("host_")
         assert out["environment"]["platform_runtime"]["runtime_type"] == "local"
 
+    def test_empty_client_host_omitted_after_machine_id_drop(self):
+        """client_host that only held machine_id must not publish as {}."""
+        out = AnonymizationManager().anonymize_result_payload(
+            {"environment": {"client_host": {"machine_id": "raw-machine"}, "other": 1}}
+        )
+        assert "client_host" not in out.get("environment", {})
+        assert out["environment"]["other"] == 1
+
+    def test_already_empty_client_host_passes_through_for_fixed_point(self):
+        """Stored `client_host: {}` is left alone until an explicit re-derive."""
+        payload = {"environment": {"client_host": {}}}
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        assert out["environment"]["client_host"] == {}
+
+    def test_nonempty_client_host_profile_still_exports(self):
+        out = AnonymizationManager().anonymize_result_payload(
+            {
+                "environment": {
+                    "client_host": {
+                        "machine_id": "raw-machine",
+                        "os": "macOS",
+                        "arch": "arm64",
+                        "cpu": "Apple M-series",
+                        "memory_gb": 32,
+                    }
+                }
+            }
+        )
+        host = out["environment"]["client_host"]
+        assert "machine_id" not in host
+        assert host["os"] == "macOS"
+        assert host["arch"] == "arm64"
+        assert host["cpu"] == "Apple M-series"
+        assert host["memory_gb"] == 32
+
     def test_drop_is_idempotent_when_fields_already_absent(self):
         manager = AnonymizationManager()
         once = manager.anonymize_result_payload({"platform": {"config": {"endpoint": "https://x.example"}}})
