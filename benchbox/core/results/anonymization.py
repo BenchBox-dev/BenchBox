@@ -55,6 +55,10 @@ _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
 # Unread identifier fields: omit at the public boundary rather than publish a
 # confirmable pseudonym. Compact forms; see anonymization_specs.yaml.
 _PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
+# Optional nested maps that collapse to `{}` after drop keys are removed.
+# Omit the empty block rather than publishing a hollow object (e.g. client_host
+# that only held machine_id). Compact forms match ``_compact_key``.
+_PUBLIC_EMPTY_OPTIONAL_MAP_KEYS = frozenset({"clienthost"})
 
 _MESSAGE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])("
@@ -518,9 +522,23 @@ class AnonymizationManager:
                     continue
                 child_path = (*key_path, str(key))
                 if self._is_secret_metadata_key(child_path):
-                    anonymized[key] = PUBLIC_REDACTED_VALUE if child not in (None, "") else child
+                    child_value = PUBLIC_REDACTED_VALUE if child not in (None, "") else child
                 else:
-                    anonymized[key] = self._anonymize_public_value(child, child_path)
+                    child_value = self._anonymize_public_value(child, child_path)
+                # After dropping identifier-only content (e.g. client_host with
+                # only machine_id), omit the empty optional block rather than
+                # publishing a hollow object. Non-empty profiles keep.
+                # Already-empty `{}` maps in stored corpus pass through so the
+                # publication fixed point is not broken without a re-derive.
+                if (
+                    isinstance(child_value, dict)
+                    and not child_value
+                    and isinstance(child, dict)
+                    and child
+                    and _compact_key(str(key)) in _PUBLIC_EMPTY_OPTIONAL_MAP_KEYS
+                ):
+                    continue
+                anonymized[key] = child_value
             return anonymized
 
         if isinstance(value, (set, frozenset)):
