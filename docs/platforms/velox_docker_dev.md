@@ -97,7 +97,7 @@ Container: /Users/joe/Developer/BenchBox/benchmark_runs/tpch_sf1/lineitem.parque
            └── same path, mounted :ro
 ```
 
-If your data lives outside `./benchmark_runs`, set `BENCHBOX_DATA_DIR` to the absolute path:
+`BENCHBOX_DATA_DIR` is not defaulted inline in the compose file. A checked-in [`docker/velox/.env`](../../docker/velox/.env) supplies the `./benchmark_runs` fallback (resolved relative to `docker/velox/`, which is why Workflow A starts with `cd docker/velox`) for bare `docker compose` runs. This indirection exists because [mocker](../operations/uat-framework.md) — the Apple-silicon local Docker-compatible engine used by `make test-docker-* CONTAINER_ENGINE=mocker` — supports neither a nested default (`${VAR:-${OTHER}}`) nor the `${VAR:?message}` required-variable form; it silently leaves either one unresolved instead of substituting or erroring. If your data lives outside `docker/velox/benchmark_runs`, export `BENCHBOX_DATA_DIR` as an absolute path — it overrides `.env` on both `docker compose` and mocker:
 
 ```bash
 BENCHBOX_DATA_DIR=/mnt/benchdata docker compose up -d velox-connect
@@ -109,6 +109,8 @@ The mount is read-only (`:ro`). Spark's managed table warehouse is redirected to
 ## Workflow B - All-in-One Runner
 
 Run BenchBox entirely inside the container using an in-process (local) Gluten session. Simpler for one-shot benchmarks, CI jobs, and situations where you don't want to keep a server running.
+
+`velox-runner` has no data mount of its own, but compose interpolates the entire file regardless of which service you target, so `BENCHBOX_DATA_DIR` still has to resolve — `docker/velox/.env` covers that (see [Data Path Contract](#data-path-contract) above).
 
 ```bash
 cd docker/velox
@@ -192,7 +194,7 @@ VELOX_OFFHEAP=16g SPARK_DRIVER_MEM=8g docker compose up -d velox-connect
 | `VELOX_OFFHEAP` | `8g` | Off-heap memory budget for Velox |
 | `SPARK_DRIVER_MEM` | `4g` | JVM driver heap |
 | `SPARK_CONNECT_PORT` | `50051` | Host port exposed for the Spark-Connect server |
-| `BENCHBOX_DATA_DIR` | `./benchmark_runs` | Bind-mounted at the same absolute path inside the container |
+| `BENCHBOX_DATA_DIR` | `./benchmark_runs` (from `docker/velox/.env`, relative to that directory) | Bind-mounted at the same absolute path inside the container |
 
 ## CI Integration
 

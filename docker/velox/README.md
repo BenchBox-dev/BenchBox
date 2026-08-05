@@ -46,10 +46,12 @@ benchbox run --platform velox \
   --benchmark tpch --scale 1.0
 ```
 
-**Data path contract:** The server runs inside Docker and reads files by their host-side absolute paths. The compose file bind-mounts `$BENCHBOX_DATA_DIR` (default: `./benchmark_runs`) at the same absolute path inside the container. The host path BenchBox sends over gRPC must equal the in-container mount path, or every load fails with file-not-found.
+**Data path contract:** The server runs inside Docker and reads files by their host-side absolute paths. The compose file bind-mounts `$BENCHBOX_DATA_DIR` at the same absolute path inside the container. The host path BenchBox sends over gRPC must equal the in-container mount path, or every load fails with file-not-found.
+
+`BENCHBOX_DATA_DIR` is **not** defaulted inline in the compose file (a nested `${VAR:-${OTHER}}` default and the `${VAR:?message}` required-variable form are both unsupported by [mocker](../../docs/operations/uat-framework.md), the Apple-silicon local Docker-compatible engine — mocker leaves either form unresolved instead of erroring or substituting). Instead, [`.env`](.env) in this directory supplies the fallback `./benchmark_runs`, resolved **relative to this directory** (i.e. `docker/velox/benchmark_runs`), not the repo root. An exported `BENCHBOX_DATA_DIR` overrides `.env` on both `docker compose` and mocker:
 
 ```bash
-# If your data is not under ./benchmark_runs, override the mount:
+# If your data is not under docker/velox/benchmark_runs, override the mount:
 BENCHBOX_DATA_DIR=/mnt/benchbox-data docker compose up -d velox-connect
 ```
 
@@ -104,7 +106,7 @@ VELOX_DOCKER_PLATFORM=linux/amd64 docker compose up -d velox-connect
 | `VELOX_OFFHEAP` | `8g` | Off-heap memory budget for Velox |
 | `SPARK_DRIVER_MEM` | `4g` | JVM driver heap |
 | `SPARK_CONNECT_PORT` | `50051` | Host port for the Spark-Connect server |
-| `BENCHBOX_DATA_DIR` | `./benchmark_runs` | Host data directory, bind-mounted into the container at the same path |
+| `BENCHBOX_DATA_DIR` | `./benchmark_runs` (from [`.env`](.env), relative to this directory) | Host data directory, bind-mounted into the container at the same path. Compose interpolates the whole file, so `velox-runner` also needs this to resolve even though it has no data mount of its own. |
 
 ## Entrypoint Modes
 

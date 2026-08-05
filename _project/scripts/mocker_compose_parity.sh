@@ -29,6 +29,16 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 STATE_DIR="${DOCKER_TEST_STATE_DIR:-/tmp/benchbox-docker-projects}"
 fails=0
 
+# Passed explicitly (not just relied on as the Makefile's own default) so
+# `up` and `down` always agree on the same value even if the Makefile's
+# default changes later -- an up/down pair that disagreed here was the
+# teardown-leak risk that made lakesail-compose-nested-variable-default's
+# ${VAR:?...} required-variable form unsafe (a `down` invoked without the
+# same exported value refused to parse the file, orphaning the containers
+# and volumes it was supposed to remove). Only lakesail/velox compose files
+# reference this variable; it is a harmless no-op for every other platform.
+DATA_DIR="${BENCHBOX_DATA_DIR:-$ROOT/benchmark_runs}"
+
 # TCP connect check via bash /dev/tcp (no nc dependency). The subshell opens and
 # (on exit) closes the fd; success == the connect succeeded.
 tcp_ok() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
@@ -49,12 +59,12 @@ port_serves() {
 
 # Tear down the in-flight stack if interrupted between up and down.
 current_plat=""
-trap 'if [ -n "$current_plat" ]; then make -C "$ROOT" "test-docker-down-$current_plat" CONTAINER_ENGINE="$ENGINE" >/dev/null 2>&1 || true; fi; exit 130' INT TERM
+trap 'if [ -n "$current_plat" ]; then make -C "$ROOT" "test-docker-down-$current_plat" CONTAINER_ENGINE="$ENGINE" BENCHBOX_DATA_DIR="$DATA_DIR" >/dev/null 2>&1 || true; fi; exit 130' INT TERM
 
 for plat in "${PLATFORMS[@]}"; do
   echo "== [$ENGINE] $plat =="
   current_plat="$plat"
-  if ! make -C "$ROOT" "test-docker-up-$plat" CONTAINER_ENGINE="$ENGINE"; then
+  if ! make -C "$ROOT" "test-docker-up-$plat" CONTAINER_ENGINE="$ENGINE" BENCHBOX_DATA_DIR="$DATA_DIR"; then
     echo "  FAIL: up -d --wait did not return healthy"; fails=1; current_plat=""; continue
   fi
   proj="$(cat "$STATE_DIR/$plat.project" 2>/dev/null || true)"
@@ -62,7 +72,7 @@ for plat in "${PLATFORMS[@]}"; do
 
   if port_serves "$plat"; then echo "  PASS: published port serves"; else echo "  FAIL: published port did not serve"; fails=1; fi
 
-  if ! make -C "$ROOT" "test-docker-down-$plat" CONTAINER_ENGINE="$ENGINE"; then
+  if ! make -C "$ROOT" "test-docker-down-$plat" CONTAINER_ENGINE="$ENGINE" BENCHBOX_DATA_DIR="$DATA_DIR"; then
     echo "  FAIL: teardown errored"; fails=1
   fi
   current_plat=""

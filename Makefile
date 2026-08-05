@@ -462,6 +462,20 @@ DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
 CONTAINER_ENGINE ?= docker
 COMPOSE := $(CONTAINER_ENGINE) compose
 
+# Some docker/*/docker-compose.yml files (lakesail, velox) interpolate
+# BENCHBOX_DATA_DIR with no inline default -- a per-stack docker/<platform>/.env
+# supplies a directory-relative fallback for manual `docker compose` runs, but
+# that fallback resolves relative to the COMPOSE FILE's directory
+# (docker/<platform>/benchmark_runs), not the repo root these test-docker-*
+# targets run from. Export an explicit, repo-root-anchored value so `up` and
+# the later, separately-invoked `down` always agree -- an `up`/`down` pair that
+# disagreed on this value was a real teardown-leak risk
+# (lakesail-compose-nested-variable-default: a required-variable ${VAR:?...}
+# default made a `down` invoked without the same exported value fail outright,
+# orphaning the containers/volumes `down` was supposed to remove).
+BENCHBOX_DATA_DIR ?= $(CURDIR)/benchmark_runs
+export BENCHBOX_DATA_DIR
+
 # `compose down -v` extended to also remove leaked named volumes on a SUCCESSFUL
 # down. mocker 0.5.4's `compose down -v` removes containers but LEAKS named
 # volumes (a stale-data risk across runs); this removes the project's volumes
