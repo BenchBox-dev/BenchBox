@@ -477,6 +477,21 @@ config = AnonymizationConfig(
 exporter = ResultExporter(anonymize=True, anonymization_config=config)
 ```
 
+#### Default salt and residual confirmation oracle
+
+`machine_id_salt` defaults to empty. With the empty default, anyone who knows
+the documented algorithm can confirm candidate values against published
+`<kind>_<12 hex>` tokens. Unread identifier fields are omitted entirely (see
+`docs/development/adr/adr-published-identifier-field-set.md`). Retained fields
+(`endpoint`, `database_name`, `submission_path`) still publish pseudonyms, so
+the **residual oracle on those fields is accepted for the OSS default** and
+documented rather than denied.
+
+A non-empty salt closes the oracle only if it is **not** shipped in the public
+tree. Operators who will publish community submissions must set
+`machine_id_salt` to a deployment-private value before the first public export.
+A repository-baked "default salt" would still be public and is rejected.
+
 #### Salt rotation
 
 The salt applies when a **raw** value is hashed. A value that is already a

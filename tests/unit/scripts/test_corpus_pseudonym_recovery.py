@@ -8,13 +8,15 @@ This gate closes that hole for the unread-identifier drop (ADR
 
 1. Drop-field keys must be absent from every corpus JSON file after re-derive.
 2. Measured recoverable tokens that lived under dropped fields must be gone.
-3. Optional: a fixed safe dictionary of low-entropy *public* candidates must
-   not recover a path/machine/host pseudonym still present in the corpus
-   (prefixes that only the dropped fields used to mint at those keys).
+3. A fixed safe dictionary of low-entropy *public* candidates must not recover
+   a path/machine/host pseudonym still present in the corpus (prefixes that
+   only the dropped fields used to mint at those keys).
 
 Retained fields (``endpoint``, ``database_name``, ``submission_path``) still
-publish pseudonyms; their salt question is open. Do not record or print
-recovered plaintext values in comments, commits, or PR bodies — tokens only.
+publish pseudonyms under the empty OSS default salt. The residual confirmation
+oracle on those fields is an accepted, documented policy (ADR salt decision
+2026-08-05), not a green-gate failure. Do not record or print recovered
+plaintext values in comments, commits, or PR bodies — tokens only.
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from benchbox.core.results.anonymization import AnonymizationManager
+from benchbox.core.results.anonymization import AnonymizationConfig, AnonymizationManager
 
 pytestmark = [
     pytest.mark.unit,
@@ -132,9 +134,9 @@ def test_safe_dictionary_does_not_recover_dropped_field_pseudonyms() -> None:
     """A fixed public dictionary must not confirm path/machine/host tokens.
 
     Only prefixes that dropped fields used to mint at those keys are checked.
-    Retained-field prefixes (database, endpoint) stay out of this sweep until
-    the open salt decision lands — pinning them here would fight the keep-list
-    and the publication fixed point.
+    Retained-field prefixes (database, endpoint, path-under-submission_path)
+    are out of this fail-closed sweep: residual empty-salt recovery there is
+    the accepted OSS default policy, not a re-derive regression.
     """
     manager = AnonymizationManager()
     blob = _corpus_blob()
@@ -149,3 +151,37 @@ def test_safe_dictionary_does_not_recover_dropped_field_pseudonyms() -> None:
     # Deduplicate while preserving order for a stable failure message.
     unique_hits = list(dict.fromkeys(hits))
     assert not unique_hits, f"dictionary-recoverable dropped-field tokens remain: {unique_hits}"
+
+
+def test_retained_field_residual_oracle_is_documented_policy_not_a_gate_failure() -> None:
+    """Empty-salt retained prefixes remain dictionary-confirmable by design.
+
+    Pins the 2026-08-05 ADR decision: residual oracle on retained fields is
+    accepted for the OSS default. This test proves the algorithm property
+    (empty salt + known candidate → stable token) without scanning the corpus
+    for residual hits and without embedding recovered plaintext.
+    """
+    empty = AnonymizationManager()
+    # Public product token only — not a personal or path secret.
+    candidate = "benchbox"
+    token = empty._hash_public_identifier(candidate, "database")
+    assert token.startswith("database_")
+    assert len(token) == len("database_") + 12
+    # Same empty-salt manager always confirms the same candidate.
+    assert empty._hash_public_identifier(candidate, "database") == token
+
+
+def test_operator_salt_defeats_safe_dictionary_for_new_raw_values() -> None:
+    """A deployment-private salt closes the oracle for newly hashed raw values."""
+    salted = AnonymizationManager(AnonymizationConfig(machine_id_salt="deployment-private-test-salt"))
+    empty = AnonymizationManager()
+    for candidate in _SAFE_PUBLIC_DICTIONARY:
+        for prefix in ("database", "endpoint", "path"):
+            assert salted._hash_public_identifier(candidate, prefix) != empty._hash_public_identifier(candidate, prefix)
+
+
+def test_publication_fixed_point_ignores_operator_salt() -> None:
+    """Already-public-shaped tokens pass through even when a salt is configured."""
+    token = AnonymizationManager()._hash_public_identifier("benchbox", "database")
+    salted = AnonymizationManager(AnonymizationConfig(machine_id_salt="deployment-private-test-salt"))
+    assert salted._hash_public_identifier(token, "database") == token

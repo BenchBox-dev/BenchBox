@@ -110,11 +110,21 @@ def _is_public_pseudonym(value: str, prefix: str) -> bool:
 
 @dataclass
 class AnonymizationConfig:
-    """Configuration for result anonymization."""
+    """Configuration for result anonymization.
+
+    ``machine_id_salt`` defaults to empty. Under that default, public
+    identifier pseudonyms are a confirmation oracle for anyone who knows the
+    documented hash (see ``adr-published-identifier-field-set`` retained-field
+    salt decision). Open-source BenchBox keeps the empty default so a
+    repository-baked salt cannot pretend to be a secret. Operators who publish
+    community-facing results must set a non-empty salt known only to the
+    deployment before the first public export. Already-public-shaped tokens
+    still pass through unchanged (publication fixed point).
+    """
 
     # Machine identification. The salt feeds both get_anonymous_machine_id and
     # the public pseudonym hash, so it is the one knob that changes published
-    # identity.
+    # identity for *raw* values. Empty default = residual confirmation oracle.
     machine_id_salt: Optional[str] = None
 
     # Data anonymization
