@@ -90,7 +90,8 @@ that uses one.
 - Prefer repository `make` targets and existing helpers.
 - Python tooling is `uv` only: `uv run -- ...`, `uv add`, `uv sync`, `uv lock`.
 - Research the affected path, make the narrowest coherent change, and preserve
-  compatibility and critical-path performance.
+  compatibility and critical-path performance. Before writing a new helper,
+  search for an existing equivalent (`make duplicate-check-verbose` / `duplicate-check-delta`).
 - Use Python 3.10+, four spaces, 120 columns, Ruff, and public API type hints.
 - No credentials in Git; redact logs and use environment variables.
 - Live cloud tests and broad/destructive cleanup require explicit approval.
