@@ -28,10 +28,9 @@ name: benchbox-velox
 #   path-mirroring contract: the client-side absolute path MUST equal the
 #   server-side mount path or every load fails with file-not-found.
 #
-#   Default: ${PWD}/benchmark_runs (assumes you run `docker compose` from the
-#   BenchBox project root).  Override with BENCHBOX_DATA_DIR if your data lives
-#   elsewhere - the same value is used as both the host path AND the in-container
-#   mount path:
+#   BENCHBOX_DATA_DIR is required (compose fails fast at parse time if unset)
+#   -- UAT always exports it, and the same value is used as both the host
+#   path AND the in-container mount path:
 #     BENCHBOX_DATA_DIR=/mnt/benchbox-data docker compose up -d velox-connect
 #   …and run benchbox so the absolute paths it sends point inside the mount.
 #
@@ -61,7 +60,7 @@ services:
       # Mount data directory at the same absolute path on host and in container
       # so the Spark server resolves the host-side paths benchbox sends over
       # gRPC.  See "DATA ACCESS" in the file header for the full contract.
-      - "${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:ro"
+      - "${BENCHBOX_DATA_DIR:?set BENCHBOX_DATA_DIR to the host data directory}:${BENCHBOX_DATA_DIR:?set BENCHBOX_DATA_DIR to the host data directory}:ro"
       # Optional: bind-mount a locally-downloaded jar instead of the one built
       # into the image (useful during jar version upgrades):
       #   - /path/to/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar:/opt/gluten.jar:ro

@@ -20,7 +20,7 @@ services:
     environment:
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
-      - "${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:ro"
+      - "${BENCHBOX_DATA_DIR:?set BENCHBOX_DATA_DIR to the host data directory}:${BENCHBOX_DATA_DIR:?set BENCHBOX_DATA_DIR to the host data directory}:ro"
     tmpfs:
       - /tmp:size=2g
     healthcheck:
