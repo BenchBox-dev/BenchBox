@@ -135,7 +135,11 @@ The soundness gate, as operated:
   rule-dispatch core), and the gate machinery itself (the predicate,
   `.github/workflows/auto-merge-on-open.yml`, and the PyPI-publishing
   `.github/workflows/release.yml`).
-- `make pr-open` and `auto-merge-on-open.yml` WITHHOLD squash auto-merge for
+- `make pr-open` no longer arms auto-merge at all; `make pr-ready` (or
+  `make pr-open READY=1`) does, so a PR cannot merge while a follow-up commit
+  is still being written. Arming at creation stranded three commits in one
+  session, two of them the fixes for their own review findings.
+- The arming path and `auto-merge-on-open.yml` WITHHOLD squash auto-merge for
   PRs touching those paths (and revoke it on a later push that newly touches
   them). CI cannot catch a change that redefines the oracle it validates
   against, so these PRs must not merge hands-free.
