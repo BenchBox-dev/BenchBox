@@ -153,6 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
     pr_comment_path: Path | None = None
     require_manifest = False
+    allow_partial_validation = False
     positional: list[str] = []
     i = 0
     while i < len(args):
@@ -164,12 +165,19 @@ def main(argv: list[str] | None = None) -> int:
             require_manifest = True
             i += 1
             continue
+        if args[i] == "--allow-partial-validation":
+            # Trusted maintainer mirror only: seed corpus includes partial
+            # cohorts. Community CI must not pass this flag.
+            allow_partial_validation = True
+            i += 1
+            continue
         positional.append(args[i])
         i += 1
 
     if not positional:
         print(
-            "Usage: validate_submission.py [--pr-comment <path>] [--require-manifest] <dir-or-files...>",
+            "Usage: validate_submission.py [--pr-comment <path>] [--require-manifest] "
+            "[--allow-partial-validation] <dir-or-files...>",
             file=sys.stderr,
         )
         return 1
@@ -188,7 +196,11 @@ def main(argv: list[str] | None = None) -> int:
         print("No bundle files found.", file=sys.stderr)
         return 1
 
-    results = validate_bundles(paths, require_manifest=require_manifest)
+    results = validate_bundles(
+        paths,
+        require_manifest=require_manifest,
+        allow_partial_validation=allow_partial_validation,
+    )
     _append_public_privacy_errors(paths, results)
     print(format_summary(results))
 

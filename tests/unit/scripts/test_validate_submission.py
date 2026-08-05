@@ -275,7 +275,7 @@ class TestValidateBundle:
         assert not vr.ok
         assert any("summary.validation is required" in e for e in vr.errors)
 
-    @pytest.mark.parametrize("status", ["not_run", "uncertain", "unknown"])
+    @pytest.mark.parametrize("status", ["not_run", "uncertain", "unknown", "partial"])
     def test_non_clean_public_validation_status_fails(self, status: str):
         data = _minimal_bundle()
         data["summary"]["validation"] = status
@@ -283,6 +283,22 @@ class TestValidateBundle:
         _validate_bundle(data, vr)
         assert not vr.ok
         assert any("summary.validation must be 'passed'" in e for e in vr.errors)
+
+    def test_partial_validation_allowed_only_when_flagged(self):
+        """Trusted mirror path may accept seed partials; community path may not."""
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        community = ValidationResult("community")
+        _validate_bundle(data, community)
+        assert not community.ok
+        mirror = ValidationResult("mirror")
+        _validate_bundle(data, mirror, allow_partial_validation=True)
+        assert mirror.ok, mirror.errors
+        failed = ValidationResult("failed")
+        data_failed = _minimal_bundle()
+        data_failed["summary"]["validation"] = "failed"
+        _validate_bundle(data_failed, failed, allow_partial_validation=True)
+        assert not failed.ok
 
     def test_translation_fallback_fails_public_submission(self):
         data = _minimal_bundle()
@@ -812,6 +828,33 @@ class TestRequireManifestCli:
         bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
         rc = main([str(bundle)])
         assert rc == 0
+
+
+class TestAllowPartialValidation:
+    def test_cli_community_default_rejects_partial(self, tmp_path: Path, capsys):
+        bundle = tmp_path / "partial.json"
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+        assert main([str(bundle)]) == 1
+        captured = capsys.readouterr()
+        assert "must be 'passed'" in captured.out or "must be 'passed'" in captured.err
+
+    def test_cli_allow_partial_accepts_seed_shaped_partial(self, tmp_path: Path, capsys):
+        bundle = tmp_path / "partial.json"
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+        assert main([str(bundle), "--allow-partial-validation"]) == 0
+
+    def test_allow_partial_still_rejects_private_path_leaks(self, tmp_path: Path, capsys):
+        """Privacy fail-closed is independent of the partial waiver."""
+        bundle = tmp_path / "leaky-partial.json"
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["platform"]["config"] = {"working_dir": "/Users/alice/private"}
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+        assert main([str(bundle), "--allow-partial-validation"]) == 1
 
 
 # ---------------------------------------------------------------------------

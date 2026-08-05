@@ -66,6 +66,9 @@ COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json")
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
+# Maintainer seed corpus includes partial cohorts by design. Trusted mirror
+# validation may accept these; community submissions may not.
+PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES = frozenset({"passed", "partial"})
 PUBLIC_NON_CLEAN_TRANSLATION_STATUSES = {"fallback", "failed"}
 CLI_REFUSED_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
@@ -288,7 +291,12 @@ def _validate_platform_section(platform: Any, vr: ValidationResult) -> None:
             vr.warn(f"Unknown platform name: {pl_name!r}")
 
 
-def _validate_summary_section(summary: Any, vr: ValidationResult) -> None:
+def _validate_summary_section(
+    summary: Any,
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
     if not isinstance(summary, dict):
         vr.error("'summary' must be a dict")
         return
@@ -299,9 +307,19 @@ def _validate_summary_section(summary: Any, vr: ValidationResult) -> None:
             vr.warn("summary.queries.total is 0 - empty result?")
 
     validation_status = _normalize_status(summary.get("validation"))
-    if validation_status != PUBLIC_CLEAN_VALIDATION_STATUS:
+    allowed = (
+        PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES
+        if allow_partial_validation
+        else frozenset({PUBLIC_CLEAN_VALIDATION_STATUS})
+    )
+    if validation_status not in allowed:
         if validation_status is None:
             vr.error("summary.validation is required for public submissions and must be 'passed'")
+        elif allow_partial_validation:
+            vr.error(
+                f"summary.validation must be one of {sorted(allowed)} for trusted mirror "
+                f"validation, got {validation_status!r}"
+            )
         else:
             vr.error(f"summary.validation must be 'passed' for public submissions, got {validation_status!r}")
 
@@ -543,7 +561,12 @@ def _validate_queries_section(queries: Any, vr: ValidationResult) -> None:
         vr.error("All query timings are 0ms - likely invalid data")
 
 
-def _validate_bundle(data: dict, vr: ValidationResult) -> None:
+def _validate_bundle(
+    data: dict,
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
     """Run all validation checks on a parsed bundle dict."""
     _capture_metadata(data, vr)
 
@@ -556,7 +579,11 @@ def _validate_bundle(data: dict, vr: ValidationResult) -> None:
     _validate_run_section(data.get("run", {}), vr)
     _validate_benchmark_section(data.get("benchmark", {}), vr)
     _validate_platform_section(data.get("platform", {}), vr)
-    _validate_summary_section(data.get("summary", {}), vr)
+    _validate_summary_section(
+        data.get("summary", {}),
+        vr,
+        allow_partial_validation=allow_partial_validation,
+    )
     _validate_translation_section(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), vr)
@@ -808,7 +835,12 @@ def _is_submission_manifest_path(path: Path) -> bool:
     return name == SUBMISSION_MANIFEST_FILENAME or name.endswith(SUBMISSION_MANIFEST_SUFFIX)
 
 
-def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[ValidationResult]:
+def validate_bundles(
+    paths: list[Path],
+    require_manifest: bool = False,
+    *,
+    allow_partial_validation: bool = False,
+) -> list[ValidationResult]:
     """Validate a list of bundle files. Returns one ValidationResult per file.
 
     When ``require_manifest`` is True, a primary bundle with no paired
@@ -819,6 +851,11 @@ def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[
     mirror PRs that sync develop's corpus onto ``published-results``. Without
     it, a community bundle submitted without a sidecar would pass validation and
     then inherit the ``maintainer-run`` trust label (and ranking eligibility).
+
+    When ``allow_partial_validation`` is True, ``summary.validation`` may be
+    ``passed`` or ``partial``. That is for the trusted maintainer mirror path
+    only: the seed corpus intentionally includes partial cohorts. Community
+    submissions must leave the flag off so partial remains refused.
     """
     results = []
     for bundle_path in paths:
@@ -848,7 +885,7 @@ def validate_bundles(paths: list[Path], require_manifest: bool = False) -> list[
             results.append(vr)
             continue
 
-        _validate_bundle(data, vr)
+        _validate_bundle(data, vr, allow_partial_validation=allow_partial_validation)
 
         # Bound an adjacent applied companion even if a hand-authored manifest
         # omitted it. The manifest hash contract is checked separately below;
