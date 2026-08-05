@@ -3398,39 +3398,51 @@ def _export_substring_scan_verifications(item: dict) -> list[int]:
     return [ver["seq"] for ver in item["verifications"] if _is_export_substring_scan(ver.get("command") or "")]
 
 
-def lint_item_notes(conn: sqlite3.Connection, item_id: str, *, item: dict[str, Any] | None = None) -> list[str]:
-    """Advisory notes, not defects: policy skips that would otherwise be
-    silent. A category exemption from the falsifiability check is author-
-    selectable free text, so lint says when it applied - an exemption you
-    can see is auditable, one you cannot is a hole."""
-    item = item if item is not None else get_item(conn, item_id)
-    notes = []
-    if (
+def _falsifiability_check_applies(conn: sqlite3.Connection, item: dict[str, Any]) -> bool:
+    """Whether the item is in scope for the falsifiability advisory check."""
+    return (
         get_config(conn, "lint.require_falsifiable_rung") == "on"
         and item["state"] in ("planning", "active")
-        and (item.get("category") or "") in _FALSIFIABILITY_EXEMPT_CATEGORIES
         and any((v.get("command") or "").strip() for v in item["verifications"])
-    ):
+    )
+
+
+def lint_item_notes(conn: sqlite3.Connection, item_id: str, *, item: dict[str, Any] | None = None) -> list[str]:
+    """Advisory notes, not defects: do not affect lint's exit code.
+
+    The falsifiability check is advisory by design: a gate whose only remedy
+    is drop+recreate was itself generating the duplication statistics used to
+    argue against the tracker. The check still reports; it no longer fails
+    the command.
+    """
+    item = item if item is not None else get_item(conn, item_id)
+    notes = []
+    if not _falsifiability_check_applies(conn, item):
+        return notes
+    category = item.get("category") or ""
+    if category in _FALSIFIABILITY_EXEMPT_CATEGORIES:
         notes.append(
             f"note: falsifiability check skipped - category '{item['category']}' is exempt "
             "(tripwires/acceptance runs legitimately pass on the current tree)"
         )
-    # Deliberately avoids the phrase the finding uses, so a caller grepping for
-    # the finding does not match a grandfathered item and read the backlog as
-    # unfixed.
-    if (
-        get_config(conn, "lint.require_falsifiable_rung") == "on"
-        and item["state"] in ("planning", "active")
-        and (item.get("category") or "") not in _FALSIFIABILITY_EXEMPT_CATEGORIES
-        and any((v.get("command") or "").strip() for v in item["verifications"])
-        and not _has_falsifiable_rung(item)
-        and _falsifiability_grandfathered(conn, item)
-    ):
+        return notes
+    if _has_falsifiable_rung(item):
+        return notes
+    if _falsifiability_grandfathered(conn, item):
+        # Deliberately avoids the exact "no falsifiability" phrase so a caller
+        # grepping for that advisory does not match a grandfathered item and
+        # read the backlog as unfixed.
         notes.append(
             f"note: unfalsifiable ladder, grandfathered - created {item['created_at']}, "
             f"before the rule landed {_FALSIFIABILITY_RULE_EPOCH}. Ladders are create-time-only; "
             "fix by drop+recreate when you next claim this item"
         )
+        return notes
+    notes.append(
+        "note: no falsifiability: every rung's expected text reads as passing on the unfixed tree "
+        "(an unrunnable rung does not count) - at least one rung must fail while the defect "
+        "exists, e.g. 'exits 1 on an unfixed tree' (advisory; does not fail lint)"
+    )
     return notes
 
 
@@ -3469,23 +3481,11 @@ def lint_item(conn: sqlite3.Connection, item_id: str, *, item: dict[str, Any] | 
         findings.append("description cites point-in-time evidence but has no w0 re-validation unit")
     if not item["work"] and item["state"] in ("planning", "active"):
         findings.append("no work breakdown")
-    if (
-        get_config(conn, "lint.require_falsifiable_rung") == "on"
-        and item["state"] in ("planning", "active")
-        and (item.get("category") or "") not in _FALSIFIABILITY_EXEMPT_CATEGORIES
-        and any((v.get("command") or "").strip() for v in item["verifications"])
-        and not _has_falsifiable_rung(item)
-        and not _falsifiability_grandfathered(conn, item)
-    ):
-        findings.append(
-            "no falsifiability: every rung's expected text reads as passing on the unfixed tree "
-            "(an unrunnable rung does not count) - at least one rung must fail while the defect "
-            "exists, e.g. 'exits 1 on an unfixed tree'"
-        )
+    # Falsifiability is advisory (see lint_item_notes); it deliberately does
+    # not contribute findings that fail the lint exit code.
     if get_config(conn, "lint.require_scope_test_files") == "on" and item["state"] in ("planning", "active"):
         findings.extend(_missing_scope_test_files(item))
     return findings
-
 
 # ---------------------------------------------------------------------------
 # Export
@@ -4298,7 +4298,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("id")
     p.add_argument("--run", type=int, metavar="SEQ")
 
-    p = sub.add_parser("lint", help="mechanical quality checks")
+    p = sub.add_parser(
+        "lint",
+        help="mechanical quality checks (falsifiability is advisory and does not fail the exit code)",
+        description=(
+            "Mechanical quality checks over item structure. Findings fail the "
+            "command (exit 1). The falsifiability rule is advisory: unfalsifiable "
+            "ladders are still reported as notes but do not fail lint."
+        ),
+    )
     p.add_argument(
         "--include-done",
         action="store_true",

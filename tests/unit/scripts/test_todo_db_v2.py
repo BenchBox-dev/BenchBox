@@ -812,10 +812,11 @@ class TestLintExemptionVisibility:
         notes = todo_db.lint_item_notes(conn, "flake-exempt")
         assert any("exempt" in n for n in notes)
 
-    def test_normal_category_gets_finding_not_note(self, conn):
+    def test_normal_category_gets_advisory_note_not_finding(self, conn):
         self._mk_exempt(conn, "normal-cat", "security")
-        assert any("falsifiability" in f for f in todo_db.lint_item(conn, "normal-cat"))
-        assert todo_db.lint_item_notes(conn, "normal-cat") == []
+        assert not any("falsifiability" in f for f in todo_db.lint_item(conn, "normal-cat"))
+        notes = todo_db.lint_item_notes(conn, "normal-cat")
+        assert any("no falsifiability" in n for n in notes)
 
     def test_exemption_note_does_not_affect_exit_code(self, conn, capsys, monkeypatch):
         self._mk_exempt(conn, "flake-exit", "flake")
@@ -867,7 +868,8 @@ class TestLintFalsifiabilityAndScopeCompleteness:
                 {"description": "suite green", "command": "uv run -- pytest tests -q", "expected": "all pass"}
             ],
         )
-        assert any("falsifiability" in f for f in todo_db.lint_item(conn, "pass-only"))
+        assert not any("falsifiability" in f for f in todo_db.lint_item(conn, "pass-only"))
+        assert any("no falsifiability" in n for n in todo_db.lint_item_notes(conn, "pass-only"))
 
     def test_falsifiability_accepts_a_gating_rung(self, conn):
         self._mk_item(
@@ -899,8 +901,9 @@ class TestLintFalsifiabilityAndScopeCompleteness:
             ],
         )
         findings = todo_db.lint_item(conn, "broken-gate")
-        assert any("falsifiability" in f for f in findings)
+        assert not any("falsifiability" in f for f in findings)
         assert any("cannot execute" in f for f in findings)
+        assert any("no falsifiability" in n for n in todo_db.lint_item_notes(conn, "broken-gate"))
 
     def test_falsifiability_exempts_flake_tripwires(self, conn):
         self._mk_item(
