@@ -63,14 +63,18 @@ force-push after every parent merge anyway. Preferred workflow:
 
 ## "No checks" is not one failure mode
 
+Use REST `mergeable_state` vocabulary from `docs/operations/pr-triage.md`
+(GraphQL `mergeable: CONFLICTING` is the same situation as REST `dirty`):
+
 | Symptom | Cause | What to do |
 | --- | --- | --- |
-| Guard fails; other checks absent | Base is not an integration branch | Retarget to `develop` (or the correct lane base) |
-| Required checks missing / stuck; `mergeable_state: CONFLICTING` | GitHub mergeability / conflicts | Resolve conflicts or rebase onto the base tip |
-| Path-aware jobs skipped; umbrella still green | Classifier decided the path set is safe-content | Expected; not a stacked-base issue |
+| Guard red; other lanes absent | Base is not an integration branch | Retarget to `develop` (or the correct lane base) |
+| `mergeable_state: dirty` (GraphQL `mergeable: CONFLICTING`) | Conflicts with the base tip | Rebase/resolve onto the base tip |
+| Required checks missing/stuck on an integration base; `mergeable_state: blocked` | CI unfinished, path gate, or ruleset | Inspect check runs — do not retarget |
 
 Do not treat an empty check list on a feature base as "CI is fine" or as the
-same problem as a conflicting PR on `develop`.
+same problem as `dirty` (conflicts) or `blocked` (unfinished gates) on
+`develop`.
 
 ## Agent checklist
 
@@ -79,5 +83,5 @@ same problem as a conflicting PR on `develop`.
 - Never open a PR with `--base` set to another feature branch.
 - If `pr-base-guard` fails, fix the base; do not try to "add CI" to the
   stacked base by editing branch filters.
-- Short agent-facing summary: `AGENTS.md` → *PR base branch (stacked PRs
-  unsupported)*.
+- Short agent-facing summary: `AGENTS.md` → section **PR base branch
+  (stacked PRs unsupported)**.
