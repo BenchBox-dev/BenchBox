@@ -395,6 +395,54 @@ class TestExceptionSecretScrubbing:
         for sentinel in ("DSN_GATE", "PK_GATE", "SAS_GATE", "PAT_GATE", "CS_GATE"):
             assert sentinel not in blob
 
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "sas=sv=2020-08-04&sig=SIG_GATE",
+            "SAS=sv=2020-08-04&ss=b&srt=sco&sig=SIG_GATE",
+            "storage_sas_token=sv=2020-08-04&sig=SIG_GATE",
+            "storage-sas-token=sv=2020-08-04&sig=SIG_GATE",
+        ],
+    )
+    def test_sas_querystring_assignment_masks_ampersand_segments(self, text: str) -> None:
+        """SAS values are query-string shaped; ``&sig=...`` must not survive."""
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert "SIG_GATE" not in blob
+        assert "sv=2020-08-04" not in blob
+        assert "****" in result["message"]
+        assert "****" in result["details"]["exception_message"]
+
+    def test_unquoted_multiline_private_key_pem_is_scrubbed(self) -> None:
+        """Unquoted PEM must not leave base64 body lines in MCP error egress.
+
+        PEM armor labels are assembled at runtime so static secret scanners do
+        not treat the test fixture as a real key material sample.
+        """
+        pem_label = " ".join(("RSA", "PRIVATE", "KEY"))
+        begin = f"-----BEGIN {pem_label}-----"
+        end = f"-----END {pem_label}-----"
+        body = "MIIE_GATE_BLOB"
+        text = f"load failed private_key={begin}\n{body}\nmoreBase64Body==\n{end} after"
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert body not in blob
+        assert "moreBase64Body" not in blob
+        assert begin not in blob
+        assert "private_key=****" in result["message"]
+        assert "private_key=****" in result["details"]["exception_message"]
+        # Trailing diagnostic prose after the PEM block remains.
+        assert "after" in result["message"]
+
+    def test_unquoted_multiline_private_key_base64_continuation_is_scrubbed(self) -> None:
+        body = "MIIE_GATE_BLOB"
+        text = f"private_key={body}\ncontinuedBase64Line\nnot_part_of_key=1"
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert body not in blob
+        assert "continuedBase64Line" not in blob
+        assert "private_key=****" in result["details"]["exception_message"]
+
 
 class TestMakeExecutionError:
     """Tests for make_execution_error helper function."""

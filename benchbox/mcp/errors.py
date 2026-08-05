@@ -35,6 +35,27 @@ _SECRET_ASSIGNMENT_RE = re.compile(
     r"(?:'[^']*'|\"[^\"]*\"|[^&\s,;'\")]+)",
     flags=re.IGNORECASE,
 )
+# Azure SAS tokens are query-string shaped (sv=...&sig=...); the generic value
+# arm stops at ``&`` and would leave signature segments in the clear.
+_SECRET_SAS_KEY_PATTERN = r"(?:storage[_-]?sas(?:[_-]?token)?|sas)[a-z0-9_-]*"
+_SECRET_SAS_ASSIGNMENT_RE = re.compile(
+    rf"(({_SECRET_SAS_KEY_PATTERN})\s*=\s*)"
+    r"(?:'[^']*'|\"[^\"]*\"|[^\s,;'\")]+)",
+    flags=re.IGNORECASE,
+)
+# Unquoted PEM / multi-line private keys span whitespace; the generic arm only
+# takes the first token and leaves base64 body lines intact.
+_SECRET_PRIVATE_KEY_KEY_PATTERN = r"private[_-]?key[a-z0-9_-]*"
+_SECRET_PRIVATE_KEY_ASSIGNMENT_RE = re.compile(
+    rf"(({_SECRET_PRIVATE_KEY_KEY_PATTERN})\s*=\s*)"
+    r"(?:"
+    r"'[^']*'"
+    r"|\"[^\"]*\""
+    r"|-----BEGIN[^\n]*-----[\s\S]*?-----END[^\n]*-----"
+    r"|[^\s,;'\")]+(?:\n[A-Za-z0-9+/=]+)*"
+    r")",
+    flags=re.IGNORECASE,
+)
 _SECRET_QUOTED_ASSIGNMENT_RE = re.compile(
     rf"""(?P<prefix>["']{_SECRET_KEY_PATTERN}["']\s*:\s*)(?P<quote>["'])(?P<value>(?:\\.|(?!(?P=quote)).)*(?P=quote))""",
     flags=re.IGNORECASE,
@@ -102,6 +123,10 @@ def scrub_secret_material(text: str) -> str:
         return f"{match.group('prefix')}****"
 
     scrubbed = _SECRET_QUOTED_ASSIGNMENT_RE.sub(replace_quoted, text)
+    # Specialized arms before the generic assignment so multi-param SAS and
+    # multi-line private keys are not truncated at ``&`` / first whitespace.
+    scrubbed = _SECRET_PRIVATE_KEY_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
+    scrubbed = _SECRET_SAS_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
     scrubbed = _SECRET_ASSIGNMENT_RE.sub(r"\1****", scrubbed)
     scrubbed = _SECRET_COLON_ASSIGNMENT_RE.sub(replace_colon, scrubbed)
     scrubbed = _SECRET_PROSE_CONNECTOR_RE.sub(replace_prose, scrubbed)
