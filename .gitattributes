@@ -6,3 +6,13 @@
 # each appending a dated entry should compose cleanly on merge instead of
 # conflicting on adjacent lines. See _project/config/fast_lane_ceiling_log.md.
 /_project/config/fast_lane_ceiling_log.md merge=union
+
+# The corpus is compared byte-for-byte against what the Explorer publishes, and
+# the publisher always emits LF (canonical_json_bytes). Without this, a Windows
+# checkout with core.autocrlf=true rewrites every multi-line bundle to CRLF, so
+# the stored bytes disagree with the published bytes for reasons that have
+# nothing to do with their content: nightly saw all 207 primary bundles fail
+# tests/unit/scripts/test_corpus_privacy_invariant.py while the same commit was
+# green on Linux. The tree is entirely text (400 .json, 4 .md, 1 .py), so
+# pinning it wholesale is safe.
+/results-data/** text eol=lf

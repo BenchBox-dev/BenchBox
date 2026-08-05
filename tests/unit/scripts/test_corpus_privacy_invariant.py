@@ -15,6 +15,7 @@ corpus regress while the gate stayed green.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -186,7 +187,52 @@ def test_rederived_corpus_publishes_byte_identically_to_what_is_stored() -> None
     assert scanned, "no primary bundles scanned - this gate would be vacuous"
     assert not drifted, (
         f"{len(drifted)} bundle(s) are not stored at the publication fixed point; "
-        "publishing would rewrite them and change their result IDs:\n" + "\n".join(drifted[:20])
+        "publishing would rewrite them:\n" + "\n".join(drifted[:20])
+    )
+
+
+def test_corpus_checks_out_with_lf_on_every_platform() -> None:
+    """The corpus must be exempt from git's end-of-line translation.
+
+    The gate above compares stored bytes against published bytes, and the
+    publisher always emits LF. So on a checkout where git translates line
+    endings - ``core.autocrlf=true``, the Windows default - every multi-line
+    bundle arrives as CRLF and disagrees with its own published form for
+    reasons that have nothing to do with its content.
+
+    That is not hypothetical: the byte-identity gate landed green and went red
+    in the next nightly, failing all 207 primary bundles on windows-latest 3.10
+    and 3.12 while the same commit passed on ubuntu. PR CI is Linux-only, so
+    the nightly matrix is the first place it can show up.
+
+    Pinning the attribute is the fix rather than comparing newline-insensitively,
+    because the weaker test would go green while still letting a contributor on
+    a translating checkout commit CRLF bundles that permanently disagree with
+    what publication emits.
+    """
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "--", "results-data"],
+        capture_output=True,
+        check=True,
+        cwd=REPO_ROOT,
+    ).stdout
+    paths = [name for name in tracked.split(b"\0") if name]
+    assert paths, "no tracked corpus files - this gate would be vacuous"
+
+    attrs = subprocess.run(
+        ["git", "check-attr", "-z", "--stdin", "eol"],
+        input=b"\0".join(paths),
+        capture_output=True,
+        check=True,
+        cwd=REPO_ROOT,
+    ).stdout
+
+    # `check-attr -z` emits a flat NUL-separated stream of (path, attr, value).
+    fields = attrs.split(b"\0")
+    untranslated = [fields[index].decode() for index in range(0, len(fields) - 2, 3) if fields[index + 2] != b"lf"]
+    assert not untranslated, (
+        f"{len(untranslated)} corpus file(s) have no explicit `eol=lf` attribute, so their "
+        "working-tree bytes depend on the platform that checked them out:\n" + "\n".join(untranslated[:20])
     )
 
 
