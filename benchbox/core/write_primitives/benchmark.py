@@ -850,6 +850,12 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     except Exception:
                         status[table_name] = 0
 
+            # Record this setup()'s provenance (benchmark, scale, spec version,
+            # source digest) so is_setup() can require an exact match rather
+            # than trusting a bare COUNT(*) that a stale staging set from a
+            # different scale/seed would also satisfy.
+            self._write_staging_manifest(connection, required_tables)
+
             self.log_verbose(f"Setup complete: {status}")
 
             return {
@@ -953,13 +959,22 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         self.log_verbose("Reset complete")
 
     def is_setup(self, connection: DatabaseConnection) -> bool:
-        """Check if staging tables are ready.
+        """Check if staging tables are ready for THIS run.
+
+        Requires both that the required staging tables exist and have data,
+        AND that the staging provenance manifest (see
+        ``TransactionalBenchmarkBase._staging_manifest_matches``) matches
+        this benchmark's scale/spec/source. A staging set left over from a
+        different scale factor (or a legacy database with no manifest at
+        all) fails this check and forces one rebuild, rather than silently
+        benchmarking the wrong data volume.
 
         Args:
             connection: Database connection
 
         Returns:
-            True if all staging tables exist and have data
+            True if all required staging tables exist, have data, and their
+            manifest matches this run's provenance.
         """
         try:
             # Check that required staging tables exist and have data
@@ -979,7 +994,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
                 if not result or result[0] == 0:
                     return False
-            return True
+            return self._staging_manifest_matches(connection, ["orders", "lineitem"])
         except Exception:
             return False
 
