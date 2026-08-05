@@ -891,9 +891,31 @@ guards-fix:
 # check after each guard is what keeps this one shell session (the whole
 # recipe is one logical line via `\` continuations) going past a failing
 # guard instead of `make` aborting at the first nonzero exit.
-# The ephemeral GitHub runner has no user.* config. The ci-lint recipe supplies
-# a synthetic human identity only for the resolved-config audit; the
-# commit-range guard remains authoritative for branch authorship.
+# Most guards below are equally meaningful whether `ci-lint` runs on a laptop
+# or on the ephemeral GitHub-hosted runner that develop-post-merge.yml uses
+# (they inspect the checked-out tree / installed venv / shipped registries,
+# none of which differ). A couple of guards instead read state that only
+# exists on a developer machine -- a resolved Git identity, a tool installed
+# at a hardcoded local path -- and either fail there for reasons unrelated to
+# the code under test, or worse, silently no-op and report success while
+# checking nothing. `_project/scripts/ci_lint_environment_gate.py` is the one
+# place that draws this boundary (a declarative table, not a per-guard inline
+# `if $GITHUB_ACTIONS` -- see its module docstring); a guard not listed there
+# always runs, on a runner exactly as it does locally.
+#
+# The gate reports its decision on stdout and the recipe skips only on the
+# exact token `SKIP`. Deliberately NOT `if <gate-command>; then`: every way of
+# failing to reach a decision (uv absent, broken venv, the script renamed, a
+# traceback) also exits non-zero, so using the exit status would make a broken
+# gate indistinguishable from a deliberate skip and silently drop the guard
+# with nothing recorded in `failed`. Anything other than `SKIP` runs the guard.
+#
+# The synthetic `GIT_CONFIG_*` identity that used to wrap agent-identity-check
+# here was removed with the gate: the guard no longer runs on a runner, so
+# nothing consumed it. Leaving it would have left
+# tests/system/test_ci_lint_parity.py asserting recipe text with no effect --
+# a vacuous pass inside the change whose whole purpose is removing vacuous
+# passes. That test now pins the gating instead.
 ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
@@ -920,18 +942,18 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed artifact-hygiene"; \
 	$(MAKE) agent-instructions-check; \
 	[ $$? -eq 0 ] || failed="$$failed agent-instructions"; \
-	if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then \
-		export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='BenchBox CI' GIT_CONFIG_KEY_1=user.email GIT_CONFIG_VALUE_1=ci@benchbox.invalid; \
-	fi; \
-	$(MAKE) agent-identity-check; \
-	[ $$? -eq 0 ] || failed="$$failed agent-identity"; \
-	if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then \
-		unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1; \
+	GATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity || true); \
+	if [ "$$GATE" != "SKIP" ]; then \
+		$(MAKE) agent-identity-check; \
+		[ $$? -eq 0 ] || failed="$$failed agent-identity"; \
 	fi; \
 	$(MAKE) agent-commit-range-check; \
 	[ $$? -eq 0 ] || failed="$$failed agent-commit-range"; \
-	$(MAKE) skill-sync-check; \
-	[ $$? -eq 0 ] || failed="$$failed skill-sync-check"; \
+	GATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check || true); \
+	if [ "$$GATE" != "SKIP" ]; then \
+		$(MAKE) skill-sync-check; \
+		[ $$? -eq 0 ] || failed="$$failed skill-sync-check"; \
+	fi; \
 	uv run -- python _project/scripts/timing_policy_check.py --strict; \
 	[ $$? -eq 0 ] || failed="$$failed timing-policy"; \
 	uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check; \
