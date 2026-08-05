@@ -38,7 +38,8 @@ The minimum surface for routine work — start here.
 | When | Command | Effect |
 |---|---|---|
 | Start a new task | `make worktree-claim BRANCH=fix/foo` | Pick a free slot, fetch + reset to current `origin/develop`, create branch, refresh `.venv/` only if `uv.lock`/`pyproject.toml` changed, and (re)install the pre-commit hooks (idempotent; `\|\| true` with a notice if `pre-commit` is unavailable). Prints `WORKTREE_PATH=…`. |
-| Inside the slot, ship the work | `make pr-preflight && make pr-open` | Run the local lint + fast-test gate, push, open PR vs `develop`, enable squash auto-merge. Walk away — auto-merge lands it once CI is green. |
+| Inside the slot, ship the work | `make pr-preflight && make pr-open` | Run the local lint + fast-test gate, push, open PR vs `develop`. Auto-merge is **not** armed. |
+| Declare the branch final | `make pr-ready` | Arms squash auto-merge. Walk away — it lands once CI is green. Use `make pr-open READY=1` to open and arm in one step when you already know the branch is done. |
 | After the PR merges | `make worktree-release` | Detach the slot back to `origin/develop`, delete the local feature branch. Refuses unless the PR state is `MERGED` (use `FORCE=1` to escape — only when intentional). |
 | See pool state any time | `make worktree-pool-status` | Tabular: pool, path, branch, state, claim age, venv health, disk size. Read-only; safe to run during other operations. |
 | Assert pool invariants | `make worktree-pool-check` | Read-only; exits non-zero if any slot is missing, has a surviving `.benchbox/claim_in_progress` marker, or there are extra `pool-NN` directories beyond `POOL_SIZE`. Cheap (no `gh` calls); use as a pre-release sanity check or periodic local cron. |
@@ -54,7 +55,7 @@ Reported by `make worktree-pool-status`:
 | State | Meaning | Recovery |
 |---|---|---|
 | `free` | Detached HEAD, clean tree — claimable. | None needed. |
-| `claimed` | On a feature branch, no PR yet or PR open. Active work. | Continue work or `make pr-open`. |
+| `claimed` | On a feature branch, no PR yet or PR open. Active work. | Continue work, `make pr-open`, then `make pr-ready` when final. |
 | `stale` | On a feature branch whose PR is `MERGED`. | `make worktree-pool-sweep-stale` (or `worktree-release` from inside). |
 | `dirty` | Uncommitted changes (excluding `.benchbox/` scratch). | Review, commit/discard manually, then release. |
 | `aborted` | A `.benchbox/claim_in_progress` marker survived a crashed claim. | `make worktree-pool-reset POOL=NN` after reviewing what's there. |
