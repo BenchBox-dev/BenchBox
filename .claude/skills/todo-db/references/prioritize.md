@@ -132,9 +132,9 @@ DB.
 Only when the user explicitly asks to apply the ranking (e.g. "write these
 priorities back", "update priorities to match"):
 
-1. Confirm the resolved command supports `update` (standalone todo-db
-   >= 0.3). If the project wrapper lacks it, report the capability gap per
-   SKILL.md rule 4 — do not drop+recreate to change priority.
+1. Confirm the resolved command supports `update` (`todo update --help`
+   exits 0). If it does not, report the capability gap — do not drop+recreate
+   to change priority.
 2. Update only items whose recommended band differs from stored priority.
 3. Record a one-line reason per update. Prefer band moves
    (`medium` → `high`) over inventing fractional ranks the schema cannot
