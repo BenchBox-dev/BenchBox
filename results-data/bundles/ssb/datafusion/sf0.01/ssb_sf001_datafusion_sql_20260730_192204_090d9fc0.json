@@ -45,15 +45,12 @@
     "arch": "x86_64",
     "client_host": {
       "arch": "x86_64",
-      "machine_id": "machine_f78e20229fbc",
       "os": "Linux",
       "python": "3.12.13"
     },
-    "machine_id": "machine_f78e20229fbc",
     "os": "Linux",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_51e3fb6b450f",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -65,7 +62,6 @@
       "type": "zstd"
     },
     "driver_package": "datafusion",
-    "driver_runtime_python_executable": "path_d3d14018ad44",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "53.0.0",
     "driver_version_resolved": "53.0.0",
@@ -173,15 +169,13 @@
       "connection_mode": "in-memory",
       "data_format": "parquet",
       "driver_package": "datafusion",
-      "driver_runtime_python_executable": "path_d3d14018ad44",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "53.0.0",
       "driver_version_resolved": "53.0.0",
       "execution_mode": "sql",
       "memory_limit": "12GB",
       "result_cache_enabled": false,
-      "target_partitions": 4,
-      "working_dir": "path_53a7d4d04b4d"
+      "target_partitions": 4
     },
     "deployment": {
       "collection_status": "partial",
@@ -203,8 +197,7 @@
       "result_cache_enabled": false,
       "target_partitions": 4,
       "tuning_source": "baseline",
-      "type": "datafusion",
-      "working_dir": "path_53a7d4d04b4d"
+      "type": "datafusion"
     },
     "storage": {
       "collection_status": "unavailable",

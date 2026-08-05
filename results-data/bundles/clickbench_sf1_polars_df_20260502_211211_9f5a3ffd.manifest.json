@@ -1,7 +1,7 @@
 {
   "benchmark": "ClickBench",
   "bundle_file": "clickbench_sf1_polars_df_20260502_211211_9f5a3ffd.json",
-  "bundle_hash": "c04f7153d0c582d0f672634641d4bac7ec214d2e7ff28f27bf61ff5f757f5aba",
+  "bundle_hash": "e02efcd560aec93d2f9d9ec4c3d62237dbc03d0fb7df60fb487626262ced9652",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",

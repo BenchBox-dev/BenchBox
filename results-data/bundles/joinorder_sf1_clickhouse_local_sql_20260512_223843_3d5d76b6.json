@@ -19,13 +19,11 @@
       "power"
     ],
     "platform_option_sources": {
-      "data_path": "path_d969e086da79",
       "force_recreate": "saved_config",
       "force_upload": "saved_config",
       "show_query_plans": "saved_config"
     },
     "platform_options": {
-      "data_path": "path_a01172077d4e",
       "force_recreate": false,
       "force_upload": false,
       "show_query_plans": false
@@ -38,15 +36,12 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
-      "machine_id": "machine_3d46427037d2",
       "os": "Darwin",
       "python": "3.12.11"
     },
-    "machine_id": "machine_3d46427037d2",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_ae35e4222f17",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -57,7 +52,6 @@
       "type": "zstd"
     },
     "driver_package": "chdb",
-    "driver_runtime_python_executable": "path_038ec9964b12",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "4.1.6",
     "driver_version_resolved": "4.1.6",
@@ -133,10 +127,8 @@
     },
     "config": {
       "connection_mode": "local",
-      "data_path": "path_0ce54145345b",
       "deployment_mode": "local",
       "driver_package": "chdb",
-      "driver_runtime_python_executable": "path_038ec9964b12",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "4.1.6",
       "driver_version_resolved": "4.1.6",
@@ -157,8 +149,6 @@
     "driver_runtime_strategy": "current-process",
     "name": "ClickHouse Local",
     "raw_config": {
-      "data_path": "path_0ce54145345b",
-      "database_path": "path_9af089d33fcd",
       "deployment_mode": "local",
       "mode": "local",
       "result_cache_enabled": false,

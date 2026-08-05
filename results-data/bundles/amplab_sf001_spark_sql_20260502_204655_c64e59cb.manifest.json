@@ -1,7 +1,7 @@
 {
   "benchmark": "AMPLab Big Data",
   "bundle_file": "amplab_sf001_spark_sql_20260502_204655_c64e59cb.json",
-  "bundle_hash": "7d7bfe06e3c4ca12448809a34406a0807d2f9281b00447778b586009d311aee1",
+  "bundle_hash": "35cb1276f70b90cef1fb8cae998ad2719a031807b1e4ade1fa72b02ea833cc45",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Spark",

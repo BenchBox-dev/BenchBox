@@ -1,7 +1,7 @@
 {
   "benchmark": "H2O Database",
   "bundle_file": "h2odb_sf1_spark_sql_20260502_204146_10979308.json",
-  "bundle_hash": "240345927d88a31e4d23e46d6501e01f7e52ee57de908baefa3cdfdb3ef01cd0",
+  "bundle_hash": "3a409f79176b02973ab94c47e7587aaec2364d487258de93bccc067cf60b3681",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Spark",

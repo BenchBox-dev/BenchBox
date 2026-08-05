@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-Havoc",
   "bundle_file": "tpchavoc_sf01_duckdb_sql_20260502_181123_fa2f5249.json",
-  "bundle_hash": "106ea3b6d191ed0a760ec7273ca481ee0606954cbf56443435772a632cc9ce6e",
+  "bundle_hash": "7b47710f5f6ea9a3c288e7fe0791a4ebb920b9433cf327da8f5631057ce40f57",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DuckDB",

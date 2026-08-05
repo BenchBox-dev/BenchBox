@@ -82,8 +82,7 @@
       "execution_mode": "dataframe",
       "family": "expression",
       "rechunk": true,
-      "streaming": false,
-      "working_dir": "path_1c98692f827e"
+      "streaming": false
     },
     "name": "Polars",
     "version": "1.39.3"
