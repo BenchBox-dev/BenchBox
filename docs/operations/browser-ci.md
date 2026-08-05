@@ -6,6 +6,68 @@ and anyone triaging a red or advisory browser-lane check on a PR.
 (why the suite is shaped this way) and
 [`docs/development/results-explorer-browser-testing.md`](../development/results-explorer-browser-testing.md)
 (how to run the suite locally, what's covered, how to add tests).
+**Admin wiring:** [`docs/operations/repo-admin-settings.md`](repo-admin-settings.md)
+(develop ruleset required checks).
+
+## Merge-gate decision
+
+**Decision: the Chromium full suite gates merges.** The job name
+`Chromium (full suite, blocking)` is truthful: Chromium is not
+`continue-on-error`, and its result feeds a required status check on
+`develop`.
+
+### How the gate actually blocks
+
+Merge blocking is **not** wired through `ci-required-result` in
+`.github/workflows/pr.yml`. Cross-workflow `needs` is not a GitHub Actions
+feature, so the browser suite cannot be a subordinate of that umbrella.
+It is wired through the develop branch ruleset instead:
+
+| Piece | Value |
+|-------|--------|
+| Ruleset | `develop-squash-only` (id `15611785`) |
+| Required context | `Results Explorer browser gate` |
+| Gate job | `browser-required-result` in `results-explorer-browser.yml` |
+| Gate inputs | `needs: [explorer-changes, chromium]`, `if: always()` |
+
+The gate job, not the Chromium job itself, holds the required context.
+Chromium is path-gated via `explorer-changes` and is skipped when nothing
+explorer-relevant changed; a required check that never reports leaves a PR
+unmergeable forever. The gate therefore always runs and:
+
+- **passes** when Chromium succeeded, or when change detection said the
+  suite was not needed (`needed=false` and Chromium was legitimately skipped);
+- **fails closed** if Chromium failed/cancelled, if Chromium was skipped while
+  `needed=true`, or if `explorer-changes` itself did not succeed.
+
+Firefox and WebKit remain advisory (`non-blocking` in the job name,
+`continue-on-error: true`) and are deliberately absent from the gate job's
+`needs`. Promote them only via the graduation path below.
+
+Live ruleset confirmation:
+
+```bash
+gh api repos/joeharris76/BenchBox/rulesets/15611785 \
+  --jq '.rules[]|select(.type=="required_status_checks")'
+```
+
+Expect both `ci-required-result` and `Results Explorer browser gate` in
+`required_status_checks`. Unit tests under
+`tests/unit/workflows/test_results_explorer_browser_gate.py` pin the
+workflow-local half of the name/wiring agreement (Chromium not
+`continue-on-error`, gate depends on Chromium, documented context string);
+the live ruleset membership is the admin half.
+
+### Historical note
+
+The Chromium job advertised "blocking" before the ruleset required the gate
+context. That name-without-wiring defect is closed: the required check and
+the always-running gate job exist, and recent browser workflow runs are
+green. Do **not** rename Chromium away from "blocking" while it still feeds
+the required gate — that would re-create the lie in the opposite direction.
+Do **not** demote the suite solely because retry-based data waits trade a
+class of first-load coverage (see the cold-snapshot section below); that is
+a known residual risk, not evidence the gate should be unwired.
 
 ## Frontend dependency audit
 
