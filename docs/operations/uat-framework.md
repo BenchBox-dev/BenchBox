@@ -370,6 +370,53 @@ full rerun cheap, and the abort-safe artifacts (`cells.jsonl`,
 `compatibility_pruned.jsonl`, `matrix_summary.partial.tsv`) from the
 aborted run remain on disk as evidence.
 
+### Platform chunking (`execute.platform_chunking`)
+
+The 2026-08-04 release-gate stage-1 sweep exhausted disk twice (2.7 GiB and
+4 GiB free) and was killed mid-sweep. Loaded databases are per-platform
+and measured roughly 15 GiB each at that sweep's scale, so 11 platforms
+needing every database to coexist concurrently is a 90-150 GiB
+requirement the flat disk-budget estimate above does not surface as a
+per-platform term -- it can pass preflight and still die partway through
+the matrix. The only thing that completed that stage 1 was an out-of-tree
+shell driver running one platform at a time and pruning databases between
+platforms; that script was lost when the scratchpad was wiped.
+
+`tests/uat/preflight_budget.estimate_platform_chunking_budget(config)`
+models this directly: grouped by platform (not summed flat) at the
+config's largest configured `scales.rungs` entry, using the same
+checked-in `disk_budget_table.tsv` rows as every other estimate in this
+module -- never a hardcoded flat per-platform constant. It returns:
+
+- `concurrent_required_gib` -- every platform's database coexisting (what
+  a non-chunked sweep needs today, and the 2026-08-04 failure mode).
+- `chunked_required_gib` -- the single worst platform's own footprint
+  (what `execute.platform_chunking: true` bounds disk to).
+- `basis` -- the scale rung and platform count the numbers were derived
+  from, for the lifecycle log.
+
+`check_platform_chunking_headroom(...)` gates free space against whichever
+of the two applies, and `recommend_platform_chunking(...)` turns that into
+an operator-facing message: chunking unnecessary, chunking recommended (set
+`execute.platform_chunking: true`), or a hard failure with the computed
+shortfall when even a single platform's chunk would not fit. These are
+library-level primitives in `tests/uat/preflight_budget.py` today; wiring
+them into the live `preflight` phase gate is tracked separately.
+
+When `execute.platform_chunking: true`, `run_execute` (already sequential,
+one platform at a time -- UAT W3 line 222) force-prunes every database the
+just-finished platform loaded before starting the next platform:
+`tests.uat.cleanup.prune_platform_chunk` calls the same reuse-aware
+`prune_database_dir` used by the existing incremental
+same-platform-consumer pruning, per (platform, benchmark, scale) -- it
+never deletes the shared `databases/` root or another platform's subtree,
+so cross-benchmark and cross-platform reuse for platforms still to run is
+untouched. Each chunk boundary is recorded to `uat_lifecycle.log`:
+
+```text
+[chunk] platform=duckdb pruned 4 database dir(s), freed 14.82 GiB (basis: execute.platform_chunking boundary -- platform fully complete, no remaining same-platform cells this sweep)
+```
+
 ## Submission terminal states
 
 The package phase reads `package.submit_terminal_state` from YAML;
@@ -465,6 +512,7 @@ just wastes the timeout window each attempt.
 |---|---|---|
 | Preflight aborts on disk | `<5 GiB free at ~/Developer/benchmark_runs` | free space, or override `preflight.free_space_min_gib` |
 | Mid-sweep execute aborts on disk | free space fell below `preflight.free_space_min_gib` after a platform | inspect `uat_lifecycle.log`; increase space or reduce the matrix before resuming |
+| Sweep passes preflight, then exhausts disk mid-sweep across many platforms | concurrent per-platform database footprint (`disk_budget_table.tsv` rows summed per platform) exceeds free space -- see "Platform chunking" | set `execute.platform_chunking: true`, or check `estimate_platform_chunking_budget`/`recommend_platform_chunking` in `tests/uat/preflight_budget.py` for the computed shortfall |
 | Skipped-unreachable platforms | local Docker / TCP services not running and Docker is externally managed | `docker compose up` for the relevant services, or set `execute.skip_unreachable: false` to surface as failures |
 | Docker daemon unavailable in managed mode | `cleanup.docker_manage_platforms: true` requires `docker ps` and `docker compose` | start Docker Desktop/daemon; preflight treats Docker as required in managed mode |
 | Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | the sweep records the stack as failed and advances (see "Managed Docker startup failures are non-fatal"); inspect compose logs and raise the timeout only after measuring a healthy startup |

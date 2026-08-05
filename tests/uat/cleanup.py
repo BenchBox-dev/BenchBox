@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import shutil
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -119,3 +120,48 @@ def prune_database_dir(
     if not dry_run:
         shutil.rmtree(target, ignore_errors=True)
     return bytes_total
+
+
+def prune_platform_chunk(
+    databases_root: Path,
+    *,
+    platform: str,
+    cells: Iterable[CellKey],
+    dry_run: bool = False,
+) -> int:
+    """Force-prune every loaded database a completed platform chunk created.
+
+    Used by `execute.platform_chunking` (tests/uat/phases/execute.py) at a
+    platform boundary: once a platform is entirely done for the sweep, no
+    later cell will ever touch it again, so every (benchmark, scale) it
+    loaded is unconditionally safe to drop -- unlike `can_prune`, which
+    exists for the WITHIN-chunk case where a later same-platform cell might
+    still be a pending consumer of a source benchmark's database.
+
+    Still goes through `prune_database_dir` per (platform, benchmark,
+    scale) -- this never `rm -rf`s `databases_root` itself or another
+    platform's subtree, so cross-benchmark and cross-platform reuse for
+    platforms still to run is untouched (see
+    uat-disk-budget-and-platform-chunking anti-pattern: pruning the whole
+    databases root between chunks destroys that reuse).
+
+    Returns the total bytes freed (du-style sum, matching
+    `prune_database_dir`). `dry_run=True` only measures.
+    """
+    freed = 0
+    seen: set[tuple[str, float]] = set()
+    for cell in cells:
+        if cell.platform != platform:
+            continue
+        key = (cell.benchmark, cell.scale)
+        if key in seen:
+            continue
+        seen.add(key)
+        freed += prune_database_dir(
+            databases_root,
+            platform=platform,
+            benchmark=cell.benchmark,
+            scale=cell.scale,
+            dry_run=dry_run,
+        )
+    return freed

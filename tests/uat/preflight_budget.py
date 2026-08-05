@@ -226,6 +226,154 @@ def format_disk_budget(budget: DiskBudget) -> str:
     )
 
 
+def _largest_scale_cells(config: UATConfig) -> tuple[Cell, ...]:
+    """Return the enumerated cells at the config's largest configured scale rung.
+
+    Mirrors the selection `estimate_largest_scale_peak_disk` makes (peak
+    concurrent database footprint is largest at the largest rung), factored
+    out so `estimate_platform_chunking_budget` can group the same cell set
+    by platform instead of summing it flat.
+    """
+    cells_by_scale: dict[float, list[Cell]] = {}
+    for cell in enumerate_cells(config):
+        cells_by_scale.setdefault(cell.scale, []).append(cell)
+    if not cells_by_scale:
+        return ()
+    return tuple(cells_by_scale[max(cells_by_scale)])
+
+
+@dataclass(frozen=True)
+class PlatformChunkingBudget:
+    """Per-platform disk math for `execute.platform_chunking` decisions.
+
+    `concurrent_required_gib` is what today's non-chunked execute needs if
+    every platform's loaded databases coexisted at once (11 platforms at
+    ~15 GiB each was the 2026-08-04 release-gate stage-1 incident this
+    estimator exists to catch before it happens again).
+    `chunked_required_gib` is the much smaller bound `execute.platform_chunking`
+    enforces by pruning a platform's databases before the next platform
+    starts -- the worst single platform's own footprint.
+
+    Both are derived from the SAME table-driven estimator as
+    `estimate_largest_scale_peak_disk` (grouped by platform instead of
+    summed flat), at the config's largest CONFIGURED `scales.rungs` entry --
+    never a hardcoded flat per-platform constant. `basis` records that
+    provenance for the lifecycle log.
+    """
+
+    platform_count: int
+    per_platform_peak_gib: float
+    concurrent_required_gib: float
+    chunked_required_gib: float
+    basis: str
+    unknown_cells: tuple[UnknownDiskCell, ...]
+
+
+def estimate_platform_chunking_budget(
+    config: UATConfig,
+    *,
+    table_path: Path | None = None,
+) -> PlatformChunkingBudget:
+    """Estimate concurrent (all-platforms) vs chunked (one-platform) disk demand.
+
+    Reuses `estimate_cells` -- the same table-driven estimator every other
+    budget function in this module uses -- grouped per platform at the
+    config's largest configured scale rung, rather than adding a second,
+    divergent estimator (see uat-disk-budget-and-platform-chunking prior
+    art: extend, don't duplicate).
+    """
+    table = load_budget_table(table_path)
+    largest_cells = _largest_scale_cells(config)
+    by_platform: dict[str, list[Cell]] = {}
+    for cell in largest_cells:
+        by_platform.setdefault(cell.platform, []).append(cell)
+
+    budgets = {platform: estimate_cells(cells, table=table) for platform, cells in by_platform.items()}
+    platform_count = len(budgets)
+    per_platform_peak_gib = max((budget.est_peak_gib for budget in budgets.values()), default=0.0)
+    concurrent_required_gib = sum(budget.est_peak_gib for budget in budgets.values())
+    scale = max((cell.scale for cell in largest_cells), default=None)
+    if scale is None:
+        basis = "no cells enumerated for the configured matrix; basis unavailable"
+    else:
+        basis = (
+            f"disk_budget_table peak_database_gib rows at scale={scale:g} "
+            f"(largest of scales.rungs={config.scales.rungs}) across {platform_count} platform(s); "
+            f"worst platform={per_platform_peak_gib:.2f} GiB, sum-if-concurrent={concurrent_required_gib:.2f} GiB"
+        )
+    unknown = tuple(cell for budget in budgets.values() for cell in budget.unknown_cells)
+    return PlatformChunkingBudget(
+        platform_count=platform_count,
+        per_platform_peak_gib=per_platform_peak_gib,
+        concurrent_required_gib=concurrent_required_gib,
+        chunked_required_gib=per_platform_peak_gib,
+        basis=basis,
+        unknown_cells=unknown,
+    )
+
+
+def check_platform_chunking_headroom(
+    budget: PlatformChunkingBudget,
+    roots: Iterable[DiskRootFreeSpace],
+    *,
+    min_free_gib: float,
+    chunking_enabled: bool,
+) -> DiskHeadroomCheck:
+    """Compare the platform-chunking budget against required disk roots.
+
+    Gates against `concurrent_required_gib` when `chunking_enabled` is
+    False (today's real risk: every platform's database can coexist) and
+    against the much smaller `chunked_required_gib` when True (one
+    platform's databases at a time, pruned between chunks).
+    """
+    required_gib = max(
+        min_free_gib,
+        budget.chunked_required_gib if chunking_enabled else budget.concurrent_required_gib,
+    )
+    shortfalls = tuple(
+        DiskHeadroomShortfall(root.label, root.path, root.free_gib, required_gib)
+        for root in roots
+        if root.free_gib < required_gib
+    )
+    return DiskHeadroomCheck(required_gib=required_gib, shortfalls=shortfalls)
+
+
+def recommend_platform_chunking(
+    budget: PlatformChunkingBudget,
+    roots: Iterable[DiskRootFreeSpace],
+    *,
+    min_free_gib: float,
+) -> str:
+    """Return an operator-facing platform-chunking recommendation.
+
+    Three outcomes: chunking unnecessary (every platform's database fits
+    concurrently), chunking recommended (fits only with between-platform
+    pruning), or a hard failure with the computed shortfall against the
+    chunked requirement -- callers should fail preflight rather than let an
+    under-provisioned sweep pass and exhaust disk mid-sweep (see
+    uat-disk-budget-and-platform-chunking anti-pattern).
+    """
+    roots = tuple(roots)
+    unchunked = check_platform_chunking_headroom(budget, roots, min_free_gib=min_free_gib, chunking_enabled=False)
+    if not unchunked.shortfalls:
+        return (
+            "platform_chunking not required: concurrent disk budget "
+            f"({unchunked.required_gib:.2f} GiB, basis: {budget.basis}) fits available headroom"
+        )
+    chunked = check_platform_chunking_headroom(budget, roots, min_free_gib=min_free_gib, chunking_enabled=True)
+    if not chunked.shortfalls:
+        return (
+            "platform_chunking recommended: concurrent disk budget "
+            f"({unchunked.required_gib:.2f} GiB) exceeds headroom, but the chunked "
+            f"per-platform footprint ({chunked.required_gib:.2f} GiB, basis: {budget.basis}) fits -- "
+            "set execute.platform_chunking: true"
+        )
+    return (
+        "insufficient disk even with execute.platform_chunking: "
+        f"{format_disk_headroom_failure(chunked)} (basis: {budget.basis})"
+    )
+
+
 def format_disk_headroom_failure(check: DiskHeadroomCheck) -> str:
     """Operator-facing abort reason for disk-budget shortfalls."""
     details = "; ".join(

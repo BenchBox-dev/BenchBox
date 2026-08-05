@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tests.uat import docker_assets
-from tests.uat.cleanup import CellKey, can_prune, prune_database_dir, source_reuse_graph
+from tests.uat.cleanup import CellKey, can_prune, prune_database_dir, prune_platform_chunk, source_reuse_graph
 from tests.uat.config import OutputConfig, UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
 from tests.uat.matrix import invalidate_reachability_cache_after_lifecycle_change, platform_is_reachable
@@ -321,6 +321,14 @@ def run_execute(
             abort_kind = platform_abort_kind
             break
         last_completed_platform = platform
+        if config.execute.platform_chunking and cleanup_enabled and databases_root is not None:
+            _prune_platform_chunk_and_log(
+                platform=platform,
+                platform_pairs=platform_pairs,
+                databases_root=databases_root,
+                dry_run=config.dry_run,
+                log_dir=log_dir,
+            )
 
     return ExecuteOutcome(
         phase="execute",
@@ -803,6 +811,40 @@ def _maybe_prune_completed(
                     dry_run=dry_run,
                 )
                 already_pruned.add(key)
+
+
+def _prune_platform_chunk_and_log(
+    *,
+    platform: str,
+    platform_pairs: list[tuple[str, list[Cell]]],
+    databases_root: Path,
+    dry_run: bool,
+    log_dir: Path | None,
+) -> None:
+    """Force-prune every database a completed `execute.platform_chunking` chunk loaded.
+
+    Called once a platform is fully done for the sweep (this platform will
+    never be visited again) -- unlike the incremental `_maybe_prune_completed`
+    reuse-graph check, which only frees a source benchmark's database once
+    its same-platform consumers finish, this is unconditional: no later cell
+    in the sweep touches this platform, so every (benchmark, scale) it
+    loaded is safe to drop. Still goes through
+    `cleanup.prune_platform_chunk` -> `prune_database_dir` per (platform,
+    benchmark, scale); never `rm -rf`s the shared databases root, which
+    would destroy cross-benchmark/cross-platform reuse for platforms still
+    to run (see uat-disk-budget-and-platform-chunking anti-pattern).
+    """
+    cell_keys = [
+        CellKey(cell.platform, cell.benchmark, cell.scale) for _, pb_cells in platform_pairs for cell in pb_cells
+    ]
+    freed_bytes = prune_platform_chunk(databases_root, platform=platform, cells=cell_keys, dry_run=dry_run)
+    freed_gib = freed_bytes / (1024**3)
+    append_lifecycle_log(
+        log_dir,
+        f"[chunk] platform={platform} pruned {len(cell_keys)} database dir(s), freed {freed_gib:.2f} GiB "
+        "(basis: execute.platform_chunking boundary -- platform fully complete, no remaining "
+        "same-platform cells this sweep)",
+    )
 
 
 def _annotate_disk_floor_abort(
