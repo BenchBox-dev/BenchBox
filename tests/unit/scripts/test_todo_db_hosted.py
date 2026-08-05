@@ -234,10 +234,26 @@ class TestBackendResolution:
         assert todo_db.resolve_backend(HOSTED_URL) == HOSTED_URL
         assert todo_db.resolve_backend("https://example-db.turso.io") == ("https://example-db.turso.io")
 
-    def test_no_env_defaults_to_local_path(self, monkeypatch):
+    def test_no_env_defaults_to_local_path(self, monkeypatch, tmp_path):
         monkeypatch.delenv("TODO_DB_URL", raising=False)
         monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        # Empty main root (no tracked config.json) so resolution reaches local fallback.
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        monkeypatch.setattr(todo_db, "_try_turso_auto_provision", lambda: (None, None))
         assert isinstance(todo_db.resolve_backend(None), Path)
+
+    def test_config_json_selects_hosted_without_env(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("TODO_DB_URL", raising=False)
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        cfg = tmp_path / ".todo-db"
+        cfg.mkdir()
+        (cfg / "config.json").write_text(json.dumps({"url": HOSTED_URL}), encoding="utf-8")
+
+        backend, implicit, auto, provision_failure = todo_db._resolve_backend(None)
+        assert backend == HOSTED_URL
+        assert implicit is False
+        assert auto is False
 
     def test_implicit_local_read_is_loud_but_allowed(self, monkeypatch, tmp_path, capsys):
         monkeypatch.delenv("TODO_DB_URL", raising=False)
