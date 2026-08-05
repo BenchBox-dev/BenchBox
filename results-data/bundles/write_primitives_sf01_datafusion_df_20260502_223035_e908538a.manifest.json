@@ -1,7 +1,7 @@
 {
   "benchmark": "Write Primitives",
   "bundle_file": "write_primitives_sf01_datafusion_df_20260502_223035_e908538a.json",
-  "bundle_hash": "d4b384017569a000436a9d6276cb37a5a380c621fcf55fa30c249e86414a670a",
+  "bundle_hash": "0fbdcb8f24390432412f56750e213fb0b62178bb73d22218f0ac814f5886958f",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

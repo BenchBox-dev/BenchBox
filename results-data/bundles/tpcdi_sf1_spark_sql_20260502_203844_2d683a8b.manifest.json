@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-DI",
   "bundle_file": "tpcdi_sf1_spark_sql_20260502_203844_2d683a8b.json",
-  "bundle_hash": "897ab8af9335a14eaee1569b463de61ea85fb88b193f505538fc8124b44fe1df",
+  "bundle_hash": "878fc88a8fff0c38c7d1e78464f55992a13f4d6ad79e2bb0c50976a6ab56e46c",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Spark",

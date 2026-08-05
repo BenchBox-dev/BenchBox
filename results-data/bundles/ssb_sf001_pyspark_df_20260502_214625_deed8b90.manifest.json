@@ -1,7 +1,7 @@
 {
   "benchmark": "SSB",
   "bundle_file": "ssb_sf001_pyspark_df_20260502_214625_deed8b90.json",
-  "bundle_hash": "2831f9d35eb3319c29f5c0ea83d35af7de4b7d4cf725bccba30a3e28218658fb",
+  "bundle_hash": "78fb729a2a0b391c8da04537547940ac6bce093b7b25d4c16360904908496262",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",

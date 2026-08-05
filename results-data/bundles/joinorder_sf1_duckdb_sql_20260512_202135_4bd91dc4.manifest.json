@@ -1,7 +1,7 @@
 {
   "benchmark": "JoinOrderBenchmark",
   "bundle_file": "joinorder_sf1_duckdb_sql_20260512_202135_4bd91dc4.json",
-  "bundle_hash": "fbb6321a62a0b71975e3212f61079d715a9a12253913feae529dcfe2a24d8813",
+  "bundle_hash": "4fae059f98220fc335b89f0efec2c5f95cf6ddd2fb3f835d8d9777349c3283ca",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DuckDB",

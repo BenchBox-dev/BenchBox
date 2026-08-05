@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-H Skew",
   "bundle_file": "tpch_skew_sf1_pyspark_df_20260502_215843_cabb8984.json",
-  "bundle_hash": "9954e86b7dc06ce74cb988faddf32329a1c072fdf43951e07d847f4c289d2dfb",
+  "bundle_hash": "b589541d6272c21f1960cc8e1b0795572d07ae7d79d882912b25294022839a94",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",

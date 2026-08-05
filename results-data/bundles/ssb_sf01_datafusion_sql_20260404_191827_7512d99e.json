@@ -22,7 +22,6 @@
   "environment": {
     "arch": "arm64",
     "cpu_count": 10,
-    "machine_id": "machine_3d46427037d2",
     "memory_gb": 16,
     "os": "Darwin 25.3.0",
     "python": "3.11.12"
@@ -32,7 +31,6 @@
       "type": "zstd"
     },
     "driver_package": "datafusion",
-    "driver_runtime_python_executable": "path_c8dc6dfff199",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "52.3.0",
     "driver_version_resolved": "52.3.0",
@@ -96,15 +94,13 @@
       "connection_mode": "in-memory",
       "data_format": "parquet",
       "driver_package": "datafusion",
-      "driver_runtime_python_executable": "path_c8dc6dfff199",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "52.3.0",
       "driver_version_resolved": "52.3.0",
       "execution_mode": "sql",
       "memory_limit": "12GB",
       "result_cache_enabled": false,
-      "target_partitions": 10,
-      "working_dir": "path_b4143dfd5cb3"
+      "target_partitions": 10
     },
     "driver_actual_version": "52.3.0",
     "driver_package": "datafusion",

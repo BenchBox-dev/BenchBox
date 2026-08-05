@@ -1,7 +1,7 @@
 {
   "benchmark": "Write Primitives",
   "bundle_file": "write_primitives_sf001_polars_df_20260502_210917_f2787858.json",
-  "bundle_hash": "b50bfd98138b28ab37521669414b16629246f79e85c42e0c212e3d6027e04e7c",
+  "bundle_hash": "0917836cd17c95b4ddc1cdff4df0e2e429c902e2db59832f51b93da197560737",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",

@@ -36,15 +36,12 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
-      "machine_id": "machine_3d46427037d2",
       "os": "Darwin",
       "python": "3.12.11"
     },
-    "machine_id": "machine_3d46427037d2",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_f8fb0209c83d",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -55,7 +52,6 @@
       "type": "zstd"
     },
     "driver_package": "duckdb",
-    "driver_runtime_python_executable": "path_51d816457550",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "1.3.2",
     "driver_version_resolved": "1.3.2",
@@ -131,9 +127,7 @@
     },
     "config": {
       "connection_mode": "file",
-      "database_path": "path_092f1d100c98",
       "driver_package": "duckdb",
-      "driver_runtime_python_executable": "path_51d816457550",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.3.2",
       "driver_version_resolved": "1.3.2",
@@ -155,11 +149,9 @@
     "driver_runtime_strategy": "current-process",
     "name": "DuckDB",
     "raw_config": {
-      "database_path": "path_092f1d100c98",
       "driver_auto_install": false,
       "driver_auto_install_used": false,
       "driver_package": "duckdb",
-      "driver_runtime_python_executable": "path_51d816457550",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.3.2",
       "driver_version_resolved": "1.3.2",
