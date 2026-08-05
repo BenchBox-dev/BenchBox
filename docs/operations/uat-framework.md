@@ -386,12 +386,20 @@ platforms; that script was lost when the scratchpad was wiped.
 models this directly: grouped by platform (not summed flat) at the
 config's largest configured `scales.rungs` entry, using the same
 checked-in `disk_budget_table.tsv` rows as every other estimate in this
-module -- never a hardcoded flat per-platform constant. It returns:
+module -- never a hardcoded flat per-platform constant. Datagen is deduped
+once globally (it is generated once and stays resident for the whole
+sweep under `cleanup.preserve_datagen: true`, regardless of chunking); only
+the loaded-database + transient-growth share is platform-specific. It
+returns:
 
 - `concurrent_required_gib` -- every platform's database coexisting (what
   a non-chunked sweep needs today, and the 2026-08-04 failure mode).
-- `chunked_required_gib` -- the single worst platform's own footprint
-  (what `execute.platform_chunking: true` bounds disk to).
+  Numerically identical to the existing flat
+  `estimate_largest_scale_peak_disk(config).est_peak_gib` -- same cells,
+  same table, same dedup rule; a regression test pins the two together.
+- `chunked_required_gib` -- the single worst platform's own footprint plus
+  the always-resident datagen (what `execute.platform_chunking: true`
+  bounds disk to).
 - `basis` -- the scale rung and platform count the numbers were derived
   from, for the lifecycle log.
 
@@ -399,9 +407,22 @@ module -- never a hardcoded flat per-platform constant. It returns:
 of the two applies, and `recommend_platform_chunking(...)` turns that into
 an operator-facing message: chunking unnecessary, chunking recommended (set
 `execute.platform_chunking: true`), or a hard failure with the computed
-shortfall when even a single platform's chunk would not fit. These are
-library-level primitives in `tests/uat/preflight_budget.py` today; wiring
-them into the live `preflight` phase gate is tracked separately.
+shortfall when even a single platform's chunk would not fit.
+
+The `preflight` phase gates on this directly (`phases/preflight.py`,
+`_platform_chunking_abort_reason`), superseding the flat headroom check
+whenever a disk-budget config is available: with `execute.platform_chunking`
+left at its default `false`, preflight fails the sweep before it starts
+whenever the CONCURRENT requirement exceeds free space, naming the computed
+concurrent and chunked figures and recommending `execute.platform_chunking:
+true` when chunking would make it fit. Preflight never turns chunking on by
+itself -- it fails loud and tells the operator, because auto-enabling it
+would silently change `run_execute`'s runtime pruning behavior. With
+`execute.platform_chunking: true` already set, preflight gates on the
+smaller CHUNKED requirement instead, and only fails (naming that smaller
+shortfall) when even a single platform's chunk would not fit. `preflight.
+free_space_min_gib: 0` disables this gate exactly like every other disk
+gate here -- there is no separate opt-out.
 
 When `execute.platform_chunking: true`, `run_execute` (already sequential,
 one platform at a time -- UAT W3 line 222) force-prunes every database the
@@ -512,7 +533,8 @@ just wastes the timeout window each attempt.
 |---|---|---|
 | Preflight aborts on disk | `<5 GiB free at ~/Developer/benchmark_runs` | free space, or override `preflight.free_space_min_gib` |
 | Mid-sweep execute aborts on disk | free space fell below `preflight.free_space_min_gib` after a platform | inspect `uat_lifecycle.log`; increase space or reduce the matrix before resuming |
-| Sweep passes preflight, then exhausts disk mid-sweep across many platforms | concurrent per-platform database footprint (`disk_budget_table.tsv` rows summed per platform) exceeds free space -- see "Platform chunking" | set `execute.platform_chunking: true`, or check `estimate_platform_chunking_budget`/`recommend_platform_chunking` in `tests/uat/preflight_budget.py` for the computed shortfall |
+| Preflight aborts with `platform_chunking recommended` | concurrent per-platform database footprint (every platform's loaded database coexisting) exceeds free space, but the chunked (one-platform-at-a-time) requirement fits -- see "Platform chunking" | set `execute.platform_chunking: true` and rerun; preflight then gates on the smaller chunked requirement instead |
+| Preflight aborts with `insufficient disk even with execute.platform_chunking` | even the single worst platform's own database + datagen exceeds free space | free more space, reduce the scale ladder, or narrow the platform/benchmark matrix -- chunking alone cannot make this fit |
 | Skipped-unreachable platforms | local Docker / TCP services not running and Docker is externally managed | `docker compose up` for the relevant services, or set `execute.skip_unreachable: false` to surface as failures |
 | Docker daemon unavailable in managed mode | `cleanup.docker_manage_platforms: true` requires `docker ps` and `docker compose` | start Docker Desktop/daemon; preflight treats Docker as required in managed mode |
 | Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | the sweep records the stack as failed and advances (see "Managed Docker startup failures are non-fatal"); inspect compose logs and raise the timeout only after measuring a healthy startup |

@@ -161,11 +161,19 @@ def test_estimate_platform_chunking_budget_accounts_for_platform_count(tmp_path:
     # smaller 0.01 rung, and not a flat sum over every cell regardless of
     # platform.
     assert budget.platform_count == 3
-    # Each platform's est_peak_gib = peak_database_gib + peak_datagen_gib +
-    # transient_growth_gib for its one tpch@1.0 cell.
-    assert budget.per_platform_peak_gib == pytest.approx(30.0 + 2.0 + 1.0)  # sqlite: worst platform
-    assert budget.concurrent_required_gib == pytest.approx((20.0 + 2.0 + 1.0) + (30.0 + 2.0 + 1.0) + (15.0 + 2.0 + 1.0))
-    assert budget.chunked_required_gib == pytest.approx(budget.per_platform_peak_gib)
+    # datagen is shared/deduped once per (benchmark, scale) -- all three
+    # platforms' tpch@1.0 rows share the SAME 2.0 GiB, matching the flat
+    # estimator's dedup rule (`estimate_cells`), not summed once per
+    # platform (that would silently inflate concurrent_required_gib by
+    # double/triple-counting a file that is only ever generated once).
+    datagen_gib = 2.0
+    # per_platform_peak_gib is the worst platform's OWN database + transient
+    # only -- datagen is excluded because cleanup.preserve_datagen keeps it
+    # resident regardless of chunking, so pruning a platform's chunk never
+    # frees it (matches what cleanup.prune_platform_chunk actually frees).
+    assert budget.per_platform_peak_gib == pytest.approx(30.0 + 1.0)  # sqlite: worst platform
+    assert budget.concurrent_required_gib == pytest.approx(datagen_gib + (20.0 + 1.0) + (30.0 + 1.0) + (15.0 + 1.0))
+    assert budget.chunked_required_gib == pytest.approx(datagen_gib + budget.per_platform_peak_gib)
     # Basis records the derivation (config scale rung + row provenance), not
     # a bare number -- an operator reading the lifecycle log must be able to
     # tell this wasn't a hardcoded constant.
@@ -173,16 +181,34 @@ def test_estimate_platform_chunking_budget_accounts_for_platform_count(tmp_path:
     assert "3 platform" in budget.basis
 
 
+def test_estimate_platform_chunking_budget_concurrent_matches_flat_estimator(tmp_path: Path):
+    """concurrent_required_gib must never diverge from the existing flat gate.
+
+    Regression guard for the datagen-dedup bug caught in review: grouping
+    per platform must not re-sum a shared datagen file once per platform
+    that reuses it. `estimate_largest_scale_peak_disk` is the existing,
+    already-trusted flat estimate `phases/preflight.py` gates on today --
+    `concurrent_required_gib` must equal it exactly, not merely be close.
+    """
+    table = _three_platform_table(tmp_path)
+    cfg = _three_platform_config()
+
+    budget = estimate_platform_chunking_budget(cfg, table_path=table)
+    flat = estimate_largest_scale_peak_disk(cfg, table_path=table)
+
+    assert budget.concurrent_required_gib == pytest.approx(flat.est_peak_gib)
+
+
 def test_check_platform_chunking_headroom_fails_unchunked_passes_chunked(tmp_path: Path):
     table = _three_platform_table(tmp_path)
     cfg = _three_platform_config()
     budget = estimate_platform_chunking_budget(cfg, table_path=table)
 
-    # Enough room for the single worst platform (chunked) but not for all
-    # three platforms coexisting (unchunked) -- the exact 2026-08-04
-    # release-gate stage-1 shape (11 platforms x ~15 GiB > free, but any
-    # single platform would have fit).
-    free_gib = budget.per_platform_peak_gib + 5.0
+    # Enough room for the single worst platform's chunk (plus the
+    # always-resident datagen) but not for all three platforms coexisting
+    # (unchunked) -- the exact 2026-08-04 release-gate stage-1 shape (11
+    # platforms x ~15 GiB > free, but any single platform would have fit).
+    free_gib = budget.chunked_required_gib + 5.0
     assert free_gib < budget.concurrent_required_gib
     roots = (DiskRootFreeSpace("output", tmp_path, free_gib),)
 
@@ -192,7 +218,7 @@ def test_check_platform_chunking_headroom_fails_unchunked_passes_chunked(tmp_pat
     assert len(unchunked.shortfalls) == 1
     assert unchunked.shortfalls[0].required_gib == pytest.approx(budget.concurrent_required_gib)
     assert chunked.shortfalls == ()
-    assert chunked.required_gib == pytest.approx(budget.per_platform_peak_gib)
+    assert chunked.required_gib == pytest.approx(budget.chunked_required_gib)
 
 
 def test_recommend_platform_chunking_not_required_when_concurrent_fits(tmp_path: Path):
@@ -210,7 +236,7 @@ def test_recommend_platform_chunking_recommended_when_only_chunked_fits(tmp_path
     table = _three_platform_table(tmp_path)
     cfg = _three_platform_config()
     budget = estimate_platform_chunking_budget(cfg, table_path=table)
-    roots = (DiskRootFreeSpace("output", tmp_path, budget.per_platform_peak_gib + 5.0),)
+    roots = (DiskRootFreeSpace("output", tmp_path, budget.chunked_required_gib + 5.0),)
 
     message = recommend_platform_chunking(budget, roots, min_free_gib=5.0)
 
@@ -222,8 +248,8 @@ def test_recommend_platform_chunking_fails_with_computed_shortfall_even_chunked(
     table = _three_platform_table(tmp_path)
     cfg = _three_platform_config()
     budget = estimate_platform_chunking_budget(cfg, table_path=table)
-    # Not even the single worst platform fits.
-    free_gib = budget.per_platform_peak_gib - 5.0
+    # Not even the single worst platform's chunk fits.
+    free_gib = budget.chunked_required_gib - 5.0
     roots = (DiskRootFreeSpace("output", tmp_path, free_gib),)
 
     message = recommend_platform_chunking(budget, roots, min_free_gib=5.0)
@@ -231,6 +257,6 @@ def test_recommend_platform_chunking_fails_with_computed_shortfall_even_chunked(
     assert message.startswith("insufficient disk even with execute.platform_chunking")
     # The computed shortfall (not a vague "not enough disk") is present:
     # required GiB, free GiB, and the root label all appear.
-    assert f"{budget.per_platform_peak_gib:.1f} GiB required" in message
+    assert f"{budget.chunked_required_gib:.1f} GiB required" in message
     assert f"{free_gib:.1f} GiB free" in message
     assert "output" in message

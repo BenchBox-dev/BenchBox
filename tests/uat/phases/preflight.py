@@ -31,7 +31,11 @@ from tests.uat.preflight_budget import (
     DiskBudget,
     DiskHeadroomCheck,
     DiskRootFreeSpace,
+    PlatformChunkingBudget,
+    check_platform_chunking_headroom,
+    estimate_platform_chunking_budget,
     free_space_gib as free_space_gib,
+    recommend_platform_chunking,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -211,6 +215,17 @@ def run_preflight(
         docker_data_root=docker_root,
     )
     free_space_entries = read_disk_root_free_space(disk_roots, free_space_reader=free_space_gib)
+    # Platform-chunking-aware gate (uat-disk-budget-and-platform-chunking):
+    # `budget_gate` above already gates on every platform's database
+    # coexisting -- numerically correct, but it cannot recognize that
+    # `execute.platform_chunking: true` bounds real disk demand to the
+    # single worst platform's chunk instead (estimate_platform_chunking_budget
+    # is regression-tested to match budget_gate's concurrent figure exactly
+    # when chunking is off). Computed in the SAME try block, over the SAME
+    # disk_budget_config/table, so a bad table row hard-fails preflight via
+    # the shared except below exactly like the flat estimate already does.
+    chunk_budget = None
+    chunk_check = None
     if disk_budget_config is not None:
         try:
             disk_budget_summary, budget_gate = estimate_disk_budget_summary_and_gate(
@@ -224,6 +239,13 @@ def run_preflight(
                     f"{len(budget_gate.budget.unknown_cells)} unknown largest-scale cell(s); "
                     "estimate may be low"
                 )
+            chunk_budget = estimate_platform_chunking_budget(disk_budget_config)
+            chunk_check = check_platform_chunking_headroom(
+                chunk_budget,
+                free_space_entries,
+                min_free_gib=free_space_min_gib,
+                chunking_enabled=disk_budget_config.execute.platform_chunking,
+            )
         except (OSError, ValueError, TypeError, KeyError, csv.Error) as exc:
             # The estimator CRASHED (bad table row, unreadable TSV, a
             # malformed config field) -- distinct from the advisory
@@ -252,6 +274,8 @@ def run_preflight(
             )
     if free_space_min_gib <= 0:
         required_gib = 0.0
+    elif chunk_check is not None:
+        required_gib = chunk_check.required_gib
     elif budget_gate is not None:
         required_gib = budget_gate.headroom.required_gib
     else:
@@ -259,7 +283,24 @@ def run_preflight(
     free_space_report = format_free_space_report(free_space_entries, required_gib=required_gib)
 
     abort_kind: str | None = None
-    if free_space_min_gib > 0 and budget_gate is not None and budget_gate.headroom.shortfalls:
+    if free_space_min_gib > 0 and chunk_check is not None:
+        # Fully supersedes the flat budget_gate branch below whenever the
+        # chunking-aware estimate is available -- an `elif` on
+        # `chunk_check.shortfalls` alone would let a stale, more
+        # conservative `budget_gate` shortfall still abort a sweep that
+        # `execute.platform_chunking: true` already makes fit.
+        chunk_abort_reason = _platform_chunking_abort_reason(
+            chunk_check=chunk_check,
+            chunk_budget=chunk_budget,
+            chunking_enabled=disk_budget_config is not None and disk_budget_config.execute.platform_chunking,
+            free_space_entries=free_space_entries,
+            free_space_min_gib=free_space_min_gib,
+        )
+        if chunk_abort_reason is not None:
+            aborted = True
+            abort_kind = "disk_floor"
+            abort_reason = chunk_abort_reason
+    elif free_space_min_gib > 0 and budget_gate is not None and budget_gate.headroom.shortfalls:
         aborted = True
         abort_reason = format_disk_headroom_failure(budget_gate.headroom)
         abort_kind = "disk_floor"
@@ -368,6 +409,36 @@ def _run_make_bring_up(platform: str, *, benchmark_runs_dir: str | Path | None =
         check=False,
     )
     return completed.returncode
+
+
+def _platform_chunking_abort_reason(
+    *,
+    chunk_check: DiskHeadroomCheck,
+    chunk_budget: PlatformChunkingBudget,
+    chunking_enabled: bool,
+    free_space_entries: Iterable[DiskRootFreeSpace],
+    free_space_min_gib: float,
+) -> str | None:
+    """Return the operator-facing abort reason for a platform-chunking shortfall, or None when it fits.
+
+    Split out of `run_preflight` to keep that function's branching flat --
+    see uat-disk-budget-and-platform-chunking w1. When `chunking_enabled` is
+    True (the operator already opted in), names the computed shortfall
+    against the smaller chunked requirement directly -- there is no further
+    remedy to suggest. When False, this deliberately fails loud rather than
+    silently turning chunking on for the operator: auto-enabling would
+    change execute's runtime pruning behavior (`prune_platform_chunk`)
+    without the operator's knowledge, so `recommend_platform_chunking`
+    either names chunking as the fix or, when even chunking would not help,
+    the computed shortfall against that smaller requirement.
+    """
+    if not chunk_check.shortfalls:
+        return None
+    if chunking_enabled:
+        return (
+            f"{format_disk_headroom_failure(chunk_check)} (execute.platform_chunking=true; basis: {chunk_budget.basis})"
+        )
+    return recommend_platform_chunking(chunk_budget, free_space_entries, min_free_gib=free_space_min_gib)
 
 
 def estimate_disk_budget_summary(config: UATConfig) -> str:

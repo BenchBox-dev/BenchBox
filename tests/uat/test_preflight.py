@@ -332,6 +332,166 @@ def test_preflight_disk_headroom_gate_respects_zero_override(tmp_path: Path, mon
     assert all("(required 0.00 GiB)" in line for line in result.free_space_report)
 
 
+# ---------------------------------------------------------------------------
+# execute.platform_chunking wired into the live preflight gate
+# (uat-disk-budget-and-platform-chunking w1). Three platforms so the
+# concurrent (all-platforms) vs chunked (worst single platform) figures
+# genuinely differ -- a single-platform config (as above) can never exercise
+# the difference chunking makes.
+# ---------------------------------------------------------------------------
+
+
+def _three_platform_chunking_table(tmp_path: Path) -> Path:
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
+        "duckdb\ttpch\t1\t2.0\t20.0\t1.0\n"
+        "sqlite\ttpch\t1\t2.0\t30.0\t1.0\n"
+        "datafusion\ttpch\t1\t2.0\t15.0\t1.0\n",
+        encoding="utf-8",
+    )
+    return table
+
+
+def _three_platform_chunking_config(*, platform_chunking: bool = False):
+    return config.validate_config(
+        {
+            "name": "chunk-preflight-smoke",
+            "platforms": {"include": ["duckdb", "sqlite", "datafusion"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [1]},
+            "execute": {"platform_chunking": platform_chunking},
+        }
+    )
+
+
+# Derived from the table above (see test_preflight_budget.py's identical
+# fixture and its regression test against estimate_largest_scale_peak_disk):
+# datagen is deduped once (2.0 GiB) since all three platforms share the same
+# tpch@1.0 source; database+transient is per platform (21/31/16 GiB).
+_CONCURRENT_REQUIRED_GIB = 70.0  # 2.0 + (20+1) + (30+1) + (15+1)
+_CHUNKED_REQUIRED_GIB = 33.0  # 2.0 + max(21, 31, 16)  -- sqlite is the worst platform
+
+
+def test_preflight_platform_chunking_gate_passes_when_concurrent_fits(tmp_path: Path, monkeypatch):
+    """Plenty of room for every platform's database to coexist -- no gate fires."""
+    table = _three_platform_chunking_table(tmp_path)
+    cfg = _three_platform_chunking_config()
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: _CONCURRENT_REQUIRED_GIB + 10.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(free_space_path=tmp_path, disk_budget_config=cfg)
+
+    assert result.aborted is False
+    assert result.abort_reason is None
+
+
+def test_preflight_platform_chunking_gate_fails_and_names_shortfall_without_chunking(tmp_path: Path, monkeypatch):
+    """Fits the chunked requirement but not the concurrent one, chunking OFF.
+
+    Real 2026-08-04 release-gate stage-1 shape: preflight must not pass this
+    -- it must fail and name the computed shortfall (not a vague "not enough
+    disk"), and tell the operator chunking would fix it rather than
+    silently turning it on.
+    """
+    table = _three_platform_chunking_table(tmp_path)
+    cfg = _three_platform_chunking_config(platform_chunking=False)
+    free_gib = _CHUNKED_REQUIRED_GIB + 5.0
+    assert free_gib < _CONCURRENT_REQUIRED_GIB
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: free_gib)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(free_space_path=tmp_path, disk_budget_config=cfg)
+
+    assert result.aborted is True
+    assert result.abort_kind == "disk_floor"
+    assert "platform_chunking recommended" in (result.abort_reason or "")
+    # The computed shortfall numbers -- both the concurrent figure that
+    # fails and the smaller chunked figure that would pass -- must be named,
+    # not just implied.
+    assert f"{_CONCURRENT_REQUIRED_GIB:.2f} GiB" in (result.abort_reason or "")
+    assert f"{_CHUNKED_REQUIRED_GIB:.2f} GiB" in (result.abort_reason or "")
+    assert "execute.platform_chunking: true" in (result.abort_reason or "")
+
+
+def test_preflight_platform_chunking_enabled_passes_when_chunked_fits(tmp_path: Path, monkeypatch):
+    """The operator already opted in to chunking -- gate on the smaller
+    chunked requirement, not the flat concurrent one (regression: the old
+    flat gate would wrongly block this sweep even though
+    execute.platform_chunking already bounds real disk demand)."""
+    table = _three_platform_chunking_table(tmp_path)
+    cfg = _three_platform_chunking_config(platform_chunking=True)
+    free_gib = _CHUNKED_REQUIRED_GIB + 5.0
+    assert free_gib < _CONCURRENT_REQUIRED_GIB
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: free_gib)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(free_space_path=tmp_path, disk_budget_config=cfg)
+
+    assert result.aborted is False
+    assert result.abort_reason is None
+
+
+def test_preflight_platform_chunking_enabled_still_fails_with_computed_shortfall(tmp_path: Path, monkeypatch):
+    """Chunking is on but even the single worst platform's chunk does not fit."""
+    table = _three_platform_chunking_table(tmp_path)
+    cfg = _three_platform_chunking_config(platform_chunking=True)
+    free_gib = _CHUNKED_REQUIRED_GIB - 5.0
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: free_gib)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(free_space_path=tmp_path, disk_budget_config=cfg)
+
+    assert result.aborted is True
+    assert result.abort_kind == "disk_floor"
+    assert "execute.platform_chunking=true" in (result.abort_reason or "")
+    assert f"{_CHUNKED_REQUIRED_GIB:.1f} GiB required" in (result.abort_reason or "")
+    assert f"{free_gib:.1f} GiB free" in (result.abort_reason or "")
+
+
+def test_preflight_platform_chunking_gate_respects_zero_override(tmp_path: Path, monkeypatch):
+    """`free_space_min_gib: 0` disables the platform-chunking gate too -- the
+    SAME disable convention as every other disk gate, not a second knob."""
+    table = _three_platform_chunking_table(tmp_path)
+    cfg = config.validate_config(
+        {
+            "name": "chunk-preflight-smoke",
+            "platforms": {"include": ["duckdb", "sqlite", "datafusion"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [1]},
+            "preflight": {"free_space_min_gib": 0},
+        }
+    )
+
+    # Free space far below even the chunked requirement -- would abort at
+    # any positive floor.
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 1.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path,
+        free_space_min_gib=0,
+        disk_budget_config=cfg,
+    )
+
+    assert result.aborted is False
+    assert result.abort_reason is None
+
+
 def test_requested_platforms_from_config_matches_uat_defaults():
     assert preflight.requested_platforms_from_config(
         config.validate_config({"name": "smoke", "platforms": {"include": ["postgresql"]}})

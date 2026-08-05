@@ -128,13 +128,8 @@ tests/uat/
 |---|---|---|---|
 | `__init__.py` | UAT package marker and documentation string | — | 6 |
 | `matrix.py` | Registry-driven benchmark enumeration, platform grouping, compose-derived TCP reachability probe (connection facts now owned by `docker_assets`) | 250 | 515 |
-<<<<<<< HEAD
 | `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path; submit classification via shared `benchbox.core.results.submit_classification` | 120 | 354 |
 | `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 761 |
-=======
-| `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path; submit classification via shared `benchbox.core.results.submit_classification` | 120 | 354 |
-| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 761 |
->>>>>>> 83a445878f (feat(uat): model per-platform disk budget and add execute.platform_chunking)
 | `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 806 |
 | `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 | 123 |
 | `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 | 167 |
@@ -147,9 +142,9 @@ tests/uat/
 | `gate_summary.py` | Writes/reads the versioned `uat_gate_summary.json` per-sweep evidence artifact; powers `make uat-gate-check` cross-stage aggregation | — | 274 |
 | `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — | 316 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 | 83 |
-| `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 384 |
+| `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 411 |
 | `phases/__init__.py` | UAT phase package marker and phase contract documentation string | — | 17 |
-| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 451 |
+| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 522 |
 | `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 | 296 |
 | `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 | 1039 |
 | `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 | 304 |
@@ -182,7 +177,7 @@ remain hand-tracked.
 
 - plumbing (orchestrator/config/`_cli`): 2,473
 - core exercise (execute/matrix/runner/enumerate/cleanup/ladder): 2,454
-- preflight/compat/timeouts: 1,156
+- preflight/compat/timeouts: 1,254
 - Docker lifecycle (default-OFF, incl. `container_cleanup.py`): 1,743
 - chartered evidence artifacts (validate/report/package/cells_io/gate_summary): 1,684
 - explorer-prep: 387
@@ -190,7 +185,7 @@ remain hand-tracked.
 - artifact hygiene: 315
 - package init markers: 23
 
-**Total: 10,551 production LOC across 26 modules.**
+**Total: 10,649 production LOC across 26 modules.**
 
 <!-- UAT-LOC-SUMMARY:END -->
 
@@ -382,9 +377,17 @@ preflight:
 # Disk-budget estimate --------------------------------------------------
 # `tests/uat/data/disk_budget_table.tsv` is an advisory, checked-in
 # inventory keyed by (platform, benchmark, scale_factor). Preflight
-# prints `Disk budget estimate: ... GiB` before workload execution.
-# The estimate never gates execution; unknown cells are surfaced as a
-# count and `preflight.free_space_min_gib` remains the hard cutoff.
+# prints `Disk budget estimate: ... GiB` before workload execution, and
+# gates on it: the largest configured scale rung's estimated peak (summed
+# across every requested platform, i.e. what a non-chunked sweep needs if
+# every platform's database coexists) against every required root, and
+# (uat-disk-budget-and-platform-chunking) the smaller
+# execute.platform_chunking requirement instead once that field is set --
+# see docs/operations/uat-framework.md "Platform chunking". Unknown cells
+# are surfaced as a count, not treated as zero, and
+# `preflight.free_space_min_gib` remains the hard cutoff -- explicitly
+# setting it to 0 disables every disk gate here, including the
+# platform-chunking one.
 
 # Resume (retired) -------------------------------------------------------
 # The resume manifest (`<log-dir>/resume.json`, `--resume <manifest>`)

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import shutil
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -249,16 +250,31 @@ class PlatformChunkingBudget:
     `concurrent_required_gib` is what today's non-chunked execute needs if
     every platform's loaded databases coexisted at once (11 platforms at
     ~15 GiB each was the 2026-08-04 release-gate stage-1 incident this
-    estimator exists to catch before it happens again).
-    `chunked_required_gib` is the much smaller bound `execute.platform_chunking`
-    enforces by pruning a platform's databases before the next platform
-    starts -- the worst single platform's own footprint.
+    estimator exists to catch before it happens again) -- numerically
+    identical to `estimate_largest_scale_peak_disk(config).est_peak_gib`
+    (same cells, same table, same dedup rule; see
+    `estimate_platform_chunking_budget`).
 
-    Both are derived from the SAME table-driven estimator as
-    `estimate_largest_scale_peak_disk` (grouped by platform instead of
-    summed flat), at the config's largest CONFIGURED `scales.rungs` entry --
-    never a hardcoded flat per-platform constant. `basis` records that
-    provenance for the lifecycle log.
+    `per_platform_peak_gib` is the worst single platform's OWN loaded
+    -database + transient-growth footprint -- deliberately excluding
+    datagen, which `cleanup.preserve_datagen: true` keeps resident for the
+    whole sweep regardless of chunking, so it is neither freed nor
+    re-charged per platform. This is exactly what
+    `cleanup.prune_platform_chunk` frees at a chunk boundary.
+
+    `chunked_required_gib` is `per_platform_peak_gib` plus that
+    always-resident datagen total -- the bound `execute.platform_chunking`
+    enforces once a platform's databases are pruned before the next
+    platform starts.
+
+    All three are derived from the SAME table-driven estimator as
+    `estimate_largest_scale_peak_disk` -- grouped by platform for the
+    per-platform split, never re-summed per platform for datagen (datagen is
+    shared/deduped globally, exactly like the flat estimate; summing a
+    shared file's size once per platform that reuses it would silently
+    inflate `concurrent_required_gib`) -- at the config's largest
+    CONFIGURED `scales.rungs` entry, never a hardcoded flat per-platform
+    constant. `basis` records that provenance for the lifecycle log.
     """
 
     platform_count: int
@@ -276,39 +292,50 @@ def estimate_platform_chunking_budget(
 ) -> PlatformChunkingBudget:
     """Estimate concurrent (all-platforms) vs chunked (one-platform) disk demand.
 
-    Reuses `estimate_cells` -- the same table-driven estimator every other
-    budget function in this module uses -- grouped per platform at the
-    config's largest configured scale rung, rather than adding a second,
+    Reuses `estimate_cells` for the authoritative concurrent total -- the
+    same table-driven estimator, over the same largest-scale cell set, that
+    `estimate_largest_scale_peak_disk` uses -- rather than adding a second,
     divergent estimator (see uat-disk-budget-and-platform-chunking prior
-    art: extend, don't duplicate).
+    art: extend, don't duplicate). A second, additive-only pass over the
+    same cells splits the per-platform loaded-database/transient share out
+    from the globally-deduped datagen share, which `DiskBudget` does not
+    expose on its own; see `PlatformChunkingBudget` for why datagen must
+    stay deduped rather than summed per platform.
     """
     table = load_budget_table(table_path)
     largest_cells = _largest_scale_cells(config)
-    by_platform: dict[str, list[Cell]] = {}
-    for cell in largest_cells:
-        by_platform.setdefault(cell.platform, []).append(cell)
+    flat_budget = estimate_cells(largest_cells, table=table)
 
-    budgets = {platform: estimate_cells(cells, table=table) for platform, cells in by_platform.items()}
-    platform_count = len(budgets)
-    per_platform_peak_gib = max((budget.est_peak_gib for budget in budgets.values()), default=0.0)
-    concurrent_required_gib = sum(budget.est_peak_gib for budget in budgets.values())
+    database_transient_by_platform: dict[str, float] = defaultdict(float)
+    for cell in largest_cells:
+        row = table.get((cell.platform, cell.benchmark, cell.scale))
+        if row is None:
+            continue
+        database_transient_by_platform[cell.platform] += row.peak_database_gib + row.transient_growth_gib
+
+    platform_count = len(database_transient_by_platform)
+    per_platform_peak_gib = max(database_transient_by_platform.values(), default=0.0)
+    concurrent_required_gib = flat_budget.est_peak_gib
+    datagen_gib = concurrent_required_gib - sum(database_transient_by_platform.values())
+    chunked_required_gib = datagen_gib + per_platform_peak_gib
     scale = max((cell.scale for cell in largest_cells), default=None)
     if scale is None:
         basis = "no cells enumerated for the configured matrix; basis unavailable"
     else:
         basis = (
-            f"disk_budget_table peak_database_gib rows at scale={scale:g} "
+            f"disk_budget_table rows at scale={scale:g} "
             f"(largest of scales.rungs={config.scales.rungs}) across {platform_count} platform(s); "
-            f"worst platform={per_platform_peak_gib:.2f} GiB, sum-if-concurrent={concurrent_required_gib:.2f} GiB"
+            f"datagen (shared, resident regardless of chunking)={datagen_gib:.2f} GiB, "
+            f"worst platform database+transient={per_platform_peak_gib:.2f} GiB, "
+            f"sum-of-all-platforms database+transient={concurrent_required_gib - datagen_gib:.2f} GiB"
         )
-    unknown = tuple(cell for budget in budgets.values() for cell in budget.unknown_cells)
     return PlatformChunkingBudget(
         platform_count=platform_count,
         per_platform_peak_gib=per_platform_peak_gib,
         concurrent_required_gib=concurrent_required_gib,
-        chunked_required_gib=per_platform_peak_gib,
+        chunked_required_gib=chunked_required_gib,
         basis=basis,
-        unknown_cells=unknown,
+        unknown_cells=flat_budget.unknown_cells,
     )
 
 
