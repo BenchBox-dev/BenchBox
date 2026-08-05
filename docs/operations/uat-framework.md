@@ -129,6 +129,7 @@ cleanup:
   docker_platform_switch: "volumes"   # down -v --remove-orphans at platform switch
   docker_project_prefix: "benchbox-uat"
   docker_start_timeout_s: 300
+  docker_settle_s: 10                 # post-`up --wait` readiness settle window, see below
   docker_fixed_container_name_policy: "fail"
 ```
 
@@ -446,10 +447,12 @@ A managed Docker compose-up failure (e.g. a heavy stack exceeding
 `cleanup.docker_start_timeout_s`) is treated as a per-platform
 infrastructure failure, not a sweep abort. The failure is recorded in
 `uat_lifecycle.log` (`action=up status=failed`), the platform's cells are
-recorded as skipped-unreachable, the half-started stack is torn down, and
-the sweep advances to the next stack — one stack at a time. Genuine global
-aborts (disk free-space, teardown failure, fixed `container_name` policy)
-still stop the sweep.
+recorded as `startup_failed` (not `skipped_unreachable` — that accounting
+split is deliberate, see "Post-start readiness re-check" below), the
+half-started stack is torn down, and the sweep advances to the next stack —
+one stack at a time. Genuine global aborts (disk free-space, memory
+headroom, teardown failure, fixed `container_name` policy) still stop the
+sweep.
 
 Setting `docker_start_timeout_s` for a slow stack (e.g. LakeSail Spark
 Connect): **measure a healthy startup first, then set the timeout above it.**
@@ -458,6 +461,84 @@ confirm the service becomes healthy, time it, and set
 `cleanup.docker_start_timeout_s` to a value comfortably above the observed
 healthy time. Do not raise it blindly — a longer timeout on a broken service
 just wastes the timeout window each attempt.
+
+### Post-start readiness re-check (settle + `compose ps` + reachability)
+
+`docker compose up -d --wait` exiting 0 only proves the stack reported
+started/healthy **at that instant**. It does not prove the stack is still
+running a few seconds later. Live-observed 2026-08-04: `mocker compose up
+--wait` reported CedarDB `Started`, and `mocker compose ps` showed
+`diag-net-cedardb-1 Exited` roughly 29 seconds later — the container's own
+log showed why (`Running under cgroup memory limit: 1024 MB`, then
+`FATAL: unable to register fixed io_uring buffer`, a host-memory-exhaustion
+failure, see "Memory headroom gate" below). Because nothing re-checked
+container state after `up --wait` returned, UAT ran all 171 cells against
+the dead stack and recorded every one as a **cell failure** instead of a
+**startup failure** — hiding the real cause behind 171 misleading rows.
+
+To close that gap, a successful `up --wait` is no longer trusted on its own.
+The execute phase now:
+
+1. Waits `cleanup.docker_settle_s` seconds (default 10) after `up --wait`
+   reports success.
+2. Re-runs `compose ps` and fails the platform block if any service's
+   STATUS column shows `Exited` or `Restarting`.
+3. Re-probes host reachability (the same TCP-probe primitive
+   `execute.skip_unreachable` already uses for `_run_or_skip_platform`).
+
+A stack that fails either check is routed into the **same** `startup_failed`
+path as a `compose up` failure: recorded in `uat_lifecycle.log`
+(`action=readiness status=failed`, plus the raw `action=ps` result), its
+cells are NOT run and are NOT counted as cell failures, and the sweep
+advances to the next stack rather than aborting. This is not a replacement
+for `docker_start_timeout_s`: `up --wait` already reported the stack
+Started/healthy by the time this runs, so raising
+`docker_start_timeout_s` in response to a readiness failure just waits
+longer on something the engine already declared done — see "Managed Docker
+startup failures are non-fatal" above for the actual timeout-tuning
+guidance.
+
+This check only runs for `cleanup.docker_manage_platforms: true` (UAT
+started the stack) and is skipped entirely for `dry_run: true` (nothing was
+actually started to settle or probe).
+
+## Memory headroom gate
+
+Preflight gates free **disk** space (`preflight.free_space_min_gib`), but
+under mocker each Docker-managed platform is its own VM with independent
+memory sizing — free disk space says nothing about whether the host has
+enough free memory left to start the next container's VM. The 2026-08-04
+incident above was ultimately a host-memory-exhaustion failure, not a
+mocker defect: the host had **72 MB free of 16 GB, with 11.7 of 13.3 GB
+swap already in use** when CedarDB's container (cgroup-limited to 1024 MB)
+failed to register an io_uring buffer and exited.
+
+`preflight.free_memory_min_gib` (default 2.0) mirrors
+`preflight.free_space_min_gib`'s shape, including the 0-disables
+convention: `preflight.free_memory_min_gib: 0` disables the gate exactly
+like `free_space_min_gib: 0` disables the disk gate, and prints a
+`[memory-gate] DISABLED by config` warning. The gate runs immediately before
+starting each Docker-managed platform (mirroring the disk floor's
+platform-boundary check in `execute.py`) and gates on **measured free
+memory**, never total RAM — a 16 GB host with 72 MB free is not "fine"
+because it has 16 GB of capacity. Every check, pass or fail, logs a
+`[free-memory]` line to `uat_lifecycle.log` with the resolved container
+engine (`docker`/`mocker`), the measured free memory against the configured
+floor, swap-used percentage alongside (telemetry only — it never gates the
+decision by itself), and the platform's declared VM/container memory
+request (from the compose file's `mem_limit` or
+`deploy.resources.limits.memory`, or "no declared memory limit (engine
+default)" when neither is set — most UAT compose files, including
+CedarDB's, declare none, so the 1024 MB cgroup limit above came from the
+engine's own default sizing, not this repo's compose files).
+
+Free memory is measured with `psutil.virtual_memory().available` (`psutil`
+is a hard project dependency) on macOS, Linux, and Windows alike. If the
+measurement itself cannot be taken (psutil unavailable, a sandboxed
+process denied access, …), the gate degrades safely: it logs that the
+reading is unavailable and does **not** gate — it never silently treats an
+unmeasurable host as having headroom (fail-open), and never hard-fails an
+otherwise-healthy host merely because the measurement failed (fail-closed).
 
 ## Troubleshooting
 
@@ -468,6 +549,8 @@ just wastes the timeout window each attempt.
 | Skipped-unreachable platforms | local Docker / TCP services not running and Docker is externally managed | `docker compose up` for the relevant services, or set `execute.skip_unreachable: false` to surface as failures |
 | Docker daemon unavailable in managed mode | `cleanup.docker_manage_platforms: true` requires `docker ps` and `docker compose` | start Docker Desktop/daemon; preflight treats Docker as required in managed mode |
 | Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | the sweep records the stack as failed and advances (see "Managed Docker startup failures are non-fatal"); inspect compose logs and raise the timeout only after measuring a healthy startup |
+| Platform `startup_failed` shortly after `up --wait` succeeded | container reported Started, then Exited/Restarted, or became unreachable within `docker_settle_s` | inspect `uat_lifecycle.log` `action=ps`/`action=readiness` events and the container's own logs; do NOT raise `docker_start_timeout_s` (see "Post-start readiness re-check") — check host memory first |
+| Preflight/execute aborts on memory | host free memory fell below `preflight.free_memory_min_gib` before starting a Docker-managed platform | inspect `uat_lifecycle.log` `[free-memory]` lines (free GiB, swap %, VM request); free host memory or override `preflight.free_memory_min_gib` for a supervised rerun |
 | Cleanup command failed | UAT-owned `docker compose down ...` returned non-zero | inspect `uat_lifecycle.log`, then run the logged command manually if safe |
 | Fixed `container_name` collision | a compose file declares a global container name already in use | stop the conflicting developer stack or keep that platform external-only until the compose file is fixed |
 | Validator clean rate breaches floor | bundle quality regression | run `make uat-validate` standalone; it validates via `benchbox.validation.bundle` and writes the rollup TSV |
