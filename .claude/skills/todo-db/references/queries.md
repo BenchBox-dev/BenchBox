@@ -16,7 +16,6 @@
 - Inspect: `todo list [filters]`, `todo show <id> [--json]`, `todo stats`,
   `todo deps <id>`, and `todo export`.
 - Rank / group open work (skill-only, read-only by default): follow
-  `prioritize.md` — not a CLI subcommand; do not invent a `todo prioritize`
-  verb.
+  `prioritize.md` — not a CLI subcommand; do not invent a prioritize verb.
 - Block/release/drop: use `todo block <id> --reason ...`, `todo unblock <id>`,
   `todo release <id>`, `todo sweep-stale`, or `todo drop <id> --reason ...`.
