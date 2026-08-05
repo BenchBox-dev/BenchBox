@@ -95,7 +95,8 @@ Loop until every item is `done` or `blocked`:
    condition — `gh pr checks`, `gh pr view`, or the project PR-status target)
    only for a batch-owned dependency gate that must resolve before another TODO
    can proceed. Deterministic gate runs are delegatable to a low-effort
-   subagent for run-and-report — see SHARED/verify-framework/SKILL.md. Fix red
+   subagent for run-and-report — see SHARED/change-framework/SKILL.md Section 2
+   (Post-Edit Verification Ladder). Fix red
    batch-owned PRs while still in scope; mark `blocked` only after one failed
    recovery.
 
@@ -118,7 +119,7 @@ For each ready TODO:
    proven invalid with cited evidence; apply Nit/Consider only within scope and
    record every skipped one in the PR body. Re-verify/re-review after
    non-trivial fixes.
-6. Commit explicit paths only (never `git add -A`) via SHARED/commit-framework,
+6. Commit explicit paths only (never `git add -A`) via SHARED/change-framework,
    then run the project's PR-open equivalent.
 7. `todo complete <id> --pr <n>` (resolve deferrals first via `promote` /
    `dismiss`, or it refuses).

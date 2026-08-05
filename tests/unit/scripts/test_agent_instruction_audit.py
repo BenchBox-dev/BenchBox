@@ -76,7 +76,7 @@ def test_repository_candidate_passes() -> None:
     [
         "AGENTS.md",
         ".claude/settings.json",
-        ".claude/skills/SHARED/context-guide/SKILL.md",
+        ".claude/skills/SHARED/investigation-framework/SKILL.md",
         "_project/evals/agent-instructions/scenarios.json",
         "docs/development/agent-review-protocol.md",
         "skill-sync.lock",

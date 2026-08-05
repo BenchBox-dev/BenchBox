@@ -1,5 +1,5 @@
 ---
-name: benchbox-workflow
+name: benchbox
 description: Use when the user asks to "test TPC-H", "check compliance", "review architecture", "run quality checks", "check binaries", "test dialect translation", "compare implementations", "run live platform tests", or "plan and execute" a benchmark feature.
 version: 0.2.0
 tools: Bash, Read, Write, Edit, Glob, Grep, Task
