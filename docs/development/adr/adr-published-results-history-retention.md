@@ -5,7 +5,7 @@
 ```{tags} adr, privacy, operations
 ```
 
-**Status:** Accepted — 2026-08-04
+**Status:** Accepted — 2026-08-04; re-examined against pseudonym reversibility — 2026-08-05
 **Scope:** the `published-results` branch only
 
 ## Context
@@ -73,3 +73,51 @@ The commits carrying the old content remain reachable in that branch's history.
 | `git filter-repo` + force-push | Does not retract already-public content; breaks all clones and forks; disproportionate for path/username exposure |
 | Delete and recreate the branch | Same non-retraction problem, plus loses the mirror audit trail linking each corpus state to a develop SHA |
 | Make the repository private | Defeats the purpose of a public results corpus |
+
+## Amendment 2026-08-05: re-examination after confirmation-oracle finding
+
+### Premise gap
+
+The 2026-08-04 decision treated the public pseudonyms as irreversible
+identifiers (a salted SHA-256 of machine-local material). After that decision
+was recorded, dictionary recovery established that the empty default salt makes
+those pseudonyms a **confirmation oracle**: a candidate value can be matched
+against the corpus with certainty, no server involved. The original retention
+rationale therefore understated the residual exposure class for values that
+remain reachable in `published-results` history.
+
+This amendment records that re-examination. It does **not** rewrite the
+2026-08-04 rationale retroactively; what was known at decision time stays as
+written above.
+
+### Re-examination outcome
+
+**Retention still holds. Do not rewrite `published-results`.**
+
+| Factor | Effect on retention |
+|---|---|
+| Confirmation oracle / recoverability | Raises residual risk for history commits that still carry empty-salt pseudonyms and pre-#1467 plaintext paths |
+| Retractability | Unchanged: force-push still does not un-publish clones, forks, or cached views |
+| Blast radius of rewrite | Unchanged: breaks every consumer of the public corpus branch |
+| Severity class | Still path/username/low-entropy product identifiers for maintainer-authored seed content — not credentials or customer data |
+| Forward mitigation already landed | Unread identifier fields dropped at the publication boundary (#1578 / tip mirror #1583); residual oracle on retained fields documented (`adr-published-identifier-field-set` salt decision 2026-08-05); scheduled directional drift canary + published-tip privacy scan |
+
+The oracle finding changes *what history contains* (recoverable confirmations,
+not just opaque digests), not *whether rewriting undoes publication*. Because
+rewriting still fails the retraction test and still taxes every external
+consumer, history remains retained. Forward exposure is reduced by omitting
+unread fields and by requiring operators who publish community submissions to
+configure a non-empty deployment-private salt.
+
+### If this were reversed
+
+A decision to rewrite would be a **separate change** with its own blast radius:
+`git filter-repo` (or branch recreate), coordinated consumer re-clones, Explorer
+pipeline pin updates, and an explicit higher-severity justification. That plan
+is out of scope for this amendment; open a dedicated item if severity class
+escalates.
+
+### Verification of this amendment
+
+- This section names reversibility / recovery as weighed factors.
+- The original severity-class scoping sentence remains above (regression rung).
