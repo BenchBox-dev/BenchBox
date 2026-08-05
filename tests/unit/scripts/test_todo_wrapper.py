@@ -105,10 +105,25 @@ class TestShim:
         stats = json.loads(result.stdout)
         assert stats["items_by_state"] == {}
 
-    def test_shim_resolves_code_from_own_location_not_cwd_git_root(self):
-        # Absolute path to this tree's shim, cwd outside any repo: must still
-        # load this tree's todo_db.py (not fail or bind to another clone).
+    def test_shim_resolves_code_from_own_location_not_cwd_git_root(self, tmp_path):
+        # Absolute path to THIS tree's shim must win even when cwd is another
+        # git root with a decoy _project/scripts/todo_db.py (the lagging-primary
+        # / wrong-clone failure mode).
         assert SHIM_PATH.is_absolute()
+        decoy = tmp_path / "other-clone"
+        scripts = decoy / "_project" / "scripts"
+        scripts.mkdir(parents=True)
+        (decoy / ".git").mkdir()
+        decoy_marker = "DECOY_TODO_DB_MARKER_NOT_FROM_REAL_TREE"
+        (scripts / "todo_db.py").write_text(
+            f"import sys\nprint({decoy_marker!r})\nsys.exit(97)\n",
+            encoding="utf-8",
+        )
+        (scripts / "pyproject.toml").write_text(
+            '[project]\nname = "decoy"\nversion = "0"\nrequires-python = ">=3.10"\n',
+            encoding="utf-8",
+        )
+        # Foreign non-git cwd smoke
         result = subprocess.run(
             [str(SHIM_PATH), "update", "--help"],
             capture_output=True,
@@ -121,6 +136,22 @@ class TestShim:
         combined = result.stdout + result.stderr
         assert result.returncode == 0, combined
         assert "update" in combined
+        assert decoy_marker not in combined
+        # Foreign git root with decoy scripts must not execute the decoy
+        result2 = subprocess.run(
+            [str(SHIM_PATH), "update", "--help"],
+            capture_output=True,
+            text=True,
+            cwd=str(decoy),
+            env={"PATH": os.environ["PATH"], "HOME": str(Path.home())},
+            check=False,
+            timeout=120,
+        )
+        combined2 = result2.stdout + result2.stderr
+        assert result2.returncode == 0, combined2
+        assert "update" in combined2
+        assert decoy_marker not in combined2
+        assert result2.returncode != 97
 
     def test_shim_propagates_gate_exit_codes(self, tmp_path):
         db = tmp_path / "wrapper.sqlite"
