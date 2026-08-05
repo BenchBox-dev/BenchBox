@@ -553,9 +553,10 @@ With G1 closed, `connect()` grew a second mode (PR #1219; hardened in
 PR #1222). Backend
 selection, first match wins: `--db` (a `libsql://`/`https://` value selects
 hosted) → `TODO_DB_PATH` (local file) → `TODO_DB_URL` (hosted; requires
-`TODO_DB_AUTH_TOKEN`) → default local path. `TODO_DB_PATH` deliberately
-outranks `TODO_DB_URL` so a test or tool that pins a local file can never be
-silently redirected at the shared database.
+`TODO_DB_AUTH_TOKEN`) → **discovered `.todo-db/config.json`** (wrapper-level;
+see "Session backend binding" below) → default local path. `TODO_DB_PATH`
+deliberately outranks `TODO_DB_URL` so a test or tool that pins a local file
+can never be silently redirected at the shared database.
 
 The default-local final branch is a diagnostic/bootstrap seam, not a silent
 production substitute. Implicit reads remain available with a loud
@@ -596,6 +597,57 @@ tracker suite (93 tests: `test_todo_db.py`, `test_todo_db_v2.py`,
 `test_todo_wrapper.py`)
 passes unchanged. Replayable acceptance protocol:
 `_project/audits/todo-db-hosted-acceptance-2026-07-18.md`.
+
+### Session backend binding (2026-08-05, committed config.json discovery)
+
+Every session previously had to `export TODO_DB_URL` by hand: no committed
+config bound the hosted backend, and the `.gitignore` bare `.todo-db/` rule
+would have hidden one even if it existed. A forgotten export silently
+selected the local fallback, which happened to sit on a stale schema, so the
+resulting `database schema_version=3, CLI expects 5; run \`todo migrate\``
+message read as "the tracker is down" -- it was healthy the whole time (v5,
+2045 items). Two findings were written to out-of-tree drafts instead of the
+tracker on 2026-07-29 and 2026-07-31 before the cause was traced.
+
+Fix: a tracked `.todo-db/config.json` (URL only -- see the security note
+below) plus a fourth backend-selection tier in the wrapper,
+`_project/scripts/todo`: `--db` > `TODO_DB_PATH` > `TODO_DB_URL` >
+**discovered config** > default local path. The wrapper reads
+`.todo-db/config.json` and exports `TODO_DB_URL` from it, but only when
+neither `TODO_DB_PATH` nor `TODO_DB_URL` is already set in the environment --
+discovery can never override an explicit selection or redirect a pinned
+test. `todo_db.py`'s own precedence (`_resolve_backend`) is unchanged; the
+wrapper hands it `TODO_DB_URL` exactly as if the operator had exported it,
+so every invariant above (implicit-local reads are loud, implicit-local
+writes fail before opening the database, hosted invocations never print the
+DSN) applies identically regardless of which tier supplied the URL.
+
+Only the short-lived auth token remains a per-session secret, minted inline
+and never stored: `TODO_DB_AUTH_TOKEN=$(turso db tokens create benchbox-todo
+--expiration 1d)` (see
+`_project/audits/todo-db-hosted-acceptance-2026-07-18.md`). `.todo-db/config.json`
+carries the database URL and nothing else -- no token, no DSN with embedded
+credentials; the repo is public and `_project/todo-db-export/` is committed,
+so a leaked token here would be a live-tracker compromise, not just a
+provisioning nuisance. Run `todo doctor` first in any session that suspects a
+backend problem: it never mutates, is safe to run before minting a token
+(reports a clean `FAIL auth` / exit 4 without attempting a network
+connection), and never prints the hosted DSN or the token either way. A
+schema-version message pointing at `todo migrate` is *never* a reason to run
+`migrate` -- or worse, `init` -- against a database `doctor` has not first
+confirmed is the intended one; the schema mismatch this item's incident
+surfaced was on the local fallback, not the hosted tracker.
+
+`.gitignore` narrows accordingly: `.todo-db/*` with `!.todo-db/config.json`,
+so the runtime state (`todo.sqlite`, `replica.db*`, `export/`) stays
+per-clone and ignored while the binding config stays tracked. TDD:
+`tests/unit/scripts/test_todo_db.py::TestSessionBackendDiscovery` pins the
+wrapper's discovery/precedence behavior against a stubbed `uv` (the real
+interpreter and the hosted tracker are never reached);
+`tests/unit/scripts/test_todo_db_doctor.py::test_env_selected_hosted_backend_reports_identity_ok_not_fallback`
+pins that an environment-supplied backend -- including one the wrapper
+injected from the discovered config -- reads as an explicit selection, not
+the implicit local fallback.
 
 ### Pilot status & readiness (2026-07-19, PR #1222 review follow-up)
 

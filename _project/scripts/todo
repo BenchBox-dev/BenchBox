@@ -7,4 +7,31 @@ set -euo pipefail
 # schema-migration inventory gate rejects a wrapper/CLI mismatch before merge.
 TODO_SCHEMA_VERSION=5
 ROOT="$(git rev-parse --show-toplevel)"
+
+# Backend discovery -- the 4th and last precedence tier, after --db,
+# TODO_DB_PATH, and TODO_DB_URL (all still resolved in todo_db.py; unaffected
+# here). A committed .todo-db/config.json binds the hosted tracker so a fresh
+# session never needs to export TODO_DB_URL by hand; only the short-lived
+# TODO_DB_AUTH_TOKEN remains a per-session, never-committed secret. See
+# _project/specs/todo-db-tracker.md "Session backend binding". Skipped
+# entirely when the operator already selected a backend, so this can never
+# override an explicit TODO_DB_PATH/TODO_DB_URL or redirect a pinned test.
+CONFIG_PATH="$ROOT/.todo-db/config.json"
+if [[ -z "${TODO_DB_PATH:-}" && -z "${TODO_DB_URL:-}" && -f "$CONFIG_PATH" ]]; then
+  DISCOVERED_URL="$(python3 -c '
+import json, sys
+try:
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        data = json.load(fh)
+except (OSError, ValueError):
+    sys.exit(0)
+url = data.get("url")
+if isinstance(url, str) and url:
+    sys.stdout.write(url)
+' "$CONFIG_PATH")"
+  if [[ -n "$DISCOVERED_URL" ]]; then
+    export TODO_DB_URL="$DISCOVERED_URL"
+  fi
+fi
+
 exec uv run --project "$ROOT/_project/scripts" -- python "$ROOT/_project/scripts/todo_db.py" "$@"

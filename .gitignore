@@ -191,9 +191,14 @@ _sources/tpc-h/dbgen/dbgen_x86_64
 _project/TODO/_indexes/
 _project/DONE/_indexes/
 
-# Local-SQLite TODO tracker spike (see _project/specs/todo-db-tracker.md):
-# per-clone operational state, never committed.
-.todo-db/
+# TODO tracker backend state (see _project/specs/todo-db-tracker.md):
+# per-clone operational state (local fallback DB, hosted replica, export
+# scratch) is never committed. `config.json` is the deliberate exception --
+# it binds the hosted backend so a fresh session finds it without exporting
+# TODO_DB_URL by hand. A bare `.todo-db/` rule would hide that config again,
+# which is exactly the bug this narrowed rule exists to prevent.
+.todo-db/*
+!.todo-db/config.json
 _project/blind-spots/_indexes/
 
 # Ephemeral review/audit evidence. Commit durable markdown summaries instead.

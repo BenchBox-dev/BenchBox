@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 import textwrap
 from pathlib import Path
@@ -906,3 +908,82 @@ class TestCheckScopeReportsWhatItActuallyChecked:
         """--strict only affects the no-rules case."""
         _mk(conn, scope=[("only_modify", "benchbox/core/*")])
         assert self._run(conn, monkeypatch, "sample-item", ["benchbox/cli/x.py"], strict=True) == 1
+
+
+class TestSessionBackendDiscovery:
+    """The wrapper's 4th backend-selection tier: a committed .todo-db/config.json.
+
+    Fixes the incident this item exists for: with no committed config, every
+    session had to export TODO_DB_URL by hand, and a forgotten export silently
+    selected the implicit local fallback -- which happened to sit on a stale
+    schema, producing a `todo migrate` prompt that looked like the hosted
+    tracker was down (it was healthy the whole time). The wrapper
+    (`_project/scripts/todo`) now discovers `.todo-db/config.json` and injects
+    TODO_DB_URL itself, but only when the operator has not already selected a
+    backend via --db, TODO_DB_PATH, or TODO_DB_URL -- so this can never
+    override an explicit selection or redirect a pinned test.
+
+    These tests intercept `uv` on PATH with a stub that only reports the
+    environment the wrapper resolved and exits immediately: todo_db.py, the
+    network, and the real hosted tracker are never reached, so running these
+    is safe regardless of what .todo-db/config.json points at.
+    """
+
+    WRAPPER_PATH = REPO_ROOT / "_project" / "scripts" / "todo"
+    CONFIG_PATH = REPO_ROOT / ".todo-db" / "config.json"
+
+    @pytest.fixture()
+    def fake_uv_path(self, tmp_path):
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        stub = bin_dir / "uv"
+        stub.write_text(
+            "#!/usr/bin/env bash\n"
+            'echo "TODO_DB_URL=${TODO_DB_URL:-<unset>}"\n'
+            'echo "TODO_DB_PATH=${TODO_DB_PATH:-<unset>}"\n',
+            encoding="utf-8",
+        )
+        stub.chmod(0o755)
+        return f"{bin_dir}:{os.environ['PATH']}"
+
+    def _run(self, fake_uv_path, extra_env=None):
+        env = {"PATH": fake_uv_path, "HOME": str(Path.home())}
+        env.update(extra_env or {})
+        return subprocess.run(
+            [str(self.WRAPPER_PATH), "stats"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            env=env,
+            check=False,
+            timeout=30,
+        )
+
+    def test_committed_config_exists_and_is_url_only(self):
+        """Guards w1: the committed config binds the hosted backend by URL alone."""
+        assert self.CONFIG_PATH.exists(), "committed .todo-db/config.json is missing"
+        data = json.loads(self.CONFIG_PATH.read_text(encoding="utf-8"))
+        serialized = json.dumps(data).lower()
+        assert "token" not in serialized
+        assert "eyj" not in serialized  # a stray JWT would start this way
+        assert data["url"].startswith("libsql://")
+
+    def test_wrapper_discovers_committed_config_when_backend_unselected(self, fake_uv_path):
+        result = self._run(fake_uv_path)
+        assert result.returncode == 0, result.stderr
+        discovered = json.loads(self.CONFIG_PATH.read_text(encoding="utf-8"))["url"]
+        assert f"TODO_DB_URL={discovered}" in result.stdout
+        assert "TODO_DB_PATH=<unset>" in result.stdout
+
+    def test_explicit_todo_db_path_is_not_overridden_by_discovery(self, fake_uv_path, tmp_path):
+        pinned = str(tmp_path / "explicit.sqlite")
+        result = self._run(fake_uv_path, {"TODO_DB_PATH": pinned})
+        assert result.returncode == 0, result.stderr
+        assert f"TODO_DB_PATH={pinned}" in result.stdout
+        assert "TODO_DB_URL=<unset>" in result.stdout, "discovery must not fire once TODO_DB_PATH is set"
+
+    def test_explicit_todo_db_url_is_not_overridden_by_discovery(self, fake_uv_path):
+        pinned = "libsql://an-explicitly-pinned-database.turso.io"
+        result = self._run(fake_uv_path, {"TODO_DB_URL": pinned})
+        assert result.returncode == 0, result.stderr
+        assert f"TODO_DB_URL={pinned}" in result.stdout

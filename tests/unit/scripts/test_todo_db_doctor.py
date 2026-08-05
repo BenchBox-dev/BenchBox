@@ -229,3 +229,22 @@ def test_implicit_local_fallback_is_warned_not_failed(monkeypatch, tmp_path, cap
     monkeypatch.setattr(todo_db, "_resolve_backend", lambda _explicit: (db, True))
     assert todo_db.main(["doctor"]) == todo_db.DOCTOR_EXIT_OK
     assert "WARN identity" in capsys.readouterr().out
+
+
+def test_env_selected_hosted_backend_reports_identity_ok_not_fallback(monkeypatch, capsys):
+    """A backend supplied via TODO_DB_URL -- including the wrapper's own
+    config-discovery injection (see _project/scripts/todo, which exports
+    TODO_DB_URL from the committed .todo-db/config.json when no backend was
+    already selected) -- must read as an explicit selection, never as the
+    implicit local fallback. Regression for the incident this item fixes:
+    an unselected backend silently read from a stale local database instead
+    of raising a clear signal.
+    """
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    monkeypatch.setenv("TODO_DB_URL", "libsql://example-doctor.turso.io")
+    monkeypatch.delenv("TODO_DB_AUTH_TOKEN", raising=False)
+
+    assert todo_db.main(["doctor"]) == todo_db.DOCTOR_EXIT_AUTH
+    out = capsys.readouterr().out
+    assert "OK   identity" in out
+    assert "LOCAL FALLBACK" not in out
