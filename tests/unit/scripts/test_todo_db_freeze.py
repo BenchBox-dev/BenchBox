@@ -544,20 +544,23 @@ class TestFalsifiabilityGrandfathering:
         # grepping for the finding reads a cleared backlog as unfixed.
         assert "no falsifiability" not in notes[0]
 
-    def test_a_post_rule_item_is_still_a_finding(self, conn):
+    def test_a_post_rule_item_is_still_reported_as_advisory_note(self, conn):
         item = self._new(conn)
-        assert [f for f in todo_db.lint_item(conn, item) if "no falsifiability" in f]
+        assert not [f for f in todo_db.lint_item(conn, item) if "no falsifiability" in f]
+        assert [n for n in todo_db.lint_item_notes(conn, item) if "no falsifiability" in n]
 
     def test_grandfathering_can_be_switched_off_to_audit_the_backlog(self, conn):
         item = self._old(conn)
         todo_db.set_config(conn, "tester", "lint.grandfather_falsifiability", "off")
-        assert [f for f in todo_db.lint_item(conn, item) if "no falsifiability" in f]
+        assert not [f for f in todo_db.lint_item(conn, item) if "no falsifiability" in f]
+        assert [n for n in todo_db.lint_item_notes(conn, item) if "no falsifiability" in n]
 
     def test_a_missing_creation_stamp_buys_no_exemption(self, conn):
         """Otherwise clearing created_at becomes an opt-out."""
         item = self._old(conn, "undated-item")
         conn.execute("UPDATE items SET created_at = '' WHERE id = ?", (item,))
-        assert [f for f in todo_db.lint_item(conn, item) if "no falsifiability" in f]
+        assert not [f for f in todo_db.lint_item(conn, item) if "no falsifiability" in f]
+        assert [n for n in todo_db.lint_item_notes(conn, item) if "no falsifiability" in n]
 
     def test_a_pre_rule_item_with_a_good_ladder_gets_no_note(self, conn):
         """Grandfathering reports only items that would otherwise trip."""
