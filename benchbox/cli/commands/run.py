@@ -65,7 +65,11 @@ from benchbox.cli.tuning_runtime import (
     infer_runtime_tuning_mode,
     resolve_dataframe_tuning_config,
 )
-from benchbox.core.benchmark_registry import get_benchmark_default_scale
+from benchbox.core.benchmark_registry import (
+    get_benchmark_default_scale,
+    get_presort_table_configs,
+    presort_capable_benchmarks,
+)
 from benchbox.core.config import DatabaseConfig
 from benchbox.core.constants import QUERY_PHASES, RUN_MODES, VALID_PHASES
 from benchbox.core.platform_registry import PlatformRegistry
@@ -272,19 +276,16 @@ def _resolve_data_organization_payload(
         "iceberg-sorted": "iceberg",
     }
     output_format = output_format_map[presort]
-    if benchmark_key == "tpch":
-        return {
-            "table_configs": {"lineitem": [{"name": "l_shipdate", "order": "asc"}]},
-            "output_format": output_format,
-        }
-    if benchmark_key == "tpcds":
-        return {
-            "table_configs": {"store_sales": [{"name": "ss_sold_date_sk", "order": "asc"}]},
-            "output_format": output_format,
-        }
+
+    # Sort keys are benchmark knowledge: a benchmark supports --presort exactly
+    # when it declares presort_table_configs in the registry.
+    table_configs = get_presort_table_configs(benchmark_key) if benchmark_key else None
+    if table_configs:
+        return {"table_configs": table_configs, "output_format": output_format}
 
     if benchmark_key:
-        raise ValueError("--presort sorted modes are currently supported for tpch and tpcds benchmarks")
+        supported = ", ".join(sorted(presort_capable_benchmarks()))
+        raise ValueError(f"--presort sorted modes are currently supported for {supported} benchmarks")
     return tuning_payload
 
 
