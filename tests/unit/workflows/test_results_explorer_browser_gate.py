@@ -1,13 +1,17 @@
 """Contract tests for the Results Explorer browser lane wiring.
 
-The browser workflow calls its Chromium job "blocking". That word is only true
-if two separate things hold: the job must actually run on the branches we care
-about, and it must not be `continue-on-error`. Neither is visible from the job
-name, and both have been wrong at some point.
+Decision (browser-gate-named-blocking-blocks-nothing): the Chromium full suite
+**does** gate merges. The job name "blocking" is truthful when all of the
+following hold:
 
-These tests pin the workflow-local half of the contract. Whether Chromium is a
-*required status check* lives in the repository ruleset, which no unit test can
-reach; that half is verified by the tracked item's `gh api` rung.
+1. Chromium is not `continue-on-error`.
+2. The always-running required gate job depends on Chromium.
+3. The gate job's `name:` (`Results Explorer browser gate`) is the context
+   recorded in the admin runbook and in `docs/operations/browser-ci.md`.
+
+The live ruleset membership (develop ruleset `develop-squash-only` /
+15611785 requires that context) is not reachable from unit tests; pin the
+documented agreement here and confirm the ruleset with `gh api` when triaging.
 """
 
 from __future__ import annotations
@@ -22,6 +26,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "results-explorer-browser.yml"
+BROWSER_CI_RUNBOOK = REPO_ROOT / "docs" / "operations" / "browser-ci.md"
+REPO_ADMIN_RUNBOOK = REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md"
 
 CHROMIUM_JOB = "chromium"
 GATE_JOB = "browser-required-result"
@@ -64,11 +70,15 @@ def test_gate_context_matches_the_documented_required_check(workflow: dict[str, 
     """The ruleset pins a context string; renaming the job silently breaks it.
 
     A required context that no job reports leaves every PR unmergeable, so the
-    job name, the admin runbook, and the live ruleset have to agree.
+    job name, the admin runbook, the browser-ci runbook, and the live ruleset
+    have to agree.
     """
     assert workflow["jobs"][GATE_JOB]["name"] == GATE_CONTEXT
-    runbook = (REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text(encoding="utf-8")
-    assert GATE_CONTEXT in runbook, "required gate context is not recorded in the repo admin runbook"
+    admin_runbook = REPO_ADMIN_RUNBOOK.read_text(encoding="utf-8")
+    assert GATE_CONTEXT in admin_runbook, "required gate context is not recorded in the repo admin runbook"
+    browser_runbook = BROWSER_CI_RUNBOOK.read_text(encoding="utf-8")
+    assert GATE_CONTEXT in browser_runbook, "required gate context is not recorded in docs/operations/browser-ci.md"
+    assert "15611785" in browser_runbook, "browser-ci runbook must cite develop ruleset id 15611785"
 
 
 def test_lane_still_runs_on_pull_requests_into_develop(workflow: dict[str, Any]) -> None:
@@ -88,8 +98,29 @@ def test_chromium_job_is_not_continue_on_error(workflow: dict[str, Any]) -> None
     assert chromium.get("continue-on-error", False) is False, "Chromium job is continue-on-error but claims to block"
 
 
+def test_chromium_blocking_name_agrees_with_wiring(workflow: dict[str, Any]) -> None:
+    """Name says blocking ⟺ not continue-on-error AND the required gate depends on it.
+
+    Renaming Chromium away from "blocking" while it still feeds the required
+    gate would re-create the historical lie in the opposite direction. Leaving
+    the name while clearing continue-on-error but dropping the gate dependency
+    would restore the original defect. Pin the full agreement.
+    """
+    chromium = workflow["jobs"][CHROMIUM_JOB]
+    name = chromium["name"].lower()
+    claims_blocking = "blocking" in name and "non-blocking" not in name
+    is_hard_fail = chromium.get("continue-on-error", False) is False
+    gate_depends_on_chromium = CHROMIUM_JOB in workflow["jobs"][GATE_JOB]["needs"]
+
+    assert claims_blocking, (
+        f"Chromium job name must claim blocking while it feeds the required gate; got {chromium['name']!r}"
+    )
+    assert is_hard_fail, "job name says 'blocking' while continue-on-error suppresses its result"
+    assert gate_depends_on_chromium, "job name says 'blocking' but browser-required-result does not depend on chromium"
+
+
 def test_chromium_job_name_claims_blocking_only_while_it_can_block(workflow: dict[str, Any]) -> None:
-    """Keep the job name and the job's actual semantics in sync."""
+    """Keep the job name and the job's actual semantics in sync (one direction)."""
     chromium = workflow["jobs"][CHROMIUM_JOB]
     if "blocking" in chromium["name"].lower() and "non-blocking" not in chromium["name"].lower():
         assert chromium.get("continue-on-error", False) is False, (

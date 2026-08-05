@@ -44,12 +44,19 @@ side had already closed out.
 
 ## Browser-lane triage
 
-- Chromium's full e2e suite is "blocking" in name only — it is **not** in
-  the required-check set (tracker:
-  `chromium-blocking-suite-not-in-required-checks`). Before attributing a
-  red Chromium run to the PR under review, check whether it is already red
-  on develop's own tip; a pre-existing develop-side failure is not the
-  PR's fault.
+- Chromium's full e2e suite **does** gate develop merges. The required
+  status check is `Results Explorer browser gate` (ruleset
+  `develop-squash-only`), not a subordinate of `ci-required-result` —
+  browser and PR workflows are separate. The gate is path-aware via
+  `explorer-changes`: a red Chromium run on explorer-relevant paths makes
+  the PR unmergeable; unrelated PRs get a green gate without running the
+  suite. Before attributing a red Chromium (or gate) result to the PR under
+  review, check whether develop's own tip is already red for the same
+  reason; a pre-existing develop-side failure is not the PR's fault.
+  Full wiring and lane status:
+  [`docs/operations/browser-ci.md`](browser-ci.md) (merge-gate decision).
+  Historical tracker id `chromium-blocking-suite-not-in-required-checks`
+  described the pre-ruleset state and is no longer accurate.
 - Firefox `@smoke` has been green in recent history — a red Firefox run is
   worth investigating as a real signal, not waved off as routine flake.
 - WebKit failures are **not** dismissible as flake. See
