@@ -28,6 +28,9 @@ except ModuleNotFoundError:  # pragma: no cover
 _C901_RE = re.compile(
     r"^(?P<file>[^:]+):(?P<line>\d+):\d+: C901 `(?P<func>[^`]+)` is too complex \((?P<score>\d+) > \d+\)"
 )
+# ruff may colorize concise output even when stdout is not a TTY (host FORCE_COLOR /
+# terminal integration). Strip SGR sequences before regex matching.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 @dataclass(frozen=True)
@@ -91,7 +94,8 @@ def _run_ruff(source_root: str) -> list[Violation]:
     result = subprocess.run(cmd, capture_output=True, text=True)
     # ruff returns non-zero when violations are found; that's expected.
     violations = []
-    for line in result.stdout.splitlines():
+    for raw_line in result.stdout.splitlines():
+        line = _ANSI_RE.sub("", raw_line)
         m = _C901_RE.match(line)
         if m:
             violations.append(

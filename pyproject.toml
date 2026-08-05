@@ -890,6 +890,11 @@ exclude_functions = [
 # identifiers). The threshold is a ceiling on total duplicated lines; raise it
 # only when intentional duplication is added and lower it as clones are removed.
 #
+# PR gate: `make duplicate-check-delta` / pr.yml `guard-duplicate-delta` compares
+# duplicated lines against the merge-base of the PR base (or origin/develop) and
+# fails only when the change *increases* the count. Absolute `threshold` below
+# remains for local/campaign use (`make duplicate-check`), not the PR delta path.
+#
 # Re-baseline protocol: when `make duplicate-check-verbose` reports actual
 # duplicated lines consistently above the threshold, re-run the classification
 # triage (see _project/DONE/core-functionality/active/

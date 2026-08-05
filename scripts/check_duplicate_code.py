@@ -6,13 +6,13 @@ then reports groups of functions whose AST structure is identical (Type-2 clones
 in the clone-detection literature: same structure, different identifiers/literals).
 
 Exit codes:
-  0 - duplicate ratio is within the configured threshold
-  1 - duplicate ratio exceeds the threshold (or other error)
+  0 - duplicated lines within the absolute threshold, or delta does not increase
+  1 - absolute threshold exceeded, PR increased duplicated lines, or other error
 
 Integration points:
-  • ``make duplicate-check``
-  • ``uv run -- python scripts/check_duplicate_code.py``
-  • CI: add as a step after tests in test.yml
+  • ``make duplicate-check`` / ``duplicate-check-verbose`` / ``duplicate-check-json``
+  • ``make duplicate-check-delta`` (``--delta-vs``, PR base comparison)
+  • PR lint job: ``guard-duplicate-delta`` (and local ``make ci-lint``)
 
 Configuration lives in ``pyproject.toml`` under ``[tool.benchbox.duplicates]``.
 """
@@ -23,8 +23,14 @@ import argparse
 import ast
 import collections
 import hashlib
+import json
+import shutil
+import subprocess
 import sys
+import tarfile
+import tempfile
 from dataclasses import dataclass, field
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -351,12 +357,15 @@ def _format_report(
 # ---------------------------------------------------------------------------
 
 
-def _json_report(groups: dict[str, DuplicateGroup], stats: dict[str, int | float]) -> str:
+def _json_report(
+    groups: dict[str, DuplicateGroup],
+    stats: dict[str, int | float],
+    *,
+    extra: dict[str, Any] | None = None,
+) -> str:
     """Produce a machine-readable JSON report."""
-    import json
-
     ranked = sorted(groups.values(), key=lambda g: g.duplicated_lines, reverse=True)
-    data = {
+    data: dict[str, Any] = {
         "summary": stats,
         "groups": [
             {
@@ -371,7 +380,109 @@ def _json_report(groups: dict[str, DuplicateGroup], stats: dict[str, int | float
             for g in ranked
         ],
     }
+    if extra:
+        data.update(extra)
     return json.dumps(data, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Delta (merge-base) comparison
+# ---------------------------------------------------------------------------
+
+
+def _repo_root(cwd: Path | None = None) -> Path:
+    """Return the git toplevel for *cwd* (default: process cwd)."""
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        cwd=cwd or Path.cwd(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or "not a git repository")
+    return Path(result.stdout.strip())
+
+
+def resolve_delta_base_sha(repo: Path, ref: str) -> str:
+    """Resolve *ref* to the merge-base with HEAD (falls back to the ref tip).
+
+    Using the merge-base answers "did *this branch* increase duplicated lines?"
+    rather than comparing against a moving develop tip after the branch point.
+    """
+    verify = subprocess.run(
+        ["git", "rev-parse", "--verify", f"{ref}^{{commit}}"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if verify.returncode != 0:
+        raise RuntimeError(f"cannot resolve base ref {ref!r}: {verify.stderr.strip()}")
+    tip = verify.stdout.strip()
+
+    merge_base = subprocess.run(
+        ["git", "merge-base", "HEAD", tip],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if merge_base.returncode == 0 and merge_base.stdout.strip():
+        return merge_base.stdout.strip()
+    return tip
+
+
+def materialize_source_at_ref(repo: Path, ref_sha: str, source_root_name: str, dest: Path) -> Path:
+    """Extract ``source_root_name`` from *ref_sha* into *dest* via ``git archive``.
+
+    Returns the path to the extracted source root (``dest / source_root_name``).
+    """
+    archive = subprocess.run(
+        ["git", "archive", "--format=tar", ref_sha, source_root_name],
+        cwd=repo,
+        capture_output=True,
+        check=False,
+    )
+    if archive.returncode != 0:
+        err = archive.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(f"git archive {ref_sha}:{source_root_name} failed: {err}")
+
+    dest.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(fileobj=BytesIO(archive.stdout), mode="r:") as tar:
+        tar.extractall(path=dest)
+
+    extracted = dest / source_root_name
+    if not extracted.is_dir():
+        raise RuntimeError(f"extracted tree missing {source_root_name!r} at {ref_sha}")
+    return extracted
+
+
+def delta_verdict(base_lines: int, head_lines: int) -> tuple[bool, int]:
+    """Return ``(increased, delta)`` for duplicated-line counts.
+
+    *increased* is True only when head strictly exceeds base (epsilon 0).
+    """
+    delta = head_lines - base_lines
+    return delta > 0, delta
+
+
+def _scan_stats(
+    source_root: Path,
+    *,
+    min_lines: int,
+    exclude_patterns: list[str],
+    ignore_function_names: list[str],
+    ignore_rules: list[dict[str, Any]],
+) -> tuple[dict[str, DuplicateGroup], dict[str, int | float]]:
+    groups = scan_directory(
+        source_root,
+        min_lines=min_lines,
+        exclude_patterns=exclude_patterns,
+        ignore_function_names=ignore_function_names,
+        ignore_rules=ignore_rules,
+    )
+    return groups, compute_stats(groups)
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +501,8 @@ Examples:
   %(prog)s --min-lines 15 --verbose          # Verbose report, larger functions only
   %(prog)s --json                            # Machine-readable output
   %(prog)s --report-only                     # Report without failing
+  %(prog)s --delta-vs origin/develop         # Fail only if duplicated lines rose vs merge-base
+  %(prog)s --delta-vs $BASE_REF              # PR base SHA (CI sets BASE_REF)
 """,
     )
     parser.add_argument(
@@ -432,6 +545,17 @@ Examples:
         help="Report duplicates without failing",
     )
     parser.add_argument(
+        "--delta-vs",
+        default=None,
+        metavar="REF",
+        help=(
+            "Compare duplicated lines against the merge-base with REF "
+            "(e.g. origin/develop or a PR base SHA). Fails only if HEAD has more "
+            "duplicated lines than the base. Absolute --threshold is not applied "
+            "in this mode."
+        ),
+    )
+    parser.add_argument(
         "--pyproject",
         default="pyproject.toml",
         help="Path to pyproject.toml for config (default: pyproject.toml)",
@@ -439,8 +563,125 @@ Examples:
     return parser.parse_args(argv)
 
 
+def _resolve_head_source_root(repo: Path, configured: str) -> tuple[Path, str]:
+    """Return ``(head_path, archive_path)`` for the source root under *repo*.
+
+    *archive_path* is the path as stored in git (used by ``git archive``).
+    """
+    head_root = Path(configured)
+    if not head_root.is_dir():
+        candidate = repo / configured
+        if not candidate.is_dir():
+            raise RuntimeError(f"source root '{configured}' is not a directory")
+        head_root = candidate
+
+    try:
+        archive_path = str(head_root.resolve().relative_to(repo.resolve()))
+    except ValueError:
+        archive_path = head_root.name
+    return head_root, archive_path
+
+
+def run_delta(args: argparse.Namespace, config: dict[str, Any]) -> int:
+    """Compare working-tree scan against a git ref (merge-base)."""
+    configured_root = str(args.source_root or config.get("source_root", "benchbox"))
+    try:
+        repo = _repo_root()
+    except RuntimeError as exc:
+        print(f"error: delta mode requires a git repository ({exc})", file=sys.stderr)
+        return 1
+
+    try:
+        head_root, archive_path = _resolve_head_source_root(repo, configured_root)
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    min_lines = args.min_lines if args.min_lines is not None else config.get("min_lines", 10)
+    scan_kwargs: dict[str, Any] = {
+        "min_lines": min_lines,
+        "exclude_patterns": config.get("exclude_patterns", []),
+        "ignore_function_names": config.get("ignore_function_names", []),
+        "ignore_rules": config.get("ignore_rules", []),
+    }
+
+    try:
+        base_sha = resolve_delta_base_sha(repo, args.delta_vs)
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    head_groups, head_stats = _scan_stats(head_root, **scan_kwargs)
+
+    tmp: Path | None = None
+    try:
+        tmp = Path(tempfile.mkdtemp(prefix="benchbox-dup-delta-"))
+        try:
+            base_root = materialize_source_at_ref(repo, base_sha, archive_path, tmp)
+        except RuntimeError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        _base_groups, base_stats = _scan_stats(base_root, **scan_kwargs)
+    finally:
+        if tmp is not None:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    base_lines = int(base_stats["duplicated_lines"])
+    head_lines = int(head_stats["duplicated_lines"])
+    increased, delta = delta_verdict(base_lines, head_lines)
+
+    extra = {
+        "delta": {
+            "base_ref": args.delta_vs,
+            "base_sha": base_sha,
+            "base_duplicated_lines": base_lines,
+            "head_duplicated_lines": head_lines,
+            "delta_duplicated_lines": delta,
+            "increased": increased,
+            "base_groups": int(base_stats["groups"]),
+            "head_groups": int(head_stats["groups"]),
+        }
+    }
+
+    if args.json_output:
+        print(_json_report(head_groups, head_stats, extra=extra))
+    else:
+        print("=" * 72)
+        print("Duplicate Code Delta Report (AST structural clone detection)")
+        print("=" * 72)
+        print(f"Base ref:  {args.delta_vs}")
+        print(f"Base SHA:  {base_sha}")
+        print(f"Base:      {base_lines} duplicated lines in {base_stats['groups']} groups")
+        print(f"Head:      {head_lines} duplicated lines in {head_stats['groups']} groups")
+        print(f"Delta:     {delta:+d} duplicated lines")
+        print("")
+        # Still show the head report for triage when something regressed.
+        if increased or args.verbose:
+            print(_format_report(head_groups, head_stats, top_n=args.top_n, verbose=args.verbose))
+
+    if increased:
+        msg = (
+            f"FAIL: duplicated lines increased by {delta} "
+            f"({base_lines} -> {head_lines}) vs merge-base of {args.delta_vs}"
+        )
+        print(msg, file=sys.stderr if args.json_output else sys.stdout)
+        if not args.report_only:
+            return 1
+        return 0
+
+    if not args.json_output:
+        print(
+            f"PASS: duplicated lines did not increase "
+            f"({base_lines} -> {head_lines}, delta {delta:+d}) vs merge-base of {args.delta_vs}"
+        )
+    return 0
+
+
 def run(args: argparse.Namespace) -> int:
     config = _load_config(Path(args.pyproject))
+
+    if args.delta_vs:
+        return run_delta(args, config)
 
     source_root = Path(args.source_root or config.get("source_root", "benchbox"))
     threshold = args.threshold if args.threshold is not None else config.get("threshold", 25000)
@@ -453,14 +694,13 @@ def run(args: argparse.Namespace) -> int:
         print(f"error: source root '{source_root}' is not a directory")
         return 1
 
-    groups = scan_directory(
+    groups, stats = _scan_stats(
         source_root,
         min_lines=min_lines,
         exclude_patterns=exclude_patterns,
         ignore_function_names=ignore_function_names,
         ignore_rules=ignore_rules,
     )
-    stats = compute_stats(groups)
 
     if args.json_output:
         print(_json_report(groups, stats))
