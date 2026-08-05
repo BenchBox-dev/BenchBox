@@ -1,15 +1,16 @@
 ---
 name: todo-db
-description: Use when the user asks to "create a TODO", "show TODO items", "manage TODOs", "prioritize TODOs", "implement a TODO", "implement a batch of TODOs", "batch implement TODOs", "complete a TODO", "cleanup TODOs", "review TODO quality", "claim a TODO", "what's ready" / "ready queue", "defer this work", "promote a deferral", "dismiss a deferral", "block"/"unblock a TODO", "create TODOs from a spec", or "todo stats". The production database-backed tracker; all tracker state lives in the shared DB and flows through the `todo` CLI.
-version: 0.3.0
+description: Use when the user asks to "create a TODO", "show TODO items", "manage TODOs", "prioritize TODOs", "top N most important todos", "rank the backlog", "what should we work on", "implement a TODO", "implement a batch of TODOs", "batch implement TODOs", "complete a TODO", "cleanup TODOs", "review TODO quality", "claim a TODO", "what's ready" / "ready queue", "defer this work", "promote a deferral", "dismiss a deferral", "block"/"unblock a TODO", "create TODOs from a spec", or "todo stats". The production database-backed tracker; all tracker state lives in the shared DB and flows through the `todo` CLI (except skill-only analysis actions such as prioritize).
+version: 0.4.0
 tools: Bash, Read, Edit, Write, Task
 ---
 
 # TODO Tracker
 
-Route the requested CLI subcommand to its guide and read that guide before
-acting. The database is the record. Resolve the `todo` command for the
-requested action, not merely by file presence:
+Route the requested action to its guide and read that guide before acting.
+The database is the record. Most actions are CLI subcommands; a few
+(skill-only) are analysis workflows over the same record. Resolve the `todo`
+command for CLI-backed actions, not merely by file presence:
 
 1. If `_project/scripts/todo` exists, inspect its top-level `--help` output.
 2. Use that wrapper only when it advertises the requested subcommand.
@@ -18,6 +19,8 @@ requested action, not merely by file presence:
    identity can be supplied from config, environment, or explicit flags.
 4. If neither command supports the action, report the capability gap and stop;
    never send a standalone-only action to a legacy project wrapper.
+5. Skill-only actions (currently `prioritize`) have no CLI verb — follow their
+   reference guide and use only the inspect verbs the guide names.
 
 Do not assume wrapper behavior from its name. Exit 2 is a generic failure.
 Treat exit 4 as hosted auth failure only when the selected command documents
@@ -33,6 +36,7 @@ Global `--db` / `--actor` flags go before the subcommand.
 | `bootstrap` / `init` / `doctor` | `references/bootstrap.md` |
 | `ready` / `claim` / `start` / `done` / `defer` / `check-scope` / `verify` / `complete` / `promote` / `dismiss` | `references/implement.md` |
 | `create` / `update` / `list` / `show` / `stats` / `deps` / `export` / `block` / `unblock` / `release` / `sweep-stale` / `drop` | `references/queries.md` |
+| `prioritize` (skill-only; no CLI verb) | `references/prioritize.md` |
 | `lint` | `references/review.md` |
 | `finding candidates` / `finding triage` / `finding sync` / `finding promote` | `references/implement.md` |
 | `batch` | `references/batch.md` |
