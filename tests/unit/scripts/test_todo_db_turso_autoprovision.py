@@ -11,6 +11,8 @@ back to the local scratch database (see `_try_turso_auto_provision` and
   - any failure (turso absent, mint failure) falls through to the existing
     local-fallback behavior, whose write-refusal error now names `turso auth
     login` alongside the existing remediations;
+  - when turso is on PATH but mint fails, a distinct provision_failure reason
+    class is surfaced (WARN / doctor check / write-refusal) without secrets;
   - auto-provisioning is never attempted when an explicit backend
     (--db/TODO_DB_PATH/TODO_DB_URL) is configured;
   - the minted token and URL are never printed, including through `doctor`.
@@ -83,11 +85,12 @@ class TestAutoProvisionSuccess:
         fake_run, calls = _make_fake_turso_run()
         monkeypatch.setattr(todo_db.subprocess, "run", fake_run)
 
-        backend, implicit_default_local, auto_provisioned = todo_db._resolve_backend(None)
+        backend, implicit_default_local, auto_provisioned, provision_failure = todo_db._resolve_backend(None)
 
         assert backend == _URL
         assert implicit_default_local is False
         assert auto_provisioned is True
+        assert provision_failure is None
         # Downstream readers (_auth_token(), connect_hosted(), ...) all key off
         # these two env vars -- auto-provisioning must behave exactly as if
         # they had been set explicitly.
@@ -103,10 +106,11 @@ class TestAutoProvisionSuccess:
         fake_run, calls = _make_fake_turso_run(db_name="my-custom-db")
         monkeypatch.setattr(todo_db.subprocess, "run", fake_run)
 
-        backend, _implicit, auto_provisioned = todo_db._resolve_backend(None)
+        backend, _implicit, auto_provisioned, provision_failure = todo_db._resolve_backend(None)
 
         assert backend == _URL
         assert auto_provisioned is True
+        assert provision_failure is None
         assert ["turso", "db", "show", "my-custom-db", "--url"] in calls
 
     def test_report_backend_names_auto_provisioning(self, capsys):
@@ -125,29 +129,70 @@ class TestAutoProvisionFailureFallsThrough:
         # autouse fixture; this is asserted explicitly here too.
         assert todo_db.shutil.which("turso") is None
 
-        backend, implicit_default_local, auto_provisioned = todo_db._resolve_backend(None)
+        backend, implicit_default_local, auto_provisioned, provision_failure = todo_db._resolve_backend(None)
 
         assert isinstance(backend, Path)
         assert implicit_default_local is True
         assert auto_provisioned is False
+        # turso absent is a silent skip -- no provision_failure reason class.
+        assert provision_failure is None
 
     def test_turso_present_but_show_fails_falls_through(self, monkeypatch, tmp_path):
         _clear_backend_env(monkeypatch)
         monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
         monkeypatch.setattr(todo_db.shutil, "which", lambda name: "/usr/bin/turso" if name == "turso" else None)
+        real_run = todo_db.subprocess.run
 
         def fake_run(cmd, *args, **kwargs):
             if cmd[:1] == ["turso"]:
                 return SimpleNamespace(returncode=1, stdout="", stderr="not logged in")
-            return todo_db.subprocess.run(cmd, *args, **kwargs)
+            return real_run(cmd, *args, **kwargs)
 
         monkeypatch.setattr(todo_db.subprocess, "run", fake_run)
 
-        backend, implicit_default_local, auto_provisioned = todo_db._resolve_backend(None)
+        backend, implicit_default_local, auto_provisioned, provision_failure = todo_db._resolve_backend(None)
 
         assert isinstance(backend, Path)
         assert implicit_default_local is True
         assert auto_provisioned is False
+        assert provision_failure == "db-show-failed"
+
+    def test_turso_present_but_token_create_fails_falls_through(self, monkeypatch, tmp_path):
+        _clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        monkeypatch.setattr(todo_db.shutil, "which", lambda name: "/usr/bin/turso" if name == "turso" else None)
+        real_run = todo_db.subprocess.run
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:1] == ["turso"]:
+                if cmd[1:3] == ["db", "show"]:
+                    return SimpleNamespace(returncode=0, stdout=f"{_URL}\n", stderr="")
+                if cmd[1:4] == ["db", "tokens", "create"]:
+                    return SimpleNamespace(returncode=1, stdout="", stderr="permission denied: secret-xyz")
+                return SimpleNamespace(returncode=1, stdout="", stderr="unexpected")
+            return real_run(cmd, *args, **kwargs)
+
+        monkeypatch.setattr(todo_db.subprocess, "run", fake_run)
+
+        backend, implicit_default_local, auto_provisioned, provision_failure = todo_db._resolve_backend(None)
+
+        assert isinstance(backend, Path)
+        assert implicit_default_local is True
+        assert auto_provisioned is False
+        assert provision_failure == "token-create-failed"
+
+    def test_report_backend_surfaces_provision_failure_class(self, tmp_path, capsys):
+        todo_db._report_backend(
+            tmp_path / "todo.sqlite",
+            implicit_default_local=True,
+            auto_provisioned=False,
+            provision_failure="token-create-failed",
+        )
+        err = capsys.readouterr().err
+        assert "WARNING: turso auto-provision failed (token-create-failed); using local fallback" in err
+        assert _URL not in err
+        assert _TOKEN not in err
+        assert "secret" not in err
 
     def test_write_refusal_error_names_turso_auth_login_remediation(self, monkeypatch, tmp_path, capsys):
         _clear_backend_env(monkeypatch)
@@ -163,6 +208,29 @@ class TestAutoProvisionFailureFallsThrough:
         assert "TODO_DB_PATH" in err
         assert not (tmp_path / ".todo-db" / "todo.sqlite").exists()
 
+    def test_write_refusal_mentions_provision_failure_class(self, monkeypatch, tmp_path, capsys):
+        _clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        monkeypatch.setattr(todo_db.shutil, "which", lambda name: "/usr/bin/turso" if name == "turso" else None)
+        real_run = todo_db.subprocess.run
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:1] == ["turso"]:
+                return SimpleNamespace(returncode=1, stdout="", stderr="not logged in: token-sekrit")
+            return real_run(cmd, *args, **kwargs)
+
+        monkeypatch.setattr(todo_db.subprocess, "run", fake_run)
+
+        rc = todo_db.main(["claim", "missing-item"])
+
+        assert rc == 2
+        err = capsys.readouterr().err
+        assert "refusing to write through the implicit local fallback" in err
+        assert "turso auto-provision was attempted but failed: db-show-failed" in err
+        assert "token-sekrit" not in err
+        assert _TOKEN not in err
+        assert _URL not in err
+
 
 class TestAutoProvisionNeverInvokedWithExplicitBackend:
     def test_explicit_flag_skips_auto_provision(self, monkeypatch, tmp_path):
@@ -173,11 +241,14 @@ class TestAutoProvisionNeverInvokedWithExplicitBackend:
 
         monkeypatch.setattr(todo_db, "_try_turso_auto_provision", boom)
 
-        backend, implicit_default_local, auto_provisioned = todo_db._resolve_backend(str(tmp_path / "todo.sqlite"))
+        backend, implicit_default_local, auto_provisioned, provision_failure = todo_db._resolve_backend(
+            str(tmp_path / "todo.sqlite")
+        )
 
         assert isinstance(backend, Path)
         assert implicit_default_local is False
         assert auto_provisioned is False
+        assert provision_failure is None
 
     def test_env_todo_db_path_skips_auto_provision(self, monkeypatch, tmp_path):
         monkeypatch.setenv("TODO_DB_PATH", str(tmp_path / "todo.sqlite"))
@@ -188,11 +259,12 @@ class TestAutoProvisionNeverInvokedWithExplicitBackend:
 
         monkeypatch.setattr(todo_db, "_try_turso_auto_provision", boom)
 
-        backend, implicit_default_local, auto_provisioned = todo_db._resolve_backend(None)
+        backend, implicit_default_local, auto_provisioned, provision_failure = todo_db._resolve_backend(None)
 
         assert isinstance(backend, Path)
         assert implicit_default_local is False
         assert auto_provisioned is False
+        assert provision_failure is None
 
     def test_env_todo_db_url_skips_auto_provision(self, monkeypatch):
         monkeypatch.delenv("TODO_DB_PATH", raising=False)
@@ -204,11 +276,12 @@ class TestAutoProvisionNeverInvokedWithExplicitBackend:
 
         monkeypatch.setattr(todo_db, "_try_turso_auto_provision", boom)
 
-        backend, implicit_default_local, auto_provisioned = todo_db._resolve_backend(None)
+        backend, implicit_default_local, auto_provisioned, provision_failure = todo_db._resolve_backend(None)
 
         assert backend == "libsql://explicit-env.turso.io"
         assert implicit_default_local is False
         assert auto_provisioned is False
+        assert provision_failure is None
 
 
 class TestDoctorRedactsAutoProvisionedSecrets:
@@ -248,3 +321,38 @@ class TestDoctorRedactsAutoProvisionedSecrets:
         combined = "".join(capsys.readouterr())
         assert _TOKEN not in combined
         assert _URL not in combined
+
+    def test_doctor_surfaces_provision_failure_class_without_secrets(self, monkeypatch, tmp_path, capsys):
+        _clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        monkeypatch.setattr(todo_db.shutil, "which", lambda name: "/usr/bin/turso" if name == "turso" else None)
+        real_run = todo_db.subprocess.run
+
+        def fake_run(cmd, *args, **kwargs):
+            if cmd[:1] == ["turso"]:
+                if cmd[1:3] == ["db", "show"]:
+                    return SimpleNamespace(returncode=0, stdout=f"{_URL}\n", stderr="")
+                if cmd[1:4] == ["db", "tokens", "create"]:
+                    return SimpleNamespace(returncode=1, stdout="", stderr=f"denied token={_TOKEN}")
+                return SimpleNamespace(returncode=1, stdout="", stderr="unexpected")
+            return real_run(cmd, *args, **kwargs)
+
+        monkeypatch.setattr(todo_db.subprocess, "run", fake_run)
+        # Local fallback needs a usable DB so doctor exit is OK (WARN only).
+        (tmp_path / ".todo-db").mkdir(parents=True, exist_ok=True)
+        db = tmp_path / ".todo-db" / "todo.sqlite"
+        assert todo_db.main(["--db", str(db), "init"]) == 0
+        # Clear env again after init (init may leave nothing, but be safe).
+        _clear_backend_env(monkeypatch)
+
+        rc = todo_db.main(["doctor"])
+
+        assert rc == todo_db.DOCTOR_EXIT_OK
+        captured = capsys.readouterr()
+        combined = captured.out + captured.err
+        assert "turso-provision" in combined
+        assert "token-create-failed" in combined
+        assert "WARN" in combined
+        assert _TOKEN not in combined
+        assert _URL not in combined
+        assert "denied token=" not in combined
