@@ -891,9 +891,26 @@ guards-fix:
 # check after each guard is what keeps this one shell session (the whole
 # recipe is one logical line via `\` continuations) going past a failing
 # guard instead of `make` aborting at the first nonzero exit.
-# The ephemeral GitHub runner has no user.* config. The ci-lint recipe supplies
-# a synthetic human identity only for the resolved-config audit; the
-# commit-range guard remains authoritative for branch authorship.
+# Most guards below are equally meaningful whether `ci-lint` runs on a laptop
+# or on the ephemeral GitHub-hosted runner that develop-post-merge.yml uses
+# (they inspect the checked-out tree / installed venv / shipped registries,
+# none of which differ). A couple of guards instead read state that only
+# exists on a developer machine -- a resolved Git identity, a tool installed
+# at a hardcoded local path -- and either fail there for reasons unrelated to
+# the code under test, or worse, silently no-op and report success while
+# checking nothing. `_project/scripts/ci_lint_environment_gate.py` is the one
+# place that draws this boundary (a declarative table, not a per-guard inline
+# `if $GITHUB_ACTIONS` -- see its module docstring); a guard not listed there
+# always runs, on a runner exactly as it does locally.
+#
+# The `GIT_CONFIG_COUNT=2 ... / unset ...` pair still wrapping
+# agent-identity-check below is now dead on a runner: the gate above skips
+# the guard between them, so nothing ever consumes the synthetic identity it
+# exports. It is kept verbatim rather than deleted because
+# tests/system/test_ci_lint_parity.py::test_ci_lint_identity_check_supplies_runner_identity
+# pins this exact recipe text; deleting it needs that test updated in the
+# same change, which is out of scope here (tests/system/** is not part of
+# this fix's authorized paths).
 ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
@@ -923,15 +940,19 @@ ci-lint:
 	if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then \
 		export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='BenchBox CI' GIT_CONFIG_KEY_1=user.email GIT_CONFIG_VALUE_1=ci@benchbox.invalid; \
 	fi; \
-	$(MAKE) agent-identity-check; \
-	[ $$? -eq 0 ] || failed="$$failed agent-identity"; \
+	if uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity; then \
+		$(MAKE) agent-identity-check; \
+		[ $$? -eq 0 ] || failed="$$failed agent-identity"; \
+	fi; \
 	if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then \
 		unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1; \
 	fi; \
 	$(MAKE) agent-commit-range-check; \
 	[ $$? -eq 0 ] || failed="$$failed agent-commit-range"; \
-	$(MAKE) skill-sync-check; \
-	[ $$? -eq 0 ] || failed="$$failed skill-sync-check"; \
+	if uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check; then \
+		$(MAKE) skill-sync-check; \
+		[ $$? -eq 0 ] || failed="$$failed skill-sync-check"; \
+	fi; \
 	uv run -- python _project/scripts/timing_policy_check.py --strict; \
 	[ $$? -eq 0 ] || failed="$$failed timing-policy"; \
 	uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check; \

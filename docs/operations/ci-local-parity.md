@@ -155,6 +155,63 @@ replacement, and is fail-open (`DELTA_CHECK_SKIPPED`, exit 0) whenever no
 baseline is available, which is always true locally. See
 docs/operations/fast-lane-budget.md for the full model.
 
+## Guards `ci-lint` skips when it runs on a CI runner itself
+
+Everything above is about the direction "a `pr.yml` guard must also run
+locally." There is a second, separate direction this doc did not previously
+cover: `develop-post-merge.yml`'s `lint` job runs `make ci-lint` directly on
+a real, ephemeral GitHub-hosted runner (not as a local-parity convenience --
+as a blocking gate wired into `auto-revert-on-failure`). Most `ci-lint`
+guards are equally meaningful there, because they inspect the checked-out
+tree, the installed venv, or a registry the repo ships -- none of which
+differ between a laptop and a runner. A couple of guards instead read state
+that only exists on a developer machine, and behave one of two bad ways on a
+runner that lacks it:
+
+- **Fail for a reason that has nothing to do with the code under test.**
+  `agent-identity-check` did exactly this before #1558/#1509: it resolves
+  `git config user.*`, an ephemeral runner has none, and the check treated
+  "no identity" as a hard failure -- reddening every post-merge run for an
+  environment fact, not a defect.
+- **Silently no-op and report success while checking nothing.** This is the
+  more dangerous failure mode: a guard that cannot fail reads as coverage in
+  the Actions log and is never investigated. `skill-sync-check` does this
+  today if left unguarded -- it shells out to `$(SKILL_SYNC)`, a local
+  absolute developer path that plainly does not exist on a runner, hits its
+  own "not installed; skipping" branch, and exits 0.
+
+`_project/scripts/ci_lint_environment_gate.py` is the single place that
+draws this boundary: a small, declarative `RUNNER_INAPPLICABLE_GUARDS` table
+mapping a guard slug to why it cannot produce a meaningful result on
+`GITHUB_ACTIONS=true`. The `ci-lint` recipe calls it immediately before each
+listed guard (`if uv run -- python _project/scripts/ci_lint_environment_gate.py <slug>; then ...; fi`)
+instead of the guard's own ad hoc `if [ "$$GITHUB_ACTIONS" = "true" ]`
+special-case -- exactly the pattern the old `agent-identity-check` synthetic-identity
+injection was, and the reason a *general* mechanism replaced it rather than
+gaining a second one for `skill-sync-check`. A guard not listed in the table
+always runs, on a runner exactly as it does locally -- the table is a narrow,
+reasoned allowlist of exceptions, not a generic on/off switch, and adding an
+entry removes real CI coverage inside `make ci-lint`'s own CI invocation
+unless that guard is *also* covered for real somewhere else in CI:
+
+- `agent-identity-check` has no CI-runner equivalent anywhere, by design --
+  see `pr.yml`'s `code-lint` job, which has no counterpart step for the same
+  reason. `agent-commit-range-check` is the real merge-time control (it
+  reads the commits a branch actually carries, not resolved config) and is
+  never in the gate's table; it keeps running unconditionally, in `ci-lint`
+  and in `pr.yml`.
+- `skill-sync-check`'s real CI-side coverage is `pr.yml`'s
+  `guard-skill-sync-verify` step (the pinned-SHA network checkout described
+  above), which runs against every PR before it can reach develop. Skipping
+  the local-path-based `skill-sync-check` inside `ci-lint`'s own CI
+  invocation does not remove coverage that existed there -- it removes a
+  guard that was already structurally unable to check anything on a runner.
+
+`GITHUB_ACTIONS` is never hand-toggled here: it is the platform-set variable
+every GitHub Actions job already has, so local runs (including
+`pr-preflight`) are unaffected -- both listed guards keep running locally
+exactly as before this table existed.
+
 ## `pr-preflight` and the content guard
 
 `make pr-preflight-fast-tests` (called by `make pr-preflight`) always runs
