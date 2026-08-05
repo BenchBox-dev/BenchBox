@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
-const TPCH_ID = fixtureIds.duckdbId;
-const TPCH_SHORT = fixtureIds.shortDuckdb;
-const STAR_SCHEMA_SHORT = "0f0add9f";
-const TPCH_SF01_SHORT = "0820b170";
+const TPCH_ID = fixtureIds.ids.duckdb;
+const TPCH_SHORT = fixtureIds.shortIds.duckdb;
+const STAR_SCHEMA_SHORT = fixtureIds.shortIds.starSchema;
+const TPCH_SF01_SHORT = fixtureIds.shortIds.duckdbSf01;
 
 test.describe.configure({ mode: "serial" });
 

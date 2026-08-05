@@ -1,9 +1,9 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { fixtureIds, waitForDataElement, waitForDataLoaded, waitForShell } from "./support/fixtures";
 
-const SHORT_DUCKDB = fixtureIds.shortDuckdb;
-const SHORT_DATAFUSION = fixtureIds.shortDatafusion;
-const DETAIL_ID = fixtureIds.detailId;
+const SHORT_DUCKDB = fixtureIds.shortIds.duckdb;
+const SHORT_DATAFUSION = fixtureIds.shortIds.datafusion;
+const DETAIL_ID = fixtureIds.ids.duckdb;
 
 // Desktop/wide use maxY = viewport.height (900); mobile/tablet use 1200 (1.33x).
 // PR #276 originally tightened the desktop intro spacing to fit

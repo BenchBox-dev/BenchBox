@@ -48,13 +48,13 @@ const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
   { slug: "platform-polars", url: "/results/p/polars/", readyText: /Polars Results/ },
   {
     slug: "result-detail-tpch-duckdb",
-    url: `/results/r/${fixtureIds.detailId}`,
+    url: `/results/r/${fixtureIds.ids.duckdb}`,
     readyText: /Query Timings/,
   },
-  { slug: "compare-same-cohort", url: `/results/compare?ids=${fixtureIds.shortDuckdb},${fixtureIds.shortDatafusion}`, readyText: /TPC-H Comparison/ },
+  { slug: "compare-same-cohort", url: `/results/compare?ids=${fixtureIds.shortIds.duckdb},${fixtureIds.shortIds.datafusion}`, readyText: /TPC-H Comparison/ },
   {
     slug: "compare-mismatch-benchmark",
-    url: `/results/compare?ids=${fixtureIds.shortDuckdb},0f0add9f`,
+    url: `/results/compare?ids=${fixtureIds.shortIds.duckdb},${fixtureIds.shortIds.starSchema}`,
     readyText: /Mixed Benchmark Comparison/,
   },
   {

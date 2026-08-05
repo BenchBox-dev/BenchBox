@@ -3,10 +3,10 @@ import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures
 
 // Short IDs assigned deterministically by the pipeline to the fixture
 // corpus. Tests that round-trip long-form → short-form use these.
-const SHORT_DUCKDB = fixtureIds.shortDuckdb;
-const SHORT_DATAFUSION = fixtureIds.shortDatafusion;
-const LONG_DUCKDB = fixtureIds.detailId;
-const LONG_DATAFUSION = "tpch-datafusion-sf0.01-20260403-a6bb8a70";
+const SHORT_DUCKDB = fixtureIds.shortIds.duckdb;
+const SHORT_DATAFUSION = fixtureIds.shortIds.datafusion;
+const LONG_DUCKDB = fixtureIds.ids.duckdb;
+const LONG_DATAFUSION = fixtureIds.ids.datafusion;
 
 test.describe("Compare", () => {
   test.describe.configure({ mode: "serial" });

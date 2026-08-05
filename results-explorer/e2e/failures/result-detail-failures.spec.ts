@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { waitForDataElement, waitForShell } from "../support/fixtures";
+import { fixtureIds, waitForDataElement, waitForShell } from "../support/fixtures";
 
-const TPCH_TUNED_ID = "tpch-duckdb-sf0.01-20260403-a5eff54e";
+const TPCH_TUNED_ID = fixtureIds.ids.duckdbTuned;
 
 // Failure tests share the same DuckDB-WASM cold-boot cost as the happy
 // paths but add network interception. Run serially so three parallel

@@ -12,27 +12,41 @@ import { expect, type Locator, type Page } from "@playwright/test";
  */
 
 /**
- * Result identifiers for the generated fixture corpus.
+ * Result identifiers for the generated fixture corpus, one entry per role.
  *
  * These are content-addressed: `result_id` ends in a SHA prefix of the
- * published bundle bytes, and `short_id` is a SHA prefix of `result_id`. Both
+ * published bundle bytes, and `short_id` is derived from `result_id`. Both
  * therefore move whenever fixture content OR anonymization output changes.
  *
- * Specs used to hardcode them, and they drifted: the literals checked in
- * (`ba6a8c83`, `5e6c5eba`, `tpch-duckdb-sf0.01-20260403-010ee756`) matched
- * neither the pre- nor the post-#1512 build, so the "blocking" Chromium suite
- * was failing on every PR that ran it. `generate-browser-fixtures.mjs` now
- * emits `fixture-ids.json` alongside the read model; read it here so the specs
- * are always pinned to whatever this build actually produced.
+ * Specs used to hardcode them, and they drifted: the checked-in literals
+ * matched neither the pre- nor the post-#1512 build, so the "blocking"
+ * Chromium suite failed on every PR that ran it.
+ * `generate-browser-fixtures.mjs` emits `fixture-ids.json` alongside the read
+ * model - keyed by `run.id`, which is authored and stable - so the specs are
+ * always pinned to whatever this build actually produced.
+ *
+ * Address a fixture by the role the test depends on, never by whichever id
+ * happens to be handy. `duckdbCommunity` is the corpus's only funding-
+ * disclosing bundle and `duckdbTuned` is the only one with a tuning sidecar;
+ * substituting `duckdb` for either does not weaken those tests, it inverts
+ * them.
  */
+export type FixtureRole =
+  | "awsCloud"
+  | "containerLocal"
+  | "datafusion"
+  | "datafusionPartial"
+  | "duckdb"
+  | "duckdbCommunity"
+  | "duckdbSf01"
+  | "duckdbTuned"
+  | "gcpServerless"
+  | "polars"
+  | "starSchema";
+
 type FixtureIds = {
-  detailId: string;
-  duckdbId: string;
-  datafusionId: string;
-  shortDuckdb: string;
-  shortDatafusion: string;
-  shortIdLength: number;
-  allResultIds: string[];
+  ids: Record<FixtureRole, string>;
+  shortIds: Record<FixtureRole, string>;
 };
 
 const FIXTURE_IDS_PATH = join(

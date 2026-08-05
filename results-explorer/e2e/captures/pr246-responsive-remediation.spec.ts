@@ -23,9 +23,9 @@ const OUT = path.join(
   `results-explorer-pr246-responsive-remediation-${TODAY}`,
 );
 
-const SHORT_DUCKDB = fixtureIds.shortDuckdb;
-const SHORT_DATAFUSION = fixtureIds.shortDatafusion;
-const DETAIL_ID = fixtureIds.detailId;
+const SHORT_DUCKDB = fixtureIds.shortIds.duckdb;
+const SHORT_DATAFUSION = fixtureIds.shortIds.datafusion;
+const DETAIL_ID = fixtureIds.ids.duckdb;
 const WIDTHS = [390, 768] as const;
 
 interface CaptureRoute {

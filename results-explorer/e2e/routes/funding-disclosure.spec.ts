@@ -13,9 +13,9 @@ import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures
 
 // Community-submission + employer-funded. The pairing is the point: it shows
 // the funding axis is independent of the trust axis.
-const FUNDED_ID = "tpch-duckdb-sf0.01-20260403-b92a4ffb";
+const FUNDED_ID = fixtureIds.ids.duckdbCommunity;
 // Maintainer-run, funding left `unspecified` -> no chip.
-const UNSPECIFIED_ID = fixtureIds.detailId;
+const UNSPECIFIED_ID = fixtureIds.ids.duckdb;
 
 // Scope header assertions to the summary region: the expanded legend renders
 // its own sample chips, so an unscoped [data-role="funding"] would match those
