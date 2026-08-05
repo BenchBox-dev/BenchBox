@@ -216,14 +216,24 @@ jobs:
           # Start from current published-results
           git switch --force-create "${MIRROR_BRANCH}" origin/published-results
 
-          # Apply the triggering commit's content for each mirrored path. For directory
-          # paths, wipe the existing tree first so develop-side deletions
-          # within the directory propagate (otherwise `git checkout` only
-          # writes paths present on the source commit and leaves stragglers behind).
+          # Apply the triggering commit's content for each mirrored path.
+          #
+          # results-data/bundles uses a **union overlay**, not a wipe:
+          # community submissions can land on published-results only (they
+          # target that branch, not develop). A prior wipe (`git rm -rf
+          # results-data/bundles` then checkout develop) deleted those
+          # published-only paths whenever develop was also ahead. Overlay
+          # instead:
+          #   - checkout develop's version of every path that exists on develop
+          #     (overwrites shared / develop-ahead files)
+          #   - leave paths that exist only on published-results intact
+          # Develop-side deletions inside bundles therefore do NOT auto-
+          # propagate; that is intentional — never delete public community
+          # content from an automated mirror. FILE_PATHS still use per-path
+          # apply (including removal when missing on the source commit).
           SOURCE_REF="${GITHUB_SHA}"
-          DIRECTORY_PATHS=(
-            'results-data/bundles'
-          )
+          # Directory trees that must union-overlay (never wipe).
+          BUNDLES_DIR='results-data/bundles'
           FILE_PATHS=(
             'results-data/corpus-inventory.json'
             'results-data/CORPUS_NOTES.md'
@@ -235,17 +245,15 @@ jobs:
             'scripts/generate_corpus_inventory.py'
           )
 
-          for path in "${DIRECTORY_PATHS[@]}"; do
-            if git cat-file -e "${SOURCE_REF}:${path}" 2>/dev/null; then
-              # Wipe the directory's existing tree so file-level deletions
-              # on the source commit propagate to the mirror.
-              git rm -rf --quiet "${path}" 2>/dev/null || true
-              git checkout "${SOURCE_REF}" -- "${path}"
-            else
-              # Whole directory removed on the source commit — mirror the removal.
-              git rm -rf --quiet "${path}" 2>/dev/null || true
-            fi
-          done
+          if git cat-file -e "${SOURCE_REF}:${BUNDLES_DIR}" 2>/dev/null; then
+            # Union overlay: checkout develop tree without removing published-only.
+            # Do NOT `git rm -rf` the directory first.
+            git checkout "${SOURCE_REF}" -- "${BUNDLES_DIR}"
+          else
+            # Source has no bundles tree — leave published intact rather than
+            # wipe community submissions. Report so the PR review can decide.
+            echo "Source commit has no ${BUNDLES_DIR}; leaving published tree intact (union overlay)."
+          fi
 
           for path in "${FILE_PATHS[@]}"; do
             if git cat-file -e "${SOURCE_REF}:${path}" 2>/dev/null; then

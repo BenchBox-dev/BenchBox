@@ -44,6 +44,19 @@ the fixed point, then proceeds unattended. A red sync run with drift still
 present is the expected signal while re-derivation is open — not a stuck
 manual gate.
 
+For `results-data/bundles/`, the apply is a **union overlay**, not a wipe:
+develop's files overwrite matching paths on `published-results`, and paths
+that exist only on `published-results` (community submissions not
+back-ported) are left intact. A previous wipe-then-checkout strategy deleted
+those published-only submissions whenever develop was also ahead.
+Develop-side *path deletions* do not auto-propagate; remove them manually via
+a reviewed PR against `published-results` when intentional. After overlay, the
+workflow regenerates `corpus-inventory.json` from the unioned tree so
+community-only paths remain inventory-listed. The scheduled
+[`corpus-drift-check.yml`](../../.github/workflows/corpus-drift-check.yml)
+canary classifies develop-ahead vs published-only and never recommends a
+wipe-based full mirror while published-only paths exist.
+
 If the workflow's heuristics ever miss a path (or a one-off mirror is
 needed outside the trigger conditions), trigger it manually via
 `workflow_dispatch` from the Actions tab.
