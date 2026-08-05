@@ -237,6 +237,28 @@ is empty for them; mocker tracks its own compose-created volumes separately.
 Use `ENGINE=docker` (the default) for volume cleanup and `ENGINE=container`
 for everything else.
 
+### Mocker validation status
+
+Apple silicon + macOS 26, LOCAL DEV ONLY -- never CI (CI runs `test-docker-*`
+on ubuntu with real docker). Validated on mocker: `questdb` + `postgresql`
+lifecycle parity and end-to-end `test-docker-questdb` (load + query).
+
+NOT validated: multi-service stacks. `docker/databend/docker-compose.yml`
+declares three services (`minio`, `minio-setup`, `databend`); databend stays
+healthy on docker, but its `minio` service exits under mocker, so use
+`CONTAINER_ENGINE=docker` for databend. This is specific to databend's
+dependency on a separate MinIO container for S3-compatible storage -- it is
+not evidence that mocker cannot run multi-service compose stacks in general.
+`docker/doris/docker-compose.yml` and `docker/starrocks/docker-compose.yml`
+each declare exactly one service (the official all-in-one FE+BE image), so
+both are unaffected and fine under mocker.
+
+`tests/uat/test_docker_assets.py` pins these three service counts against the
+compose files so this guidance cannot silently drift out of sync again (it
+drifted once, in commit `fd29aa77c0`, when a canonicalization pass compressed
+this section into a vague "unsuitable for certain multi-service stacks"
+claim with no named platform).
+
 ## Explorer smoke (browser)
 
 `make uat-explorer-smoke` invokes Playwright directly against a freshly

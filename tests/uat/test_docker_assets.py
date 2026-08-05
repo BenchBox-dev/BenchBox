@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tests.uat import docker_assets, matrix
 from tests.uat.docker_path_helpers import compose_path_ends_with
@@ -451,3 +452,31 @@ def test_sweep_leaked_mocker_volumes_swallows_individual_removal_failure(tmp_pat
 
     # One volume's rm failure does not abort the rest of the sweep.
     assert removed == ("benchbox-uat-demo-cache",)
+
+
+@pytest.mark.parametrize(
+    ("platform", "expected_service_count"),
+    [
+        # minio, minio-setup, databend -- the validated mocker failure is
+        # databend's minio service exiting under mocker (AGENTS.md).
+        ("databend", 3),
+        # all-in-one FE+BE image -- single container, unaffected by mocker.
+        ("doris", 1),
+        # all-in-one image -- single container, unaffected by mocker.
+        ("starrocks", 1),
+    ],
+)
+def test_multi_service_platform_service_counts_match_documented_guidance(platform, expected_service_count):
+    """Pin the compose service counts AGENTS.md and uat-framework.md cite.
+
+    Guards against the mocker multi-service guidance drifting out of sync
+    with the compose files it describes, the way it silently did once before
+    (commit fd29aa77c0 compressed the specific databend/minio caveat into a
+    vague, unverifiable claim).
+    """
+    spec = docker_assets.docker_platform_spec(platform)
+    total_services = 0
+    for compose_file in spec.compose_files:
+        data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+        total_services += len(data.get("services", {}))
+    assert total_services == expected_service_count
