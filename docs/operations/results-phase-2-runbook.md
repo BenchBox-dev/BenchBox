@@ -36,6 +36,56 @@ If the workflow's heuristics ever miss a path (or a one-off mirror is
 needed outside the trigger conditions), trigger it manually via
 `workflow_dispatch` from the Actions tab.
 
+#### Why the mirror PR needs its own check, and what still doesn't run there
+
+The mirror PR is opened by `sync-results-data-to-published.yml` using its own
+`GITHUB_TOKEN`, so its author is `github-actions[bot]`. GitHub never starts
+`pull_request`-triggered workflow runs for events raised by `GITHUB_TOKEN`
+(documented recursion prevention) — so `validate-submission.yml`, despite
+being wired to fire on exactly this PR's base and paths, never actually runs
+on it. #1542 shipped with an empty `statusCheckRollup` for exactly this
+reason: not zero failures, zero checks.
+
+The sync workflow now closes that gap itself: before opening or updating the
+PR, it runs the same two corpus gates `validate-submission.yml` would have
+(bundle validation via `scripts/validate_submission.py`, inventory freshness
+via `scripts/generate_corpus_inventory.py --check`) against the exact content
+it is about to mirror, and posts the result as a `corpus-mirror/validate-bundles`
+commit status on the mirror branch's head SHA. A commit status is a plain
+Statuses-API write, not a workflow trigger, so it is unaffected by the
+GITHUB_TOKEN recursion rule above and needed no new credential — only a
+`statuses: write` permission grant on the token this workflow already holds.
+
+A separate, narrower gap remains and is **not** fixed by the above:
+`published-results` carries exactly one workflow file
+(`validate-submission.yml`). `pr-base-guard.yml` — the repo-wide check that
+every PR gets regardless of base, added precisely so a PR against an
+unexpected base branch cannot show zero checks — cannot run against
+`published-results` because its file simply does not exist there, whatever
+its trigger says. It cannot be added by the sync workflow either:
+`GITHUB_TOKEN` cannot push changes under `.github/workflows/` regardless of
+the `permissions:` block granted to it (a hard-coded GitHub Actions
+restriction — see the "workflow file itself is NOT auto-mirrored" section of
+[`adr-published-results-slim-corpus-branch.md`](../development/adr/adr-published-results-slim-corpus-branch.md),
+which already documents this exact restriction for `validate-submission.yml`
+edits). Porting `pr-base-guard.yml` (or any future repo-wide guard) onto
+`published-results` is therefore a **manual** maintainer step, using the same
+diff-and-reapply protocol the ADR already prescribes for validator changes:
+
+```bash
+git diff origin/develop:.github/workflows/pr-base-guard.yml \
+         origin/published-results:.github/workflows/pr-base-guard.yml
+```
+
+then apply and push directly to `published-results` (or a PR against it) as
+a maintainer with `contents: write` access. In practice this matters less
+than it sounds: `pr-base-guard.yml` only protects against a PR whose base is
+some *other* branch entirely, and every route onto `published-results`
+(contributor submissions, this sync workflow) already targets it directly —
+but a future stacked-PR mistake against this branch would still see zero
+checks until this manual port happens. Treat it as tracked debt, not a
+silent gap.
+
 ### 1.3 Explorer publish path
 
 The static explorer at `benchbox.dev/results/` is intended to build and

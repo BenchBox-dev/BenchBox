@@ -14,6 +14,22 @@ name: Sync results-data to published-results
 # on the public corpus branch. Validator changes mirror both the thin
 # `scripts/validate_submission.py` entrypoint and its shared
 # `benchbox/validation/bundle.py` implementation.
+#
+# The mirror PR's author is this workflow's own GITHUB_TOKEN identity
+# (github-actions[bot]). GitHub never starts `pull_request`-triggered workflow
+# runs for events raised by GITHUB_TOKEN — documented recursion prevention,
+# not something a trigger filter can work around — so `validate-submission.yml`
+# never fires on this PR even though its `paths:` filter matches every file
+# the PR touches. Left alone, the PR's statusCheckRollup is empty: not zero
+# failures, zero checks. See #1542 and
+# `docs/operations/results-phase-2-runbook.md` §1.2. The "Validate mirrored
+# corpus content" / "Report validation as a commit status" steps below are the
+# fix: this run validates the exact content it is about to propose and posts
+# the result as a commit status on the mirror branch's head SHA. A commit
+# status is a plain write via the Statuses API, not a workflow trigger, so it
+# is unaffected by the GITHUB_TOKEN recursion rule and needs no new
+# credential — `statuses: write` only widens the permissions already granted
+# to the token this workflow already holds.
 
 on:
   push:
@@ -33,6 +49,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  statuses: write
 
 concurrency:
   group: sync-results-to-published-${{ github.ref }}
@@ -189,6 +206,95 @@ jobs:
           # same SHA collide.
           PRE_COMMIT_ALLOW_NO_CONFIG=1 git push --force-with-lease origin "${MIRROR_BRANCH}"
 
+      # w0: which checks genuinely protect a corpus-only branch. `published-results`
+      # carries results-data/, a slim results-validation subset of benchbox/, and
+      # docs — not the develop package or test suite. Reimporting develop's
+      # lint/type/pytest matrix here would gate corpus content on checks that have
+      # nothing to do with it (rejected by the ADR for the same reason it rejected
+      # routing submissions through develop directly). The two checks that ARE
+      # domain-appropriate are exactly the ones `validate-submission.yml` already
+      # runs for a human-authored submission PR: does each changed bundle pass
+      # schema/hash/privacy validation, and is the generated inventory still
+      # current. Run precisely those two, reusing the identical vendored scripts
+      # and the identical `--no-project --python 3.11` invocation convention
+      # documented in `adr-published-results-slim-corpus-branch.md`, so the mirror
+      # PR is judged by the same bar a contributor PR would be.
+      - name: Install uv
+        if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate mirrored corpus content
+        # The working tree right now (after `git switch --force-create` and the
+        # path-level checkouts above) IS the exact content the PR will present as
+        # its diff — validating it here checks precisely what a reviewer would
+        # see, not a proxy for it. `set -u`/`pipefail` without `-e`: a validator
+        # failure must be captured as a reported state, not abort the job before
+        # the PR / status steps below ever run.
+        if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
+        id: validate
+        run: |
+          set -uo pipefail
+
+          CHANGED_BUNDLES=$(git diff --no-renames --name-only --diff-filter=ACMR origin/published-results HEAD -- \
+            'results-data/bundles/*.json' 'results-data/bundles/**/*.json' \
+            | grep -vi '\.plans\.json$' \
+            | grep -vi '\.tuning\.json$' \
+            | grep -vi '\.applied\.json$' \
+            | grep -vi '\.manifest\.json$' \
+            || true)
+
+          STATE="success"
+          DESCRIPTION="Corpus content validated before mirroring."
+
+          if [[ -n "${CHANGED_BUNDLES}" ]]; then
+            echo "Validating changed bundle(s):"
+            printf '  %s\n' "${CHANGED_BUNDLES}"
+            # No --require-manifest: this run IS the maintainer-run mirror that
+            # validate-submission.yml's own "Validate bundles" step already
+            # waives the sidecar requirement for (same auto/results-mirror-*
+            # same-repo signal) — the seed-corpus, sidecar-less path is
+            # legitimate here too, not a gap.
+            if ! printf '%s\n' "${CHANGED_BUNDLES}" | xargs -d '\n' uv run --no-project --python 3.11 -- python scripts/validate_submission.py; then
+              STATE="failure"
+              DESCRIPTION="scripts/validate_submission.py rejected the mirrored bundle content."
+            fi
+          fi
+
+          if [[ "${STATE}" == "success" ]]; then
+            if ! uv run --no-project --python 3.11 -- python scripts/generate_corpus_inventory.py --check; then
+              STATE="failure"
+              DESCRIPTION="results-data/corpus-inventory.json is stale for the mirrored content."
+            fi
+          fi
+
+          echo "state=${STATE}" >> "$GITHUB_OUTPUT"
+          echo "description=${DESCRIPTION}" >> "$GITHUB_OUTPUT"
+
+      - name: Report validation as a commit status on the mirror PR
+        # This is the fix for Cause 1 (see the workflow-level comment above): a
+        # commit status posted by THIS run, tied to the mirror branch's own head
+        # SHA, is what makes the PR's statusCheckRollup non-empty. It must carry
+        # the same condition as "Open or update draft PR" so every mirror PR gets
+        # it, not just some.
+        if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE: ${{ steps.validate.outputs.state }}
+          DESCRIPTION: ${{ steps.validate.outputs.description }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          gh api "repos/${{ github.repository }}/statuses/${SHA}" \
+            -f state="${STATE}" \
+            -f context="corpus-mirror/validate-bundles" \
+            -f description="${DESCRIPTION}" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
       - name: Open or update draft PR
         if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
         env:
@@ -232,6 +338,15 @@ jobs:
             echo "PR #${EXISTING} already open for ${MIRROR_BRANCH}; updating body."
             gh pr edit "${EXISTING}" --body "${BODY}"
           fi
+
+      - name: Fail the run if mirrored content failed validation
+        # Runs after the PR/status steps above on purpose: the PR must still
+        # exist and carry the failing status for a maintainer to act on, not
+        # disappear because this job stopped early.
+        if: steps.validate.outputs.state == 'failure'
+        run: |
+          echo "::error::Mirrored corpus content failed validation; see the corpus-mirror/validate-bundles status on the mirror PR for detail."
+          exit 1
 
       - name: No-op summary
         if: steps.drift.outputs.has_drift != 'true' || steps.build.outputs.has_changes != 'true'
