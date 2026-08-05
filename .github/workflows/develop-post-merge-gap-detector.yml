@@ -1,0 +1,78 @@
+name: Develop post-merge gap detector
+
+# Instrumentation for the silent develop-post-merge push-drop class.
+#
+# develop-post-merge.yml is push-triggered on develop. GitHub has dropped push
+# delivery for consecutive develop merges (2026-08-03 corpus-mirror gap;
+# 2026-08-04 six consecutive merges with no post-merge run). The hourly
+# schedule on develop-post-merge.yml re-gates the *tip* so develop is not left
+# un-gated; this workflow records whether each recent develop SHA ever got a
+# post-merge run at all, and fails when gaps remain so the class stays visible
+# until the lookback window advances past it.
+#
+# Read-only. No write permissions. Does not open PRs, re-run gates, or mutate
+# repository state. Manual recovery for tip coverage is still
+# `gh workflow run develop-post-merge.yml` (or wait for the next hourly sweep).
+#
+# See docs/operations/develop-post-merge-gaps.md.
+
+on:
+  schedule:
+    # Daily, offset from other canaries. Instrumentation does not need hourly
+    # cadence; the sweep in develop-post-merge.yml already bounds tip exposure.
+    - cron: "47 7 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  # actions:read is required to list workflow runs via gh/api. The main
+  # develop-post-merge workflow already grants actions:read on its metrics /
+  # auto-revert jobs; this is not a new capability class for the repo.
+  actions: read
+
+concurrency:
+  group: develop-post-merge-gap-detector
+  cancel-in-progress: false
+
+jobs:
+  detect-gaps:
+    name: Detect missing develop-post-merge runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          # Need enough history for the lookback window.
+          fetch-depth: 0
+
+      - name: Fetch origin/develop tip
+        run: git fetch --no-tags origin develop
+
+      - name: Run gap detector
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Capture JSON even when the detector exits 1 (gaps present) so the
+          # always()-run upload below still has a report artifact.
+          set +e
+          python3 scripts/detect_develop_post_merge_gaps.py \
+            --live \
+            --branch origin/develop \
+            --commit-limit 20 \
+            --run-limit 100 \
+            --json > gap-report.json
+          rc=$?
+          set -e
+          cat gap-report.json
+          exit "${rc}"
+
+      - name: Upload gap report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: develop-post-merge-gap-report
+          path: gap-report.json
+          retention-days: 30
+          if-no-files-found: ignore

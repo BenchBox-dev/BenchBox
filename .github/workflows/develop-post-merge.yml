@@ -4,16 +4,33 @@ name: Develop post-merge
 # run the same lightweight local gates against the actual develop tip. This is
 # intentionally narrower than test.yml's full PR matrix so it does not turn
 # every squash merge into the heavyweight optional suite.
+#
+# Push is the primary trigger. GitHub has been observed to drop push delivery
+# for consecutive develop merges (see docs/operations/develop-post-merge-gaps.md
+# and the 2026-08-03 corpus-mirror gap), so a scheduled sweep is additive: it
+# re-runs the same gates against the current develop tip within a bounded
+# window when a per-push run was never created. It is not a replacement for
+# push, and it does not paper over the gap with extra event types.
 
 on:
   push:
     branches: [develop]
+  # Bound silent push-drop exposure. Hourly is enough to re-gate tip without
+  # waiting for the next real merge; the gap detector (sibling workflow)
+  # instruments which exact SHAs still lack a per-push run.
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch: {}
 
 permissions:
   contents: read
 
 concurrency:
-  group: develop-post-merge-${{ github.sha }}
+  # Push (and manual dispatch) stay SHA-keyed so concurrent merges do not
+  # cancel each other. Schedule uses a fixed group so a sweep never cancels
+  # — and is never cancelled by — a push-triggered run for the same tip, and
+  # successive sweeps serialize instead of stacking.
+  group: ${{ github.event_name == 'schedule' && 'develop-post-merge-schedule' || format('develop-post-merge-{0}', github.sha) }}
   cancel-in-progress: false
 
 jobs:
@@ -26,7 +43,12 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
+      # Default branch is develop, so schedule/dispatch already resolve to the
+      # tip workflow + tip SHA. Pin ref explicitly so a future default-branch
+      # rename cannot silently re-target this sweep.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -94,6 +116,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -159,6 +183,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
       - name: Run explorer token scan
         id: token-scan
@@ -230,6 +256,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -305,6 +333,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
           fetch-depth: 0
 
       - name: Close PRs whose branches are ancestors of the merged PR
@@ -428,6 +457,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
           fetch-depth: 0
 
       - name: Download current run signature artifacts
@@ -842,6 +872,8 @@ jobs:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
       - name: Close stale auto-revert PRs and develop-red incidents
         shell: bash
