@@ -61,6 +61,22 @@ class DuplicateResultIdError(Exception):
     """
 
 
+class PrivacyRejectionError(Exception):
+    """A bundle, receipt, or plans companion failed the public privacy check.
+
+    Intentionally not a ``ValueError``, for the same reason as
+    ``DuplicateResultIdError`` above: the publication loop downgrades everything
+    in its ``except`` tuple to a skip plus a warning, so a rejection raised as
+    ``ValueError`` let the build finish green having quietly dropped the result.
+
+    That inverts what the check is for. ``find_public_path_leaks`` firing means
+    the fail-closed boundary caught something a human needs to look at - a
+    bundle that was never run through the public boundary, or run through a
+    different one. Dropping it makes the corpus silently incomplete and leaves
+    the leaking bundle in the repository, still leaking.
+    """
+
+
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 COMMUNITY_TRUST_LABEL = "community-submission"
@@ -216,7 +232,9 @@ def _public_applied_receipt(bundle_path: Path, anonymizer: AnonymizationManager)
         raise ValueError(f"could not sanitize applied receipt {bundle_path.name}: {exc}") from exc
     leaks = find_public_path_leaks(public_receipt)
     if leaks:
-        raise ValueError("public applied receipt privacy check failed for fields: " + ", ".join(sorted(set(leaks))))
+        raise PrivacyRejectionError(
+            "public applied receipt privacy check failed for fields: " + ", ".join(sorted(set(leaks)))
+        )
     return canonical_json_bytes(public_receipt).decode("utf-8")
 
 
@@ -229,7 +247,9 @@ def _public_bundle_data(
     public_bundle = anonymizer.anonymize_result_payload(bundle_data)
     public_leaks = find_public_path_leaks(public_bundle)
     if public_leaks:
-        raise ValueError("public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks))))
+        raise PrivacyRejectionError(
+            "public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks)))
+        )
     return public_bundle, _public_applied_receipt(bundle_path, anonymizer)
 
 
@@ -737,7 +757,12 @@ class ExplorerPipeline:
                                 public_plans = public_anonymizer.anonymize_result_payload(plans_payload)
                                 plans_leaks = find_public_path_leaks(public_plans)
                                 if plans_leaks:
-                                    raise ValueError(
+                                    # Escapes both this block's handler and the
+                                    # per-bundle one. A leaking companion used to
+                                    # be the quietest case of all: the bundle
+                                    # still published, only `plans_published`
+                                    # stayed false, so the corpus looked complete.
+                                    raise PrivacyRejectionError(
                                         "public plans privacy check failed for fields: "
                                         + ", ".join(sorted(set(plans_leaks)))
                                     )
