@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.results.environment import build_platform_metadata_payload
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.core.results.regression_policy import is_regression
@@ -353,7 +354,7 @@ class ResultDatabase:
             total_cost = result.cost_summary.get("total_cost")
 
         # Build metadata
-        metadata = {
+        metadata: dict[str, Any] = {
             "system_profile": result.system_profile,
             # ~/.benchbox/results.db outlives the run; sanitize so a
             # convention slip in an adapter's platform_info never persists a
@@ -362,6 +363,32 @@ class ResultDatabase:
             "tunings_applied": result.tunings_applied,
             "test_execution_type": result.test_execution_type,
         }
+        # Persist filtered platform metadata when the result carries explicit
+        # blocks so the local DB is not a silent egress channel for raw_config,
+        # raw_metadata, or the normalized deployment/cloud/compute/storage
+        # mappings. Same structural boundary as public/private payloads.
+        has_explicit_platform_meta = any(
+            getattr(result, name, None) is not None
+            for name in (
+                "platform_deployment",
+                "platform_cloud",
+                "platform_compute",
+                "platform_storage",
+                "platform_raw_config",
+                "platform_raw_metadata",
+            )
+        )
+        if has_explicit_platform_meta:
+            metadata["platform"] = build_platform_metadata_payload(
+                platform_info=result.platform_info,
+                platform_config=None,
+                deployment=getattr(result, "platform_deployment", None),
+                cloud=getattr(result, "platform_cloud", None),
+                compute=getattr(result, "platform_compute", None),
+                storage=getattr(result, "platform_storage", None),
+                raw_config=getattr(result, "platform_raw_config", None),
+                raw_metadata=getattr(result, "platform_raw_metadata", None),
+            )
 
         with self._connection() as conn:
             cursor = conn.cursor()

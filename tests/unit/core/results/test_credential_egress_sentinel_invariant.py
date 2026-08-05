@@ -174,3 +174,56 @@ def test_registered_adapter_result_payload_redacts_credential_sentinels(platform
     database_bytes = (tmp_path / "results.db").read_bytes()
     for sentinel in _CREDENTIAL_SENTINELS:
         assert sentinel.encode() not in database_bytes, f"{platform_name} results.db leaked {sentinel}"
+
+
+def test_platform_metadata_blocks_never_egress_distinct_sentinels(tmp_path: Path) -> None:
+    """raw_config, raw_metadata, and normalized mapping blocks share one boundary.
+
+    Distinct sentinels per source ensure a partial fix cannot silence the gate.
+    """
+    gates = {
+        "raw_config": "RAW_CONFIG_GATE",
+        "raw_metadata": "RAW_METADATA_GATE",
+        "deployment": "DEPLOYMENT_GATE",
+        "cloud": "CLOUD_GATE",
+        "compute": "COMPUTE_GATE",
+        "storage": "STORAGE_GATE",
+    }
+    result = BenchmarkResults(
+        benchmark_name="synthetic",
+        platform="synthetic",
+        scale_factor=1.0,
+        execution_id="metadata-blocks-gate",
+        timestamp=datetime.now(),
+        duration_seconds=0.1,
+        total_queries=0,
+        successful_queries=0,
+        failed_queries=0,
+        platform_info={"sort_key": "o_orderkey", "threads": 4},
+        platform_raw_config={"password": gates["raw_config"], "threads": 4},
+        platform_raw_metadata={"password": gates["raw_metadata"], "partition_key": "l_orderkey"},
+        platform_deployment={"token": gates["deployment"], "connection_mode": "embedded"},
+        platform_cloud={"access_key": gates["cloud"], "region": "us-east-1"},
+        platform_compute={"connection_string": gates["compute"], "warehouse": "BENCH_WH"},
+        platform_storage={"secret": gates["storage"], "bucket": "bench-bucket"},
+    )
+
+    public = json.dumps(build_result_payload(result), default=str)
+    private = (
+        ResultExporter(output_dir=tmp_path / "export", anonymize=False)
+        .export_result(result, formats=["json"])["json"]
+        .read_text(encoding="utf-8")
+    )
+    db_path = tmp_path / "results.db"
+    ResultDatabase(db_path=db_path).store_result(result)
+    database_bytes = db_path.read_bytes()
+
+    for source, sentinel in gates.items():
+        assert sentinel not in public, f"public payload leaked {source}={sentinel}"
+        assert sentinel not in private, f"private export leaked {source}={sentinel}"
+        assert sentinel.encode() not in database_bytes, f"results.db leaked {source}={sentinel}"
+
+    # Non-secret tuning must still be available to analysis consumers.
+    assert "o_orderkey" in public
+    assert "BENCH_WH" in private
+    assert b"bench-bucket" in database_bytes

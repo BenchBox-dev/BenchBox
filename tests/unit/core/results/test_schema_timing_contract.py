@@ -52,6 +52,44 @@ def _result_with_queries(query_results: list[dict[str, Any]], execution_id: str 
     )
 
 
+def test_build_result_payload_redacts_platform_metadata_credential_sentinels() -> None:
+    """Timing payload construction must not bypass the platform metadata boundary."""
+    import json
+
+    from benchbox.core.results.models import BenchmarkResults
+
+    gates = (
+        "RAW_CONFIG_GATE",
+        "RAW_METADATA_GATE",
+        "DEPLOYMENT_GATE",
+        "CLOUD_GATE",
+        "COMPUTE_GATE",
+        "STORAGE_GATE",
+    )
+    result = BenchmarkResults(
+        benchmark_name="synthetic",
+        platform="synthetic",
+        scale_factor=1.0,
+        execution_id="timing-meta-gate",
+        timestamp=datetime(2026, 2, 12),
+        duration_seconds=0.1,
+        total_queries=0,
+        successful_queries=0,
+        failed_queries=0,
+        platform_info={"sort_key": "o_orderkey", "threads": 4},
+        platform_raw_config={"password": "RAW_CONFIG_GATE", "threads": 4},
+        platform_raw_metadata={"password": "RAW_METADATA_GATE"},
+        platform_deployment={"token": "DEPLOYMENT_GATE"},
+        platform_cloud={"access_key": "CLOUD_GATE"},
+        platform_compute={"connection_string": "COMPUTE_GATE"},
+        platform_storage={"secret": "STORAGE_GATE"},
+    )
+    text = json.dumps(build_result_payload(result), default=str)
+    for gate in gates:
+        assert gate not in text, f"timing payload path leaked {gate}"
+    assert "o_orderkey" in text
+
+
 def test_build_result_payload_prefers_execution_time_seconds() -> None:
     result = _result_with_queries(
         [

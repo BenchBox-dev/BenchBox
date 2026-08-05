@@ -228,3 +228,6 @@ def test_private_export_preserves_raw_platform_metadata_behind_explicit_option(t
     assert payload["platform"]["raw_config"]["username"] == "<redacted>"
     assert payload["platform"]["raw_config"]["password"] == "<redacted>"
     assert payload["platform"]["raw_config"]["access_token"] == "<redacted>"
+    # raw_metadata and normalized blocks share the same structural boundary:
+    # credentials never egress even when anonymize=False preserves identifiers.
+    assert "super-secret-password" not in json.dumps(payload.get("platform", {}).get("raw_metadata", {}))
