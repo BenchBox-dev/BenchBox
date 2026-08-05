@@ -39,7 +39,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check skill-sync-verify skill-sync-lock-audit mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -740,10 +740,12 @@ agent-commit-range-check:
 
 # skill-sync — materialize project-local skills from ~/.skill-sync/skills.
 # Manifest is tracked (skill-sync.yaml/skill-sync.lock). The `claude` target
-# (.claude/skills) is a TRACKED snapshot committed for cloud/CI parity — verify
-# it with `make skill-sync-verify`. The codex/gemini/antigravity mirrors stay
-# gitignored and are regenerated locally per developer. Override SKILL_SYNC to
-# point at a different install (e.g. an npm-installed copy).
+# (.claude/skills) is a TRACKED snapshot committed for cloud/CI parity —
+# integrity comes from PR review of the mirror diff, plus the untracked-mirror
+# drift guard (`scripts/check_untracked_skill_mirrors.sh`). The
+# codex/gemini/antigravity mirrors stay gitignored and are regenerated locally
+# per developer. Override SKILL_SYNC to point at a different install (e.g. an
+# npm-installed copy).
 SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js
 
 skill-sync:
@@ -767,26 +769,6 @@ skill-sync-check:
 	else \
 		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
 	fi
-
-# skill-sync-verify — offline integrity gate for the tracked snapshot (CI/local).
-# Proves .claude/skills matches skill-sync.lock + the regenerated config; exits
-# non-zero on any hand-edit, stray file, or stale config. Skips when the CLI is
-# absent (e.g. cloud/CI without skill-sync) — the committed snapshot is plain
-# files and needs skill-sync only to be *verified*, not to be consumed.
-skill-sync-verify:
-	@if [ -f "$(SKILL_SYNC)" ]; then \
-		node "$(SKILL_SYNC)" verify; \
-	else \
-		echo "skill-sync not installed at $(SKILL_SYNC); skipping verify (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
-	fi
-
-# Review helper for PRs that modify skill-sync.lock while .claude/skills is gitignored.
-# Usage: make skill-sync-lock-audit [BASE=origin/develop] [TODO=_project/.../item.yaml] [CHECK=1]
-skill-sync-lock-audit:
-	uv run --project _project/scripts -- python _project/scripts/skill_sync_lock_audit.py \
-		--base $${BASE:-origin/develop} \
-		$${TODO:+--todo $$TODO} \
-		$${CHECK:+--check}
 
 # Duplicate code detection (AST structural clone detection)
 duplicate-check:
@@ -877,11 +859,7 @@ guards-fix:
 # lint-site-theme-tokens, skill-sync-check, spellcheck). Every guard the
 # pr.yml `lint` job runs (after dependency install) must also run here at the
 # COMMAND level, or tests/system/test_ci_lint_parity.py fails — see
-# docs/operations/ci-local-parity.md. One guard is a documented, tested
-# exception: the pinned `npx github:...#sha verify` skill-sync step needs
-# network access this sandbox/local dev flow cannot rely on (verified: it
-# hangs with no route even when npx is installed) — see that doc and the
-# parity test's exclusion dict for the full rationale.
+# docs/operations/ci-local-parity.md.
 #
 # Report-all: mirrors pr.yml's `lint-guard-summary` design. Every guard runs
 # to completion in one pass (no stopping at the first failure) with its
@@ -1376,9 +1354,9 @@ release-cut:
 	@# Tests that import _project/dev-only tooling or test curated-out surfaces
 	@# cannot collect on the release tree (found by the v0.3.1 release PR CI).
 	git rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer
-	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_skill_sync_lock_audit.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
+	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
 	@# Post-curation guard: every curated path must be gone from the index.
-	@LEFTOVER=$$(git ls-files _project _blog results-data results-explorer .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_skill_sync_lock_audit.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
+	@LEFTOVER=$$(git ls-files _project _blog results-data results-explorer .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
 	if [ -n "$$LEFTOVER" ]; then \
 		echo "ERROR: release curation incomplete; dev-only paths still tracked:" >&2; \
 		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \

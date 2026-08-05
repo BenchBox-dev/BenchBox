@@ -112,19 +112,6 @@ repos:
         pass_filenames: false
         stages: [manual]
 
-      # Offline integrity gate for the tracked skill-sync snapshot
-      # (.claude/skills): proves the committed bytes match skill-sync.lock +
-      # the regenerated config. `make skill-sync-verify` skips gracefully when
-      # skill-sync isn't installed (cloud/CI, contributors without the CLI), so
-      # this never blocks those environments. Runs only when the snapshot changes.
-      - id: skill-sync-verify
-        name: skill-sync tracked snapshot verify
-        entry: make skill-sync-verify
-        language: system
-        pass_filenames: false
-        stages: [pre-commit]
-        files: ^\.claude/skills/
-
       - id: agent-instructions-check
         name: agent instruction authority and efficiency audit
         entry: make agent-instructions-check

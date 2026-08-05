@@ -80,7 +80,7 @@ directory loses its signal).
 
 ## Section 3 - L2 audit scope
 
-The Layer 2 question from `SHARED/plan-deepening-framework`:
+The Layer 2 question from `SHARED/review-protocol` (Section 3, Planning-Depth Layers):
 
 > *What class of issue does my framework fail to catch for this type
 > of change/bug/decision?*

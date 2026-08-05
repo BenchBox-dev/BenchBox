@@ -49,7 +49,7 @@ rule 4 applies to wrappers.
 ## Rules
 
 - Follow the selected guide and commit changed files only through
-  `SHARED/commit-framework/SKILL.md`.
+  `SHARED/change-framework/SKILL.md`.
 - The selected command's `--help` is the full CLI contract. Never hand-write tracker state
   into repo files. `TODO_DB_URL` may provide the hosted database; the CLI never
   echoes its DSN.

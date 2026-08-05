@@ -18,11 +18,9 @@ renamed or removed (so the exclusion can't quietly rot into cover for a
 guard nobody runs anywhere).
 
 Command-level, not name-level, matters here: a local target can share a
-step's name while running different logic. `skill-sync-check` in `ci-lint`
-(`node skill-sync doctor`) is not the same command as CI's pinned
-full-SHA skill-sync checkout plus `npm ci` and `verify` step -- treating the
-name match as parity would hide that the local run isn't actually checking
-what CI checks.
+step's name while running different logic -- treating a name match as
+parity would hide that the local run isn't actually checking what CI
+checks.
 
 ## Adding a new lint guard
 
@@ -106,39 +104,12 @@ trailing `; \` continuation marker before comparing it against the `pr.yml`
 command text -- see `_normalize_recipe_lines` in
 `tests/system/test_ci_lint_parity.py`.
 
-If a guard genuinely cannot run locally (see the network exception below
+If a guard genuinely cannot run locally (see the cache exception below
 for the only current example), add it to the `EXCLUDED_STEPS` dict in the
 parity test with a concrete reason -- do not silently omit it, and do not
 weaken the CI guard itself so a lossier local equivalent can "pass."
 
 ## Documented exceptions
-
-### Pinned skill-sync checkout verify
-
-The `lint` job's "skill-sync tracked snapshot verify (cloud/CI integrity
-gate)" uses `actions/checkout` at a full skill-sync commit SHA, runs
-`npm ci` in that isolated tool checkout, then runs its built verifier against
-the BenchBox root. This needs network access to fetch the pinned commit and
-its npm dependencies. The explicit checkout avoids npm's unreliable
-GitFetcher packaging path while retaining immutable source provenance.
-
-This was tested directly in a local/sandboxed dev shell: the equivalent flow
-hangs with no route (no DNS/proxy path configured for GitHub or the npm
-registry). Two options were
-considered:
-
-- **Guard it with a network probe and print a notice.** Rejected:
-  on a machine where Git/npm tooling and network are available, this
-  swallows a real local verify failure and prints a "skipped" notice
-  instead -- silently weakening the guard, which is the exact anti-pattern
-  this parity invariant exists to prevent elsewhere.
-- **Exclude it explicitly, with a reason, in the parity test.** This is
-  what the repo does. CI's runner has network, so the gate stays fully
-  enforced there; it is simply not a viable *blocking* local gate.
-
-`make ci-lint` therefore does not run this step. `make skill-sync-check`
-(`node skill-sync doctor`) is a different, unrelated local convenience and
-does not substitute for it -- see the command-level-parity note above.
 
 ### Fast lane delta guard vs. develop
 

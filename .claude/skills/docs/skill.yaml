@@ -1,8 +1,7 @@
 depends:
-  - SHARED/commit-framework
-  - SHARED/compare-framework
-  - SHARED/shrink-framework
-  - SHARED/research-framework
+  - SHARED/change-framework
+  - SHARED/investigation-framework
+  - SHARED/review-protocol
 tags:
   - documentation
 category: content

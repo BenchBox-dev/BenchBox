@@ -1,6 +1,6 @@
 # Code Shrink Reference
 
-Use SHARED/shrink-framework/SKILL.md for code compression.
+Use SHARED/investigation-framework/SKILL.md (Shrink section) for code compression.
 
 ## Preserve
 

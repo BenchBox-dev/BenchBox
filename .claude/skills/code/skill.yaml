@@ -1,13 +1,6 @@
 depends:
-  - SHARED/commit-framework
-  - SHARED/verify-framework
-  - SHARED/research-framework
-  - SHARED/compare-framework
-  - SHARED/shrink-framework
-  - SHARED/context-guide
-  - SHARED/debug-framework
-  - SHARED/slicing-framework
-  - SHARED/plan-deepening-framework
+  - SHARED/change-framework
+  - SHARED/investigation-framework
   - SHARED/review-protocol
 config_inputs:
   - key: code.lint

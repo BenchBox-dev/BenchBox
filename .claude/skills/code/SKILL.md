@@ -36,7 +36,7 @@ fall back to the Makefile, manifests, and project agent docs.
 ## Global rules
 
 - Write actions require research before edits and verification before return;
-  commit/push/PR only through `SHARED/commit-framework/SKILL.md` when
+  commit/push/PR only through `SHARED/change-framework/SKILL.md` when
   authorized.
 - `review`, `research`, `compare`, `to-spec`, and `handoff` are read-only
   under `SHARED/review-protocol/SKILL.md`: no commits, pushes, PRs, or

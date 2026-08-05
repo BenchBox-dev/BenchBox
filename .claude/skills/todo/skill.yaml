@@ -1,7 +1,6 @@
 depends:
-  - SHARED/research-framework
+  - SHARED/investigation-framework
   - SHARED/review-protocol
-  - SHARED/plan-deepening-framework
 tags:
   - workflow
   - todo
