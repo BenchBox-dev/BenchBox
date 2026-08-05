@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-H Skew Benchmark (moderate)",
   "bundle_file": "tpch_skew_sf001_sqlite_sql_20260502_202559_fda6d32a.json",
-  "bundle_hash": "7758bdb800295e5127f979e27cc9e846b3c8bdba13bc322c30f5d2121000e930",
+  "bundle_hash": "47df85c5eff0e962af27911f92b0c9beeabdc2bcaad33d7751084f8ed1c6843d",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

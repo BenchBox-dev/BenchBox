@@ -1,7 +1,7 @@
 {
   "benchmark": "Write Primitives",
   "bundle_file": "write_primitives_sf001_sqlite_sql_20260502_192540_036c84f7.json",
-  "bundle_hash": "c8a5aa95a34ddb21f894ccb83f157b086d7d8c9a4ca63964379187f7bb02e737",
+  "bundle_hash": "85f9dbf287d4b08f2f1cf1f467897f9eef3a15e8005d11685221d34ef0e4921c",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

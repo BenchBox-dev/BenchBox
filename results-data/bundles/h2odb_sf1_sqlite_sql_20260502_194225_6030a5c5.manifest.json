@@ -1,7 +1,7 @@
 {
   "benchmark": "H2O Database",
   "bundle_file": "h2odb_sf1_sqlite_sql_20260502_194225_6030a5c5.json",
-  "bundle_hash": "6d1e977524a934a44b8885e75179d4643f3d0646a0499c444105e128b963f860",
+  "bundle_hash": "96ddf80a424bc8d040422e3428320d869421f86cc65324495201feaf2a502f50",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

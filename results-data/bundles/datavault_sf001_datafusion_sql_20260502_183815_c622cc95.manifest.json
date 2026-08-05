@@ -1,7 +1,7 @@
 {
   "benchmark": "Data Vault",
   "bundle_file": "datavault_sf001_datafusion_sql_20260502_183815_c622cc95.json",
-  "bundle_hash": "2a36641a662b5dd2ed1fecdacf735a1c09dddfc37778acc961986528099546b6",
+  "bundle_hash": "6367ce61b967cf7b28479187df328add1e03912b1d6f76b56f94a6f4c423b0e8",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

@@ -15,14 +15,12 @@
   "environment": {
     "arch": "arm64",
     "cpu_count": 10,
-    "machine_id": "machine_3d46427037d2",
     "memory_gb": 16,
     "os": "Darwin 25.3.0",
     "python": "3.12.11"
   },
   "execution": {
     "driver_package": "polars",
-    "driver_runtime_python_executable": "path_ea3a8ec6f65d",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "1.37.1",
     "driver_version_resolved": "1.37.1",
@@ -77,15 +75,13 @@
     "client_version": "unknown",
     "config": {
       "driver_package": "polars",
-      "driver_runtime_python_executable": "path_ea3a8ec6f65d",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.37.1",
       "driver_version_resolved": "1.37.1",
       "execution_mode": "dataframe",
       "family": "expression",
       "rechunk": true,
-      "streaming": false,
-      "working_dir": "path_65ebcc3f359b"
+      "streaming": false
     },
     "driver_actual_version": "1.37.1",
     "driver_package": "polars",

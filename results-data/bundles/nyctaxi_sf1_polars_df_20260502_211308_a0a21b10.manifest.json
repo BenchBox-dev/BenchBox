@@ -1,7 +1,7 @@
 {
   "benchmark": "NYC Taxi",
   "bundle_file": "nyctaxi_sf1_polars_df_20260502_211308_a0a21b10.json",
-  "bundle_hash": "cd52539f784f49488362afb592e574948ba2a57cb2aaf64fa1c109f52ea536a1",
+  "bundle_hash": "a2043c301955df4c0c7388a2398cae7aac3a3648e46895fb756fef4efdd33bd0",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",

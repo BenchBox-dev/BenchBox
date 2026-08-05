@@ -1,7 +1,7 @@
 {
   "benchmark": "Read Primitives",
   "bundle_file": "read_primitives_sf001_datafusion_sql_20260502_182650_763aa432.json",
-  "bundle_hash": "e89f82c64cdfb2cdd71023d94e9078f1d79e9d6ae8707fe4595775dc9d67767b",
+  "bundle_hash": "7a2f02387ecc1db2e12c780349bf82d2f519a02220945e8161502cb9f91a0b14",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

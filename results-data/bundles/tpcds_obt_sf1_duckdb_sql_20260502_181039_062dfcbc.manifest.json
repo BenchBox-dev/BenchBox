@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-DS One Big Table",
   "bundle_file": "tpcds_obt_sf1_duckdb_sql_20260502_181039_062dfcbc.json",
-  "bundle_hash": "20bdc4dbb9329d90964e26d9275f69fe3bc3a009cf9e7e6c527d3f18504ad6f1",
+  "bundle_hash": "c1ba7fcbda4cdcf6c26cb772878859b1a9fd7b0cf787de0b9467919e99bd7287",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DuckDB",

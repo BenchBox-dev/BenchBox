@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-DS One Big Table",
   "bundle_file": "tpcds_obt_sf1_datafusion_sql_20260502_182906_756bc088.json",
-  "bundle_hash": "7fa3f3eb6e877d9f8f727976ead7b6c722e94d3aee16246ddca391a46439230a",
+  "bundle_hash": "b97aa993e8848aacf1624a5c417be047b184b8ef5078764298e0dbb2414eaf9f",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

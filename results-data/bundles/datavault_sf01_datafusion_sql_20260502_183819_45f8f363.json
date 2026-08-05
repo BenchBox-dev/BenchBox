@@ -34,15 +34,12 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
-      "machine_id": "machine_3d46427037d2",
       "os": "Darwin",
       "python": "3.12.11"
     },
-    "machine_id": "machine_3d46427037d2",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_51e3fb6b450f",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -439,7 +436,6 @@
       "type": "zstd"
     },
     "driver_package": "datafusion",
-    "driver_runtime_python_executable": "path_51d816457550",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "53.0.0",
     "driver_version_resolved": "53.0.0",
@@ -518,15 +514,13 @@
       "connection_mode": "in-memory",
       "data_format": "parquet",
       "driver_package": "datafusion",
-      "driver_runtime_python_executable": "path_51d816457550",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "53.0.0",
       "driver_version_resolved": "53.0.0",
       "execution_mode": "sql",
       "memory_limit": "12GB",
       "result_cache_enabled": false,
-      "target_partitions": 10,
-      "working_dir": "path_6ccacae31266"
+      "target_partitions": 10
     },
     "deployment": {
       "collection_status": "partial",
@@ -547,8 +541,7 @@
       "memory_limit": "12GB",
       "result_cache_enabled": false,
       "target_partitions": 10,
-      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
-      "working_dir": "path_6ccacae31266"
+      "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})"
     },
     "raw_metadata": {
       "driver_runtime_strategy": "current-process",
