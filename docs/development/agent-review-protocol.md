@@ -42,21 +42,6 @@ shorter here, but a contradiction is drift and the canonical behavior wins.
 
 ## Audit evidence provenance
 
-`_project/audits/*.md` uses distinct SHA fields for distinct claims:
-
-| Convention | Meaning | Numeric measurement binding |
-|---|---|---|
-| `develop_sha` | Develop base or lineage the audit describes | Necessary, but not sufficient for measured results |
-| `checked_sha` | Exact non-base tree under test | `measured_at_sha` must match it |
-| Test-result counts | Passed, failed, skipped, or timed-out totals | Require `measured_at_sha` |
-| Inventory counts | Counted tests, queries, bundles, findings, comments, and similar entities | Require `measured_at_sha` |
-| Dates, versions, PR/issue references | Narrative identifiers, not empirical results | Do not require fabricated measurement provenance |
-
-`measured_at_sha` binds the original numeric evidence to the exact commit that
-produced it. It equals `checked_sha` when that field exists, otherwise
-`develop_sha`. A later spot replay does not replace or refresh the original
-measurement: record its commit as `replay_sha` and describe exactly what was
-rerun in `replay_scope`. The replay commit must descend from the measured
-commit, and both must be reachable from the audit's committed tree when the
-record is validated. If a replay contradicts a number, correct the claim using
-new evidence instead of using `replay_sha` to bless the stale value.
+Audit records bind numbers to the tree that produced them through distinct SHA
+fields. `make audit-sha-check` enforces it; the conventions are documented in
+`docs/development/audit-evidence-provenance.md`.

@@ -133,8 +133,12 @@ repos:
         stages: [pre-commit]
         files: ^(AGENTS\.md|CLAUDE\.md|GEMINI\.md|ANTIGRAVITY\.md|\.claude/(commands/|settings\.json)|\.claude/skills/|docs/(development/agent-|operations/agent-instruction)|_project/(evals/agent-instructions/|scripts/agent_instruction_audit\.py)|skill-sync\.(yaml|lock))
 
+      # Runs the whole instruction audit, not only the identity check, so the
+      # name cannot claim one check. The script prints `FAIL (<checks>)` naming
+      # what actually failed - a byte-budget failure used to surface here as a
+      # Git identity problem.
       - id: agent-git-identity
-        name: reject stale agent Git identity
+        name: agent instruction + Git identity audit
         entry: make agent-identity-check
         language: system
         pass_filenames: false
