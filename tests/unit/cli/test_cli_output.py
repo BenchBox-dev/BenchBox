@@ -734,8 +734,13 @@ class TestResultExporter:
             data = json.load(f)
 
         assert data["export"]["anonymized"] is True
-        # v2.0 schema puts machine_id in environment block
-        assert data.get("environment", {}).get("machine_id")
+        # Unread identifier fields (including machine_id) are omitted at the
+        # public anonymization boundary — see adr-published-identifier-field-set.
+        environment = data.get("environment") or {}
+        assert "machine_id" not in environment
+        client_host = environment.get("client_host")
+        if isinstance(client_host, dict):
+            assert "machine_id" not in client_host
 
     def test_list_results_empty(self):
         """Test listing results when no results exist."""
