@@ -150,10 +150,12 @@
           "benchbox_private"
         ],
         "prefixes": {
-          "environment.platform_runtime.engine_host": "host_",
           "platform.raw_config.host": "host_",
           "platform.raw_config.database": "database_"
-        }
+        },
+        "absent_keys": [
+          "engine_host"
+        ]
       }
     },
     {

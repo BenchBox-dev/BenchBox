@@ -1,7 +1,7 @@
 {
   "benchmark": "Flight Data",
   "bundle_file": "flightdata_sf001_polars_df_20260502_211311_d255f81b.json",
-  "bundle_hash": "c697ac89243d16f2529229f0f2690a6aaa166d46cd4bcf0a779636d2493f2c8f",
+  "bundle_hash": "a5356e214abf83b96c970aa6e157b9af6b5a325fc0d51e0597c59dbd4dc633d0",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Polars",

@@ -1,6 +1,6 @@
 # ADR: Drop unread identifier fields from the published corpus
 
-- Status: Accepted
+- Status: Accepted (implemented at the public anonymization boundary)
 - Date: 2026-08-04
 - Supersedes nothing. Constrains `benchbox/core/results/anonymization.py` and
   any future re-derivation of `results-data/`.

@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-DI",
   "bundle_file": "tpcdi_sf01_sqlite_sql_20260502_191358_656d6cd6.json",
-  "bundle_hash": "28533bc096aa56b65c267d0d0bb84b6262027c359a279a031f3a67829ad6d5c4",
+  "bundle_hash": "4a7efac44cbe341c3a98f9963007469843ef899478c1833201954e18076aafe4",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

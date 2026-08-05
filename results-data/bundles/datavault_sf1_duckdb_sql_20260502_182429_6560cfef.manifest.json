@@ -1,7 +1,7 @@
 {
   "benchmark": "Data Vault",
   "bundle_file": "datavault_sf1_duckdb_sql_20260502_182429_6560cfef.json",
-  "bundle_hash": "2524ced5b1990ef332a4327c83cf3f2bf4f181faa6dde83b53935b90d6c2e774",
+  "bundle_hash": "9cb77539593658bcac2d5f5f7e9f92bbe2db1ba1d787b78da0a787db50b7e4b9",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DuckDB",

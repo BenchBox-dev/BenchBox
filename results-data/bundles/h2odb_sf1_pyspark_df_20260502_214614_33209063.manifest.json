@@ -1,7 +1,7 @@
 {
   "benchmark": "H2ODB",
   "bundle_file": "h2odb_sf1_pyspark_df_20260502_214614_33209063.json",
-  "bundle_hash": "567de0bc7574c69894165a6e0fb39bfcc7f0f5ebcfc098cc903927abd7bf574d",
+  "bundle_hash": "bf1a0c88f96885ddaa2f96ae56375aa602c25e349f68147cf56781e011c51de5",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",

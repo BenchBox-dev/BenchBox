@@ -34,15 +34,12 @@
     "arch": "arm64",
     "client_host": {
       "arch": "arm64",
-      "machine_id": "machine_3d46427037d2",
       "os": "Darwin",
       "python": "3.12.11"
     },
-    "machine_id": "machine_3d46427037d2",
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_e9490ed88fd5",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -53,7 +50,6 @@
       "type": "zstd"
     },
     "driver_package": "pyspark",
-    "driver_runtime_python_executable": "path_51d816457550",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "4.1.1",
     "driver_version_resolved": "4.1.1",
@@ -132,7 +128,6 @@
       "database": "database_9a24b5c9c1ba",
       "driver_memory": "4g",
       "driver_package": "pyspark",
-      "driver_runtime_python_executable": "path_51d816457550",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "4.1.1",
       "driver_version_resolved": "4.1.1",

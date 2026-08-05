@@ -159,10 +159,13 @@ def test_anonymized_json_export_hashes_infrastructure_identifiers_and_redacts_se
         assert leaked not in serialized
 
     assert payload["export"]["anonymized"] is True
-    assert payload["environment"]["machine_id"].startswith("machine_")
+    # Unread identifier fields are omitted, not published as pseudonyms.
+    assert "machine_id" not in payload["environment"]
+    assert "machine_id" not in payload["environment"]["client_host"]
+    assert "engine_host" not in payload["environment"]["platform_runtime"]
+    assert "machine_id" not in payload.get("platform", {}).get("raw_metadata", {})
     assert payload["environment"]["client_host"]["hostname"].startswith("host_")
     assert payload["environment"]["client_host"]["username"].startswith("user_")
-    assert payload["environment"]["platform_runtime"]["engine_host"].startswith("host_")
     assert "path_" in payload["environment"]["platform_runtime"]["collection_error_message"]
     assert payload["environment"]["container"]["container_name"].startswith("container_")
     assert payload["environment"]["container"]["bind_mounts"][0]["source"].startswith("path_")

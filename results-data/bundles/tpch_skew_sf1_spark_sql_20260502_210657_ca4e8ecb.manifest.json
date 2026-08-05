@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-H Skew Benchmark (moderate)",
   "bundle_file": "tpch_skew_sf1_spark_sql_20260502_210657_ca4e8ecb.json",
-  "bundle_hash": "5f5488af99794148caca4925675b23672abe16d1afdb44ebb2c9415ec7ee1466",
+  "bundle_hash": "8295826bae7bbfb8cfd097698cf1dea68ec3e746a2f9d9902f26ad0f22a1162b",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Spark",

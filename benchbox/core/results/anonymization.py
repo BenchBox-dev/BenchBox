@@ -52,6 +52,9 @@ _MOUNT_COLLECTION_KEYS = set(_ANONYMIZATION_SPECS["mount_collection_keys"])
 _MOUNT_PATH_KEYS = set(_ANONYMIZATION_SPECS["mount_path_keys"])
 _LOCAL_ENDPOINT_VALUES = set(_ANONYMIZATION_SPECS["local_endpoint_values"])
 _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
+# Unread identifier fields: omit at the public boundary rather than publish a
+# confirmable pseudonym. Compact forms; see anonymization_specs.yaml.
+_PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
 
 _MESSAGE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])("
@@ -406,6 +409,10 @@ class AnonymizationManager:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
+                # Same drop set as the public walker: omit unread identifiers
+                # rather than KeyErroring when the scalar walk drops the key.
+                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                    continue
                 if key in {"table", "table_name", "referenced_table", "referenced_table_name"}:
                     anonymized[key] = self._hash_public_identifier(str(child), "table")
                 elif key in {
@@ -421,11 +428,12 @@ class AnonymizationManager:
                 elif key in {"columns", "column_names", "referenced_columns", "referenced_column_names"}:
                     anonymized[key] = self._anonymize_constraint_identifier_collection(child, "column")
                 else:
-                    anonymized[key] = (
-                        self._anonymize_tuning_constraints(child)
-                        if isinstance(child, (dict, list, tuple))
-                        else self._anonymize_public_value({str(key): child}, ())[str(key)]
-                    )
+                    if isinstance(child, (dict, list, tuple)):
+                        anonymized[key] = self._anonymize_tuning_constraints(child)
+                    else:
+                        walked = self._anonymize_public_value({str(key): child}, ())
+                        if str(key) in walked:
+                            anonymized[key] = walked[str(key)]
             return anonymized
         if isinstance(value, list):
             return [self._anonymize_tuning_constraints(item) for item in value]
@@ -474,6 +482,8 @@ class AnonymizationManager:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
+                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                    continue
                 if key in {"table", "table_name"}:
                     anonymized[key] = self._hash_public_identifier(str(child), "table")
                 elif key in {"column", "column_name", "name"}:
@@ -491,6 +501,11 @@ class AnonymizationManager:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
+                # Drop unread identifier fields at every nesting depth so they
+                # never appear as pseudonyms in public bundles (ADR published
+                # identifier field set).
+                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                    continue
                 child_path = (*key_path, str(key))
                 if self._is_secret_metadata_key(child_path):
                     anonymized[key] = PUBLIC_REDACTED_VALUE if child not in (None, "") else child

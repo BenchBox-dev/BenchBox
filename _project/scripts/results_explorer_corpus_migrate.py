@@ -81,12 +81,21 @@ def _manifest_path(bundle_path: Path) -> Path | None:
 
 
 def _sanitize_manifest(payload: dict[str, Any], manager: AnonymizationManager) -> dict[str, Any]:
-    """Scrub free-text manifest values while preserving hash/file structure."""
-    sanitized = dict(payload)
+    """Scrub free-text manifest values while preserving hash/file structure.
+
+    Unread identifier keys are omitted by the public anonymizer rather than
+    rewritten; when a whole key is dropped the entry is removed from the
+    sanitized manifest instead of being re-read (which would KeyError).
+    """
+    sanitized: dict[str, Any] = {}
     for key, value in payload.items():
         if key in STRUCTURAL_MANIFEST_KEYS:
+            sanitized[key] = value
             continue
-        sanitized[key] = manager.anonymize_result_payload({key: value})[key]
+        walked = manager.anonymize_result_payload({key: value})
+        if key in walked:
+            sanitized[key] = walked[key]
+        # else: drop-field key — omit from public manifest
     return sanitized
 
 

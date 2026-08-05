@@ -1,7 +1,7 @@
 {
   "benchmark": "ClickBench",
   "bundle_file": "clickbench_sf1_pyspark_df_20260502_214548_16a1516b.json",
-  "bundle_hash": "a9578a116aa6d794410f449d317dd1b5e935becc206d58404f1ad1597b9683b0",
+  "bundle_hash": "c379e5aa665d49df2855e4a5053b7caeec727a7c48ca00e4836dd0baaeb9fd59",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",

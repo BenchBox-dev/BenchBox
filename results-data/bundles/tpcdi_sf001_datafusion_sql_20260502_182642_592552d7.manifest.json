@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-DI",
   "bundle_file": "tpcdi_sf001_datafusion_sql_20260502_182642_592552d7.json",
-  "bundle_hash": "ebd561e7728933e27dbfdf8ed01fa53d24ca7c3a0f715f12e94527404024dd25",
+  "bundle_hash": "2aa33cb57b4770ae598ea387370b983c8c525b86c74844e3344edc76e8e09fd3",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

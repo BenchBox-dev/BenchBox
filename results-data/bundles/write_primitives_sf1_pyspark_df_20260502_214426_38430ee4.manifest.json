@@ -1,7 +1,7 @@
 {
   "benchmark": "Write Primitives",
   "bundle_file": "write_primitives_sf1_pyspark_df_20260502_214426_38430ee4.json",
-  "bundle_hash": "4230759cc5c69e621d8fd9becd519853c75af0d7acdd1ae0353285fc517bd34e",
+  "bundle_hash": "08125b25328e9afccd6910f0f741e73de0a8583fd03dbf2b9f2cfc3168198e48",
   "companion_hashes": {},
   "phase": 2,
   "platform": "PySpark",

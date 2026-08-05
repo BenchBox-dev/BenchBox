@@ -1,7 +1,7 @@
 {
   "benchmark": "ClickBench",
   "bundle_file": "clickbench_sf1_sqlite_sql_20260502_193842_c618230d.json",
-  "bundle_hash": "817115dd86533749efefa1715ad4abd98e8fbcf117d3fc8a4b2dad3f9801f62c",
+  "bundle_hash": "85cbf245e964b10da3ebd374e4ef2d2d797c5c5411f64c0c6b11681c344ae068",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

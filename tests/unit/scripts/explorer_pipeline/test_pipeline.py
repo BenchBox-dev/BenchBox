@@ -186,7 +186,9 @@ class TestExplorerPipelineRun:
         result_id = _duckdb_results(output)[0]["result_id"]
         published = (output / "bundles" / f"{result_id}.json").read_text(encoding="utf-8")
         assert "/Users/alice" not in published
-        assert "path_" in published
+        # working_dir is dropped at the public boundary (not path-hashed).
+        assert "working_dir" not in published
+        assert "private-run" not in published
 
     def test_result_id_and_bundle_filename_use_public_bytes(self, tmp_path: Path) -> None:
         bundles_dir = tmp_path / "data" / "bundles"
