@@ -36,6 +36,7 @@ def _write_result_json(
     failed: int = 0,
     validation: str = "passed",
     compliance_class: str | None = None,
+    translation_status: str | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     passed = 1 if failed == 0 else 0
@@ -53,6 +54,8 @@ def _write_result_json(
     }
     if compliance_class is not None:
         payload["benchmark"]["compliance_class"] = compliance_class
+    if translation_status is not None:
+        payload["execution"] = {"translation": {"status": translation_status}}
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
@@ -79,6 +82,22 @@ def _loadable_cases(tmp_path: Path) -> list[tuple[str, Path, SubmitTerminalState
     unvalidated_unknown = tmp_path / "unvalidated-unknown.json"
     _write_result_json(unvalidated_unknown, failed=0, validation="unknown")
 
+    # Translation fallback alone is non-clean but not an unvalidated partition
+    # status → schema_violation terminal (not submittable).
+    translation_fallback = tmp_path / "translation-fallback.json"
+    _write_result_json(translation_fallback, failed=0, validation="passed", translation_status="fallback")
+
+    # Uncertain + translation fallback: unvalidated takes precedence over the
+    # translation non-clean reason so the refusal wording stays in the
+    # unvalidated family (claim-weakened), not schema_violation.
+    uncertain_with_translation_fallback = tmp_path / "uncertain-with-translation-fallback.json"
+    _write_result_json(
+        uncertain_with_translation_fallback,
+        failed=0,
+        validation="uncertain",
+        translation_status="fallback",
+    )
+
     unofficial = tmp_path / "unofficial.json"
     _write_result_json(unofficial, compliance_class="unofficial_subscale")
 
@@ -94,10 +113,16 @@ def _loadable_cases(tmp_path: Path) -> list[tuple[str, Path, SubmitTerminalState
         ("clean", clean, SubmitTerminalState.submittable),
         ("query_failure", query_failure, SubmitTerminalState.query_failure),
         ("schema_violation", schema_violation, SubmitTerminalState.schema_violation),
+        ("translation_fallback", translation_fallback, SubmitTerminalState.schema_violation),
         ("unvalidated_not_validated", unvalidated_not_validated, SubmitTerminalState.unvalidated),
         ("unvalidated_not_run", unvalidated_not_run, SubmitTerminalState.unvalidated),
         ("unvalidated_uncertain", unvalidated_uncertain, SubmitTerminalState.unvalidated),
         ("unvalidated_unknown", unvalidated_unknown, SubmitTerminalState.unvalidated),
+        (
+            "uncertain_with_translation_fallback",
+            uncertain_with_translation_fallback,
+            SubmitTerminalState.unvalidated,
+        ),
         ("unofficial", unofficial, SubmitTerminalState.unofficial),
         ("unofficial_and_unvalidated", unofficial_and_unvalidated, SubmitTerminalState.unofficial),
     ]
