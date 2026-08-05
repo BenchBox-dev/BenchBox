@@ -26,6 +26,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 DOCKER_PLATFORM_SWITCH_MODES: tuple[str, ...] = ("off", "containers", "volumes", "images")
 DOCKER_FIXED_CONTAINER_NAME_POLICIES: tuple[str, ...] = ("fail", "override", "allow")
+
+# `_PROJECT_NAME_MAX_LEN` is compose's own project-name ceiling, but it is not
+# the identifier that actually gets constrained at runtime: compose derives
+# the CONTAINER name as `<project>-<service>-<replica>`, and mocker rejects
+# anything over `_CONTAINER_NAME_MAX_LEN` (uat-compose-project-name-overflows-
+# container-id-limit-20260805). Plain Docker's own limit is looser (~255), but
+# the bound below is intentionally the tighter mocker one applied everywhere
+# -- see the "preserves" note on compose_project_name: this only ever makes
+# the project name shorter, never longer, so it is safe for Docker too.
+_CONTAINER_NAME_MAX_LEN = 64
+# Reserve room for a two-digit compose replica index ("-10".."-99"), not just
+# "-1": a scaled service silently overflows by one character the moment it
+# reaches its 10th replica if the budget only ever assumes a single digit.
+_REPLICA_SUFFIX_MAX_LEN = len("-99")
 _PROJECT_NAME_MAX_LEN = 63
 
 # Env override honored by resolve_container_cli() -- verbatim, no rewriting.
@@ -156,38 +170,49 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
     "clickhouse-server": DockerPlatformSpec(
         platform="clickhouse-server",
         compose_files=(_repo_path("docker/clickhouse/docker-compose.yml"),),
+        services=("clickhouse",),
     ),
     "cedardb": DockerPlatformSpec(
         platform="cedardb",
         compose_files=(_repo_path("docker/cedardb/docker-compose.yml"),),
+        services=("cedardb",),
     ),
     "starrocks": DockerPlatformSpec(
         platform="starrocks",
         compose_files=(_repo_path("docker/starrocks/docker-compose.yml"),),
+        services=("starrocks",),
     ),
     "postgresql": DockerPlatformSpec(
         platform="postgresql",
         compose_files=(_repo_path("docker/postgresql/docker-compose.yml"),),
+        services=("postgresql",),
     ),
     "presto": DockerPlatformSpec(
         platform="presto",
         compose_files=(_repo_path("docker/presto/docker-compose.yml"),),
+        services=("presto",),
     ),
     "trino": DockerPlatformSpec(
         platform="trino",
         compose_files=(_repo_path("docker/trino/docker-compose.yml"),),
+        services=("trino",),
     ),
     "databend": DockerPlatformSpec(
         platform="databend",
         compose_files=(_repo_path("docker/databend/docker-compose.yml"),),
+        # All three declared services start together (no host-run subset like
+        # lakesail/velox below); "minio-setup" is the longest at 11 chars.
+        services=("minio", "minio-setup", "databend"),
     ),
     "doris": DockerPlatformSpec(
         platform="doris",
         compose_files=(_repo_path("docker/doris/docker-compose.yml"),),
+        services=("doris",),
     ),
     "influxdb": DockerPlatformSpec(
         platform="influxdb",
         compose_files=(_repo_path("docker/influxdb/docker-compose.yml"),),
+        services=("influxdb",),
     ),
     "lakesail": DockerPlatformSpec(
         platform="lakesail",
@@ -198,25 +223,30 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
     "pg-duckdb": DockerPlatformSpec(
         platform="pg-duckdb",
         compose_files=(_repo_path("docker/postgres-extensions/docker-compose.pg-duckdb.yaml"),),
+        services=("pg-duckdb",),
         notes="PostgreSQL-family stack on localhost:5432; run sequentially with other PG-family platforms.",
     ),
     "pg-mooncake": DockerPlatformSpec(
         platform="pg-mooncake",
         compose_files=(_repo_path("docker/postgres-extensions/docker-compose.pg-mooncake.yaml"),),
+        services=("pg-mooncake",),
         notes="PostgreSQL-family stack on localhost:5432; run sequentially with other PG-family platforms.",
     ),
     "timescaledb": DockerPlatformSpec(
         platform="timescaledb",
         compose_files=(_repo_path("docker/postgres-extensions/docker-compose.timescaledb.yaml"),),
+        services=("timescaledb",),
         notes="PostgreSQL-family stack on localhost:5432; run sequentially with other PG-family platforms.",
     ),
     "questdb": DockerPlatformSpec(
         platform="questdb",
         compose_files=(_repo_path("docker/questdb/docker-compose.yml"),),
+        services=("questdb",),
     ),
     "singlestore": DockerPlatformSpec(
         platform="singlestore",
         compose_files=(_repo_path("docker/singlestore/docker-compose.yml"),),
+        services=("singlestore",),
     ),
     "velox": DockerPlatformSpec(
         platform="velox",
@@ -432,16 +462,68 @@ def docker_platform_spec(platform: str) -> DockerPlatformSpec:
         raise DockerAssetError(f"No UAT Docker compose spec is registered for platform {platform!r}") from exc
 
 
-def compose_project_name(config_name: str, platform: str, prefix: str = "benchbox-uat") -> str:
-    """Return a deterministic Docker compose project name for one UAT platform block."""
+def _max_declared_service_len(platform: str) -> int:
+    """Return the longest compose service name UAT can start for `platform`, or 0 if unknown.
+
+    Reads `spec.services`, populated once at module load for every registered
+    platform -- never the compose YAML itself, which would make this callable
+    from compose_project_name()'s hot teardown path without a per-call parse.
+    Unregistered platforms (e.g. a synthetic name in a unit test) return 0,
+    which leaves the project-name budget at its unconstrained `_PROJECT_NAME_MAX_LEN`
+    ceiling -- compose_project_name() is only ever invoked for real container
+    lifecycle work through a registered `is_docker_platform()` platform.
+    """
+    spec = _DOCKER_PLATFORM_SPECS.get(platform)
+    if spec is None or not spec.services:
+        return 0
+    return max(len(service) for service in spec.services)
+
+
+def _project_name_budget(platform: str, max_service_len: int | None = None) -> int:
+    """Return the max project-name length that still leaves room for the container id.
+
+    The constrained identifier is the derived CONTAINER id --
+    ``<project>-<service>-<replica>`` -- not the project name alone, so the
+    budget is derived from `_CONTAINER_NAME_MAX_LEN` minus the longest service
+    name this platform starts and a multi-digit replica suffix, capped at
+    compose's own `_PROJECT_NAME_MAX_LEN` ceiling (never looser than before).
+    """
+    service_len = _max_declared_service_len(platform) if max_service_len is None else max_service_len
+    if service_len <= 0:
+        return _PROJECT_NAME_MAX_LEN
+    # -1 for the hyphen joining <project> and <service>; the replica suffix
+    # budget already accounts for its own leading hyphen.
+    derived = _CONTAINER_NAME_MAX_LEN - service_len - _REPLICA_SUFFIX_MAX_LEN - 1
+    return min(_PROJECT_NAME_MAX_LEN, derived)
+
+
+def compose_project_name(
+    config_name: str,
+    platform: str,
+    prefix: str = "benchbox-uat",
+    *,
+    max_service_len: int | None = None,
+) -> str:
+    """Return a deterministic Docker compose project name for one UAT platform block.
+
+    The length budget is derived from the *container* id limit
+    (`_CONTAINER_NAME_MAX_LEN`), not just compose's project-name ceiling: a
+    project name that itself fits under 63 chars can still produce a
+    container id (`<project>-<service>-<replica>`) that overflows mocker's
+    64-char limit once the service name and replica suffix are appended.
+    `max_service_len` lets a caller override the auto-derived value (e.g. for
+    a service not yet in the registry); by default it is looked up from the
+    platform's registered `DockerPlatformSpec.services`.
+    """
     raw = f"{prefix}-{config_name}-{platform}".lower()
     name = re.sub(r"[^a-z0-9_-]+", "-", raw)
     name = re.sub(r"[-_]{2,}", "-", name).strip("-_")
     if not name or not name[0].isalnum():
         name = f"uat-{name}".strip("-_")
-    if len(name) > _PROJECT_NAME_MAX_LEN:
+    budget = _project_name_budget(platform, max_service_len)
+    if len(name) > budget:
         digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:8]
-        keep = _PROJECT_NAME_MAX_LEN - len(digest) - 1
+        keep = max(budget - len(digest) - 1, 1)
         name = f"{name[:keep].rstrip('-_')}-{digest}"
     return name
 

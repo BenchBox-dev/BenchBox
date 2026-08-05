@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tests.uat import docker_assets, matrix
 from tests.uat.docker_path_helpers import compose_path_ends_with
@@ -96,6 +97,77 @@ def test_compose_project_name_sanitizes_and_bounds_length():
         "pg.duckdb",
         "BenchBox_UAT",
     )
+
+
+# --------------------------------------------------------------------------
+# uat-compose-project-name-overflows-container-id-limit-20260805
+#
+# The constrained identifier is the derived CONTAINER id
+# (<project>-<service>-<replica>), which mocker caps at 64 chars -- not the
+# project name alone (compose's own ceiling is 63). The project-name budget
+# must derive from the container-id limit and the platform's longest started
+# service name, with headroom for a multi-digit replica suffix.
+# --------------------------------------------------------------------------
+
+
+def test_docker_platform_services_populated_and_match_compose_files():
+    """w0: every registered spec declares its compose services explicitly, and
+    those tuples reflect the platform's actual compose file(s) -- the full
+    declared set for platforms that start everything, and the documented
+    host-run-only subset for lakesail/velox (see their spec.notes)."""
+    intentional_subset_platforms = {"lakesail", "velox"}
+    specs = docker_assets.docker_platform_specs()
+    assert not [platform for platform, spec in specs.items() if not spec.services]
+
+    for platform, spec in specs.items():
+        declared: list[str] = []
+        for compose_file in spec.compose_files:
+            data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+            declared.extend((data.get("services") or {}) if isinstance(data, dict) else {})
+        if platform in intentional_subset_platforms:
+            assert set(spec.services) <= set(declared), (platform, spec.services, declared)
+        else:
+            assert set(spec.services) == set(declared), (platform, spec.services, declared)
+
+
+def test_compose_project_name_container_name_budget_derives_from_service_len():
+    """w1: the project budget tightens for a platform with a longer service
+    name, and loosens back toward the compose ceiling for a short one -- it
+    must not be a fixed magic-number cut regardless of which service starts."""
+    long_config = "x" * 80
+    short_service_name = docker_assets.compose_project_name(long_config, "cedardb")  # service "cedardb", len 7
+    long_service_name = docker_assets.compose_project_name(
+        long_config, "lakesail"
+    )  # service "lakesail-connect", len 17
+
+    assert len(long_service_name) < len(short_service_name)
+    assert len(short_service_name) <= 63
+    assert len(long_service_name) <= 63
+
+
+@pytest.mark.parametrize("replica_index", ["1", "10"])
+def test_container_name_budget_fits_every_config_and_platform(replica_index):
+    """The enumerating guard (w2): every checked-in UAT config crossed with
+    every registered Docker platform must yield a container id
+    (<project>-<longest-started-service>-<replica>) within mocker's 64-char
+    limit -- including a double-digit replica index, not just index 1."""
+    config_dir = docker_assets.REPO_ROOT / "tests" / "uat" / "configs"
+    config_names = sorted(p.stem for p in config_dir.glob("*.yaml"))
+    assert config_names, "expected at least one checked-in UAT config"
+
+    specs = docker_assets.docker_platform_specs()
+    assert len(specs) == 16, "expected all 16 registered Docker platforms"
+
+    overflows = []
+    for config_name in config_names:
+        for platform, spec in specs.items():
+            project = docker_assets.compose_project_name(config_name, platform)
+            service = max(spec.services, key=len)
+            container_id = f"{project}-{service}-{replica_index}"
+            if len(container_id) > 64:
+                overflows.append((config_name, platform, len(container_id)))
+
+    assert not overflows, f"{len(overflows)} (config, platform) pairs overflow: {overflows[:5]}"
 
 
 def test_matrix_docker_specs_are_project_scoped_for_managed_start():

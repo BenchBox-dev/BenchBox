@@ -237,6 +237,33 @@ is empty for them; mocker tracks its own compose-created volumes separately.
 Use `ENGINE=docker` (the default) for volume cleanup and `ENGINE=container`
 for everything else.
 
+### Compose project naming and the container-id limit
+
+`compose_project_name()` builds a deterministic project name from
+`docker_project_prefix`, the config name, and the platform, then truncates
+(sha1-suffixed for determinism) so it fits under a length budget. That budget
+is *not* simply compose's own 63-char project-name ceiling: compose derives
+the actual CONTAINER name as `<project>-<service>-<replica>`, and mocker
+rejects any container id over 64 chars. A project name that itself fits under
+63 chars can still produce an oversized container id once the longest
+service name a platform starts (e.g. `lakesail-connect`) and the replica
+suffix are appended.
+
+The budget is therefore derived per platform: `min(63, 64 - <longest started
+service name> - <replica suffix headroom> - 1)`. The replica suffix headroom
+reserves room for a two-digit index (`-10`..`-99`), not just `-1`, so a
+scaled service does not silently overflow the moment it reaches its 10th
+replica. Every registered `DockerPlatformSpec.services` tuple is populated at
+module load from the platform's compose file(s) (the full set for platforms
+that start everything, a documented host-run-only subset for lakesail and
+velox), so this lookup never parses YAML on the hot teardown path.
+
+A guard test (`tests/uat/test_docker_assets.py::test_container_name_budget_fits_every_config_and_platform`)
+enumerates every checked-in `tests/uat/configs/*.yaml` config against every
+registered Docker platform and asserts the resulting container id fits.
+`docker_project_prefix` stays fully operator-configurable -- a longer prefix
+still produces a valid, distinct project name, just truncated sooner.
+
 ## Explorer smoke (browser)
 
 `make uat-explorer-smoke` invokes Playwright directly against a freshly
