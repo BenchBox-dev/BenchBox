@@ -105,6 +105,23 @@ class TestShim:
         stats = json.loads(result.stdout)
         assert stats["items_by_state"] == {}
 
+    def test_shim_resolves_code_from_own_location_not_cwd_git_root(self):
+        # Absolute path to this tree's shim, cwd outside any repo: must still
+        # load this tree's todo_db.py (not fail or bind to another clone).
+        assert SHIM_PATH.is_absolute()
+        result = subprocess.run(
+            [str(SHIM_PATH), "update", "--help"],
+            capture_output=True,
+            text=True,
+            cwd="/tmp",
+            env={"PATH": os.environ["PATH"], "HOME": str(Path.home())},
+            check=False,
+            timeout=120,
+        )
+        combined = result.stdout + result.stderr
+        assert result.returncode == 0, combined
+        assert "update" in combined
+
     def test_shim_propagates_gate_exit_codes(self, tmp_path):
         db = tmp_path / "wrapper.sqlite"
         create = _run_shim(
