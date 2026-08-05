@@ -67,14 +67,39 @@ def _loadable_cases(tmp_path: Path) -> list[tuple[str, Path, SubmitTerminalState
     schema_violation = tmp_path / "schema-violation.json"
     _write_result_json(schema_violation, failed=0, validation="failed")
 
+    unvalidated_not_validated = tmp_path / "unvalidated-not-validated.json"
+    _write_result_json(unvalidated_not_validated, failed=0, validation="not_validated")
+
+    unvalidated_not_run = tmp_path / "unvalidated-not-run.json"
+    _write_result_json(unvalidated_not_run, failed=0, validation="not_run")
+
+    unvalidated_uncertain = tmp_path / "unvalidated-uncertain.json"
+    _write_result_json(unvalidated_uncertain, failed=0, validation="uncertain")
+
+    unvalidated_unknown = tmp_path / "unvalidated-unknown.json"
+    _write_result_json(unvalidated_unknown, failed=0, validation="unknown")
+
     unofficial = tmp_path / "unofficial.json"
     _write_result_json(unofficial, compliance_class="unofficial_subscale")
+
+    unofficial_and_unvalidated = tmp_path / "unofficial-and-unvalidated.json"
+    _write_result_json(
+        unofficial_and_unvalidated,
+        failed=0,
+        validation="not_validated",
+        compliance_class="unofficial_subscale",
+    )
 
     return [
         ("clean", clean, SubmitTerminalState.submittable),
         ("query_failure", query_failure, SubmitTerminalState.query_failure),
         ("schema_violation", schema_violation, SubmitTerminalState.schema_violation),
+        ("unvalidated_not_validated", unvalidated_not_validated, SubmitTerminalState.unvalidated),
+        ("unvalidated_not_run", unvalidated_not_run, SubmitTerminalState.unvalidated),
+        ("unvalidated_uncertain", unvalidated_uncertain, SubmitTerminalState.unvalidated),
+        ("unvalidated_unknown", unvalidated_unknown, SubmitTerminalState.unvalidated),
         ("unofficial", unofficial, SubmitTerminalState.unofficial),
+        ("unofficial_and_unvalidated", unofficial_and_unvalidated, SubmitTerminalState.unofficial),
     ]
 
 
@@ -121,5 +146,15 @@ def test_submit_classifier_contract_cli_refusal_tracks_state(tmp_path: Path, mon
             assert "Submission refused" in result.output, label
             if expected is SubmitTerminalState.unofficial:
                 assert "compliance_class" in result.output, label
+            elif expected is SubmitTerminalState.unvalidated:
+                # Distinct wording: must name unvalidated, not imply schema violation.
+                assert "unvalidated" in result.output, label
+                assert "validation_status=" in result.output, label
+                assert "schema violation" not in result.output.lower(), label
+                if "uncertain" in label:
+                    assert "uncertain correctness claim" in result.output, label
+                    assert "never executed" not in result.output, label
+                elif "not_validated" in label or "not_run" in label or "unknown" in label:
+                    assert "never executed" in result.output or "was skipped" in result.output, label
             else:
                 assert "not a clean pass" in result.output, label

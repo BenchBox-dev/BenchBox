@@ -108,10 +108,95 @@ def test_package_counts_failures(tmp_path: Path):
         result_paths=[tmp_path / f"r{i}.json" for i in range(3)],
         submissions_dir=tmp_path / "subs",
         runner=runner,
+        # Missing paths skip classification; exercise submit-runner failure counts.
+        classify_results=False,
     )
     assert result.success_count == 2
     assert result.failure_count == 1
     assert result.exit_code() == 1
+
+
+def _write_minimal_result(path: Path, *, validation: str = "passed", compliance_class: str | None = None) -> None:
+    import json
+
+    payload = {
+        "version": "2.1",
+        "run": {"id": "pkg", "timestamp": "2026-01-01T00:00:00", "total_duration_ms": 1},
+        "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01, "test_type": "power"},
+        "platform": {"name": "DuckDB"},
+        "summary": {
+            "queries": {"total": 1, "passed": 1, "failed": 0},
+            "validation": {"status": validation},
+        },
+        "queries": [{"id": "Q1", "status": "SUCCESS", "execution_time_ms": 1}],
+        "phases": {},
+    }
+    if compliance_class is not None:
+        payload["benchmark"]["compliance_class"] = compliance_class
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_package_skips_unvalidated_without_counting_failure(tmp_path: Path):
+    """Unvalidated (never-validated) results soft-skip like unofficial; not package failures."""
+    cfg = validate_config({"name": "x", "package": {"submit_terminal_state": "local-stage"}})
+    clean = tmp_path / "clean.json"
+    unvalidated = tmp_path / "unvalidated.json"
+    _write_minimal_result(clean, validation="passed")
+    _write_minimal_result(unvalidated, validation="not_validated")
+    runner = _fake_runner_factory([0])
+    warnings: list[str] = []
+    result = package.run_package(
+        cfg,
+        result_paths=[clean, unvalidated],
+        submissions_dir=tmp_path / "subs",
+        runner=runner,
+        warn=warnings.append,
+        classify_results=True,
+    )
+    assert result.success_count == 1
+    assert result.failure_count == 0
+    assert result.exit_code() == 0
+    assert len(result.invocations) == 1
+    assert any("unvalidated" in w for w in warnings)
+
+
+def test_package_skips_unofficial_without_counting_failure(tmp_path: Path):
+    cfg = validate_config({"name": "x", "package": {"submit_terminal_state": "local-stage"}})
+    unofficial = tmp_path / "unofficial.json"
+    _write_minimal_result(unofficial, compliance_class="unofficial_subscale")
+    runner = _fake_runner_factory([])
+    warnings: list[str] = []
+    result = package.run_package(
+        cfg,
+        result_paths=[unofficial],
+        submissions_dir=tmp_path / "subs",
+        runner=runner,
+        warn=warnings.append,
+        classify_results=True,
+    )
+    assert result.success_count == 0
+    assert result.failure_count == 0
+    assert result.invocations == ()
+    assert any("unofficial" in w for w in warnings)
+
+
+def test_package_counts_schema_violation_as_failure(tmp_path: Path):
+    cfg = validate_config({"name": "x", "package": {"submit_terminal_state": "local-stage"}})
+    bad = tmp_path / "schema.json"
+    _write_minimal_result(bad, validation="failed")
+    runner = _fake_runner_factory([])
+    warnings: list[str] = []
+    result = package.run_package(
+        cfg,
+        result_paths=[bad],
+        submissions_dir=tmp_path / "subs",
+        runner=runner,
+        warn=warnings.append,
+        classify_results=True,
+    )
+    assert result.failure_count == 1
+    assert result.invocations == ()
+    assert any("schema_violation" in w for w in warnings)
 
 
 @pytest.mark.parametrize("state", sorted(package.PR_STUB_TERMINAL_STATES))

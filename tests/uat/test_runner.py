@@ -32,9 +32,17 @@ def _isolate_cwd(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
 
-def _write_result_json(path: Path, *, failed: int = 0, compliance_class: str | None = None) -> None:
+def _write_result_json(
+    path: Path,
+    *,
+    failed: int = 0,
+    compliance_class: str | None = None,
+    validation: str | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     passed = 1 if failed == 0 else 0
+    if validation is None:
+        validation = "passed" if failed == 0 else "failed"
     payload = {
         "version": "2.1",
         "run": {
@@ -54,7 +62,7 @@ def _write_result_json(path: Path, *, failed: int = 0, compliance_class: str | N
         "platform": {"name": "DuckDB"},
         "summary": {
             "queries": {"total": 1, "passed": passed, "failed": failed},
-            "validation": {"status": "passed" if failed == 0 else "failed"},
+            "validation": {"status": validation},
         },
         "queries": [{"id": "Q1", "status": "SUCCESS" if failed == 0 else "ERROR", "execution_time_ms": 1}],
         "phases": {},
@@ -483,8 +491,18 @@ def test_classify_for_submit_vocabulary_and_clean_result(tmp_path: Path):
         "unofficial",
         "query_failure",
         "schema_violation",
+        "unvalidated",
         "missing_manifest",
     }
+
+
+def test_submit_state_is_cell_failure_excludes_unvalidated() -> None:
+    """Unvalidated cells stay PASSED; only integrity failures downgrade the cell."""
+    assert not runner.submit_state_is_cell_failure("unvalidated")
+    assert not runner.submit_state_is_cell_failure(runner.SubmitTerminalState.unvalidated)
+    assert runner.submit_state_is_cell_failure("schema_violation")
+    assert runner.submit_state_is_cell_failure("query_failure")
+    assert runner.submit_state_is_cell_failure("missing_manifest")
 
 
 def test_classify_for_submit_marks_query_failure_and_run_cell_failed(tmp_path: Path):
@@ -512,6 +530,28 @@ def test_classify_for_submit_keeps_unofficial_as_passed_cell(tmp_path: Path):
     assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unofficial
     assert result.status == "passed"
     assert result.submit_terminal_state == "unofficial"
+
+
+def test_classify_for_submit_keeps_unvalidated_as_passed_cell(tmp_path: Path):
+    """Never-validated results must not flip UAT cells to FAILED (DataFrame false 0%)."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "unvalidated.json"
+    _write_result_json(result_path, validation="not_validated")
+    fake_argv = [sys.executable, "-c", f"print({str(result_path)!r})"]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unvalidated
+    assert result.status == "passed"
+    assert result.exit_code == 0
+    assert result.submit_terminal_state == "unvalidated"
+
+
+def test_classify_for_submit_prefers_unofficial_over_unvalidated(tmp_path: Path):
+    """Compliance refusal still wins when a result is both unofficial and unvalidated."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "unofficial-unvalidated.json"
+    _write_result_json(result_path, compliance_class="unofficial_subscale", validation="not_validated")
+    assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unofficial
 
 
 # ---------------------------------------------------------------------------

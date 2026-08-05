@@ -32,7 +32,7 @@ from benchbox.core.results.loader import (
     load_result_file,
 )
 from benchbox.core.results.provenance import FUNDING_SOURCES, normalize_funding
-from benchbox.core.results.status import result_non_clean_reason
+from benchbox.core.results.status import result_non_clean_reason, result_unvalidated_reason
 from benchbox.core.results.submission_history import record_hosted_submission
 from benchbox.core.results.submit_classification import (
     SubmitTerminalState,
@@ -185,6 +185,45 @@ def _build_submission_manifest(
     if submission_notes:
         manifest["submission_notes"] = submission_notes
     return manifest
+
+
+def _refuse_non_submittable_result(ctx: click.Context, result: object, submit_state: SubmitTerminalState) -> None:
+    """Print a state-specific refusal message and exit non-zero.
+
+    Unvalidated results get distinct wording so operators do not confuse
+    never-validated runs with schema/integrity failures.
+    """
+    if submit_state is SubmitTerminalState.unvalidated:
+        unvalidated_reason = result_unvalidated_reason(result) or result_non_clean_reason(result)
+        # Branch copy on the concrete status: "never executed" is wrong for
+        # uncertain (validation ran but the correctness claim is weakened).
+        status = None
+        if unvalidated_reason and unvalidated_reason.startswith("validation_status="):
+            status = unvalidated_reason.split("=", 1)[1]
+        if status == "uncertain":
+            detail = (
+                "   Validation completed with an uncertain correctness claim; the result is\n"
+                "   not eligible for public submission until validation produces a clean pass."
+            )
+        elif status in {"not_run", "not_validated", "unknown"}:
+            detail = (
+                "   Validation never executed (or was skipped); the result is not eligible\n"
+                "   for public submission until validation produces a clean pass."
+            )
+        else:
+            detail = (
+                "   The result is not a clean validation pass and is not eligible for public\n"
+                "   submission until validation produces a clean pass."
+            )
+        console.print(f"\n[red]❌ Submission refused: result is unvalidated ({unvalidated_reason})[/red]\n{detail}")
+    else:
+        non_clean_reason = result_non_clean_reason(result)
+        console.print(
+            f"\n[red]❌ Submission refused: result is not a clean pass ({non_clean_reason})[/red]\n"
+            "   Query-level failures remain visible in the result artifact, but\n"
+            "   partial runs are not eligible for public submission or leaderboard display."
+        )
+    ctx.exit(1)
 
 
 def _validate_submission_bundle_for_dry_run(ctx: click.Context, source_path: Path) -> None:
@@ -653,13 +692,7 @@ def submit(
         return
 
     if submit_state is not SubmitTerminalState.submittable:
-        non_clean_reason = result_non_clean_reason(result)
-        console.print(
-            f"\n[red]❌ Submission refused: result is not a clean pass ({non_clean_reason})[/red]\n"
-            "   Query-level failures remain visible in the result artifact, but\n"
-            "   partial runs are not eligible for public submission or leaderboard display."
-        )
-        ctx.exit(1)
+        _refuse_non_submittable_result(ctx, result, submit_state)
         return
 
     companions = [

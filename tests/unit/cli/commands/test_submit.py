@@ -171,6 +171,24 @@ def test_submit_refuses_partial_query_failure(monkeypatch: pytest.MonkeyPatch, t
     assert not out_dir.exists()
 
 
+def test_submit_refuses_unvalidated_with_distinct_message(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    src = tmp_path / "tpch_duckdb_unvalidated.json"
+    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    unvalidated = _fake_result()
+    unvalidated.validation_status = "not_validated"
+    unvalidated.failed_queries = 0
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (unvalidated, {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 1
+    assert "unvalidated" in result.output
+    assert "validation_status=not_validated" in result.output
+    assert "schema violation" not in result.output.lower()
+    assert not out_dir.exists()
+
+
 # ---------------------------------------------------------------------------
 # 4b. Packaged CONTRIBUTING.md aligns with canonical docs/contributing-results.md
 #     (regression for dry-run-followup-package-canonical-contributing)
