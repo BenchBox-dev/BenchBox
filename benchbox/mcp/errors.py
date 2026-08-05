@@ -44,15 +44,20 @@ _SECRET_SAS_ASSIGNMENT_RE = re.compile(
     flags=re.IGNORECASE,
 )
 # Unquoted PEM / multi-line private keys span whitespace; the generic arm only
-# takes the first token and leaves base64 body lines intact.
+# takes the first token and leaves base64 body lines intact. Truncated PEM
+# (BEGIN without END) and CRLF-separated base64 continuations must still mask.
 _SECRET_PRIVATE_KEY_KEY_PATTERN = r"private[_-]?key[a-z0-9_-]*"
+# Body lines are base64-ish; allow ``_`` so truncated PEM / test sentinels are
+# not split mid-token (which re-exposes the remainder after the first mask).
+_SECRET_PRIVATE_KEY_BODY_LINE = r"[A-Za-z0-9+/=_]+"
 _SECRET_PRIVATE_KEY_ASSIGNMENT_RE = re.compile(
     rf"(({_SECRET_PRIVATE_KEY_KEY_PATTERN})\s*=\s*)"
     r"(?:"
     r"'[^']*'"
     r"|\"[^\"]*\""
     r"|-----BEGIN[^\n]*-----[\s\S]*?-----END[^\n]*-----"
-    r"|[^\s,;'\")]+(?:\n[A-Za-z0-9+/=]+)*"
+    rf"|-----BEGIN[^\n]*-----(?:\r?\n{_SECRET_PRIVATE_KEY_BODY_LINE})*"
+    rf"|[^\s,;'\")]+(?:\r?\n{_SECRET_PRIVATE_KEY_BODY_LINE})*"
     r")",
     flags=re.IGNORECASE,
 )

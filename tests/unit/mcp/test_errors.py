@@ -443,6 +443,29 @@ class TestExceptionSecretScrubbing:
         assert "continuedBase64Line" not in blob
         assert "private_key=****" in result["details"]["exception_message"]
 
+    def test_truncated_pem_without_end_is_scrubbed(self) -> None:
+        """BEGIN without END must still mask following base64 body lines."""
+        pem_label = " ".join(("RSA", "PRIVATE", "KEY"))
+        begin = f"-----BEGIN {pem_label}-----"
+        body = "MIIE_GATE_BLOB"
+        text = f"private_key={begin}\n{body}\nmoreBase64Body=="
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert body not in blob
+        assert "moreBase64Body" not in blob
+        assert begin not in blob
+        assert "private_key=****" in result["details"]["exception_message"]
+
+    def test_crlf_private_key_base64_continuation_is_scrubbed(self) -> None:
+        """Windows-style CRLF continuations must not leave base64 lines."""
+        body = "MIIE_GATE_BLOB"
+        text = f"private_key={body}\r\ncontinuedBase64Line\r\nnot_part_of_key=1"
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert body not in blob
+        assert "continuedBase64Line" not in blob
+        assert "private_key=****" in result["details"]["exception_message"]
+
 
 class TestMakeExecutionError:
     """Tests for make_execution_error helper function."""
