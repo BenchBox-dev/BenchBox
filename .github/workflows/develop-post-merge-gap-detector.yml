@@ -57,11 +57,15 @@ jobs:
           # Capture JSON even when the detector exits 1 (gaps present) so the
           # always()-run upload below still has a report artifact.
           set +e
+          # --run-limit is a hard row cap while paginating unique headShas
+          # (commit-limit + unique-margin). Do not pass a shallow fixed limit:
+          # schedule tip floods would self-poison the window.
           python3 scripts/detect_develop_post_merge_gaps.py \
             --live \
             --branch origin/develop \
             --commit-limit 20 \
-            --run-limit 100 \
+            --unique-margin 10 \
+            --run-limit 1000 \
             --json > gap-report.json
           rc=$?
           set -e

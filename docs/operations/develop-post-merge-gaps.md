@@ -45,23 +45,36 @@ Two additive pieces. Neither replaces per-push runs.
 - `schedule: "17 * * * *"` (hourly, minute offset to spread load)
 - `workflow_dispatch` (manual recovery)
 
-On schedule it checks out the current `develop` tip and runs the **same**
-gate jobs. Concurrency is split deliberately:
+**Schedule path is slim and gates-only:**
 
-| Event | Concurrency group | Why |
+| Job | `push` / `workflow_dispatch` | `schedule` |
 | --- | --- | --- |
-| `push` / `workflow_dispatch` | `develop-post-merge-${{ github.sha }}` | Concurrent merges must not cancel each other. |
-| `schedule` | `develop-post-merge-schedule` (fixed) | A sweep must not cancel a push run for the same tip, and successive sweeps serialize. |
+| lint, fast-test, explorer-tokens | yes | yes |
+| medium-test (~40 min) | yes | **no** |
+| close-orphaned-prs, auto-revert-on-failure, green-run-cleanup | yes | **no** (mutation) |
 
-`cancel-in-progress` stays `false` in both cases.
+Medium-test stays on the real merge path so a squash race still trips
+auto-revert; the hourly sweep deliberately omits it to avoid ~24 full
+medium runs/day when tip is already push-covered. Schedule also never
+opens revert PRs, closes orphaned PRs, or cleans green-run issues — those
+remain push/dispatch only.
 
-The sweep covers **tip only**. Intermediate SHAs whose push events were
-dropped still will not show a per-SHA run; they age out of lookback windows.
-Safety property restored: develop tip is re-gated within about an hour even
-when push delivery fails.
+Concurrency:
+
+| Event | Concurrency group | `cancel-in-progress` |
+| --- | --- | --- |
+| `push` / `workflow_dispatch` | `develop-post-merge-${{ github.sha }}` | `false` (concurrent merges must not cancel each other) |
+| `schedule` | `develop-post-merge-schedule` (fixed) | `true` (newer sweep supersedes an older still-running one; never shares a group with push) |
+
+**Success criterion for the sweep:** develop **tip** is re-gated by the
+slim gates within about an hour of a silent push-drop. That is the safety
+property. It is **not** a claim that every intermediate dropped SHA gets
+its own run, and it is **not** a claim that the exact-SHA verification
+ladder stays green after an incident.
 
 Permissions are unchanged: workflow-level `contents: read`, with the same
-job-level escalations auto-revert / orphan-close already used.
+job-level escalations auto-revert / orphan-close already used on the
+push path only.
 
 ### 2. Gap detector (instrumentation)
 
@@ -71,7 +84,7 @@ job-level escalations auto-revert / orphan-close already used.
 
 ```bash
 python3 scripts/detect_develop_post_merge_gaps.py \
-  --live --branch origin/develop --commit-limit 20 --run-limit 100
+  --live --branch origin/develop --commit-limit 20
 ```
 
 The script compares the last N develop commits to recent
@@ -80,50 +93,60 @@ is a gap: GitHub never started post-merge for that push. The job fails and
 emits `::error` annotations so the class stays visible until the SHAs age
 out of the lookback — it does **not** open PRs or re-run gates.
 
+Live mode paginates the run list until it has enough **unique** headShas
+(`commit_limit + margin`, default margin 10) or hits a hard row cap
+(default 1000). A fixed shallow `--limit` is not safe: after many hourly
+schedule runs for the same tip, the most-recent N rows can all share one
+`headSha` and would otherwise hide older push-covered commits deeper in
+history (self-poisoning).
+
 A tip that was only covered by the hourly sweep (event=`schedule`) still
 counts as covered for that tip SHA. Intermediate dropped SHAs remain
 uncovered by design: that is the instrumentation of the push-drop class.
 
 ## Verification ladder
 
-Exact-SHA coverage for the last 10 develop commits:
+Exact-SHA coverage for the last 10 develop commits (diagnostic, not a
+post-incident green promise):
 
 ```bash
 bash -c '
   shas=$(git log --format=%H origin/develop -10)
-  runs=$(gh run list --workflow develop-post-merge.yml --limit 60 --json headSha --jq .[].headSha)
+  runs=$(gh run list --workflow develop-post-merge.yml --limit 100 --json headSha --jq .[].headSha)
   for s in $shas; do
     echo "$runs" | grep -q "$s" || exit 1
   done
 '
 ```
 
-- Exit `0`: every recent develop push has a post-merge run for its exact SHA
-  (or a schedule/dispatch run was recorded against that SHA as tip).
-- Exit `1`: at least one recent SHA has no run. That is the gap class. After
-  a drop episode this can stay non-zero until those SHAs fall out of the
-  `-10` window even if tip is currently green via the sweep.
+How to read the result:
 
-Offline / scripted form of the same check:
+| Exit | Meaning |
+| --- | --- |
+| `0` | Every looked-up develop SHA currently has at least one post-merge run (push, schedule, or dispatch) whose `headSha` matches. Quiet periods with healthy push delivery look like this. |
+| `1` | At least one recent SHA has no run. **Expected after a real push-drop episode**, and can remain non-zero until those intermediate SHAs age out of the lookback — even when tip is green via the hourly sweep. Do not treat this as "the sweep is broken." |
 
-```bash
-git log --format=%H origin/develop -20 > /tmp/commits.txt
-gh run list --workflow develop-post-merge.yml --limit 100 --json headSha \
-  --jq '.[].headSha' > /tmp/runs.txt
-python3 scripts/detect_develop_post_merge_gaps.py \
-  --commits-file /tmp/commits.txt --runs-file /tmp/runs.txt --json
-```
-
-Live form used by CI:
+Preferred scripted form (paginates unique headShas; same honesty rules):
 
 ```bash
 python3 scripts/detect_develop_post_merge_gaps.py --live --json
 ```
 
+Offline form (no pagination; you supply both lists):
+
+```bash
+git log --format=%H origin/develop -20 > /tmp/commits.txt
+gh run list --workflow develop-post-merge.yml --limit 200 --json headSha \
+  --jq '.[].headSha' > /tmp/runs.txt
+python3 scripts/detect_develop_post_merge_gaps.py \
+  --commits-file /tmp/commits.txt --runs-file /tmp/runs.txt --json
+```
+
 ## Manual recovery
 
 If tip has no recent post-merge run and you do not want to wait for the
-hourly sweep:
+hourly sweep (full push-equivalent path including medium-test and mutation
+jobs when tip is red/green as usual):
 
 ```bash
 gh workflow run develop-post-merge.yml --ref develop
@@ -143,7 +166,14 @@ gh workflow run develop-post-merge-gap-detector.yml --ref develop
   related event.
 - **No replacement of the push trigger.** Push remains primary; schedule is
   additive.
+- **No full medium-test on every hourly sweep.** Cost decision: slim
+  schedule (lint + fast-test + explorer-tokens) bounds tip exposure without
+  ~24× medium-tier runner hours/day.
+- **No mutation jobs on schedule.** Auto-revert / orphan-close / green-run
+  cleanup stay push + dispatch only so a sweep cannot open or close GitHub
+  objects without a real merge event.
 - **No new permission classes** beyond what develop-post-merge already uses
   (`actions: read` already appears on metrics / auto-revert jobs).
 - **No claim that intermediate dropped SHAs are "covered" by a later tip
-  sweep.** Tip safety and per-SHA instrumentation are separate signals.
+  sweep, or that the every-SHA ladder stays green post-incident.** Tip
+  safety (≤~1h re-gate) and per-SHA instrumentation are separate signals.

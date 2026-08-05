@@ -15,11 +15,17 @@ This script is the instrumentation half of the fix:
   loudly instead of silently.
 
 It does **not** open PRs, re-run gates, or mutate repository state. The
-scheduled sweep in ``develop-post-merge.yml`` is the coverage half: it re-runs
-the same gates against the current tip within a bounded window.
+scheduled sweep in ``develop-post-merge.yml`` is the coverage half: it
+re-gates the current tip (slim gates on schedule) within a bounded window.
+
+Live mode paginates the run list until it has enough **unique** headShas to
+cover the commit lookback (plus margin). A fixed shallow limit is not safe:
+after the hourly schedule lands, the most-recent N runs can all share the
+same tip SHA and would otherwise "poison" the window so older push-covered
+commits look uncovered.
 
 Usage:
-    # Offline / unit-testable pure check (stdin or flags):
+    # Offline / unit-testable pure check:
     python scripts/detect_develop_post_merge_gaps.py \\
         --commits-file commits.txt --runs-file runs.txt
 
@@ -38,11 +44,16 @@ import argparse
 import json
 import subprocess
 import sys
+from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 
 DEFAULT_COMMIT_LIMIT = 20
-DEFAULT_RUN_LIMIT = 100
+DEFAULT_UNIQUE_MARGIN = 10
+DEFAULT_PAGE_SIZE = 100
+DEFAULT_MAX_RUN_ROWS = 1000
 WORKFLOW_FILE = "develop-post-merge.yml"
+
+ListRunsFn = Callable[[int], list[dict]]
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +78,41 @@ def parse_sha_lines(text: str) -> list[str]:
         token = line.split()[0]
         out.append(normalize_sha(token))
     return out
+
+
+def extract_head_shas(rows: Sequence[object]) -> set[str]:
+    """Collect headSha values from a gh/api run-list payload."""
+    shas: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        head = row.get("headSha")
+        if isinstance(head, str) and head.strip():
+            shas.add(normalize_sha(head))
+    return shas
+
+
+def accumulate_unique_head_shas(
+    pages: Iterable[Sequence[object]],
+    *,
+    min_unique: int,
+) -> set[str]:
+    """Fold run-list pages into a unique headSha set until ``min_unique`` or exhausted.
+
+    Stops early once enough distinct headShas are collected so a flood of
+    schedule runs for the same tip cannot hide older push-covered SHAs that
+    sit deeper in the run history.
+    """
+    if min_unique < 1:
+        raise ValueError("min_unique must be >= 1")
+    unique: set[str] = set()
+    for page in pages:
+        if not page:
+            break
+        unique |= extract_head_shas(page)
+        if len(unique) >= min_unique:
+            break
+    return unique
 
 
 def find_uncovered(commit_shas: list[str], run_head_shas: set[str]) -> list[str]:
@@ -96,7 +142,7 @@ def format_report(
     lines = [
         "develop-post-merge gap detector",
         f"  commits checked: {len(commit_shas)} (limit {commit_limit})",
-        f"  run headShas supplied: {run_count}",
+        f"  unique run headShas supplied: {run_count}",
         f"  uncovered: {len(uncovered)}",
     ]
     if uncovered:
@@ -105,8 +151,8 @@ def format_report(
             lines.append(f"    - {sha}")
         lines.append(
             "  A missing SHA means GitHub never delivered (or never recorded) a "
-            "push-triggered develop-post-merge run for that commit. The hourly "
-            "schedule on develop-post-merge.yml re-gates the *tip* only; this "
+            "develop-post-merge run for that commit. The hourly schedule on "
+            "develop-post-merge.yml re-gates the *tip* only (slim gates); this "
             "detector keeps intermediate push-drop SHAs visible until they age "
             "out of the lookback window. See docs/operations/develop-post-merge-gaps.md."
         )
@@ -139,13 +185,8 @@ def live_commit_shas(limit: int, branch: str = "origin/develop") -> list[str]:
     return parse_sha_lines(out)
 
 
-def live_run_head_shas(limit: int, workflow: str = WORKFLOW_FILE) -> set[str]:
-    """List recent workflow run headShas via the gh CLI.
-
-    Includes every status/conclusion: a queued or failed run still proves the
-    push was not silently dropped. Only a total absence of runs for a SHA is
-    a gap.
-    """
+def _gh_run_list(limit: int, workflow: str = WORKFLOW_FILE) -> list[dict]:
+    """Fetch the most recent ``limit`` runs as a list of dicts via gh."""
     raw = _run(
         [
             "gh",
@@ -154,7 +195,7 @@ def live_run_head_shas(limit: int, workflow: str = WORKFLOW_FILE) -> set[str]:
             f"--workflow={workflow}",
             f"--limit={limit}",
             "--json",
-            "headSha",
+            "headSha,event,databaseId",
         ]
     )
     try:
@@ -163,14 +204,74 @@ def live_run_head_shas(limit: int, workflow: str = WORKFLOW_FILE) -> set[str]:
         raise RuntimeError(f"gh run list returned non-JSON: {exc}") from exc
     if not isinstance(rows, list):
         raise RuntimeError("gh run list JSON was not a list")
-    shas: set[str] = set()
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        head = row.get("headSha")
-        if isinstance(head, str) and head.strip():
-            shas.add(normalize_sha(head))
-    return shas
+    return [row for row in rows if isinstance(row, dict)]
+
+
+def iter_growing_run_pages(
+    list_runs: ListRunsFn,
+    *,
+    page_size: int,
+    max_rows: int,
+) -> Iterable[list[dict]]:
+    """Yield successive run-list windows with a growing ``--limit``.
+
+    ``gh run list`` has no offset; each call returns the most recent N runs.
+    We grow N by page_size and yield only the *new* tail each time so
+    ``accumulate_unique_head_shas`` sees each run once while still being able
+    to dig past a tip-SHA flood.
+    """
+    if page_size < 1 or max_rows < 1:
+        raise ValueError("page_size and max_rows must be >= 1")
+    seen_ids: set[object] = set()
+    limit = min(page_size, max_rows)
+    while True:
+        rows = list_runs(limit)
+        fresh = []
+        for row in rows:
+            # Prefer stable run id when present; fall back to object identity.
+            rid = row.get("databaseId", row.get("id"))
+            key: object = rid if rid is not None else id(row)
+            if key in seen_ids:
+                continue
+            seen_ids.add(key)
+            fresh.append(row)
+        yield fresh
+        if len(rows) < limit:
+            # API returned fewer than requested: no more history.
+            break
+        if limit >= max_rows:
+            break
+        limit = min(limit + page_size, max_rows)
+
+
+def live_run_head_shas(
+    *,
+    min_unique: int,
+    page_size: int = DEFAULT_PAGE_SIZE,
+    max_rows: int = DEFAULT_MAX_RUN_ROWS,
+    workflow: str = WORKFLOW_FILE,
+    list_runs: ListRunsFn | None = None,
+) -> set[str]:
+    """Collect unique run headShas until ``min_unique`` or history is exhausted.
+
+    Includes every status/conclusion: a queued or failed run still proves the
+    push (or schedule/dispatch) was not silently dropped for that SHA. Only a
+    total absence of runs for a SHA is a gap.
+
+    Pagination is unique-set driven: after many hourly schedule runs for the
+    same tip, a fixed shallow ``--limit`` would return only that tip SHA and
+    false-gap older commits that still have push runs deeper in history.
+    """
+    if min_unique < 1:
+        raise ValueError("min_unique must be >= 1")
+
+    def _list(limit: int) -> list[dict]:
+        if list_runs is not None:
+            return list_runs(limit)
+        return _gh_run_list(limit, workflow=workflow)
+
+    pages = iter_growing_run_pages(_list, page_size=page_size, max_rows=max_rows)
+    return accumulate_unique_head_shas(pages, min_unique=min_unique)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -197,10 +298,22 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"How many recent develop commits to check (live mode). Default {DEFAULT_COMMIT_LIMIT}.",
     )
     parser.add_argument(
+        "--unique-margin",
+        type=int,
+        default=DEFAULT_UNIQUE_MARGIN,
+        help=(
+            "Extra unique headShas to collect beyond --commit-limit before "
+            f"stopping pagination (live mode). Default {DEFAULT_UNIQUE_MARGIN}."
+        ),
+    )
+    parser.add_argument(
         "--run-limit",
         type=int,
-        default=DEFAULT_RUN_LIMIT,
-        help=f"How many recent workflow runs to load (live mode). Default {DEFAULT_RUN_LIMIT}.",
+        default=DEFAULT_MAX_RUN_ROWS,
+        help=(
+            "Hard cap on how many recent workflow runs to fetch while "
+            f"paginating (live mode). Default {DEFAULT_MAX_RUN_ROWS}."
+        ),
     )
     parser.add_argument(
         "--branch",
@@ -223,8 +336,14 @@ def main(argv: list[str] | None = None) -> int:
         if args.live:
             if args.commit_limit < 1 or args.run_limit < 1:
                 raise RuntimeError("--commit-limit and --run-limit must be >= 1")
+            if args.unique_margin < 0:
+                raise RuntimeError("--unique-margin must be >= 0")
             commit_shas = live_commit_shas(args.commit_limit, branch=args.branch)
-            run_shas = live_run_head_shas(args.run_limit)
+            min_unique = args.commit_limit + args.unique_margin
+            run_shas = live_run_head_shas(
+                min_unique=min_unique,
+                max_rows=args.run_limit,
+            )
         else:
             if args.commits_file is None or args.runs_file is None:
                 parser.error("provide --live, or both --commits-file and --runs-file")

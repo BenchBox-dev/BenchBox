@@ -8,9 +8,13 @@ name: Develop post-merge
 # Push is the primary trigger. GitHub has been observed to drop push delivery
 # for consecutive develop merges (see docs/operations/develop-post-merge-gaps.md
 # and the 2026-08-03 corpus-mirror gap), so a scheduled sweep is additive: it
-# re-runs the same gates against the current develop tip within a bounded
-# window when a per-push run was never created. It is not a replacement for
-# push, and it does not paper over the gap with extra event types.
+# re-runs the lightweight tip gates within a bounded window when a per-push
+# run was never created. It is not a replacement for push, and it does not
+# paper over the gap with extra event types.
+#
+# Schedule path is gates-only and slim: lint + fast-test + explorer-tokens.
+# medium-test (~40 min) and all mutation jobs (auto-revert, green-run-cleanup,
+# close-orphaned-prs) stay on push / workflow_dispatch only.
 
 on:
   push:
@@ -28,10 +32,11 @@ permissions:
 concurrency:
   # Push (and manual dispatch) stay SHA-keyed so concurrent merges do not
   # cancel each other. Schedule uses a fixed group so a sweep never cancels
-  # — and is never cancelled by — a push-triggered run for the same tip, and
-  # successive sweeps serialize instead of stacking.
+  # — and is never cancelled by — a push-triggered run for the same tip.
+  # cancel-in-progress is true only for schedule so a newer sweep supersedes
+  # a still-running older one; push runs never cancel each other.
   group: ${{ github.event_name == 'schedule' && 'develop-post-merge-schedule' || format('develop-post-merge-{0}', github.sha) }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'schedule' }}
 
 jobs:
   lint:
@@ -252,6 +257,12 @@ jobs:
     # eventual develop tip has a semantic conflict with another PR merged in
     # between (see the TODO description for the #1093/#1095/#1100 incident
     # this closes half of).
+    #
+    # SLIM SCHEDULE: medium-test is intentionally omitted on the hourly
+    # schedule (push + workflow_dispatch only). The ~40 min tier would
+    # otherwise cost ~24 full medium runs/day even when tip is already
+    # push-covered; lint/fast-test/explorer-tokens still bound tip exposure.
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -323,6 +334,9 @@ jobs:
     # its original (un-squashed) branch tip via the GraphQL API. Any other
     # open PR whose head commit is a git ancestor of that tip has all of its
     # content already on develop and can be closed safely.
+    #
+    # Schedule path is gates-only: mutation jobs never run on schedule.
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -437,7 +451,9 @@ jobs:
     # dispositioned failures were fixed (#977, #994), so a medium-test failure
     # now opens a (reviewable) revert PR, same as lint/fast-test/explorer-tokens.
     needs: [lint, fast-test, explorer-tokens, medium-test]
-    if: ${{ always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure' || needs.explorer-tokens.result == 'failure' || needs.medium-test.result == 'failure') }}
+    # Schedule path is gates-only: never open revert PRs / issues from a sweep.
+    # event_name must lead so always() cannot re-enable mutation on schedule.
+    if: ${{ github.event_name != 'schedule' && always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure' || needs.explorer-tokens.result == 'failure' || needs.medium-test.result == 'failure') }}
     outputs:
       auto-revert-pr-opened-at: ${{ steps.open-revert.outputs.auto-revert-pr-opened-at }}
       auto-revert-pr-url: ${{ steps.open-revert.outputs.auto-revert-pr-url }}
@@ -860,7 +876,9 @@ jobs:
     # it tracked is resolved, so clear it instead of leaving it for a human
     # to notice and close by hand.
     needs: [lint, fast-test, explorer-tokens, medium-test]
-    if: ${{ always() && needs.lint.result == 'success' && needs.fast-test.result == 'success' && needs.explorer-tokens.result == 'success' && needs.medium-test.result == 'success' }}
+    # Schedule path is gates-only: never close PRs/issues from a sweep.
+    # event_name must lead so always() cannot re-enable mutation on schedule.
+    if: ${{ github.event_name != 'schedule' && always() && needs.lint.result == 'success' && needs.fast-test.result == 'success' && needs.explorer-tokens.result == 'success' && needs.medium-test.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

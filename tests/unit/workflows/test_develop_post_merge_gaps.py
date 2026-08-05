@@ -4,13 +4,17 @@ Pins:
 
 1. develop-post-merge.yml keeps the push trigger and adds an additive schedule
    with a fixed concurrency group that will not cancel SHA-keyed push runs.
-2. develop-post-merge-gap-detector.yml exists as a cheap read-only canary.
-3. Pure gap-classification logic in scripts/detect_develop_post_merge_gaps.py.
+2. Mutation jobs and medium-test are excluded from schedule.
+3. Every checkout pins develop on schedule.
+4. develop-post-merge-gap-detector.yml exists as a cheap read-only canary.
+5. Pure gap-classification + unique-headSha pagination logic in
+   scripts/detect_develop_post_merge_gaps.py.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +28,14 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 POST_MERGE = REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml"
 GAP_DETECTOR = REPO_ROOT / ".github" / "workflows" / "develop-post-merge-gap-detector.yml"
 SCRIPT = REPO_ROOT / "scripts" / "detect_develop_post_merge_gaps.py"
+
+MUTATION_JOBS = (
+    "auto-revert-on-failure",
+    "green-run-cleanup",
+    "close-orphaned-prs",
+)
+CHECKOUT_PIN = "github.event_name == 'schedule' && 'develop' || github.sha"
+SCHEDULE_EXCLUSION = "github.event_name != 'schedule'"
 
 
 def _load_script():
@@ -59,17 +71,12 @@ def test_post_merge_keeps_push_and_adds_schedule() -> None:
 
 
 def test_post_merge_schedule_uses_fixed_concurrency_group() -> None:
-    """Schedule must not share the SHA-keyed group used by push runs.
-
-    A fixed schedule group with cancel-in-progress false means a sweep cannot
-    cancel (or be cancelled by) a concurrent push-triggered run for the tip.
-    """
+    """Schedule must not share the SHA-keyed group used by push runs."""
     text = POST_MERGE.read_text(encoding="utf-8")
     assert "develop-post-merge-schedule" in text
     assert "github.event_name == 'schedule'" in text
-    assert "cancel-in-progress: false" in text
-    # Push path still SHA-keyed (format or legacy literal both acceptable as
-    # long as schedule is the fixed branch of the expression).
+    # Push path never cancels in progress; schedule may supersede itself.
+    assert "cancel-in-progress: ${{ github.event_name == 'schedule' }}" in text
     assert "develop-post-merge-" in text
 
 
@@ -87,9 +94,59 @@ def test_post_merge_gate_jobs_still_present() -> None:
 
 
 def test_post_merge_schedule_checkouts_pin_develop() -> None:
-    """Schedule must not silently re-target if the default branch ever moves."""
+    """Every checkout must pin develop on schedule (count match)."""
     text = POST_MERGE.read_text(encoding="utf-8")
-    assert "github.event_name == 'schedule' && 'develop' || github.sha" in text
+    checkout_count = len(re.findall(r"uses:\s*actions/checkout@v4", text))
+    pin_count = text.count(CHECKOUT_PIN)
+    assert checkout_count >= 1
+    assert pin_count == checkout_count, (
+        f"expected every checkout to pin develop on schedule; "
+        f"found {checkout_count} checkouts but {pin_count} pin expressions"
+    )
+
+
+def test_mutation_jobs_exclude_schedule() -> None:
+    """auto-revert / green-run-cleanup / close-orphaned must not run on schedule."""
+    workflow = _load_workflow(POST_MERGE)
+    jobs = workflow["jobs"]
+    for name in MUTATION_JOBS:
+        assert name in jobs, f"missing mutation job {name}"
+        job_if = str(jobs[name].get("if", ""))
+        assert SCHEDULE_EXCLUSION in job_if, f"{name} must gate on {SCHEDULE_EXCLUSION!r}; got if={job_if!r}"
+
+
+def test_mutation_jobs_preserve_push_path_conditions() -> None:
+    """Push-path behavior must not be weakened when adding schedule exclusion."""
+    workflow = _load_workflow(POST_MERGE)
+    jobs = workflow["jobs"]
+
+    auto = str(jobs["auto-revert-on-failure"]["if"])
+    assert "always()" in auto
+    assert "needs.lint.result == 'failure'" in auto
+    assert "needs.medium-test.result == 'failure'" in auto
+    # event_name leads so always() cannot re-enable the job on schedule.
+    assert auto.index(SCHEDULE_EXCLUSION) < auto.index("always()")
+
+    green = str(jobs["green-run-cleanup"]["if"])
+    assert "always()" in green
+    assert "needs.lint.result == 'success'" in green
+    assert "needs.medium-test.result == 'success'" in green
+    assert green.index(SCHEDULE_EXCLUSION) < green.index("always()")
+
+    # close-orphaned had no prior if; exclusion alone is the gate.
+    close = str(jobs["close-orphaned-prs"]["if"])
+    assert SCHEDULE_EXCLUSION in close
+
+
+def test_medium_test_is_slim_schedule_omitted() -> None:
+    """Cost decision: medium-test runs on push/dispatch only, not schedule."""
+    workflow = _load_workflow(POST_MERGE)
+    medium_if = str(workflow["jobs"]["medium-test"].get("if", ""))
+    assert SCHEDULE_EXCLUSION in medium_if
+    # Slim gates remain unconditional (no schedule exclusion).
+    for name in ("lint", "fast-test", "explorer-tokens"):
+        job_if = workflow["jobs"][name].get("if")
+        assert job_if is None or SCHEDULE_EXCLUSION not in str(job_if)
 
 
 # ---------------------------------------------------------------------------
@@ -166,6 +223,66 @@ def test_format_report_mentions_uncovered_shas() -> None:
     assert "uncovered: 1" in report
     assert "b" in report
     assert "develop-post-merge" in report
+
+
+def test_accumulate_unique_head_shas_stops_at_min_unique() -> None:
+    pages = [
+        [{"headSha": "aaa", "databaseId": 1}, {"headSha": "aaa", "databaseId": 2}],
+        [{"headSha": "bbb", "databaseId": 3}],
+        [{"headSha": "ccc", "databaseId": 4}],  # should not be needed
+    ]
+    got = mod.accumulate_unique_head_shas(pages, min_unique=2)
+    assert got == {"aaa", "bbb"}
+
+
+def test_live_run_head_shas_paginates_past_tip_flood() -> None:
+    """100 schedule runs for tip must not hide older push-covered SHAs."""
+    tip = "t" * 40
+    older = [f"{i:040x}" for i in range(1, 6)]  # five distinct older SHAs
+
+    # First 100 rows are all tip (schedule self-poisoning shape).
+    # Deeper rows carry the older push headShas.
+    def list_runs(limit: int) -> list[dict]:
+        rows: list[dict] = []
+        for i in range(100):
+            rows.append({"headSha": tip, "databaseId": i + 1, "event": "schedule"})
+        for i, sha in enumerate(older):
+            rows.append({"headSha": sha, "databaseId": 200 + i, "event": "push"})
+        return rows[:limit]
+
+    unique = mod.live_run_head_shas(
+        min_unique=1 + len(older),  # tip + all older
+        page_size=100,
+        max_rows=200,
+        list_runs=list_runs,
+    )
+    assert tip in unique
+    for sha in older:
+        assert sha in unique, f"older push SHA {sha} must survive tip flood"
+    # And find_uncovered must not false-gap those older commits.
+    commits = [tip, *older]
+    assert mod.find_uncovered(commits, unique) == []
+
+
+def test_live_run_head_shas_still_reports_true_gaps() -> None:
+    tip = "a" * 40
+    covered = "b" * 40
+    missing = "c" * 40
+
+    def list_runs(limit: int) -> list[dict]:
+        rows = [
+            {"headSha": tip, "databaseId": 1},
+            {"headSha": covered, "databaseId": 2},
+        ]
+        return rows[:limit]
+
+    unique = mod.live_run_head_shas(
+        min_unique=20,
+        page_size=10,
+        max_rows=50,
+        list_runs=list_runs,
+    )
+    assert mod.find_uncovered([tip, covered, missing], unique) == [missing]
 
 
 def test_cli_exits_one_on_gap(tmp_path: Path) -> None:
