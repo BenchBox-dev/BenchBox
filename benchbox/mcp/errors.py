@@ -23,9 +23,12 @@ from typing import Any
 # embedded in a value.
 # Keep the key vocabulary in one pattern so JSON, assignment, and prose forms
 # cannot drift apart.
+# Expandable keys accept common suffixes (e.g. motherduck_token). Short exact
+# keys (pat) must not expand into longer non-secret words such as "path".
 _SECRET_KEY_PATTERN = (
-    r"(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|account[_-]?key|"
-    r"key[_-]?id|credential)[a-z0-9_-]*"
+    r"(?:(?:password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|account[_-]?key|"
+    r"key[_-]?id|credential|dsn|connection[_-]?string|private[_-]?key|sas)[a-z0-9_-]*|"
+    r"pat)"
 )
 _SECRET_ASSIGNMENT_RE = re.compile(
     rf"(({_SECRET_KEY_PATTERN})\s*=\s*)"

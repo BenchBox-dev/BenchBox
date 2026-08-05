@@ -351,6 +351,50 @@ class TestExceptionSecretScrubbing:
         result = make_execution_error("failed", exception=Exception("table lineitem not found"))
         assert result["details"]["exception_message"] == "table lineitem not found"
 
+    @pytest.mark.parametrize(
+        ("text", "sentinel"),
+        [
+            ("dsn=DSN_GATE", "DSN_GATE"),
+            ("DSN=DSN_GATE", "DSN_GATE"),
+            ("dsn='DSN_GATE'", "DSN_GATE"),
+            ('dsn="DSN_GATE"', "DSN_GATE"),
+            ("connection_string=CONNECTION_GATE", "CONNECTION_GATE"),
+            ("CONNECTION_STRING=CONNECTION_GATE", "CONNECTION_GATE"),
+            ("connection-string=CONNECTION_GATE", "CONNECTION_GATE"),
+            ("private_key=PRIVATE_GATE", "PRIVATE_GATE"),
+            ("Private_Key=PRIVATE_GATE", "PRIVATE_GATE"),
+            ("private-key=PRIVATE_GATE", "PRIVATE_GATE"),
+            ("sas=SAS_GATE", "SAS_GATE"),
+            ("SAS=SAS_GATE", "SAS_GATE"),
+            ("pat=PAT_GATE", "PAT_GATE"),
+            ("PAT=PAT_GATE", "PAT_GATE"),
+            ("password=EXISTING_SECRET", "EXISTING_SECRET"),
+        ],
+    )
+    def test_credential_assignment_vocabulary_is_scrubbed(self, text: str, sentinel: str) -> None:
+        """Assignment forms for the remaining credential vocabulary must not leak."""
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        assert sentinel not in blob
+        assert sentinel not in result["message"]
+        assert sentinel not in result["details"]["exception_message"]
+        assert "****" in result["message"]
+        assert "****" in result["details"]["exception_message"]
+
+    def test_pat_does_not_match_path_assignment(self) -> None:
+        """Exact-key ``pat`` must not expand into non-secret ``path``."""
+        text = "path=/var/tmp/data failed to open"
+        result = make_execution_error(text, exception=Exception(text))
+        assert result["details"]["exception_message"] == text
+        assert result["message"] == text
+
+    def test_combined_credential_assignment_vocabulary_is_scrubbed(self) -> None:
+        text = "dsn=DSN_GATE private_key=PK_GATE sas=SAS_GATE pat=PAT_GATE connection_string=CS_GATE"
+        result = make_execution_error(text, exception=Exception(text))
+        blob = str(result)
+        for sentinel in ("DSN_GATE", "PK_GATE", "SAS_GATE", "PAT_GATE", "CS_GATE"):
+            assert sentinel not in blob
+
 
 class TestMakeExecutionError:
     """Tests for make_execution_error helper function."""
