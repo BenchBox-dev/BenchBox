@@ -19,6 +19,13 @@ name: Corpus Drift Check
 # It only reports. Opening the mirror stays a human step
 # (`gh workflow run sync-results-data-to-published.yml`) so a stale public
 # corpus is loud without this workflow gaining write access to a public branch.
+#
+# Direction matters. A two-way `git diff published develop` also surfaces
+# published-only paths (community submissions that landed on published-results
+# and have not been back-ported to develop). Recommending a full mirror for
+# those paths would *delete* public content. This canary therefore classifies:
+#   - develop-ahead / content-changed: fail + recommend mirror (leak class)
+#   - published-only: report as info, never recommend a destructive mirror
 
 on:
   schedule:
@@ -44,38 +51,137 @@ jobs:
           ref: develop
           fetch-depth: 0
 
-      - name: Compare the mirrored corpus paths
+      - name: Compare the mirrored corpus paths (directional)
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin published-results
+          # Explicit refspec so origin/published-results is a named ref, not only FETCH_HEAD.
+          git fetch --no-tags --depth=1 origin published-results:refs/remotes/origin/published-results
+
+          PUB=origin/published-results
+          DEV=HEAD
 
           # Fail clearly rather than silently passing an empty comparison.
-          if ! git cat-file -e FETCH_HEAD:results-data 2>/dev/null; then
+          if ! git cat-file -e "${PUB}:results-data" 2>/dev/null; then
             echo "::error::published-results has no results-data/ tree"
             exit 2
           fi
 
-          # Same path set the sync workflow mirrors.
-          DRIFT=$(git diff --name-only FETCH_HEAD HEAD -- \
-            'results-data/bundles' \
-            'results-data/corpus-inventory.json' \
-            'results-data/CORPUS_NOTES.md' \
-            'results-data/SEED_CORPUS_SPEC.md' \
-            'results-data/README.md' \
-            'results-data/validate_corpus.py')
+          # Same path set the sync workflow mirrors for the corpus tip.
+          # Two-tree compare (no dots): published-results is an orphan branch
+          # with no merge-base with develop.
+          PATHSPECS=(
+            'results-data/bundles'
+            'results-data/corpus-inventory.json'
+            'results-data/CORPUS_NOTES.md'
+            'results-data/SEED_CORPUS_SPEC.md'
+            'results-data/README.md'
+            'results-data/validate_corpus.py'
+          )
 
-          if [[ -z "${DRIFT}" ]]; then
-            echo "Corpus is in sync between develop and published-results."
+          # A = published, B = develop. Diff filter is relative to A→B.
+          #  A: paths present on develop only (or added) — develop is ahead.
+          #  D: paths present on published only — would be deleted by a full mirror.
+          #  M: content differs on both sides — develop is ahead with updates.
+          DEVELOP_AHEAD=$(git diff --name-only --diff-filter=A "${PUB}" "${DEV}" -- "${PATHSPECS[@]}" || true)
+          PUBLISHED_ONLY=$(git diff --name-only --diff-filter=D "${PUB}" "${DEV}" -- "${PATHSPECS[@]}" || true)
+          CONTENT_CHANGED=$(git diff --name-only --diff-filter=M "${PUB}" "${DEV}" -- "${PATHSPECS[@]}" || true)
+
+          STALE_PATHS=$(printf '%s\n%s\n' "${CONTENT_CHANGED}" "${DEVELOP_AHEAD}" | sed '/^$/d' || true)
+
+          if [[ -n "${PUBLISHED_ONLY}" ]]; then
+            PO_COUNT=$(printf '%s\n' "${PUBLISHED_ONLY}" | sed '/^$/d' | wc -l | tr -d ' ')
+            echo "::notice::published-results has ${PO_COUNT} path(s) not on develop (published-only)."
+            echo "These are often community submissions that landed on the public"
+            echo "branch and have not been back-ported. Do NOT run a full mirror"
+            echo "to clear this list — that would delete public content."
+            echo "Published-only paths (first 40):"
+            printf '%s\n' "${PUBLISHED_ONLY}" | head -40
+            echo ""
+          fi
+
+          if [[ -z "${STALE_PATHS}" ]]; then
+            if [[ -z "${PUBLISHED_ONLY}" ]]; then
+              echo "Corpus is in sync between develop and published-results."
+            else
+              echo "No develop-ahead drift. published-only paths were reported above (non-fatal)."
+            fi
             exit 0
           fi
 
-          COUNT=$(printf '%s\n' "${DRIFT}" | wc -l | tr -d ' ')
-          echo "::error::published-results corpus is ${COUNT} path(s) behind develop."
+          COUNT=$(printf '%s\n' "${STALE_PATHS}" | wc -l | tr -d ' ')
+          echo "::error::published-results corpus is ${COUNT} path(s) behind develop (develop-ahead or content-changed)."
           echo "The public corpus is stale. If develop has since sanitized or"
           echo "corrected bundles, the public branch is still serving the old"
           echo "content. Mirror it with:"
           echo "  gh workflow run sync-results-data-to-published.yml --ref develop"
           echo ""
-          echo "Drifted paths (first 40):"
-          printf '%s\n' "${DRIFT}" | head -40
+          echo "Develop-ahead / content-changed paths (first 40):"
+          printf '%s\n' "${STALE_PATHS}" | head -40
           exit 1
+
+      - name: Install uv for the published-tip privacy scan
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Privacy scan published-results tip for plaintext path leaks
+        run: |
+          set -euo pipefail
+          # Detector lives on develop; scanned bytes come from published-results.
+          # Report-only for the canary surface: exit non-zero on any leak so the
+          # scheduled run is loud, without granting write access to the public branch.
+          git fetch --no-tags --depth=1 origin published-results:refs/remotes/origin/published-results
+          PUB=origin/published-results
+          if ! git cat-file -e "${PUB}:results-data/bundles" 2>/dev/null; then
+            echo "::error::published-results has no results-data/bundles tree"
+            exit 2
+          fi
+
+          uv run -- python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import subprocess
+          import sys
+
+          from benchbox.core.results.anonymization import find_public_path_leaks
+
+          pub = "origin/published-results"
+          listed = subprocess.check_output(
+              ["git", "ls-tree", "-r", "--name-only", pub, "results-data/"],
+              text=True,
+          )
+          json_paths = [p for p in listed.splitlines() if p.endswith(".json")]
+          if not json_paths:
+              print("::error::published-results results-data/ has no JSON files to scan", file=sys.stderr)
+              sys.exit(2)
+
+          offenders: list[str] = []
+          unreadable: list[str] = []
+          for path in json_paths:
+              try:
+                  raw = subprocess.check_output(["git", "show", f"{pub}:{path}"])
+                  payload = json.loads(raw)
+              except (subprocess.CalledProcessError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                  unreadable.append(f"{path}: {type(exc).__name__}")
+                  continue
+              leaks = find_public_path_leaks(payload)
+              if leaks:
+                  offenders.append(f"{path}: {', '.join(sorted(set(leaks))[:5])}")
+
+          if unreadable:
+              print(
+                  f"::error::{len(unreadable)} published corpus file(s) could not be parsed (failing closed):",
+                  file=sys.stderr,
+              )
+              print("\n".join(unreadable[:20]), file=sys.stderr)
+              sys.exit(1)
+          if offenders:
+              print(
+                  f"::error::{len(offenders)} published corpus file(s) expose private paths:",
+                  file=sys.stderr,
+              )
+              print("\n".join(offenders[:20]), file=sys.stderr)
+              sys.exit(1)
+          print(f"Privacy scan clean: {len(json_paths)} published JSON surface(s), 0 path leaks.")
+          PY
