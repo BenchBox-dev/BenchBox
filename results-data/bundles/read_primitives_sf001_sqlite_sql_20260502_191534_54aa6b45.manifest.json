@@ -1,7 +1,7 @@
 {
   "benchmark": "Read Primitives",
   "bundle_file": "read_primitives_sf001_sqlite_sql_20260502_191534_54aa6b45.json",
-  "bundle_hash": "d0493a4b3da654ff11293ee97dc0ca0da5f28c97f85281dbcfac354eb345d07c",
+  "bundle_hash": "c0bb929badad8bd68515727529ffddca7e799f14c8d9f4adfce750c45d50eb1b",
   "companion_hashes": {},
   "phase": 2,
   "platform": "SQLite",

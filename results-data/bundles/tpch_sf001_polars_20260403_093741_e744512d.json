@@ -22,7 +22,7 @@
   },
   "execution": {
     "driver_package": "polars",
-    "driver_runtime_python_executable": "path_2891a231af24",
+    "driver_runtime_python_executable": "path_ea3a8ec6f65d",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "1.37.1",
     "driver_version_resolved": "1.37.1",
@@ -77,7 +77,7 @@
     "client_version": "unknown",
     "config": {
       "driver_package": "polars",
-      "driver_runtime_python_executable": "path_2891a231af24",
+      "driver_runtime_python_executable": "path_ea3a8ec6f65d",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.37.1",
       "driver_version_resolved": "1.37.1",

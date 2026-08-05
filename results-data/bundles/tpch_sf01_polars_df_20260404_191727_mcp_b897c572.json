@@ -83,7 +83,7 @@
       "family": "expression",
       "rechunk": true,
       "streaming": false,
-      "working_dir": "path_26077f837912"
+      "working_dir": "path_1c98692f827e"
     },
     "name": "Polars",
     "version": "1.39.3"

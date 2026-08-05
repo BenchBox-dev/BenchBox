@@ -27,7 +27,7 @@
     "machine_id": "machine_3d46427037d2",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_7e5bc04be41b",
+      "engine_host": "host_51e3fb6b450f",
       "runtime_type": "dataframe_process",
       "source": "inferred"
     }
@@ -37,7 +37,7 @@
       "type": "zstd"
     },
     "driver_package": "datafusion",
-    "driver_runtime_python_executable": "path_ae50093e082b",
+    "driver_runtime_python_executable": "path_51d816457550",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "53.0.0",
     "driver_version_resolved": "53.0.0",
@@ -109,7 +109,7 @@
     "config": {
       "batch_size": 8192,
       "driver_package": "datafusion",
-      "driver_runtime_python_executable": "path_ae50093e082b",
+      "driver_runtime_python_executable": "path_51d816457550",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "53.0.0",
       "driver_version_resolved": "53.0.0",
@@ -118,7 +118,7 @@
       "parquet_pushdown": true,
       "repartition_joins": true,
       "target_partitions": 10,
-      "working_dir": "path_77c128090c9b"
+      "working_dir": "path_e4347b0f77ab"
     },
     "deployment": {
       "collection_status": "partial",
@@ -197,11 +197,11 @@
       "target_partitions": 10,
       "thread_limit": 8,
       "tuning_config": "UnifiedTuningConfiguration(primary_keys=PrimaryKeyConfiguration(enabled=False, enforce_uniqueness=True, nullable=False), foreign_keys=ForeignKeyConfiguration(enabled=False, enforce_referential_integrity=True, on_delete_action='RESTRICT', on_update_action='RESTRICT'), unique_constraints=UniqueConstraintConfiguration(enabled=False, ignore_nulls=False), check_constraints=CheckConstraintConfiguration(enabled=False, enforce_on_insert=True, enforce_on_update=True), platform_optimizations=PlatformOptimizationConfiguration(z_ordering_enabled=False, z_ordering_columns=[], liquid_clustering_enabled=False, liquid_clustering_columns=[], databricks_clustering_strategy='z_order', sorted_ingestion_mode='off', sorted_ingestion_method='auto', auto_optimize_enabled=False, auto_compact_enabled=False, bloom_filters_enabled=False, bloom_filter_columns=[], materialized_views_enabled=False), table_tunings={})",
-      "working_dir": "path_77c128090c9b"
+      "working_dir": "path_e4347b0f77ab"
     },
     "raw_metadata": {
       "driver_package": "datafusion",
-      "driver_runtime_python_executable": "path_ae50093e082b",
+      "driver_runtime_python_executable": "path_51d816457550",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "53.0.0",
       "driver_version_resolved": "53.0.0"

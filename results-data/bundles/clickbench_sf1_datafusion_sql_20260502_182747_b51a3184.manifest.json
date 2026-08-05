@@ -1,7 +1,7 @@
 {
   "benchmark": "ClickBench",
   "bundle_file": "clickbench_sf1_datafusion_sql_20260502_182747_b51a3184.json",
-  "bundle_hash": "f33f2b59f6df524b3abf24aa4ebbf064e253a2fd1682dba26bd3d92b0bcc81a2",
+  "bundle_hash": "e6b4685ba5a5b7b4355a49f7a4457bb1c18a56a2336c7607e456277dc95826a0",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

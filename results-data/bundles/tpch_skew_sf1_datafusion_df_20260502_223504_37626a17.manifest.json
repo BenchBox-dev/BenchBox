@@ -1,7 +1,7 @@
 {
   "benchmark": "TPC-H Skew",
   "bundle_file": "tpch_skew_sf1_datafusion_df_20260502_223504_37626a17.json",
-  "bundle_hash": "ed137f2c98006658470b7728af6413b2b444f40fab9e2fa559173653a815d6b0",
+  "bundle_hash": "145fd2f4342a4d9c2ad601a9f054ef4b240236e290b7f2955e18ad2ee96d52f5",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

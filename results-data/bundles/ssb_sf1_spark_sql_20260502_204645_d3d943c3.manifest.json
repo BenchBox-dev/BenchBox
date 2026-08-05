@@ -1,7 +1,7 @@
 {
   "benchmark": "Star Schema",
   "bundle_file": "ssb_sf1_spark_sql_20260502_204645_d3d943c3.json",
-  "bundle_hash": "855fd2e9c08f8ee9e2426327606099ebd980caa37eb64d521d233196df2648e4",
+  "bundle_hash": "511622f39939bf1f5bec9f7d76b91a24e91cba9c1c5f16244cb106dc3ce3115d",
   "companion_hashes": {},
   "phase": 2,
   "platform": "Spark",

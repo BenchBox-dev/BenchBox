@@ -32,7 +32,7 @@
       "type": "zstd"
     },
     "driver_package": "duckdb",
-    "driver_runtime_python_executable": "path_2b036483c7f0",
+    "driver_runtime_python_executable": "path_c8dc6dfff199",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "1.5.1",
     "driver_version_resolved": "1.5.1",
@@ -97,9 +97,9 @@
     "client_version": "1.5.1",
     "config": {
       "connection_mode": "file",
-      "database_path": "path_5daa2bea49f8",
+      "database_path": "path_b3d1fbc112f0",
       "driver_package": "duckdb",
-      "driver_runtime_python_executable": "path_2b036483c7f0",
+      "driver_runtime_python_executable": "path_c8dc6dfff199",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "1.5.1",
       "driver_version_resolved": "1.5.1",

@@ -1,7 +1,7 @@
 {
   "benchmark": "NYC Taxi",
   "bundle_file": "nyctaxi_sf01_datafusion_df_20260502_223345_6b902570.json",
-  "bundle_hash": "0eaee670660a6c543d697d811b340ff0fe5f1939d4520ed563cfb06fc512bfb4",
+  "bundle_hash": "69672952938e099698c43d890cb66b808b0bcff813ffc54298eb2119351a37da",
   "companion_hashes": {},
   "phase": 2,
   "platform": "DataFusion",

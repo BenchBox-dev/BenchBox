@@ -42,7 +42,7 @@
     "os": "Darwin",
     "platform_runtime": {
       "collection_status": "partial",
-      "engine_host": "host_6aa0a22c2a01",
+      "engine_host": "host_e9490ed88fd5",
       "runtime_type": "local_process",
       "source": "inferred"
     },
@@ -679,7 +679,7 @@
       "type": "zstd"
     },
     "driver_package": "pyspark",
-    "driver_runtime_python_executable": "path_ae50093e082b",
+    "driver_runtime_python_executable": "path_51d816457550",
     "driver_runtime_strategy": "current-process",
     "driver_version_actual": "4.1.1",
     "driver_version_resolved": "4.1.1",
@@ -755,10 +755,10 @@
     "config": {
       "adaptive_enabled": true,
       "connection_mode": "local",
-      "database": "database_7e34823e63d1",
+      "database": "database_d69fce23f1a1",
       "driver_memory": "4g",
       "driver_package": "pyspark",
-      "driver_runtime_python_executable": "path_ae50093e082b",
+      "driver_runtime_python_executable": "path_51d816457550",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "4.1.1",
       "driver_version_resolved": "4.1.1",
@@ -787,7 +787,7 @@
     "name": "Spark",
     "raw_config": {
       "adaptive_enabled": true,
-      "database": "database_7e34823e63d1",
+      "database": "database_d69fce23f1a1",
       "driver_memory": "4g",
       "executor_cores": 2,
       "executor_memory": "4g",
