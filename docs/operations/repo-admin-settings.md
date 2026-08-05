@@ -366,44 +366,59 @@ future regression (ruleset deleted, made inactive, ref narrowed, creation rule
 dropped, or bypass emptied) becomes a blocking drift finding instead of a
 warning.
 
-### `pypi` environment required-reviewers gate (verify/pending admin action)
+### `pypi` environment required-reviewers gate (enforced)
 
 `release.yml`'s `publish` job already scopes the real-PyPI publish to the
 GitHub `environment: pypi` (and `test-pypi` for the test-PyPI path), which
 is the correct native mechanism for a required-reviewers/human-approval
 gate on publish. The workflow file alone does not prove the `pypi`
-environment has `required_reviewers` configured on the repo side.
+environment has `required_reviewers` configured on the repo side — only a
+live environments API read does.
 
 Verify:
 
 ```bash
-gh api repos/joeharris76/BenchBox/environments/pypi
+gh api repos/joeharris76/BenchBox/environments/pypi \
+  --jq '{name, protection_rules: [.protection_rules[] | {type, reviewers: [.reviewers[]?.reviewer.login]}]}'
 ```
 
-Check the response's `protection_rules` array for an entry with
-`type: "required_reviewers"` and a non-empty `reviewers` list.
+Live verification on 2026-08-05 (command above) shows the `pypi` environment
+already carries a required-reviewers gate:
 
-Live state at time of writing: not independently re-verified in this
-session (no `gh`/network access available in this sandbox to call the API).
-No prior record of `required_reviewers` being configured for the `pypi`
-environment exists elsewhere in this repo's admin history
-(`_project/decisions/`), so treat it as unconfirmed/likely absent until an
-admin runs the verify command above and records the result here.
+```text
+# pypi environment live state
+# checked: 2026-08-05  by: joeharris76 (admin)
+# command: gh api repos/joeharris76/BenchBox/environments/pypi --jq '{name, protection_rules: [.protection_rules[] | {type, reviewers: [.reviewers[]?.reviewer.login]}]}'
+# observed: {"name":"pypi","protection_rules":[{"reviewers":["joeharris76"],"type":"required_reviewers"}]}
+# type: required_reviewers  reviewer login(s): joeharris76  (User id 57046)
+# prevent_self_review: false  wait_timer: null  deployment_branch_policy: null
+```
 
-Apply (admin only, if the verify command shows no `required_reviewers`
-rule):
+No admin mutation required for this gate — it is already configured. A future
+regression (rule removed, reviewers emptied, or environment deleted) would be
+caught by re-running the verify command above and comparing to this dated
+record.
+
+`test-pypi` intentionally has no protection rules (lower friction for dry-run
+publish paths). Observed on 2026-08-05:
+
+```bash
+gh api repos/joeharris76/BenchBox/environments/test-pypi --jq '{name, protection_rules}'
+# {"name":"test-pypi","protection_rules":[]}
+```
+
+That empty gate is accepted by design; do not copy the real-PyPI
+`required_reviewers` rule onto `test-pypi` unless a future policy change
+explicitly wants the same friction on the test path.
+
+Historical re-apply reference (admin only, if the live verify ever shows the
+gate missing):
 
 ```bash
 gh api -X PUT repos/joeharris76/BenchBox/environments/pypi \
   -f 'reviewers[][type]=User' \
-  -f 'reviewers[][id]=<github-user-id-of-approver>'
+  -f 'reviewers[][id]=57046'
 ```
-
-Repeat for the `test-pypi` environment only if the same gate is desired
-there (lower risk by design; optional).
-
-After applying (or confirming already applied), record the positive
-confirmation here — do not leave this section silent about live state.
 
 ## Release canary and ruleset drift
 
