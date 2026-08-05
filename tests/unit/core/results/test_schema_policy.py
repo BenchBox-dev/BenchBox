@@ -91,3 +91,43 @@ def test_normalizer_policy_names_fallback_reason_for_unknown_v2() -> None:
     assert decision.accepted
     assert decision.normalized_version == LEGACY_NORMALIZED_SCHEMA_VERSION
     assert decision.reason == "legacy-fallback-unknown-v2"
+
+
+def test_producer_payload_boundary_redacts_platform_metadata_sentinels() -> None:
+    """Producer schema path must apply the multi-source credential boundary."""
+    import json
+    from datetime import datetime
+
+    from benchbox.core.results.models import BenchmarkResults
+    from benchbox.core.results.schema import build_result_payload
+
+    gates = (
+        "RAW_CONFIG_GATE",
+        "RAW_METADATA_GATE",
+        "DEPLOYMENT_GATE",
+        "CLOUD_GATE",
+        "COMPUTE_GATE",
+        "STORAGE_GATE",
+    )
+    result = BenchmarkResults(
+        benchmark_name="synthetic",
+        platform="synthetic",
+        scale_factor=1.0,
+        execution_id="schema-policy-gate",
+        timestamp=datetime.now(),
+        duration_seconds=0.1,
+        total_queries=0,
+        successful_queries=0,
+        failed_queries=0,
+        platform_info={"sort_key": "o_orderkey", "threads": 4},
+        platform_raw_config={"password": "RAW_CONFIG_GATE"},
+        platform_raw_metadata={"password": "RAW_METADATA_GATE"},
+        platform_deployment={"token": "DEPLOYMENT_GATE"},
+        platform_cloud={"access_key": "CLOUD_GATE"},
+        platform_compute={"connection_string": "COMPUTE_GATE"},
+        platform_storage={"secret": "STORAGE_GATE"},
+    )
+    text = json.dumps(build_result_payload(result), default=str)
+    for gate in gates:
+        assert gate not in text, f"producer payload leaked {gate}"
+    assert "o_orderkey" in text

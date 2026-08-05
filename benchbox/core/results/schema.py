@@ -550,7 +550,8 @@ def _build_platform_section(
             # Credential redaction is a boundary invariant for every exported
             # result, including explicitly private/internal artifacts. The
             # flag still controls public anonymization elsewhere, but it must
-            # not turn a raw adapter config into a credential egress channel.
+            # not turn raw adapter config/metadata or normalized deployment/
+            # cloud/compute/storage blocks into a credential egress channel.
             sanitize_raw_config=True,
         )
     )

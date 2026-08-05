@@ -842,6 +842,48 @@ class TestSummaryStats:
         assert stats["unique_platforms"] == 0
 
 
+class TestPlatformMetadataCredentialBoundary:
+    """results.db must not persist credential-shaped platform metadata values."""
+
+    def test_store_result_filters_all_platform_metadata_sources(self, tmp_path):
+        gates = (
+            "RAW_CONFIG_GATE",
+            "RAW_METADATA_GATE",
+            "DEPLOYMENT_GATE",
+            "CLOUD_GATE",
+            "COMPUTE_GATE",
+            "STORAGE_GATE",
+        )
+        result = create_test_result(execution_id="platform-meta-db")
+        result.platform_raw_config = {"password": "RAW_CONFIG_GATE", "threads": 4, "sort_key": "o_orderkey"}
+        result.platform_raw_metadata = {"password": "RAW_METADATA_GATE", "partition_key": "l_orderkey"}
+        result.platform_deployment = {"token": "DEPLOYMENT_GATE", "connection_mode": "embedded"}
+        result.platform_cloud = {"access_key": "CLOUD_GATE", "region": "us-east-1"}
+        result.platform_compute = {"connection_string": "COMPUTE_GATE", "warehouse": "BENCH_WH"}
+        result.platform_storage = {"secret": "STORAGE_GATE", "bucket": "bench-bucket"}
+
+        db = ResultDatabase(tmp_path / "test.db")
+        db.store_result(result)
+        raw = (tmp_path / "test.db").read_bytes()
+        for gate in gates:
+            assert gate.encode() not in raw, f"results.db leaked {gate}"
+
+        stored = db.get_result("platform-meta-db")
+        assert stored is not None
+        platform = stored.metadata["platform"]
+        assert platform["raw_config"]["password"] == "<redacted>"
+        assert platform["raw_config"]["threads"] == 4
+        assert platform["raw_config"]["sort_key"] == "o_orderkey"
+        assert platform["raw_metadata"]["password"] == "<redacted>"
+        assert platform["raw_metadata"]["partition_key"] == "l_orderkey"
+        assert platform["deployment"]["token"] == "<redacted>"
+        assert platform["cloud"]["access_key"] == "<redacted>"
+        assert platform["compute"]["connection_string"] == "<redacted>"
+        assert platform["compute"]["warehouse"] == "BENCH_WH"
+        assert platform["storage"]["secret"] == "<redacted>"
+        assert platform["storage"]["bucket"] == "bench-bucket"
+
+
 class TestImportResults:
     """Tests for importing results from files."""
 
