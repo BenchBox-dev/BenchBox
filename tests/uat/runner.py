@@ -87,6 +87,7 @@ def submit_state_is_cell_failure(state: SubmitTerminalState | str) -> bool:
     return normalized in {
         SubmitTerminalState.query_failure.value,
         SubmitTerminalState.schema_violation.value,
+        SubmitTerminalState.bundle_load_error.value,
         SubmitTerminalState.missing_manifest.value,
     }
 
