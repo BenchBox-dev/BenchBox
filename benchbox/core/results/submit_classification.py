@@ -34,12 +34,19 @@ from benchbox.validation.bundle import CLI_REFUSED_COMPLIANCE_CLASSES
 
 
 class SubmitTerminalState(str, Enum):
-    """Terminal submit verdict shared by the CLI and UAT surfaces."""
+    """Terminal submit verdict shared by the CLI and UAT surfaces.
+
+    ``schema_violation`` is reserved for a *successfully loaded* result that
+    fails clean-pass integrity (failed validation claim, translation fallback,
+    …). Unreadable or unparseable files use ``bundle_load_error`` so operators
+    can distinguish "could not load the artifact" from "loaded but not clean".
+    """
 
     submittable = "submittable"
     unofficial = "unofficial"
     query_failure = "query_failure"
     schema_violation = "schema_violation"
+    bundle_load_error = "bundle_load_error"
     unvalidated = "unvalidated"
     missing_manifest = "missing_manifest"
 
@@ -69,9 +76,10 @@ def classify_loaded_result(result: Any) -> SubmitTerminalState:
 def classify_result_path(result_json: Path | str | None) -> SubmitTerminalState:
     """Classify a result-file path, including missing-file and load failures.
 
-    A missing path/file is ``missing_manifest``; an unreadable or
-    schema-invalid file is ``schema_violation``. A loadable result is then
-    routed through :func:`classify_loaded_result`.
+    A missing path/file is ``missing_manifest``; an unreadable or unparseable
+    file is ``bundle_load_error``. A loadable result is then routed through
+    :func:`classify_loaded_result` (which may still return ``schema_violation``
+    for integrity problems on a successfully loaded payload).
     """
     if result_json is None:
         return SubmitTerminalState.missing_manifest
@@ -82,6 +90,6 @@ def classify_result_path(result_json: Path | str | None) -> SubmitTerminalState:
         result, _raw = load_result_file(path)
     except FileNotFoundError:
         return SubmitTerminalState.missing_manifest
-    except (json.JSONDecodeError, OSError, ResultLoadError, UnsupportedSchemaError):
-        return SubmitTerminalState.schema_violation
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError, ResultLoadError, UnsupportedSchemaError):
+        return SubmitTerminalState.bundle_load_error
     return classify_loaded_result(result)

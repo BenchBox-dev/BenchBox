@@ -199,6 +199,25 @@ def test_package_counts_schema_violation_as_failure(tmp_path: Path):
     assert any("schema_violation" in w for w in warnings)
 
 
+def test_package_counts_bundle_load_error_as_failure(tmp_path: Path):
+    cfg = validate_config({"name": "x", "package": {"submit_terminal_state": "local-stage"}})
+    bad = tmp_path / "malformed.json"
+    bad.write_text("{not valid json", encoding="utf-8")
+    runner = _fake_runner_factory([])
+    warnings: list[str] = []
+    result = package.run_package(
+        cfg,
+        result_paths=[bad],
+        submissions_dir=tmp_path / "subs",
+        runner=runner,
+        warn=warnings.append,
+        classify_results=True,
+    )
+    assert result.failure_count == 1
+    assert result.invocations == ()
+    assert any("bundle_load_error" in w for w in warnings)
+
+
 @pytest.mark.parametrize("state", sorted(package.PR_STUB_TERMINAL_STATES))
 def test_package_warns_for_pr_stub_states(tmp_path: Path, state: str):
     cfg = validate_config({"name": "x", "package": {"submit_terminal_state": state}})

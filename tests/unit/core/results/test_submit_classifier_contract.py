@@ -149,8 +149,20 @@ def test_submit_classifier_contract_path_only_states(tmp_path: Path):
 
     malformed = tmp_path / "malformed.json"
     malformed.write_text("{not valid json", encoding="utf-8")
-    assert classify_result_path(malformed) is SubmitTerminalState.schema_violation
-    assert runner.classify_for_submit(malformed) is runner.SubmitTerminalState.schema_violation
+    # Load/parse failures are bundle_load_error, not schema_violation (integrity).
+    assert classify_result_path(malformed) is SubmitTerminalState.bundle_load_error
+    assert runner.classify_for_submit(malformed) is runner.SubmitTerminalState.bundle_load_error
+
+
+def test_submit_classifier_contract_load_error_distinct_from_integrity(tmp_path: Path):
+    """Loaded integrity failures stay schema_violation; unreadable files are load errors."""
+    integrity = tmp_path / "integrity.json"
+    _write_result_json(integrity, failed=0, validation="failed")
+    assert classify_result_path(integrity) is SubmitTerminalState.schema_violation
+
+    unreadable = tmp_path / "unreadable.json"
+    unreadable.write_bytes(b"\xff\xfe not json")
+    assert classify_result_path(unreadable) is SubmitTerminalState.bundle_load_error
 
 
 def test_submit_classifier_contract_cli_refusal_tracks_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
