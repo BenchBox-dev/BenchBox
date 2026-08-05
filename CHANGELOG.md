@@ -50,6 +50,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Stale transactional staging data is now rebuilt, not certified** - The
+  staging provenance manifest that gates `is_setup()` for Transaction
+  Primitives and Write Primitives was written unconditionally at the end of
+  `setup()`, including on the path where `setup(force=False)` skipped
+  repopulation because the staging tables were already non-empty. A staging set
+  left over from a smaller scale factor was therefore detected as stale exactly
+  once, never rebuilt, and then stamped with a manifest asserting it belonged
+  to the new run — so the benchmark still reported timings for the wrong data
+  volume as a PASS. A manifest mismatch now triggers the same rebuild that
+  `force=True` does, and the manifest is written over data that was actually
+  repopulated. Databases that already carry a manifest written by the previous
+  behaviour pay one real staging rebuild on next use.
 - **Unrunnable precompiled TPC binaries now fall back to source compilation** -
   Binary selection probes that a bundled `dbgen`/`qgen`/`dsdgen`/`dsqgen`
   actually executes on the host before choosing it over compiling from source.

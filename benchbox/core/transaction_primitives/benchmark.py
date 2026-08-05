@@ -376,12 +376,23 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             )
 
         try:
-            # Drop existing staging tables if force=True (done once before loop)
-            if force:
+            # A staging set whose manifest does not match this run is stale, not
+            # reusable. Without this the population loop below takes its "already
+            # populated" branch on the leftover rows, nothing is rebuilt, and the
+            # unconditional _write_staging_manifest() at the end then certifies
+            # the stale data as this run's -- the exact silent wrong-results bug
+            # the manifest exists to close. Reuse the force drop path rather than
+            # adding a second one; a dropped table re-enters the loop empty and
+            # repopulates through the already-audited branch.
+            rebuild = force or not self._staging_manifest_matches(connection, required_tables)
+
+            # Drop existing staging tables when rebuilding (done once before loop)
+            if rebuild:
+                reason = "force mode" if force else "stale/absent staging manifest"
                 for table_name in STAGING_TABLES:
                     try:
                         connection.execute(f"DROP TABLE IF EXISTS {table_name}")
-                        self.log_verbose(f"Dropped existing {table_name} (force mode)")
+                        self.log_verbose(f"Dropped existing {table_name} ({reason})")
                     except Exception as e:
                         self.log_verbose(f"Warning: Could not drop {table_name}: {e}")
 
