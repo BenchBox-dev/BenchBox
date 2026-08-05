@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -142,25 +143,34 @@ class TestGateCli:
     def test_ci_lint_environment_boundary_cli_skips_on_a_runner(self, monkeypatch, capsys) -> None:
         gate = _load_gate()
         monkeypatch.setenv("GITHUB_ACTIONS", "true")
-        assert gate.main(["agent-identity"]) == 1
-        out = capsys.readouterr().out
-        assert "SKIP agent-identity" in out
+        # Exit status stays 0: it reports "the gate ran", not the decision.
+        # See TestGateFailsClosed for why conflating the two drops guards.
+        assert gate.main(["agent-identity"]) == 0
+        assert capsys.readouterr().out.strip() == gate.DECISION_SKIP
 
     def test_ci_lint_environment_boundary_cli_runs_off_a_runner(self, monkeypatch, capsys) -> None:
         gate = _load_gate()
         monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
         assert gate.main(["agent-identity"]) == 0
-        assert capsys.readouterr().out == ""
+        assert capsys.readouterr().out.strip() == gate.DECISION_RUN
 
-    def test_ci_lint_environment_boundary_cli_ignores_non_true_values(self, monkeypatch) -> None:
+    def test_ci_lint_environment_boundary_cli_ignores_non_true_values(self, monkeypatch, capsys) -> None:
         """GitHub Actions itself only ever sets the literal string `true`;
         a stray/falsy value (unset, empty, `false`) must never trip the
         skip path -- otherwise a locally-exported `GITHUB_ACTIONS=1` for
-        some unrelated tool would silently start skipping real guards."""
+        some unrelated tool would silently start skipping real guards.
+
+        Asserts the emitted decision, not the exit status: `main` returns 0
+        for both decisions now, so an exit-status assertion here would pass
+        no matter which branch was taken.
+        """
         gate = _load_gate()
         for value in ("false", "", "1", "True"):
             monkeypatch.setenv("GITHUB_ACTIONS", value)
-            assert gate.main(["agent-identity"]) == 0
+            gate.main(["agent-identity"])
+            assert capsys.readouterr().out.strip() == gate.DECISION_RUN, (
+                f"GITHUB_ACTIONS={value!r} was treated as a runner, so real guards would be skipped"
+            )
 
 
 class TestMakefileWiring:
@@ -226,3 +236,89 @@ class TestMakefileWiring:
             "a differing count means the general mechanism was abandoned for a per-member one-off, "
             "or a guard was gated that should not be"
         )
+
+
+class TestGateFailsClosed:
+    """A gate that cannot be consulted must run the guard, not skip it.
+
+    This is the property the first version of this fix got backwards. It used
+    the gate process itself as the `if` condition - exit 0 to run, exit 1 to
+    skip - which makes every way of failing to *reach* a decision (`uv`
+    absent, a broken venv, the script renamed, any traceback) exit non-zero
+    and therefore indistinguishable from a deliberate skip. The guard was
+    then silently dropped with nothing recorded in the recipe's `failed`
+    list: a guard that cannot fail, which is the exact defect the gate was
+    written to remove, reproduced one layer up.
+    """
+
+    def test_ci_lint_environment_boundary_decision_is_on_stdout_not_the_exit_status(self) -> None:
+        """The gate must exit 0 for both decisions, distinguishing them by output."""
+        gate = _load_gate()
+        assert gate.main(["agent-identity"]) == 0, "a RUN decision must not be signalled by a non-zero exit"
+        assert gate.main(["skill-sync-check"]) == 0, "a SKIP decision must not be signalled by a non-zero exit"
+
+    def test_ci_lint_environment_boundary_emits_a_single_decision_token(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """stdout carries exactly one machine-readable token; the reason goes to stderr.
+
+        If the human-readable reason shared stdout with the token, the recipe's
+        string comparison would stop matching and every guard would run again -
+        failing closed, but silently undoing the fix.
+        """
+        gate = _load_gate()
+        monkeypatch.setenv("GITHUB_ACTIONS", "true")
+
+        gate.main(["skill-sync-check"])
+        captured = capsys.readouterr()
+        assert captured.out.strip() == gate.DECISION_SKIP
+        assert "hardcoded" in captured.err or "does not exist on a runner" in captured.err, (
+            "the skip reason no longer reaches stderr, so an Actions log shows a guard vanishing with no explanation"
+        )
+
+        gate.main(["ruff-check"])
+        assert capsys.readouterr().out.strip() == gate.DECISION_RUN
+
+    def test_ci_lint_environment_boundary_runs_the_guard_when_the_gate_is_broken(self) -> None:
+        """Execute the recipe's OWN condition against a gate that cannot run.
+
+        Asserting on Makefile text alone would not catch this: `if <cmd>; then`
+        and a `!= SKIP` comparison look equally reasonable in a diff, and only
+        one of them is safe. So take the real lines out of the recipe, swap the
+        gate command for one that fails the way a missing interpreter would,
+        and check which branch a shell actually takes.
+        """
+        lines = _ci_lint_recipe_text().splitlines()
+        for slug, guard in (("agent-identity", "agent-identity-check"), ("skill-sync-check", "skill-sync-check")):
+            start = next(
+                (i for i, line in enumerate(lines) if f"{GATE_INVOCATION} {slug}" in line),
+                None,
+            )
+            assert start is not None, f"ci-lint never consults the gate for {slug!r}"
+            end = next(
+                (i for i in range(start + 1, len(lines)) if f"$(MAKE) {guard}" in lines[i]),
+                None,
+            )
+            assert end is not None, f"no {guard!r} invocation follows its gate call"
+
+            # Take the recipe's own gating lines, stopping before the guard
+            # itself so `$(MAKE)` never reaches the shell. `$$` is make's
+            # escape for a literal `$`. Whatever shape the condition has -
+            # a `GATE=...` capture, a bare `if <cmd>; then` - it is exercised
+            # as written rather than pattern-matched, so a future rewrite is
+            # judged on behaviour instead of on looking familiar.
+            block = "\n".join(line.rstrip("\\").strip() for line in lines[start:end]).replace("$$", "$")
+            # Simulate the gate being uninvokable, NOT deciding to skip.
+            broken = re.sub(r"uv run\b.*?" + re.escape(slug), "command-that-does-not-exist", block, count=1)
+            assert "command-that-does-not-exist" in broken, f"could not neutralise the gate command for {slug!r}"
+
+            result = subprocess.run(
+                ["sh", "-c", f"{broken} echo RAN; else echo SKIPPED; fi"],
+                capture_output=True,
+                text=True,
+            )
+            assert result.stdout.strip() == "RAN", (
+                f"a broken gate silently skips {guard}: the recipe treats 'could not decide' as 'skip', "
+                f"so the guard disappears with nothing recorded in `failed`. Shell said "
+                f"{result.stdout.strip()!r} for block:\n{broken}"
+            )

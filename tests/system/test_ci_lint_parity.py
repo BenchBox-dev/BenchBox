@@ -208,15 +208,36 @@ def test_lint_job_guards_run_in_ci_lint() -> None:
     )
 
 
-def test_ci_lint_identity_check_supplies_runner_identity() -> None:
-    """The CI runner has no Git config for the resolved-config audit."""
+def test_ci_lint_identity_check_is_gated_rather_than_fed_a_synthetic_identity() -> None:
+    """The runner has no Git identity, so the audit is skipped, not faked.
+
+    This test used to pin a ``GIT_CONFIG_COUNT=2 ... / unset ...`` pair that
+    injected a synthetic ``BenchBox CI`` identity so the resolved-config audit
+    had something to read on a runner. That only ever swapped one input the
+    audit cannot fail on for another: a synthetic identity matches no known
+    agent either, so the guard passed without verifying anything.
+
+    The guard is now skipped on a runner via the environment gate, and the
+    synthetic identity is gone because nothing consumed it. Pinning the old
+    text here would have made this test assert recipe content with no
+    behaviour behind it - a vacuous pass, which is the exact defect class the
+    gate exists to remove.
+
+    ``agent-commit-range-check`` stays unconditional and is the real
+    merge-time authorship control; it is asserted separately below.
+    """
     recipe = _ci_lint_recipe_text()
-    assert 'if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then' in recipe
-    assert "export GIT_CONFIG_COUNT=2" in recipe
-    assert "GIT_CONFIG_VALUE_0='BenchBox CI'" in recipe
-    assert "GIT_CONFIG_VALUE_1=ci@benchbox.invalid" in recipe
-    assert "unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0" in recipe
-    assert recipe.count('if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then') == 2
+    assert "ci_lint_environment_gate.py agent-identity" in recipe, (
+        "ci-lint no longer consults the environment gate before agent-identity-check"
+    )
+    assert "GIT_CONFIG_COUNT" not in recipe, (
+        "the synthetic runner identity is back; the audit it fed is skipped on CI, so it feeds nothing"
+    )
+    # The control that must never be gated.
+    assert "ci_lint_environment_gate.py agent-commit-range" not in recipe, (
+        "agent-commit-range-check is gated; it is the merge-time authorship control and must always run"
+    )
+    assert "$(MAKE) agent-commit-range-check" in recipe
 
 
 def test_excluded_steps_still_exist() -> None:

@@ -903,14 +903,19 @@ guards-fix:
 # `if $GITHUB_ACTIONS` -- see its module docstring); a guard not listed there
 # always runs, on a runner exactly as it does locally.
 #
-# The `GIT_CONFIG_COUNT=2 ... / unset ...` pair still wrapping
-# agent-identity-check below is now dead on a runner: the gate above skips
-# the guard between them, so nothing ever consumes the synthetic identity it
-# exports. It is kept verbatim rather than deleted because
-# tests/system/test_ci_lint_parity.py::test_ci_lint_identity_check_supplies_runner_identity
-# pins this exact recipe text; deleting it needs that test updated in the
-# same change, which is out of scope here (tests/system/** is not part of
-# this fix's authorized paths).
+# The gate reports its decision on stdout and the recipe skips only on the
+# exact token `SKIP`. Deliberately NOT `if <gate-command>; then`: every way of
+# failing to reach a decision (uv absent, broken venv, the script renamed, a
+# traceback) also exits non-zero, so using the exit status would make a broken
+# gate indistinguishable from a deliberate skip and silently drop the guard
+# with nothing recorded in `failed`. Anything other than `SKIP` runs the guard.
+#
+# The synthetic `GIT_CONFIG_*` identity that used to wrap agent-identity-check
+# here was removed with the gate: the guard no longer runs on a runner, so
+# nothing consumed it. Leaving it would have left
+# tests/system/test_ci_lint_parity.py asserting recipe text with no effect --
+# a vacuous pass inside the change whose whole purpose is removing vacuous
+# passes. That test now pins the gating instead.
 ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
@@ -937,19 +942,15 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed artifact-hygiene"; \
 	$(MAKE) agent-instructions-check; \
 	[ $$? -eq 0 ] || failed="$$failed agent-instructions"; \
-	if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then \
-		export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='BenchBox CI' GIT_CONFIG_KEY_1=user.email GIT_CONFIG_VALUE_1=ci@benchbox.invalid; \
-	fi; \
-	if uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity; then \
+	GATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity || true); \
+	if [ "$$GATE" != "SKIP" ]; then \
 		$(MAKE) agent-identity-check; \
 		[ $$? -eq 0 ] || failed="$$failed agent-identity"; \
 	fi; \
-	if [ "$${GITHUB_ACTIONS:-}" = "true" ]; then \
-		unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1; \
-	fi; \
 	$(MAKE) agent-commit-range-check; \
 	[ $$? -eq 0 ] || failed="$$failed agent-commit-range"; \
-	if uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check; then \
+	GATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check || true); \
+	if [ "$$GATE" != "SKIP" ]; then \
 		$(MAKE) skill-sync-check; \
 		[ $$? -eq 0 ] || failed="$$failed skill-sync-check"; \
 	fi; \

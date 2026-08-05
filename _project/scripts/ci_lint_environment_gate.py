@@ -94,6 +94,21 @@ def runs_on_runner(guard: str, *, github_actions: bool) -> tuple[bool, str | Non
     return False, reason
 
 
+#: The decision is carried on stdout, never in the exit status.
+#:
+#: An earlier version returned 0 for "run" and 1 for "skip", and the recipe
+#: used the process itself as the `if` condition. That inverted this module's
+#: whole purpose: every way of failing to *reach* a decision -- `uv` absent,
+#: a broken venv, this file renamed, a traceback -- also exits non-zero and
+#: was therefore indistinguishable from a deliberate skip, so the guard was
+#: silently disabled and nothing landed in the recipe's `failed` list. A gate
+#: that cannot be consulted must fall back to RUNNING the guard: a guard that
+#: fails noisily for an environmental reason is a nuisance, but a guard that
+#: vanishes without a trace is the exact defect this module exists to remove.
+DECISION_RUN = "RUN"
+DECISION_SKIP = "SKIP"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("guard", help="ci-lint guard slug, e.g. 'agent-identity' or 'skill-sync-check'")
@@ -102,9 +117,16 @@ def main(argv: list[str] | None = None) -> int:
     github_actions = os.environ.get("GITHUB_ACTIONS", "") == "true"
     should_run, reason = runs_on_runner(args.guard, github_actions=github_actions)
     if should_run:
+        print(DECISION_RUN)
         return 0
-    print(f"SKIP {args.guard}: environment-inapplicable on a CI runner -- {reason}")
-    return 1
+    print(DECISION_SKIP)
+    # The reason goes to stderr so it still reaches the Actions log while
+    # stdout stays exactly one machine-readable token for the recipe to test.
+    print(
+        f"ci-lint: skipping {args.guard} - environment-inapplicable on a CI runner -- {reason}",
+        file=sys.stderr,
+    )
+    return 0
 
 
 if __name__ == "__main__":

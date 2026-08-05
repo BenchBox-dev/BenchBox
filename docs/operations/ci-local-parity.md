@@ -184,11 +184,31 @@ runner that lacks it:
 draws this boundary: a small, declarative `RUNNER_INAPPLICABLE_GUARDS` table
 mapping a guard slug to why it cannot produce a meaningful result on
 `GITHUB_ACTIONS=true`. The `ci-lint` recipe calls it immediately before each
-listed guard (`if uv run -- python _project/scripts/ci_lint_environment_gate.py <slug>; then ...; fi`)
-instead of the guard's own ad hoc `if [ "$$GITHUB_ACTIONS" = "true" ]`
+listed guard and skips only on the exact stdout token `SKIP`:
+
+```sh
+GATE=$(uv run -- python _project/scripts/ci_lint_environment_gate.py <slug> || true)
+if [ "$GATE" != "SKIP" ]; then <guard>; fi
+```
+
+This replaces the guard's own ad hoc `if [ "$$GITHUB_ACTIONS" = "true" ]`
 special-case -- exactly the pattern the old `agent-identity-check` synthetic-identity
 injection was, and the reason a *general* mechanism replaced it rather than
-gaining a second one for `skill-sync-check`. A guard not listed in the table
+gaining a second one for `skill-sync-check`.
+
+**The decision travels on stdout, never in the exit status, and the gate fails
+closed.** Using the gate process itself as the `if` condition looks equivalent
+and is not: every way of failing to *reach* a decision -- `uv` absent, a broken
+venv, the script renamed, any traceback -- also exits non-zero, so a broken gate
+would be indistinguishable from a deliberate skip and the guard would vanish
+with nothing recorded in `failed`. That is the same "guard that cannot fail"
+defect the gate exists to remove, one layer up. Anything other than `SKIP` runs
+the guard; the human-readable reason goes to stderr so it still reaches the
+Actions log. `tests/unit/scripts/test_ci_lint_environment_boundary.py::TestGateFailsClosed`
+extracts the recipe's own condition and executes it against an uninvokable gate
+to pin this behaviourally rather than by pattern-matching the shell text.
+
+A guard not listed in the table
 always runs, on a runner exactly as it does locally -- the table is a narrow,
 reasoned allowlist of exceptions, not a generic on/off switch, and adding an
 entry removes real CI coverage inside `make ci-lint`'s own CI invocation
