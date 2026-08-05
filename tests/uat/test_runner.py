@@ -38,6 +38,7 @@ def _write_result_json(
     failed: int = 0,
     compliance_class: str | None = None,
     validation: str | None = None,
+    translation_status: str | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     passed = 1 if failed == 0 else 0
@@ -69,6 +70,8 @@ def _write_result_json(
     }
     if compliance_class is not None:
         payload["benchmark"]["compliance_class"] = compliance_class
+    if translation_status is not None:
+        payload["execution"] = {"translation": {"status": translation_status}}
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
@@ -552,6 +555,37 @@ def test_classify_for_submit_prefers_unofficial_over_unvalidated(tmp_path: Path)
     result_path = tmp_path / "benchmark_runs" / "results" / "unofficial-unvalidated.json"
     _write_result_json(result_path, compliance_class="unofficial_subscale", validation="not_validated")
     assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unofficial
+
+
+def test_classify_for_submit_keeps_uncertain_with_translation_fallback_as_passed_cell(tmp_path: Path):
+    """Uncertain+fallback stays unvalidated (not a cell failure); unvalidated excludes cell FAIL."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "uncertain-fallback.json"
+    _write_result_json(result_path, validation="uncertain", translation_status="fallback")
+    fake_argv = [sys.executable, "-c", f"print({str(result_path)!r})"]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.unvalidated
+    assert not runner.submit_state_is_cell_failure(runner.SubmitTerminalState.unvalidated)
+    assert result.status == "passed"
+    assert result.exit_code == 0
+    assert result.submit_terminal_state == "unvalidated"
+
+
+def test_classify_for_submit_marks_translation_fallback_as_cell_failure(tmp_path: Path):
+    """Translation fallback alone is non-clean schema_violation and fails the UAT cell."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "translation-fallback.json"
+    _write_result_json(result_path, validation="passed", translation_status="fallback")
+    fake_argv = [sys.executable, "-c", f"print({str(result_path)!r})"]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell("duckdb", "tpch", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert runner.classify_for_submit(result_path) is runner.SubmitTerminalState.schema_violation
+    assert runner.submit_state_is_cell_failure(runner.SubmitTerminalState.schema_violation)
+    assert result.status == "failed"
+    assert result.submit_terminal_state == "schema_violation"
 
 
 # ---------------------------------------------------------------------------
