@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 // Short IDs assigned deterministically by the pipeline to the fixture
 // corpus. Tests that round-trip long-form → short-form use these.
-const SHORT_DUCKDB = "ba6a8c83";
-const SHORT_DATAFUSION = "5e6c5eba";
-const LONG_DUCKDB = "tpch-duckdb-sf0.01-20260403-010ee756";
-const LONG_DATAFUSION = "tpch-datafusion-sf0.01-20260403-a6bb8a70";
+const SHORT_DUCKDB = fixtureIds.shortIds.duckdb;
+const SHORT_DATAFUSION = fixtureIds.shortIds.datafusion;
+const LONG_DUCKDB = fixtureIds.ids.duckdb;
+const LONG_DATAFUSION = fixtureIds.ids.datafusion;
 
 test.describe("Compare", () => {
   test.describe.configure({ mode: "serial" });

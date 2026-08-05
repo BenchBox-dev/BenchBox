@@ -35,6 +35,7 @@ const genSourceRoot = join(genRoot, "source");
 const genBundlesDir = join(genSourceRoot, "bundles");
 const genDataDir = join(genRoot, "data");
 
+
 const assertExplorerBuildContract = () => {
   const contract = readExplorerBuildContract();
   log(`validated explorer build contract ${contract.version} (${contract.command})`);
@@ -499,6 +500,112 @@ const runPipeline = (contract) => {
   }
 };
 
+/**
+ * Every fixture role a browser spec can address, keyed by the `run.id` that
+ * identifies it.
+ *
+ * `run.id` is authored in the source bundles and in the VARIANTS above; it is
+ * the only stable handle on a fixture. `result_id` is content-addressed - it
+ * ends in a SHA prefix of the published bundle bytes - so it moves whenever
+ * fixture content or anonymization output changes, and `short_id` is derived
+ * from `result_id`, so it moves too.
+ *
+ * Filename prefix cannot stand in for this. Three fixtures share the
+ * `tpch-duckdb-sf0.01-` prefix (canonical, tuned, community) and they are not
+ * interchangeable: `funding-disclosure.spec.ts` asserts that the community
+ * fixture is the ONLY one declaring `provenance.funding`, so handing it the
+ * canonical id does not weaken the test, it inverts it.
+ */
+const FIXTURE_ROLES = {
+  "9c0925d1": "duckdb",
+  "9c0925d1-tuned": "duckdbTuned",
+  "9c0925d1-community": "duckdbCommunity",
+  "9c0925d1-sf01": "duckdbSf01",
+  "9c0925d1-env-aws-cloud": "awsCloud",
+  "9c0925d1-env-container-local": "containerLocal",
+  "9c0925d1-env-gcp-serverless": "gcpServerless",
+  c235e698: "datafusion",
+  "c235e698-partial-query": "datafusionPartial",
+  d4ec318a: "starSchema",
+  e744512d: "polars",
+};
+
+/**
+ * Read the pipeline's own short-id table out of the built read model.
+ *
+ * An earlier revision of this file recomputed the algorithm in JavaScript from
+ * a comment describing `_build_short_ids`. That trades one drift class for
+ * another: nothing enforced that the two implementations agreed, and the JS
+ * copy silently assumed its input set (bundle filenames) matched the
+ * pipeline's (`all_result_ids`). The pipeline already persists the mapping in
+ * `short_ids`, so read it instead of reproducing it.
+ */
+const readShortIds = () => {
+  const script = [
+    "import duckdb, json, sys",
+    `con = duckdb.connect(${JSON.stringify(join(genDataDir, "results.duckdb"))}, read_only=True)`,
+    'rows = con.execute("select result_id, short_id from short_ids").fetchall()',
+    "json.dump({result_id: short_id for result_id, short_id in rows}, sys.stdout)",
+  ].join("\n");
+  const result = spawnSync("uv", ["run", "--", "python", "-c", script], { cwd: repoRoot, encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error(`could not read short_ids from the read model (exit ${result.status}): ${result.stderr ?? ""}`);
+  }
+  return JSON.parse(result.stdout);
+};
+
+/**
+ * Emit `fixture-ids.json` next to the read model.
+ *
+ * Specs used to hardcode these ids and they drifted: the literals checked in
+ * matched neither the pre- nor the post-#1512 build, so the browser suite
+ * failed on every run. Emitting one entry per role keeps every spec pinned to
+ * whatever this build actually produced.
+ */
+const writeFixtureIds = () => {
+  const rows = readdirSync(join(genDataDir, "bundles"))
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => name.slice(0, -".json".length));
+  const runIdOf = (rid) => JSON.parse(readFileSync(join(genDataDir, "bundles", `${rid}.json`), "utf8"))?.run?.id;
+  const shortIds = readShortIds();
+
+  // Fail loudly on an unclaimed or missing fixture. A spec that silently loses
+  // its role is the failure mode this whole file exists to remove, so a new or
+  // renamed fixture must break the generator, not the suite.
+  const byRole = {};
+  const unclaimed = [];
+  for (const resultId of rows) {
+    const role = FIXTURE_ROLES[runIdOf(resultId)];
+    if (!role) {
+      unclaimed.push(`${resultId} (run.id=${runIdOf(resultId)})`);
+      continue;
+    }
+    if (byRole[role]) {
+      throw new Error(`two fixtures claim role ${role}: ${byRole[role]} and ${resultId}`);
+    }
+    byRole[role] = resultId;
+  }
+  if (unclaimed.length) {
+    throw new Error(`fixture(s) with no role in FIXTURE_ROLES: ${unclaimed.join(", ")}`);
+  }
+  const missing = Object.values(FIXTURE_ROLES).filter((role) => !byRole[role]);
+  if (missing.length) {
+    throw new Error(`FIXTURE_ROLES names role(s) this build did not produce: ${missing.join(", ")}`);
+  }
+
+  const payload = { ids: {}, shortIds: {} };
+  for (const [role, resultId] of Object.entries(byRole).sort(([a], [b]) => a.localeCompare(b))) {
+    const shortId = shortIds[resultId];
+    if (!shortId) {
+      throw new Error(`the read model has no short_id for ${resultId}`);
+    }
+    payload.ids[role] = resultId;
+    payload.shortIds[role] = shortId;
+  }
+  writeFileSync(join(genDataDir, "fixture-ids.json"), `${JSON.stringify(payload, null, 2)}\n`);
+  log(`wrote fixture-ids.json (${Object.keys(payload.ids).length} roles, duckdb=${payload.ids.duckdb})`);
+};
+
 const main = () => {
   log(`sourceRoot=${sourceRoot}`);
   log(`genRoot=${genRoot}`);
@@ -513,6 +620,7 @@ const main = () => {
   if (!existsSync(duckdbPath)) {
     throw new Error(`pipeline did not produce ${duckdbPath}`);
   }
+  writeFixtureIds();
   log(`generated ${duckdbPath}`);
 };
 

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 /**
  * Funding-disclosure surface on the result detail page: the funding chip and
@@ -13,9 +13,9 @@ import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 // Community-submission + employer-funded. The pairing is the point: it shows
 // the funding axis is independent of the trust axis.
-const FUNDED_ID = "tpch-duckdb-sf0.01-20260403-b92a4ffb";
+const FUNDED_ID = fixtureIds.ids.duckdbCommunity;
 // Maintainer-run, funding left `unspecified` -> no chip.
-const UNSPECIFIED_ID = "tpch-duckdb-sf0.01-20260403-010ee756";
+const UNSPECIFIED_ID = fixtureIds.ids.duckdb;
 
 // Scope header assertions to the summary region: the expanded legend renders
 // its own sample chips, so an unscoped [data-role="funding"] would match those

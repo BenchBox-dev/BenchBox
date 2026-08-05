@@ -1,17 +1,17 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { waitForDataElement, waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { fixtureIds, waitForDataElement, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const DUCKDB = {
-  id: "tpch-duckdb-sf0.01-20260403-010ee756",
-  shortId: "ba6a8c83",
+  id: fixtureIds.ids.duckdb,
+  shortId: fixtureIds.shortIds.duckdb,
 };
 const DUCKDB_TUNED = {
-  id: "tpch-duckdb-sf0.01-20260403-a5eff54e",
-  shortId: "009ee9fd",
+  id: fixtureIds.ids.duckdbTuned,
+  shortId: fixtureIds.shortIds.duckdbTuned,
 };
 const DATAFUSION = {
-  id: "tpch-datafusion-sf0.01-20260403-a6bb8a70",
-  shortId: "5e6c5eba",
+  id: fixtureIds.ids.datafusion,
+  shortId: fixtureIds.shortIds.datafusion,
 };
 type FixtureRun = typeof DUCKDB;
 
