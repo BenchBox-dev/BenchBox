@@ -410,6 +410,24 @@ jobs:
         continue-on-error: true
         run: sh scripts/check_untracked_skill_mirrors.sh
 
+      - name: Duplicate code delta vs PR base
+        # Fail only when this PR increases AST Type-2 duplicated lines vs the
+        # merge-base with the PR base (not an absolute repo-wide ceiling).
+        # Absolute ceiling remains `make duplicate-check` / pyproject threshold.
+        id: guard-duplicate-delta
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: make duplicate-check-delta
+
+      - name: Complexity report (advisory)
+        # Surfaces functions in the warn band (CC 12–18). Hard ceiling remains
+        # ruff C901 max-complexity=18; this step is log visibility only
+        # (`make complexity-report` always exits 0 via --no-fail).
+        id: guard-complexity-report
+        continue-on-error: true
+        run: make complexity-report
+
       # --- Aggregator ---------------------------------------------------
       # Reports every guard's pass/fail in one CI cycle instead of stopping
       # at the first failure. Derives the guard set programmatically from
