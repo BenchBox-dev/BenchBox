@@ -21,7 +21,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from tests.uat import cells_io, docker_assets, gate_summary, preflight_budget, timeouts
+from tests.uat import cells_io, docker_assets, gate_summary, preflight_budget
 from tests.uat.config import UATConfig, disk_gate_disabled_warning, load_config
 from tests.uat.phases import (
     enumerate as enumerate_phase,
@@ -100,18 +100,13 @@ def _install_sweep_sigterm_shim(log_dir: Path, phase_holder: list[str | None]) -
     thread -- `signal.signal` raises there). Installing in the sweep's own
     process does not touch cell subprocesses directly: `timeouts.py` owns
     their process-group kill semantics via `run_with_timeout`'s own
-    `except BaseException` guard, which fires as `SweepCancelled` unwinds
-    through a blocked `communicate()` call. Returning the sentinel (rather
-    than raising) keeps a sweep driven from a worker thread working with
-    default SIGTERM behavior; row durability does not depend on the shim,
-    only the orderly-teardown upgrade does.
-
-    Before raising, the handler also drains `timeouts._LIVE_PROCESS_GROUPS`
-    (`timeouts.drain_live_process_groups()`): the narrow window between a
-    cell's `Popen()` and `run_with_timeout` entering its own try/except has
-    no kill path armed yet, so a signal landing exactly there would
-    otherwise escape with the child still alive
-    (uat-cell-teardown-orphans-child-processes-20260805 w2).
+    `except BaseException` guard (with `Popen()` itself inside that guarded
+    `try`, see its docstring), which fires as `SweepCancelled` unwinds
+    through wherever `run_with_timeout` currently is -- including a blocked
+    `communicate()` call. Returning the sentinel (rather than raising) keeps
+    a sweep driven from a worker thread working with default SIGTERM
+    behavior; row durability does not depend on the shim, only the
+    orderly-teardown upgrade does.
 
     The handler records the cancellation (signal name, phase in flight,
     timestamp) to uat_lifecycle.log before raising (w3), so a killed sweep
@@ -121,7 +116,6 @@ def _install_sweep_sigterm_shim(log_dir: Path, phase_holder: list[str | None]) -
 
     def _raise_cancelled(signum: int, _frame: object) -> None:
         signal_name = signal.Signals(signum).name
-        timeouts.drain_live_process_groups()
         exec_phase.append_lifecycle_log(
             log_dir,
             f"[cancel] signal={signal_name} phase={phase_holder[0]} "

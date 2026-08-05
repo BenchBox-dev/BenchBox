@@ -171,9 +171,18 @@ def test_run_with_timeout_kills_group_on_base_exception_before_reraising(monkeyp
         def kill(self):
             pass
 
-    monkeypatch.setattr(timeouts.subprocess, "Popen", lambda *a, **k: FakeProc())
+    sigterm = object()
+    sigkill = object()
     killpg_calls: list[tuple[int, object]] = []
-    monkeypatch.setattr(timeouts.os, "killpg", lambda pid, sig: killpg_calls.append((pid, sig)))
+
+    monkeypatch.setattr(timeouts.subprocess, "Popen", lambda *a, **k: FakeProc())
+    # raising=False so this also runs on win32, where os.killpg/SIGKILL do not
+    # exist: injecting them makes the hasattr guard take the POSIX branch,
+    # which is exactly the ladder under test -- same technique as
+    # test_kill_process_group_uses_killpg_when_available above.
+    monkeypatch.setattr(timeouts.os, "killpg", lambda pid, sig: killpg_calls.append((pid, sig)), raising=False)
+    monkeypatch.setattr(timeouts.signal, "SIGTERM", sigterm, raising=False)
+    monkeypatch.setattr(timeouts.signal, "SIGKILL", sigkill, raising=False)
 
     with pytest.raises(_Cancelled):
         timeouts.run_with_timeout([sys.executable, "-c", "pass"], timeout_s=5)
@@ -181,8 +190,8 @@ def test_run_with_timeout_kills_group_on_base_exception_before_reraising(monkeyp
     # killpg fired (SIGTERM, then SIGKILL after the 200ms ladder sleep) before
     # the cancellation escaped -- proving the kill happens, not just that the
     # exception eventually propagates.
-    assert killpg_calls[0] == (4242, timeouts.signal.SIGTERM)
-    assert killpg_calls[-1] == (4242, timeouts.signal.SIGKILL)
+    assert killpg_calls[0] == (4242, sigterm)
+    assert killpg_calls[-1] == (4242, sigkill)
 
 
 def test_run_with_timeout_zero_timeout_kills_group_on_base_exception(monkeypatch):
@@ -202,14 +211,20 @@ def test_run_with_timeout_zero_timeout_kills_group_on_base_exception(monkeypatch
         def kill(self):
             pass
 
-    monkeypatch.setattr(timeouts.subprocess, "Popen", lambda *a, **k: FakeProc())
+    sigterm = object()
+    sigkill = object()
     killpg_calls: list[tuple[int, object]] = []
-    monkeypatch.setattr(timeouts.os, "killpg", lambda pid, sig: killpg_calls.append((pid, sig)))
+
+    monkeypatch.setattr(timeouts.subprocess, "Popen", lambda *a, **k: FakeProc())
+    # raising=False -- see the sibling timed-branch test above for why.
+    monkeypatch.setattr(timeouts.os, "killpg", lambda pid, sig: killpg_calls.append((pid, sig)), raising=False)
+    monkeypatch.setattr(timeouts.signal, "SIGTERM", sigterm, raising=False)
+    monkeypatch.setattr(timeouts.signal, "SIGKILL", sigkill, raising=False)
 
     with pytest.raises(_Cancelled):
         timeouts.run_with_timeout([sys.executable, "-c", "pass"], timeout_s=0)
 
-    assert killpg_calls[0] == (4343, timeouts.signal.SIGTERM)
+    assert killpg_calls[0] == (4343, sigterm)
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only kill ladder / SIGALRM")
