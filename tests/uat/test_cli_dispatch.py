@@ -481,6 +481,60 @@ def test_execute_main_reports_success_for_dry_run_config(tmp_path, monkeypatch, 
 
 
 # ---------------------------------------------------------------------------
+# unvalidated-results-misclassified-as-schema-violations: `report`'s JSON
+# stdout is a third machine-readable surface built from the same
+# ReportSummary as matrix_summary.tsv's `# UNVALIDATED_CELLS=` footer and
+# uat_gate_summary.json's accounting.unvalidated (see tests/uat/phases/report.py
+# and tests/uat/orchestrator.py::_accounting_for_gate_summary). It must not be
+# the one surface that silently omits the count while "passed" quietly
+# includes never-validated cells with no adjacent disclosure.
+# ---------------------------------------------------------------------------
+
+
+def test_report_json_includes_unvalidated_count(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    from tests.uat import cells_io, orchestrator
+    from tests.uat.runner import CellResult
+
+    source_info = orchestrator.RunSourceInfo(commit_sha="deadbeef", commit_short_sha="deadbee", dirty=False)
+    clean_cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "duckdb.log",
+        result_path=tmp_path / "duckdb_result.json",
+        submit_terminal_state="submittable",
+    )
+    unvalidated_cell = CellResult(
+        platform="polars-df",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "polars_df.log",
+        result_path=tmp_path / "polars_df_result.json",
+        submit_terminal_state="unvalidated",
+    )
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cells_io.write_cells_jsonl(cells_jsonl, [clean_cell, unvalidated_cell], source_info=source_info)
+
+    exit_code = _cli.main(
+        ["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(tmp_path / "matrix_summary.tsv")]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["passed"] == 2
+    # Already counted in "passed"/"attempted" above -- not a disjoint bucket.
+    assert payload["attempted"] == 2
+    # The one assertion this test exists for: present, and not 0.
+    assert payload["unvalidated"] == 1
+
+
+# ---------------------------------------------------------------------------
 # uat-release-gate-enforcement w3: gate-check subcommand.
 # ---------------------------------------------------------------------------
 

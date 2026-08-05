@@ -130,7 +130,7 @@ tests/uat/
 | `matrix.py` | Registry-driven benchmark enumeration, platform grouping, compose-derived TCP reachability probe (connection facts now owned by `docker_assets`) | 250 | 515 |
 | `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path; submit classification via shared `benchbox.core.results.submit_classification` | 120 | 354 |
 | `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 751 |
-| `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 806 |
+| `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 816 |
 | `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 | 123 |
 | `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 | 121 |
 | `compatibility.py` | Platform/benchmark compatibility rules; record compatibility-pruned cells with rule metadata | — | 198 |
@@ -139,7 +139,7 @@ tests/uat/
 | `container_cleanup.py` | Apple `container`-engine sibling of `docker_cleanup.py`; backs `make uat-docker-cleanup ENGINE=container` | — | 557 |
 | `artifact_hygiene.py` | Local-artifact hygiene guard: flags worktree-local `benchmark_runs/` growth whenever the resolved output root is outside the worktree — including the default `../benchmark_runs`, not only a configured one; report-only (`make uat-artifact-hygiene`) | — | 315 |
 | `cells_io.py` | `cells.jsonl` + accounting-sidecar read/write codec; single schema shared by `orchestrator.py` and `_cli.py` | — | 464 |
-| `gate_summary.py` | Writes/reads the versioned `uat_gate_summary.json` per-sweep evidence artifact; powers `make uat-gate-check` cross-stage aggregation | — | 274 |
+| `gate_summary.py` | Writes/reads the versioned `uat_gate_summary.json` per-sweep evidence artifact; powers `make uat-gate-check` cross-stage aggregation | — | 284 |
 | `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — | 316 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 | 83 |
 | `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 236 |
@@ -150,8 +150,8 @@ tests/uat/
 | `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 | 304 |
 | `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; `draft-pr`/`merged-to-published-results` are **stubs** (dispatcher only, per `PR_STUB_TERMINAL_STATES`) that emit the same argv as `local-stage` plus an operator warning -- PR-opening to `published-results` is not implemented | 130 | 180 |
 | `phases/explorer_smoke.py` | Branch-presence-guarded explorer smoke: always-on corpus contract, delegates build+Playwright to the Results Explorer | 60 | 387 |
-| `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 | 462 |
-| `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 | 906 |
+| `phases/report.py` | Read each phase's outputs; emit `matrix_summary.tsv`; cross-scale coverage check | 130 | 490 |
+| `orchestrator.py` | Walk YAML `phases:` list in order; surface phase failures; respect `dry_run:` toggle | 100 | 924 |
 
 **Budget reconciliation (revised 2026-06-01, `uat-loc-budget-reconciliation`; re-measured
 2026-07-19, `uat-config-schema-spec-realignment`).**
@@ -175,17 +175,17 @@ remain hand-tracked.
 
 **Per-bucket production LOC** (auto-generated -- run the script to refresh):
 
-- plumbing (orchestrator/config/`_cli`): 2,463
+- plumbing (orchestrator/config/`_cli`): 2,491
 - core exercise (execute/matrix/runner/enumerate/cleanup/ladder): 2,366
 - preflight/compat/timeouts: 1,008
 - Docker lifecycle (default-OFF, incl. `container_cleanup.py`): 1,743
-- chartered evidence artifacts (validate/report/package/cells_io/gate_summary): 1,684
+- chartered evidence artifacts (validate/report/package/cells_io/gate_summary): 1,722
 - explorer-prep: 387
 - throughput: 316
 - artifact hygiene: 315
 - package init markers: 23
 
-**Total: 10,305 production LOC across 26 modules.**
+**Total: 10,371 production LOC across 26 modules.**
 
 <!-- UAT-LOC-SUMMARY:END -->
 
