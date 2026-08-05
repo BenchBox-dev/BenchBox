@@ -1,4 +1,4 @@
-"""Auto-merge must not be armed at PR creation.
+"""Auto-merge must not be armed merely because a PR was opened.
 
 Arming at creation is only correct if nothing more will be pushed - and the
 usual reason something more is pushed is review feedback, which arrives after
@@ -11,21 +11,30 @@ own PR body described, and #1521 and #1531 then each lost the very commit that
 addressed their own review findings. No local check can prevent it - in all
 three the working tree was clean when the PR was opened.
 
-So `pr-open` withholds, `pr-ready` arms, and `pr-open READY=1` keeps the
-one-command path for a branch already known to be final.
+#1567 moved the Makefile hold (`pr-open` withholds; `pr-ready` arms). The
+workflow `auto-merge-on-open.yml` still armed on `opened` for any non-draft
+PR, so bare `gh pr create` defeated the hold (#1568/#1569). The cross-layer
+policy is therefore:
+
+- Local: `pr-open` withholds; `pr-ready` / `READY=1` arms.
+- Workflow: arm only on `ready_for_review`; never enable on
+  opened/reopened/synchronize. Soundness disable still runs on those events.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MAKEFILE = REPO_ROOT / "Makefile"
+AUTO_MERGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "auto-merge-on-open.yml"
 
 ARM_COMMAND = "gh pr merge --auto --squash"
 
@@ -36,6 +45,37 @@ def _target_body(name: str) -> str:
     match = re.search(rf"^{re.escape(name)}:.*?\n((?:\t.*\n|\n)*)", text, re.MULTILINE)
     assert match, f"Makefile has no target {name!r}"
     return match.group(1)
+
+
+def _load_workflow() -> dict[str, Any]:
+    return yaml.safe_load(AUTO_MERGE_WORKFLOW.read_text(encoding="utf-8"))
+
+
+def _triggers(workflow: dict[str, Any]) -> dict[str, Any]:
+    """Return the `on:` block (PyYAML 1.1 may resolve unquoted `on` to True)."""
+    triggers = workflow.get("on", workflow.get(True))
+    assert triggers is not None, "workflow has no `on:` block"
+    return triggers
+
+
+def _enable_job(workflow: dict[str, Any]) -> dict[str, Any]:
+    jobs = workflow.get("jobs") or {}
+    assert "enable" in jobs, "auto-merge workflow has no enable job"
+    return jobs["enable"]
+
+
+def _steps_by_name(job: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    named: dict[str, dict[str, Any]] = {}
+    for step in job.get("steps") or []:
+        name = step.get("name")
+        if name:
+            named[str(name)] = step
+    return named
+
+
+# ---------------------------------------------------------------------------
+# Makefile layer (hold at pr-open; arm via pr-ready)
+# ---------------------------------------------------------------------------
 
 
 def test_auto_merge_enablement_point_is_not_pr_open() -> None:
@@ -85,3 +125,75 @@ def test_auto_merge_enablement_point_preserves_soundness_withholding() -> None:
     arm_index = body.index(ARM_COMMAND)
     check_index = body.index("auto_merge_soundness_paths.py")
     assert check_index < arm_index, "soundness check runs after arming, so it cannot withhold"
+
+
+# ---------------------------------------------------------------------------
+# Workflow layer (do not arm on opened; arm only on ready_for_review)
+# ---------------------------------------------------------------------------
+
+
+def test_auto_merge_workflow_does_not_enable_merely_because_pr_was_opened() -> None:
+    """No layer may arm auto-merge solely because a non-draft PR was opened.
+
+    After #1567 the Makefile held at pr-open, but this workflow still ran
+    `gh pr merge --auto --squash` on the `opened` event for any non-draft
+    develop PR. That is the defect under test.
+    """
+    workflow = _load_workflow()
+    steps = _steps_by_name(_enable_job(workflow))
+    enable = steps.get("Enable squash auto-merge")
+    assert enable is not None, "enable step missing from auto-merge-on-open.yml"
+    condition = str(enable.get("if") or "")
+    assert "ready_for_review" in condition, (
+        "enable step must require ready_for_review so opened/reopened/synchronize cannot arm"
+    )
+    assert ARM_COMMAND in str(enable.get("run") or ""), "enable step no longer arms squash auto-merge"
+    # Must not enable for opened / reopened / synchronize (positive exclusion
+    # is hard in YAML `if:`; requiring ready_for_review is the policy pin).
+    for forbidden in ("opened", "reopened", "synchronize"):
+        # Allow the action name only as the required positive match, not as an
+        # alternate arming path. A condition that ORs in opened would re-open
+        # the race.
+        if forbidden == "ready_for_review":
+            continue
+        assert f"== '{forbidden}'" not in condition and f'== "{forbidden}"' not in condition, (
+            f"enable step still matches event action {forbidden!r}: {condition!r}"
+        )
+
+
+def test_auto_merge_workflow_keeps_opened_trigger_for_soundness_re_eval() -> None:
+    """opened/reopened/synchronize must still run for soundness disable.
+
+    Dropping those triggers would leave a soundness PR that was opened with
+    auto-merge already on (or that later gains a soundness commit) without a
+    revocation path from this workflow.
+    """
+    types = _triggers(_load_workflow())["pull_request"]["types"]
+    for required in ("opened", "reopened", "ready_for_review", "synchronize"):
+        assert required in types, f"pull_request types missing {required!r}: {types}"
+
+
+def test_auto_merge_workflow_does_not_re_enable_on_synchronize() -> None:
+    """synchronize must not re-arm auto-merge.
+
+    Re-enabling on every push would defeat the open-time hold as soon as the
+    first post-open push lands, restoring the partial-stack race.
+    """
+    workflow = _load_workflow()
+    steps = _steps_by_name(_enable_job(workflow))
+    enable = steps["Enable squash auto-merge"]
+    condition = str(enable.get("if") or "")
+    assert "synchronize" not in condition, f"enable step condition still mentions synchronize: {condition!r}"
+    # Only ready_for_review should be the positive arming event in the condition.
+    assert "ready_for_review" in condition
+
+
+def test_auto_merge_workflow_preserves_soundness_disable() -> None:
+    """Must-preserve: soundness paths still revoke auto-merge."""
+    workflow = _load_workflow()
+    steps = _steps_by_name(_enable_job(workflow))
+    disable = steps.get("Disable auto-merge for soundness PR")
+    assert disable is not None, "soundness disable step is gone"
+    assert "--disable-auto" in str(disable.get("run") or ""), "soundness disable no longer calls --disable-auto"
+    condition = str(disable.get("if") or "")
+    assert "soundness_path" in condition, "disable step no longer gates on soundness_path"

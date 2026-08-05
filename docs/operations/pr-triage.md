@@ -84,8 +84,9 @@ a PR's mergeability — both only alert.
   `.github/workflows/nightly.yml`) — for PRs that *should* have auto-merge
   on (non-draft, non-soundness-gated, required lane green) but don't:
   flags ones stranded more than 2 hours after their head commit was
-  pushed, on the theory that `auto-merge-on-open.yml`'s `synchronize`
-  re-evaluation has had every chance to fire by then. A green
+  pushed. Note: `auto-merge-on-open.yml` no longer arms on `opened` or
+  `synchronize`; it only arms on `ready_for_review`. Ordinary non-draft PRs
+  still need `make pr-ready` / `READY=1` (or draft→ready) to arm. A green
   `enable`-job run is not proof the PR's own `auto_merge` field ended up
   populated — the sweep always re-reads the PR's current field rather than
   trusting the workflow run's conclusion.
