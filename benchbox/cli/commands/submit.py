@@ -195,11 +195,27 @@ def _refuse_non_submittable_result(ctx: click.Context, result: object, submit_st
     """
     if submit_state is SubmitTerminalState.unvalidated:
         unvalidated_reason = result_unvalidated_reason(result) or result_non_clean_reason(result)
-        console.print(
-            f"\n[red]❌ Submission refused: result is unvalidated ({unvalidated_reason})[/red]\n"
-            "   Validation never executed (or was skipped); the result is not eligible\n"
-            "   for public submission until validation produces a clean pass."
-        )
+        # Branch copy on the concrete status: "never executed" is wrong for
+        # uncertain (validation ran but the correctness claim is weakened).
+        status = None
+        if unvalidated_reason and unvalidated_reason.startswith("validation_status="):
+            status = unvalidated_reason.split("=", 1)[1]
+        if status == "uncertain":
+            detail = (
+                "   Validation completed with an uncertain correctness claim; the result is\n"
+                "   not eligible for public submission until validation produces a clean pass."
+            )
+        elif status in {"not_run", "not_validated", "unknown"}:
+            detail = (
+                "   Validation never executed (or was skipped); the result is not eligible\n"
+                "   for public submission until validation produces a clean pass."
+            )
+        else:
+            detail = (
+                "   The result is not a clean validation pass and is not eligible for public\n"
+                "   submission until validation produces a clean pass."
+            )
+        console.print(f"\n[red]❌ Submission refused: result is unvalidated ({unvalidated_reason})[/red]\n{detail}")
     else:
         non_clean_reason = result_non_clean_reason(result)
         console.print(
