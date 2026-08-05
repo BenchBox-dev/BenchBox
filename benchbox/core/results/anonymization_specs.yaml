@@ -10,12 +10,23 @@
 # default salt. Compact forms match ``_compact_key`` (lowercase, non-alnum
 # stripped). Retained identifiers (endpoint, database_name, submission_path)
 # stay under identifier_keys / path / endpoint rules below.
+#
+# Alias rows cover alternate spellings of the six unread drop fields so a
+# producer using workdir/datadir/pythonexecutable cannot reintroduce empty-salt
+# path_/host_ tokens. host/hostname/server are intentionally NOT dropped: they
+# are broader than engine_host and may carry non-local endpoints still hashed.
 public_drop_keys:
 - machineid
 - workingdir
+- workdir
+- workingdirectory
+- workingroot
 - driverruntimepythonexecutable
+- pythonexecutable
 - databasepath
 - datapath
+- datadir
+- datadirectory
 - enginehost
 identifier_keys:
   account: account

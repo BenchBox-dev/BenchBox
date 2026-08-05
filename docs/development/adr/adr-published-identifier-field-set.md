@@ -50,7 +50,11 @@ implemented. Nothing correlates by machine today.
 ## Decision
 
 **Do not publish the six fields that have no consumer.** Remove them at the
-publication boundary rather than pseudonymising them.
+publication boundary rather than pseudonymising them. Also omit compact-form
+**aliases** of those fields (`workdir`, `workingdirectory`, `workingroot`,
+`datadir`, `datadirectory`, `pythonexecutable`) so alternate spellings cannot
+reintroduce empty-salt path tokens. `host` / `hostname` / `server` stay hashed
+rather than dropped: they are broader than `engine_host`.
 
 For the three that do have a consumer, keep publishing a pseudonym. The
 retained-field salt decision is recorded below (closed 2026-08-05).

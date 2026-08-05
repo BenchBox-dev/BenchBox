@@ -1005,6 +1005,42 @@ class TestPublicUnreadIdentifierDrop:
         assert out["environment"]["client_host"]["hostname"].startswith("host_")
         assert out["environment"]["platform_runtime"]["runtime_type"] == "local"
 
+    def test_alias_drop_keys_of_unread_identifiers_are_omitted(self):
+        """Aliases of the six unread fields must drop, not mint path_ tokens."""
+        payload = {
+            "platform": {
+                "config": {
+                    "workdir": "/Users/alice/project",
+                    "working_directory": "/Users/alice/project",
+                    "working_root": "/Users/alice/project",
+                    "data_dir": "/Users/alice/data",
+                    "data_directory": "/Users/alice/data",
+                    "python_executable": "/Users/alice/.venv/bin/python",
+                    "endpoint": "https://example.invalid/warehouse",
+                    "database_name": "analytics",
+                }
+            },
+            "metadata": {"submission_path": "PR-based"},
+        }
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        cfg = out["platform"]["config"]
+        for key in (
+            "workdir",
+            "working_directory",
+            "working_root",
+            "data_dir",
+            "data_directory",
+            "python_executable",
+        ):
+            assert key not in cfg, f"alias drop key still present: {key}"
+        assert "alice" not in json.dumps(out)
+        # Retained consumers still publish under canonical keys.
+        assert _is_public_pseudonym(cfg["endpoint"], "endpoint")
+        assert _is_public_pseudonym(cfg["database_name"], "database")
+        assert out["metadata"]["submission_path"] == "PR-based" or _is_public_pseudonym(
+            out["metadata"]["submission_path"], "path"
+        )
+
     def test_empty_client_host_omitted_after_machine_id_drop(self):
         """client_host that only held machine_id must not publish as {}."""
         out = AnonymizationManager().anonymize_result_payload(
