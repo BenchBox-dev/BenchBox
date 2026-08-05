@@ -1012,6 +1012,39 @@ class TestPublicUnreadIdentifierDrop:
         assert "machine_id" not in once
         assert "working_dir" not in once.get("platform", {}).get("config", {})
 
+    def test_tuning_constraints_omit_drop_keys_without_keyerror(self):
+        """Scalar walk under unconstrained keys must not KeyError when the key is dropped."""
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "source_file": "templates/tuning/example.yaml",
+                "requested": {
+                    "constraints": {
+                        "machine_id": "raw-machine",
+                        "working_dir": "/Users/alice/run",
+                        "table": "lineitem",
+                        "nested": {"engine_host": "db.internal", "ok": 1},
+                    },
+                    "table_tunings": {
+                        "lineitem": {
+                            "machine_id": "should-drop",
+                            "columns": [{"name": "l_orderkey"}],
+                        }
+                    },
+                },
+            }
+        )
+        constraints = out["requested"]["constraints"]
+        assert "machine_id" not in constraints
+        assert "working_dir" not in constraints
+        assert "engine_host" not in constraints["nested"]
+        assert constraints["nested"]["ok"] == 1
+        assert "table" in constraints
+        tunings = out["requested"]["table_tunings"]
+        assert "lineitem" not in tunings  # table keys are hashed
+        assert tunings, "table_tunings should retain the hashed table entry"
+        for table_entry in tunings.values():
+            assert "machine_id" not in table_entry
+
 
 class TestPublicPseudonymFixedPoint:
     """Anonymization must reach a fixed point.

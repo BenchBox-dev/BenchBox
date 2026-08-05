@@ -122,11 +122,14 @@ def test_anonymizing_the_corpus_twice_matches_anonymizing_it_once() -> None:
     """Publication must be a fixed point over every curated bundle.
 
     The corpus is stored already-anonymized, so the Explorer boundary
-    anonymizes these payloads a second time. If that second pass re-hashes the
-    pseudonyms, a curated bundle and a fresh submission from the *same machine*
-    publish different ``machine_id`` values and the Explorer groups them apart.
-    Nothing raises when this regresses - only the grouping is wrong - so scan
-    the real corpus rather than a fixture.
+    anonymizes these payloads a second time. If that second pass re-hashes
+    retained pseudonyms (``endpoint`` / ``database_name`` / ``submission_path``),
+    a curated bundle and a fresh submission from the same source diverge after
+    re-publication. Unread identifier fields (including ``machine_id``) are
+    omitted at the public boundary — see ``adr-published-identifier-field-set``
+    — so this gate is about retained-field fixed-point stability, not machine
+    grouping. Nothing raises when this regresses; only published bytes change,
+    so scan the real corpus rather than a fixture.
     """
     manager = AnonymizationManager()
     unstable: list[str] = []

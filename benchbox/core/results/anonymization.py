@@ -409,6 +409,10 @@ class AnonymizationManager:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
+                # Same drop set as the public walker: omit unread identifiers
+                # rather than KeyErroring when the scalar walk drops the key.
+                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                    continue
                 if key in {"table", "table_name", "referenced_table", "referenced_table_name"}:
                     anonymized[key] = self._hash_public_identifier(str(child), "table")
                 elif key in {
@@ -424,11 +428,12 @@ class AnonymizationManager:
                 elif key in {"columns", "column_names", "referenced_columns", "referenced_column_names"}:
                     anonymized[key] = self._anonymize_constraint_identifier_collection(child, "column")
                 else:
-                    anonymized[key] = (
-                        self._anonymize_tuning_constraints(child)
-                        if isinstance(child, (dict, list, tuple))
-                        else self._anonymize_public_value({str(key): child}, ())[str(key)]
-                    )
+                    if isinstance(child, (dict, list, tuple)):
+                        anonymized[key] = self._anonymize_tuning_constraints(child)
+                    else:
+                        walked = self._anonymize_public_value({str(key): child}, ())
+                        if str(key) in walked:
+                            anonymized[key] = walked[str(key)]
             return anonymized
         if isinstance(value, list):
             return [self._anonymize_tuning_constraints(item) for item in value]
@@ -477,6 +482,8 @@ class AnonymizationManager:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
+                if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
+                    continue
                 if key in {"table", "table_name"}:
                     anonymized[key] = self._hash_public_identifier(str(child), "table")
                 elif key in {"column", "column_name", "name"}:
