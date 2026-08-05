@@ -107,17 +107,19 @@ Read a claimed TODO's `verification` ladder and run the narrowest proof first.
 Useful local checks: `uv run -- python -m pytest -m fast -q`,
 `uv run -- ruff check .`, `uv run -- ruff format --check .`, `uv run -- ty check`.
 
-Before publication, self-review with the `code` skill's review action and fix
-all issues, considerations, and nits unless the user explicitly opts out. Run
-`make pr-preflight` once, then `make pr-open`. Boilerplate gates may go to a
-low-effort subagent; you still choose the command and interpret failures. Do
-not poll CI: pending is a valid terminal state.
+Before publication, self-review with the `code` skill's review action and fix all
+issues, considerations, and nits unless the user explicitly opts out. Run `make pr-preflight`
+once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still
+choose the command and interpret failures. Do not poll CI: pending is a valid terminal state.
 
-Dev PRs target `develop`, use squash merge, and never direct-push protected
-branches. Force-push only feature/pool branches with `--force-with-lease`.
-Soundness paths listed by `_project/scripts/auto_merge_soundness_paths.py`
-require maintainer review and remain excluded from auto-merge. A drift/pinning
-guard and its required-CI wiring must land in the same PR.
+Dev PRs target `develop` (or `release` / `published-results`), use squash merge, and never direct-push protected
+branches. Force-push only feature/pool branches with `--force-with-lease`. Soundness paths listed by
+`_project/scripts/auto_merge_soundness_paths.py` require maintainer review and remain excluded from auto-merge.
+A drift/pinning guard and its required-CI wiring must land in the same PR.
+## PR base branch (stacked PRs unsupported)
+Stacked/feature-base PRs unsupported: zero CI by filters; `pr-base-guard.yml` fails loud — retarget/rebase onto
+`develop` after parent squash-merge (`docs/development/pr-base-branch-policy.md`). Bad-base empty checks ≠
+`mergeable_state: dirty` (conflicts).
 
 ## TODO tracker
 
@@ -144,26 +146,25 @@ claimable items).
 - CLI dry runs must propagate explicit phases; deterministic runs use a seed.
 - Green focused/fast tests are not UAT or production certification.
 
-Apple/macOS notes: `make test-correctness-gate` uses Linux-generated digests;
-use `make ci-linux` for parity. Mocker is local-only and unsuitable for the
-known multi-service stacks; follow `docs/operations/uat-framework.md` for
-container lifecycle and cleanup. Never globally prune without approval.
+Apple/macOS notes: `make test-correctness-gate` uses Linux-generated digests; use
+`make ci-linux` for parity. Mocker is local-only and unsuitable for the known multi-service
+stacks; follow `docs/operations/uat-framework.md` for container lifecycle and cleanup. Never
+globally prune without approval.
 
 ## Skills and generated mirrors
 
-Stable wrappers are `code`, `test`, `todo`, `todo-db`, `blog`,
-`benchbox`, `skill-sync`, and `tidy-perms`. `todo` authors ideas/specs;
-`todo-db` owns tracker actions. Skill source is
-`/Users/joe/.skill-sync/skills`; `.claude/skills`, `.codex/skills`,
-`.gemini/skills`, and `.antigravity/skills` are generated mirrors. Run
-`make skill-sync` to regenerate mirrors, never hand-edit one. Integrity
-comes from PR review of the mirror diff plus the untracked-mirror drift
-guard (`scripts/check_untracked_skill_mirrors.sh`), not a lock-verify step.
+Stable wrappers are `code`, `test`, `todo`, `todo-db`, `blog`, `benchbox`,
+`skill-sync`, and `tidy-perms`. `todo` authors ideas/specs; `todo-db` owns tracker
+actions. Skill source is `/Users/joe/.skill-sync/skills`; `.claude/skills`, `.codex/skills`,
+`.gemini/skills`, and `.antigravity/skills` are generated mirrors. Run `make skill-sync` to
+regenerate mirrors, never hand-edit one. Integrity comes from PR review of the mirror diff
+plus the untracked-mirror drift guard (`scripts/check_untracked_skill_mirrors.sh`), not a
+lock-verify step.
 
 ## Operational references
 
 - Operations: `docs/operations/` — `repo-admin-settings.md` (PR/admin policy),
   `uat-framework.md`, `release-guide.md`, `agent-instruction-evaluation.md`
 - Development: `docs/development/` — `run-lifecycle-map.md`,
-  `result-integrity-validation.md`, `adding-new-platforms.md`
+  `result-integrity-validation.md`, `adding-new-platforms.md`, `pr-base-branch-policy.md`
 - SQL compatibility: `benchbox/sql_compat/README.md`; tests: `tests/README.md`
