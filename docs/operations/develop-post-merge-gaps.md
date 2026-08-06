@@ -34,6 +34,11 @@ develop-post-merge.yml` `headSha`.
 That is a silent failure mode. Push-only guards share it. Every workflow
 that only fires on `push` to develop can miss the same window.
 
+**Full inventory of develop-push workflows** (which ones already have a
+schedule, which residual gaps are accepted, and recovery commands) lives in
+[`develop-push-drop-inventory.md`](develop-push-drop-inventory.md). This page
+stays focused on the `develop-post-merge` backstop and gap detector.
+
 ## What we do about it
 
 Two additive pieces. Neither replaces per-push runs.
