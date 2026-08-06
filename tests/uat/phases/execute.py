@@ -38,6 +38,8 @@ from tests.uat.phases.enumerate import (
 )
 from tests.uat.preflight_budget import (
     MemorySnapshot,
+    check_memory_headroom,
+    format_memory_headroom_failure,
     free_space_gib as default_free_space_reader,
     read_memory_snapshot as default_free_memory_reader,
 )
@@ -1091,6 +1093,17 @@ def _free_memory_abort_reason(
     memory request to uat_lifecycle.log on every call where the gate is
     enabled, regardless of pass/fail -- see
     uat-container-readiness-and-memory-headroom-gate w3.
+
+    The comparison and the operator-facing message both come from
+    `preflight_budget.check_memory_headroom` /
+    `format_memory_headroom_failure` rather than being open-coded here, so
+    the shipped message and the unit-tested one cannot diverge (the disk
+    gate routes through `check_disk_headroom` /
+    `format_disk_headroom_failure` the same way, at
+    phases/preflight.py:264). This function contributes only the
+    call-site context the primitives cannot know: which platform boundary
+    it fired at, the resolved container engine, and that platform's
+    declared VM memory request.
     """
     min_gib = config.preflight.free_memory_min_gib
     if min_gib <= 0 or not config.cleanup.docker_manage_platforms or not docker_assets.is_docker_platform(platform):
@@ -1103,6 +1116,7 @@ def _free_memory_abort_reason(
     vm_request = _describe_platform_vm_request(platform)
 
     snapshot = reader()
+    check = check_memory_headroom(snapshot, min_free_gib=min_gib)
     swap_note = f", swap {snapshot.swap_used_percent:.1f}% used" if snapshot.swap_used_percent is not None else ""
     if snapshot.free_gib is None:
         # Free memory could not be measured on this host -- degrade safely:
@@ -1124,21 +1138,28 @@ def _free_memory_abort_reason(
         f"[free-memory] {context}: engine={engine} vm_request={vm_request} "
         f"{snapshot.free_gib:.2f} GiB free (threshold {min_gib:.2f} GiB{swap_note})",
     )
-    if snapshot.free_gib >= min_gib:
+    if not check.shortfall:
         return None
-    return (
-        f"free memory {snapshot.free_gib:.2f} GiB < cutoff {min_gib:.2f} GiB {context} "
-        f"(engine={engine}, vm_request={vm_request}{swap_note})"
-    )
+    return f"{format_memory_headroom_failure(check)} {context} (engine={engine}, vm_request={vm_request})"
 
 
 def _describe_platform_vm_request(platform: str) -> str:
-    """One-line description of a Docker platform's declared memory request, for logging."""
+    """One-line description of a Docker platform's declared memory request, for logging.
+
+    Never raises. This value is pure log/message decoration on the memory
+    gate's hot path, so any failure to derive it must degrade to a string --
+    an exception escaping here would propagate out of `run_execute` and
+    abort an entire multi-hour sweep because a compose file could not be
+    summarized for one log line.
+    """
     try:
         spec = docker_assets.docker_platform_spec(platform)
     except docker_assets.DockerAssetError:
         return "unknown (no compose spec)"
-    limits = docker_assets.compose_declared_memory_limits(spec)
+    try:
+        limits = docker_assets.compose_declared_memory_limits(spec)
+    except Exception as exc:  # noqa: BLE001 - decoration must never abort the sweep
+        return f"unknown (could not read declared limits: {exc})"
     if not limits:
         return "no declared memory limit (engine default)"
     return ", ".join(f"{service}={limit}" for service, limit in sorted(limits.items()))

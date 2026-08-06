@@ -543,7 +543,18 @@ def compose_declared_memory_limits(spec: DockerPlatformSpec) -> dict[str, str]:
                 continue
             deploy = service.get("deploy")
             resources = deploy.get("resources") if isinstance(deploy, dict) else None
-            declared = resources.get("limits", {}).get("memory") if isinstance(resources, dict) else None
+            # Every level is isinstance-guarded rather than relying on
+            # `.get(key, {})` defaults: a default only applies when the key
+            # is ABSENT, so a compose file that writes `limits:` with no
+            # children yields an explicit None and `.get("memory")` on it
+            # raises AttributeError. That would escape this function's
+            # `except (OSError, yaml.YAMLError)` AND the caller's
+            # `except DockerAssetError` (execute.py's
+            # `_describe_platform_vm_request`) and abort the whole sweep
+            # from a logging helper. Same reasoning for a scalar or list
+            # under `limits:`.
+            limits_block = resources.get("limits") if isinstance(resources, dict) else None
+            declared = limits_block.get("memory") if isinstance(limits_block, dict) else None
             if declared:
                 limits[str(name)] = str(declared)
     return limits

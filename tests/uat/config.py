@@ -79,6 +79,22 @@ class PreflightConfig:
     # 2026-08-04 postmortem host had 72 MB free of 16 GB when a 1024 MB
     # cgroup-limited container failed to start. See
     # uat-container-readiness-and-memory-headroom-gate w2.
+    #
+    # CALIBRATION PROVENANCE -- read before retuning this number. The floor
+    # is compared against `psutil.virtual_memory().available`
+    # (preflight_budget.read_memory_snapshot), but the motivating "72 MB
+    # free of 16 GB" observation is a macOS *free*-style figure, and those
+    # are NOT the same metric: measured on the 2026-08-05 dev host,
+    # `.available` read 6.888 GiB against `.free` 1.076 GiB -- a ~6.4:1
+    # spread. So 2.0 GiB-of-`.available` is NOT "the incident value plus
+    # margin"; the incident number cannot be converted into an `.available`
+    # threshold after the fact, and this floor has deliberately NOT been
+    # silently re-derived from it. `.available` is still the correct metric
+    # to gate on (a `.free` gate would refuse to start on a perfectly
+    # healthy machine -- 1.076 GiB < 2.0 GiB on the host above); what is
+    # unproven is the exact value. Treat 2.0 as a placeholder pending a
+    # `.available` reading captured during a real memory-starved incident,
+    # and record any change against a measured `.available` figure.
     free_memory_min_gib: float = 2.0
 
 

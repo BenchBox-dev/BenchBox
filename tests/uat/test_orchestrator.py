@@ -816,6 +816,143 @@ def test_zero_floor_warns_loudly_and_flags_accounting_sidecar(tmp_path: Path, ca
     assert "[disk-gate] DISABLED by config" in capsys.readouterr().err
     accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
     assert accounting["disk_gate_disabled"] is True
+    # The memory gate was left at its default, so it is NOT flagged.
+    assert accounting["memory_gate_disabled"] is False
+
+
+def test_zero_memory_floor_warns_loudly_and_flags_accounting_sidecar(tmp_path: Path, capsys):
+    """`free_memory_min_gib: 0` disables the memory gate and must say so loudly.
+
+    Mirrors the disk gate's opt-out disclosure exactly. Before this,
+    `memory_gate_disabled_warning` existed but had no production caller at
+    all -- the documented `[memory-gate] DISABLED by config` line was never
+    printed and nothing in the evidence artifacts recorded that the gate had
+    been switched off, so a sweep with the gate disabled was
+    indistinguishable from one where it ran and passed.
+    """
+    cfg = validate_config(
+        {
+            "name": "zero-memory-floor-smoke",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "preflight": {"free_memory_min_gib": 0},
+        }
+    )
+    assert cfg.memory_gate_enabled is False
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 0,
+        },
+    )()
+
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    assert result.aborted_phase is None
+    stderr = capsys.readouterr().err
+    assert "[memory-gate] DISABLED by config" in stderr
+    # The disk gate is at its default here, so only the memory warning fires.
+    assert "[disk-gate] DISABLED by config" not in stderr
+    accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert accounting["memory_gate_disabled"] is True
+    assert accounting["disk_gate_disabled"] is False
+
+
+def test_memory_floor_abort_records_memory_floor_abort_kind_in_gate_summary(tmp_path: Path):
+    """An execute-phase memory-floor abort is machine-distinguishable from a
+    disk-floor abort in the gate summary, not only by prose.
+
+    `ExecuteOutcome.abort_kind="memory_floor"` was write-only before this:
+    it reached no artifact, so every abort looked identical to a reader of
+    `uat_gate_summary.json`.
+    """
+    cfg = validate_config(
+        {
+            "name": "memory-floor-abort",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    aborted_outcome = exec_phase.ExecuteOutcome(
+        phase="execute",
+        results=(),
+        pruned=(),
+        skipped_unreachable=(),
+        startup_failed=(),
+        compatibility_pruned=(),
+        aborted=True,
+        abort_reason="memory headroom gate failed: 0.07 GiB free < 2.00 GiB required",
+        abort_kind="memory_floor",
+    )
+
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=aborted_outcome):
+        orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    payload = json.loads((tmp_path / "logs" / "uat_gate_summary.json").read_text(encoding="utf-8"))
+    assert payload["abort_kind"] == "memory_floor"
+    assert payload["abort_phase"] == "execute"
+    assert payload["verdict"] == "red"
+
+
+def test_gate_summary_abort_kind_is_none_on_a_clean_sweep(tmp_path: Path):
+    cfg = validate_config(
+        {
+            "name": "clean-abort-kind",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (cell,),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 0,
+        },
+    )()
+
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    payload = json.loads((tmp_path / "logs" / "uat_gate_summary.json").read_text(encoding="utf-8"))
+    assert payload["abort_kind"] is None
 
 
 def test_execute_free_space_abort_emits_partial_artifacts(tmp_path: Path):
@@ -1191,6 +1328,7 @@ def test_update_accounting_sidecar_preserves_existing_counts(tmp_path: Path):
         "early_stop_pruned_count": 0,
         "registry_pruned_count": 0,
         "disk_gate_disabled": False,
+        "memory_gate_disabled": False,
         "container_engine": None,
         "explorer_smoke_status": "skipped_no_node",
     }

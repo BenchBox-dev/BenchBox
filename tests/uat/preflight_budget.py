@@ -74,6 +74,13 @@ def read_memory_snapshot() -> MemorySnapshot:
     `/proc/meminfo`-only approach that would silently read as "unmeasurable"
     on macOS -- exactly the platform the 2026-08-04 incident happened on.
 
+    `.available` is NOT interchangeable with the `free` figure an operator
+    reads off `top`/Activity Monitor: on the 2026-08-05 dev host `.available`
+    was 6.888 GiB while `.free` was 1.076 GiB. The gate's floor is expressed
+    in `.available` terms -- see the CALIBRATION PROVENANCE note on
+    `config.PreflightConfig.free_memory_min_gib` before comparing this
+    reading against any number quoted in an incident report.
+
     Degrades safely to `MemorySnapshot(None, None)` on ANY failure (missing
     psutil, a sandboxed process denied access, ...) rather than raising or
     fabricating a value -- the gate must not silently pass as if there were

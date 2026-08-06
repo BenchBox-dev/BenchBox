@@ -483,3 +483,65 @@ def test_multi_service_platform_service_names_match_documented_guidance(platform
         data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
         service_names.update(data.get("services", {}).keys())
     assert service_names == expected_service_names
+
+
+# ---------------------------------------------------------------------------
+# compose_declared_memory_limits: static compose-file parsing for the
+# free-memory gate's log decoration.
+# ---------------------------------------------------------------------------
+
+
+def _spec_for_compose(tmp_path: Path, body: str) -> docker_assets.DockerPlatformSpec:
+    compose_file = tmp_path / "docker-compose.yml"
+    compose_file.write_text(body, encoding="utf-8")
+    return docker_assets.DockerPlatformSpec(platform="fake", compose_files=(compose_file,))
+
+
+def test_compose_declared_memory_limits_reads_mem_limit(tmp_path: Path):
+    spec = _spec_for_compose(tmp_path, "services:\n  db:\n    mem_limit: 4g\n")
+    assert docker_assets.compose_declared_memory_limits(spec) == {"db": "4g"}
+
+
+def test_compose_declared_memory_limits_reads_deploy_resources_limits(tmp_path: Path):
+    spec = _spec_for_compose(
+        tmp_path,
+        "services:\n  db:\n    deploy:\n      resources:\n        limits:\n          memory: 2G\n",
+    )
+    assert docker_assets.compose_declared_memory_limits(spec) == {"db": "2G"}
+
+
+def test_compose_declared_memory_limits_empty_when_nothing_declared(tmp_path: Path):
+    spec = _spec_for_compose(tmp_path, "services:\n  db:\n    image: postgres:16\n")
+    assert docker_assets.compose_declared_memory_limits(spec) == {}
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # `limits:` present with NO children -> yaml gives an explicit None.
+        # `.get("limits", {})` returns that None (a default applies only when
+        # the key is ABSENT), and `None.get("memory")` raises AttributeError.
+        "services:\n  db:\n    deploy:\n      resources:\n        limits:\n",
+        # Same trap one level up.
+        "services:\n  db:\n    deploy:\n      resources:\n",
+        "services:\n  db:\n    deploy:\n",
+        # Non-mapping values where a mapping is expected.
+        "services:\n  db:\n    deploy:\n      resources:\n        limits: 2G\n",
+        "services:\n  db:\n    deploy:\n      resources:\n        limits:\n          - memory\n",
+    ],
+)
+def test_compose_declared_memory_limits_survives_degenerate_limits_blocks(tmp_path: Path, body: str):
+    """Regression: this helper only decorates a log line, but it ran inside a
+    `try` catching just (OSError, yaml.YAMLError) and its caller
+    (`execute.py::_describe_platform_vm_request`) caught only
+    DockerAssetError -- so an AttributeError here propagated out of
+    run_execute and aborted an entire sweep. No compose file in the repo
+    triggers it today; one `limits:` with no children would have.
+    """
+    spec = _spec_for_compose(tmp_path, body)
+    assert docker_assets.compose_declared_memory_limits(spec) == {}
+
+
+def test_compose_declared_memory_limits_ignores_unparseable_file(tmp_path: Path):
+    spec = _spec_for_compose(tmp_path, "services: [oops\n")
+    assert docker_assets.compose_declared_memory_limits(spec) == {}

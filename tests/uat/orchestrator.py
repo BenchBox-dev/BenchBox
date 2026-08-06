@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from tests.uat import cells_io, docker_assets, gate_summary, preflight_budget
-from tests.uat.config import UATConfig, disk_gate_disabled_warning, load_config
+from tests.uat.config import UATConfig, disk_gate_disabled_warning, load_config, memory_gate_disabled_warning
 from tests.uat.phases import (
     enumerate as enumerate_phase,
     execute as exec_phase,
@@ -281,6 +281,7 @@ def _run_sweep_phases(  # noqa: C901
     phase_exit_codes: dict[str, int] = {}
     aborted_phase: str | None = None
     abort_reason: str | None = None
+    abort_kind: str | None = None
 
     cells_jsonl = log_dir / "cells.jsonl"
     compatibility_pruned_jsonl = log_dir / "compatibility_pruned.jsonl"
@@ -293,9 +294,9 @@ def _run_sweep_phases(  # noqa: C901
     explorer_smoke_status = gate_summary.EXPLORER_SMOKE_NOT_RUN
 
     if not config.dry_run and "execute" in config.phases:
-        gate_warning = disk_gate_disabled_warning(config)
-        if gate_warning is not None:
-            print(gate_warning, file=sys.stderr)
+        for gate_warning in (disk_gate_disabled_warning(config), memory_gate_disabled_warning(config)):
+            if gate_warning is not None:
+                print(gate_warning, file=sys.stderr)
 
     for phase in config.phases:
         phase_holder[0] = phase
@@ -318,6 +319,7 @@ def _run_sweep_phases(  # noqa: C901
             if result.aborted:
                 aborted_phase = phase
                 abort_reason = result.abort_reason
+                abort_kind = getattr(result, "abort_kind", None)
                 report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
@@ -358,6 +360,13 @@ def _run_sweep_phases(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = exc.reason
+                # Hardcoded, and correct here: this except arm is reachable
+                # only from `_build_disk_floor_runner`'s mid-cell disk
+                # watch, which raises DiskFloorAbort and nothing else. The
+                # free-memory gate never lands here -- it returns an
+                # ExecuteOutcome carrying abort_kind="memory_floor",
+                # handled in the `execute_outcome.aborted` branch below.
+                abort_kind = "disk_floor"
                 # Synthesize an ExecuteOutcome from what run_execute had
                 # already accumulated before the abort propagated, instead
                 # of passing execute_outcome=None. The None path forced
@@ -410,6 +419,7 @@ def _run_sweep_phases(  # noqa: C901
                 early_stop_pruned_count=len(getattr(execute_outcome, "pruned", ())),
                 registry_pruned_count=registry_pruned_count,
                 disk_gate_disabled=not config.disk_gate_enabled,
+                memory_gate_disabled=not config.memory_gate_enabled,
                 container_engine=container_engine,
             )
             _write_compatibility_pruned_jsonl(
@@ -420,6 +430,7 @@ def _run_sweep_phases(  # noqa: C901
                 phase_exit_codes[phase] = 2
                 aborted_phase = phase
                 abort_reason = execute_outcome.abort_reason
+                abort_kind = getattr(execute_outcome, "abort_kind", None)
                 report_summary = _emit_abort_artifacts(
                     config=config,
                     log_dir=log_dir,
@@ -652,6 +663,7 @@ def _run_sweep_phases(  # noqa: C901
         completed_at=completed_at,
         aborted_phase=aborted_phase,
         abort_reason=abort_reason,
+        abort_kind=abort_kind,
         phase_exit_codes=phase_exit_codes,
         execute_outcome=execute_outcome,
         report_summary=report_summary,
@@ -722,6 +734,7 @@ def _emit_abort_artifacts(
         early_stop_pruned_count=early_stop_pruned_count,
         registry_pruned_count=registry_pruned_count,
         disk_gate_disabled=not config.disk_gate_enabled,
+        memory_gate_disabled=not config.memory_gate_enabled,
         container_engine=container_engine,
     )
     _write_compatibility_pruned_jsonl(log_dir / "compatibility_pruned.jsonl", compatibility_pruned)
@@ -834,6 +847,7 @@ def _write_gate_summary_artifact(
     completed_at: _dt.datetime,
     aborted_phase: str | None,
     abort_reason: str | None,
+    abort_kind: str | None,
     phase_exit_codes: dict[str, int],
     execute_outcome: Any,
     report_summary: Any,
@@ -851,6 +865,7 @@ def _write_gate_summary_artifact(
         aborted=aborted_phase is not None,
         abort_phase=aborted_phase,
         abort_reason=abort_reason,
+        abort_kind=abort_kind,
         phase_exit_codes=dict(phase_exit_codes),
         accounting=_accounting_for_gate_summary(report_summary, execute_outcome),
         unreachable_is_estimated=bool(getattr(report_summary, "unreachable_count_is_estimated", False)),

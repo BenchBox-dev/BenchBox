@@ -19,6 +19,11 @@ from tests.uat.phases import (
     preflight as preflight_phase,
     report as report_phase,
 )
+from tests.uat.preflight_budget import (
+    MemorySnapshot,
+    check_memory_headroom,
+    format_memory_headroom_failure,
+)
 from tests.uat.runner import CellResult, classify_for_submit, submit_state_is_cell_failure
 
 pytestmark = pytest.mark.fast
@@ -988,6 +993,216 @@ def test_execute_readiness_check_skipped_for_dry_run(tmp_path):
     assert outcome.aborted is False
     assert sleep_calls == []
     assert not any(event.action in {"ps", "readiness"} for event in outcome.docker_events)
+
+
+def _memory_reader(free_gib, swap_used_percent=0.0):
+    """A `memory_reader` for run_execute that returns a fixed host reading."""
+    return lambda: MemorySnapshot(free_gib=free_gib, swap_used_percent=swap_used_percent)
+
+
+def _managed_docker_cfg(name, **overrides):
+    payload = {
+        "name": name,
+        "platforms": {"include": ["clickhouse-server"]},
+        "benchmarks": {"include": ["tpch"]},
+        "scales": {"rungs": [0.01]},
+        "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+    }
+    for section, values in overrides.items():
+        payload.setdefault(section, {}).update(values)
+    return validate_config(payload)
+
+
+def _healthy_fake_docker(argv, **kwargs):
+    if _docker_verb(argv) == "ps":
+        return _healthy_ps_result(argv)
+    return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+
+def test_execute_memory_floor_aborts_the_platform_before_starting_it(tmp_path):
+    """End-to-end: a host below the free-memory floor aborts the sweep at the
+    platform boundary, with abort_kind="memory_floor".
+
+    The gate had zero end-to-end coverage: inserting `return None` as the
+    first statement of `_free_memory_abort_reason` (making the gate
+    incapable of ever aborting) left the whole suite green. This test, and
+    the three below, are what make that mutation fail.
+    """
+    cfg = _managed_docker_cfg("memory floor abort")
+    started: list[str] = []
+
+    def fake_docker(argv, **kwargs):  # pragma: no cover - gate fires before any compose call
+        started.append(_docker_verb(argv))
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def fail_runner(platform, benchmark, scale, **kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError("no cell may run once the memory floor has aborted")
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=fail_runner,
+        docker_runner=fake_docker,
+        memory_reader=_memory_reader(0.07, swap_used_percent=88.0),
+        sleep_fn=lambda _s: None,
+    )
+
+    assert outcome.aborted is True
+    assert outcome.abort_kind == "memory_floor"
+    assert outcome.results == ()
+    # The abort happens BEFORE the stack is started: the whole point is to
+    # not ask a starved host for another container VM.
+    assert "up" not in started
+
+
+def test_execute_memory_floor_abort_reason_carries_the_shipped_failure_message(tmp_path):
+    """The abort reason is the message `format_memory_headroom_failure`
+    renders, plus this call site's context -- not a second, divergent
+    open-coded string (see preflight_budget.format_memory_headroom_failure)."""
+    cfg = _managed_docker_cfg("memory floor message")
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+        docker_runner=_healthy_fake_docker,
+        memory_reader=_memory_reader(0.07, swap_used_percent=88.0),
+        sleep_fn=lambda _s: None,
+    )
+
+    reason = outcome.abort_reason
+    assert reason is not None
+    expected_core = format_memory_headroom_failure(
+        check_memory_headroom(MemorySnapshot(free_gib=0.07, swap_used_percent=88.0), min_free_gib=2.0)
+    )
+    assert reason.startswith(expected_core)
+    assert "before starting platform clickhouse-server" in reason
+    assert "engine=docker" in reason
+    # Single source of truth: the swap note comes from the shared formatter
+    # and must not be appended a second time by the call site.
+    assert reason.count("swap 88.0% used") == 1
+    # And the same reading is on the lifecycle log for the operator.
+    lifecycle = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
+    assert "[free-memory]" in lifecycle
+    assert "0.07 GiB free" in lifecycle
+
+
+def test_execute_memory_floor_passes_when_host_has_headroom(tmp_path):
+    cfg = _managed_docker_cfg("memory floor ok")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            memory_reader=_memory_reader(8.0),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert outcome.abort_kind is None
+    assert any(r.platform == "clickhouse-server" and r.status == "passed" for r in outcome.results)
+
+
+def test_execute_memory_floor_disabled_by_zero_never_aborts(tmp_path):
+    """0-disables convention: `free_memory_min_gib: 0` turns the gate off even
+    on a host with essentially no free memory."""
+    cfg = _managed_docker_cfg("memory floor off", preflight={"free_memory_min_gib": 0})
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            memory_reader=_memory_reader(0.01),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert any(r.status == "passed" for r in outcome.results)
+    # Gate off means no reading is logged either -- nothing was measured.
+    lifecycle_path = tmp_path / "uat_lifecycle.log"
+    lifecycle = lifecycle_path.read_text(encoding="utf-8") if lifecycle_path.exists() else ""
+    assert "[free-memory]" not in lifecycle
+
+
+def test_execute_memory_floor_unmeasurable_host_does_not_gate(tmp_path):
+    """A host where free memory cannot be read must neither abort nor pass
+    silently: it logs "could not be measured" and lets the sweep proceed."""
+    cfg = _managed_docker_cfg("memory unmeasurable")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            memory_reader=_memory_reader(None, swap_used_percent=None),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    lifecycle = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
+    assert "could not be measured" in lifecycle
+
+
+def test_execute_memory_floor_ignores_non_docker_platforms(tmp_path):
+    """The gate exists to protect a container VM start. A native platform
+    asks the host for no VM, so a low reading must not abort it."""
+    cfg = validate_config(
+        {
+            "name": "memory native",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            memory_reader=_memory_reader(0.01),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert any(r.platform == "duckdb" and r.status == "passed" for r in outcome.results)
+
+
+def test_execute_disk_floor_takes_precedence_over_memory_floor(tmp_path):
+    """Both gates short at the same boundary; disk wins, matching the
+    disk-before-docker_required precedence in run_preflight."""
+    cfg = _managed_docker_cfg("both floors")
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+        docker_runner=_healthy_fake_docker,
+        free_space_checks_enabled=True,
+        free_space_path=tmp_path,
+        free_space_min_gib=100.0,
+        free_space_reader=lambda _p: 1.0,
+        memory_reader=_memory_reader(0.01),
+        sleep_fn=lambda _s: None,
+    )
+
+    assert outcome.aborted is True
+    assert outcome.abort_kind == "disk_floor"
+    assert "free space" in (outcome.abort_reason or "")
 
 
 def test_execute_teardown_failure_after_startup_failure_advances_instead_of_aborting(tmp_path):

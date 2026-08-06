@@ -122,6 +122,18 @@ class GateSummary:
     cross_scale_floor_breached: bool | None
     explorer_smoke_status: str
     verdict: str
+    # Machine-readable abort taxonomy ("disk_floor", "memory_floor",
+    # "docker_required", "local_platform_unreachable", ...) beside the human
+    # `abort_reason` prose. Without it every abort looks alike to a machine
+    # reader: a sweep killed by the free-memory floor was distinguishable
+    # from one killed by the disk floor only by substring-matching the
+    # reason text. Additive, defaulted, and declared last so existing
+    # constructors are unaffected -- per this module's schema contract
+    # readers drop unknown keys and older summaries simply lack the field,
+    # so no version bump (no consumer branches on `version`). None on
+    # non-aborted sweeps and on aborts from phases that do not classify
+    # (validate/report).
+    abort_kind: str | None = None
     version: int = GATE_SUMMARY_SCHEMA_VERSION
 
     def to_json_dict(self) -> dict:

@@ -244,6 +244,7 @@ def write_cells_jsonl(
     early_stop_pruned_count: int = 0,
     registry_pruned_count: int = 0,
     disk_gate_disabled: bool = False,
+    memory_gate_disabled: bool = False,
     container_engine: str | None = None,
     finalize: bool = True,
 ) -> None:
@@ -283,6 +284,14 @@ def write_cells_jsonl(
                 "early_stop_pruned_count": int(early_stop_pruned_count),
                 "registry_pruned_count": int(registry_pruned_count),
                 "disk_gate_disabled": bool(disk_gate_disabled),
+                # Companion to disk_gate_disabled: records that
+                # `preflight.free_memory_min_gib: 0` turned the free-memory
+                # headroom gate OFF for this sweep, so a reader can tell
+                # "the gate ran and passed" from "the gate never ran"
+                # instead of reading a clean sweep as evidence of headroom.
+                # Additive field -- see
+                # uat-container-readiness-and-memory-headroom-gate w2.
+                "memory_gate_disabled": bool(memory_gate_disabled),
                 # Resolved engine binary (docker/mocker/...) at sweep start --
                 # additive field, None on older artifacts and on sweeps whose
                 # engine resolution failed. See uat-container-engine-routing
