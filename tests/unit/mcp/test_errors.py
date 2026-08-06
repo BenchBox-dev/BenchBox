@@ -72,6 +72,59 @@ def test_scrub_secret_material_covers_quoted_colon_and_prose_values(text: str, e
     assert scrub_secret_material(text) == expected
 
 
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # Benign diagnostic prose: byte-identical preservation.
+        ("secret sauce is the default", "secret sauce is the default"),
+        ("token refresh required", "token refresh required"),
+        ("password reset required", "password reset required"),
+        ("password field is missing", "password field is missing"),
+        ("password reset required for user", "password reset required for user"),
+        # Connector assignments: scrub the value.
+        ("password is hunter2", "password is ****"),
+        ("token was abc123", "token was ****"),
+        ("secret equals REALVAL", "secret equals ****"),
+        ("password set to xyz", "password set to ****"),
+        ("token configured as ABCDEF", "token configured as ****"),
+        # Quoted / structured assignments.
+        ("password: 'hunter2'", "password: ****"),
+        ('token: "secret-value"', "token: ****"),
+        ("password=REAL_SECRET", "password=****"),
+        # Bare prose with credential-like tokens (digits / underscores / ALLCAPS).
+        ("driver returned password PROSE_SECRET", "driver returned password ****"),
+        ("driver returned password hunter2", "driver returned password ****"),
+        # Mixed: preserve benign words, scrub real assignment values.
+        ("secret sauce and password=REAL_SECRET", "secret sauce and password=****"),
+        ("token refresh required; password=REAL_SECRET", "token refresh required; password=****"),
+    ],
+)
+def test_scrub_secret_material_prose_precision(text: str, expected: str) -> None:
+    """Benign secret-related prose stays readable; assignment forms stay scrubbed."""
+    assert scrub_secret_material(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected_message"),
+    [
+        ("secret sauce is the default", "secret sauce is the default"),
+        ("token refresh required", "token refresh required"),
+        ("password reset required", "password reset required"),
+        ("password field is missing", "password field is missing"),
+        ("password=REAL_SECRET", "password=****"),
+        (
+            "token refresh required; password=REAL_SECRET",
+            "token refresh required; password=****",
+        ),
+    ],
+)
+def test_make_execution_error_prose_precision(text: str, expected_message: str) -> None:
+    """Structured execution errors preserve diagnostics and scrub assignments."""
+    result = make_execution_error(text)
+    assert result["message"] == expected_message
+    assert "REAL_SECRET" not in result["message"]
+
+
 class TestErrorCategory:
     """Tests for ErrorCategory enum."""
 

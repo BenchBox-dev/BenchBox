@@ -906,3 +906,134 @@ class TestCheckScopeReportsWhatItActuallyChecked:
         """--strict only affects the no-rules case."""
         _mk(conn, scope=[("only_modify", "benchbox/core/*")])
         assert self._run(conn, monkeypatch, "sample-item", ["benchbox/cli/x.py"], strict=True) == 1
+
+
+class TestConfigDiscovery:
+    """Credential-free `.todo-db/config.json` URL discovery (selected hosted)."""
+
+    _CONFIG_URL = "libsql://benchbox-todo-from-config.turso.io"
+
+    def _clear_backend_env(self, monkeypatch):
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        monkeypatch.delenv("TODO_DB_URL", raising=False)
+        monkeypatch.delenv("TODO_DB_AUTH_TOKEN", raising=False)
+
+    def _write_config(self, root: Path, payload: dict | str) -> Path:
+        cfg_dir = root / ".todo-db"
+        cfg_dir.mkdir(parents=True, exist_ok=True)
+        path = cfg_dir / "config.json"
+        if isinstance(payload, str):
+            path.write_text(payload, encoding="utf-8")
+        else:
+            path.write_text(json.dumps(payload), encoding="utf-8")
+        return path
+
+    def test_config_url_selects_hosted_not_implicit_local(self, monkeypatch, tmp_path):
+        self._clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        self._write_config(tmp_path, {"url": self._CONFIG_URL})
+
+        backend, implicit_default_local, auto_provisioned, provision_failure = todo_db._resolve_backend(None)
+
+        assert backend == self._CONFIG_URL
+        assert implicit_default_local is False
+        assert auto_provisioned is False
+        assert provision_failure is None
+
+    def test_config_url_outranks_auto_provision(self, monkeypatch, tmp_path):
+        self._clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        self._write_config(tmp_path, {"url": self._CONFIG_URL})
+
+        def boom(*_args, **_kwargs):
+            raise AssertionError("auto-provisioning must not run when config.json supplies a URL")
+
+        monkeypatch.setattr(todo_db, "_try_turso_auto_provision", boom)
+
+        backend, implicit, auto, provision_failure = todo_db._resolve_backend(None)
+        assert backend == self._CONFIG_URL
+        assert implicit is False
+        assert auto is False
+        assert provision_failure is None
+
+    def test_env_url_outranks_config(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("TODO_DB_PATH", raising=False)
+        monkeypatch.setenv("TODO_DB_URL", "libsql://from-env.turso.io")
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        self._write_config(tmp_path, {"url": self._CONFIG_URL})
+
+        backend, implicit, auto, provision_failure = todo_db._resolve_backend(None)
+        assert backend == "libsql://from-env.turso.io"
+        assert implicit is False
+        assert auto is False
+        assert provision_failure is None
+
+    def test_env_path_outranks_config(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("TODO_DB_PATH", str(tmp_path / "pin.sqlite"))
+        monkeypatch.delenv("TODO_DB_URL", raising=False)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        self._write_config(tmp_path, {"url": self._CONFIG_URL})
+
+        backend, implicit, auto, provision_failure = todo_db._resolve_backend(None)
+        assert backend == Path(tmp_path / "pin.sqlite")
+        assert implicit is False
+        assert auto is False
+        assert provision_failure is None
+
+    def test_missing_config_falls_through_to_local(self, monkeypatch, tmp_path):
+        self._clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        monkeypatch.setattr(todo_db, "_try_turso_auto_provision", lambda: (None, None))
+
+        backend, implicit, auto, provision_failure = todo_db._resolve_backend(None)
+        assert backend == tmp_path / ".todo-db" / "todo.sqlite"
+        assert implicit is True
+        assert auto is False
+        assert provision_failure is None
+
+    def test_config_with_token_key_is_rejected(self, monkeypatch, tmp_path):
+        self._clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        self._write_config(tmp_path, {"url": self._CONFIG_URL, "auth_token": "sekrit"})
+
+        with pytest.raises(todo_db.TodoError, match="must not contain credentials"):
+            todo_db._resolve_backend(None)
+
+    def test_config_http_url_is_rejected(self, monkeypatch, tmp_path):
+        self._clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        self._write_config(tmp_path, {"url": "http://insecure.example/db"})
+
+        with pytest.raises(todo_db.TodoError, match="plaintext http"):
+            todo_db._resolve_backend(None)
+
+    def test_report_backend_never_echoes_config_url(self, monkeypatch, tmp_path, capsys):
+        self._clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        self._write_config(tmp_path, {"url": self._CONFIG_URL})
+
+        backend, implicit, auto, provision_failure = todo_db._resolve_backend(None)
+        todo_db._report_backend(
+            backend,
+            implicit_default_local=implicit,
+            auto_provisioned=auto,
+            provision_failure=provision_failure,
+        )
+        err = capsys.readouterr().err
+        assert "todo backend: hosted" in err
+        assert self._CONFIG_URL not in err
+        assert "LOCAL FALLBACK" not in err
+
+    def test_mutating_via_config_is_not_implicit_local_refusal(self, monkeypatch, tmp_path, capsys):
+        """Config-selected hosted must reach connect/auth, not the local write fence."""
+        self._clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+        self._write_config(tmp_path, {"url": self._CONFIG_URL})
+
+        rc = todo_db.main(["claim", "missing-item"])
+        err = capsys.readouterr().err
+        assert rc == 2
+        assert "refusing to write through the implicit local fallback" not in err
+        # Missing token is the expected hard-error path for a selected hosted backend.
+        assert "TODO_DB_AUTH_TOKEN" in err
+        assert self._CONFIG_URL not in err

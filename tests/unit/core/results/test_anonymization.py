@@ -752,6 +752,83 @@ class TestTuningPayloadAnonymization:
             "column_"
         )
 
+    def test_nested_companion_constraint_shapes_are_pseudonymized(self):
+        """List-of-dicts FK tables, slash-delimited local_table, and TPC-DI-style
+        references_table/references_column must not leak identifiers. The simple
+        mapping shape was already covered; these companion shapes were the
+        residual leak after #1479.
+        """
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "foreign_keys": {
+                            "enabled": True,
+                            "on_delete_action": "CASCADE",
+                            "tables": [
+                                {
+                                    "table": "orders",
+                                    "columns": ["o_orderkey"],
+                                    "referenced_table": "customers",
+                                    "referenced_columns": ["c_custkey"],
+                                }
+                            ],
+                        },
+                        "local_table": "orders/o_orderkey",
+                        "references_table": "customers",
+                        "references_column": "c_custkey",
+                    }
+                }
+            }
+        )
+
+        serialized = json.dumps(out)
+        assert all(identifier not in serialized for identifier in ("orders", "o_orderkey", "customers", "c_custkey"))
+        constraints = out["requested"]["constraints"]
+        fk = constraints["foreign_keys"]
+        assert fk["enabled"] is True
+        assert fk["on_delete_action"] == "CASCADE"
+        assert isinstance(fk["tables"], list) and len(fk["tables"]) == 1
+        entry = fk["tables"][0]
+        assert entry["table"].startswith("table_")
+        assert entry["referenced_table"].startswith("table_")
+        assert entry["columns"][0].startswith("column_")
+        assert entry["referenced_columns"][0].startswith("column_")
+        assert constraints["local_table"].startswith("table_")
+        assert constraints["references_table"].startswith("table_")
+        assert constraints["references_column"].startswith("column_")
+
+    def test_mixed_and_list_constraint_companion_shapes(self):
+        """Mixed scalar/dict collections and top-level list constraints."""
+        out = AnonymizationManager().anonymize_tuning_payload(
+            {
+                "requested": {
+                    "constraints": {
+                        "foreign_keys": {
+                            "tables": [
+                                "orders",
+                                {"table": "customers", "columns": [{"name": "c_custkey"}, "c_nationkey"]},
+                            ]
+                        },
+                    }
+                }
+            }
+        )
+        serialized = json.dumps(out)
+        assert all(identifier not in serialized for identifier in ("orders", "customers", "c_custkey", "c_nationkey"))
+        tables = out["requested"]["constraints"]["foreign_keys"]["tables"]
+        assert tables[0].startswith("table_")
+        assert tables[1]["table"].startswith("table_")
+        assert tables[1]["columns"][0]["name"].startswith("column_")
+        assert tables[1]["columns"][1].startswith("column_")
+
+        list_constraints = AnonymizationManager().anonymize_tuning_payload(
+            {"requested": {"constraints": [{"table": "orders", "columns": ["o_orderkey"]}]}}
+        )
+        serialized_list = json.dumps(list_constraints)
+        assert "orders" not in serialized_list and "o_orderkey" not in serialized_list
+        assert list_constraints["requested"]["constraints"][0]["table"].startswith("table_")
+
     def test_table_and_column_identifiers_are_pseudonymized_but_source_is_preserved(self):
         manager = AnonymizationManager()
         out = manager.anonymize_tuning_payload(
@@ -1114,11 +1191,12 @@ class TestPublicUnreadIdentifierDrop:
         assert "client_host" not in out.get("environment", {})
         assert out["environment"]["other"] == 1
 
-    def test_already_empty_client_host_passes_through_for_fixed_point(self):
-        """Stored `client_host: {}` is left alone until an explicit re-derive."""
-        payload = {"environment": {"client_host": {}}}
+    def test_already_empty_client_host_is_omitted(self):
+        """Empty client_host maps are omitted so stored residuals can be re-derived away."""
+        payload = {"environment": {"client_host": {}, "other": 1}}
         out = AnonymizationManager().anonymize_result_payload(payload)
-        assert out["environment"]["client_host"] == {}
+        assert "client_host" not in out.get("environment", {})
+        assert out["environment"]["other"] == 1
 
     def test_nonempty_client_host_profile_still_exports(self):
         out = AnonymizationManager().anonymize_result_payload(

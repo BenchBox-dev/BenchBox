@@ -415,7 +415,7 @@ def build_digest(
         "When the branch is final, arm via `make pr-ready` (or `make pr-open READY=1`, or draft → "
         "ready). Do **not** re-push expecting `synchronize` to re-arm -- that path no longer "
         "enables auto-merge. To hold a non-draft intentionally, apply "
-        f"the `{AUTO_MERGE_HOLD_LABEL}` label (or convert to draft). See docs/operations/pr-triage.md." 
+        f"the `{AUTO_MERGE_HOLD_LABEL}` label (or convert to draft). See docs/operations/pr-triage.md."
     )
     lines.append(f"(repo: {repo})")
     return "\n".join(lines)
