@@ -96,7 +96,9 @@ class ResultExporter:
         Args:
             output_dir: Output directory for results. Defaults to benchmark_runs/results.
             anonymize: Whether to anonymize system information. Defaults to True.
-            anonymization_config: Configuration for anonymization.
+            anonymization_config: Configuration for anonymization. When omitted and
+                ``anonymize`` is true, soft-reads ``BENCHBOX_MACHINE_ID_SALT`` via
+                :meth:`AnonymizationConfig.from_public_environ` (empty salt if unset).
             console: Rich console for output. Creates new one if not provided.
             plan_history_dir: Opt-in directory to record this run's plan
                 fingerprints into via ``PlanHistory.add_run`` (see
@@ -122,9 +124,15 @@ class ResultExporter:
 
         self.console = console or Console()
         self.anonymize = anonymize
-        self.anonymization_manager = (
-            AnonymizationManager(anonymization_config or AnonymizationConfig()) if anonymize else None
-        )
+        # Soft-read BENCHBOX_MACHINE_ID_SALT when present so public-shaped
+        # exports mint salted tokens at export time. Empty/unset remains the
+        # OSS default (private/local export still works). Community submit is
+        # the hard-require gate; this path must not refuse without salt.
+        if anonymize:
+            default_config = anonymization_config or AnonymizationConfig.from_public_environ()
+            self.anonymization_manager = AnonymizationManager(default_config)
+        else:
+            self.anonymization_manager = None
         self._validator = SchemaV2Validator()
 
         resolved_plan_history_dir = plan_history_dir or os.environ.get("BENCHBOX_PLAN_HISTORY_DIR")

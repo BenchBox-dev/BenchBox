@@ -23,6 +23,14 @@ pytestmark = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def _community_publish_salt(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test here exercises `--service` (hosted/community submit), which
+    now hard-refuses without a deployment salt. Mirrors the autouse fixture in
+    tests/unit/cli/commands/test_submit.py."""
+    monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
+
+
 class FakeKeyring:
     def __init__(self) -> None:
         self.passwords: dict[tuple[str, str], str] = {}

@@ -1869,7 +1869,9 @@ class ResultCaptureMixin:
             )
             from benchbox.utils.system_info import get_system_info
 
-            anonymization_manager = AnonymizationManager(AnonymizationConfig())
+            # Soft-read env salt when present so capture-side machine ids match
+            # salted public export. Unset salt keeps the empty OSS default.
+            anonymization_manager = AnonymizationManager(AnonymizationConfig.from_public_environ())
             system_info = get_system_info()
             system_profile = system_info.to_dict()
             anonymous_machine_id = anonymization_manager.get_anonymous_machine_id()
