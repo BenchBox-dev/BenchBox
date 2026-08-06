@@ -88,9 +88,11 @@ a PR's mergeability — both only alert.
   waiting on the owner's manual review and merge.
 - **Green-unmerged nightly sweep**
   (`_project/scripts/green_unmerged_sweep.py`,
-  `.github/workflows/nightly.yml`) — alerts on non-draft, non-soundness
-  PRs whose required lane is green but auto-merge is still off for more
-  than 2 hours after the head commit.
+  `.github/workflows/nightly.yml`) — alerts on non-draft, non-soundness,
+  non-hold-label PRs whose required lane is green but auto-merge is still
+  off for more than 2 hours after the head commit. `--apply` only upserts
+  the digest issue; it **never** enables auto-merge and must not re-arm a
+  hold it did not set.
 
   After the auto-merge hold, **an intentional non-armed green PR is normal**,
   not a stuck state. Auto-merge is **not** armed by `opened`, `reopened`, or
@@ -99,18 +101,36 @@ a PR's mergeability — both only alert.
 
   - `make pr-ready` (or `make pr-arm-auto-merge`) on a finished branch
   - `make pr-open READY=1` to open and arm in one step
-  - draft → ready (`ready_for_review` in `auto-merge-on-open.yml`)
+  - draft → ready (`ready_for_review` in `auto-merge-on-open.yml`), and only
+    when the PR does **not** carry the `no-auto-merge` label
 
   Do **not** remediate a green-unmerged alert by re-pushing "to re-trigger
   synchronize." That path no longer enables auto-merge. If the branch is
-  final, arm it; if work continues, leave auto-merge off.
+  final, arm it; if work continues, leave auto-merge off (or apply a durable
+  hold — see below).
 
-  Known follow-up: `green_unmerged_sweep.py` still classifies many of these
-  intentional holds as stranded (false positives). Fixing the classifier is
-  out of the enablement-hold change set (`_project/scripts/`); until then,
-  treat sweep hits as triage signals, not proof of a broken arm path. A green
-  `enable`-job run is also not proof the PR's `auto_merge` field is set —
-  the sweep re-reads the PR field rather than trusting the workflow conclusion.
+  A green `enable`-job run is also not proof the PR's `auto_merge` field is
+  set — the sweep re-reads the PR field rather than trusting the workflow
+  conclusion. Default non-armed greens that were never intended to arm can
+  still appear as sweep hits until a broader intentional-hold classifier
+  lands; treat those as triage signals, not proof of a broken arm path.
+
+## Durable auto-merge holds
+
+`gh pr merge --disable-auto` alone is **not** a durable product signal: a later
+intentional arm path could still enable auto-merge. Both re-arming layers
+honour these durable holds (and neither re-arms on push or nightly `--apply`):
+
+| Hold | Who honours it | Effect |
+| --- | --- | --- |
+| **Draft** | `auto-merge-on-open.yml` (job skip), green-unmerged sweep | Not ready; no arm, not stranded |
+| **Label `no-auto-merge`** | `auto-merge-on-open.yml` (enable blocked + disable on apply/`labeled`), green-unmerged sweep | Non-draft intentional hold; revoke any enabled auto-merge; not stranded |
+
+Use draft while the branch is incomplete. Use `no-auto-merge` when the PR
+should stay non-draft (CI/review as ready) but must not auto-merge — for
+example waiting on another PR, or after an explicit disable that must survive
+a later `ready_for_review` / re-arm attempt. Remove the label before arming
+with `make pr-ready` or draft → ready.
 
 Both sweeps upsert a single marker-tagged tracking issue while their
 respective queue is non-empty, and patch it to the empty state exactly

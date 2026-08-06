@@ -12,25 +12,40 @@ name: Auto-enable auto-merge
 #     bare `gh pr create`) is not the final signal — that is what defeated the
 #     Makefile hold after #1567 (live proof: #1568/#1569 merged hands-free).
 #   - DO arm on `ready_for_review` (draft → ready is the UI equivalent of
-#     `make pr-ready`).
-#   - On `synchronize` (and other events): only re-evaluate soundness
-#     revocation — disable auto-merge if soundness paths are touched. Never
-#     re-enable on synchronize; that would re-open the race on the first push
-#     after open.
+#     `make pr-ready`), unless the PR carries the durable hold label
+#     `no-auto-merge` (see below).
+#   - On `synchronize` / `labeled` (and other events): only re-evaluate
+#     revocation — disable auto-merge if soundness paths are touched or the
+#     durable hold label is present. Never re-enable on synchronize; that
+#     would re-open the race on the first push after open.
+#
+# Durable holds (both re-arming paths honour these):
+#   1. Draft status — job-level skip. Opening a draft is "not yet ready".
+#   2. Label `no-auto-merge` — holds a non-draft PR without converting it to
+#      draft. Applying the label revokes any enabled auto-merge; ready_for_review
+#      will not re-arm while the label remains. The nightly green-unmerged
+#      sweep also treats this label as intentional (not stranded) and never
+#      enables auto-merge itself. See docs/operations/pr-triage.md.
 #
 # Intentional gap: a non-draft PR opened without `make pr-ready`, `READY=1`,
 # or marking a draft ready will not get auto-merge from this workflow. Use
-# one of those paths when the branch is final.
-#
-# Drafts remain skipped at the job level — opening a draft is the user's
-# signal that the PR is not yet ready. Auto-merge is enabled when the draft
-# is marked ready (`ready_for_review`).
+# one of those paths when the branch is final (and remove `no-auto-merge`
+# first if it was applied).
 #
 # `synchronize` re-evaluates on every push so a later commit that newly
 # touches a soundness-critical path can flip auto-merge back OFF. GitHub
 # only auto-disables auto-merge on push when the pusher lacks write access,
 # so in the normal same-repo/write-author flow a stale enabled auto-merge
 # would otherwise survive and merge after checks without review.
+#
+# Soundness predicate evaluation (disable path):
+#   Union of (a) the base-ref copy and (b) the PR checkout copy. Base-ref
+#   alone stops a PR from judging its own diff by a narrowed rule set.
+#   Evaluating the PR copy alongside it means a gate *widened* mid-flight
+#   in the same PR still revokes auto-merge for paths only the new gate
+#   covers. Enable still requires soundness_path != true (both false), so
+#   a PR cannot weaken its own gate. Self-touch of the predicate or this
+#   workflow forces soundness_path=true regardless.
 #
 # HONESTY NOTE on the self-protection checks below (base-ref predicate
 # execution + self-touch override): they are BEST-EFFORT for same-repo PRs.
@@ -49,7 +64,8 @@ name: Auto-enable auto-merge
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+    # `labeled` so applying `no-auto-merge` revokes auto-merge without a push.
+    types: [opened, reopened, ready_for_review, synchronize, labeled]
     branches: [develop]
 
 permissions:
@@ -68,6 +84,24 @@ jobs:
       - name: Fetch base branch
         run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
 
+      - name: Check explicit hold label
+        id: hold
+        env:
+          # Newline-joined so grep -xF matches whole label names only.
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, '\n') }}
+        run: |
+          set -euo pipefail
+          # Durable hold label shared with green_unmerged_sweep.AUTO_MERGE_HOLD_LABEL.
+          # Exact match only — substring false positives (e.g. no-auto-merge-except) rejected.
+          held=false
+          if printf '%s\n' "$PR_LABELS" | grep -qxF 'no-auto-merge'; then
+            held=true
+          fi
+          echo "held=$held" >> "$GITHUB_OUTPUT"
+          if [ "$held" = "true" ]; then
+            echo "Explicit hold label no-auto-merge present; will not arm auto-merge."
+          fi
+
       - name: Check soundness-critical paths
         id: soundness
         run: |
@@ -78,25 +112,37 @@ jobs:
           # file via rename would slip past the gate.
           diff_paths="$(git diff --name-only --no-renames "origin/${{ github.base_ref }}...HEAD")"
 
-          # Run the BASE-REF copy of the predicate, not the PR's own checkout
-          # copy. For a same-repo (non-fork) PR - the normal case here - the
-          # checked-out copy IS whatever the PR itself introduces, so a PR
-          # that edits auto_merge_soundness_paths.py (e.g. narrows
-          # SOUNDNESS_PREFIXES) would otherwise evaluate its own diff against
-          # its own modified rules, neutralizing its review gate in the same
-          # commit that would otherwise have triggered it. The base branch is
-          # already fetched by the preceding "Fetch base branch" step.
-          git show "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate.py
+          # (a) BASE-REF copy: a PR that narrows SOUNDNESS_PREFIXES must still be
+          # judged by develop's rules, not its own. The base branch is already
+          # fetched by the preceding "Fetch base branch" step.
+          git show "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate_base.py
+          base_result="$(printf '%s\n' "$diff_paths" | python3 /tmp/predicate_base.py --stdin --format github-output)"
 
-          result="$(printf '%s\n' "$diff_paths" | python3 /tmp/predicate.py --stdin --format github-output)"
+          # (b) PR checkout copy: a gate *widened* in this PR still revokes
+          # auto-merge for paths only the new gate covers. Fail closed (treat as
+          # soundness) if the PR copy is missing or errors — never let a broken
+          # PR-side predicate silence revocation.
+          pr_result="soundness_path=false"
+          if [ -f "_project/scripts/auto_merge_soundness_paths.py" ]; then
+            if ! pr_result="$(printf '%s\n' "$diff_paths" | python3 _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output)"; then
+              pr_result="soundness_path=true"
+            fi
+          fi
 
-          # Base-ref execution alone stops the predicate from judging its own
-          # diff leniently, but doesn't by itself flag "this diff touches the
+          # Union: soundness if either copy says so. Enable requires both false,
+          # so a PR cannot weaken its own gate by narrowing the PR-side rules.
+          if [ "$base_result" = "soundness_path=true" ] || [ "$pr_result" = "soundness_path=true" ]; then
+            result="soundness_path=true"
+          else
+            result="soundness_path=false"
+          fi
+
+          # Base-ref + PR-copy union alone does not flag "this diff touches the
           # predicate (or the workflow that runs it)" as review-worthy - a PR
           # could still edit the predicate to make FUTURE PRs unsafe without
           # itself needing owner review. Force soundness_path=true whenever
-          # the diff touches either file, regardless of what the (correctly
-          # base-ref-evaluated) predicate says about the rest of the diff.
+          # the diff touches either file, regardless of what either predicate
+          # says about the rest of the diff.
           if printf '%s\n' "$diff_paths" | grep -qxF "_project/scripts/auto_merge_soundness_paths.py" \
              || printf '%s\n' "$diff_paths" | grep -qxF ".github/workflows/auto-merge-on-open.yml"; then
             result="soundness_path=true"
@@ -105,11 +151,13 @@ jobs:
           echo "$result" >> "$GITHUB_OUTPUT"
 
       - name: Enable squash auto-merge
-        # Arm only on draft→ready. Never on opened/reopened/synchronize — those
-        # are not "branch is final" signals (see header policy). Soundness
-        # predicate first so the existing substring pin in
-        # test_auto_merge_soundness_paths still matches.
-        if: steps.soundness.outputs.soundness_path != 'true' && github.event.action == 'ready_for_review'
+        # Arm only on draft→ready, and only when neither soundness nor the
+        # durable hold label blocks. Never on opened/reopened/synchronize —
+        # those are not "branch is final" signals (see header policy).
+        if: >-
+          steps.soundness.outputs.soundness_path != 'true'
+          && steps.hold.outputs.held != 'true'
+          && github.event.action == 'ready_for_review'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -132,4 +180,15 @@ jobs:
           # A push that newly touches a soundness path must not ride an auto-merge
           # enabled by an earlier (non-soundness) push. --disable-auto exits
           # non-zero when auto-merge is already off, so tolerate that.
+          gh pr merge --disable-auto --repo "$REPO" "$PR_NUMBER" || true
+
+      - name: Disable auto-merge for explicit hold
+        if: steps.hold.outputs.held == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Explicit hold label no-auto-merge present; clearing any auto-merge."
           gh pr merge --disable-auto --repo "$REPO" "$PR_NUMBER" || true

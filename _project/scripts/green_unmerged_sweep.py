@@ -23,8 +23,14 @@ every OPEN, non-draft develop PR and alerts when one looks stranded:
         soundness-drain digest, not this sweep.
     (d) past the grace period -- more than `GRACE_PERIOD_HOURS` (default
         2h) since the head commit was pushed, so the enable workflow's
-        `synchronize`-triggered re-run has had every chance to fire
-        before this sweep calls a PR stranded.
+        soundness re-eval has had every chance to fire before this sweep
+        calls a PR stranded.
+    (e) not explicitly held -- the PR does not carry the durable hold
+        label ``no-auto-merge`` (``AUTO_MERGE_HOLD_LABEL``). That label is
+        the same durable hold ``auto-merge-on-open.yml`` honours: drafts
+        are already excluded by (job skip / draft check); the label holds
+        a non-draft without converting it to draft. An explicit hold is
+        intentional, not stranded — this sweep must never re-arm it.
 
 The only mutation this script ever performs (and only under `--apply`) is
 creating/updating ONE marker-tagged tracking issue (title "Green-but-unmerged
@@ -33,7 +39,8 @@ set is non-empty (or develop post-merge is red, see `--check-post-merge`
 below), and patched to the empty state exactly once when it drains, then
 left alone. It never enables auto-merge, never merges, never labels, and
 never comments on a PR -- enabling auto-merge outside the sanctioned
-predicate path in `auto-merge-on-open.yml` would bypass the soundness gate.
+predicate path in `auto-merge-on-open.yml` would bypass the soundness gate
+and would re-arm a hold this sweep did not set.
 
 `--check-post-merge` additionally checks the most recent "Develop post-merge"
 workflow run; if its conclusion is `failure`, a prominent section is added to
@@ -95,6 +102,12 @@ GRACE_PERIOD_HOURS = 2.0
 API_ROOT = "https://api.github.com"
 DEVELOP_POST_MERGE_WORKFLOW = "develop-post-merge.yml"
 
+# Durable explicit hold shared with `.github/workflows/auto-merge-on-open.yml`
+# (exact label name; keep both layers in lockstep — pinned by
+# tests/unit/test_auto_merge_hold_is_durable.py). Applying this label is the
+# non-draft durable hold; drafts remain a separate, job-level hold.
+AUTO_MERGE_HOLD_LABEL = "no-auto-merge"
+
 PINNED_ISSUE_TITLE = "Green-but-unmerged PR sweep"
 # Body marker: proves the digest issue was written by this script, so
 # find_pinned_issue never adopts (and later clobbers) a human issue that
@@ -117,6 +130,9 @@ class ClassifiedPR:
     auto_merge_enabled: bool
     head_age_hours: float
     stranded: bool
+    # True when the PR carries AUTO_MERGE_HOLD_LABEL. Composable with other
+    # intentional-hold classifiers (draft is tracked separately via `draft`).
+    explicit_hold: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -150,6 +166,18 @@ def is_soundness_gated(changed_files: list[str]) -> bool:
     return any_soundness_path(changed_files)
 
 
+def has_auto_merge_hold_label(labels: list[str] | tuple[str, ...] | None) -> bool:
+    """True when *labels* includes the durable ``no-auto-merge`` hold label.
+
+    Exact name match only (case-sensitive, same as the workflow's
+    ``grep -qxF``). Composable: intentional-hold classifiers can OR this
+    with draft / other signals without forking the label constant.
+    """
+    if not labels:
+        return False
+    return AUTO_MERGE_HOLD_LABEL in {str(label).strip() for label in labels if label is not None}
+
+
 def head_age_hours(pr: dict[str, Any], now: dt.datetime) -> float:
     """Hours since the PR's head commit was pushed.
 
@@ -178,13 +206,20 @@ def is_stranded(
     soundness_gated: bool,
     age_hours: float,
     grace_hours: float,
+    explicit_hold: bool = False,
 ) -> bool:
-    """True when a PR looks like a stranded (never-enabled-or-dropped) auto-merge."""
+    """True when a PR looks like a stranded (never-enabled-or-dropped) auto-merge.
+
+    An explicit hold (``no-auto-merge`` label) is intentional, not stranded:
+    both this sweep and ``auto-merge-on-open.yml`` honour it, and ``--apply``
+    must never re-arm a hold it did not set.
+    """
     return (
         (not draft)
         and required_green
         and (not auto_merge_enabled)
         and (not soundness_gated)
+        and (not explicit_hold)
         and age_hours > grace_hours
     )
 
@@ -198,11 +233,13 @@ def classify_pr(
     """Classify one normalized PR record. Pure -- no I/O."""
     check_runs = pr.get("check_runs") or []
     changed_files = pr.get("changed_files") or []
+    labels = pr.get("labels") or []
 
     required_green = is_required_lane_green(check_runs)
     soundness_gated = is_soundness_gated(changed_files)
     auto_merge_enabled = bool(pr.get("auto_merge"))
     draft = bool(pr.get("draft"))
+    explicit_hold = has_auto_merge_hold_label(labels)
     age_h = head_age_hours(pr, now)
     stranded = is_stranded(
         draft=draft,
@@ -211,6 +248,7 @@ def classify_pr(
         soundness_gated=soundness_gated,
         age_hours=age_h,
         grace_hours=grace_hours,
+        explicit_hold=explicit_hold,
     )
 
     return ClassifiedPR(
@@ -223,6 +261,7 @@ def classify_pr(
         auto_merge_enabled=auto_merge_enabled,
         head_age_hours=age_h,
         stranded=stranded,
+        explicit_hold=explicit_hold,
     )
 
 
@@ -307,9 +346,10 @@ def build_digest(
         lines.append(f"- #{c.number} {c.title} -- head pushed {_fmt_hours(c.head_age_hours)} ago -- {c.html_url}")
     lines.append("")
     lines.append(
-        "This sweep never enables auto-merge itself -- re-run `gh pr merge --auto --squash` "
-        "by hand (or re-push to retrigger auto-merge-on-open.yml's `synchronize` path) after "
-        "confirming the PR is genuinely ready. See docs/operations/pr-triage.md."
+        "This sweep never enables auto-merge itself (and must not re-arm a hold it did not set). "
+        "When the branch is final, arm via `make pr-ready` / `make pr-arm-auto-merge` (or draft → "
+        "ready). A re-push will NOT re-arm auto-merge. To hold a non-draft intentionally, apply "
+        f"the `{AUTO_MERGE_HOLD_LABEL}` label (or convert to draft). See docs/operations/pr-triage.md."
     )
     lines.append(f"(repo: {repo})")
     return "\n".join(lines)
@@ -438,6 +478,10 @@ def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str
         head_pushed_at = (commit_info.get("committer") or {}).get("date") or (commit_info.get("author") or {}).get(
             "date"
         )
+        raw_labels = raw.get("labels") or []
+        label_names = [
+            (item.get("name") if isinstance(item, dict) else str(item)) for item in raw_labels if item is not None
+        ]
         normalized.append(
             {
                 "number": number,
@@ -450,6 +494,8 @@ def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str
                 # never inferred from a workflow run's conclusion. See "Known
                 # timing behavior" in the module docstring.
                 "auto_merge": raw.get("auto_merge"),
+                # Durable hold signal shared with auto-merge-on-open.yml.
+                "labels": [name for name in label_names if name],
                 "changed_files": [f.get("filename", "") for f in files],
                 "check_runs": [
                     {
@@ -550,6 +596,8 @@ def run_self_test() -> int:
             expect(c.soundness_gated, f"PR #{number} expected soundness_gated=True")
         elif reason == "within_grace":
             expect(c.head_age_hours <= grace_hours, f"PR #{number} expected head_age_hours <= {grace_hours}")
+        elif reason == "explicit_hold":
+            expect(c.explicit_hold, f"PR #{number} expected explicit_hold=True")
 
     # build_digest must always carry the marker, whatever the queue state.
     expect(
