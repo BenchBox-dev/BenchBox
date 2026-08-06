@@ -42,8 +42,8 @@ the alert. Auto-remint is only for todo-db >= 0.3 wrappers. Global `--db` /
 Banner is stderr-only and zero-suppressed, so stdout stays machine-readable.
 
 Standalone-only actions are declared in the skill sidecar as
-`standalone_only_commands` (currently none for this wrapper); rule 4 applies
-when a future verb is declared.
+`standalone_only_commands` (currently none for the BenchBox wrapper once it
+exposes `update`); rule 4 applies when a future verb is declared.
 
 ## Rules
 
