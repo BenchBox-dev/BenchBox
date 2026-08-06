@@ -622,12 +622,18 @@ def compose_environment(
 ) -> dict[str, str]:
     """Return environment overrides needed by a compose spec.
 
-    Raises DockerAssetError when ``benchmark_runs_dir`` is given but not
+    Raises DockerAssetError when ``benchmark_runs_dir`` is missing or not
     absolute for a path-mirroring platform (lakesail, velox): their compose
     files bind-mount BENCHBOX_DATA_DIR at the SAME absolute path inside the
     container as on the host (the server resolves client-sent file paths
-    server-side), so a relative value silently breaks every file load
-    instead of failing loudly (lakesail-compose-nested-variable-default).
+    server-side), so a relative value -- or a caller that never resolved a
+    value at all -- silently breaks every file load instead of failing
+    loudly (lakesail-compose-nested-variable-default). A `None`
+    benchmark_runs_dir must NOT fall through to returning `{}` for these two
+    platforms: `run_docker_command` fills an omitted/empty ``env`` with
+    `os.environ.copy()`, so a `{}` return here would let the child process
+    silently inherit whatever ambient BENCHBOX_DATA_DIR happens to be set
+    (or unset) in the caller's shell instead of the resolved run directory.
 
     This is the single choke point every UAT-managed bring-up path funnels
     through -- tests/uat/phases/execute.py's up AND down calls, and
@@ -641,8 +647,17 @@ def compose_environment(
     should catch DockerAssetError and substitute a throwaway absolute value
     rather than skip this validation.
     """
-    if spec.platform not in {"lakesail", "velox"} or benchmark_runs_dir is None:
+    if spec.platform not in {"lakesail", "velox"}:
         return {}
+    if benchmark_runs_dir is None:
+        raise DockerAssetError(
+            f"benchmark_runs_dir is required for platform {spec.platform!r} -- its compose "
+            "file mounts BENCHBOX_DATA_DIR at the SAME absolute path inside the container as "
+            "on the host, so omitting it would let the child process silently inherit "
+            "whatever ambient BENCHBOX_DATA_DIR (if any) is set in the caller's environment "
+            "instead of the resolved run directory. Pass an absolute benchmark_runs_dir / "
+            "--benchmark-runs-dir."
+        )
     data_dir = Path(benchmark_runs_dir).expanduser()
     if not data_dir.is_absolute():
         raise DockerAssetError(

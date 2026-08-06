@@ -514,6 +514,7 @@ endef
 
 test-docker-up-%:
 	@set -e; \
+		$(call require_data_dir_if_mounted,$*); \
 		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
 		project_file="$$state_dir/$*.project"; \
 		mkdir -p "$$state_dir"; \
@@ -529,7 +530,6 @@ test-docker-up-%:
 			fi; \
 		}; \
 		trap cleanup EXIT INT TERM; \
-		$(call require_data_dir_if_mounted,$*); \
 		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
 		printf '%s\n' "$$project_name" > "$$project_file"; \
 		status=0

@@ -184,6 +184,36 @@ def test_compose_environment_error_names_platform_and_the_offending_value(platfo
     assert "relative_runs" in str(excinfo.value)
 
 
+@pytest.mark.parametrize("platform", ["lakesail", "velox"])
+def test_compose_environment_raises_for_missing_benchmark_runs_dir(platform):
+    """must_preserve: a `None` benchmark_runs_dir must NOT fall through to
+    compose_environment() returning `{}` for lakesail/velox the way it does
+    for every other platform. run_docker_command() fills an empty/omitted
+    `env` with `os.environ.copy()` (tests/uat/docker_assets.py), so `{}`
+    here would let the child compose process silently inherit whatever
+    ambient BENCHBOX_DATA_DIR happens to be set (or unset) in the caller's
+    shell -- exactly the same silent-no-mount failure mode the relative-path
+    guard closes, just reached by omitting the argument instead of passing
+    a relative one."""
+    spec = docker_assets.docker_platform_spec(platform)
+
+    with pytest.raises(docker_assets.DockerAssetError, match="benchmark_runs_dir"):
+        docker_assets.compose_environment(spec, benchmark_runs_dir=None)
+
+    with pytest.raises(docker_assets.DockerAssetError):
+        docker_assets.compose_environment(spec)
+
+
+@pytest.mark.parametrize("platform", ["postgresql", "clickhouse-server", "questdb"])
+def test_compose_environment_returns_empty_for_missing_dir_on_non_path_mirroring_platforms(platform):
+    """Only lakesail/velox reference BENCHBOX_DATA_DIR at all -- a missing
+    benchmark_runs_dir must not raise for any other platform."""
+    spec = docker_assets.docker_platform_spec(platform)
+
+    assert docker_assets.compose_environment(spec, benchmark_runs_dir=None) == {}
+    assert docker_assets.compose_environment(spec) == {}
+
+
 @pytest.mark.parametrize("platform", ["postgresql", "pg-duckdb", "pg-mooncake", "timescaledb"])
 def test_local_managed_postgres_compose_password_matches_uat_argv(platform):
     spec = docker_assets.docker_platform_spec(platform)
