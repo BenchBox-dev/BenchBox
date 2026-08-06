@@ -32,9 +32,20 @@ DOCKER_FIXED_CONTAINER_NAME_POLICIES: tuple[str, ...] = ("fail", "override", "al
 # the CONTAINER name as `<project>-<service>-<replica>`, and mocker rejects
 # anything over `_CONTAINER_NAME_MAX_LEN` (uat-compose-project-name-overflows-
 # container-id-limit-20260805). Plain Docker's own limit is looser (~255), but
-# the bound below is intentionally the tighter mocker one applied everywhere
-# -- see the "preserves" note on compose_project_name: this only ever makes
-# the project name shorter, never longer, so it is safe for Docker too.
+# the bound below is intentionally the tighter mocker one applied everywhere.
+#
+# NOT "safe for Docker too" in the sense of unchanged: this tightens the
+# budget, so it RENAMES roughly half of the checked-in (config, platform)
+# project names (shorter, never longer -- never re-introduces an overflow).
+# A pre-upgrade sweep's containers are registered under the OLD, longer name;
+# `compose_project_name()` is deterministic on *current* code, so the next
+# sweep's exact `-p <new-name>` teardown will not match and tear down those
+# leftovers -- they keep holding host ports until removed separately. They
+# remain recoverable: `docker_cleanup.py`'s recovery inventory matches by the
+# `benchbox-uat` *prefix*, which this rename preserves (only the tail after
+# the prefix is truncated differently). See "Compose project naming and the
+# container-id limit" in docs/operations/uat-framework.md for the operator
+# recovery step.
 _CONTAINER_NAME_MAX_LEN = 64
 # Reserve room for a two-digit compose replica index ("-10".."-99"), not just
 # "-1": a scaled service silently overflows by one character the moment it

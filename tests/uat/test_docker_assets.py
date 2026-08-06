@@ -112,10 +112,17 @@ def test_compose_project_name_sanitizes_and_bounds_length():
 
 def test_docker_platform_services_populated_and_match_compose_files():
     """w0: every registered spec declares its compose services explicitly, and
-    those tuples reflect the platform's actual compose file(s) -- the full
-    declared set for platforms that start everything, and the documented
-    host-run-only subset for lakesail/velox (see their spec.notes)."""
-    intentional_subset_platforms = {"lakesail", "velox"}
+    those tuples match the compose file's non-profile-gated declared services
+    exactly -- the services a plain `docker compose up` starts without an
+    explicit `--profile` selection.
+
+    This is an equality check for every platform, with no per-platform
+    exemption list: lakesail declares exactly one service, so a `<=` subset
+    exemption for it would never actually be exercised (vacuous). velox's
+    documented host-run-only subset (see its spec.notes) is expressed in the
+    compose file itself -- velox-runner carries `profiles: [runner]`, so it is
+    excluded from "declared" here the same way `docker compose up` (no
+    `--profile`) would exclude it, rather than via a hardcoded name check."""
     specs = docker_assets.docker_platform_specs()
     assert not [platform for platform, spec in specs.items() if not spec.services]
 
@@ -123,11 +130,12 @@ def test_docker_platform_services_populated_and_match_compose_files():
         declared: list[str] = []
         for compose_file in spec.compose_files:
             data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
-            declared.extend((data.get("services") or {}) if isinstance(data, dict) else {})
-        if platform in intentional_subset_platforms:
-            assert set(spec.services) <= set(declared), (platform, spec.services, declared)
-        else:
-            assert set(spec.services) == set(declared), (platform, spec.services, declared)
+            services = (data.get("services") or {}) if isinstance(data, dict) else {}
+            for name, definition in services.items():
+                if isinstance(definition, dict) and definition.get("profiles"):
+                    continue  # profile-gated: not started by a plain `docker compose up`
+                declared.append(name)
+        assert set(spec.services) == set(declared), (platform, spec.services, declared)
 
 
 def test_compose_project_name_container_name_budget_derives_from_service_len():
@@ -138,7 +146,7 @@ def test_compose_project_name_container_name_budget_derives_from_service_len():
     short_service_name = docker_assets.compose_project_name(long_config, "cedardb")  # service "cedardb", len 7
     long_service_name = docker_assets.compose_project_name(
         long_config, "lakesail"
-    )  # service "lakesail-connect", len 17
+    )  # service "lakesail-connect", len 16
 
     assert len(long_service_name) < len(short_service_name)
     assert len(short_service_name) <= 63

@@ -264,6 +264,28 @@ registered Docker platform and asserts the resulting container id fits.
 `docker_project_prefix` stays fully operator-configurable -- a longer prefix
 still produces a valid, distinct project name, just truncated sooner.
 
+**Migration note (container-id budget tightening, 2026-08).** Deriving the
+budget from the 64-char container-id limit instead of compose's looser
+63-char project-name ceiling is strictly tighter, so it renames roughly half
+of the checked-in (config, platform) project names -- always shorter, never
+longer, so it never reintroduces an overflow. The rename itself is safe, but
+teardown matches by exact `-p <project-name>`: containers started by a
+pre-upgrade sweep are registered under the OLD, longer project name, so the
+first post-upgrade sweep's teardown will not match and stop them, and they
+keep holding their host ports. They are not lost -- `make uat-docker-cleanup`
+inventories by the `benchbox-uat` project-label *prefix* (see above), which
+every generation of this name has always shared, old and new alike. After
+upgrading, run the recovery command once to catch any pre-upgrade
+leftovers:
+
+```bash
+make uat-docker-cleanup APPLY=1
+```
+
+This removes only `benchbox-uat`-prefixed resources (containers, then their
+volumes/networks/images) and leaves everything else for manual review, per
+the recovery command's normal `APPLY=1` semantics above.
+
 ## Explorer smoke (browser)
 
 `make uat-explorer-smoke` invokes Playwright directly against a freshly
