@@ -112,6 +112,59 @@ def _is_public_pseudonym(value: str, prefix: str) -> bool:
     return len(digest) == _PUBLIC_HASH_WIDTH and all(char in _PUBLIC_HASH_DIGITS for char in digest)
 
 
+# Community-facing publish paths (``benchbox submit``) require a non-empty salt
+# from this env var. The value must not be baked into the repository.
+PUBLIC_PSEUDONYM_SALT_ENV = "BENCHBOX_MACHINE_ID_SALT"
+
+
+class MissingPublicPseudonymSaltError(ValueError):
+    """Raised when a community-facing path is used without a deployment salt."""
+
+
+def resolve_public_pseudonym_salt(
+    *,
+    explicit: Optional[str] = None,
+    environ: Optional[dict[str, str]] = None,
+) -> Optional[str]:
+    """Return a non-empty public pseudonym salt, or ``None`` if unset.
+
+    Precedence: *explicit* argument, then :data:`PUBLIC_PSEUDONYM_SALT_ENV`.
+    Empty strings are treated as unset. The OSS default remains empty so a
+    repository-baked constant cannot pretend to be a secret.
+    """
+    if explicit is not None:
+        stripped = str(explicit).strip()
+        return stripped or None
+    env = environ if environ is not None else os.environ
+    raw = env.get(PUBLIC_PSEUDONYM_SALT_ENV)
+    if raw is None:
+        return None
+    stripped = str(raw).strip()
+    return stripped or None
+
+
+def require_public_pseudonym_salt(
+    *,
+    explicit: Optional[str] = None,
+    environ: Optional[dict[str, str]] = None,
+) -> str:
+    """Return a non-empty salt or raise :class:`MissingPublicPseudonymSaltError`.
+
+    Use on community-facing publish paths only. Private/local export may still
+    use an empty default salt.
+    """
+    salt = resolve_public_pseudonym_salt(explicit=explicit, environ=environ)
+    if salt is None:
+        raise MissingPublicPseudonymSaltError(
+            "Community publish requires a non-empty public pseudonym salt. "
+            f"Set the {PUBLIC_PSEUDONYM_SALT_ENV} environment variable to a "
+            "deployment-private value before the first public export/submit. "
+            "See docs/development/adr/adr-published-identifier-field-set.md "
+            "(retained-field salt decision)."
+        )
+    return salt
+
+
 @dataclass
 class AnonymizationConfig:
     """Configuration for result anonymization.
@@ -122,8 +175,9 @@ class AnonymizationConfig:
     salt decision). Open-source BenchBox keeps the empty default so a
     repository-baked salt cannot pretend to be a secret. Operators who publish
     community-facing results must set a non-empty salt known only to the
-    deployment before the first public export. Already-public-shaped tokens
-    still pass through unchanged (publication fixed point).
+    deployment before the first public export (via ``machine_id_salt`` or
+    :data:`PUBLIC_PSEUDONYM_SALT_ENV`). Already-public-shaped tokens still pass
+    through unchanged (publication fixed point).
     """
 
     # Machine identification. The salt feeds both get_anonymous_machine_id and
@@ -142,6 +196,25 @@ class AnonymizationConfig:
 
     # Custom sanitizers
     custom_sanitizers: dict[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_public_environ(
+        cls,
+        *,
+        environ: Optional[dict[str, str]] = None,
+        require_salt: bool = False,
+    ) -> "AnonymizationConfig":
+        """Build config from the public-salt environment variable.
+
+        When *require_salt* is true, raises :class:`MissingPublicPseudonymSaltError`
+        if the salt is unset (community publish). When false, empty salt is allowed
+        for private/local use.
+        """
+        if require_salt:
+            salt: Optional[str] = require_public_pseudonym_salt(environ=environ)
+        else:
+            salt = resolve_public_pseudonym_salt(environ=environ)
+        return cls(machine_id_salt=salt)
 
 
 class AnonymizationManager:
@@ -746,8 +819,12 @@ def find_public_path_leaks(value: Any, key_path: tuple[str, ...] = ()) -> list[s
 
 
 __all__ = [
+    "PUBLIC_PSEUDONYM_SALT_ENV",
     "PUBLIC_REDACTED_VALUE",
     "AnonymizationConfig",
     "AnonymizationManager",
+    "MissingPublicPseudonymSaltError",
     "find_public_path_leaks",
+    "require_public_pseudonym_salt",
+    "resolve_public_pseudonym_salt",
 ]

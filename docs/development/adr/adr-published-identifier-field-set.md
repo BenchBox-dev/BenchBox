@@ -119,9 +119,12 @@ Rationale:
    plus whatever community submitters put in retained keys — the latter is why
    operators must set a real salt before accepting third-party submissions.
 4. **Operators close the residual.** Set `AnonymizationConfig.machine_id_salt`
-   (or the equivalent export config) to a non-empty value known only to the
-   deployment *before* the first public publish. New raw values then hash under
-   that salt; already-published tokens still pass through by design.
+   or the `BENCHBOX_MACHINE_ID_SALT` environment variable to a non-empty value
+   known only to the deployment *before* the first public publish. New raw
+   values then hash under that salt; already-published tokens still pass
+   through by design. **`benchbox submit` hard-refuses** when the salt is
+   unset/empty (community-facing gate); private/local export without salt
+   remains allowed.
 
 ## Alternatives considered (field-set)
 

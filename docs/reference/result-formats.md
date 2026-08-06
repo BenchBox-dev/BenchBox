@@ -489,8 +489,11 @@ documented rather than denied.
 
 A non-empty salt closes the oracle only if it is **not** shipped in the public
 tree. Operators who will publish community submissions must set
-`machine_id_salt` to a deployment-private value before the first public export.
-A repository-baked "default salt" would still be public and is rejected.
+`machine_id_salt` or the `BENCHBOX_MACHINE_ID_SALT` environment variable to a
+deployment-private value before the first public export. `benchbox submit`
+refuses when that salt is missing. A repository-baked "default salt" would
+still be public and is rejected. Private/local export without salt remains
+allowed.
 
 #### Salt rotation
 
