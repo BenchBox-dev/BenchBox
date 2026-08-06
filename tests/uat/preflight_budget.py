@@ -67,6 +67,105 @@ DATABASE_STATUS_UNMEASURED = "unmeasured"
 
 
 @dataclass(frozen=True)
+class MemorySnapshot:
+    """A host memory reading for the free-memory headroom gate (preflight.free_memory_min_gib).
+
+    `free_gib` is None when free memory could not be measured on this host
+    (psutil unavailable, or the read itself raised) -- callers MUST treat
+    None as "unknown", never coerce it to 0.0 (would fail-closed and abort a
+    host the gate simply cannot read) nor to a large number (would
+    fail-open and silently skip the exact check this gate exists for). See
+    `read_memory_snapshot` and `check_memory_headroom`.
+
+    `swap_used_percent` is best-effort telemetry only (the 2026-08-04
+    postmortem host also had 11.7 of 13.3 GB swap used alongside 72 MB free)
+    -- it is logged alongside the gate result but never participates in the
+    pass/fail decision, per the "gate on measured free memory with swap
+    pressure logged alongside" guidance.
+    """
+
+    free_gib: float | None
+    swap_used_percent: float | None
+
+
+def read_memory_snapshot() -> MemorySnapshot:
+    """Best-effort host free-memory + swap-pressure reading.
+
+    Single measurement primitive for the free-memory gate, mirroring
+    `free_space_gib`'s role for the disk gate. Uses
+    `psutil.virtual_memory().available` -- `psutil` is a hard project
+    dependency (see pyproject.toml; already used the same way for host
+    telemetry in benchbox/platforms/base/result_capture.py) and reports
+    memory actually available for new allocations (page cache/buffers
+    already excluded on Linux) on macOS, Linux, and Windows alike, unlike a
+    `/proc/meminfo`-only approach that would silently read as "unmeasurable"
+    on macOS -- exactly the platform the 2026-08-04 incident happened on.
+
+    Degrades safely to `MemorySnapshot(None, None)` on ANY failure (missing
+    psutil, a sandboxed process denied access, ...) rather than raising or
+    fabricating a value -- the gate must not silently pass as if there were
+    headroom, nor hard-fail a host where the measurement itself is
+    unavailable (e.g. a locked-down Linux CI container).
+    """
+    try:
+        import psutil
+    except ImportError:
+        return MemorySnapshot(free_gib=None, swap_used_percent=None)
+    try:
+        free_gib = psutil.virtual_memory().available / (1024**3)
+    except (OSError, RuntimeError, ValueError, AttributeError):
+        free_gib = None
+    try:
+        swap_used_percent = psutil.swap_memory().percent
+    except (OSError, RuntimeError, ValueError, AttributeError):
+        swap_used_percent = None
+    return MemorySnapshot(free_gib=free_gib, swap_used_percent=swap_used_percent)
+
+
+@dataclass(frozen=True)
+class MemoryHeadroomCheck:
+    """Memory-gate result for one host memory snapshot."""
+
+    free_gib: float | None
+    required_gib: float
+    swap_used_percent: float | None
+
+    @property
+    def shortfall(self) -> bool:
+        """True iff free memory was measured and fell below the floor.
+
+        An unmeasured reading (`free_gib is None`) is never a shortfall --
+        the fail-safe "unknown != failing" branch (see
+        `read_memory_snapshot`).
+        """
+        return self.free_gib is not None and self.free_gib < self.required_gib
+
+
+def check_memory_headroom(snapshot: MemorySnapshot, *, min_free_gib: float) -> MemoryHeadroomCheck:
+    """Compare a memory snapshot against the configured floor.
+
+    Mirrors `check_disk_headroom`'s shape. Callers own the 0-disables
+    convention (`min_free_gib <= 0` means the gate is off) the same way
+    `execute.py`'s free-space check does -- this function does not special
+    case it, but `shortfall` is `False` whenever `min_free_gib <= 0` since
+    no measured `free_gib` can be less than a non-positive floor.
+    """
+    return MemoryHeadroomCheck(
+        free_gib=snapshot.free_gib,
+        required_gib=min_free_gib,
+        swap_used_percent=snapshot.swap_used_percent,
+    )
+
+
+def format_memory_headroom_failure(check: MemoryHeadroomCheck) -> str:
+    """Operator-facing abort reason for a memory-budget shortfall."""
+    swap_note = f"; swap {check.swap_used_percent:.1f}% used" if check.swap_used_percent is not None else ""
+    return (
+        f"memory headroom gate failed: {check.free_gib:.2f} GiB free < {check.required_gib:.2f} GiB required{swap_note}"
+    )
+
+
+@dataclass(frozen=True)
 class DiskBudgetRow:
     """One observed disk envelope for a (platform, benchmark, scale) cell.
 

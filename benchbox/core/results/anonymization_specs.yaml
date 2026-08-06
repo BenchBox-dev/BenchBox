@@ -13,8 +13,14 @@
 #
 # Alias rows cover alternate spellings of the six unread drop fields so a
 # producer using workdir/datadir/pythonexecutable cannot reintroduce empty-salt
-# path_/host_ tokens. host/hostname/server are intentionally NOT dropped: they
-# are broader than engine_host and may carry non-local endpoints still hashed.
+# path_/host_ tokens. Residual pure-local filesystem keys (output*/result*/
+# log*/filepath/path/sourceroot/credentialfile) are also dropped: no Explorer
+# or pipeline consumer, empty-salt confirmation oracle only.
+#
+# KEEP HASH (do not add here): sslrootcert (libpq privacy hash); s3stagingurl /
+# staginglocation / stagingurl / httppath (may embed account/tenant); host /
+# hostname / server (broader than engine_host, may be remote); retained
+# consumers endpoint / database_name / submission_path.
 public_drop_keys:
 - machineid
 - workingdir
@@ -28,6 +34,19 @@ public_drop_keys:
 - datadir
 - datadirectory
 - enginehost
+# Residual local-path keys (compact forms): omit rather than path_ tokens.
+- outputdir
+- outputdirectory
+- outputpath
+- outputlocation
+- resultdir
+- resultpath
+- logpath
+- logfile
+- filepath
+- path
+- sourceroot
+- credentialfile
 identifier_keys:
   account: account
   accountid: account

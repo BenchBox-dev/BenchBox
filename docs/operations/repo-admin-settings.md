@@ -139,6 +139,20 @@ The soundness gate, as operated:
   `make pr-open READY=1`) does, so a PR cannot merge while a follow-up commit
   is still being written. Arming at creation stranded three commits in one
   session, two of them the fixes for their own review findings.
+- `.github/workflows/auto-merge-on-open.yml` matches that hold: it does **not**
+  arm on `opened` / `reopened` / `synchronize` (bare `gh pr create` no longer
+  auto-arms). It arms only on `ready_for_review` (draft → ready), which is the
+  UI equivalent of `make pr-ready`, and only when the PR does not carry the
+  durable hold label `no-auto-merge`. `synchronize` / `labeled` re-evaluate
+  revocation only (soundness paths or the hold label) — they never re-enable
+  auto-merge. The soundness check unions the base-ref predicate with the PR
+  checkout copy so a gate widened mid-flight still revokes; enable still
+  requires both false so a PR cannot weaken its own gate.
+- Durable holds both re-arm paths honour: **draft** (job/sweep skip) and
+  label **`no-auto-merge`** (workflow blocks enable + disables; nightly
+  green-unmerged sweep never enables auto-merge and does not classify the
+  label as stranded). See `docs/operations/pr-triage.md` "Durable auto-merge
+  holds".
 - The arming path and `auto-merge-on-open.yml` WITHHOLD squash auto-merge for
   PRs touching those paths (and revoke it on a later push that newly touches
   them). CI cannot catch a change that redefines the oracle it validates

@@ -6,5 +6,8 @@ set -euo pipefail
 # Keep this declaration synchronized with todo_db.SCHEMA_VERSION. The required
 # schema-migration inventory gate rejects a wrapper/CLI mismatch before merge.
 TODO_SCHEMA_VERSION=5
-ROOT="$(git rev-parse --show-toplevel)"
+# Resolve the tree that owns this shim, not cwd's git toplevel. An absolute
+# path to another clone's shim must still run that clone's todo_db.py.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 exec uv run --project "$ROOT/_project/scripts" -- python "$ROOT/_project/scripts/todo_db.py" "$@"

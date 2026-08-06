@@ -22,10 +22,13 @@ name: Corpus Drift Check
 #
 # Direction matters. A two-way `git diff published develop` also surfaces
 # published-only paths (community submissions that landed on published-results
-# and have not been back-ported to develop). Recommending a full mirror for
-# those paths would *delete* public content. This canary therefore classifies:
-#   - develop-ahead / content-changed: fail + recommend mirror (leak class)
-#   - published-only: report as info, never recommend a destructive mirror
+# and have not been back-ported to develop). Recommending a wipe-based full
+# mirror for those paths would *delete* public content. This canary classifies:
+#   - develop-ahead / content-changed alone: fail + recommend overlay mirror
+#   - published-only alone: report as info, never recommend a destructive mirror
+#   - mixed (develop-ahead AND published-only): fail for the stale paths, but
+#     never recommend a wipe-based full mirror; point at the union-overlay sync
+#     that preserves published-only community submissions
 
 on:
   schedule:
@@ -112,11 +115,30 @@ jobs:
           echo "::error::published-results corpus is ${COUNT} path(s) behind develop (develop-ahead or content-changed)."
           echo "The public corpus is stale. If develop has since sanitized or"
           echo "corrected bundles, the public branch is still serving the old"
-          echo "content. Mirror it with:"
-          echo "  gh workflow run sync-results-data-to-published.yml --ref develop"
+          echo "content."
           echo ""
           echo "Develop-ahead / content-changed paths (first 40):"
           printf '%s\n' "${STALE_PATHS}" | head -40
+          echo ""
+          if [[ -n "${PUBLISHED_ONLY}" ]]; then
+            # Mixed drift: develop is ahead AND published has community-only
+            # paths. Never recommend a wipe-based full mirror of
+            # results-data/bundles — that deletes public content. The sync
+            # workflow applies a union overlay (checkout develop's files
+            # without git-rm of the tree) so published-only paths survive.
+            echo "Published-only paths also exist (see notice above)."
+            echo "Develop-ahead can be mirrored with the union-overlay sync that"
+            echo "overwrites develop's files under results-data/bundles without"
+            echo "deleting published-only community submissions."
+            echo "Do NOT use a wipe-based full mirror (git rm -rf results-data/bundles)"
+            echo "while published-only paths exist — that would delete public content."
+            echo "Run the non-destructive overlay mirror:"
+            echo "  gh workflow run sync-results-data-to-published.yml --ref develop"
+          else
+            echo "Mirror develop-ahead onto published-results (union overlay for"
+            echo "results-data/bundles; no wipe of published-only content):"
+            echo "  gh workflow run sync-results-data-to-published.yml --ref develop"
+          fi
           exit 1
 
       - name: Install uv for the published-tip privacy scan

@@ -9,3 +9,4 @@ Architecture Decision Records
 - [ADR: published-results as a Slim Corpus-Only Branch](adr-published-results-slim-corpus-branch.md)
 - [ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias](adr-ducklake-maturity-and-publishability.md)
 - [ADR: One Engine, Scoped Surfaces — CLI and MCP over a Shared Core](adr-one-engine-scoped-surfaces.md)
+- [ADR: `public_result_id` permanence attaches at publication](adr-public-result-id-permanence.md)

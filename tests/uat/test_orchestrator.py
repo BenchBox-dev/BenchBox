@@ -1303,6 +1303,79 @@ def test_green_sweep_writes_green_gate_summary_with_accounting(tmp_path: Path):
     assert payload["explorer_smoke_status"] == "not_run"
 
 
+def test_green_sweep_with_unvalidated_cells_reports_unvalidated_count_not_zero(tmp_path: Path):
+    """Regression: uat_gate_summary.json must not silently disagree with matrix_summary.tsv.
+
+    tests.uat.phases.report.write_report already rolls an unvalidated DataFrame
+    cell into ReportSummary.unvalidated_count and the TSV's
+    `# UNVALIDATED_CELLS=N` footer; this pins that
+    orchestrator._accounting_for_gate_summary actually copies that count into
+    PhaseAccounting.unvalidated rather than leaving the gate summary --
+    the one artifact a release gate reads by machine, not by a human scanning
+    rows -- silently asserting 0. The verdict must still be green: unvalidated
+    is not a UAT cell failure.
+    """
+    cfg = validate_config(
+        {
+            "name": "gate-green-unvalidated",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb", "polars-df"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "report": {"cross_scale_coverage_min_pairs": 1},
+        }
+    )
+    clean_cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "duckdb.log",
+        result_path=tmp_path / "duckdb_result.json",
+        submit_terminal_state="submittable",
+    )
+    unvalidated_cell = CellResult(
+        platform="polars-df",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "polars_df.log",
+        result_path=tmp_path / "polars_df_result.json",
+        submit_terminal_state="unvalidated",
+    )
+    fake_execute = type(
+        "ExecuteOutcome",
+        (),
+        {
+            "results": (clean_cell, unvalidated_cell),
+            "pruned": (),
+            "skipped_unreachable": (),
+            "startup_failed": (),
+            "compatibility_pruned": (),
+            "aborted": False,
+            "abort_reason": None,
+            "exit_code": lambda self: 0,
+        },
+    )()
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=fake_execute):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
+
+    assert result.exit_code() == 0
+    payload = _read_gate_summary(tmp_path)
+    assert payload["verdict"] == "green"
+    assert payload["accounting"]["passed"] == 2
+    assert payload["accounting"]["attempted"] == 2
+    # The one assertion this test exists for: not 0.
+    assert payload["accounting"]["unvalidated"] == 1
+
+    tsv_text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
+    assert "# UNVALIDATED_CELLS=1 release_gate_attention=required" in tsv_text
+
+
 def test_failed_cell_sweep_writes_red_gate_summary(tmp_path: Path):
     cfg = validate_config(
         {

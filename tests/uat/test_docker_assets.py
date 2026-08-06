@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from tests.uat import docker_assets, matrix
 from tests.uat.docker_path_helpers import compose_path_ends_with
@@ -451,3 +452,34 @@ def test_sweep_leaked_mocker_volumes_swallows_individual_removal_failure(tmp_pat
 
     # One volume's rm failure does not abort the rest of the sweep.
     assert removed == ("benchbox-uat-demo-cache",)
+
+
+@pytest.mark.parametrize(
+    ("platform", "expected_service_names"),
+    [
+        # The validated mocker failure is specifically databend's `minio`
+        # service exiting under mocker (AGENTS.md) -- `minio` is the
+        # load-bearing token in that guidance, not just "three services".
+        ("databend", frozenset({"minio", "minio-setup", "databend"})),
+        # all-in-one FE+BE image -- single container, unaffected by mocker.
+        ("doris", frozenset({"doris"})),
+        # all-in-one image -- single container, unaffected by mocker.
+        ("starrocks", frozenset({"starrocks"})),
+    ],
+)
+def test_multi_service_platform_service_names_match_documented_guidance(platform, expected_service_names):
+    """Pin the compose service *identities* AGENTS.md and uat-framework.md cite.
+
+    Guards against the mocker multi-service guidance drifting out of sync
+    with the compose files it describes, the way it silently did once before
+    (commit fd29aa77c0 compressed the specific databend/minio caveat into a
+    vague, unverifiable claim). A count-only assertion would stay green even
+    if databend's `minio` service were renamed to something else, so this
+    pins the actual service names, not just how many there are.
+    """
+    spec = docker_assets.docker_platform_spec(platform)
+    service_names: set[str] = set()
+    for compose_file in spec.compose_files:
+        data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+        service_names.update(data.get("services", {}).keys())
+    assert service_names == expected_service_names
