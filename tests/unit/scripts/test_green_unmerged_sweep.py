@@ -92,7 +92,7 @@ def test_soundness_gated_false_for_ordinary_path() -> None:
 
 
 # ------------------------------------------------------------------ #
-# head_age_hours / is_stranded                                        #
+# head_age_hours / has_arm_intent / is_stranded                       #
 # ------------------------------------------------------------------ #
 def test_head_age_hours_uses_head_pushed_at_over_updated_at() -> None:
     pr = {"head_pushed_at": "2026-07-23T10:00:00Z", "updated_at": "2026-07-23T11:59:00Z"}
@@ -109,19 +109,68 @@ def test_head_age_hours_unknown_anchor_is_zero() -> None:
 
 
 @pytest.mark.parametrize(
-    ("draft", "required_green", "auto_merge_enabled", "soundness_gated", "age_hours", "explicit_hold", "expected"),
+    ("events", "expected"),
     [
-        (False, True, False, False, 3.0, False, True),  # stranded
-        (True, True, False, False, 3.0, False, False),  # draft excluded
-        (False, False, False, False, 3.0, False, False),  # red lane excluded
-        (False, True, True, False, 3.0, False, False),  # auto-merge already on
-        (False, True, False, True, 3.0, False, False),  # soundness-gated excluded
-        (False, True, False, False, 1.0, False, False),  # within grace period
-        (False, True, False, False, 3.0, True, False),  # explicit hold label excluded
+        ([], False),
+        (None, False),
+        ([{"event": "committed"}], False),
+        ([{"event": "ready_for_review"}], True),
+        ([{"event": "auto_squash_enabled"}], True),
+        ([{"event": "auto_merge_enabled"}], True),
+        ([{"event": "auto_merge_disabled"}], True),
+        ([{"event": "committed"}, {"event": "auto_squash_enabled"}, {"event": "auto_merge_disabled"}], True),
+    ],
+)
+def test_has_arm_intent(events, expected) -> None:
+    assert mod.has_arm_intent(events) is expected
+
+
+def test_resolve_had_arm_intent_prefers_explicit_flag() -> None:
+    # Explicit false wins even if timeline would say true (fixture override).
+    assert (
+        mod.resolve_had_arm_intent({"had_arm_intent": False, "timeline_events": [{"event": "ready_for_review"}]})
+        is False
+    )
+    assert mod.resolve_had_arm_intent({"had_arm_intent": True, "timeline_events": []}) is True
+    assert mod.resolve_had_arm_intent({"timeline_events": [{"event": "auto_squash_enabled"}]}) is True
+    assert mod.resolve_had_arm_intent({}) is False
+
+
+@pytest.mark.parametrize(
+    (
+        "draft",
+        "required_green",
+        "auto_merge_enabled",
+        "soundness_gated",
+        "age_hours",
+        "explicit_hold",
+        "had_arm_intent",
+        "expected",
+    ),
+    [
+        # True strand: green, auto-merge off, past grace, prior arm intent, no hold label.
+        (False, True, False, False, 3.0, False, True, True),
+        # Never-armed intentional hold -- NOT stranded.
+        (False, True, False, False, 3.0, False, False, False),
+        # Explicit hold label excludes even with prior arm intent.
+        (False, True, False, False, 3.0, True, True, False),
+        (False, True, False, False, 3.0, True, False, False),
+        (True, True, False, False, 3.0, False, True, False),  # draft excluded
+        (False, False, False, False, 3.0, False, True, False),  # red lane excluded
+        (False, True, True, False, 3.0, False, True, False),  # auto-merge already on
+        (False, True, False, True, 3.0, False, True, False),  # soundness-gated excluded
+        (False, True, False, False, 1.0, False, True, False),  # within grace period
     ],
 )
 def test_is_stranded_matrix(
-    draft, required_green, auto_merge_enabled, soundness_gated, age_hours, explicit_hold, expected
+    draft,
+    required_green,
+    auto_merge_enabled,
+    soundness_gated,
+    age_hours,
+    explicit_hold,
+    had_arm_intent,
+    expected,
 ) -> None:
     assert (
         mod.is_stranded(
@@ -132,6 +181,7 @@ def test_is_stranded_matrix(
             age_hours=age_hours,
             grace_hours=2.0,
             explicit_hold=explicit_hold,
+            had_arm_intent=had_arm_intent,
         )
         is expected
     )
@@ -141,6 +191,112 @@ def test_has_auto_merge_hold_label() -> None:
     assert mod.has_auto_merge_hold_label([mod.AUTO_MERGE_HOLD_LABEL]) is True
     assert mod.has_auto_merge_hold_label(["enhancement"]) is False
     assert mod.has_auto_merge_hold_label(None) is False
+
+
+def test_classify_pr_intentional_hold_not_stranded() -> None:
+    pr = {
+        "number": 1,
+        "title": "hold",
+        "html_url": "https://example.invalid/1",
+        "draft": False,
+        "auto_merge": None,
+        "timeline_events": [],
+        "changed_files": ["docs/readme.md"],
+        "head_pushed_at": "2026-07-23T08:00:00Z",
+        "check_runs": [
+            {
+                "name": "ci-required-result",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-07-23T08:10:00Z",
+            }
+        ],
+    }
+    c = mod.classify_pr(pr, _now(), grace_hours=2.0)
+    assert c.required_green is True
+    assert c.auto_merge_enabled is False
+    assert c.had_arm_intent is False
+    assert c.explicit_hold is False
+    assert c.stranded is False
+
+
+def test_classify_pr_explicit_hold_label_not_stranded() -> None:
+    # Even with prior arm intent, the durable hold label wins.
+    pr = {
+        "number": 11,
+        "title": "labeled hold",
+        "html_url": "https://example.invalid/11",
+        "draft": False,
+        "auto_merge": None,
+        "labels": [mod.AUTO_MERGE_HOLD_LABEL],
+        "timeline_events": [{"event": "ready_for_review"}, {"event": "auto_squash_enabled"}],
+        "changed_files": ["docs/readme.md"],
+        "head_pushed_at": "2026-07-23T08:00:00Z",
+        "check_runs": [
+            {
+                "name": "ci-required-result",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-07-23T08:10:00Z",
+            }
+        ],
+    }
+    c = mod.classify_pr(pr, _now(), grace_hours=2.0)
+    assert c.had_arm_intent is True
+    assert c.explicit_hold is True
+    assert c.stranded is False
+
+
+def test_classify_pr_true_strand_ready_for_review() -> None:
+    pr = {
+        "number": 2,
+        "title": "strand",
+        "html_url": "https://example.invalid/2",
+        "draft": False,
+        "auto_merge": None,
+        "timeline_events": [{"event": "ready_for_review"}],
+        "changed_files": ["docs/readme.md"],
+        "head_pushed_at": "2026-07-23T08:00:00Z",
+        "check_runs": [
+            {
+                "name": "ci-required-result",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-07-23T08:10:00Z",
+            }
+        ],
+    }
+    c = mod.classify_pr(pr, _now(), grace_hours=2.0)
+    assert c.had_arm_intent is True
+    assert c.explicit_hold is False
+    assert c.stranded is True
+
+
+def test_classify_pr_true_strand_auto_merge_dropped() -> None:
+    pr = {
+        "number": 3,
+        "title": "dropped",
+        "html_url": "https://example.invalid/3",
+        "draft": False,
+        "auto_merge": None,
+        "timeline_events": [
+            {"event": "auto_squash_enabled"},
+            {"event": "auto_merge_disabled"},
+        ],
+        "changed_files": ["docs/readme.md"],
+        "head_pushed_at": "2026-07-23T08:00:00Z",
+        "check_runs": [
+            {
+                "name": "ci-required-result",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-07-23T08:10:00Z",
+            }
+        ],
+    }
+    c = mod.classify_pr(pr, _now(), grace_hours=2.0)
+    assert c.had_arm_intent is True
+    assert c.stranded is True
 
 
 # ------------------------------------------------------------------ #
@@ -170,6 +326,7 @@ def test_build_digest_always_carries_marker() -> None:
     digest = mod.build_digest([], now=_now(), repo="joeharris76/BenchBox")
     assert mod.DIGEST_BODY_MARKER in digest
     assert "No stranded PRs" in digest
+    assert "Intentional holds" in digest
 
 
 def test_build_digest_post_merge_red_section() -> None:
@@ -184,7 +341,7 @@ def test_build_digest_post_merge_red_section() -> None:
     assert "develop post-merge is RED" in digest
 
 
-def test_build_digest_lists_stranded_prs() -> None:
+def test_build_digest_lists_stranded_prs_with_safe_remediation() -> None:
     c = mod.ClassifiedPR(
         number=42,
         title="Some PR",
@@ -193,12 +350,19 @@ def test_build_digest_lists_stranded_prs() -> None:
         required_green=True,
         soundness_gated=False,
         auto_merge_enabled=False,
+        had_arm_intent=True,
         head_age_hours=5.0,
         stranded=True,
     )
     digest = mod.build_digest([c], now=_now(), repo="joeharris76/BenchBox")
     assert "#42 Some PR" in digest
     assert "never enables auto-merge itself" in digest
+    assert "make pr-ready" in digest
+    assert "READY=1" in digest
+    # Must not claim re-push / synchronize re-enables auto-merge.
+    assert "retrigger" not in digest.lower()
+    assert "re-push expecting" in digest or "Do **not** re-push" in digest
+    assert "synchronize` to re-arm" in digest or "synchronize" in digest
 
 
 # ------------------------------------------------------------------ #
@@ -207,8 +371,21 @@ def test_build_digest_lists_stranded_prs() -> None:
 def test_bundled_fixture_is_valid_json_with_required_keys() -> None:
     fixture = json.loads(_FIXTURE.read_text(encoding="utf-8"))
     assert "as_of" in fixture
-    assert "prs" in fixture and len(fixture["prs"]) >= 6
-    assert set(fixture["expected_stranded"]) == {2001, 2007}
+    assert "prs" in fixture and len(fixture["prs"]) >= 8
+    assert set(fixture["expected_stranded"]) == {2008, 2009, 2010}
+    assert fixture["expected_excluded_reasons"]["2001"] == "intentional_hold"
+    assert fixture["expected_excluded_reasons"]["2007"] == "no_arm_intent"
+
+
+def test_fixture_distinguishes_hold_from_true_strand() -> None:
+    fixture = json.loads(_FIXTURE.read_text(encoding="utf-8"))
+    now = mod._parse_iso(fixture["as_of"])
+    classified = {c.number: c for c in mod.classify_all(fixture["prs"], now, grace_hours=fixture["grace_hours"])}
+    assert classified[2001].stranded is False and classified[2001].had_arm_intent is False
+    assert classified[2007].stranded is False and classified[2007].had_arm_intent is False
+    assert classified[2008].stranded is True and classified[2008].had_arm_intent is True
+    assert classified[2009].stranded is True and classified[2009].had_arm_intent is True
+    assert classified[2010].stranded is True and classified[2010].had_arm_intent is True
 
 
 def test_run_self_test_passes() -> None:

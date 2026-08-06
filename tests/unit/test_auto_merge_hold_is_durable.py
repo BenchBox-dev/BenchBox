@@ -199,6 +199,8 @@ def test_sweep_has_auto_merge_hold_label_is_exact() -> None:
 
 def test_sweep_explicit_hold_is_not_stranded() -> None:
     sweep = _load_sweep()
+    # Composed with arm-intent classifier: hold label excludes even when
+    # timeline would otherwise prove prior arm intent (true-strand shape).
     assert (
         sweep.is_stranded(
             draft=False,
@@ -208,10 +210,11 @@ def test_sweep_explicit_hold_is_not_stranded() -> None:
             age_hours=10.0,
             grace_hours=2.0,
             explicit_hold=True,
+            had_arm_intent=True,
         )
         is False
     )
-    # Control: same row without hold is stranded.
+    # Control: same row without hold label, with prior arm intent, is stranded.
     assert (
         sweep.is_stranded(
             draft=False,
@@ -221,6 +224,7 @@ def test_sweep_explicit_hold_is_not_stranded() -> None:
             age_hours=10.0,
             grace_hours=2.0,
             explicit_hold=False,
+            had_arm_intent=True,
         )
         is True
     )
@@ -240,6 +244,8 @@ def test_sweep_classify_pr_reads_hold_label() -> None:
         "head_pushed_at": "2026-07-23T08:00:00Z",
         "auto_merge": None,
         "labels": [HOLD_LABEL],
+        # Prior arm intent still present: label must win over stranding.
+        "timeline_events": [{"event": "ready_for_review"}, {"event": "auto_squash_enabled"}],
         "changed_files": ["benchbox/platforms/duckdb/adapter.py"],
         "check_runs": [
             {
@@ -252,6 +258,7 @@ def test_sweep_classify_pr_reads_hold_label() -> None:
     }
     classified = sweep.classify_pr(pr, now)
     assert classified.explicit_hold is True
+    assert classified.had_arm_intent is True
     assert classified.stranded is False
 
 
