@@ -1665,7 +1665,8 @@ pr-arm-auto-merge:
 		URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
 	fi; \
 	if [ -z "$$URL" ]; then echo "No open PR found for this branch." >&2; exit 1; fi; \
-	if gh pr view "$$URL" --json labels --jq '.labels[].name' | grep -qxF 'no-auto-merge'; then \
+	LABELS=$$(gh pr view "$$URL" --json labels --jq '.labels[].name') || { echo "Cannot read PR labels — refusing to arm (fail closed)." >&2; exit 1; }; \
+	if printf '%s\n' "$$LABELS" | grep -qxF 'no-auto-merge'; then \
 		echo "PR carries the durable no-auto-merge hold label; leaving auto-merge disabled. Remove the label first if arming is intended."; \
 		exit 0; \
 	fi; \

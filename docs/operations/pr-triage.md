@@ -149,7 +149,10 @@ Use draft while the branch is incomplete. Use `no-auto-merge` when the PR
 should stay non-draft (CI/review as ready) but must not auto-merge — for
 example waiting on another PR, or after an explicit disable that must survive
 a later re-arm attempt. Remove the label before arming with `make pr-ready`
-(which refuses to arm while the label is present).
+(which refuses to arm while the label is present, and fails closed when the
+label list cannot be read). The hold guarantee is **eventual, not atomic**: a
+label applied after the arm path's check but before the arm lands is caught
+by the workflow's `labeled`-trigger revoke within one run, not instantly.
 
 Both sweeps upsert a single marker-tagged tracking issue while their
 respective queue is non-empty, and patch it to the empty state exactly

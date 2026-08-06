@@ -191,6 +191,11 @@ def test_makefile_arm_path_refuses_hold_label() -> None:
     assert label_index < arm_index, "label check runs after arming, so it cannot withhold"
     # Exact-match semantics stay lockstep with the workflow's grep -qxF.
     assert "--json labels" in body
+    # Fail closed: an unreadable label list (gh auth/rate-limit failure) must
+    # abort the arm, not fall through as "no label". Without this, a transient
+    # gh error piped into grep reads as label-absent and arms through the hold.
+    assert "refusing to arm (fail closed)" in body, "label read no longer fails closed"
+    assert body.index("refusing to arm (fail closed)") < arm_index
 
 
 def test_soundness_unions_base_ref_and_pr_copy_predicates() -> None:
