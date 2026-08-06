@@ -1191,11 +1191,12 @@ class TestPublicUnreadIdentifierDrop:
         assert "client_host" not in out.get("environment", {})
         assert out["environment"]["other"] == 1
 
-    def test_already_empty_client_host_passes_through_for_fixed_point(self):
-        """Stored `client_host: {}` is left alone until an explicit re-derive."""
-        payload = {"environment": {"client_host": {}}}
+    def test_already_empty_client_host_is_omitted(self):
+        """Empty client_host maps are omitted so stored residuals can be re-derived away."""
+        payload = {"environment": {"client_host": {}, "other": 1}}
         out = AnonymizationManager().anonymize_result_payload(payload)
-        assert out["environment"]["client_host"] == {}
+        assert "client_host" not in out.get("environment", {})
+        assert out["environment"]["other"] == 1
 
     def test_nonempty_client_host_profile_still_exports(self):
         out = AnonymizationManager().anonymize_result_payload(

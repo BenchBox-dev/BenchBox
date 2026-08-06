@@ -39,3 +39,49 @@ Both cohorts meet the >=3-platform depth criterion required for the Compare view
 ## Public-path single-pass status (2026-08-05)
 
 Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.
+
+---
+
+# Regeneration - strip residual empty `client_host` (2026-08-05 / 2026-08-06)
+
+**Related PR:** #1614 (`fix/strip-empty-client-host-corpus`)
+**Date:** 2026-08-05 (local) / 2026-08-06 (UTC commit)
+
+## Reason
+
+After `machine_id` was dropped from public environment maps, some already
+public-shaped primary bundles retained residual empty `client_host: {}`
+objects. Those hollow maps were identifier-only leftovers, not real host
+profiles. Anonymization policy now **always omits empty optional environment
+maps** (including already-empty `{}` residuals) so the public shape has no
+hollow blocks.
+
+## What landed together
+
+Code change and corpus re-derive shipped in one fixed-point commit so stored
+bytes match the fresh public shape:
+
+1. **Policy** (`benchbox/core/results/anonymization.py`): omit empty optional
+   maps under `_PUBLIC_EMPTY_OPTIONAL_MAP_KEYS` even when the stored input was
+   already `{}` (not only when non-empty content was stripped to empty).
+2. **Corpus**: re-derived **105** primary bundles under
+   `results-data/bundles/` (plus inventory refresh) so checked-in bytes match
+   re-anonymization output. Count verified as the primary-bundle delta vs
+   `origin/develop` on this branch (105 `results-data/bundles/*.json` primaries;
+   not plans/tuning/manifest sidecars).
+
+No full corpus rewrite beyond those residual hollow maps; non-empty
+`client_host` profiles and unrelated fields were left alone. Anonymization
+policy was not expanded beyond empty optional map omission.
+
+## How to verify
+
+- Unit: `tests/unit/core/results/test_anonymization.py` —
+  `test_already_empty_client_host_is_omitted` (and related public-unread
+  identifier drop cases).
+- Corpus fixed point: re-anonymize primary bundles and assert byte-identical
+  publication (existing re-derived / fixed-point corpus gates; no empty
+  `client_host` objects remain in primary bundles).
+- Spot check: `rg -n '"client_host": \{\}' results-data/bundles` should not
+  match residual hollow maps in primary result JSON.
+
