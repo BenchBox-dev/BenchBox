@@ -234,8 +234,11 @@ jobs:
           SOURCE_REF="${GITHUB_SHA}"
           # Directory trees that must union-overlay (never wipe).
           BUNDLES_DIR='results-data/bundles'
+          # corpus-inventory.json is NOT blind-overlaid from develop: after a
+          # union overlay the tree may still hold published-only community
+          # bundles that develop's inventory does not list. Regenerate from the
+          # post-overlay tree so validate --check can pass under mixed drift.
           FILE_PATHS=(
-            'results-data/corpus-inventory.json'
             'results-data/CORPUS_NOTES.md'
             'results-data/SEED_CORPUS_SPEC.md'
             'results-data/README.md'
@@ -263,6 +266,12 @@ jobs:
               git rm -f --quiet "${path}" 2>/dev/null || true
             fi
           done
+
+          # Derive inventory from the unioned tree (published-only + develop).
+          if [[ -d "${BUNDLES_DIR}" ]]; then
+            python3 scripts/generate_corpus_inventory.py --write
+            git add results-data/corpus-inventory.json
+          fi
 
           if git diff --staged --quiet && git diff --quiet; then
             echo "After applying develop content, mirror branch matches"

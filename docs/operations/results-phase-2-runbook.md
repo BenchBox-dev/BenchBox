@@ -49,10 +49,13 @@ develop's files overwrite matching paths on `published-results`, and paths
 that exist only on `published-results` (community submissions not
 back-ported) are left intact. A previous wipe-then-checkout strategy deleted
 those published-only submissions whenever develop was also ahead.
-Develop-side *path deletions* do not auto-propagate; remove them manually via
-a reviewed PR against `published-results` when intentional. After overlay, the
-workflow regenerates `corpus-inventory.json` from the unioned tree so
-community-only paths remain inventory-listed. The scheduled
+Develop-side *path deletions* do not auto-propagate (a deleted seed path that
+still exists only on published-results becomes published-only and is kept).
+Remove those manually via a reviewed PR against `published-results` when the
+deletion is intentional privacy remediation. After overlay, the workflow
+regenerates `corpus-inventory.json` from the unioned tree so community-only
+paths remain inventory-listed. Other allowlist files (docs, validators) still
+use per-path checkout / removal. The scheduled
 [`corpus-drift-check.yml`](../../.github/workflows/corpus-drift-check.yml)
 canary classifies develop-ahead vs published-only and never recommends a
 wipe-based full mirror while published-only paths exist.

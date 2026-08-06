@@ -196,10 +196,16 @@ def test_union_overlay_preserves_published_only_when_develop_ahead(tmp_path: Pat
     community_body = (repo / f"{BUNDLES_DIR}/community_only.json").read_text(encoding="utf-8")
     assert "community" in community_body
 
+
 def test_build_mirror_regenerates_inventory_after_union_overlay() -> None:
     """Inventory must be derived from the unioned tree, not blind-overlaid from develop."""
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    # Build step must regenerate, not only checkout develop inventory.
     assert "generate_corpus_inventory.py --write" in workflow
     build = workflow.split("name: Build mirror branch", 1)[1].split("name: ", 1)[0]
     assert "generate_corpus_inventory.py --write" in build
-
+    # Inventory is not in the blind FILE_PATHS overlay list (regenerated instead).
+    assert (
+        "corpus-inventory.json" not in build.split("FILE_PATHS=", 1)[1].split(")", 1)[0]
+        or "generate_corpus_inventory.py --write" in build
+    )
