@@ -137,6 +137,83 @@ def test_path_mirrored_compose_environment_points_at_benchmark_runs_dir(platform
     assert env == {"BENCHBOX_DATA_DIR": str(tmp_path / "runs")}
 
 
+@pytest.mark.parametrize("platform", ["lakesail", "velox"])
+@pytest.mark.parametrize(
+    "relative_dir",
+    (
+        Path("relative_runs"),
+        Path("./relative_runs"),
+        Path("../sibling_runs"),
+        "relative_runs",
+    ),
+)
+def test_compose_environment_raises_for_relative_benchmark_runs_dir(platform, relative_dir):
+    """must_preserve: compose_environment() is the single choke point every
+    UAT-managed bring-up path funnels through (tests/uat/phases/execute.py's
+    up AND down, scripts/uat-bring-up/uat_bring_up.py) -- the Makefile's
+    require_data_dir_if_mounted only guards `make test-docker-up-*`
+    directly, so a relative --benchmark-runs-dir / benchmark_runs_dir_template
+    reached compose unguarded through those Python entry points until this
+    check moved here. lakesail/velox mount BENCHBOX_DATA_DIR at the SAME
+    absolute path on host and in container, so a relative value silently
+    breaks every file load."""
+    spec = docker_assets.docker_platform_spec(platform)
+
+    with pytest.raises(docker_assets.DockerAssetError, match="absolute"):
+        docker_assets.compose_environment(spec, benchmark_runs_dir=relative_dir)
+
+
+@pytest.mark.parametrize("platform", ["postgresql", "clickhouse-server", "questdb"])
+def test_compose_environment_ignores_relative_dir_for_non_path_mirroring_platforms(platform):
+    """Only lakesail/velox reference BENCHBOX_DATA_DIR at all -- a relative
+    benchmark_runs_dir must not raise for any other platform, since
+    compose_environment() returns {} for them regardless."""
+    spec = docker_assets.docker_platform_spec(platform)
+
+    assert docker_assets.compose_environment(spec, benchmark_runs_dir=Path("relative_runs")) == {}
+
+
+@pytest.mark.parametrize("platform", ["lakesail", "velox"])
+def test_compose_environment_error_names_platform_and_the_offending_value(platform):
+    spec = docker_assets.docker_platform_spec(platform)
+
+    with pytest.raises(docker_assets.DockerAssetError) as excinfo:
+        docker_assets.compose_environment(spec, benchmark_runs_dir="relative_runs")
+
+    assert platform in str(excinfo.value)
+    assert "relative_runs" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("platform", ["lakesail", "velox"])
+def test_compose_environment_raises_for_missing_benchmark_runs_dir(platform):
+    """must_preserve: a `None` benchmark_runs_dir must NOT fall through to
+    compose_environment() returning `{}` for lakesail/velox the way it does
+    for every other platform. run_docker_command() fills an empty/omitted
+    `env` with `os.environ.copy()` (tests/uat/docker_assets.py), so `{}`
+    here would let the child compose process silently inherit whatever
+    ambient BENCHBOX_DATA_DIR happens to be set (or unset) in the caller's
+    shell -- exactly the same silent-no-mount failure mode the relative-path
+    guard closes, just reached by omitting the argument instead of passing
+    a relative one."""
+    spec = docker_assets.docker_platform_spec(platform)
+
+    with pytest.raises(docker_assets.DockerAssetError, match="benchmark_runs_dir"):
+        docker_assets.compose_environment(spec, benchmark_runs_dir=None)
+
+    with pytest.raises(docker_assets.DockerAssetError):
+        docker_assets.compose_environment(spec)
+
+
+@pytest.mark.parametrize("platform", ["postgresql", "clickhouse-server", "questdb"])
+def test_compose_environment_returns_empty_for_missing_dir_on_non_path_mirroring_platforms(platform):
+    """Only lakesail/velox reference BENCHBOX_DATA_DIR at all -- a missing
+    benchmark_runs_dir must not raise for any other platform."""
+    spec = docker_assets.docker_platform_spec(platform)
+
+    assert docker_assets.compose_environment(spec, benchmark_runs_dir=None) == {}
+    assert docker_assets.compose_environment(spec) == {}
+
+
 @pytest.mark.parametrize("platform", ["postgresql", "pg-duckdb", "pg-mooncake", "timescaledb"])
 def test_local_managed_postgres_compose_password_matches_uat_argv(platform):
     spec = docker_assets.docker_platform_spec(platform)
