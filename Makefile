@@ -494,9 +494,22 @@ endef
 # name-prefix grep here would also match a sibling project whose name extends
 # this one (`p` vs `p-ha`) and delete its data -- same fix as
 # tests/uat/docker_assets.py sweep_leaked_mocker_volumes.
+#
+# BENCHBOX_DATA_DIR is deliberately NOT validated here the way
+# require_data_dir_if_mounted validates it for `up`: `down` is called from
+# every one of this file's teardown paths (test-docker-down-%,
+# test-docker-down-all, and the failure-cleanup traps in test-docker-up-%,
+# test-docker-%, test-docker-firebolt, test-docker-up-all -- some of which
+# fire even when `up` never ran, e.g. require_data_dir_if_mounted itself
+# rejecting the value), so a hard failure here would risk exactly the
+# teardown leak this macro exists to close. `down` never re-mounts anything
+# (it only needs the compose file to interpolate/parse), so an unset or
+# relative BENCHBOX_DATA_DIR is replaced with a throwaway absolute
+# placeholder instead of erroring -- a no-op for every platform other than
+# lakesail/velox, whose compose files are the only ones that reference it.
 # $(1)=project $(2)=compose file.
 define compose_down_fresh
-$(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then awk '/^volumes:/{f=1;next} f&&/^[^ ]/{f=0} f&&/^  [A-Za-z0-9._-]+:/{k=$$1;sub(/:.*/,"",k);print k}' "$(2)" 2>/dev/null | while read -r _k; do mocker volume rm "$(1)-$$_k" >/dev/null 2>&1 || true; mocker volume rm "$(1)"_"$$_k" >/dev/null 2>&1 || true; done; fi
+case "$$BENCHBOX_DATA_DIR" in /*) ;; *) BENCHBOX_DATA_DIR="/tmp/benchbox-teardown-placeholder"; export BENCHBOX_DATA_DIR ;; esac; $(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then awk '/^volumes:/{f=1;next} f&&/^[^ ]/{f=0} f&&/^  [A-Za-z0-9._-]+:/{k=$$1;sub(/:.*/,"",k);print k}' "$(2)" 2>/dev/null | while read -r _k; do mocker volume rm "$(1)-$$_k" >/dev/null 2>&1 || true; mocker volume rm "$(1)"_"$$_k" >/dev/null 2>&1 || true; done; fi
 endef
 
 test-docker-up-%:
@@ -554,6 +567,11 @@ test-docker-%:
 		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
 		uv run -- python -m pytest -m "live_$*" --tb=short -v -n 0
 
+# No require_data_dir_if_mounted call in the loop below: DOCKER_PLATFORMS
+# (above) never includes lakesail or velox, so the call would be
+# permanently dead here -- coverage that reads as real but never fires.
+# `make test-docker-up-lakesail` / `test-docker-up-velox` (test-docker-up-%)
+# is the supported bring-up path for those two and IS guarded.
 test-docker-up-all:
 	@set -e; \
 		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
@@ -582,7 +600,6 @@ test-docker-up-all:
 				printf '%s\n' "$$project_name" > "$$project_file"; \
 			fi; \
 			echo "Starting $$p..."; \
-			$(call require_data_dir_if_mounted,$$p); \
 			$(COMPOSE) -p "$$project_name" -f docker/$$p/docker-compose.yml up -d --wait; \
 		done; \
 		status=0

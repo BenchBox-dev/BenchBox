@@ -29,16 +29,22 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 STATE_DIR="${DOCKER_TEST_STATE_DIR:-/tmp/benchbox-docker-projects}"
 fails=0
 
-# Passed explicitly (the Makefile has no BENCHBOX_DATA_DIR default of its
-# own -- see Makefile's require_data_dir_if_mounted) so `up` and `down`
-# always agree on the same value -- an up/down pair that disagreed here was
-# the teardown-leak risk that made lakesail-compose-nested-variable-default's
-# ${VAR:?...} required-variable form unsafe (a `down` invoked without the
-# same exported value refused to parse the file, orphaning the containers
-# and volumes it was supposed to remove). It must be absolute: `make
-# test-docker-up-<lakesail|velox>` now rejects a relative or unset value
-# before invoking compose. Only lakesail/velox compose files reference this
-# variable; it is a harmless no-op for every other platform.
+# Passed explicitly for `up`: the Makefile has no BENCHBOX_DATA_DIR default
+# of its own -- require_data_dir_if_mounted rejects an unset or relative
+# value before `make test-docker-up-<lakesail|velox>` ever invokes compose,
+# so this script must supply a real absolute one. `down` no longer needs
+# BENCHBOX_DATA_DIR to be set at all: compose_down_fresh substitutes a
+# throwaway absolute placeholder when it is unset or relative, because
+# `down` never re-mounts anything -- it only needs the compose file to
+# parse. (An earlier version of this comment claimed an unset `down`
+# "refused to parse the file" under lakesail-compose-nested-variable-
+# default's ${VAR:?...} required-variable form, orphaning containers/
+# volumes -- that was true for real `docker compose`, which errors on an
+# unset required variable, but wrong for mocker 0.7.2, which is what this
+# harness actually exercises: mocker leaves ${VAR:?...} as a literal
+# unresolved string instead of erroring and exits 0, so it never refused to
+# parse anything here.) Only lakesail/velox compose files reference
+# BENCHBOX_DATA_DIR at all; it is a harmless no-op for every other platform.
 DATA_DIR="${BENCHBOX_DATA_DIR:-$ROOT/benchmark_runs}"
 
 # TCP connect check via bash /dev/tcp (no nc dependency). The subshell opens and
