@@ -220,7 +220,9 @@ def run_preflight(
                 min_free_gib=free_space_min_gib,
             )
             warnings.extend(_disk_budget_coverage_warnings(budget_gate.coverage))
-            disk_budget_summary = _disk_budget_report(disk_budget_summary, budget_gate)
+            disk_budget_summary = _disk_budget_report(
+                disk_budget_summary, budget_gate, free_space_min_gib=free_space_min_gib
+            )
         except (OSError, ValueError, TypeError, KeyError, csv.Error) as exc:
             # The estimator CRASHED (bad table row, unreadable TSV, a
             # malformed config field) -- distinct from the advisory
@@ -446,17 +448,36 @@ def _disk_budget_coverage_warnings(coverage: DiskBudgetCoverage) -> tuple[str, .
     )
 
 
-def _disk_budget_report(summary: str, gate: DiskBudgetGate) -> str:
+def _disk_budget_report(summary: str, gate: DiskBudgetGate, *, free_space_min_gib: float) -> str:
     """Compose the always-printed operator block for the disk-budget gate.
 
-    Coverage is always disclosed. The verdict line is added only when the
-    gate did not refuse, because that is the outcome an operator can
-    misread as "measured and fine" -- a refusal is unambiguous.
+    Coverage is always disclosed. `gate.headroom` is always computed against
+    the estimate ALONE (`estimate_disk_budget_summary_and_gate` calls
+    `check_disk_headroom` with the raw configured `free_space_min_gib`,
+    unadjusted), so when `free_space_min_gib <= 0` disables the gate
+    (`run_preflight`'s own abort checks are guarded by `free_space_min_gib >
+    0`), `gate.headroom.required_gib`/`shortfalls` still describe a
+    requirement that was never going to be enforced. Printing
+    `format_budget_verdict` unmodified in that case would (a) assert "no
+    shortfall"/"fits" against a requirement the free-space table right below
+    it correctly prints as `0.00 GiB`, and (b) vanish entirely with no
+    explanation whenever the estimate exceeded free space, since the verdict
+    line is otherwise gated on `not gate.headroom.shortfalls` and a disabled
+    floor still won't abort. State plainly that the gate is off instead.
+
+    Otherwise the verdict line is added only when the gate did not refuse,
+    because that is the outcome an operator can misread as "measured and
+    fine" -- a refusal is unambiguous.
     """
     from tests.uat.preflight_budget import format_budget_coverage, format_budget_verdict
 
     lines = [summary, format_budget_coverage(gate.coverage)]
-    if not gate.headroom.shortfalls:
+    if free_space_min_gib <= 0:
+        lines.append(
+            "Disk budget verdict: gate disabled (preflight.free_space_min_gib <= 0); "
+            "the estimate above is informational only and was not enforced"
+        )
+    elif not gate.headroom.shortfalls:
         lines.append(format_budget_verdict(gate.headroom, gate.coverage))
     return "\n".join(lines)
 

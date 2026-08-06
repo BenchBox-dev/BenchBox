@@ -18,7 +18,6 @@ from tests.uat.preflight_budget import (
     assess_budget_coverage,
     check_disk_headroom,
     check_memory_headroom,
-    estimate_largest_scale_peak_disk,
     estimate_peak_disk,
     format_budget_coverage,
     format_budget_verdict,
@@ -82,29 +81,62 @@ def test_format_disk_budget_includes_operator_fields(tmp_path: Path):
     assert "unknown=0" in line
 
 
-def test_estimate_largest_scale_peak_disk_uses_largest_configured_scale(tmp_path: Path):
+def test_largest_scale_cells_selects_the_largest_rung_through_the_live_path(tmp_path: Path):
+    """Pin `largest_scale_cells` -- the LIVE cell-selection path the preflight gate
+    actually runs (`estimate_disk_budget_summary_and_gate` and `assess_budget_coverage`
+    in `phases/preflight.py` both consume it) -- against a MULTI-rung config.
+
+    Every other test in this module uses a single-rung config (`rungs: [0.01]`), which
+    cannot distinguish "select the largest rung" from "select any rung" or "select every
+    rung": with one rung, `max`, `min`, and "all cells" all return the same set. That gap
+    let two mutations survive the full suite:
+
+    - M15: `max(cells_by_scale)` -> `min(cells_by_scale)` -- rung selection silently
+      flips to the SMALLEST configured scale. With `rungs: [0.01, 1, 100]` this is the
+      exact mid-sweep disk death the gate exists to prevent: preflight budgets the
+      tiny-scale figure while the sweep runs the largest.
+    - M13: returning cells from every rung instead of only the largest -- the gate would
+      then estimate/report coverage over a mixed population instead of "the largest
+      configured scale's estimated peak" (the module's own docstring, and
+      docs/operations/uat-framework.md's "Disk-budget estimate" section).
+
+    This test uses three rungs specifically so `min` and `max` disagree AND "all cells"
+    (6, across 3 rungs x 2 platforms) disagrees with "largest only" (2).
+    """
+    cfg = validate_config(
+        {
+            "name": "multi-rung-live-path-smoke",
+            "platforms": {"include": ["duckdb", "sqlite"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01, 1, 100]},
+        }
+    )
+
+    cells = largest_scale_cells(cfg)
+
+    assert cells, "expected cells at the largest configured scale rung"
+    assert {cell.scale for cell in cells} == {100.0}
+    assert {cell.platform for cell in cells} == {"duckdb", "sqlite"}
+    assert len(cells) == 2
+
+    # Same assertion through the estimator that consumes `largest_scale_cells`'
+    # output, so a regression in either the selection or its consumption is caught.
     table = tmp_path / "disk_budget.tsv"
     table.write_text(
         "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
         "duckdb\ttpch\t0.01\t1.0\t2.0\t0.5\n"
         "duckdb\ttpch\t1\t10.0\t20.0\t5.0\n"
-        "sqlite\ttpch\t1\t12.0\t30.0\t7.0\n",
+        "duckdb\ttpch\t100\t100.0\t200.0\t50.0\n"
+        "sqlite\ttpch\t100\t120.0\t300.0\t70.0\n",
         encoding="utf-8",
     )
-    cfg = validate_config(
-        {
-            "name": "budget-smoke",
-            "platforms": {"include": ["duckdb", "sqlite"]},
-            "benchmarks": {"include": ["tpch"]},
-            "scales": {"rungs": [0.01, 1]},
-        }
-    )
+    from tests.uat.preflight_budget import estimate_cells
 
-    budget = estimate_largest_scale_peak_disk(cfg, table_path=table)
+    budget = estimate_cells(cells, table=load_budget_table(table))
 
     assert budget.cells == 2
-    assert budget.est_steady_gib == pytest.approx(12.0 + 20.0 + 30.0)
-    assert budget.est_peak_gib == pytest.approx(12.0 + 20.0 + 30.0 + 5.0 + 7.0)
+    assert budget.est_steady_gib == pytest.approx(120.0 + 200.0 + 300.0)
+    assert budget.est_peak_gib == pytest.approx(120.0 + 200.0 + 300.0 + 50.0 + 70.0)
     assert budget.unknown_cells == ()
 
 
@@ -297,22 +329,69 @@ def test_format_budget_verdict_partial_is_not_a_certification(tmp_path: Path):
 
 
 def test_format_budget_verdict_complete_may_state_the_requirement_fits(tmp_path: Path):
-    coverage = assess_budget_coverage((), table={})
-    coverage = type(coverage)(
-        cells_total=1,
-        cells_with_rows=1,
-        cells_with_measured_database=1,
-        platforms_total=1,
-        measured_platforms=("duckdb",),
-        unmeasured_platforms=(),
+    """A genuine fully-measured single-cell coverage, not a hand-substituted one.
+
+    Previously this test built its "complete" coverage by calling
+    `assess_budget_coverage((), table={})` (`cells_total=0`) and then
+    hand-substituting `cells_total=1` on the result -- which sidestepped the
+    real `cells_total == 0` case entirely (see
+    `test_format_budget_verdict_zero_cells_never_claims_a_fit` for that case)
+    and never actually exercised `assess_budget_coverage` computing a
+    genuine complete rung.
+    """
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\t"
+        "peak_database_gib_status\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t1.0\t2.0\tmeasured\t0.5\n",
+        encoding="utf-8",
     )
+    cfg = validate_config(
+        {
+            "name": "verdict-complete-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    coverage = assess_budget_coverage(largest_scale_cells(cfg), table=load_budget_table(table))
     check = check_disk_headroom(
         DiskBudget(cells=1, est_peak_gib=4.0, est_steady_gib=3.5, unknown_cells=()),
         (DiskRootFreeSpace("output", tmp_path, 100.0),),
         min_free_gib=5.0,
     )
 
+    assert coverage.cells_total == 1
+    assert coverage.is_lower_bound is False
     assert "fits" in format_budget_verdict(check, coverage)
+
+
+def test_format_budget_verdict_zero_cells_never_claims_a_fit(tmp_path: Path):
+    """A zero-cell config (e.g. `platforms: {include: [duckdb], exclude:
+    [duckdb]}`) must not read as a MEASURED fit.
+
+    `coverage.is_lower_bound` evaluates `(0 < 0) or (0 < 0)` = False for a
+    zero-cell coverage, which used to fall through to the "fits" branch and
+    print `Disk budget verdict: measured requirement of 5.00 GiB fits every
+    required root` for a config that measured nothing at all --
+    self-contradicting alongside `format_budget_coverage`'s own "nothing
+    measured and nothing gated" line for the same coverage.
+    """
+    coverage = assess_budget_coverage((), table={})
+    check = check_disk_headroom(
+        DiskBudget(cells=0, est_peak_gib=0.0, est_steady_gib=0.0, unknown_cells=()),
+        (DiskRootFreeSpace("output", tmp_path, 500.0),),
+        min_free_gib=5.0,
+    )
+
+    assert coverage.cells_total == 0
+
+    verdict = format_budget_verdict(check, coverage)
+
+    assert "no cells enumerated" in verdict
+    assert "fits" not in verdict
+    assert "measured requirement" not in verdict
 
 
 # ---------------------------------------------------------------------------

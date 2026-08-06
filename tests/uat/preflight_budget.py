@@ -306,23 +306,6 @@ def estimate_peak_disk(config: UATConfig, *, table_path: Path | None = None) -> 
     return estimate_cells(enumerate_cells(config), table=load_budget_table(table_path))
 
 
-def estimate_peak_disk_by_scale(config: UATConfig, *, table_path: Path | None = None) -> dict[float, DiskBudget]:
-    """Return advisory disk estimates grouped by scale rung."""
-    table = load_budget_table(table_path)
-    cells_by_scale: dict[float, list[Cell]] = {}
-    for cell in enumerate_cells(config):
-        cells_by_scale.setdefault(cell.scale, []).append(cell)
-    return {scale: estimate_cells(cells, table=table) for scale, cells in cells_by_scale.items()}
-
-
-def estimate_largest_scale_peak_disk(config: UATConfig, *, table_path: Path | None = None) -> DiskBudget:
-    """Return the disk estimate for the largest configured scale rung."""
-    by_scale = estimate_peak_disk_by_scale(config, table_path=table_path)
-    if not by_scale:
-        return DiskBudget(cells=0, est_peak_gib=0.0, est_steady_gib=0.0, unknown_cells=())
-    return by_scale[max(by_scale)]
-
-
 def estimate_cells(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudget:
     """Estimate a concrete cell iterable; public for focused tests."""
     cells_tuple = tuple(cells)
@@ -353,9 +336,10 @@ def estimate_cells(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudget:
 def largest_scale_cells(config: UATConfig) -> tuple[Cell, ...]:
     """Return the enumerated cells at the config's largest configured scale rung.
 
-    The same cell set `estimate_largest_scale_peak_disk` estimates, exposed
-    so `assess_budget_coverage` reports coverage of exactly what the gate
-    gated on rather than of a differently-selected population.
+    This is the live cell-selection path for the preflight disk-budget gate
+    (`estimate_disk_budget_summary_and_gate` in `phases/preflight.py`), so
+    `assess_budget_coverage` reports coverage of exactly what the gate gated
+    on rather than of a differently-selected population.
     """
     cells_by_scale: dict[float, list[Cell]] = {}
     for cell in enumerate_cells(config):
@@ -470,7 +454,24 @@ def format_budget_verdict(check: DiskHeadroomCheck, coverage: DiskBudgetCoverage
     `format_disk_headroom_failure` for the refusing direction, which stays
     sound regardless of coverage -- a lower bound that already does not fit
     cannot fit.
+
+    `coverage.cells_total == 0` (e.g. `platforms: {include: [duckdb],
+    exclude: [duckdb]}` enumerating nothing) gets its own branch, mirroring
+    `format_budget_coverage`'s: with no cells, `coverage.is_lower_bound` is
+    trivially `False` (`0 < 0` is `False` on both terms), which would
+    otherwise fall through to the "fits" branch below and print a MEASURED
+    fit for a config that measured nothing -- self-contradicting alongside
+    `format_budget_coverage`'s own "nothing measured and nothing gated"
+    line, and a violation of this function's "never renders as fits when
+    coverage is partial" contract (zero cells is the most partial coverage
+    possible).
     """
+    if coverage.cells_total == 0:
+        return (
+            "Disk budget verdict: no cells enumerated for this config; the "
+            f"{check.required_gib:.2f} GiB requirement above reflects the configured "
+            "floor only, not a measured or estimated disk footprint"
+        )
     if coverage.is_lower_bound:
         return (
             f"Disk budget verdict: no shortfall detected against a lower-bound requirement of "

@@ -332,6 +332,58 @@ def test_preflight_disk_headroom_gate_respects_zero_override(tmp_path: Path, mon
     assert all("(required 0.00 GiB)" in line for line in result.free_space_report)
 
 
+def test_preflight_disk_budget_verdict_states_gate_disabled_when_floor_is_zero(tmp_path: Path, monkeypatch):
+    """`free_space_min_gib: 0` must not print a verdict that implies enforcement.
+
+    Regression for finding F3 (uat-disk-budget-platform-chunking review):
+    `gate.headroom` is always computed against the estimate alone, so a
+    disabled floor used to still produce `Disk budget verdict: no shortfall
+    detected against a lower-bound requirement of 22.00 GiB` right above a
+    free-space line that (correctly) said `required 0.00 GiB` -- two
+    contradictory requirements on one screen. Here free space (1 GiB) is
+    also set BELOW the 22 GiB estimate, so `gate.headroom.shortfalls` is
+    non-empty and the OLD code's verdict line would have vanished entirely
+    with no explanation and no abort -- the other half of F3.
+    """
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t20.0\t0.0\t2.0\n",
+        encoding="utf-8",
+    )
+    cfg = config.validate_config(
+        {
+            "name": "zero-floor-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "preflight": {"free_space_min_gib": 0},
+        }
+    )
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 1.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        free_space_min_gib=0,
+        disk_budget_config=cfg,
+    )
+
+    assert result.aborted is False
+    assert result.abort_reason is None
+    summary = result.disk_budget_summary or ""
+    verdict = next(line for line in summary.splitlines() if line.startswith("Disk budget verdict:"))
+    assert "disabled" in verdict
+    assert "22.00 GiB" not in verdict
+    assert "fits" not in verdict
+    assert "no shortfall detected" not in verdict
+    assert all("(required 0.00 GiB)" in line for line in result.free_space_report)
+
+
 def test_requested_platforms_from_config_matches_uat_defaults():
     assert preflight.requested_platforms_from_config(
         config.validate_config({"name": "smoke", "platforms": {"include": ["postgresql"]}})

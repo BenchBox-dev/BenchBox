@@ -363,26 +363,35 @@ previous SIGTERM handler is always restored when the sweep returns.
 
 ## Disk-budget estimate
 
-Preflight prints a disk-budget line and a per-root free-space report before
-workload cells run:
+Preflight prints a disk-budget line, a coverage disclosure, a verdict, and a
+per-root free-space report before workload cells run. With every one of the
+141 checked-in TSV rows currently `unmeasured` (see "The disk budget is a
+lower bound, not a certification" below), this is what a real default-group
+run prints today:
 
 ```text
 Disk budget estimate: 12.34 GiB peak (10.50 GiB steady; cells=141; unknown=4)
-Free space: tmp                     18.63 GiB (required 12.34 GiB) /tmp
-Free space: output                 240.12 GiB (required 12.34 GiB) ~/Developer/benchmark_runs
-Free space: benchmark-data         240.12 GiB (required 12.34 GiB) ~/Developer/benchmark_runs/datagen
-Free space: docker-data            240.12 GiB (required 12.34 GiB) ~/Developer/benchmark_runs
+Disk budget coverage: PARTIAL -- this estimate is a LOWER BOUND, not a certification that the sweep fits. Measured rows cover 0 of 21 platform(s); 137 of 141 largest-scale cell(s) have any row and 0 of 141 have a measured loaded-database footprint. Unmeasured platform(s): cedardb, clickhouse-local, clickhouse-server, databend, datafusion, doris, +15 more
+Disk budget verdict: no shortfall detected against a lower-bound requirement of 12.34 GiB; real demand may be higher (see coverage above)
+Free space: tmp                     18.63 GiB (required >= 12.34 GiB) /tmp
+Free space: output                 240.12 GiB (required >= 12.34 GiB) ~/Developer/benchmark_runs
+Free space: benchmark-data         240.12 GiB (required >= 12.34 GiB) ~/Developer/benchmark_runs/datagen
+Free space: docker-data            240.12 GiB (required >= 12.34 GiB) ~/Developer/benchmark_runs
 ```
 
 The estimate comes from `tests/uat/data/disk_budget_table.tsv`, an
 operator-maintained inventory from prior sweeps. Preflight gates the
 sweep on the largest configured scale's estimated peak against every
 required root (`/tmp`, the output root, the datagen root, and the
-managed Docker data root when Docker lifecycle management is enabled).
-Unknown cells are still reported in the count and as a preflight warning;
-they are not treated as zero. Treat a large `unknown=` count as a prompt
-to partition the sweep into smaller configs or refresh the table after
-the next run.
+managed Docker data root when Docker lifecycle management is enabled) --
+in practice, with today's inventory, that estimate is almost always a
+**lower bound**, not an exact figure: the `required >= ...` marker and the
+`Disk budget coverage:`/`Disk budget verdict:` lines above say so
+explicitly, and "The disk budget is a lower bound, not a certification"
+below explains why and what it takes to remove the caveat. Unknown cells
+are still reported in the count and as a preflight warning; they are not
+treated as zero. Treat a large `unknown=` count as a prompt to partition
+the sweep into smaller configs or refresh the table after the next run.
 
 The free-space floor and per-cell disk watch are always on for every
 execute-bearing run, independent of the `phases:` list — omitting
@@ -431,7 +440,7 @@ a verdict that is deliberately not the word "fits":
 
 ```text
 Disk budget estimate: 25.20 GiB peak (25.20 GiB steady; cells=1127; unknown=1000)
-Disk budget coverage: PARTIAL -- this estimate is a LOWER BOUND, not a certification that the sweep fits. Measured rows cover 0 of 21 platform(s); 41 of 419 largest-scale cell(s) have any row and 0 of 419 have a measured loaded-database footprint. Unmeasured platform(s): cedardb, clickhouse-local, ...
+Disk budget coverage: PARTIAL -- this estimate is a LOWER BOUND, not a certification that the sweep fits. Measured rows cover 0 of 21 platform(s); 41 of 419 largest-scale cell(s) have any row and 0 of 419 have a measured loaded-database footprint. Unmeasured platform(s): cedardb, clickhouse-local, clickhouse-server, databend, datafusion, doris, +15 more
 Disk budget verdict: no shortfall detected against a lower-bound requirement of 22.04 GiB; real demand may be higher (see coverage above)
 ```
 
@@ -459,12 +468,15 @@ configured floor holds regardless of how low the estimate runs.
 > section proposed a config flag that pruned each platform's loaded
 > databases at the platform boundary, on the premise that the flat
 > estimate hides a per-platform term and that ~11 platforms' databases
-> coexist at 90-150 GiB. Both premises were wrong. `_maybe_prune_completed`
+> coexist at 90-150 GiB. Both premises were wrong. With the default
+> `cleanup.prune_databases: true` (`tests/uat/config.py`), `_maybe_prune_completed`
 > (`tests/uat/phases/execute.py`) already runs after every benchmark
 > including a platform's last, and `remaining_consumers` only counts
 > same-platform pending cells -- so at a platform boundary that platform's
 > databases are already pruned and the proposed step measured zero bytes
-> freed in every realistic case. And with the loaded-database column
+> freed in every realistic case. (With `prune_databases: false` nothing is
+> pruned at all, platform boundary or not, so the flag would not have
+> helped there either.) And with the loaded-database column
 > unmeasured (gap 2 above), the "concurrent" and "chunked" figures differ
 > by under 1 MiB on every checked-in config, so the recommendation could
 > never fire. The flag, its execute wiring and its preflight branch were

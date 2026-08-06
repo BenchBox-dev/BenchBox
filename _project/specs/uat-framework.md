@@ -142,9 +142,9 @@ tests/uat/
 | `gate_summary.py` | Writes/reads the versioned `uat_gate_summary.json` per-sweep evidence artifact; powers `make uat-gate-check` cross-stage aggregation | — | 284 |
 | `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — | 316 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 | 83 |
-| `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 524 |
+| `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 525 |
 | `phases/__init__.py` | UAT phase package marker and phase contract documentation string | — | 17 |
-| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 529 |
+| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 550 |
 | `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 | 296 |
 | `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 | 1273 |
 | `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 | 304 |
@@ -177,7 +177,7 @@ remain hand-tracked.
 
 - plumbing (orchestrator/config/`_cli`): 2,547
 - core exercise (execute/matrix/runner/enumerate/cleanup/ladder): 2,642
-- preflight/compat/timeouts: 1,374
+- preflight/compat/timeouts: 1,396
 - Docker lifecycle (default-OFF, incl. `container_cleanup.py`): 1,824
 - chartered evidence artifacts (validate/report/package/cells_io/gate_summary): 1,722
 - explorer-prep: 387
@@ -185,7 +185,7 @@ remain hand-tracked.
 - artifact hygiene: 315
 - package init markers: 23
 
-**Total: 11,150 production LOC across 26 modules.**
+**Total: 11,172 production LOC across 26 modules.**
 
 <!-- UAT-LOC-SUMMARY:END -->
 
