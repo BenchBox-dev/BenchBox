@@ -117,6 +117,18 @@ class ReportSummary(PhaseResult):
     # fail_count or unreachable_count would misrepresent an environment
     # condition as a cell failure.
     startup_failed_count: int = 0
+    # Cells whose platform was reachable when it started and had stopped
+    # being reachable before the cell ran -- the stack died mid-platform
+    # (uat-container-readiness-and-memory-headroom-gate). A fifth disjoint
+    # component of total_defined_count alongside attempted/skipped/
+    # unreachable/startup_failed, and like unreachable_count and
+    # startup_failed_count it DOES feed exit_code(): cells that should have
+    # run did not, because the infrastructure under them went away. Folding
+    # it into fail_count would recreate the very miscount it exists to stop
+    # (171 cells recorded as cell failures on 2026-08-04); folding it into
+    # startup_failed_count would assert the stack never started, which is
+    # false.
+    died_mid_platform_count: int = 0
     # The sweep that produced these cells never wrote its finalize marker --
     # it was killed mid-run (uat-sweep-durability-and-signal-teardown w1). A
     # partial cells.jsonl must never read as a clean sweep, so this forces a
@@ -138,7 +150,11 @@ class ReportSummary(PhaseResult):
         if self.aborted or self.unfinalized:
             return 2
         has_uncleared_cells = (
-            self.fail_count > 0 or self.timeout_count > 0 or self.unreachable_count > 0 or self.startup_failed_count > 0
+            self.fail_count > 0
+            or self.timeout_count > 0
+            or self.unreachable_count > 0
+            or self.startup_failed_count > 0
+            or self.died_mid_platform_count > 0
         )
         return 1 if has_uncleared_cells or self.cross_scale_floor_breached else 0
 
@@ -239,6 +255,7 @@ def write_report(
     skipped_unreachable_count: int = 0,
     startup_failed_count: int = 0,
     registry_pruned_count: int = 0,
+    died_mid_platform_count: int = 0,
     unreachable_count_is_estimated: bool = False,
     source_info: SourceInfo | None = None,
     run_status: str = "COMPLETED",
@@ -270,6 +287,11 @@ def write_report(
     It feeds `total_defined_count` and the exit-code check exactly like
     `unreachable_count` does, but is reported under its own counter -- see
     uat-fail-advance-consistency w3.
+
+    `died_mid_platform_count` is disjoint from both: the stack DID start and
+    WAS reachable, then stopped being reachable partway through the
+    platform's cells. It feeds `total_defined_count` and the exit-code check
+    the same way.
     """
     # A run whose sweep never finalized (killed mid-stream) is INCOMPLETE and
     # must not read as a clean COMPLETED run, whatever the rows-so-far say. An
@@ -287,7 +309,9 @@ def write_report(
     attempted_count = executed_count - row_skipped_count - row_unreachable_count
     skipped_count = row_skipped_count + compatibility_pruned_count + early_stop_pruned_count + registry_pruned_count
     unreachable_count = row_unreachable_count + skipped_unreachable_count
-    total_defined_count = attempted_count + skipped_count + unreachable_count + startup_failed_count
+    total_defined_count = (
+        attempted_count + skipped_count + unreachable_count + startup_failed_count + died_mid_platform_count
+    )
     candidate_count = total_defined_count
     # Cross-cutting, NOT one of the disjoint total_defined_count components
     # above (an unvalidated cell is already `passed`, already counted in
@@ -316,6 +340,7 @@ def write_report(
         f"skipped={skipped_count} "
         f"unreachable={unreachable_count} "
         f"startup_failed={startup_failed_count} "
+        f"died_mid_platform={died_mid_platform_count} "
         f"total_defined={total_defined_count} "
         f"passed={pass_count} "
         f"failed={fail_count} "
@@ -326,7 +351,8 @@ def write_report(
         "# "
         f"release_accounting passed={pass_count} failed={fail_count} timed_out={timeout_count} "
         f"attempted={attempted_count} skipped={skipped_count} unreachable={unreachable_count} "
-        f"startup_failed={startup_failed_count} total_defined={total_defined_count} "
+        f"startup_failed={startup_failed_count} died_mid_platform={died_mid_platform_count} "
+        f"total_defined={total_defined_count} "
         f"registry_pruned={registry_pruned_count}\n"
     )
     if unreachable_count or unreachable_count_is_estimated:
@@ -337,6 +363,11 @@ def write_report(
         )
     if startup_failed_count:
         lines.append(f"# STARTUP_FAILED_CELLS={startup_failed_count} release_gate_attention=required\n")
+    if died_mid_platform_count:
+        # Its own aggregate line, like UNREACHABLE_CELLS/STARTUP_FAILED_CELLS:
+        # a platform lost mid-sweep is exactly the condition an operator must
+        # not have to reconstruct by diffing row counts.
+        lines.append(f"# DIED_MID_PLATFORM_CELLS={died_mid_platform_count} release_gate_attention=required\n")
     if unvalidated_count:
         # Visible-by-construction: a reader scanning per-row
         # submit_terminal_state values across 200 rows is not a safeguard,
@@ -387,6 +418,7 @@ def write_report(
         startup_failed_count=startup_failed_count,
         aborted=run_status in {"ABORTED", "BLOCKED"},
         abort_reason=abort_reason,
+        died_mid_platform_count=died_mid_platform_count,
         unfinalized=not finalized,
         unvalidated_count=unvalidated_count,
     )

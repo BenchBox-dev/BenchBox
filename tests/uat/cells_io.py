@@ -240,6 +240,7 @@ def write_cells_jsonl(
     source_info: SourceInfo,
     skipped_unreachable_count: int = 0,
     startup_failed_count: int = 0,
+    died_mid_platform_count: int = 0,
     compatibility_pruned_count: int = 0,
     early_stop_pruned_count: int = 0,
     registry_pruned_count: int = 0,
@@ -273,6 +274,13 @@ def write_cells_jsonl(
                 # probe that found nothing listening. Additive field -- see
                 # uat-fail-advance-consistency w3.
                 "startup_failed_count": int(startup_failed_count),
+                # Disjoint from both of the above: the stack started AND was
+                # reachable, then stopped being reachable partway through
+                # this platform's cells, so its remaining cells never ran.
+                # Recorded separately so a mid-sweep stack death is not
+                # laundered into either "never started" or "cell failures"
+                # (uat-container-readiness-and-memory-headroom-gate).
+                "died_mid_platform_count": int(died_mid_platform_count),
                 # Prune counts persisted so `make uat-report` regeneration
                 # reconstructs the same total_defined the live report had,
                 # instead of defaulting these to 0 (which made a regenerated

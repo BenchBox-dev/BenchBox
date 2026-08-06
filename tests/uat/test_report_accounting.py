@@ -68,7 +68,7 @@ def test_report_cli_reconciles_skipped_and_unreachable_fixture(tmp_path: Path, c
 
     text = output_tsv.read_text(encoding="utf-8")
     # Footer ordering contract: components (incl. startup_failed) precede total_defined.
-    assert "attempted=3 skipped=1 unreachable=1 startup_failed=0 total_defined=5" in text
+    assert "attempted=3 skipped=1 unreachable=1 startup_failed=0 died_mid_platform=0 total_defined=5" in text
     assert "# UNREACHABLE_CELLS=1 release_gate_attention=required" in text
 
 
@@ -94,7 +94,7 @@ def test_report_counts_execute_unreachable_cells_outside_rows(tmp_path: Path):
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
     assert (
         "compatibility_pruned=2 early_stop_pruned=1 attempted=3 skipped=3 "
-        "unreachable=4 startup_failed=0 total_defined=10"
+        "unreachable=4 startup_failed=0 died_mid_platform=0 total_defined=10"
     ) in text
     assert "# UNREACHABLE_CELLS=4 release_gate_attention=required" in text
 
@@ -123,7 +123,7 @@ def test_report_threads_startup_failed_count_into_total_defined_and_exit_code(tm
 
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
     # Footer ordering contract: components precede their total.
-    assert "unreachable=2 startup_failed=3 total_defined=6" in text
+    assert "unreachable=2 startup_failed=3 died_mid_platform=0 total_defined=6" in text
     assert "release_accounting" in text and "startup_failed=3" in text
     assert "# STARTUP_FAILED_CELLS=3 release_gate_attention=required" in text
 
@@ -583,3 +583,38 @@ def test_report_cli_throughput_check_defaults_to_none_when_absent(tmp_path: Path
     lines = output_tsv.read_text(encoding="utf-8").splitlines()
     assert lines[1].split("\t")[-1] == ""
     capsys.readouterr()
+
+
+# ---------------------------------------------------------------------------
+# died_mid_platform: a stack that started, was reachable, then died partway
+# through its own cell list (uat-container-readiness-and-memory-headroom-gate).
+# ---------------------------------------------------------------------------
+
+
+def test_report_threads_died_mid_platform_count_into_total_defined_and_exit_code(tmp_path: Path):
+    summary = report.write_report(
+        [_cell("duckdb", "tpch", 0.01, status="passed")],
+        output_path=tmp_path / "matrix_summary.tsv",
+        died_mid_platform_count=171,
+    )
+
+    assert summary.died_mid_platform_count == 171
+    # A fifth disjoint component: 1 attempted + 171 died.
+    assert summary.total_defined_count == 172
+    # Cells that should have run did not, because the infrastructure went
+    # away. A sweep that loses a platform mid-run must not read as clean.
+    assert summary.exit_code() == 1
+
+    text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
+    assert "startup_failed=0 died_mid_platform=171 total_defined=172" in text
+    assert "# DIED_MID_PLATFORM_CELLS=171 release_gate_attention=required" in text
+
+
+def test_report_exit_code_clean_when_died_mid_platform_count_zero(tmp_path: Path):
+    summary = report.write_report(
+        [_cell("duckdb", "tpch", 0.01, status="passed")],
+        output_path=tmp_path / "matrix_summary.tsv",
+        died_mid_platform_count=0,
+    )
+    assert summary.exit_code() == 0
+    assert "DIED_MID_PLATFORM_CELLS" not in (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")

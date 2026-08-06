@@ -240,27 +240,51 @@ def tcp_probe(host: str, port: int, timeout_s: float = 2.0) -> bool:
         return False
 
 
-def platform_is_reachable(platform: str) -> bool:
-    """Return True iff `platform` has no port mapping or its port is open.
+def probe_platform_reachability(platform: str, *, timeout_s: float = 2.0) -> bool:
+    """Return True iff `platform` has no port mapping or its port is open RIGHT NOW.
 
-    The reachability endpoint is re-resolved from the compose-derived facts on
-    each cache miss so an env override (e.g. SINGLESTORE_HOST_PORT) set before
-    the probe is honored.
+    The no-cache variant: never reads `_REACHABILITY_CACHE` and never writes
+    to it. Two callers need that guarantee, for opposite reasons.
+
+    1. The per-cell liveness probe (`phases/execute.py`). A cached answer is
+       useless to it by construction -- it exists precisely to notice that a
+       stack which WAS reachable has since died, which is the only way to
+       catch a container that outlives the post-start readiness check. The
+       2026-08-04 CedarDB incident died ~29s after `up --wait` returned and
+       every subsequent cell was recorded as a cell failure.
+    2. The post-start readiness check. Writing `True` here would poison the
+       cache for whatever probes next, converting a later real probe into a
+       stale cached pass.
+
+    `platform_is_reachable` remains the cached, once-per-process entry point
+    for callers that just want "is this platform up" at sweep or platform
+    granularity. The reachability endpoint is re-resolved from the
+    compose-derived facts on every call so an env override (e.g.
+    SINGLESTORE_HOST_PORT) set before the probe is honored.
     """
-    if platform in _REACHABILITY_CACHE:
-        return _REACHABILITY_CACHE[platform]
     addr = docker_assets.host_reachability_endpoint(platform)
     if addr is None:
-        # No probe configured -> assume reachable.
-        _REACHABILITY_CACHE[platform] = True
+        # No probe configured -> assume reachable. Costs no socket, so the
+        # per-cell liveness probe is free for native platforms (duckdb, ...).
         return True
     host, _, port_s = addr.partition(":")
     try:
         port = int(port_s)
     except ValueError:
-        _REACHABILITY_CACHE[platform] = True
         return True
-    reachable = tcp_probe(host, port)
+    return tcp_probe(host, port, timeout_s=timeout_s)
+
+
+def platform_is_reachable(platform: str) -> bool:
+    """Return True iff `platform` has no port mapping or its port is open.
+
+    Cached per platform for this process (see `_REACHABILITY_CACHE`);
+    invalidated only by `invalidate_reachability_cache_after_lifecycle_change`.
+    Use `probe_platform_reachability` when a fresh answer is required.
+    """
+    if platform in _REACHABILITY_CACHE:
+        return _REACHABILITY_CACHE[platform]
+    reachable = probe_platform_reachability(platform)
     _REACHABILITY_CACHE[platform] = reachable
     return reachable
 

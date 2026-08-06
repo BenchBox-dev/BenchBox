@@ -40,6 +40,19 @@ class ExecuteConfig:
     extra_args: tuple[str, ...] = ()
     skip_unreachable: bool = True
     parallel_platforms: bool = False  # reserved; must remain False
+    # Per-cell liveness probe: TCP timeout, in seconds, for the fresh
+    # reachability probe run before each cell of a platform that WAS
+    # reachable when the platform started. 0 disables the probe entirely --
+    # the same 0-disables convention as free_space_min_gib /
+    # free_memory_min_gib, so every gate this change adds is switched off
+    # the same way.
+    #
+    # This is the mechanism that catches a stack dying at arbitrary latency
+    # mid-platform; the post-start readiness check
+    # (cleanup.docker_settle_s) covers only immediate crashes. Cost is one
+    # loopback TCP connect per cell against multi-minute cells, and zero
+    # syscalls for platforms with no reachability endpoint.
+    liveness_probe_timeout_s: float = 2.0
     # official/streams/seed drive a real multi-stream throughput cell via
     # `benchbox run-official --streams N` instead of the default `benchbox
     # run` -- see tests.uat.throughput for why `run-official` is the only
@@ -426,6 +439,7 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
                 "extra_args",
                 "skip_unreachable",
                 "parallel_platforms",
+                "liveness_probe_timeout_s",
                 "official",
                 "streams",
                 "seed",
@@ -475,6 +489,12 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
         extra_args=extra_args,
         skip_unreachable=_require_bool(payload, "skip_unreachable", default=True, section="execute"),
         parallel_platforms=parallel_platforms,
+        liveness_probe_timeout_s=_require_nonnegative_float(
+            payload,
+            "liveness_probe_timeout_s",
+            default=2.0,
+            section="execute",
+        ),
         official=official,
         streams=streams,
         seed=seed,

@@ -90,6 +90,10 @@ class PhaseAccounting:
     timed_out: int = 0
     unreachable: int = 0
     startup_failed: int = 0
+    # Cells whose platform died partway through its own cell list -- see
+    # ReportSummary.died_mid_platform_count. A disjoint component of
+    # total_defined, like startup_failed.
+    died_mid_platform: int = 0
     skipped: int = 0
     compatibility_pruned: int = 0
     early_stop_pruned: int = 0

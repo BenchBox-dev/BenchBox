@@ -9,8 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.uat import cells_io, docker_assets, orchestrator
+from tests.uat import _cli as uat_cli, cells_io, docker_assets, orchestrator
 from tests.uat.config import validate_config
+from tests.uat.conftest import docker_verb, platform_reachability
 from tests.uat.docker_path_helpers import compose_path_ends_with
 from tests.uat.phases import execute as exec_phase
 from tests.uat.phases.enumerate import CompatibilityPrunedCell
@@ -1185,7 +1186,10 @@ def test_disk_floor_abort_carries_skipped_unreachable_count():
     # duckdb is processed first and recorded as skipped-unreachable; the
     # reachable clickhouse-server stack then trips the disk-floor runner. The
     # raised abort must carry the already-accumulated unreachable count (1).
-    with patch.object(exec_phase, "platform_is_reachable", side_effect=lambda p, **_: p != "duckdb"):
+    with (
+        patch.object(exec_phase, "platform_is_reachable", side_effect=lambda p, **_: p != "duckdb"),
+        patch.object(exec_phase, "probe_platform_reachability", side_effect=lambda p, **_: p != "duckdb"),
+    ):
         with pytest.raises(orchestrator.DiskFloorAbort) as excinfo:
             exec_phase.run_execute(
                 cfg,
@@ -1198,7 +1202,7 @@ def test_disk_floor_abort_carries_skipped_unreachable_count():
 
 def _startup_fail_clickhouse_docker(argv, **kwargs):
     """Fake docker runner: clickhouse compose-up fails, everything else succeeds."""
-    action = "up" if "up" in argv else "down"
+    action = docker_verb(argv)
     compose_file = argv[argv.index("-f") + 1] if "-f" in argv else ""
     if action == "up" and compose_path_ends_with(compose_file, "docker", "clickhouse", "docker-compose.yml"):
         return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose up failed")
@@ -1227,7 +1231,7 @@ def test_disk_floor_abort_carries_startup_failed_count(tmp_path: Path):
     def runner(platform, benchmark, scale, **kwargs):
         raise orchestrator.DiskFloorAbort("free space 1.0 GiB < cutoff 5.0 GiB")
 
-    with patch.object(exec_phase, "platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         with pytest.raises(orchestrator.DiskFloorAbort) as excinfo:
             exec_phase.run_execute(
                 cfg,
@@ -1270,7 +1274,7 @@ def test_disk_floor_abort_threads_startup_failed_count_into_sidecar_and_partial_
     )
 
     with (
-        patch.object(exec_phase, "platform_is_reachable", return_value=True),
+        platform_reachability(True),
         patch.object(exec_phase.docker_assets, "run_docker_command", side_effect=_startup_fail_clickhouse_docker),
         patch.object(orchestrator.exec_phase, "run_cell", return_value=cell),
         patch.object(orchestrator.exec_phase, "default_free_space_reader", return_value=100.0),
@@ -1288,7 +1292,7 @@ def test_disk_floor_abort_threads_startup_failed_count_into_sidecar_and_partial_
     # And the partial report accounts for it (components precede the total).
     partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
     assert "startup_failed=1" in partial_text
-    assert "attempted=1 skipped=0 unreachable=0 startup_failed=1 total_defined=2" in partial_text
+    assert "attempted=1 skipped=0 unreachable=0 startup_failed=1 died_mid_platform=0 total_defined=2" in partial_text
 
 
 # ---------------------------------------------------------------------------
@@ -1324,6 +1328,7 @@ def test_update_accounting_sidecar_preserves_existing_counts(tmp_path: Path):
     assert payload == {
         "skipped_unreachable_count": 3,
         "startup_failed_count": 2,
+        "died_mid_platform_count": 0,
         "compatibility_pruned_count": 0,
         "early_stop_pruned_count": 0,
         "registry_pruned_count": 0,
@@ -1765,3 +1770,109 @@ def test_combined_evidence_red_when_a_stage_has_no_floor_gates():
     )
     assert evidence.verdict == "red"
     assert any("floor gates were not configured" in reason for reason in evidence.reasons), evidence.reasons
+
+
+def test_mid_platform_death_surfaces_in_every_machine_readable_rollup(tmp_path: Path):
+    """The threading test this batch keeps needing: a source change whose
+    consumers stay blind is the recurring failure mode here (cf. the
+    `unvalidated` accounting fix). A stack dying mid-platform must be
+    visible in ALL THREE roll-up surfaces built from the same sweep, not
+    just the ExecuteOutcome that produced it:
+
+      - matrix_summary.tsv's footer (human-readable)
+      - uat_gate_summary.json's accounting block (what a release gate reads)
+      - cells.jsonl's accounting sidecar (what `uat report` regenerates from)
+    """
+    cfg = validate_config(
+        {
+            "name": "mid-platform-death-rollup",
+            "phases": ["execute", "report"],
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+    ran = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+    died = tuple(
+        exec_phase.Cell(platform="clickhouse-server", benchmark="tpch", scale=scale) for scale in (0.1, 1.0, 10.0)
+    )
+    outcome = exec_phase.ExecuteOutcome(
+        phase="execute",
+        results=(ran,),
+        pruned=(),
+        skipped_unreachable=(),
+        startup_failed=(),
+        died_mid_platform=died,
+        compatibility_pruned=(),
+    )
+
+    with patch.object(orchestrator.exec_phase, "run_execute", return_value=outcome):
+        result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
+
+    # 1. matrix_summary.tsv footer.
+    tsv = (tmp_path / "logs" / "matrix_summary.tsv").read_text(encoding="utf-8")
+    assert "died_mid_platform=3" in tsv
+    assert "# DIED_MID_PLATFORM_CELLS=3 release_gate_attention=required" in tsv
+
+    # 2. uat_gate_summary.json accounting.
+    gate = json.loads((tmp_path / "logs" / "uat_gate_summary.json").read_text(encoding="utf-8"))
+    assert gate["accounting"]["died_mid_platform"] == 3
+    assert gate["accounting"]["total_defined"] == 4
+    # A lost platform makes the stage red, not green.
+    assert gate["verdict"] == "red"
+
+    # 3. cells.jsonl accounting sidecar (the regeneration input).
+    accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
+    assert accounting["died_mid_platform_count"] == 3
+    # Disjoint from both neighbours -- not laundered into either.
+    assert accounting["startup_failed_count"] == 0
+    assert accounting["skipped_unreachable_count"] == 0
+
+    assert result.exit_code() != 0
+
+
+def test_report_cli_json_surfaces_died_mid_platform_from_the_sidecar(tmp_path: Path, capsys):
+    """`uat report --json` is the fourth reader, and it rebuilds from the
+    sidecar rather than from the live outcome -- so it needs its own wiring
+    or a regenerated report silently loses the count."""
+    cells_jsonl = tmp_path / "cells.jsonl"
+    cell = CellResult(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=0.01,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=None,
+    )
+    cells_io.write_cells_jsonl(
+        cells_jsonl,
+        (cell,),
+        source_info=_source_info(),
+        died_mid_platform_count=171,
+    )
+
+    exit_code = uat_cli.main(
+        [
+            "report",
+            "--cells-jsonl",
+            str(cells_jsonl),
+            "--output-tsv",
+            str(tmp_path / "matrix_summary.tsv"),
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["died_mid_platform"] == 171
+    assert payload["total_defined"] == 172
+    assert exit_code == 1

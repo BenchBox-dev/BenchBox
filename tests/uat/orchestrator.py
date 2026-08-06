@@ -382,6 +382,7 @@ def _run_sweep_phases(  # noqa: C901
                     pruned=(),
                     skipped_unreachable=(),
                     startup_failed=(),
+                    died_mid_platform=(),
                     compatibility_pruned=getattr(exc, "compatibility_pruned", ()) or (),
                     aborted=True,
                     abort_reason=abort_reason,
@@ -403,6 +404,7 @@ def _run_sweep_phases(  # noqa: C901
                     # abort report would under-count total_defined.
                     skipped_unreachable_count=getattr(exc, "skipped_unreachable_count", 0),
                     startup_failed_count=getattr(exc, "startup_failed_count", 0),
+                    died_mid_platform_count=getattr(exc, "died_mid_platform_count", 0),
                     container_engine=container_engine,
                 )
                 break
@@ -415,6 +417,7 @@ def _run_sweep_phases(  # noqa: C901
                 source_info=source_info,
                 skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
                 startup_failed_count=len(getattr(execute_outcome, "startup_failed", ())),
+                died_mid_platform_count=len(getattr(execute_outcome, "died_mid_platform", ())),
                 compatibility_pruned_count=compat_rule_pruned_count,
                 early_stop_pruned_count=len(getattr(execute_outcome, "pruned", ())),
                 registry_pruned_count=registry_pruned_count,
@@ -639,6 +642,7 @@ def _run_sweep_phases(  # noqa: C901
                 registry_pruned_count=report_registry_pruned_count,
                 skipped_unreachable_count=len(getattr(execute_outcome, "skipped_unreachable", ())),
                 startup_failed_count=len(getattr(execute_outcome, "startup_failed", ())),
+                died_mid_platform_count=len(getattr(execute_outcome, "died_mid_platform", ())),
                 source_info=source_info,
             )
             report_summary = summary
@@ -701,6 +705,7 @@ def _emit_abort_artifacts(
     abort_reason: str | None,
     skipped_unreachable_count: int | None = None,
     startup_failed_count: int | None = None,
+    died_mid_platform_count: int | None = None,
     container_engine: str | None = None,
 ) -> report_phase.ReportSummary:
     cells = tuple(getattr(execute_outcome, "results", ())) if execute_outcome is not None else tuple(attempted)
@@ -721,6 +726,10 @@ def _emit_abort_artifacts(
         )
     if startup_failed_count is None:
         startup_failed_count = len(getattr(execute_outcome, "startup_failed", ())) if execute_outcome is not None else 0
+    if died_mid_platform_count is None:
+        died_mid_platform_count = (
+            len(getattr(execute_outcome, "died_mid_platform", ())) if execute_outcome is not None else 0
+        )
     # Same registry/compatibility split as the happy path so an abort report
     # and its regenerated counterpart agree on the buckets (w1/w2).
     compat_rule_pruned_count, registry_pruned_count = enumerate_phase.count_pruned_by_kind(compatibility_pruned)
@@ -730,6 +739,7 @@ def _emit_abort_artifacts(
         source_info=source_info,
         skipped_unreachable_count=skipped_unreachable_count,
         startup_failed_count=startup_failed_count,
+        died_mid_platform_count=died_mid_platform_count,
         compatibility_pruned_count=compat_rule_pruned_count,
         early_stop_pruned_count=early_stop_pruned_count,
         registry_pruned_count=registry_pruned_count,
@@ -750,6 +760,7 @@ def _emit_abort_artifacts(
         registry_pruned_count=registry_pruned_count,
         skipped_unreachable_count=skipped_unreachable_count,
         startup_failed_count=startup_failed_count,
+        died_mid_platform_count=died_mid_platform_count,
         source_info=source_info,
         run_status="ABORTED",
         abort_phase=aborted_phase,
@@ -784,6 +795,7 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
             timed_out=report_summary.timeout_count,
             unreachable=report_summary.unreachable_count,
             startup_failed=report_summary.startup_failed_count,
+            died_mid_platform=report_summary.died_mid_platform_count,
             skipped=report_summary.skipped_count,
             compatibility_pruned=report_summary.compatibility_pruned_count,
             early_stop_pruned=report_summary.early_stop_pruned_count,
@@ -820,6 +832,7 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
     early_stop_pruned = len(getattr(execute_outcome, "pruned", ()))
     unreachable = row_unreachable + len(getattr(execute_outcome, "skipped_unreachable", ()))
     startup_failed = len(getattr(execute_outcome, "startup_failed", ()))
+    died_mid_platform = len(getattr(execute_outcome, "died_mid_platform", ()))
     attempted = len(results) - row_skipped - row_unreachable
     skipped = row_skipped + compatibility_pruned + registry_pruned + early_stop_pruned
     return gate_summary.PhaseAccounting(
@@ -829,11 +842,12 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
         timed_out=timed_out,
         unreachable=unreachable,
         startup_failed=startup_failed,
+        died_mid_platform=died_mid_platform,
         skipped=skipped,
         compatibility_pruned=compatibility_pruned,
         early_stop_pruned=early_stop_pruned,
         registry_pruned=registry_pruned,
-        total_defined=attempted + skipped + unreachable + startup_failed,
+        total_defined=attempted + skipped + unreachable + startup_failed + died_mid_platform,
         unvalidated=unvalidated,
     )
 
