@@ -475,6 +475,25 @@ def _docker_platform_from_argv(argv: list[str]) -> str:
     return compose_file
 
 
+def _docker_verb(argv: list[str]) -> str:
+    """Classify a compose argv into "up"/"ps"/"down" for fake docker_runner fixtures.
+
+    `compose_up_command`, `compose_ps_command`, and `compose_down_command`
+    argvs each contain exactly one of these three literal verb tokens (see
+    docker_assets.py), so order does not matter here.
+    """
+    if "up" in argv:
+        return "up"
+    if "ps" in argv:
+        return "ps"
+    return "down"
+
+
+def _healthy_ps_result(argv: list[str]) -> docker_assets.DockerCommandResult:
+    """A `compose ps` result with no Exited/Restarting rows -- readiness passes."""
+    return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+
 def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path):
     cfg = validate_config(
         {
@@ -488,8 +507,10 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
     sequence: list[tuple[str, str, str]] = []
 
     def fake_docker(argv, **kwargs):
-        action = "up" if "up" in argv else "down"
+        action = _docker_verb(argv)
         sequence.append(("docker", action, _docker_platform_from_argv(argv)))
+        if action == "ps":
+            return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def recording_runner(platform, benchmark, scale, **kwargs):
@@ -514,14 +535,17 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
             docker_runner=fake_docker,
             free_space_checks_enabled=True,
             free_space_reader=lambda _path: 100.0,
+            sleep_fn=lambda _s: None,
         )
 
     assert outcome.aborted is False
     assert sequence == [
         ("docker", "up", "clickhouse-server"),
+        ("docker", "ps", "clickhouse-server"),
         ("cell", "run", "clickhouse-server"),
         ("docker", "down", "clickhouse-server"),
         ("docker", "up", "postgresql"),
+        ("docker", "ps", "postgresql"),
         ("cell", "run", "postgresql"),
         ("docker", "down", "postgresql"),
     ]
@@ -583,6 +607,7 @@ def test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_m
                 databases_root=tmp_path / "databases",
                 runner=recording_runner,
                 docker_runner=fake_docker,
+                sleep_fn=lambda _s: None,
             )
 
         assert outcome.aborted is False
@@ -638,6 +663,7 @@ def test_execute_teardown_skips_mocker_volume_sweep_for_containers_mode(tmp_path
                 databases_root=tmp_path / "databases",
                 runner=recording_runner,
                 docker_runner=fake_docker,
+                sleep_fn=lambda _s: None,
             )
 
         assert not any(e.action == "volume-sweep" for e in outcome.docker_events)
@@ -659,10 +685,12 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
     commands: list[str] = []
 
     def fake_docker(argv, **kwargs):
-        action = "up" if "up" in argv else "down"
+        action = _docker_verb(argv)
         commands.append(f"{action}:{_docker_platform_from_argv(argv)}")
         if action == "down":
             return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose down failed")
+        if action == "ps":
+            return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
@@ -673,11 +701,12 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
             runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
             docker_runner=fake_docker,
             free_space_reader=lambda _path: 100.0,
+            sleep_fn=lambda _s: None,
         )
 
     assert outcome.aborted is True
     assert "Docker cleanup failed" in (outcome.abort_reason or "")
-    assert commands == ["up:clickhouse-server", "down:clickhouse-server"]
+    assert commands == ["up:clickhouse-server", "ps:clickhouse-server", "down:clickhouse-server"]
 
 
 def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tmp_path):
@@ -702,7 +731,7 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
     sequence: list[tuple[str, str, str]] = []
 
     def fake_docker(argv, **kwargs):
-        action = "up" if "up" in argv else "down"
+        action = _docker_verb(argv)
         platform = _docker_platform_from_argv(argv)
         sequence.append(("docker", action, platform))
         # clickhouse-server compose-up fails (e.g. start timeout); others succeed.
@@ -710,6 +739,8 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
             return docker_assets.DockerCommandResult(
                 tuple(argv), 1, "", "docker command timed out after 300s", timed_out=True
             )
+        if action == "ps":
+            return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def recording_runner(platform, benchmark, scale, **kwargs):
@@ -734,6 +765,7 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
             docker_runner=fake_docker,
             free_space_checks_enabled=True,
             free_space_reader=lambda _path: 100.0,
+            sleep_fn=lambda _s: None,
         )
 
     # The sweep is NOT aborted by one stack's startup failure.
@@ -743,6 +775,7 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
         ("docker", "up", "clickhouse-server"),
         ("docker", "down", "clickhouse-server"),
         ("docker", "up", "postgresql"),
+        ("docker", "ps", "postgresql"),
         ("cell", "run", "postgresql"),
         ("docker", "down", "postgresql"),
     ]
@@ -757,6 +790,204 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
         event.platform == "clickhouse-server" and event.action == "up" and event.status == "failed"
         for event in outcome.docker_events
     )
+
+
+def test_execute_readiness_settle_reprobes_compose_ps_after_up_wait_reports_success(tmp_path):
+    """uat-container-readiness-and-memory-headroom-gate w0/w1 (RED-NOW rung 2).
+
+    Regression for the 2026-08-04 CedarDB incident: `up --wait` exited 0,
+    but `compose ps` showed the container Exited ~29s later, and UAT ran
+    171 cells against the dead stack -- all recorded as CELL failures
+    instead of a startup failure. `up --wait` succeeding must not be
+    trusted on its own: a settle window plus a `compose ps` re-check must
+    run first, and a service that has already Exited by then must route
+    into the existing startup_failed path (advance, don't run cells,
+    don't abort the sweep) instead of being counted as 171 cell failures.
+    """
+    cfg = validate_config(
+        {
+            "name": "readiness settle",
+            "platforms": {"include": ["clickhouse-server", "postgresql"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    sequence: list[tuple[str, str, str]] = []
+    sleep_calls: list[float] = []
+
+    def fake_docker(argv, **kwargs):
+        action = _docker_verb(argv)
+        platform = _docker_platform_from_argv(argv)
+        sequence.append(("docker", action, platform))
+        if action == "ps" and platform == "clickhouse-server":
+            # `mocker compose ps` output shape (live-observed 2026-08-04):
+            # the service reported started by `up --wait` has since exited.
+            return docker_assets.DockerCommandResult(
+                tuple(argv),
+                0,
+                "NAME                STATUS\nclickhouse-server   Exited (137) 5 seconds ago\n",
+                "",
+            )
+        if action == "ps":
+            return _healthy_ps_result(argv)
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        sequence.append(("cell", "run", platform))
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / f"{platform}.log",
+            result_path=None,
+        )
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=fake_docker,
+            sleep_fn=sleep_calls.append,
+        )
+
+    # The dead stack's cells are NOT run and NOT counted as cell failures --
+    # exactly the miscount the 2026-08-04 incident produced.
+    assert not any(entry[:2] == ("cell", "run") and entry[2] == "clickhouse-server" for entry in sequence)
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
+    assert not any(r.platform == "clickhouse-server" for r in outcome.results)
+    # The settle window ran (the default docker_settle_s=10) before the
+    # re-check, once per managed Docker platform (clickhouse-server, then
+    # postgresql).
+    assert sleep_calls == [10, 10]
+    # The sweep still advances to the next stack -- one dead stack does not
+    # abort the whole sweep (uat-docker-stack-recovery w2, preserved here).
+    assert outcome.aborted is False
+    assert any(r.platform == "postgresql" and r.status == "passed" for r in outcome.results)
+    assert any(
+        event.platform == "clickhouse-server" and event.action == "readiness" and event.status == "failed"
+        for event in outcome.docker_events
+    )
+    readiness_event = next(e for e in outcome.docker_events if e.action == "readiness")
+    assert "clickhouse-server" in readiness_event.message
+    assert "Exited/Restarting" in readiness_event.message
+
+
+def test_execute_readiness_check_fails_when_platform_unreachable_after_settle(tmp_path):
+    """`compose ps` can look healthy while nothing is actually listening yet
+    (or ever) -- the readiness check must also re-probe reachability, reusing
+    the same primitive `_run_or_skip_platform`'s skip_unreachable check uses
+    (see uat-container-readiness-and-memory-headroom-gate w0 prior_art)."""
+    cfg = validate_config(
+        {
+            "name": "readiness unreachable",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def fake_docker(argv, **kwargs):
+        action = _docker_verb(argv)
+        if action == "ps":
+            return _healthy_ps_result(argv)
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def fail_runner(platform, benchmark, scale, **kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError("no cell should run against an unreachable stack")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=False):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=fail_runner,
+            docker_runner=fake_docker,
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert len(outcome.results) == 0
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
+    readiness_event = next(e for e in outcome.docker_events if e.action == "readiness")
+    assert readiness_event.status == "failed"
+    assert "reachability probe" in readiness_event.message
+
+
+def test_execute_readiness_settle_uses_configured_docker_settle_s(tmp_path):
+    cfg = validate_config(
+        {
+            "name": "custom settle",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {
+                "docker_manage_platforms": True,
+                "docker_platform_switch": "volumes",
+                "docker_settle_s": 3,
+            },
+        }
+    )
+    sleep_calls: list[float] = []
+
+    def fake_docker(argv, **kwargs):
+        action = _docker_verb(argv)
+        if action == "ps":
+            return _healthy_ps_result(argv)
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            sleep_fn=sleep_calls.append,
+        )
+
+    assert outcome.aborted is False
+    assert sleep_calls == [3]
+
+
+def test_execute_readiness_check_skipped_for_dry_run(tmp_path):
+    """A dry run never actually starts a container -- there is nothing to
+    settle or probe, and the readiness check must not fabricate a settle
+    delay or a real reachability probe against it."""
+    cfg = validate_config(
+        {
+            "name": "dry run readiness",
+            "dry_run": True,
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    sleep_calls: list[float] = []
+
+    def fake_docker(argv, **kwargs):  # pragma: no cover - dry_run short-circuits before any real call
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "", dry_run=True)
+
+    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            sleep_fn=sleep_calls.append,
+        )
+
+    assert outcome.aborted is False
+    assert sleep_calls == []
+    assert not any(event.action in {"ps", "readiness"} for event in outcome.docker_events)
 
 
 def test_execute_teardown_failure_after_startup_failure_advances_instead_of_aborting(tmp_path):
@@ -783,12 +1014,14 @@ def test_execute_teardown_failure_after_startup_failure_advances_instead_of_abor
     sequence: list[tuple[str, str, str]] = []
 
     def fake_docker(argv, **kwargs):
-        action = "up" if "up" in argv else "down"
+        action = _docker_verb(argv)
         platform = _docker_platform_from_argv(argv)
         sequence.append(("docker", action, platform))
         # clickhouse-server's compose-up fails AND its teardown also fails.
         if platform == "clickhouse-server":
             return docker_assets.DockerCommandResult(tuple(argv), 1, "", f"{action} failed")
+        if action == "ps":
+            return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def recording_runner(platform, benchmark, scale, **kwargs):
@@ -813,6 +1046,7 @@ def test_execute_teardown_failure_after_startup_failure_advances_instead_of_abor
             docker_runner=fake_docker,
             free_space_checks_enabled=True,
             free_space_reader=lambda _path: 100.0,
+            sleep_fn=lambda _s: None,
         )
 
     # The sweep advances past the broken stack instead of a global abort.
@@ -822,6 +1056,7 @@ def test_execute_teardown_failure_after_startup_failure_advances_instead_of_abor
         ("docker", "up", "clickhouse-server"),
         ("docker", "down", "clickhouse-server"),
         ("docker", "up", "postgresql"),
+        ("docker", "ps", "postgresql"),
         ("cell", "run", "postgresql"),
         ("docker", "down", "postgresql"),
     ]
@@ -859,9 +1094,11 @@ def test_execute_healthy_stack_teardown_failure_still_aborts_after_startup_faile
     )
 
     def fake_docker(argv, **kwargs):
-        action = "up" if "up" in argv else "down"
+        action = _docker_verb(argv)
         if action == "down":
             return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose down failed")
+        if action == "ps":
+            return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
@@ -872,6 +1109,7 @@ def test_execute_healthy_stack_teardown_failure_still_aborts_after_startup_faile
             runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
             docker_runner=fake_docker,
             free_space_reader=lambda _path: 100.0,
+            sleep_fn=lambda _s: None,
         )
 
     assert outcome.aborted is True
@@ -1048,6 +1286,7 @@ def test_execute_scopes_local_managed_platform_options_to_managed_docker(
             databases_root=tmp_path / "databases",
             runner=recording_runner,
             docker_runner=fake_docker,
+            sleep_fn=lambda _s: None,
         )
 
     assert outcome.aborted is False
@@ -1067,7 +1306,10 @@ def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
     actions: list[str] = []
 
     def fake_docker(argv, **kwargs):
-        actions.append("up" if "up" in argv else "down")
+        action = _docker_verb(argv)
+        actions.append(action)
+        if action == "ps":
+            return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def raising_runner(platform, benchmark, scale, **kwargs):
@@ -1084,9 +1326,10 @@ def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
             runner=raising_runner,
             docker_runner=fake_docker,
             free_space_reader=lambda _path: 100.0,
+            sleep_fn=lambda _s: None,
         )
 
-    assert actions == ["up", "down"]
+    assert actions == ["up", "ps", "down"]
 
 
 def test_execute_fixed_container_name_platform_aborts_before_docker_command(tmp_path, monkeypatch):
@@ -1153,6 +1396,7 @@ def test_execute_free_space_abort_reports_context_after_docker_teardown(tmp_path
             docker_runner=fake_docker,
             free_space_checks_enabled=True,
             free_space_reader=lambda _path: next(readings),
+            sleep_fn=lambda _s: None,
         )
 
     assert outcome.aborted is True
