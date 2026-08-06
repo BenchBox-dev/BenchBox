@@ -1,8 +1,8 @@
 # ADR: Drop unread identifier fields from the published corpus
 
 - Status: Accepted (implemented at the public anonymization boundary;
-  retained-field salt closed 2026-08-05)
-- Date: 2026-08-04; salt amendment 2026-08-05
+  retained-field salt closed 2026-08-05; residual local-path drop 2026-08-05)
+- Date: 2026-08-04; salt amendment 2026-08-05; residual path/host keys 2026-08-05
 - Supersedes nothing. Constrains `benchbox/core/results/anonymization.py` and
   any future re-derivation of `results-data/`.
 
@@ -58,6 +58,31 @@ rather than dropped: they are broader than `engine_host`.
 
 For the three that do have a consumer, keep publishing a pseudonym. The
 retained-field salt decision is recorded below (closed 2026-08-05).
+
+## Residual path/host keys (2026-08-05)
+
+After the six-field drop and alias rows, several **pure local filesystem**
+keys could still mint empty-salt `path_` tokens under `path_keys` / suffix
+rules, with no Explorer or publication-pipeline consumer. Treat them like the
+other unread local identifiers: **drop**, do not hash.
+
+| compact key class | policy | rationale |
+|---|---|---|
+| `outputdir`, `outputdirectory`, `outputpath`, `outputlocation` | **drop** | Local run output location; no public reader |
+| `resultdir`, `resultpath` | **drop** | Local results location; no public reader |
+| `logpath`, `logfile` | **drop** | Local log location; no public reader |
+| `filepath`, `path` | **drop** | Exact key name only (compact); not `submission_path` / `*_path` retained consumers |
+| `sourceroot` | **drop** | Local source tree root; no public reader |
+| `credentialfile` | **drop** | Local credential path; omit entirely (stronger than redact-in-place) |
+| `datadir` / `datadirectory` / `workdir` family | **drop** | Already covered by unread-field aliases |
+| `sslrootcert` | **keep hash** | libpq spelling; intentional privacy hash for cert path material |
+| `s3stagingurl`, `staginglocation`, `stagingurl`, `httppath` | **keep hash** | May embed account/tenant; not pure local FS |
+| `host`, `hostname`, `server` | **keep hash** | Broader than `engine_host`; may be remote endpoints |
+| `endpoint`, `database_name`, `submission_path` | **keep hash** | Retained consumers (see field-set table above) |
+
+Corpus inventory (tip `results-data/` JSON): none of the newly dropped compact
+keys appear as object keys, so **no full re-derive** is required for this
+amendment. Fixed-point / privacy gates remain the regression bar.
 
 ## Retained-field salt decision (2026-08-05)
 
@@ -138,6 +163,9 @@ bundles are the product.
 - Retained-field salt decision (2026-08-05): empty OSS default; residual
   confirmation oracle documented; operator-configured non-empty salt recommended
   for community-facing publishes; publication fixed point from #1512 preserved.
+- Residual local-path keys (2026-08-05): additional pure-FS compact keys dropped
+  at the public boundary; remote-ish path/host keys remain hashed; no corpus
+  re-derive when tip bundles lack those keys.
 
 ## What this does not change
 

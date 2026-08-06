@@ -179,7 +179,8 @@ def test_anonymized_json_export_hashes_infrastructure_identifiers_and_redacts_se
     assert payload["platform"]["storage"]["prefix"].startswith("prefix_")
     assert payload["platform"]["raw_config"]["password"] == "<redacted>"
     assert payload["platform"]["raw_config"]["access_token"] == "<redacted>"
-    assert payload["platform"]["raw_config"]["credential_file"] == "<redacted>"
+    # Residual local-path drop: credential_file is omitted, not redacted-in-place.
+    assert "credential_file" not in payload["platform"]["raw_config"]
     assert payload["platform"]["raw_config"]["connection_string"] == "<redacted>"
     assert payload["config"]["platform_options"]["client_secret"] == "<redacted>"
 
