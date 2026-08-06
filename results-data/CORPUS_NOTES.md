@@ -35,3 +35,7 @@ results were exported directly by filename.
 Both cohorts meet the >=3-platform depth criterion required for the Compare view:
 - `tpch SF=0.01`: DuckDB, DataFusion, Polars
 - `star_schema SF=0.01`: DuckDB, DataFusion, SQLite
+
+## Public-path single-pass status (2026-08-05)
+
+Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.
