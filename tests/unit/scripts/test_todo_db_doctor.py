@@ -226,6 +226,6 @@ def test_implicit_local_fallback_is_warned_not_failed(monkeypatch, tmp_path, cap
     db = tmp_path / "fallback.sqlite"
     assert todo_db.main(["--db", str(db), "init"]) == 0
 
-    monkeypatch.setattr(todo_db, "_resolve_backend", lambda _explicit: (db, True, False))
+    monkeypatch.setattr(todo_db, "_resolve_backend", lambda _explicit: (db, True, False, None))
     assert todo_db.main(["doctor"]) == todo_db.DOCTOR_EXIT_OK
     assert "WARN identity" in capsys.readouterr().out

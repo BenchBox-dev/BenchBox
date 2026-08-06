@@ -841,8 +841,12 @@ TODO tree from an untrusted source would plant shell commands; do not.
     backend transparently, falling back to the local implicit DB (with a
     refusal-on-write pointing at `turso auth login` /
     `TODO_DB_URL`+`TODO_DB_AUTH_TOKEN` / `--db`/`TODO_DB_PATH`) if turso is
-    absent, not logged in, or the mint fails. This closes the former open
-    provisioning item without requiring the two variables in local `.env`.
+    absent, not logged in, or the mint fails. When turso is on PATH but mint
+    fails, a short reason class (`db-show-failed`, `token-create-failed`,
+    etc. — never stderr/URL/token) is surfaced via stderr WARN, the doctor
+    `turso-provision` check, and the write-refusal message, so the fallthrough
+    is not silent. This closes the former open provisioning item without
+    requiring the two variables in local `.env`.
 - **G2 — CLI MVP:** schema DDL + `create/show/claim/start/done/defer/
   promote/dismiss/complete/ready/list/stats/export` + tests. No repo changes
   to the YAML system yet.
