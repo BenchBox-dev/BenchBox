@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import os
+import time
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -35,7 +36,11 @@ from tests.uat.phases.enumerate import (
     CompatibilityPrunedCell,
     enumerate_cells_with_pruning,
 )
-from tests.uat.preflight_budget import free_space_gib as default_free_space_reader
+from tests.uat.preflight_budget import (
+    MemorySnapshot,
+    free_space_gib as default_free_space_reader,
+    read_memory_snapshot as default_free_memory_reader,
+)
 from tests.uat.runner import CellResult, run_cell
 
 # Frozen-dataclass default instance, used to render the schema-default
@@ -140,6 +145,8 @@ class _DockerPlatformState:
 
 DockerRunner = Callable[..., docker_assets.DockerCommandResult]
 FreeSpaceReader = Callable[[str | Path], float]
+FreeMemoryReader = Callable[[], MemorySnapshot]
+SleepFn = Callable[[float], None]
 
 
 def run_execute(
@@ -155,14 +162,18 @@ def run_execute(
     free_space_path: Path | str | None = None,
     free_space_min_gib: float | None = None,
     free_space_reader: FreeSpaceReader | None = None,
+    memory_reader: FreeMemoryReader | None = None,
+    sleep_fn: SleepFn | None = None,
 ) -> ExecuteOutcome:
     """Walk the matrix sequentially with ladder pruning and platform-boundary cleanup.
 
     Parameters mirror the spec's W4 execute phase. `runner`, `docker_runner`,
-    and `free_space_reader` are injectable so fast tests can drive the loop
-    without spawning subprocesses or requiring a live Docker daemon. Resolves
-    the module-level `run_cell` lazily so monkeypatching
-    `tests.uat.phases.execute.run_cell` from a test takes effect.
+    `free_space_reader`, `memory_reader`, and `sleep_fn` are injectable so
+    fast tests can drive the loop without spawning subprocesses, requiring a
+    live Docker daemon, reading real host memory, or waiting out the
+    post-start settle window. Resolves the module-level `run_cell` lazily so
+    monkeypatching `tests.uat.phases.execute.run_cell` from a test takes
+    effect.
 
     Submit classification is the runner's contract, not this phase's: the
     real `run_cell` (runner.py:256-260) classifies the exported result JSON
@@ -170,6 +181,14 @@ def run_execute(
     every `CellResult` it receives as already classified. Injected test
     runners must do the same (see
     test_execute_downgrades_passed_cell_with_query_failure_result).
+
+    Unlike the free-space check (`free_space_checks_enabled`, an explicit
+    opt-in flag the orchestrator sets from `config.disk_gate_enabled`), the
+    Docker-startup readiness re-check and the free-memory gate are driven
+    directly off `config` -- `config.cleanup.docker_manage_platforms` and
+    `config.preflight.free_memory_min_gib` -- with no separate enable flag,
+    so every caller (including the orchestrator, unchanged) gets both for
+    free the moment `docker_manage_platforms: true` is set.
     """
     if runner is None:
         runner = run_cell
@@ -177,6 +196,10 @@ def run_execute(
         docker_runner = docker_assets.run_docker_command
     if free_space_reader is None:
         free_space_reader = default_free_space_reader
+    if memory_reader is None:
+        memory_reader = default_free_memory_reader
+    if sleep_fn is None:
+        sleep_fn = time.sleep
     assert config.execute.parallel_platforms is False, "parallel_platforms must remain False — UAT W3 line 222"
     benchmark_runs_dir = (
         Path(benchmark_runs_dir).expanduser() if benchmark_runs_dir is not None else default_benchmark_runs_dir(config)
@@ -217,17 +240,18 @@ def run_execute(
     abort_kind: str | None = None
 
     for platform, platform_pairs in by_platform:
-        platform_abort_reason = _free_space_abort_reason(
-            enabled=free_space_checks_enabled,
-            path=free_space_path,
-            min_gib=free_space_min_gib,
-            reader=free_space_reader,
+        platform_abort_reason, platform_abort_kind = _pre_start_abort_reason(
+            config,
+            platform=platform,
+            free_space_checks_enabled=free_space_checks_enabled,
+            free_space_path=free_space_path,
+            free_space_min_gib=free_space_min_gib,
+            free_space_reader=free_space_reader,
+            memory_reader=memory_reader,
             last_completed_platform=last_completed_platform,
             docker_cleanup_status=last_docker_cleanup_status,
-            context=f"before starting platform {platform}",
             log_dir=log_dir,
         )
-        platform_abort_kind: str | None = "disk_floor" if platform_abort_reason is not None else None
         docker_state = _DockerPlatformState(cleanup_status=last_docker_cleanup_status)
 
         docker_startup_failed = False
@@ -240,6 +264,7 @@ def run_execute(
                     docker_runner=docker_runner,
                     docker_events=docker_events,
                     log_dir=log_dir,
+                    sleep_fn=sleep_fn,
                 )
                 last_docker_cleanup_status = docker_state.cleanup_status
                 if startup_reason is not None:
@@ -344,6 +369,7 @@ def _start_docker_platform_if_needed(
     docker_runner: DockerRunner,
     docker_events: list[DockerLifecycleEvent],
     log_dir: Path | None,
+    sleep_fn: SleepFn,
 ) -> tuple[_DockerPlatformState, str | None]:
     if not docker_assets.is_docker_platform(platform):
         return _DockerPlatformState(), None
@@ -404,18 +430,145 @@ def _start_docker_platform_if_needed(
         message=_docker_result_message(up_result),
         result=up_result,
     )
+    if not up_result.succeeded:
+        state = _DockerPlatformState(
+            spec=spec,
+            project_name=project_name,
+            started=True,
+            cleanup_status="startup-failed",
+        )
+        return (
+            state,
+            f"UAT-managed Docker startup failed for {platform} project {project_name}: "
+            f"{_docker_result_message(up_result)}",
+        )
+    # Invalidate BEFORE the readiness re-check below (not after, as before
+    # this fix) so its reachability probe is fresh for the container that
+    # just started, not a stale cached value from before it existed.
+    invalidate_reachability_cache_after_lifecycle_change()
+
+    # `up --wait` exiting 0 only proves the container reported
+    # started/healthy AT THAT INSTANT -- observed 2026-08-04: mocker
+    # reported CedarDB Started, then `mocker compose ps` showed it Exited
+    # ~29s later, and UAT ran 171 cells against the dead stack before this
+    # check existed. Re-check before trusting it. Skipped for a dry run:
+    # nothing was actually started to settle or probe.
+    if not config.dry_run:
+        readiness_reason = _check_docker_platform_readiness(
+            config,
+            spec=spec,
+            project_name=project_name,
+            platform=platform,
+            docker_runner=docker_runner,
+            docker_events=docker_events,
+            log_dir=log_dir,
+            benchmark_runs_dir=benchmark_runs_dir,
+            sleep_fn=sleep_fn,
+        )
+        if readiness_reason is not None:
+            # A dedicated event: the "ps" event above only carries
+            # `_docker_result_message`, which reports "command completed
+            # successfully" for a `compose ps` that ran fine but found an
+            # Exited/Restarting service -- the readiness verdict itself
+            # (why THIS platform was routed to startup_failed) needs its
+            # own line in uat_lifecycle.log.
+            _record_docker_event(
+                docker_events,
+                log_dir=log_dir,
+                platform=platform,
+                action="readiness",
+                status="failed",
+                project_name=project_name,
+                message=readiness_reason,
+            )
+            state = _DockerPlatformState(
+                spec=spec,
+                project_name=project_name,
+                started=True,
+                cleanup_status="startup-failed",
+            )
+            return state, readiness_reason
+
     state = _DockerPlatformState(
         spec=spec,
         project_name=project_name,
         started=True,
-        cleanup_status="started" if up_result.succeeded else "startup-failed",
+        cleanup_status="started",
     )
-    if up_result.succeeded:
-        invalidate_reachability_cache_after_lifecycle_change()
-        return state, None
+    return state, None
+
+
+def _check_docker_platform_readiness(
+    config: UATConfig,
+    *,
+    spec: docker_assets.DockerPlatformSpec,
+    project_name: str,
+    platform: str,
+    docker_runner: DockerRunner,
+    docker_events: list[DockerLifecycleEvent],
+    log_dir: Path | None,
+    benchmark_runs_dir: Path,
+    sleep_fn: SleepFn,
+) -> str | None:
+    """Re-check a stack `up --wait` already reported as started.
+
+    Settles for `cleanup.docker_settle_s` (default 10s), then re-checks
+    `compose ps` service state and re-probes host reachability via
+    `platform_is_reachable` -- the same tcp_probe +
+    `docker_assets.host_reachability_endpoint` reachability primitive
+    `_run_or_skip_platform`'s skip_unreachable check already uses, reused
+    here rather than probing directly so the two checks can never disagree
+    about what "reachable" means, and so a pass here populates the
+    reachability cache for that later check instead of probing twice (the
+    caller invalidates the cache right after `up --wait` succeeds, before
+    this runs, so the read here is fresh for the container that just
+    started). A stack that fails either check here is reported exactly like
+    a compose-up failure (same `startup-failed` routing in the caller): the
+    platform's cells go to `startup_failed` and the sweep advances to the
+    next stack instead of running cells against a dead stack (see
+    uat-container-readiness-and-memory-headroom-gate w0/w1, and
+    uat-docker-stack-recovery w2 for the advance-past-broken-stack policy
+    this reuses).
+    """
+    sleep_fn(config.cleanup.docker_settle_s)
+
+    ps_result = docker_runner(
+        docker_assets.compose_ps_command(spec, project_name),
+        dry_run=False,
+        timeout_s=config.cleanup.docker_start_timeout_s,
+        cwd=docker_assets.REPO_ROOT,
+        env=docker_assets.compose_environment(spec, benchmark_runs_dir=benchmark_runs_dir),
+    )
+    _record_docker_event(
+        docker_events,
+        log_dir=log_dir,
+        platform=platform,
+        action="ps",
+        status="ok" if ps_result.succeeded else "failed",
+        project_name=project_name,
+        message=_docker_result_message(ps_result),
+        result=ps_result,
+    )
+    if not ps_result.succeeded:
+        return (
+            f"UAT readiness check for {platform} project {project_name} could not run `compose ps` "
+            f"{config.cleanup.docker_settle_s}s after `up --wait` reported success: "
+            f"{_docker_result_message(ps_result)}"
+        )
+    unhealthy = docker_assets.compose_ps_unhealthy_services(ps_result.stdout)
+    if unhealthy:
+        return (
+            f"UAT-managed Docker readiness check failed for {platform} project {project_name}: "
+            f"service(s) {', '.join(unhealthy)} Exited/Restarting {config.cleanup.docker_settle_s}s "
+            "after `up --wait` reported success"
+        )
+
+    if platform_is_reachable(platform):
+        return None
+    endpoint = docker_assets.host_reachability_endpoint(platform) or platform
     return (
-        state,
-        f"UAT-managed Docker startup failed for {platform} project {project_name}: {_docker_result_message(up_result)}",
+        f"UAT-managed Docker readiness check failed for {platform} project {project_name}: "
+        f"reachability probe to {endpoint} failed {config.cleanup.docker_settle_s}s after `up --wait` reported success"
     )
 
 
@@ -861,6 +1014,51 @@ def _annotate_disk_floor_abort(
             pass
 
 
+def _pre_start_abort_reason(
+    config: UATConfig,
+    *,
+    platform: str,
+    free_space_checks_enabled: bool,
+    free_space_path: Path | str,
+    free_space_min_gib: float,
+    free_space_reader: FreeSpaceReader,
+    memory_reader: FreeMemoryReader,
+    last_completed_platform: str | None,
+    docker_cleanup_status: str,
+    log_dir: Path | None,
+) -> tuple[str | None, str | None]:
+    """Combine the disk-floor and memory-floor platform-boundary gates.
+
+    Disk takes precedence when both fire in the same call -- matches the
+    existing precedence between the disk-floor and docker_required checks
+    in `phases/preflight.py`'s `run_preflight`. Returns `(reason, kind)`;
+    `kind` is one of "disk_floor", "memory_floor", or None.
+    """
+    context = f"before starting platform {platform}"
+    disk_reason = _free_space_abort_reason(
+        enabled=free_space_checks_enabled,
+        path=free_space_path,
+        min_gib=free_space_min_gib,
+        reader=free_space_reader,
+        last_completed_platform=last_completed_platform,
+        docker_cleanup_status=docker_cleanup_status,
+        context=context,
+        log_dir=log_dir,
+    )
+    if disk_reason is not None:
+        return disk_reason, "disk_floor"
+    memory_reason = _free_memory_abort_reason(
+        config=config,
+        platform=platform,
+        reader=memory_reader,
+        context=context,
+        log_dir=log_dir,
+    )
+    if memory_reason is not None:
+        return memory_reason, "memory_floor"
+    return None, None
+
+
 def _free_space_abort_reason(
     *,
     enabled: bool,
@@ -888,6 +1086,84 @@ def _free_space_abort_reason(
         f"{context}; last_completed_platform={last_platform}; "
         f"docker_cleanup_status={docker_cleanup_status}"
     )
+
+
+def _free_memory_abort_reason(
+    *,
+    config: UATConfig,
+    platform: str,
+    reader: FreeMemoryReader,
+    context: str,
+    log_dir: Path | None,
+) -> str | None:
+    """Gate on measured host free memory before starting a Docker-managed platform.
+
+    Mirrors `_free_space_abort_reason`'s shape and 0-disables convention
+    (`preflight.free_memory_min_gib <= 0` disables the gate). Only relevant
+    for Docker-managed platforms -- under mocker, each container is its own
+    VM with independent memory sizing, so headroom must exist BEFORE the
+    next VM is asked to start (2026-08-04 postmortem: 72 MB free of 16 GB,
+    11.7 of 13.3 GB swap used; CedarDB's container reported "Running under
+    cgroup memory limit: 1024 MB" and then failed to register an io_uring
+    buffer). Gates on MEASURED free memory, never total RAM -- a 16 GB host
+    with 72 MB free is not "fine" because it has 16 GB of capacity.
+
+    Logs engine identity, the host free-memory reading (with swap pressure
+    alongside, never gating on it), and this platform's declared VM/container
+    memory request to uat_lifecycle.log on every call where the gate is
+    enabled, regardless of pass/fail -- see
+    uat-container-readiness-and-memory-headroom-gate w3.
+    """
+    min_gib = config.preflight.free_memory_min_gib
+    if min_gib <= 0 or not config.cleanup.docker_manage_platforms or not docker_assets.is_docker_platform(platform):
+        return None
+
+    try:
+        engine = docker_assets.resolve_container_cli()
+    except docker_assets.DockerAssetError as exc:
+        engine = f"unresolved ({exc})"
+    vm_request = _describe_platform_vm_request(platform)
+
+    snapshot = reader()
+    swap_note = f", swap {snapshot.swap_used_percent:.1f}% used" if snapshot.swap_used_percent is not None else ""
+    if snapshot.free_gib is None:
+        # Free memory could not be measured on this host -- degrade safely:
+        # log it and do NOT gate. Silently treating "unknown" as "healthy"
+        # would defeat the gate on exactly the hosts most likely to need it
+        # (e.g. a locked-down psutil-less sandbox); treating it as a hard
+        # failure would break every host/platform combination where the
+        # measurement is merely unavailable, including a perfectly healthy
+        # Linux CI box.
+        append_lifecycle_log(
+            log_dir,
+            f"[free-memory] {context}: engine={engine} vm_request={vm_request} "
+            "free memory could not be measured on this host; gate skipped",
+        )
+        return None
+
+    append_lifecycle_log(
+        log_dir,
+        f"[free-memory] {context}: engine={engine} vm_request={vm_request} "
+        f"{snapshot.free_gib:.2f} GiB free (threshold {min_gib:.2f} GiB{swap_note})",
+    )
+    if snapshot.free_gib >= min_gib:
+        return None
+    return (
+        f"free memory {snapshot.free_gib:.2f} GiB < cutoff {min_gib:.2f} GiB {context} "
+        f"(engine={engine}, vm_request={vm_request}{swap_note})"
+    )
+
+
+def _describe_platform_vm_request(platform: str) -> str:
+    """One-line description of a Docker platform's declared memory request, for logging."""
+    try:
+        spec = docker_assets.docker_platform_spec(platform)
+    except docker_assets.DockerAssetError:
+        return "unknown (no compose spec)"
+    limits = docker_assets.compose_declared_memory_limits(spec)
+    if not limits:
+        return "no declared memory limit (engine default)"
+    return ", ".join(f"{service}={limit}" for service, limit in sorted(limits.items()))
 
 
 def _record_docker_event(

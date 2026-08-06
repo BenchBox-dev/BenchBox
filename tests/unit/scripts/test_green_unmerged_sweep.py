@@ -109,17 +109,20 @@ def test_head_age_hours_unknown_anchor_is_zero() -> None:
 
 
 @pytest.mark.parametrize(
-    ("draft", "required_green", "auto_merge_enabled", "soundness_gated", "age_hours", "expected"),
+    ("draft", "required_green", "auto_merge_enabled", "soundness_gated", "age_hours", "explicit_hold", "expected"),
     [
-        (False, True, False, False, 3.0, True),  # stranded
-        (True, True, False, False, 3.0, False),  # draft excluded
-        (False, False, False, False, 3.0, False),  # red lane excluded
-        (False, True, True, False, 3.0, False),  # auto-merge already on
-        (False, True, False, True, 3.0, False),  # soundness-gated excluded
-        (False, True, False, False, 1.0, False),  # within grace period
+        (False, True, False, False, 3.0, False, True),  # stranded
+        (True, True, False, False, 3.0, False, False),  # draft excluded
+        (False, False, False, False, 3.0, False, False),  # red lane excluded
+        (False, True, True, False, 3.0, False, False),  # auto-merge already on
+        (False, True, False, True, 3.0, False, False),  # soundness-gated excluded
+        (False, True, False, False, 1.0, False, False),  # within grace period
+        (False, True, False, False, 3.0, True, False),  # explicit hold label excluded
     ],
 )
-def test_is_stranded_matrix(draft, required_green, auto_merge_enabled, soundness_gated, age_hours, expected) -> None:
+def test_is_stranded_matrix(
+    draft, required_green, auto_merge_enabled, soundness_gated, age_hours, explicit_hold, expected
+) -> None:
     assert (
         mod.is_stranded(
             draft=draft,
@@ -128,9 +131,16 @@ def test_is_stranded_matrix(draft, required_green, auto_merge_enabled, soundness
             soundness_gated=soundness_gated,
             age_hours=age_hours,
             grace_hours=2.0,
+            explicit_hold=explicit_hold,
         )
         is expected
     )
+
+
+def test_has_auto_merge_hold_label() -> None:
+    assert mod.has_auto_merge_hold_label([mod.AUTO_MERGE_HOLD_LABEL]) is True
+    assert mod.has_auto_merge_hold_label(["enhancement"]) is False
+    assert mod.has_auto_merge_hold_label(None) is False
 
 
 # ------------------------------------------------------------------ #

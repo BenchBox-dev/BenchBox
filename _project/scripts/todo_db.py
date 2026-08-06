@@ -16,8 +16,12 @@ Backend selection (first match wins):
                             replica at <git root>/.todo-db/replica.db
                             (override: TODO_DB_REPLICA); plaintext
                             http:// is refused
-- turso auto-provision      when none of the above are set and a logged-in
-                            `turso` CLI can mint a short-lived token
+- .todo-db/config.json      credential-free hosted URL discovery at the git
+                            main root (``{"url": "libsql://..."}`` only;
+                            token still comes from TODO_DB_AUTH_TOKEN or a
+                            later connect/auth failure path)
+- turso auto-provision      when none of the above yield a backend and a
+                            logged-in `turso` CLI can mint a short-lived token
 - default                   <git main root>/.todo-db/todo.sqlite (gitignored)
 
 Hosted mode keeps the exact write-transaction discipline of local mode:
@@ -532,25 +536,83 @@ def _turso_db_name() -> str:
     return os.environ.get("TODO_DB_TURSO_DB") or "benchbox-todo"
 
 
-def _try_turso_auto_provision() -> tuple[str, str] | None:
+def _todo_db_config_path() -> Path:
+    """Credential-free backend config at the shared main-root tracker dir."""
+    return git_main_root() / ".todo-db" / "config.json"
+
+
+def _load_config_url() -> str | None:
+    """Load a hosted URL from ``.todo-db/config.json`` if present and valid.
+
+    Shape (tracked, credential-free)::
+
+        {"url": "libsql://benchbox-todo-....turso.io"}
+
+    Tokens must NEVER appear in this file. A missing file returns ``None``
+    so resolution falls through to auto-provision / local fallback. A present
+    but unreadable or invalid file raises ``TodoError`` so a bad commit does
+    not silently demote the clone to the implicit local scratch DB.
+    """
+    path = _todo_db_config_path()
+    try:
+        if not path.is_file():
+            return None
+        raw_text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise TodoError(f"cannot read todo backend config {path}: {exc}") from exc
+    try:
+        data = json.loads(raw_text)
+    except json.JSONDecodeError as exc:
+        raise TodoError(f"todo backend config {path} is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict):
+        raise TodoError(f"todo backend config {path} must be a JSON object")
+    # Reject accidental credential commits loudly (never load or echo them).
+    for forbidden in ("auth_token", "token", "TODO_DB_AUTH_TOKEN"):
+        if forbidden in data:
+            raise TodoError(
+                f"todo backend config {path} must not contain credentials "
+                f"(found key {forbidden!r}); URL only, token via TODO_DB_AUTH_TOKEN"
+            )
+    raw = data.get("url")
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw.strip():
+        raise TodoError(f"todo backend config {path}: 'url' must be a non-empty string")
+    url = _normalize_url(raw)
+    if not _is_hosted_url(url):
+        raise TodoError(
+            f"todo backend config {path}: 'url' must be a libsql:// or https:// hosted URL, got {url!r}"
+        )
+    return _require_secure_url(url)
+
+
+def _try_turso_auto_provision() -> tuple[tuple[str, str] | None, str | None]:
     """Mint a short-lived hosted backend via the maintainer's logged-in turso CLI.
 
-    Only called from `_resolve_backend` when no explicit backend is configured
-    at all (--db absent, TODO_DB_PATH unset, TODO_DB_URL unset) -- this is the
-    sanctioned local pattern documented in
-    _project/specs/todo-db-tracker.md ("Local auth provisioning"): mint a URL
-    with `turso db show <name> --url` and a token with
-    `turso db tokens create <name> --expiration 1d` (Turso CLI accepts
+    Only called from `_resolve_backend` when no backend URL/path is configured
+    at all (--db absent, TODO_DB_PATH unset, TODO_DB_URL unset, no
+    `.todo-db/config.json` URL) -- this is the sanctioned local pattern
+    documented in _project/specs/todo-db-tracker.md ("Local auth
+    provisioning"): mint a URL with `turso db show <name> --url` and a token
+    with `turso db tokens create <name> --expiration 1d` (Turso CLI accepts
     day-granularity expirations or ``never``; sub-day values like ``30m``
     are rejected).
 
-    Returns ``(url, token)`` on success, ``None`` on ANY failure -- turso not
-    on PATH, not logged in, a nonzero exit, or empty output -- so the caller
-    falls through to the existing implicit-local-fallback behavior. Neither
-    the URL nor the token is ever printed or logged here.
+    Returns a structured ``(credentials, failure_reason)`` pair:
+
+    * turso absent: ``(None, None)`` -- skipped, no special warning
+    * success: ``((url, token), None)``
+    * failure while turso is present: ``(None, reason)`` where ``reason`` is a
+      short class only (``db-show-failed``, ``db-show-empty``,
+      ``token-create-failed``, ``token-empty``, ``turso-error``). Never
+      includes stderr content that might hold secrets.
+
+    The caller falls through to the existing implicit-local-fallback on any
+    non-success result. Neither the URL nor the token is ever printed or
+    logged here.
     """
     if not shutil.which("turso"):
-        return None
+        return None, None
     name = _turso_db_name()
     try:
         show = subprocess.run(
@@ -561,10 +623,10 @@ def _try_turso_auto_provision() -> tuple[str, str] | None:
             timeout=15,
         )
         if show.returncode != 0:
-            return None
+            return None, "db-show-failed"
         url = show.stdout.strip()
         if not url:
-            return None
+            return None, "db-show-empty"
         tokens = subprocess.run(
             ["turso", "db", "tokens", "create", name, "--expiration", "1d"],
             capture_output=True,
@@ -573,32 +635,53 @@ def _try_turso_auto_provision() -> tuple[str, str] | None:
             timeout=15,
         )
         if tokens.returncode != 0:
-            return None
+            return None, "token-create-failed"
         token = tokens.stdout.strip()
         if not token:
-            return None
-        return url, token
+            return None, "token-empty"
+        return (url, token), None
     except (OSError, subprocess.SubprocessError):
-        return None
+        return None, "turso-error"
 
 
-def _resolve_backend(explicit: str | None) -> tuple[Path | str, bool, bool]:
-    """Return ``(backend, implicit_default_local, auto_provisioned)``.
+def _resolve_backend(explicit: str | None) -> tuple[Path | str, bool, bool, str | None]:
+    """Return ``(backend, implicit_default_local, auto_provisioned, provision_failure)``.
 
-    CLI precedence: --db > TODO_DB_PATH > TODO_DB_URL > turso auto-provisioning
-    > local fallback. Auto-provisioning is attempted ONLY when none of the
-    three explicit knobs are set, so explicit config always outranks it and
-    hermetic tests pinning TODO_DB_PATH never invoke it.
+    CLI precedence: --db > TODO_DB_PATH > TODO_DB_URL > ``.todo-db/config.json``
+    URL discovery > turso auto-provisioning > local fallback.
+
+    Config-discovered and env URLs are "selected" backends (not
+    ``implicit_default_local``), so mutating commands proceed to connect and
+    fail on missing auth rather than the implicit-local write refusal.
+    Auto-provisioning runs ONLY when no path/URL was selected by any earlier
+    step, so hermetic tests pinning TODO_DB_PATH never invoke it.
+
+    ``provision_failure`` is a short reason class when turso was on PATH but
+    minting failed (so the operator gets a distinct WARN instead of silent
+    fallthrough); it is ``None`` when auto-provision was skipped, succeeded,
+    or never considered (explicit backend or config URL).
     """
     if explicit:
-        return (_normalize_url(explicit) if _is_hosted_url(explicit) else Path(explicit)), False, False
+        return (
+            (_normalize_url(explicit) if _is_hosted_url(explicit) else Path(explicit)),
+            False,
+            False,
+            None,
+        )
     env_path = os.environ.get("TODO_DB_PATH")
     if env_path:
-        return Path(env_path), False, False
+        return Path(env_path), False, False, None
     env_url = os.environ.get("TODO_DB_URL")
     if env_url:
-        return _normalize_url(env_url), False, False
-    provisioned = _try_turso_auto_provision()
+        return _normalize_url(env_url), False, False, None
+    config_url = _load_config_url()
+    if config_url:
+        # Selected hosted backend (same class as TODO_DB_URL). Token still
+        # comes from TODO_DB_AUTH_TOKEN; missing token surfaces through the
+        # existing connect/auth failure paths. Do not auto-mint here --
+        # full auto-provision (URL+token) only runs when no URL is known.
+        return config_url, False, False, None
+    provisioned, provision_failure = _try_turso_auto_provision()
     if provisioned:
         url, token = provisioned
         # Use the hosted backend exactly as if TODO_DB_URL/TODO_DB_AUTH_TOKEN
@@ -607,12 +690,12 @@ def _resolve_backend(explicit: str | None) -> tuple[Path | str, bool, bool]:
         # etc.) works unchanged.
         os.environ["TODO_DB_URL"] = url
         os.environ["TODO_DB_AUTH_TOKEN"] = token
-        return _normalize_url(url), False, True
-    return git_main_root() / ".todo-db" / "todo.sqlite", True, False
+        return _normalize_url(url), False, True, None
+    return git_main_root() / ".todo-db" / "todo.sqlite", True, False, provision_failure
 
 
 def resolve_backend(explicit: str | None) -> Path | str:
-    """Pick the backend: --db > TODO_DB_PATH > TODO_DB_URL > auto-provision > local fallback."""
+    """Pick the backend: --db > TODO_DB_PATH > TODO_DB_URL > config.json > auto-provision > local fallback."""
     return _resolve_backend(explicit)[0]
 
 
@@ -1398,15 +1481,28 @@ def _premigrate_freeze_refusal(backend: Path | str, actor: str) -> int | None:
     return 2
 
 
-def _report_backend(backend: Path | str, *, implicit_default_local: bool, auto_provisioned: bool = False) -> None:
+def _report_backend(
+    backend: Path | str,
+    *,
+    implicit_default_local: bool,
+    auto_provisioned: bool = False,
+    provision_failure: str | None = None,
+) -> None:
     if isinstance(backend, Path):
         print(f"todo backend: local ({backend})", file=sys.stderr)
         if implicit_default_local:
             print(
                 "WARNING: LOCAL FALLBACK DB - NOT the production tracker; "
-                "set --db, TODO_DB_PATH, or TODO_DB_URL explicitly.",
+                "set --db, TODO_DB_PATH, or TODO_DB_URL, ensure "
+                ".todo-db/config.json is present, or log in with `turso auth login`.",
                 file=sys.stderr,
             )
+            if provision_failure:
+                # Reason class only -- never stderr content (may hold secrets).
+                print(
+                    f"WARNING: turso auto-provision failed ({provision_failure}); using local fallback",
+                    file=sys.stderr,
+                )
         return
     # Never print the hosted URL or token: the backend kind is enough.
     if auto_provisioned:
@@ -1479,6 +1575,7 @@ def run_doctor(
     *,
     implicit_default_local: bool,
     auto_provisioned: bool = False,
+    provision_failure: str | None = None,
     as_json: bool = False,
 ) -> int:
     """Side-effect-free health check over config, identity, reachability, and auth.
@@ -1519,13 +1616,20 @@ def run_doctor(
             (
                 "WARN",
                 "implicit local fallback -- NOT the production tracker; "
-                "set --db, TODO_DB_PATH, or TODO_DB_URL",
+                "set --db, TODO_DB_PATH, TODO_DB_URL, or .todo-db/config.json",
             )
             if implicit_default_local
             else ("OK", "backend selected explicitly")
         )
     record("backend", "OK", backend_detail)
     record("identity", identity_status, identity_detail)
+
+    # 1b. Auto-provision mint failure. WARN only (exit 0 still allowed): turso
+    # was on PATH and mint was attempted, but it failed, so the operator can
+    # see why they landed on the local fallback. Reason class only -- never
+    # stderr content that might hold secrets.
+    if provision_failure:
+        record("turso-provision", "WARN", f"auto-provision failed ({provision_failure})")
 
     # 2. Auth. Only hosted needs a token; checked before reachability so a missing
     # token reports as auth rather than as a confusing connection error.
@@ -1592,7 +1696,7 @@ def run_doctor(
         print(json.dumps({"exit_code": exit_code, "checks": checks}, indent=2, sort_keys=True))
     else:
         for entry in checks:
-            print(f"{entry['status']:<4} {entry['check']:<11} {entry['detail']}")
+            print(f"{entry['status']:<4} {entry['check']:<15} {entry['detail']}")
         if exit_code == DOCTOR_EXIT_AUTH:
             # stdout is block-buffered when redirected while stderr is not, so the
             # remediation would otherwise print ABOVE the checks it refers to.
@@ -1613,6 +1717,7 @@ def _preconnect_command(
     *,
     implicit_default_local: bool,
     auto_provisioned: bool = False,
+    provision_failure: str | None = None,
 ) -> int | None:
     """Handle the commands that must run BEFORE `connect_backend`, else ``None``.
 
@@ -1631,14 +1736,22 @@ def _preconnect_command(
             backend,
             implicit_default_local=implicit_default_local,
             auto_provisioned=auto_provisioned,
+            provision_failure=provision_failure,
             as_json=args.as_json,
         )
 
     if implicit_default_local and _command_mutates_tracker(args):
+        provision_note = (
+            f" (turso auto-provision was attempted but failed: {provision_failure})"
+            if provision_failure
+            else ""
+        )
         print(
-            "error: refusing to write through the implicit local fallback; "
-            "select a backend with --db, TODO_DB_PATH, or TODO_DB_URL, or log in with "
-            "`turso auth login` so this can auto-provision a hosted backend",
+            "error: refusing to write through the implicit local fallback"
+            f"{provision_note}; "
+            "select a backend with --db, TODO_DB_PATH, TODO_DB_URL, or "
+            ".todo-db/config.json, or log in with `turso auth login` so this "
+            "can auto-provision a hosted backend",
             file=sys.stderr,
         )
         return 2
@@ -4142,7 +4255,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--db",
         help="database path, or libsql://... / https://... URL for the hosted backend"
-        " (default: <git main root>/.todo-db/todo.sqlite, or TODO_DB_URL when set)",
+        " (default: TODO_DB_PATH / TODO_DB_URL / .todo-db/config.json / auto-provision / local)",
     )
     parser.add_argument("--actor", help="override actor identity for the audit log")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -4370,14 +4483,25 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 2
 
-    backend, implicit_default_local, auto_provisioned = _resolve_backend(args.db)
-    _report_backend(backend, implicit_default_local=implicit_default_local, auto_provisioned=auto_provisioned)
+    try:
+        backend, implicit_default_local, auto_provisioned, provision_failure = _resolve_backend(args.db)
+    except TodoError as exc:
+        # Corrupt/credential-bearing config.json and similar resolution errors.
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    _report_backend(
+        backend,
+        implicit_default_local=implicit_default_local,
+        auto_provisioned=auto_provisioned,
+        provision_failure=provision_failure,
+    )
     early = _preconnect_command(
         args,
         actor,
         backend,
         implicit_default_local=implicit_default_local,
         auto_provisioned=auto_provisioned,
+        provision_failure=provision_failure,
     )
     if early is not None:
         return early

@@ -29,7 +29,7 @@ from tests.uat.phases import (
     preflight as preflight_phase,
     report as report_phase,
 )
-from tests.uat.runner import CellResult
+from tests.uat.runner import CellResult, SubmitTerminalState
 
 
 @dataclass(frozen=True)
@@ -753,6 +753,15 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
     `make uat-execute`'s scoped `[preflight, execute]` loop) mirrors
     write_report's counting on the outcome directly rather than writing a
     throwaway TSV.
+
+    `unvalidated` is threaded through in both branches so `uat_gate_summary.json`
+    -- the machine-readable artifact a release gate reads -- cannot silently
+    disagree with the human-readable `matrix_summary.tsv` footer's
+    `# UNVALIDATED_CELLS=N` line. Leaving it at the `PhaseAccounting` default
+    of 0 here would have been worse than the original bug: the TSV would
+    honestly show N unvalidated DataFrame cells while the one artifact
+    automation actually consumes asserted zero
+    (unvalidated-results-misclassified-as-schema-violations).
     """
     if report_summary is not None:
         return gate_summary.PhaseAccounting(
@@ -767,6 +776,7 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
             early_stop_pruned=report_summary.early_stop_pruned_count,
             registry_pruned=report_summary.registry_pruned_count,
             total_defined=report_summary.total_defined_count,
+            unvalidated=report_summary.unvalidated_count,
         )
     if execute_outcome is None:
         return gate_summary.PhaseAccounting()
@@ -776,6 +786,13 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
     timed_out = sum(1 for r in results if r.status == "timed-out")
     row_skipped = sum(1 for r in results if report_phase.is_skipped_status(r.status))
     row_unreachable = sum(1 for r in results if report_phase.is_unreachable_status(r.status))
+    # Mirror the report phase's unvalidated_count math exactly (see
+    # tests.uat.phases.report.write_report): a passed cell whose classifier
+    # verdict is `unvalidated`, cross-cutting and already included in
+    # `passed`/`attempted` above, not a disjoint bucket.
+    unvalidated = sum(
+        1 for r in results if r.status == "passed" and r.submit_terminal_state == SubmitTerminalState.unvalidated.value
+    )
     # Mirror the sidecar accounting written by the streaming path above:
     # execute_outcome.compatibility_pruned is a MIXED stream of compatibility-
     # rule drops and registry/ladder drops, so split it by kind rather than
@@ -804,6 +821,7 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
         early_stop_pruned=early_stop_pruned,
         registry_pruned=registry_pruned,
         total_defined=attempted + skipped + unreachable + startup_failed,
+        unvalidated=unvalidated,
     )
 
 

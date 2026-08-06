@@ -261,6 +261,74 @@ def test_uri_userinfo_credentials_are_redacted_without_touching_public_values() 
     assert sanitized["sort_key"] == "o_orderkey"
 
 
+def test_uri_username_only_identity_is_preserved() -> None:
+    """Username-only userinfo is identity, not a secret — do not replace with ****.
+
+    Successor of the query-credential scrub TODO: earlier userinfo redaction
+    treated every authority userinfo as credential-bearing and over-redacted
+    ``https://public-user@host/path`` in exported platform options.
+    """
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    sanitized = sanitize_platform_options(
+        {
+            "username_only": "https://public-user@example.invalid/export",
+            # Key must not itself be secret-named; this tests value-level URI scrub.
+            "export_url": "https://public-user:URI_USERINFO_GATE@example.invalid/export",
+        }
+    )
+
+    assert sanitized["username_only"] == "https://public-user@example.invalid/export"
+    assert "public-user" in sanitized["username_only"]
+    assert sanitized["export_url"] == "https://****@example.invalid/export"
+    assert "URI_USERINFO_GATE" not in sanitized["export_url"]
+
+
+def test_uri_query_and_fragment_credential_params_are_scrubbed() -> None:
+    """Credential-named query/fragment params must not reach serialized payloads.
+
+    Structural key filtering already redacts options named ``access_token``;
+    this covers the same names embedded as URI components on non-secret keys
+    (export URLs, connection URIs with sslpassword, OAuth-style fragments).
+    Ordinary params such as ``x=1`` stay intact for downstream routing.
+    """
+    import json
+
+    from benchbox.core.results.platform_options import sanitize_platform_options
+
+    values = {
+        "query": "https://example.invalid/export?access_token=URI_QUERY_GATE&x=1",
+        "ssl": "postgresql://host.example/db?sslpassword=URI_SSL_GATE&application_name=bb",
+        "fragment": "https://example.invalid/export#access_token=URI_FRAG_GATE&section=results",
+        # Non-secret option key: credential lives only in the URI query component.
+        "endpoint": "https://example.invalid/x?password=URI_PW_GATE&region=us-east-1",
+        "combined": "postgresql://u:URI_USERINFO_GATE@example.invalid/db?sslpassword=URI_SSL2_GATE&x=1",
+        "ordinary": "https://example.invalid/export?x=1&region=us-east-1",
+    }
+    sanitized = sanitize_platform_options(values)
+    out = json.dumps(sanitized)
+
+    for sentinel in (
+        "URI_QUERY_GATE",
+        "URI_SSL_GATE",
+        "URI_FRAG_GATE",
+        "URI_PW_GATE",
+        "URI_USERINFO_GATE",
+        "URI_SSL2_GATE",
+    ):
+        assert sentinel not in out, out
+
+    assert sanitized["query"] == "https://example.invalid/export?access_token=****&x=1"
+    assert sanitized["ssl"] == "postgresql://host.example/db?sslpassword=****&application_name=bb"
+    assert sanitized["fragment"] == "https://example.invalid/export#access_token=****&section=results"
+    assert sanitized["endpoint"] == "https://example.invalid/x?password=****&region=us-east-1"
+    assert sanitized["combined"] == "postgresql://****@example.invalid/db?sslpassword=****&x=1"
+    assert sanitized["ordinary"] == "https://example.invalid/export?x=1&region=us-east-1"
+    assert "x=1" in out
+    assert "application_name=bb" in out
+    assert "region=us-east-1" in out
+
+
 def test_uri_userinfo_redaction_consumes_an_unescaped_at_in_the_password() -> None:
     """Review follow-up: a password may legally contain an unescaped '@'.
 

@@ -9,6 +9,18 @@ name: Sync results-data to published-results
 # workflow keeps it in sync with develop's authoritative `results-data/`
 # without forcing maintainers to mirror by hand.
 #
+# Publication fixed-point precondition: develop's corpus must already be at
+# the publication fixed point before any mirror branch is built or PR opened.
+# The gate below is the same check as
+# tests/unit/scripts/test_corpus_privacy_invariant.py::test_rederived_corpus_publishes_byte_identically_to_what_is_stored
+# (AnonymizationManager + canonical_json_bytes over primary bundles). If
+# re-anonymizing would rewrite stored bytes, this workflow fails loudly and
+# does not open a mirror that would re-publish rewriteable content. When
+# re-derivation is in flight on develop, the mirror waits on that fixed point
+# automatically; once the precondition holds, the mirror runs unattended
+# again. The gate runs on the content being mirrored (develop @ GITHUB_SHA),
+# not on published-results.
+#
 # The mirror PR is intentionally a draft — it never auto-merges. Maintainers
 # review and flip ready when the develop-side change is ready to be visible
 # on the public corpus branch. Validator changes mirror both the thin
@@ -115,6 +127,83 @@ jobs:
             echo "diff_count=${#DIFFED[@]}"
           } >> "$GITHUB_OUTPUT"
 
+      # Fixed-point gate: refuse to build or open a mirror when develop's
+      # results-data would be rewritten by a second anonymization pass. Same
+      # logic as test_rederived_corpus_publishes_byte_identically_to_what_is_stored
+      # in tests/unit/scripts/test_corpus_privacy_invariant.py. Runs on the
+      # develop checkout (content being mirrored) before any mirror branch is
+      # created. uv/Python are installed here so the gate can import
+      # AnonymizationManager; later validate steps reuse the same toolchain.
+      - name: Install uv
+        if: steps.drift.outputs.has_drift == 'true'
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        if: steps.drift.outputs.has_drift == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Gate corpus publication fixed point
+        if: steps.drift.outputs.has_drift == 'true'
+        run: |
+          set -euo pipefail
+          # Inline equivalent of
+          # test_rederived_corpus_publishes_byte_identically_to_what_is_stored.
+          # Uses AnonymizationManager directly so this stays a corpus-domain
+          # gate rather than develop's full test matrix.
+          # Fails loud: a skipped/refused mirror must not look like success.
+          uv run -- python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import sys
+          from pathlib import Path
+
+          from benchbox.core.results.anonymization import AnonymizationManager
+          from benchbox.core.results.canonical_json import canonical_json_bytes
+
+          RESULTS_DATA = Path("results-data")
+          COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json")
+          MIGRATION_MANIFEST = "path-privacy-migration.manifest.json"
+
+          manager = AnonymizationManager()
+          drifted: list[str] = []
+          scanned = 0
+
+          for path in sorted((RESULTS_DATA / "bundles").rglob("*.json")):
+              if path.name.endswith(COMPANION_SUFFIXES) or path.name == MIGRATION_MANIFEST:
+                  continue
+              stored = path.read_bytes()
+              payload = json.loads(stored.decode("utf-8"))
+              if not isinstance(payload, dict):
+                  continue
+              scanned += 1
+              if canonical_json_bytes(manager.anonymize_result_payload(payload)) != stored:
+                  drifted.append(str(path))
+
+          if not scanned:
+              print(
+                  "::error::No primary bundles scanned — publication fixed-point gate would be vacuous.",
+                  file=sys.stderr,
+              )
+              raise SystemExit(1)
+
+          if drifted:
+              print(
+                  f"::error::Corpus is not at the publication fixed point "
+                  f"({len(drifted)} bundle(s) would be rewritten by re-anonymization). "
+                  f"Refusing to open a mirror that would rewrite published bytes. "
+                  f"Same check as test_rederived_corpus_publishes_byte_identically_to_what_is_stored.",
+                  file=sys.stderr,
+              )
+              for rel in drifted[:20]:
+                  print(f"  {rel}", file=sys.stderr)
+              raise SystemExit(1)
+
+          print(f"Publication fixed point OK ({scanned} primary bundles).")
+          PY
+
       - name: Build mirror branch
         if: steps.drift.outputs.has_drift == 'true'
         id: build
@@ -127,16 +216,29 @@ jobs:
           # Start from current published-results
           git switch --force-create "${MIRROR_BRANCH}" origin/published-results
 
-          # Apply the triggering commit's content for each mirrored path. For directory
-          # paths, wipe the existing tree first so develop-side deletions
-          # within the directory propagate (otherwise `git checkout` only
-          # writes paths present on the source commit and leaves stragglers behind).
+          # Apply the triggering commit's content for each mirrored path.
+          #
+          # results-data/bundles uses a **union overlay**, not a wipe:
+          # community submissions can land on published-results only (they
+          # target that branch, not develop). A prior wipe (`git rm -rf
+          # results-data/bundles` then checkout develop) deleted those
+          # published-only paths whenever develop was also ahead. Overlay
+          # instead:
+          #   - checkout develop's version of every path that exists on develop
+          #     (overwrites shared / develop-ahead files)
+          #   - leave paths that exist only on published-results intact
+          # Develop-side deletions inside bundles therefore do NOT auto-
+          # propagate; that is intentional — never delete public community
+          # content from an automated mirror. FILE_PATHS still use per-path
+          # apply (including removal when missing on the source commit).
           SOURCE_REF="${GITHUB_SHA}"
-          DIRECTORY_PATHS=(
-            'results-data/bundles'
-          )
+          # Directory trees that must union-overlay (never wipe).
+          BUNDLES_DIR='results-data/bundles'
+          # corpus-inventory.json is NOT blind-overlaid from develop: after a
+          # union overlay the tree may still hold published-only community
+          # bundles that develop's inventory does not list. Regenerate from the
+          # post-overlay tree so validate --check can pass under mixed drift.
           FILE_PATHS=(
-            'results-data/corpus-inventory.json'
             'results-data/CORPUS_NOTES.md'
             'results-data/SEED_CORPUS_SPEC.md'
             'results-data/README.md'
@@ -146,17 +248,15 @@ jobs:
             'scripts/generate_corpus_inventory.py'
           )
 
-          for path in "${DIRECTORY_PATHS[@]}"; do
-            if git cat-file -e "${SOURCE_REF}:${path}" 2>/dev/null; then
-              # Wipe the directory's existing tree so file-level deletions
-              # on the source commit propagate to the mirror.
-              git rm -rf --quiet "${path}" 2>/dev/null || true
-              git checkout "${SOURCE_REF}" -- "${path}"
-            else
-              # Whole directory removed on the source commit — mirror the removal.
-              git rm -rf --quiet "${path}" 2>/dev/null || true
-            fi
-          done
+          if git cat-file -e "${SOURCE_REF}:${BUNDLES_DIR}" 2>/dev/null; then
+            # Union overlay: checkout develop tree without removing published-only.
+            # Do NOT `git rm -rf` the directory first.
+            git checkout "${SOURCE_REF}" -- "${BUNDLES_DIR}"
+          else
+            # Source has no bundles tree — leave published intact rather than
+            # wipe community submissions. Report so the PR review can decide.
+            echo "Source commit has no ${BUNDLES_DIR}; leaving published tree intact (union overlay)."
+          fi
 
           for path in "${FILE_PATHS[@]}"; do
             if git cat-file -e "${SOURCE_REF}:${path}" 2>/dev/null; then
@@ -166,6 +266,13 @@ jobs:
               git rm -f --quiet "${path}" 2>/dev/null || true
             fi
           done
+
+          # Derive inventory from the unioned tree (published-only + develop).
+          # Same uv/--no-project/--python 3.11 contract as the validate step.
+          if [[ -d "${BUNDLES_DIR}" ]]; then
+            uv run --no-project --python 3.11 -- python scripts/generate_corpus_inventory.py --write
+            git add results-data/corpus-inventory.json
+          fi
 
           if git diff --staged --quiet && git diff --quiet; then
             echo "After applying develop content, mirror branch matches"
@@ -212,23 +319,15 @@ jobs:
       # lint/type/pytest matrix here would gate corpus content on checks that have
       # nothing to do with it (rejected by the ADR for the same reason it rejected
       # routing submissions through develop directly). The two checks that ARE
-      # domain-appropriate are exactly the ones `validate-submission.yml` already
-      # runs for a human-authored submission PR: does each changed bundle pass
-      # schema/hash/privacy validation, and is the generated inventory still
-      # current. Run precisely those two, reusing the identical vendored scripts
-      # and the identical `--no-project --python 3.11` invocation convention
-      # documented in `adr-published-results-slim-corpus-branch.md`, so the mirror
-      # PR is judged by the same bar a contributor PR would be.
-      - name: Install uv
-        if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
-        uses: astral-sh/setup-uv@v4
-
-      - name: Set up Python
-        if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
+      # domain-appropriate after the publication fixed-point gate above are exactly
+      # the ones `validate-submission.yml` already runs for a human-authored
+      # submission PR: does each changed bundle pass schema/hash/privacy
+      # validation, and is the generated inventory still current. Run precisely
+      # those two, reusing the identical vendored scripts and the identical
+      # `--no-project --python 3.11` invocation convention documented in
+      # `adr-published-results-slim-corpus-branch.md`, so the mirror PR is judged
+      # by the same bar a contributor PR would be. uv/Python were installed
+      # earlier for the fixed-point gate and are reused here.
       - name: Validate mirrored corpus content
         # The working tree right now (after `git switch --force-create` and the
         # path-level checkouts above) IS the exact content the PR will present as

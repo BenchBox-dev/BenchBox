@@ -73,7 +73,16 @@ def gate_summary_path(log_dir: Path) -> Path:
 
 @dataclass(frozen=True)
 class PhaseAccounting:
-    """Per-sweep cell counts, disjoint components mirroring the report-phase footer."""
+    """Per-sweep cell counts, disjoint components mirroring the report-phase footer.
+
+    ``unvalidated`` is the one exception to "disjoint components": it mirrors
+    ``ReportSummary.unvalidated_count`` (see `tests/uat/phases/report.py`), a
+    cross-cutting visibility count of ``passed`` cells whose
+    ``submit_terminal_state`` is ``unvalidated`` -- already included in
+    ``passed``/``attempted``, not a fifth bucket alongside them, and must
+    never make a stage's verdict red on its own
+    (unvalidated-results-misclassified-as-schema-violations).
+    """
 
     attempted: int = 0
     passed: int = 0
@@ -86,6 +95,7 @@ class PhaseAccounting:
     early_stop_pruned: int = 0
     registry_pruned: int = 0
     total_defined: int = 0
+    unvalidated: int = 0
 
 
 @dataclass(frozen=True)

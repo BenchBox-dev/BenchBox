@@ -70,6 +70,16 @@ class PreflightConfig:
     docker_required: bool = False
     noisy_neighbor_warn_load: float = 8.0
     local_platforms_check: bool = False
+    # Mirrors free_space_min_gib's shape and 0-disables convention (see
+    # UATConfig.memory_gate_enabled). Under mocker each Docker-managed
+    # platform is its own VM with independent memory sizing; `up --wait`
+    # exiting 0 says nothing about host headroom for that VM. Default 2.0
+    # GiB is a deliberately modest floor -- roughly one container VM's
+    # worth of breathing room -- not a tuned production threshold; the
+    # 2026-08-04 postmortem host had 72 MB free of 16 GB when a 1024 MB
+    # cgroup-limited container failed to start. See
+    # uat-container-readiness-and-memory-headroom-gate w2.
+    free_memory_min_gib: float = 2.0
 
 
 @dataclass(frozen=True)
@@ -81,6 +91,14 @@ class CleanupConfig:
     docker_project_prefix: str = "benchbox-uat"
     docker_start_timeout_s: int = 300
     docker_fixed_container_name_policy: str = "fail"
+    # Settle window after `up --wait` reports success and before the
+    # post-start readiness re-check (compose ps state + TCP probe) runs --
+    # see uat-container-readiness-and-memory-headroom-gate w0. NOT a
+    # replacement for docker_start_timeout_s: `up --wait` already reported
+    # Started/healthy by the time this fires, so raising
+    # docker_start_timeout_s would only wait longer on something the engine
+    # already declared done. This waits to see whether it STAYS up.
+    docker_settle_s: int = 10
 
 
 @dataclass(frozen=True)
@@ -173,8 +191,22 @@ class UATConfig:
         """
         return self.preflight.free_space_min_gib > 0
 
+    @property
+    def memory_gate_enabled(self) -> bool:
+        """Whether the free-memory floor is active before starting a Docker-managed platform.
+
+        Mirrors `disk_gate_enabled`'s shape and 0-disables convention:
+        gated purely on the configured floor (`preflight.free_memory_min_gib
+        > 0`), read directly by `execute.py` at the platform boundary --
+        there is no separate orchestrator-level toggle to keep in sync (see
+        uat-container-readiness-and-memory-headroom-gate w2). The sole
+        opt-out is an explicit `preflight.free_memory_min_gib: 0`.
+        """
+        return self.preflight.free_memory_min_gib > 0
+
 
 DISK_GATE_DISABLED_WARNING_PREFIX = "[disk-gate] DISABLED by config"
+MEMORY_GATE_DISABLED_WARNING_PREFIX = "[memory-gate] DISABLED by config"
 
 
 def disk_gate_disabled_warning(config: UATConfig) -> str | None:
@@ -184,6 +216,16 @@ def disk_gate_disabled_warning(config: UATConfig) -> str | None:
     return (
         f"{DISK_GATE_DISABLED_WARNING_PREFIX}: preflight.free_space_min_gib=0 -- "
         "the free-space floor and per-cell disk watch will NOT run for this sweep"
+    )
+
+
+def memory_gate_disabled_warning(config: UATConfig) -> str | None:
+    """Return the loud opt-out warning when `memory_gate_enabled` is False."""
+    if config.memory_gate_enabled:
+        return None
+    return (
+        f"{MEMORY_GATE_DISABLED_WARNING_PREFIX}: preflight.free_memory_min_gib=0 -- "
+        "the free-memory headroom gate will NOT run before starting Docker-managed platforms"
     )
 
 
@@ -500,6 +542,7 @@ def _validate_preflight(payload: dict[str, Any] | None) -> PreflightConfig:
                 "docker_required",
                 "noisy_neighbor_warn_load",
                 "local_platforms_check",
+                "free_memory_min_gib",
             }
         ),
         "preflight",
@@ -523,6 +566,12 @@ def _validate_preflight(payload: dict[str, Any] | None) -> PreflightConfig:
             section="preflight",
         ),
         local_platforms_check=_require_bool(payload, "local_platforms_check", default=False, section="preflight"),
+        free_memory_min_gib=_require_nonnegative_float(
+            payload,
+            "free_memory_min_gib",
+            default=2.0,
+            section="preflight",
+        ),
     )
 
 
@@ -542,6 +591,7 @@ def _validate_cleanup(payload: dict[str, Any] | None) -> CleanupConfig:
                 "docker_project_prefix",
                 "docker_start_timeout_s",
                 "docker_fixed_container_name_policy",
+                "docker_settle_s",
             }
         ),
         "cleanup",
@@ -586,6 +636,12 @@ def _validate_cleanup(payload: dict[str, Any] | None) -> CleanupConfig:
             section="cleanup",
         ),
         docker_fixed_container_name_policy=docker_fixed_container_name_policy,
+        docker_settle_s=_require_positive_int(
+            payload,
+            "docker_settle_s",
+            default=10,
+            section="cleanup",
+        ),
     )
 
 

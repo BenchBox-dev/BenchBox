@@ -30,6 +30,15 @@ _URI_USERINFO_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+# Query and fragment parameters. Separators cover the first query ("?"), later
+# query pairs ("&"), the fragment start ("#"), and fragment pairs ("&" after
+# "#"). Credential-named params (access_token, sslpassword, password, ...) are
+# masked; ordinary params (x=1, region=...) are left intact. Name matching
+# reuses is_secret_option_key so key-level and URI-component rules stay aligned.
+_URI_QUERY_OR_FRAGMENT_PARAM_RE = re.compile(
+    r"(?P<sep>[?&#])(?P<name>[^=?#&]+)=(?P<value>[^?#&]*)",
+)
+
 
 def _normalize_secret_key(key: str) -> str:
     """Lowercase ``key`` and strip non-alphanumerics so ``sessionToken``,
@@ -92,15 +101,37 @@ def _is_username_key(key: str) -> bool:
 
 
 def _redact_uri_userinfo_match(match: re.Match[str]) -> str:
-    """Redact one URI's userinfo, preserving Azure storage container authorities."""
+    """Redact credential-bearing userinfo; keep username-only and Azure authorities.
+
+    Userinfo with a password uses ``user:password`` form (colon present). A bare
+    username (``https://public-user@host/path``) is identity, not a secret, and
+    must survive export so provenance is not replaced with a generic mask.
+    """
     if match.group("scheme").lower() in _AUTHORITY_USERINFO_SCHEMES:
+        return match.group(0)
+    userinfo = match.group("userinfo")
+    # Colon marks a password component (including empty password ``user:``).
+    if ":" not in userinfo:
         return match.group(0)
     return f"{match.group('scheme')}{match.group('sep')}****@"
 
 
-def _scrub_uri_userinfo(value: str) -> str:
-    """Replace credential-bearing URI userinfo without changing ordinary values."""
-    return _URI_USERINFO_RE.sub(_redact_uri_userinfo_match, value)
+def _redact_uri_query_or_fragment_param(match: re.Match[str]) -> str:
+    """Mask one query/fragment parameter value when its name is credential-like."""
+    if is_secret_option_key(match.group("name")):
+        return f"{match.group('sep')}{match.group('name')}=****"
+    return match.group(0)
+
+
+def _scrub_uri_credentials(value: str) -> str:
+    """Scrub URI userinfo passwords and credential-named query/fragment params.
+
+    Component-aware: ordinary hosts, paths, ports, non-secret query params, and
+    username-only userinfo are preserved. Does not stack independent broken
+    matchers — one pass for userinfo precision, one for query/fragment names.
+    """
+    scrubbed = _URI_USERINFO_RE.sub(_redact_uri_userinfo_match, value)
+    return _URI_QUERY_OR_FRAGMENT_PARAM_RE.sub(_redact_uri_query_or_fragment_param, scrubbed)
 
 
 _INTERNAL_OPTION_KEYS = {
@@ -222,7 +253,7 @@ def _iter_public_options(options: Mapping[str, Any] | None):
 
 def _sanitize_option_value(value: Any, *, exclude_internal: bool = False, redact_usernames: bool = True) -> Any:
     if isinstance(value, str):
-        return _scrub_uri_userinfo(value)
+        return _scrub_uri_credentials(value)
     if isinstance(value, Mapping):
         return sanitize_platform_options(
             value,
