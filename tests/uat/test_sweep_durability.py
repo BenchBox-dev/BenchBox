@@ -292,7 +292,11 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
     sequence: list[str] = []
 
     def fake_docker(argv, **_kwargs):
-        action = "up" if "up" in argv else "down"
+        # Classify up/ps/down, not just up/down: the post-start readiness
+        # `compose ps` re-check must not be recorded as a teardown, or the
+        # ordering assertion below matches that instead of the real `down`
+        # (same three-way classify as test_phases.py's `_docker_verb`).
+        action = "up" if "up" in argv else ("ps" if "ps" in argv else "down")
         sequence.append(action)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
