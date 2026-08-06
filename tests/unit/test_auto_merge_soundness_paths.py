@@ -104,29 +104,31 @@ def test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge() -> None:
 
     # Diff via git with --no-renames (gh pr diff --name-only drops rename sources).
     assert "git diff --name-only --no-renames" in workflow
-    assert "if: steps.soundness.outputs.soundness_path != 'true'" in workflow
+    # Enable is multi-line (`if: >-`); pin the soundness gate fragment rather than
+    # a single-line `if:` that no longer exists after the hold-label conjunction.
+    assert "steps.soundness.outputs.soundness_path != 'true'" in workflow
     assert "if: steps.soundness.outputs.soundness_path == 'true'" in workflow
     # A soundness-touching push must re-evaluate and clear any stale auto-merge.
     assert "synchronize" in workflow
     assert "gh pr merge --disable-auto" in workflow
 
-    # auto-merge-predicate-base-ref-execution: the predicate must be executed
-    # from the base ref's copy of the file, not the PR's own checkout copy,
-    # so a PR that edits the predicate can't judge its own diff by its own
-    # modified rules.
+    # auto-merge-predicate-base-ref-execution: base-ref copy must still run so
+    # a PR that narrows the predicate can't judge its own diff by its own rules.
     assert (
-        'git show "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate.py'
+        'git show "origin/${{ github.base_ref }}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate_base.py'
         in workflow
     )
-    assert "python3 /tmp/predicate.py --stdin --format github-output" in workflow
-    # The predicate script itself is executed from the checked-out repo
-    # nowhere in this workflow (only the base-ref materialized copy).
-    assert "_project/scripts/auto_merge_soundness_paths.py --stdin --format github-output" not in workflow
+    assert "python3 /tmp/predicate_base.py --stdin --format github-output" in workflow
+    # PR checkout copy is evaluated alongside base-ref (union/OR) so a gate
+    # *widened* mid-flight still revokes. Enable requires soundness_path != true
+    # (both false), so the PR copy cannot weaken the gate by narrowing rules.
+    assert "python3 _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output" in workflow
+    assert '[ "$base_result" = "soundness_path=true" ] || [ "$pr_result" = "soundness_path=true" ]' in workflow
 
     # A PR touching the predicate or this workflow itself must be forced to
-    # soundness_path=true, regardless of what the base-ref predicate says
-    # about the rest of the diff (closes the "edit the predicate to make
-    # future PRs unsafe" gap that base-ref execution alone doesn't cover).
+    # soundness_path=true, regardless of what either predicate says about the
+    # rest of the diff (closes the "edit the predicate to make future PRs
+    # unsafe" gap that predicate evaluation alone doesn't cover).
     assert 'grep -qxF "_project/scripts/auto_merge_soundness_paths.py"' in workflow
     assert 'grep -qxF ".github/workflows/auto-merge-on-open.yml"' in workflow
     assert 'result="soundness_path=true"' in workflow

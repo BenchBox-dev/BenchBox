@@ -39,8 +39,14 @@ AUTO_MERGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "auto-merge-on-open.
 ARM_COMMAND = "gh pr merge --auto --squash"
 
 # Exact enable/disable `if:` pins for auto-merge-on-open.yml (collapsed form).
-ENABLE_IF = "steps.soundness.outputs.soundness_path != 'true' && github.event.action == 'ready_for_review'"
+# Enable also requires the durable hold label absent (steps.hold).
+ENABLE_IF = (
+    "steps.soundness.outputs.soundness_path != 'true' "
+    "&& steps.hold.outputs.held != 'true' "
+    "&& github.event.action == 'ready_for_review'"
+)
 DISABLE_IF = "steps.soundness.outputs.soundness_path == 'true'"
+HOLD_DISABLE_IF = "steps.hold.outputs.held == 'true'"
 
 
 def _target_body(name: str) -> str:
@@ -185,10 +191,11 @@ def test_auto_merge_workflow_keeps_opened_trigger_for_soundness_re_eval() -> Non
 
     Dropping those triggers would leave a soundness PR that was opened with
     auto-merge already on (or that later gains a soundness commit) without a
-    revocation path from this workflow.
+    revocation path from this workflow. `labeled` is also required so the
+    durable hold label revokes without needing a push.
     """
     types = _triggers(_load_workflow())["pull_request"]["types"]
-    for required in ("opened", "reopened", "ready_for_review", "synchronize"):
+    for required in ("opened", "reopened", "ready_for_review", "synchronize", "labeled"):
         assert required in types, f"pull_request types missing {required!r}: {types}"
 
 
@@ -213,4 +220,16 @@ def test_auto_merge_workflow_preserves_soundness_disable() -> None:
     assert "--disable-auto" in str(disable.get("run") or ""), "soundness disable no longer calls --disable-auto"
     assert _collapsed_if(disable) == DISABLE_IF, (
         f"disable step if: drifted from policy pin\n  got:  {_collapsed_if(disable)!r}\n  want: {DISABLE_IF!r}"
+    )
+
+
+def test_auto_merge_workflow_preserves_explicit_hold_disable() -> None:
+    """Must-preserve: no-auto-merge label revokes auto-merge independently."""
+    workflow = _load_workflow()
+    steps = _steps_by_name(_enable_job(workflow))
+    disable = steps.get("Disable auto-merge for explicit hold")
+    assert disable is not None, "explicit-hold disable step is gone"
+    assert "--disable-auto" in str(disable.get("run") or "")
+    assert _collapsed_if(disable) == HOLD_DISABLE_IF, (
+        f"hold disable if: drifted from policy pin\n  got:  {_collapsed_if(disable)!r}\n  want: {HOLD_DISABLE_IF!r}"
     )
