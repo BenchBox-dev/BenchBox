@@ -709,6 +709,99 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
     assert commands == ["up:clickhouse-server", "ps:clickhouse-server", "down:clickhouse-server"]
 
 
+def test_execute_aborts_before_compose_up_when_benchmark_runs_dir_is_relative_for_path_mirroring_platform(tmp_path):
+    """must_preserve: compose_environment() (tests/uat/docker_assets.py) is
+    the enforcement point every UAT-managed bring-up path funnels through --
+    not just `make test-docker-up-*`, which the Makefile's
+    require_data_dir_if_mounted guards separately and does not cover this
+    path at all. A relative benchmark_runs_dir for a path-mirroring platform
+    (lakesail, velox) is a pre-flight config problem identical in kind to
+    validate_managed_start_allowed's failures -- it would break EVERY cell
+    on the platform identically, not one query -- so it must abort the
+    sweep before compose is ever invoked, not silently mount an
+    empty/garbage path (`mocker compose config -q` exits 0 on that)."""
+    cfg = validate_config(
+        {
+            "name": "docker relative data dir",
+            "platforms": {"include": ["lakesail"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    calls: list[str] = []
+
+    def fake_docker(argv, **kwargs):
+        calls.append("up" if "up" in argv else "down")
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        benchmark_runs_dir=Path("relative_runs"),
+        runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+        docker_runner=fake_docker,
+        free_space_reader=lambda _path: 100.0,
+    )
+
+    assert outcome.aborted is True
+    assert "BENCHBOX_DATA_DIR" in (outcome.abort_reason or "")
+    assert "absolute" in (outcome.abort_reason or "")
+    # compose is never invoked at all -- the config error is caught before `up`.
+    assert calls == []
+
+
+def test_run_docker_teardown_substitutes_absolute_placeholder_when_benchmark_runs_dir_is_relative():
+    """Down must never fail (or raise out of run_execute's `finally`) just
+    because BENCHBOX_DATA_DIR is unset or relative -- `down` never mounts
+    anything, so any absolute value lets compose parse the file.
+
+    Direct unit test of _run_docker_teardown rather than through
+    run_execute's public API: within one run_execute call, up and down for a
+    single platform always share the SAME benchmark_runs_dir value, so if up
+    already succeeded (compose_environment did not raise), down's identical
+    call cannot raise either -- the defensive substitution in
+    _run_docker_teardown is unreachable end-to-end through run_execute as
+    currently wired. It exists as defence-in-depth against a future
+    caller/refactor that decouples the two values, mirroring the Makefile's
+    compose_down_fresh placeholder for `make test-docker-down-*` (same
+    reasoning, same fix, different layer)."""
+    cfg = validate_config(
+        {
+            "name": "docker teardown relative data dir",
+            "platforms": {"include": ["lakesail"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    spec = docker_assets.docker_platform_spec("lakesail")
+    docker_state = exec_phase._DockerPlatformState(
+        spec=spec, project_name="benchbox-uat-test-lakesail", started=True, cleanup_status="started"
+    )
+    captured_env: dict[str, str] = {}
+
+    def fake_docker(argv, **kwargs):
+        captured_env.update(kwargs.get("env") or {})
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    cleanup_status, abort_reason = exec_phase._run_docker_teardown(
+        cfg,
+        platform="lakesail",
+        docker_state=docker_state,
+        benchmark_runs_dir=Path("relative_runs"),
+        docker_runner=fake_docker,
+        docker_events=[],
+        log_dir=None,
+    )
+
+    assert cleanup_status == "ok"
+    assert abort_reason is None
+    assert "BENCHBOX_DATA_DIR" in captured_env
+    assert Path(captured_env["BENCHBOX_DATA_DIR"]).is_absolute()
+
+
 def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tmp_path):
     """A managed compose-up failure must not truncate the sweep.
 

@@ -29,6 +29,24 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 STATE_DIR="${DOCKER_TEST_STATE_DIR:-/tmp/benchbox-docker-projects}"
 fails=0
 
+# Passed explicitly for `up`: the Makefile has no BENCHBOX_DATA_DIR default
+# of its own -- require_data_dir_if_mounted rejects an unset or relative
+# value before `make test-docker-up-<lakesail|velox>` ever invokes compose,
+# so this script must supply a real absolute one. `down` no longer needs
+# BENCHBOX_DATA_DIR to be set at all: compose_down_fresh substitutes a
+# throwaway absolute placeholder when it is unset or relative, because
+# `down` never re-mounts anything -- it only needs the compose file to
+# parse. (An earlier version of this comment claimed an unset `down`
+# "refused to parse the file" under lakesail-compose-nested-variable-
+# default's ${VAR:?...} required-variable form, orphaning containers/
+# volumes -- that was true for real `docker compose`, which errors on an
+# unset required variable, but wrong for mocker 0.7.2, which is what this
+# harness actually exercises: mocker leaves ${VAR:?...} as a literal
+# unresolved string instead of erroring and exits 0, so it never refused to
+# parse anything here.) Only lakesail/velox compose files reference
+# BENCHBOX_DATA_DIR at all; it is a harmless no-op for every other platform.
+DATA_DIR="${BENCHBOX_DATA_DIR:-$ROOT/benchmark_runs}"
+
 # TCP connect check via bash /dev/tcp (no nc dependency). The subshell opens and
 # (on exit) closes the fd; success == the connect succeeded.
 tcp_ok() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
@@ -49,12 +67,12 @@ port_serves() {
 
 # Tear down the in-flight stack if interrupted between up and down.
 current_plat=""
-trap 'if [ -n "$current_plat" ]; then make -C "$ROOT" "test-docker-down-$current_plat" CONTAINER_ENGINE="$ENGINE" >/dev/null 2>&1 || true; fi; exit 130' INT TERM
+trap 'if [ -n "$current_plat" ]; then make -C "$ROOT" "test-docker-down-$current_plat" CONTAINER_ENGINE="$ENGINE" BENCHBOX_DATA_DIR="$DATA_DIR" >/dev/null 2>&1 || true; fi; exit 130' INT TERM
 
 for plat in "${PLATFORMS[@]}"; do
   echo "== [$ENGINE] $plat =="
   current_plat="$plat"
-  if ! make -C "$ROOT" "test-docker-up-$plat" CONTAINER_ENGINE="$ENGINE"; then
+  if ! make -C "$ROOT" "test-docker-up-$plat" CONTAINER_ENGINE="$ENGINE" BENCHBOX_DATA_DIR="$DATA_DIR"; then
     echo "  FAIL: up -d --wait did not return healthy"; fails=1; current_plat=""; continue
   fi
   proj="$(cat "$STATE_DIR/$plat.project" 2>/dev/null || true)"
@@ -62,7 +80,7 @@ for plat in "${PLATFORMS[@]}"; do
 
   if port_serves "$plat"; then echo "  PASS: published port serves"; else echo "  FAIL: published port did not serve"; fails=1; fi
 
-  if ! make -C "$ROOT" "test-docker-down-$plat" CONTAINER_ENGINE="$ENGINE"; then
+  if ! make -C "$ROOT" "test-docker-down-$plat" CONTAINER_ENGINE="$ENGINE" BENCHBOX_DATA_DIR="$DATA_DIR"; then
     echo "  FAIL: teardown errored"; fails=1
   fi
   current_plat=""
