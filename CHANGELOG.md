@@ -60,8 +60,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to the new run — so the benchmark still reported timings for the wrong data
   volume as a PASS. A manifest mismatch now triggers the same rebuild that
   `force=True` does, and the manifest is written over data that was actually
-  repopulated. Databases that already carry a manifest written by the previous
-  behaviour pay one real staging rebuild on next use.
+  repopulated. Manifest rows written by the previous behaviour cannot be
+  trusted — they are internally consistent (right scale, right spec version,
+  digest of the live source tables) while the staging data they describe is
+  stale — so the manifest moves to a new table generation that those rows
+  cannot satisfy. Any database the previous behaviour already mis-certified
+  therefore takes the missing-manifest path and pays one real staging rebuild
+  on next use; no operator action is required, and the superseded table is
+  dropped during that rebuild.
 - **Unrunnable precompiled TPC binaries now fall back to source compilation** -
   Binary selection probes that a bundled `dbgen`/`qgen`/`dsdgen`/`dsqgen`
   actually executes on the host before choosing it over compiling from source.

@@ -811,6 +811,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             # Drop existing staging tables when rebuilding (done once before loop)
             if rebuild:
                 reason = "force mode" if force else "stale/absent staging manifest"
+                self._drop_legacy_staging_manifests(connection)
                 for table_name in STAGING_TABLES:
                     try:
                         quoted = self._quote_identifier(table_name)

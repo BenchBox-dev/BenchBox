@@ -100,6 +100,34 @@ def _rows(conn: duckdb.DuckDBPyConnection, table: str) -> int:
     return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
 
 
+#: Every staging table the corresponding ``is_setup()`` gates on. Assertions
+#: must cover ALL of them: a rebuild that refreshes only the one or two tables
+#: a test happens to name leaves the rest stale AND certified, and the suite
+#: stays green -- the same "healed and untouched are indistinguishable" hole
+#: that let the first version of this fix ship with its headline bug intact.
+_TXN_GATED_TABLES = ("txn_orders", "txn_lineitem", "txn_customer")
+_WRITE_GATED_TABLES = (
+    "update_ops_orders",
+    "delete_ops_orders",
+    "delete_ops_lineitem",
+    "merge_ops_target",
+    "merge_ops_source",
+    "merge_ops_lineitem_target",
+    "ddl_truncate_target",
+)
+
+
+def _snapshot(conn: duckdb.DuckDBPyConnection, tables: tuple[str, ...]) -> dict[str, int]:
+    return {t: _rows(conn, t) for t in tables}
+
+
+def _assert_all_rebuilt(conn: duckdb.DuckDBPyConnection, before: dict[str, int], tables: tuple[str, ...]) -> None:
+    """Every gated table must reflect the grown source, not just the asserted ones."""
+    after = _snapshot(conn, tables)
+    stale = {t: (before[t], after[t]) for t in tables if after[t] <= before[t]}
+    assert not stale, f"staging tables left stale after rebuild (before, after): {stale}"
+
+
 @pytest.fixture
 def loaded_tpch_conn():
     conn = _minimal_tpch_conn()
@@ -170,7 +198,7 @@ class TestTransactionPrimitivesStagingProvenance:
         """
         small = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         small.setup(loaded_tpch_conn, force=False)
-        stale_rows = _rows(loaded_tpch_conn, "txn_orders")
+        before = _snapshot(loaded_tpch_conn, _TXN_GATED_TABLES)
 
         _grow_tpch_source(loaded_tpch_conn)
         large = TransactionPrimitivesBenchmark(scale_factor=1.0, output_dir=tmp_path)
@@ -178,9 +206,45 @@ class TestTransactionPrimitivesStagingProvenance:
 
         large.setup(loaded_tpch_conn, force=False)
 
+        _assert_all_rebuilt(loaded_tpch_conn, before, _TXN_GATED_TABLES)
         assert _rows(loaded_tpch_conn, "txn_orders") == _rows(loaded_tpch_conn, "orders")
-        assert _rows(loaded_tpch_conn, "txn_orders") != stale_rows
         assert large.is_setup(loaded_tpch_conn) is True
+
+    def test_manifest_from_the_pre_rebuild_generation_is_not_reused(self, tmp_path: Path, loaded_tpch_conn):
+        """A manifest written by the generation that certified without rebuilding must not match.
+
+        That generation wrote its row unconditionally at the end of setup(),
+        including on the path that skipped repopulation. Those rows are
+        internally consistent -- right scale, right spec, digest of the live
+        source -- while the staging data they describe is stale. If the current
+        code read them, every database that generation mis-certified would stay
+        silently wrong forever instead of rebuilding once.
+        """
+        bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        benchmark_id, scale, spec_version = bench._staging_provenance_key()
+        digest = bench._staging_source_digest(loaded_tpch_conn, ["orders", "lineitem", "customer"])
+
+        for legacy in bench._LEGACY_STAGING_MANIFEST_TABLES:
+            loaded_tpch_conn.execute(
+                f"CREATE TABLE {legacy} (benchmark VARCHAR, scale VARCHAR, spec_version VARCHAR, "
+                "source_digest VARCHAR, created_at VARCHAR)"
+            )
+            loaded_tpch_conn.execute(
+                f"INSERT INTO {legacy} VALUES "
+                f"('{benchmark_id}', '{scale}', '{spec_version}', '{digest}', '2026-08-05T00:00:00Z')"
+            )
+        loaded_tpch_conn.execute("CREATE TABLE txn_orders AS SELECT * FROM orders LIMIT 1")
+        loaded_tpch_conn.execute("CREATE TABLE txn_lineitem AS SELECT * FROM lineitem LIMIT 1")
+        loaded_tpch_conn.execute("CREATE TABLE txn_customer AS SELECT * FROM customer LIMIT 1")
+
+        assert bench.is_setup(loaded_tpch_conn) is False
+
+        bench.setup(loaded_tpch_conn, force=False)
+        assert _rows(loaded_tpch_conn, "txn_orders") == _rows(loaded_tpch_conn, "orders")
+        # The superseded generation's table is cleaned up, not left as cruft.
+        for legacy in bench._LEGACY_STAGING_MANIFEST_TABLES:
+            with pytest.raises(duckdb.CatalogException):
+                loaded_tpch_conn.execute(f"SELECT 1 FROM {legacy}")
 
 
 class TestWritePrimitivesStagingProvenance:
@@ -231,7 +295,7 @@ class TestWritePrimitivesStagingProvenance:
         """write_primitives has the identical setup() short-circuit; pin it too."""
         small = WritePrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         small.setup(loaded_tpch_conn, force=False)
-        stale_rows = _rows(loaded_tpch_conn, "delete_ops_lineitem")
+        before = _snapshot(loaded_tpch_conn, _WRITE_GATED_TABLES)
 
         _grow_tpch_source(loaded_tpch_conn)
         large = WritePrimitivesBenchmark(scale_factor=1.0, output_dir=tmp_path)
@@ -239,8 +303,8 @@ class TestWritePrimitivesStagingProvenance:
 
         large.setup(loaded_tpch_conn, force=False)
 
+        _assert_all_rebuilt(loaded_tpch_conn, before, _WRITE_GATED_TABLES)
         assert _rows(loaded_tpch_conn, "delete_ops_lineitem") == _rows(loaded_tpch_conn, "lineitem")
-        assert _rows(loaded_tpch_conn, "delete_ops_lineitem") != stale_rows
         assert large.is_setup(loaded_tpch_conn) is True
 
 

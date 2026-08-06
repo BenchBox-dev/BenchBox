@@ -389,6 +389,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             # Drop existing staging tables when rebuilding (done once before loop)
             if rebuild:
                 reason = "force mode" if force else "stale/absent staging manifest"
+                self._drop_legacy_staging_manifests(connection)
                 for table_name in STAGING_TABLES:
                     try:
                         connection.execute(f"DROP TABLE IF EXISTS {table_name}")
