@@ -252,6 +252,62 @@ def test_canonical_bundle_export_serializes_primary_and_companions(monkeypatch, 
     _assert_canonical_json_file(tmp_path / f"{primary_path.stem}.tuning.json")
 
 
+def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monkeypatch, tmp_path):
+    """Anonymized .tuning.json must pseudonymize list-of-dicts FK companions and
+    slash-delimited local_table scalars while preserving enabled/action flags.
+    """
+    nested_constraints = {
+        "version": "2.1",
+        "run_id": "cost-duckdb",
+        "requested": {
+            "constraints": {
+                "foreign_keys": {
+                    "enabled": True,
+                    "on_delete_action": "CASCADE",
+                    "tables": [
+                        {
+                            "table": "orders",
+                            "columns": ["o_orderkey"],
+                            "referenced_table": "customers",
+                        }
+                    ],
+                },
+                "local_table": "orders/o_orderkey",
+                "references_table": "customers",
+                "primary_keys": {
+                    "enabled": True,
+                    "tables": {"orders": ["o_orderkey"]},
+                },
+            }
+        },
+    }
+    monkeypatch.setattr(exporter_module, "build_tuning_payload", lambda _result: nested_constraints)
+
+    exported = ResultExporter(output_dir=tmp_path, anonymize=True).export_result(
+        _minimal_result("duckdb"),
+        formats=["json"],
+    )
+    tuning_path = tmp_path / f"{exported['json'].stem}.tuning.json"
+    raw = tuning_path.read_text(encoding="utf-8")
+    assert all(identifier not in raw for identifier in ("orders", "o_orderkey", "customers"))
+
+    payload = json.loads(raw)
+    constraints = payload["requested"]["constraints"]
+    fk = constraints["foreign_keys"]
+    assert fk["enabled"] is True
+    assert fk["on_delete_action"] == "CASCADE"
+    assert fk["tables"][0]["table"].startswith("table_")
+    assert fk["tables"][0]["columns"][0].startswith("column_")
+    assert constraints["local_table"].startswith("table_")
+    assert constraints["references_table"].startswith("table_")
+    pk_tables = constraints["primary_keys"]["tables"]
+    table_key = next(iter(pk_tables))
+    assert table_key.startswith("table_")
+    assert pk_tables[table_key][0].startswith("column_")
+    assert constraints["primary_keys"]["enabled"] is True
+    _assert_canonical_json_file(tuning_path)
+
+
 def test_canonical_bundle_export_anonymizes_plans_raw_explain_output(monkeypatch, tmp_path):
     """qpc-07 w3: the plans companion bypassed anonymization entirely, so
     raw_explain_output (opaque per-platform EXPLAIN text that can embed
