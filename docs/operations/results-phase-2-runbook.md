@@ -32,6 +32,18 @@ validators, plus `corpus-inventory.json`) and opens a **draft** PR against
 auto-merges — a maintainer reviews and flips it ready when the develop-side
 change is ready to surface on the public corpus branch.
 
+**Publication fixed-point gate.** Before building a mirror branch or opening
+a PR, the sync workflow runs the same check as
+`tests/unit/scripts/test_corpus_privacy_invariant.py::test_rederived_corpus_publishes_byte_identically_to_what_is_stored`
+against the develop content at `GITHUB_SHA` (the bytes about to be mirrored).
+If re-anonymization would rewrite any primary bundle, the run fails loudly and
+does **not** open a mirror. That keeps `published-results` from receiving a
+corpus that Explorer publication would immediately rewrite, and sequences any
+in-flight re-derivation automatically: the mirror waits until develop is at
+the fixed point, then proceeds unattended. A red sync run with drift still
+present is the expected signal while re-derivation is open — not a stuck
+manual gate.
+
 If the workflow's heuristics ever miss a path (or a one-off mirror is
 needed outside the trigger conditions), trigger it manually via
 `workflow_dispatch` from the Actions tab.
