@@ -55,6 +55,7 @@ def _build_step_run() -> str:
             return run
     raise AssertionError("sync workflow has no Build mirror branch step")
 
+
 FIXED_POINT_GATE_STEP = "Gate corpus publication fixed point"
 BUILD_MIRROR_STEP = "Build mirror branch"
 FIXED_POINT_TEST_FRAGMENT = "rederived_corpus_publishes_byte_identically"
@@ -106,6 +107,8 @@ def test_sync_workflow_fixed_point_gate_runs_before_mirror_build() -> None:
     run = gate.get("run", "")
     assert "Refusing to open a mirror" in run or "not at the publication fixed point" in run
     assert "SystemExit(1)" in run or "raise SystemExit" in run
+
+
 def test_sync_workflow_does_not_wipe_bundles_directory() -> None:
     """The apply path must not ``git rm -rf`` results-data/bundles (union overlay)."""
     run = _build_step_run()

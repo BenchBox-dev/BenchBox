@@ -268,8 +268,9 @@ jobs:
           done
 
           # Derive inventory from the unioned tree (published-only + develop).
+          # Same uv/--no-project/--python 3.11 contract as the validate step.
           if [[ -d "${BUNDLES_DIR}" ]]; then
-            python3 scripts/generate_corpus_inventory.py --write
+            uv run --no-project --python 3.11 -- python scripts/generate_corpus_inventory.py --write
             git add results-data/corpus-inventory.json
           fi
 
