@@ -67,6 +67,10 @@ _CREDENTIAL_SENTINELS = (
     "EGRESS_SECRET_KEY_SENTINEL",
     "EGRESS_ACCESS_TOKEN_SENTINEL",
     "EGRESS_DSN_PASSWORD_SENTINEL",
+    # Injected via access_key_id / secret_access_key; must be in the asserted set
+    # so a partial filter cannot silently drop only the short aliases.
+    "EGRESS_ACCESS_KEY_ID_SENTINEL",
+    "EGRESS_SECRET_ACCESS_KEY_SENTINEL",
 )
 
 # Cross-layer expansion gates (distinct so a partial fix cannot silence all).
@@ -167,10 +171,12 @@ def _prepare_config_for_platform(platform_name: str, tmp_path: Path) -> dict[str
 def _construct_adapter_or_skip_reason(platform_name: str, tmp_path: Path) -> Any | str:
     """Return a constructed adapter, or a skip-reason string (never empty).
 
-    Adapters are inconsistent about which exception carries a missing optional
-    dependency: most raise ImportError, but the Spark-family adapters raise
-    ConfigurationError with the same get_dependency_error_message() text. Gate
-    on the shared message so a genuine ConfigurationError still fails loudly.
+    Only the known optional ODBC adapters may skip. Any other missing-dependency
+    failure is an unexpected skip and must fail the invariant (run under
+    ``uv run --all-extras`` so non-ODBC extras are present). Adapters are
+    inconsistent about which exception carries a missing optional dependency:
+    most raise ImportError, but the Spark-family adapters raise
+    ConfigurationError with the same get_dependency_error_message() text.
     """
     config = _prepare_config_for_platform(platform_name, tmp_path)
     adapter_class = PlatformRegistry.get_adapter_class(platform_name)
@@ -181,7 +187,14 @@ def _construct_adapter_or_skip_reason(platform_name: str, tmp_path: Path) -> Any
         if "Missing dependencies" not in message:
             raise
         required = OPTIONAL_ODBC_ADAPTER_DEPENDENCIES.get(platform_name)
-        if required is not None and required not in message.lower():
+        if required is None:
+            raise AssertionError(
+                f"unexpected non-ODBC skip for {platform_name!r}: {message}. "
+                f"Only {sorted(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES)} may skip; "
+                "install optional extras (uv run --all-extras) or expand the "
+                "optional-ODBC allowlist deliberately."
+            ) from exc
+        if required not in message.lower():
             raise AssertionError(
                 f"{platform_name} optional skip must cite missing dependency {required!r}; got: {message}"
             ) from exc
@@ -221,12 +234,12 @@ def test_registered_platform_count_is_forty_seven() -> None:
 
 
 def test_adapter_construct_coverage_accounting(tmp_path: Path) -> None:
-    """Every registered adapter must construct or record an explicit skip reason.
+    """Every registered adapter must construct or record an explicit ODBC skip.
 
-    Under ``uv run --all-extras`` on a host without pyodbc the partition is the
-    reviewed 45-pass / 2-optional-ODBC-skip accounting. When other optional
-    extras are also absent, each skip still carries the Missing dependencies
-    text so the sweep cannot silently shrink.
+    Only ``OPTIONAL_ODBC_ADAPTER_DEPENDENCIES`` may skip. Under
+    ``uv run --all-extras`` without host pyodbc the reviewed partition is
+    45-pass / 2-skip; with pyodbc present it is 47-pass / 0-skip. Any other
+    missing-dependency outcome fails inside ``_construct_adapter_or_skip_reason``.
     """
     names = _registered_platform_names()
     assert len(names) == EXPECTED_REGISTERED_PLATFORM_COUNT
@@ -238,37 +251,40 @@ def test_adapter_construct_coverage_accounting(tmp_path: Path) -> None:
         if isinstance(outcome, str):
             assert outcome.startswith("skip:optional-dependency:"), outcome
             assert "Missing dependencies" in outcome
+            assert platform_name in OPTIONAL_ODBC_ADAPTER_DEPENDENCIES, (
+                f"non-ODBC adapter {platform_name!r} must not skip; got {outcome}"
+            )
             skipped[platform_name] = outcome
             continue
         constructed.append(platform_name)
 
     assert len(constructed) + len(skipped) == EXPECTED_REGISTERED_PLATFORM_COUNT
     assert not (set(constructed) & set(skipped))
+    assert set(skipped).issubset(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES)
 
-    odbc_skips = {name: reason for name, reason in skipped.items() if name in OPTIONAL_ODBC_ADAPTER_DEPENDENCIES}
-    non_odbc_skips = {
-        name: reason for name, reason in skipped.items() if name not in OPTIONAL_ODBC_ADAPTER_DEPENDENCIES
-    }
-
-    for name, reason in odbc_skips.items():
+    for name, reason in skipped.items():
         required = OPTIONAL_ODBC_ADAPTER_DEPENDENCIES[name]
         assert required in reason.lower(), f"{name} ODBC skip must cite {required}: {reason}"
 
-    # Full-extras environment (only ODBC host packages missing): pin 45/2.
-    if not non_odbc_skips:
-        assert set(odbc_skips).issubset(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES)
-        assert len(constructed) == EXPECTED_REGISTERED_PLATFORM_COUNT - len(odbc_skips)
-        assert len(constructed) >= EXPECTED_REGISTERED_PLATFORM_COUNT - len(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES)
-        # When both ODBC adapters skip, the reviewed accounting is exactly 45/2.
-        if set(odbc_skips) == set(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES):
-            assert len(constructed) == 45
-            assert len(skipped) == 2
+    # Reviewed partitions: both ODBC skip (45/2) or neither (47/0). A single
+    # ODBC install is allowed but still must stay inside the allowlist.
+    if not skipped:
+        assert len(constructed) == EXPECTED_REGISTERED_PLATFORM_COUNT
+        assert len(skipped) == 0
+    elif set(skipped) == set(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES):
+        assert len(constructed) == 45
+        assert len(skipped) == 2
+    else:
+        assert set(skipped).issubset(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES)
+        assert len(constructed) == EXPECTED_REGISTERED_PLATFORM_COUNT - len(skipped)
 
 
 @pytest.mark.parametrize("platform_name", _registered_platform_names())
 def test_registered_adapter_result_payload_redacts_credential_sentinels(platform_name: str, tmp_path: Path) -> None:
     outcome = _construct_adapter_or_skip_reason(platform_name, tmp_path)
     if isinstance(outcome, str):
+        # Only ODBC allowlist names reach here; others fail in construct.
+        assert platform_name in OPTIONAL_ODBC_ADAPTER_DEPENDENCIES
         pytest.skip(outcome.removeprefix("skip:optional-dependency:").split(":", 1)[-1])
 
     adapter = outcome
@@ -403,9 +419,14 @@ def test_mcp_error_scrub_never_egress_credential_sentinels() -> None:
     for text in cases:
         result = make_execution_error(text, exception=Exception(text))
         blob = json.dumps(result)
-        assert _SWEEP_MCP_GATE not in blob, f"MCP error leaked sentinel for {text!r}: {blob}"
-        assert _SWEEP_MCP_GATE not in result["message"]
-        assert _SWEEP_MCP_GATE not in result["details"]["exception_message"]
+        # Failure messages name the assignment form only — never re-embed the
+        # full serialized response (which would re-materialize secrets in CI logs).
+        case_label = text.split("=", 1)[0]
+        assert _SWEEP_MCP_GATE not in blob, f"MCP error leaked sentinel for assignment form {case_label!r}"
+        assert _SWEEP_MCP_GATE not in result["message"], f"MCP message leaked sentinel for {case_label!r}"
+        assert _SWEEP_MCP_GATE not in result["details"]["exception_message"], (
+            f"MCP exception_message leaked sentinel for {case_label!r}"
+        )
         assert "****" in result["message"]
 
     # Benign diagnostic prose must remain readable (prose-precision contract).
@@ -417,24 +438,33 @@ def test_mcp_error_scrub_never_egress_credential_sentinels() -> None:
 def test_nested_tuning_companion_identifiers_never_egress(tmp_path: Path) -> None:
     """List-of-dicts FK companion shapes must not leak table/column identifiers.
 
-    The public anonymizer and the anonymized .tuning.json companion are the
-    durable chokepoints; private (anonymize=False) may retain identifiers for
-    local analysis, matching the exporter contract.
+    ``build_tuning_payload`` promotes top-level keys on ``tunings_applied``
+    (``foreign_keys``, ``primary_keys``, …) into ``requested.constraints``.
+    Nesting those under a ``constraints`` bag is ignored and would make the
+    export half of this gate vacuous — use the real shape and prove presence
+    both before and after anonymization.
     """
+    # Shape matching UnifiedTuningConfiguration.to_dict() / build_tuning_payload.
+    foreign_keys_block = {
+        "enabled": True,
+        "tables": [
+            {
+                "table": _SWEEP_TABLE_GATE,
+                "columns": [_SWEEP_COLUMN_GATE],
+                "referenced_table": _SWEEP_TABLE_GATE,
+                "referenced_columns": [_SWEEP_COLUMN_GATE],
+            }
+        ],
+    }
+    primary_keys_block = {
+        "enabled": True,
+        "tables": {_SWEEP_TABLE_GATE: [_SWEEP_COLUMN_GATE]},
+    }
     companion_payload = {
         "requested": {
             "constraints": {
-                "foreign_keys": {
-                    "enabled": True,
-                    "tables": [
-                        {
-                            "table": _SWEEP_TABLE_GATE,
-                            "columns": [_SWEEP_COLUMN_GATE],
-                            "referenced_table": _SWEEP_TABLE_GATE,
-                            "referenced_columns": [_SWEEP_COLUMN_GATE],
-                        }
-                    ],
-                },
+                "foreign_keys": foreign_keys_block,
+                "primary_keys": primary_keys_block,
                 "local_table": f"{_SWEEP_TABLE_GATE}/{_SWEEP_COLUMN_GATE}",
                 "references_table": _SWEEP_TABLE_GATE,
                 "references_column": _SWEEP_COLUMN_GATE,
@@ -454,8 +484,16 @@ def test_nested_tuning_companion_identifiers_never_egress(tmp_path: Path) -> Non
     assert constraints["local_table"].startswith("table_")
     assert constraints["references_table"].startswith("table_")
     assert constraints["references_column"].startswith("column_")
+    pk_tables = constraints["primary_keys"]["tables"]
+    pk_key = next(iter(pk_tables))
+    assert pk_key.startswith("table_")
+    assert pk_tables[pk_key][0].startswith("column_")
 
-    # Public export path: anonymized .tuning.json companion.
+    # Real export path: top-level constraint keys on tunings_applied.
+    tunings_applied = {
+        "foreign_keys": foreign_keys_block,
+        "primary_keys": primary_keys_block,
+    }
     result = BenchmarkResults(
         benchmark_name="synthetic",
         platform="synthetic",
@@ -466,12 +504,26 @@ def test_nested_tuning_companion_identifiers_never_egress(tmp_path: Path) -> Non
         total_queries=0,
         successful_queries=0,
         failed_queries=0,
-        tunings_applied={
-            "constraints": companion_payload["requested"]["constraints"],
-        },
+        tunings_applied=tunings_applied,
         tuning_source="wizard",
         tuning_source_file="examples/tunings/custom.yaml:0123456789abcdef",
     )
+
+    # Positive presence: private (unanonymized) companion retains the gates so
+    # the anonymized half cannot pass by emitting an empty/missing structure.
+    private_export = ResultExporter(output_dir=tmp_path / "private", anonymize=False).export_result(
+        result, formats=["json"]
+    )
+    private_tuning = tmp_path / "private" / f"{private_export['json'].stem}.tuning.json"
+    assert private_tuning.is_file(), "private export must emit .tuning.json when tunings_applied is set"
+    private_raw = private_tuning.read_text(encoding="utf-8")
+    private_payload = json.loads(private_raw)
+    assert "requested" in private_payload and "constraints" in private_payload["requested"]
+    assert "foreign_keys" in private_payload["requested"]["constraints"]
+    assert _SWEEP_TABLE_GATE in private_raw
+    assert _SWEEP_COLUMN_GATE in private_raw
+
+    # Public export path: anonymized .tuning.json companion.
     exported = ResultExporter(output_dir=tmp_path / "export", anonymize=True).export_result(result, formats=["json"])
     tuning_path = tmp_path / "export" / f"{exported['json'].stem}.tuning.json"
     assert tuning_path.is_file(), "anonymized export must emit .tuning.json when tunings_applied is set"
@@ -480,6 +532,17 @@ def test_nested_tuning_companion_identifiers_never_egress(tmp_path: Path) -> Non
     for gate in (_SWEEP_TABLE_GATE, _SWEEP_COLUMN_GATE):
         assert gate not in tuning_raw, f"anonymized .tuning.json leaked {gate}"
         assert gate not in primary_raw, f"anonymized primary JSON leaked {gate}"
+
+    public_payload = json.loads(tuning_raw)
+    public_constraints = public_payload["requested"]["constraints"]
+    public_fk = public_constraints["foreign_keys"]
+    assert public_fk["enabled"] is True
+    assert public_fk["tables"][0]["table"].startswith("table_")
+    assert public_fk["tables"][0]["columns"][0].startswith("column_")
+    public_pk_tables = public_constraints["primary_keys"]["tables"]
+    public_pk_key = next(iter(public_pk_tables))
+    assert public_pk_key.startswith("table_")
+    assert public_pk_tables[public_pk_key][0].startswith("column_")
 
 
 def test_cross_layer_sentinel_gate_is_green() -> None:
