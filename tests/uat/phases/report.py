@@ -49,7 +49,7 @@ from pathlib import Path
 from typing import Iterable, Protocol
 
 from tests.uat.phases import PhaseResult
-from tests.uat.runner import CellResult
+from tests.uat.runner import CellResult, SubmitTerminalState
 
 REPORT_HEADER = (
     "platform\tbenchmark\tscale\tstatus\tterminal_state\telapsed_s\tlog_path\tresult_path\t"
@@ -122,6 +122,17 @@ class ReportSummary(PhaseResult):
     # partial cells.jsonl must never read as a clean sweep, so this forces a
     # nonzero exit regardless of what the rows-so-far happen to say.
     unfinalized: bool = False
+    # Cells classified `unvalidated` (a completed run whose validation never
+    # executed -- DataFrame mode, --validation disabled): these are `passed`
+    # cells, already counted in `pass_count`/`attempted_count` above, NOT an
+    # additional disjoint bucket. This is a cross-cutting visibility counter
+    # only -- unlike unreachable_count/startup_failed_count it must never
+    # feed exit_code() below, since UAT must not treat unvalidated as a cell
+    # failure (unvalidated-results-misclassified-as-schema-violations). Its
+    # purpose is the opposite of hiding: keep a majority-unvalidated sweep
+    # (e.g. a DataFrame release-gate stage) visible in the roll-up rather
+    # than reading as an ordinary clean pass.
+    unvalidated_count: int = 0
 
     def exit_code(self) -> int:
         if self.aborted or self.unfinalized:
@@ -278,6 +289,13 @@ def write_report(
     unreachable_count = row_unreachable_count + skipped_unreachable_count
     total_defined_count = attempted_count + skipped_count + unreachable_count + startup_failed_count
     candidate_count = total_defined_count
+    # Cross-cutting, NOT one of the disjoint total_defined_count components
+    # above (an unvalidated cell is already `passed`, already counted in
+    # attempted_count/pass_count) -- see the ReportSummary.unvalidated_count
+    # field docstring for why this must stay out of exit_code().
+    unvalidated_count = sum(
+        1 for r in rows if r.status == "passed" and r.submit_terminal_state == SubmitTerminalState.unvalidated.value
+    )
 
     lines: list[str] = [REPORT_HEADER + "\n"]
     for cell in rows:
@@ -319,6 +337,15 @@ def write_report(
         )
     if startup_failed_count:
         lines.append(f"# STARTUP_FAILED_CELLS={startup_failed_count} release_gate_attention=required\n")
+    if unvalidated_count:
+        # Visible-by-construction: a reader scanning per-row
+        # submit_terminal_state values across 200 rows is not a safeguard,
+        # so a majority-unvalidated sweep (e.g. a DataFrame release-gate
+        # stage) still gets its own aggregate line, same as
+        # UNREACHABLE_CELLS/STARTUP_FAILED_CELLS -- even though, unlike
+        # those two, this does NOT affect exit_code() (see
+        # ReportSummary.unvalidated_count).
+        lines.append(f"# UNVALIDATED_CELLS={unvalidated_count} release_gate_attention=required\n")
     footer = f"# run_status={run_status}"
     if source_info is not None:
         footer += f" source_commit_sha={source_info.commit_sha} source_dirty={str(source_info.dirty).lower()}"
@@ -361,6 +388,7 @@ def write_report(
         aborted=run_status in {"ABORTED", "BLOCKED"},
         abort_reason=abort_reason,
         unfinalized=not finalized,
+        unvalidated_count=unvalidated_count,
     )
 
 

@@ -241,6 +241,16 @@ def _handle_report(args: argparse.Namespace) -> int:
                 "passed": summary.pass_count,
                 "failed": summary.fail_count,
                 "timed_out": summary.timeout_count,
+                # Cross-cutting, already included in "passed"/"attempted" above --
+                # not a disjoint bucket. Named to match ReportSummary.unvalidated_count
+                # and PhaseAccounting.unvalidated (unvalidated-results-misclassified-
+                # as-schema-violations): this JSON is the third machine-readable
+                # surface built from the same ReportSummary (matrix_summary.tsv's
+                # `# UNVALIDATED_CELLS=` footer and uat_gate_summary.json's
+                # accounting.unvalidated are the other two), and must not be the one
+                # that silently omits it while "passed" quietly includes never-
+                # validated cells with no adjacent disclosure.
+                "unvalidated": summary.unvalidated_count,
                 "finalized": finalized,
                 "cross_scale_clean_pairs": summary.cross_scale_clean_pairs,
                 "cross_scale_floor": summary.cross_scale_floor,

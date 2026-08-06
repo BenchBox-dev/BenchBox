@@ -345,10 +345,12 @@ To evaluate the design without provisioning a hosted service, the full G2
 scope was built as a spike against a **local SQLite file**:
 `_project/scripts/todo_db.py` (schema v1 + complete CLI) with
 `tests/unit/scripts/test_todo_db.py` (41 tests covering every enforced
-invariant). Database path: `<git root>/.todo-db/todo.sqlite` (gitignored);
-override with `--db` / `TODO_DB_PATH`. The implicit path is visibly a local
-fallback: reads emit an unmistakable stderr warning, while writes exit 2 until
-the operator explicitly selects `--db`, `TODO_DB_PATH`, or `TODO_DB_URL`.
+invariant). Database path: `<git root>/.todo-db/todo.sqlite` (gitignored operational
+state under `.todo-db/*`; credential-free `.todo-db/config.json` is tracked);
+override with `--db` / `TODO_DB_PATH` / `TODO_DB_URL` / config URL. The
+implicit path is visibly a local fallback: reads emit an unmistakable stderr
+warning, while writes exit 2 until a backend is selected (`--db`,
+`TODO_DB_PATH`, `TODO_DB_URL`, config discovery, or turso auto-provision).
 `init` remains available for fresh-clone bootstrap. Every invocation reports
 `local (<path>)` or `hosted` on stderr; hosted URLs and tokens are never
 printed.
@@ -411,8 +413,11 @@ historical archive deferrals).
 **Thin wrapper + UAT (2026-07-18, third round).** The wrapper was built
 TDD-first: `tests/unit/scripts/test_todo_wrapper.py` pins the contract
 (10 tests written red), then the implementation turned them green —
-`_project/scripts/todo` (7-line shim, works from any cwd, propagates gate
-exit codes) and `.claude/skills/todo-db/SKILL.md` (the thin skill). The
+`_project/scripts/todo` (shim resolves ROOT from its own path via
+`BASH_SOURCE`, not cwd/`git rev-parse --show-toplevel`, so an absolute
+path to another clone's shim still runs that clone's `todo_db.py`;
+propagates gate exit codes) and `.claude/skills/todo-db/SKILL.md` (the
+thin skill). The
 contract tests enforce thinness structurally: ≤40 non-empty body lines,
 every referenced `todo <cmd>` must exist in the CLI's handler table, the
 mandatory workflow verbs must be present, and schema/validation vocabulary
@@ -562,9 +567,14 @@ With G1 closed, `connect()` grew a second mode (PR #1219; hardened in
 PR #1222). Backend
 selection, first match wins: `--db` (a `libsql://`/`https://` value selects
 hosted) → `TODO_DB_PATH` (local file) → `TODO_DB_URL` (hosted; requires
-`TODO_DB_AUTH_TOKEN`) → default local path. `TODO_DB_PATH` deliberately
-outranks `TODO_DB_URL` so a test or tool that pins a local file can never be
-silently redirected at the shared database.
+`TODO_DB_AUTH_TOKEN`) → `.todo-db/config.json` URL discovery (credential-free
+hosted URL only; see "Session binding & token minting" below) → turso
+auto-provision (URL+token mint when a logged-in CLI is available) → default
+local path. `TODO_DB_PATH` deliberately outranks `TODO_DB_URL` so a test or
+tool that pins a local file can never be silently redirected at the shared
+database. A config-discovered URL is a *selected* hosted backend (not the
+implicit local fallback): mutating commands proceed to connect and surface
+auth failures rather than the implicit-local write refusal.
 
 The default-local final branch is a diagnostic/bootstrap seam, not a silent
 production substitute. Implicit reads remain available with a loud
@@ -572,6 +582,42 @@ production substitute. Implicit reads remain available with a loud
 writes fail before opening the database. Explicit local pins are warning-free,
 and hosted invocations identify only the backend kind so the DSN remains
 secret. `init` and non-mutating dry-runs are the deliberate exceptions.
+
+### Session binding & token minting
+
+Clones discover the production tracker without embedding secrets:
+
+1. **URL (non-secret, tracked).** `<git main root>/.todo-db/config.json`
+   holds only `{"url": "libsql://..."}`. The file is deliberately *not*
+   gitignored (see `.gitignore`: `.todo-db/*` with `!.todo-db/config.json`);
+   local DBs and the per-worktree `replica.db` remain ignored. Never put
+   tokens, cookies, or other credentials in this file — the loader refuses
+   known credential keys.
+2. **Token (secret, session-scoped).** Auth remains
+   `TODO_DB_AUTH_TOKEN` in the process environment. Mint a short-lived token
+   from a logged-in maintainer shell:
+
+   ```bash
+   turso auth login   # once per machine / when the CLI session expires
+   export TODO_DB_AUTH_TOKEN=$(turso db tokens create benchbox-todo --expiration 1d)
+   ```
+
+   Turso CLI accepts day-granularity expirations or `never`; sub-day values
+   like `30m` are rejected. Prefer 1d session tokens over long-lived ones.
+3. **Auto-provision (no config, no env).** When no `--db` / `TODO_DB_PATH` /
+   `TODO_DB_URL` / config URL is set and `turso` is on PATH and logged in,
+   `_try_turso_auto_provision` mints both URL and a 1d token in-process
+   (never written to disk or printed) and selects the hosted backend as
+   auto-provisioned. This is the zero-config path for a logged-in operator
+   on a machine that has not yet pulled `config.json`.
+4. **Precedence reminder.** Config supplies the URL the way `TODO_DB_URL`
+   would; it does **not** mint a token. A selected hosted backend with a
+   missing token fails at connect / `doctor` auth (exit 4), never by silently
+   writing to a local scratch DB.
+
+Credentials never land in the repo, in stderr backend banners, or in
+`doctor` output. Hosted reports only `todo backend: hosted` (or
+`hosted (auto-provisioned via turso CLI)`).
 
 Hosted mode uses the `libsql` Python client (0.1.11) with a **per-worktree
 embedded replica** at `<git root>/.todo-db/replica.db` (override:
@@ -833,16 +879,24 @@ TODO tree from an untrusted source would plant shell commands; do not.
     (`turso db tokens create benchbox-todo`), never stored or echoed.
     **Local auto-provisioning now exists** (`_project/scripts/todo_db.py`,
     `_resolve_backend`/`_try_turso_auto_provision`): when none of --db,
-    `TODO_DB_PATH`, or `TODO_DB_URL` is set, the CLI shells out to the
-    logged-in `turso` CLI itself (`turso db show <name> --url` +
-    `turso db tokens create <name> --expiration 1d` (Turso CLI requires
-    day granularity or ``never``; sub-day values are rejected), db name from
-    `TODO_DB_TURSO_DB`, default `benchbox-todo`) and uses the hosted
-    backend transparently, falling back to the local implicit DB (with a
-    refusal-on-write pointing at `turso auth login` /
-    `TODO_DB_URL`+`TODO_DB_AUTH_TOKEN` / `--db`/`TODO_DB_PATH`) if turso is
-    absent, not logged in, or the mint fails. This closes the former open
-    provisioning item without requiring the two variables in local `.env`.
+    `TODO_DB_PATH`, `TODO_DB_URL`, or a `.todo-db/config.json` URL is set,
+    the CLI shells out to the logged-in `turso` CLI itself
+    (`turso db show <name> --url` + `turso db tokens create <name>
+    --expiration 1d` (Turso CLI requires day granularity or ``never``;
+    sub-day values are rejected), db name from `TODO_DB_TURSO_DB`, default
+    `benchbox-todo`) and uses the hosted backend transparently, falling
+    back to the local implicit DB (with a refusal-on-write pointing at
+    `turso auth login` / `TODO_DB_URL`+`TODO_DB_AUTH_TOKEN` /
+    `--db`/`TODO_DB_PATH`/config) if turso is absent, not logged in, or the
+    mint fails. When turso is on PATH but mint fails, a short reason class
+    (`db-show-failed`, `token-create-failed`, etc. — never stderr/URL/token)
+    is surfaced via stderr WARN, the doctor `turso-provision` check, and the
+    write-refusal message, so the fallthrough is not silent. Tracked
+    credential-free config discovery (`.todo-db/config.json` with URL only)
+    is the clone-default path for selecting the production hosted URL;
+    session tokens still mint as above or via `TODO_DB_AUTH_TOKEN`. This
+    closes the former open provisioning item without requiring the two
+    variables in local `.env`.
 - **G2 — CLI MVP:** schema DDL + `create/show/claim/start/done/defer/
   promote/dismiss/complete/ready/list/stats/export` + tests. No repo changes
   to the YAML system yet.

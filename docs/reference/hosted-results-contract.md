@@ -65,20 +65,29 @@ idempotent with respect to content.
 #### `public_result_id`
 
 A stable, human-readable permalink slug that identifies a result in the public
-corpus.
+corpus. In the explorer publication pipeline this is the same value as
+`result_id` on manifest entries and published bundle filenames.
 
 | Property | Value |
 |---|---|
-| Format | `{benchmark}-{platform}-sf{scale_factor}-{date}` (e.g., `tpch-duckdb-sf1-20260315`) |
-| Stability | Permanent once minted. Never reused for a different result. |
-| Uniqueness | Unique within the public corpus. Conflicts are resolved by the minting service (not the submitter) appending `-{n}`, where `n` starts at 2 and increments monotonically (e.g., `-2`, `-3`). |
-| Minting | Phase 1: on commit to `results-data/`. Phase 2+: after validation passes. |
+| Format | `{benchmark}-{platform}-sf{scale_factor}-{yyyymmdd}-{sha8}` (e.g., `tpch-duckdb-sf1.0-20260315-a1b2c3d4`) |
+| `sha8` | First 8 hex characters of `sha256(published_bundle_bytes)`. Published bytes are the anonymized, canonical-JSON payload written to `bundles/{public_result_id}.json` — not the raw private capture. |
+| Stability | Permanent once minted for a given set of published bytes. Same published bytes always re-derive the same id. Permanence attaches at **publication** (content address of public artifact), not at local run capture. See `docs/development/adr/adr-public-result-id-permanence.md`. |
+| Uniqueness | Unique within the public corpus. Identical published digests under the same id are idempotent (publish once). Distinct published content that collides on the same id fails the build closed (`DuplicateResultIdError`); the Phase 1 pipeline does **not** append `-{n}`. |
+| Minting | Phase 1: by the explorer static pipeline when projecting `results-data/` into the public corpus. Phase 2+: after validation passes, using the same format over the published payload. |
 | Phase introduced | Phase 1 |
-| Used for | Stable URLs (`/results/r/{public_result_id}`), manifest index, compare links |
+| Used for | Stable URLs (`/results/r/{public_result_id}`), manifest index, compare links, `bundles/{public_result_id}.json` |
 
 The `public_result_id` is the only identifier that is stable across all phases
 and safe to use in external links. CLI tools and frontend must use this identifier
 for any URL or reference intended to be shared or bookmarked.
+
+**Pre-deploy alias note:** Before the first public Explorer deploy, no
+alias/redirect table is required for format or corpus rotations (documentation
+previously omitted `sha8`, but code has always minted it; no external product
+links used the wrong format). After first public deploy, any id-changing
+re-derivation of already-public published bytes needs an explicit
+compatibility mechanism — see the ADR.
 
 #### Identifier Summary
 
@@ -721,8 +730,11 @@ The frontend enforces cohort rules before rendering:
 The following questions are explicitly deferred to Phase 3 design and are not
 resolved by this contract:
 
-- **`public_result_id` collision resolution:** Algorithm and concurrency strategy
-  when two submissions produce the same deterministic ID.
+- **`public_result_id` collision resolution (Phase 3 only):** Concurrent mint
+  strategy when two API submissions race to the same content-addressed id.
+  Phase 1 static publication already fails closed on distinct content and
+  skips identical content (see §1.1 and
+  `docs/development/adr/adr-public-result-id-permanence.md`).
 - **Idempotency semantics:** Re-submitting a bundle that is already in
   `pending` or `validated` state - return `200 OK` or `409 Conflict`?
 - **Cross-visibility cohort comparisons:** Whether results in different

@@ -561,6 +561,87 @@ def compose_up_command(
     return argv
 
 
+def compose_ps_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
+    """Build `docker compose ps` argv for a UAT-owned platform project.
+
+    Post-start readiness check (uat-container-readiness-and-memory-headroom-gate
+    w0): `up --wait` exiting 0 only proves the container reported
+    started/healthy at that instant -- live-observed 2026-08-04, mocker
+    reported CedarDB Started and `mocker compose ps` showed it Exited ~29s
+    later. Deliberately NOT `--format json`: mocker's `--format json` output
+    is non-Docker-compatible for several inventory verbs (see
+    `list_mocker_volumes_matching`'s docstring and docker_cleanup.py's
+    `--format json` note), so the readiness check greps the STATUS column of
+    the default table output instead (`compose_ps_unhealthy_services`).
+    """
+    argv = _compose_base_command(spec, project_name)
+    argv.append("ps")
+    return argv
+
+
+# `compose ps`'s default table STATUS column renders e.g. "Up 5 seconds",
+# "Exited (1) 2 seconds ago", "Restarting (1) 3 seconds ago". Matched as a
+# whole word so a service/container NAME that happens to contain "Exited" (or
+# similar) in the first column cannot false-positive.
+_UNHEALTHY_PS_STATE_RE = re.compile(r"\b(?:Exited|Restarting)\b")
+
+
+def compose_ps_unhealthy_services(ps_stdout: str) -> tuple[str, ...]:
+    """Return the leading (name) column of every `compose ps` row whose STATUS is Exited or Restarting.
+
+    Empty stdout, a header-only table, or a table with only "Up ..." rows
+    all return `()` -- readiness passes. Best-effort text parsing (not a
+    strict table parser): a malformed or unexpected `compose ps` layout
+    that never mentions Exited/Restarting simply reports no unhealthy
+    services rather than raising.
+    """
+    unhealthy: list[str] = []
+    for line in ps_stdout.splitlines():
+        if not _UNHEALTHY_PS_STATE_RE.search(line):
+            continue
+        columns = line.split()
+        if columns:
+            unhealthy.append(columns[0])
+    return tuple(unhealthy)
+
+
+def compose_declared_memory_limits(spec: DockerPlatformSpec) -> dict[str, str]:
+    """Return {service: declared-memory-limit} for services with an explicit compose memory cap.
+
+    Reads `mem_limit` or `deploy.resources.limits.memory` straight from the
+    compose YAML -- static configuration, not a live container inspect (mocker
+    and docker do not expose a portable "runtime cgroup limit" query). Most
+    UAT compose files declare no limit at all (e.g.
+    docker/cedardb/docker-compose.yml): the 2026-08-04 postmortem's "Running
+    under cgroup memory limit: 1024 MB" for CedarDB was the CONTAINER ENGINE's
+    own default sizing, not anything this repo's compose files requested --
+    logged as "no declared memory limit (engine default)" by callers in that
+    case (see execute.py's per-platform-boundary memory gate logging, w3).
+    """
+    limits: dict[str, str] = {}
+    for compose_file in spec.compose_files:
+        try:
+            data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            continue
+        services = data.get("services") if isinstance(data, dict) else None
+        if not isinstance(services, dict):
+            continue
+        for name, service in services.items():
+            if not isinstance(service, dict):
+                continue
+            mem_limit = service.get("mem_limit")
+            if mem_limit:
+                limits[str(name)] = str(mem_limit)
+                continue
+            deploy = service.get("deploy")
+            resources = deploy.get("resources") if isinstance(deploy, dict) else None
+            declared = resources.get("limits", {}).get("memory") if isinstance(resources, dict) else None
+            if declared:
+                limits[str(name)] = str(declared)
+    return limits
+
+
 def compose_pull_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
     """Build `docker compose pull --ignore-buildable` argv for a UAT-owned
     platform project (uat-operator-provisioning w4).

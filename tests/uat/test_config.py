@@ -44,8 +44,11 @@ def test_validate_config_minimal():
     assert cfg.execute.parallel_platforms is False
     assert cfg.output.benchmark_runs_dir_template == "~/Developer/benchmark_runs"
     assert cfg.preflight.free_space_min_gib == 5.0
+    assert cfg.preflight.free_memory_min_gib == 2.0
+    assert cfg.memory_gate_enabled is True
     assert cfg.cleanup.docker_manage_platforms is False
     assert cfg.cleanup.docker_platform_switch == "off"
+    assert cfg.cleanup.docker_settle_s == 10
     assert cfg.platforms.groups is None
     assert cfg.benchmarks.groups is None
     assert cfg.scales.rungs == (0.01,)
@@ -137,6 +140,43 @@ def test_validate_config_accepts_managed_docker_cleanup_contract():
     assert cfg.cleanup.docker_platform_switch == "volumes"
     assert cfg.cleanup.docker_project_prefix == "benchbox-uat-test"
     assert cfg.cleanup.docker_start_timeout_s == 42
+
+
+def test_validate_config_accepts_docker_settle_s():
+    cfg = config.validate_config({"name": "smoke", "cleanup": {"docker_settle_s": 5}})
+    assert cfg.cleanup.docker_settle_s == 5
+
+
+def test_validate_config_rejects_zero_docker_settle_s():
+    with pytest.raises(config.ConfigError, match="docker_settle_s"):
+        config.validate_config({"name": "smoke", "cleanup": {"docker_settle_s": 0}})
+
+
+def test_validate_config_accepts_free_memory_min_gib():
+    cfg = config.validate_config({"name": "smoke", "preflight": {"free_memory_min_gib": 4.5}})
+    assert cfg.preflight.free_memory_min_gib == 4.5
+    assert cfg.memory_gate_enabled is True
+
+
+def test_validate_config_free_memory_min_gib_zero_disables_gate():
+    """Mirrors free_space_min_gib: 0 -- the same 0-disables convention (must_preserve)."""
+    cfg = config.validate_config({"name": "smoke", "preflight": {"free_memory_min_gib": 0}})
+    assert cfg.preflight.free_memory_min_gib == 0.0
+    assert cfg.memory_gate_enabled is False
+    warning = config.memory_gate_disabled_warning(cfg)
+    assert warning is not None
+    assert warning.startswith(config.MEMORY_GATE_DISABLED_WARNING_PREFIX)
+    assert "free_memory_min_gib=0" in warning
+
+
+def test_validate_config_memory_gate_disabled_warning_is_none_when_enabled():
+    cfg = config.validate_config({"name": "smoke"})
+    assert config.memory_gate_disabled_warning(cfg) is None
+
+
+def test_validate_config_rejects_negative_free_memory_min_gib():
+    with pytest.raises(config.ConfigError, match="free_memory_min_gib"):
+        config.validate_config({"name": "smoke", "preflight": {"free_memory_min_gib": -1}})
 
 
 @pytest.mark.parametrize(

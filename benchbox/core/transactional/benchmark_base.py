@@ -327,19 +327,66 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
     #: produced. Keyed by ``benchmark`` so transaction_primitives and
     #: write_primitives sharing one physical database do not clobber each
     #: other's row.
-    _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest"
+    #:
+    #: The ``_v2`` generation is load-bearing, not cosmetic. The first release
+    #: of this manifest wrote a row unconditionally at the end of ``setup()``,
+    #: including on the path that skipped repopulation because the staging
+    #: tables were already non-empty. Those rows are *internally consistent* --
+    #: correct scale, correct spec version, and a digest of the live source
+    #: tables -- while the staging data they describe is stale. Reusing the
+    #: original table name would therefore match them, ``is_setup()`` would
+    #: short-circuit, and every database that generation already mis-certified
+    #: would stay silently wrong forever. A new name makes them unmatchable, so
+    #: those databases take the missing-manifest path and rebuild once.
+    _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest_v2"
+
+    #: Superseded manifest table, dropped on rebuild so a database does not
+    #: carry a stale generation's rows around indefinitely. Never read.
+    _LEGACY_STAGING_MANIFEST_TABLES: tuple[str, ...] = ("benchbox_staging_manifest",)
 
     def _quote_identifier(self, identifier: str) -> str:
         """Quote a SQL identifier. Subclasses override for dialect-specific quoting."""
         return quote_identifier(identifier)
 
+    def _drop_legacy_staging_manifests(self, connection: DatabaseConnection) -> None:
+        """Remove superseded manifest generations during a rebuild.
+
+        Best-effort: a failure here leaves harmless cruft, never an incorrect
+        reuse decision, because the superseded names are never read.
+        """
+        for legacy in self._LEGACY_STAGING_MANIFEST_TABLES:
+            try:
+                connection.execute(f"DROP TABLE IF EXISTS {self._quote_identifier(legacy)}")
+            except Exception:  # noqa: BLE001 - cleanup only; never fail setup over cruft
+                pass
+
     def _staging_provenance_key(self) -> tuple[str, str, str]:
-        """Return ``(benchmark_id, scale, spec_version)`` identifying this run's staging provenance."""
+        """Return ``(benchmark_id, scale, spec_version)`` identifying this run's staging provenance.
+
+        ``scale`` is normalised through ``float`` so a benchmark constructed
+        with ``scale_factor=1`` and one constructed with ``scale_factor=1.0``
+        agree. Without it the two stringify differently ("1" vs "1.0"), never
+        match each other's manifest, and each pays a full staging rebuild.
+        """
         benchmark_id = getattr(self, "_benchmark_label", self.__class__.__name__)
-        return str(benchmark_id), str(self.scale_factor), str(getattr(self, "_version", "unknown"))
+        try:
+            scale = str(float(self.scale_factor))
+        except (TypeError, ValueError):
+            scale = str(self.scale_factor)
+        return str(benchmark_id), scale, str(getattr(self, "_version", "unknown"))
 
     def _staging_source_digest(self, connection: DatabaseConnection, source_tables: list[str]) -> str:
         """Fingerprint the live TPC-H source tables backing this benchmark's staging data.
+
+        INVARIANT: no benchmark operation may mutate ``source_tables``. Both
+        operation catalogues read orders/lineitem/customer and write only to
+        their own staging tables, which is what keeps the digest stable for the
+        duration of a run. ``is_setup()`` legitimately goes False mid-run when
+        an operation empties a staging table it gates on; the manifest still
+        matching at that moment is what limits the response to repopulating
+        that one table. Add an operation that writes to a source table and
+        every subsequent operation instead pays a full drop-and-repopulate of
+        the whole staging set.
 
         Hashes ordered ``table:row_count`` pairs so a manifest written against
         one data volume cannot match a differently-provisioned database even

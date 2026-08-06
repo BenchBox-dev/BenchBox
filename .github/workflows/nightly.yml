@@ -739,7 +739,9 @@ jobs:
     # `conclusion: success` while the PR's own `auto_merge` field never ends
     # up populated (see the script's "Known timing behavior" note). This job
     # does NOT modify auto-merge-on-open.yml and does NOT enable auto-merge
-    # itself -- it only alerts via one marker-tagged tracking issue. See
+    # itself -- `--apply` only upserts one marker-tagged tracking issue. It
+    # must never re-arm a hold it did not set (draft or `no-auto-merge`
+    # label); the sweep classifies those as intentional, not stranded. See
     # docs/operations/pr-triage.md.
     runs-on: ubuntu-latest
     timeout-minutes: 10
