@@ -88,32 +88,42 @@ a PR's mergeability — both only alert.
   waiting on the owner's manual review and merge.
 - **Green-unmerged nightly sweep**
   (`_project/scripts/green_unmerged_sweep.py`,
-  `.github/workflows/nightly.yml`) — alerts on non-draft, non-soundness,
-  non-hold-label PRs whose required lane is green but auto-merge is still
-  off for more than 2 hours after the head commit. `--apply` only upserts
-  the digest issue; it **never** enables auto-merge and must not re-arm a
-  hold it did not set.
+  `.github/workflows/nightly.yml`) — alerts only on **true stranding**:
+  non-draft, non-soundness, non-hold-label PRs whose required lane is green,
+  auto-merge is still off more than 2 hours after the head commit, **and**
+  the PR timeline shows prior arm intent that was lost. `--apply` only
+  upserts the digest issue; it **never** enables auto-merge and must not
+  re-arm a hold it did not set.
 
   After the auto-merge hold, **an intentional non-armed green PR is normal**,
-  not a stuck state. Auto-merge is **not** armed by `opened`, `reopened`, or
-  `synchronize` (a re-push will not flip it on). The only intentional arm
-  signals are:
+  not a stuck state, and the sweep **excludes** it. Auto-merge is **not**
+  armed by `opened`, `reopened`, or `synchronize` (a re-push will not flip it
+  on). The only intentional arm signals are:
 
   - `make pr-ready` (or `make pr-arm-auto-merge`) on a finished branch
   - `make pr-open READY=1` to open and arm in one step
   - draft → ready (`ready_for_review` in `auto-merge-on-open.yml`), and only
     when the PR does **not** carry the `no-auto-merge` label
 
+  **Classifier (arm intent):** a PR is stranded only when auto-merge is off
+  *and* the issue/PR timeline includes at least one of
+  `ready_for_review`, `auto_squash_enabled` / `auto_merge_enabled`, or
+  `auto_merge_disabled` (the last implies a prior enable that was dropped).
+  Never-armed intentional holds never emit those events. Missing timeline
+  data fail-closes to "no arm intent" (prefer a missed strand over
+  false-positiveing holds). Durable holds (draft or `no-auto-merge`) are
+  also excluded even if the timeline still shows older arm events.
+  `--apply` only upserts the digest issue from the stranded set; it never
+  enables auto-merge and therefore cannot re-arm holds.
+
   Do **not** remediate a green-unmerged alert by re-pushing "to re-trigger
-  synchronize." That path no longer enables auto-merge. If the branch is
-  final, arm it; if work continues, leave auto-merge off (or apply a durable
-  hold — see below).
+  synchronize." That path no longer enables auto-merge. When the branch is
+  final, arm via `make pr-ready` / `READY=1` / draft → ready; if work
+  continues, leave auto-merge off (or apply a durable hold — see below).
 
   A green `enable`-job run is also not proof the PR's `auto_merge` field is
-  set — the sweep re-reads the PR field rather than trusting the workflow
-  conclusion. Default non-armed greens that were never intended to arm can
-  still appear as sweep hits until a broader intentional-hold classifier
-  lands; treat those as triage signals, not proof of a broken arm path.
+  set — the sweep re-reads the PR field (and the timeline) rather than
+  trusting the workflow conclusion.
 
 ## Durable auto-merge holds
 
@@ -125,6 +135,7 @@ honour these durable holds (and neither re-arms on push or nightly `--apply`):
 | --- | --- | --- |
 | **Draft** | `auto-merge-on-open.yml` (job skip), green-unmerged sweep | Not ready; no arm, not stranded |
 | **Label `no-auto-merge`** | `auto-merge-on-open.yml` (enable blocked + disable on apply/`labeled`), green-unmerged sweep | Non-draft intentional hold; revoke any enabled auto-merge; not stranded |
+| **Never armed** | green-unmerged sweep (timeline arm-intent classifier) | Green + auto-merge OFF with no prior arm events is normal after the post-#1592 policy; not stranded |
 
 Use draft while the branch is incomplete. Use `no-auto-merge` when the PR
 should stay non-draft (CI/review as ready) but must not auto-merge — for
