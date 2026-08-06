@@ -134,7 +134,7 @@ tests/uat/
 | `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 | 123 |
 | `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 | 121 |
 | `compatibility.py` | Platform/benchmark compatibility rules; record compatibility-pruned cells with rule metadata | — | 198 |
-| `docker_assets.py` | Single connection registry: compose-file map, compose-derived host ports + platform options, safe project-scoped compose commands | 180 | 934 |
+| `docker_assets.py` | Single connection registry: compose-file map, compose-derived host ports + platform options, safe project-scoped compose commands | 180 | 966 |
 | `docker_cleanup.py` | Docker stack teardown at platform boundaries; project-scoped down/volume handling | — | 426 |
 | `container_cleanup.py` | Apple `container`-engine sibling of `docker_cleanup.py`; backs `make uat-docker-cleanup ENGINE=container` | — | 557 |
 | `artifact_hygiene.py` | Local-artifact hygiene guard: flags worktree-local `benchmark_runs/` growth whenever the resolved output root is outside the worktree — including the default `../benchmark_runs`, not only a configured one; report-only (`make uat-artifact-hygiene`) | — | 315 |
@@ -178,14 +178,14 @@ remain hand-tracked.
 - plumbing (orchestrator/config/`_cli`): 2,547
 - core exercise (execute/matrix/runner/enumerate/cleanup/ladder): 2,642
 - preflight/compat/timeouts: 1,107
-- Docker lifecycle (default-OFF, incl. `container_cleanup.py`): 1,917
+- Docker lifecycle (default-OFF, incl. `container_cleanup.py`): 1,949
 - chartered evidence artifacts (validate/report/package/cells_io/gate_summary): 1,722
 - explorer-prep: 387
 - throughput: 316
 - artifact hygiene: 315
 - package init markers: 23
 
-**Total: 10,976 production LOC across 26 modules.**
+**Total: 11,008 production LOC across 26 modules.**
 
 <!-- UAT-LOC-SUMMARY:END -->
 

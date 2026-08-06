@@ -43,7 +43,14 @@ DOCKER_FIXED_CONTAINER_NAME_POLICIES: tuple[str, ...] = ("fail", "override", "al
 # leftovers -- they keep holding host ports until removed separately. They
 # remain recoverable: `docker_cleanup.py`'s recovery inventory matches by the
 # `benchbox-uat` *prefix*, which this rename preserves (only the tail after
-# the prefix is truncated differently). See "Compose project naming and the
+# the prefix is truncated differently). This overflow is mocker-only, so
+# every affected operator is on macOS/mocker, where the default
+# `ENGINE=docker` cleanup pass alone is NOT sufficient: it degrades to
+# named-volumes-only inventory and reports no orphaned containers, leaving
+# them holding host ports for the next sweep to collide on. Recovery needs
+# BOTH `ENGINE=container APPLY=1` (containers/networks/images) and the
+# default `ENGINE=docker APPLY=1` pass (mocker-managed named volumes, which
+# `ENGINE=container` cannot see). See "Compose project naming and the
 # container-id limit" in docs/operations/uat-framework.md for the operator
 # recovery step.
 _CONTAINER_NAME_MAX_LEN = 64
@@ -539,9 +546,34 @@ def compose_project_name(
     return name
 
 
+def validate_project_name_budget(spec: DockerPlatformSpec, project_name: str) -> None:
+    """Raise DockerAssetError if `project_name` would overflow `spec.platform`'s container-id budget.
+
+    `compose_project_name()` always returns a name within budget, but an
+    operator-supplied project name (e.g. `--project-name` on
+    `scripts/uat-bring-up/uat_bring_up.py`) never goes through it, so it can
+    carry an arbitrary length. `_compose_base_command` calls this on every
+    UAT-managed compose verb (up/pull/build/down/ps) so the budget is enforced
+    at one chokepoint regardless of caller; a caller that accepts an operator-
+    supplied project name up front can also call this directly for a clear,
+    actionable error before any Docker command runs, instead of an oversized-
+    container-id failure well into `compose up`/`pull`/`build`
+    (uat-compose-project-name-budget-review-20260806 finding 4).
+    """
+    budget = _project_name_budget(spec.platform)
+    if len(project_name) > budget:
+        raise DockerAssetError(
+            f"Docker compose project name {project_name!r} is {len(project_name)} chars, "
+            f"which exceeds the {budget}-char budget for platform {spec.platform!r} "
+            "(derived from the 64-char container-id limit minus the longest started "
+            "service name and replica-suffix headroom; see compose_project_name())."
+        )
+
+
 def _compose_base_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
     if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project_name):
         raise DockerAssetError(f"Unsafe Docker compose project name {project_name!r}")
+    validate_project_name_budget(spec, project_name)
     argv = [resolve_container_cli(), "compose", "-p", project_name]
     for compose_file in spec.compose_files:
         argv.extend(["-f", str(compose_file)])

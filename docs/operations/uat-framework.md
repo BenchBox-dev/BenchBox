@@ -275,17 +275,28 @@ pre-upgrade sweep are registered under the OLD, longer project name, so the
 first post-upgrade sweep's teardown will not match and stop them, and they
 keep holding their host ports. They are not lost -- `make uat-docker-cleanup`
 inventories by the `benchbox-uat` project-label *prefix* (see above), which
-every generation of this name has always shared, old and new alike. After
-upgrading, run the recovery command once to catch any pre-upgrade
-leftovers:
+every generation of this name has always shared, old and new alike. Every
+affected operator is on macOS/mocker (this overflow is mocker-only), so the
+default `ENGINE=docker` pass alone is NOT sufficient: as "Container engine
+resolution" above explains, that mode's inventory listing degrades to
+named-volumes-only when the resolved engine is mocker and reports no
+containers at all -- an operator who runs only that pass sees a clean
+"applied" report while the orphaned containers keep holding ports (5432,
+8080, 9000, ...), and the next sweep's `compose up --wait` then fails on a
+port conflict, the exact symptom this note exists to prevent. After
+upgrading, run BOTH passes once to catch any pre-upgrade leftovers:
 
 ```bash
+make uat-docker-cleanup ENGINE=container APPLY=1
 make uat-docker-cleanup APPLY=1
 ```
 
-This removes only `benchbox-uat`-prefixed resources (containers, then their
-volumes/networks/images) and leaves everything else for manual review, per
-the recovery command's normal `APPLY=1` semantics above.
+The first pass (`ENGINE=container`) removes containers, networks, and
+images via the native `container` CLI. The second (default `ENGINE=docker`)
+pass sweeps mocker-managed named volumes, which `ENGINE=container` cannot
+see. Together they remove only `benchbox-uat`-prefixed resources and leave
+everything else for manual review, per the recovery command's normal
+`APPLY=1` semantics above.
 
 ### Mocker validation status
 
