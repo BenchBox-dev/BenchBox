@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lockedAt": "2026-08-05T23:53:01.556Z",
+  "lockedAt": "2026-08-06T17:17:38.593Z",
   "skills": {
     "blog": {
       "source": {
@@ -319,52 +319,6 @@
         "skill.yaml": {
           "sha256": "187c448569159314ce05ce063ab529bf4509cae7faa37ce7fab57b4d306360c9",
           "size": 224
-        }
-      }
-    },
-    "todo-db": {
-      "source": {
-        "type": "git",
-        "name": "canonical",
-        "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "76ef27b0e5567e14e130b60251c9e03f8fbefbdf",
-        "subdir": "skills",
-        "revision": "76ef27b0e5567e14e130b60251c9e03f8fbefbdf",
-        "fetchedAt": "2026-08-05T23:52:50.534Z"
-      },
-      "installMode": "mirror",
-      "files": {
-        "references/batch.md": {
-          "sha256": "aab379390eff63baded2f815c5fd8579dea9c42a0980ad6484ce788c3a786423",
-          "size": 7387
-        },
-        "references/bootstrap.md": {
-          "sha256": "32e63add6eeb9a867e21c35edf6860fd11723815efd79df10b082ee5b0197ac9",
-          "size": 3691
-        },
-        "references/implement.md": {
-          "sha256": "6fc17f784136f6ae179742379855513792cafcb084feaeb5db73274b3fc22f60",
-          "size": 1777
-        },
-        "references/prioritize.md": {
-          "sha256": "8924375eb6ff92dbbefc94473bd7df0e4246c0608bbf8abd2961508f01cd94f7",
-          "size": 6980
-        },
-        "references/queries.md": {
-          "sha256": "cc115cd912588f0c719c9a841b10174a2904375287ce3887edbb0a3b3346e7c2",
-          "size": 1219
-        },
-        "references/review.md": {
-          "sha256": "716b75c1d896f01219d0d10a00192732d61f471d7f1ea5cbdb837f0a22339013",
-          "size": 318
-        },
-        "SKILL.md": {
-          "sha256": "6a90a828bbc122d9bcd4e39feccc90d0d5adef48ee02e18eaac8b0d2f952b9d6",
-          "size": 3169
-        },
-        "skill.yaml": {
-          "sha256": "dabb671a004d7be8e23058695385b853508416ac7b4e2a66ffaeaffd74a64519",
-          "size": 427
         }
       }
     },
