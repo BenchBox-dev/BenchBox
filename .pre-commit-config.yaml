@@ -30,12 +30,12 @@ repos:
         files: ^uv\.lock$
 
       - id: uat-loc-table
-        name: UAT spec LOC table drift check
+        name: UAT production-LOC ceiling gate
         entry: uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check
         language: system
         pass_filenames: false
         stages: [pre-commit]
-        files: ^(tests/uat/.*\.py|_project/specs/uat-framework\.md|_project/scripts/uat_loc_table\.py)$
+        files: ^(tests/uat/.*\.py|_project/specs/uat-framework\.md|_project/specs/uat-loc-budget\.json|_project/scripts/uat_loc_table\.py)$
 
       # Fast (<1s) allowlist-only scan. Runs on every commit.
       # The pytest-collection fast-lane checks moved to `timing-policy-fast-lane`
