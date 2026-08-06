@@ -1,11 +1,12 @@
 """Tests for turso auto-provisioning of the hosted backend.
 
 `_project/scripts/todo_db.py` resolves its backend with precedence
---db > TODO_DB_PATH > TODO_DB_URL > implicit local fallback. When none of the
-three explicit knobs are set, it now attempts to auto-provision a hosted
-backend via the maintainer's already-logged-in `turso` CLI before falling
-back to the local scratch database (see `_try_turso_auto_provision` and
-`_resolve_backend`). These tests pin:
+--db > TODO_DB_PATH > TODO_DB_URL > .todo-db/config.json > turso
+auto-provision > implicit local fallback. When none of the path/URL knobs
+(including credential-free config discovery) yield a backend, it attempts to
+auto-provision a hosted backend via the maintainer's already-logged-in
+`turso` CLI before falling back to the local scratch database (see
+`_try_turso_auto_provision` and `_resolve_backend`). These tests pin:
 
   - success mints a URL + token and selects the hosted backend transparently;
   - any failure (turso absent, mint failure) falls through to the existing
@@ -14,8 +15,11 @@ back to the local scratch database (see `_try_turso_auto_provision` and
   - when turso is on PATH but mint fails, a distinct provision_failure reason
     class is surfaced (WARN / doctor check / write-refusal) without secrets;
   - auto-provisioning is never attempted when an explicit backend
-    (--db/TODO_DB_PATH/TODO_DB_URL) is configured;
+    (--db/TODO_DB_PATH/TODO_DB_URL) or config.json URL is configured;
   - the minted token and URL are never printed, including through `doctor`.
+
+Hermetic note: success paths pin `git_main_root` to an empty tmp dir so a
+tracked repo `config.json` cannot short-circuit auto-provision.
 
 The repo-wide `conftest.py` autouse fixture forces `shutil.which("turso")` to
 report absent by default, so these tests must explicitly opt back in via
@@ -79,8 +83,10 @@ def _clear_backend_env(monkeypatch):
 
 
 class TestAutoProvisionSuccess:
-    def test_success_selects_hosted_backend_and_propagates_env(self, monkeypatch):
+    def test_success_selects_hosted_backend_and_propagates_env(self, monkeypatch, tmp_path):
         _clear_backend_env(monkeypatch)
+        # Empty main root: no config.json short-circuiting auto-provision.
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
         monkeypatch.setattr(todo_db.shutil, "which", lambda name: "/usr/bin/turso" if name == "turso" else None)
         fake_run, calls = _make_fake_turso_run()
         monkeypatch.setattr(todo_db.subprocess, "run", fake_run)
@@ -99,8 +105,9 @@ class TestAutoProvisionSuccess:
         assert ["turso", "db", "show", "benchbox-todo", "--url"] in calls
         assert ["turso", "db", "tokens", "create", "benchbox-todo", "--expiration", "1d"] in calls
 
-    def test_custom_db_name_from_env(self, monkeypatch):
+    def test_custom_db_name_from_env(self, monkeypatch, tmp_path):
         _clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
         monkeypatch.setenv("TODO_DB_TURSO_DB", "my-custom-db")
         monkeypatch.setattr(todo_db.shutil, "which", lambda name: "/usr/bin/turso" if name == "turso" else None)
         fake_run, calls = _make_fake_turso_run(db_name="my-custom-db")
@@ -285,8 +292,9 @@ class TestAutoProvisionNeverInvokedWithExplicitBackend:
 
 
 class TestDoctorRedactsAutoProvisionedSecrets:
-    def test_doctor_never_prints_the_auto_provisioned_url_or_token(self, monkeypatch, capsys):
+    def test_doctor_never_prints_the_auto_provisioned_url_or_token(self, monkeypatch, tmp_path, capsys):
         _clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
         monkeypatch.setattr(todo_db.shutil, "which", lambda name: "/usr/bin/turso" if name == "turso" else None)
         fake_run, _calls = _make_fake_turso_run()
         monkeypatch.setattr(todo_db.subprocess, "run", fake_run)
@@ -305,8 +313,9 @@ class TestDoctorRedactsAutoProvisionedSecrets:
         assert _URL not in combined
         assert "auto-provisioned" in combined
 
-    def test_doctor_json_never_prints_the_auto_provisioned_url_or_token(self, monkeypatch, capsys):
+    def test_doctor_json_never_prints_the_auto_provisioned_url_or_token(self, monkeypatch, tmp_path, capsys):
         _clear_backend_env(monkeypatch)
+        monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
         monkeypatch.setattr(todo_db.shutil, "which", lambda name: "/usr/bin/turso" if name == "turso" else None)
         fake_run, _calls = _make_fake_turso_run()
         monkeypatch.setattr(todo_db.subprocess, "run", fake_run)

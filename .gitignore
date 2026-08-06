@@ -192,8 +192,13 @@ _project/TODO/_indexes/
 _project/DONE/_indexes/
 
 # Local-SQLite TODO tracker spike (see _project/specs/todo-db-tracker.md):
-# per-clone operational state, never committed.
-.todo-db/
+# per-clone operational state (DBs / replica) stays ignored; credential-free
+# backend config.json is tracked so clones discover the hosted URL.
+.todo-db/*.db
+.todo-db/*.sqlite
+.todo-db/*.sqlite-*
+.todo-db/replica*
+.todo-db/export/
 _project/blind-spots/_indexes/
 
 # Ephemeral review/audit evidence. Commit durable markdown summaries instead.

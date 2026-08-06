@@ -229,3 +229,46 @@ def test_implicit_local_fallback_is_warned_not_failed(monkeypatch, tmp_path, cap
     monkeypatch.setattr(todo_db, "_resolve_backend", lambda _explicit: (db, True, False, None))
     assert todo_db.main(["doctor"]) == todo_db.DOCTOR_EXIT_OK
     assert "WARN identity" in capsys.readouterr().out
+
+
+def test_config_discovered_url_is_selected_not_implicit(monkeypatch, tmp_path, capsys):
+    """Tracked config.json selects hosted; doctor treats it as explicit identity."""
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    monkeypatch.delenv("TODO_DB_URL", raising=False)
+    monkeypatch.delenv("TODO_DB_AUTH_TOKEN", raising=False)
+    monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+    cfg = tmp_path / ".todo-db"
+    cfg.mkdir()
+    (cfg / "config.json").write_text(json.dumps({"url": _HOSTED_URL}), encoding="utf-8")
+
+    rc = todo_db.main(["doctor"])
+    captured = capsys.readouterr()
+    combined = captured.out + captured.err
+
+    assert rc == todo_db.DOCTOR_EXIT_AUTH  # hosted selected, token missing
+    assert "WARN identity" not in captured.out
+    assert "backend selected explicitly" in captured.out or "OK   identity" in captured.out
+    assert "TODO_DB_AUTH_TOKEN is not set" in captured.out
+    assert _HOSTED_URL not in combined
+    assert _SECRET not in combined
+
+
+def test_doctor_config_path_never_leaks_url_on_connect_failure(monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    monkeypatch.delenv("TODO_DB_URL", raising=False)
+    monkeypatch.setenv("TODO_DB_AUTH_TOKEN", _SECRET)
+    monkeypatch.setattr(todo_db, "git_main_root", lambda: tmp_path)
+    cfg = tmp_path / ".todo-db"
+    cfg.mkdir()
+    (cfg / "config.json").write_text(json.dumps({"url": _HOSTED_URL}), encoding="utf-8")
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError(f"connect failed for {_HOSTED_URL} using {_SECRET}")
+
+    monkeypatch.setattr(todo_db, "connect_backend", boom)
+
+    rc = todo_db.main(["doctor"])
+    combined = "".join(capsys.readouterr())
+    assert rc in (todo_db.DOCTOR_EXIT_FAIL, todo_db.DOCTOR_EXIT_AUTH)
+    assert _HOSTED_URL not in combined
+    assert _SECRET not in combined

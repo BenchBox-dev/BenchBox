@@ -370,3 +370,15 @@ and `tests/unit/test_release_infrastructure.py`:
 
 With gap 1 (history alignment via `-s ours`) folded into `release-cut` by #1089,
 both gaps this release exposed are now closed in the target itself.
+
+## Amendment 2026-08-05 — .todo-db config to main-only allowlist
+
+Adding `.todo-db/` as a top-level tracked path: credential-free
+`.todo-db/config.json` binds clones to the hosted tracker URL. Operational
+DB/replica files stay gitignored. The directory ships on both `develop` and
+released `main` so operators discover the production URL without silent
+local fallback.
+
+- **`main` only** (extension to A3): `.todo-db/`.
+
+This amendment is authoritative for the release-curation guard.
