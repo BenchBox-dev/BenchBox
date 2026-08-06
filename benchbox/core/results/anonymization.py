@@ -404,7 +404,10 @@ class AnonymizationManager:
         if constraints is not None or table_tunings is not None:
             anonymized_requested = anonymized.setdefault("requested", {})
             if isinstance(anonymized_requested, dict):
-                if isinstance(constraints, dict):
+                # Non-dict companions (list-of-constraint-dicts) are untrusted
+                # shapes too; route every non-None value through the recursive
+                # constraint walker rather than only dict payloads.
+                if constraints is not None:
                     anonymized_requested["constraints"] = self._anonymize_tuning_constraints(constraints)
                 if table_tunings is not None:
                     anonymized_requested["table_tunings"] = self._anonymize_tuning_table_tunings(table_tunings)
@@ -418,8 +421,44 @@ class AnonymizationManager:
         reference = value.rpartition(":")[0] if ":" in value else value
         return bool(reference) and all(part not in {"", ".", ".."} for part in reference.split("/"))
 
+    # Identifier-bearing companion keys. Scalar keys hash the value (including
+    # slash-delimited compounds such as ``orders/o_orderkey`` as one token so
+    # neither segment survives). Collection keys hash list/dict containers while
+    # recursing into nested dict entries so list-of-dicts FK shapes do not leak.
+    _CONSTRAINT_TABLE_SCALAR_KEYS = frozenset(
+        {
+            "table",
+            "table_name",
+            "referenced_table",
+            "referenced_table_name",
+            "local_table",
+            "references_table",
+        }
+    )
+    _CONSTRAINT_COLUMN_SCALAR_KEYS = frozenset(
+        {
+            "column",
+            "column_name",
+            "name",
+            "referenced_column",
+            "referenced_column_name",
+            "references_column",
+            "local_column",
+        }
+    )
+    _CONSTRAINT_TABLE_COLLECTION_KEYS = frozenset({"tables", "table_names", "referenced_tables"})
+    _CONSTRAINT_COLUMN_COLLECTION_KEYS = frozenset(
+        {"columns", "column_names", "referenced_columns", "referenced_column_names"}
+    )
+
     def _anonymize_tuning_constraints(self, value: Any) -> Any:
-        """Anonymize table/column identifiers nested in constraint settings."""
+        """Anonymize table/column identifiers nested in constraint settings.
+
+        Walks dict/list/tuple companions recursively. Only identifier-bearing
+        keys (table/column scalars and collections, including TPC-DI-style
+        ``local_table`` / ``references_table``) are pseudonymized; enabled
+        flags, actions, and unrelated tuning values pass through.
+        """
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
@@ -427,19 +466,13 @@ class AnonymizationManager:
                 # rather than KeyErroring when the scalar walk drops the key.
                 if _compact_key(str(key)) in _PUBLIC_DROP_KEYS:
                     continue
-                if key in {"table", "table_name", "referenced_table", "referenced_table_name"}:
-                    anonymized[key] = self._hash_public_identifier(str(child), "table")
-                elif key in {
-                    "column",
-                    "column_name",
-                    "name",
-                    "referenced_column",
-                    "referenced_column_name",
-                }:
-                    anonymized[key] = self._hash_public_identifier(str(child), "column")
-                elif key in {"tables", "table_names", "referenced_tables"}:
+                if key in self._CONSTRAINT_TABLE_SCALAR_KEYS:
+                    anonymized[key] = self._anonymize_constraint_identifier_value(child, "table")
+                elif key in self._CONSTRAINT_COLUMN_SCALAR_KEYS:
+                    anonymized[key] = self._anonymize_constraint_identifier_value(child, "column")
+                elif key in self._CONSTRAINT_TABLE_COLLECTION_KEYS:
                     anonymized[key] = self._anonymize_constraint_identifier_collection(child, "table")
-                elif key in {"columns", "column_names", "referenced_columns", "referenced_column_names"}:
+                elif key in self._CONSTRAINT_COLUMN_COLLECTION_KEYS:
                     anonymized[key] = self._anonymize_constraint_identifier_collection(child, "column")
                 else:
                     if isinstance(child, (dict, list, tuple)):
@@ -455,33 +488,51 @@ class AnonymizationManager:
             return [self._anonymize_tuning_constraints(item) for item in value]
         return value
 
+    def _anonymize_constraint_identifier_value(self, value: Any, prefix: str) -> Any:
+        """Hash one identifier scalar, or walk a nested collection under a scalar key."""
+        if isinstance(value, (dict, list, tuple)):
+            return self._anonymize_constraint_identifier_collection(value, prefix)
+        if value in (None, ""):
+            return value
+        return self._hash_public_identifier(str(value), prefix)
+
     def _anonymize_constraint_identifier_collection(self, value: Any, prefix: str) -> Any:
-        """Hash identifier collections while preserving their container shape."""
+        """Hash identifier collections while preserving their container shape.
+
+        Dict keys are table/column identifiers. List/tuple string items are
+        hashed; nested dicts/lists recurse so list-of-dicts FK companions
+        (``tables: [{table, columns, referenced_table}, ...]``) do not pass
+        through unhashed.
+        """
         if isinstance(value, dict):
             return {
                 self._hash_public_identifier(str(key), prefix): self._anonymize_constraint_columns(child)
                 for key, child in value.items()
             }
-        if isinstance(value, list):
-            return [
-                self._hash_public_identifier(str(item), prefix) if isinstance(item, str) else item for item in value
-            ]
-        if isinstance(value, tuple):
-            return [
-                self._hash_public_identifier(str(item), prefix) if isinstance(item, str) else item for item in value
-            ]
+        if isinstance(value, (list, tuple)):
+            return [self._anonymize_constraint_identifier_item(item, prefix) for item in value]
         if isinstance(value, str):
             return self._hash_public_identifier(value, prefix)
         return value
 
+    def _anonymize_constraint_identifier_item(self, item: Any, prefix: str) -> Any:
+        """Hash one collection member, or recurse into nested companion structure."""
+        if isinstance(item, str):
+            return self._hash_public_identifier(item, prefix)
+        if isinstance(item, dict):
+            return self._anonymize_tuning_constraints(item)
+        if isinstance(item, (list, tuple)):
+            return [self._anonymize_constraint_identifier_item(child, prefix) for child in item]
+        return item
+
     def _anonymize_constraint_columns(self, value: Any) -> Any:
         """Hash column lists stored as values under a table identifier."""
         if isinstance(value, (list, tuple)):
-            return [
-                self._hash_public_identifier(str(item), "column") if isinstance(item, str) else item for item in value
-            ]
+            return [self._anonymize_constraint_identifier_item(item, "column") for item in value]
         if isinstance(value, dict):
             return self._anonymize_tuning_constraints(value)
+        if isinstance(value, str):
+            return self._hash_public_identifier(value, "column")
         return value
 
     def _anonymize_tuning_table_tunings(self, value: Any) -> Any:
