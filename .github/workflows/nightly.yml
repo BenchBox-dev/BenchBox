@@ -734,15 +734,15 @@ jobs:
           make test-pyspark
 
   green-unmerged-sweep:
-    # External read-only observer for the harden-auto-merge-on-open-stranding
-    # failure class: auto-merge-on-open.yml's `enable` job can complete
-    # `conclusion: success` while the PR's own `auto_merge` field never ends
-    # up populated (see the script's "Known timing behavior" note). This job
-    # does NOT modify auto-merge-on-open.yml and does NOT enable auto-merge
-    # itself -- `--apply` only upserts one marker-tagged tracking issue. It
-    # must never re-arm a hold it did not set (draft or `no-auto-merge`
-    # label); the sweep classifies those as intentional, not stranded. See
-    # docs/operations/pr-triage.md.
+    # External read-only observer for true auto-merge stranding (arm intent
+    # then lost): green + auto-merge OFF alone is an intentional hold after
+    # the post-#1592 policy and is NOT alerted. The script requires timeline
+    # evidence of prior arm (ready_for_review / auto_squash_enabled /
+    # auto_merge_disabled) and excludes durable holds (draft or the
+    # `no-auto-merge` label). It does NOT modify auto-merge-on-open.yml and
+    # does NOT enable auto-merge itself -- --apply only upserts one
+    # marker-tagged tracking issue and must never re-arm a hold it did not
+    # set. See docs/operations/pr-triage.md.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

@@ -167,6 +167,11 @@ def test_submit_classifier_contract_load_error_distinct_from_integrity(tmp_path:
 
 def test_submit_classifier_contract_cli_refusal_tracks_state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """The CLI's externally observable refuse/accept verdict equals the shared state."""
+    # This test drives `sub.submit` end-to-end, which is community-facing and
+    # hard-refuses without a deployment salt. That precondition is orthogonal
+    # to the classification-refusal contract under test here, so satisfy it
+    # once up front (mirrors tests/unit/cli/commands/test_submit.py).
+    monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "unit-test-community-publish-salt")
     out_dir = tmp_path / "out"
     for label, path, expected in _loadable_cases(tmp_path):
         loaded, _raw = load_result_file(path)
