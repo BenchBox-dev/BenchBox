@@ -120,11 +120,14 @@ Rationale:
    operators must set a real salt before accepting third-party submissions.
 4. **Operators close the residual.** Set `AnonymizationConfig.machine_id_salt`
    or the `BENCHBOX_MACHINE_ID_SALT` environment variable to a non-empty value
-   known only to the deployment *before* the first public publish. New raw
-   values then hash under that salt; already-published tokens still pass
-   through by design. **`benchbox submit` hard-refuses** when the salt is
-   unset/empty (community-facing gate); private/local export without salt
-   remains allowed.
+   known only to the deployment *before* the first public export, so raw
+   retained-field values hash under that salt at mint time. Public export
+   soft-reads the env salt when present; unset salt still allows local/private
+   export with the empty default. **`benchbox submit` hard-refuses** when the
+   salt is unset/empty (community-facing gate only). Setting salt only at
+   submit does not re-hash already-exported files — already-public-shaped
+   tokens pass through by fixed-point design — so the submit gate alone does
+   not close the empty-salt confirmation oracle for previously minted bundles.
 
 ## Alternatives considered (field-set)
 

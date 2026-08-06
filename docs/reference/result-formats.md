@@ -490,10 +490,18 @@ documented rather than denied.
 A non-empty salt closes the oracle only if it is **not** shipped in the public
 tree. Operators who will publish community submissions must set
 `machine_id_salt` or the `BENCHBOX_MACHINE_ID_SALT` environment variable to a
-deployment-private value before the first public export. `benchbox submit`
-refuses when that salt is missing. A repository-baked "default salt" would
-still be public and is rejected. Private/local export without salt remains
-allowed.
+deployment-private value **before the first public export**, so retained-field
+tokens are salted when they are minted. `ResultExporter(anonymize=True)`
+soft-reads `BENCHBOX_MACHINE_ID_SALT` when present; without it, public-shaped
+export still succeeds with the empty default (local/private use).
+
+`benchbox submit` hard-refuses when that salt env is unset/empty — a
+community-path gate so operators cannot forget to configure salt on the
+submission machine. That gate does **not** re-hash already-exported files:
+already-public-shaped tokens pass through under the publication fixed point,
+so setting salt only at submit time does not close the empty-salt oracle for
+bundles that were minted earlier without salt. A repository-baked "default
+salt" would still be public and is rejected.
 
 #### Salt rotation
 
