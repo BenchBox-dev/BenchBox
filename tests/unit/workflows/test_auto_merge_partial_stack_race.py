@@ -1,20 +1,21 @@
 """Guards against auto-merge landing a PR before its later commits are pushed.
 
-`make pr-open` enables squash auto-merge at PR creation. When work continues on
-the branch afterwards, the PR can satisfy its checks and merge while a later
-commit is still being written, so develop receives a partial change and the
-remaining commit is orphaned: the branch is merged, the PR is closed, and
-nothing reports that part of the work never landed.
+Auto-merge is no longer armed at bare PR creation (`make pr-open` withholds;
+`auto-merge-on-open.yml` arms only on `ready_for_review`). The partial-stack
+race remains when a branch is marked final too early (`make pr-ready` /
+`READY=1` / draft→ready) and more commits follow: the PR can satisfy its
+checks and merge while a later commit is still being written, so develop
+receives a partial change and the remainder is orphaned on a closed branch.
 
 This is not hypothetical. PR #1503 merged carrying only its first commit; the
 `Results Explorer browser gate` job that its own PR body described never landed,
 and the orphan (b5c56ea9) was found by hand. The detector's own header records
 three earlier occurrences in the same remediation.
 
-`auto-merge-on-open.yml` cannot prevent it: it reacts to `synchronize`, and in
-this race there is no later push to react to *until after* the merge has already
-happened. So the guard is detection, and detection is only useful if it runs
-close to the event - hence the trigger assertions below.
+`auto-merge-on-open.yml` cannot prevent it: once auto-merge is armed, the race
+has no later push to react to *until after* the merge has already happened.
+So the guard is detection, and detection is only useful if it runs close to
+the event - hence the trigger assertions below.
 """
 
 from __future__ import annotations

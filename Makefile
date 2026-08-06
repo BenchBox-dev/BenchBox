@@ -1566,15 +1566,15 @@ pr-content-guard:
 		echo "No docs paths changed."; \
 	fi
 
-# Push current branch and open a PR against develop with auto-merge enabled
-# unless the diff touches soundness-critical comparator/plan-parser paths.
-# Squash-merge happens automatically once `lint` + `test (ubuntu-latest, 3.12)`
-# go green. Refuses to run from develop/release.
+# Push current branch and open a PR against develop. Auto-merge is WITHHELD by
+# default so a follow-up commit cannot race a merge. Arm only when the branch
+# is final: `make pr-ready`, or `make pr-open READY=1` to open and arm in one
+# step. Soundness-path diffs are never armed (see pr-arm-auto-merge).
+# Refuses to run from develop/release.
 #
-# Idempotent: safe to rerun. If a PR is already open for the branch, reuses it
-# and just (re)enables auto-merge when the soundness-path review gate does not
-# apply — useful after a partial run, or to flip auto-merge on for a PR opened
-# via `gh pr create` directly.
+# Idempotent: safe to rerun. If a PR is already open for the branch, reuses it.
+# Without READY=1 this does not re-enable auto-merge — run `make pr-ready`
+# when the branch is final (or READY=1 here to arm after open/reuse).
 #
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
@@ -1668,9 +1668,11 @@ pr-fanout:
 
 # Refresh the current PR branch onto origin/develop, then run pr-open.
 # This is the stale-PR escape hatch when required checks must be current with
-# develop: GitHub can show a PR as CLEAN even though auto-merge is waiting for
-# a branch update. Run this one stale PR at a time; updating several branches
-# at once can let the first merge stale the others again under strict checks.
+# develop: GitHub can show a PR as CLEAN even though merge is waiting for a
+# branch update. pr-refresh does NOT re-enable auto-merge on its own (pr-open
+# withholds unless READY=1); run `make pr-ready` when the branch is final.
+# Run this one stale PR at a time; updating several branches at once can let
+# the first merge stale the others again under strict checks.
 pr-refresh:
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
@@ -2653,10 +2655,11 @@ help:
 	@echo "PR Workflow & Worktrees:"
 	@echo "  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden"
 	@echo "  make pr-preflight    Run lint + fast marker tests locally (coverage remains CI-only)"
-	@echo "  make pr-open [PR_BODY_FILE=path] Push branch + open PR vs develop + enable auto-merge"
+	@echo "  make pr-open [PR_BODY_FILE=path] [READY=1]  Push branch + open PR vs develop (auto-merge withheld unless READY=1)"
+	@echo "  make pr-ready        Arm squash auto-merge for the open PR on this branch (when final)"
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop"
-	@echo "  make pr-refresh      Merge origin/develop into current branch, push, and re-enable auto-merge"
+	@echo "  make pr-refresh      Merge origin/develop into current branch and re-run pr-open (still withholds auto-merge unless READY=1)"
 	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
 	@echo "  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs"
 	@echo "  make pr-review-followups             Action each comment, reply with marker, submit PR"

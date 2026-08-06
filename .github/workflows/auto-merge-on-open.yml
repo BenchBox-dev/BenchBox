@@ -1,15 +1,33 @@
 name: Auto-enable auto-merge
 
-# Backstop for the local `make pr-open` flow: if a PR is opened against
-# develop via the GitHub UI, `gh pr create` directly, or any path that
-# skips `gh pr merge --auto --squash`, this workflow turns auto-merge on.
+# Auto-merge arming policy (cross-layer with the Makefile):
 #
-# Drafts are explicitly skipped — opening a draft is the user's signal
-# that the PR is not yet ready to land. Auto-merge gets enabled when the
-# draft is marked ready (the `ready_for_review` event).
+# Local path:
+#   - `make pr-open` withholds auto-merge by default.
+#   - `make pr-ready` / `pr-arm-auto-merge` (or `make pr-open READY=1`) is the
+#     intentional arming path for a finished branch.
 #
-# `synchronize` re-evaluates on every push: a later commit that newly
-# touches a soundness-critical path must flip auto-merge back OFF. GitHub
+# Workflow path (this file):
+#   - Do NOT arm on `opened` or `reopened`. Opening a non-draft PR (including
+#     bare `gh pr create`) is not the final signal — that is what defeated the
+#     Makefile hold after #1567 (live proof: #1568/#1569 merged hands-free).
+#   - DO arm on `ready_for_review` (draft → ready is the UI equivalent of
+#     `make pr-ready`).
+#   - On `synchronize` (and other events): only re-evaluate soundness
+#     revocation — disable auto-merge if soundness paths are touched. Never
+#     re-enable on synchronize; that would re-open the race on the first push
+#     after open.
+#
+# Intentional gap: a non-draft PR opened without `make pr-ready`, `READY=1`,
+# or marking a draft ready will not get auto-merge from this workflow. Use
+# one of those paths when the branch is final.
+#
+# Drafts remain skipped at the job level — opening a draft is the user's
+# signal that the PR is not yet ready. Auto-merge is enabled when the draft
+# is marked ready (`ready_for_review`).
+#
+# `synchronize` re-evaluates on every push so a later commit that newly
+# touches a soundness-critical path can flip auto-merge back OFF. GitHub
 # only auto-disables auto-merge on push when the pusher lacks write access,
 # so in the normal same-repo/write-author flow a stale enabled auto-merge
 # would otherwise survive and merge after checks without review.
@@ -87,7 +105,11 @@ jobs:
           echo "$result" >> "$GITHUB_OUTPUT"
 
       - name: Enable squash auto-merge
-        if: steps.soundness.outputs.soundness_path != 'true'
+        # Arm only on draft→ready. Never on opened/reopened/synchronize — those
+        # are not "branch is final" signals (see header policy). Soundness
+        # predicate first so the existing substring pin in
+        # test_auto_merge_soundness_paths still matches.
+        if: steps.soundness.outputs.soundness_path != 'true' && github.event.action == 'ready_for_review'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

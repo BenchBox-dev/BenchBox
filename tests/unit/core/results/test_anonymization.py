@@ -633,7 +633,8 @@ class TestPublicPayloadCredentialAliases:
         assert out["passwd"] == PUBLIC_REDACTED_VALUE
         assert out["pwd"] == PUBLIC_REDACTED_VALUE
         assert out["pat"] == PUBLIC_REDACTED_VALUE
-        assert out["path"].startswith("path_")
+        # Exact key ``path`` is a residual local-FS drop key (no public consumer).
+        assert "path" not in out
         assert out["sort_key"] == "o_orderkey"
 
 
@@ -1117,6 +1118,70 @@ class TestPublicUnreadIdentifierDrop:
         assert out["metadata"]["submission_path"] == "PR-based" or _is_public_pseudonym(
             out["metadata"]["submission_path"], "path"
         )
+
+    def test_residual_local_path_keys_are_dropped_not_hashed(self):
+        """Pure local-FS residual keys omit rather than mint empty-salt path_ tokens."""
+        payload = {
+            "platform": {
+                "config": {
+                    "output_dir": "/Users/alice/out",
+                    "output_directory": "/Users/alice/out",
+                    "output_path": "/Users/alice/out/run.json",
+                    "output_location": "/Users/alice/out",
+                    "result_dir": "/Users/alice/results",
+                    "result_path": "/Users/alice/results/run.json",
+                    "log_path": "/Users/alice/logs/run.log",
+                    "log_file": "/Users/alice/logs/run.log",
+                    "file_path": "/Users/alice/data/file.parquet",
+                    "path": "/Users/alice/scratch",
+                    "source_root": "/Users/alice/src",
+                    "credential_file": "/Users/alice/.aws/credentials",
+                    # KEEP HASH / retained consumers
+                    "sslrootcert": "/Users/alice/certs/root.pem",
+                    "s3_staging_url": "s3://tenant-bucket/staging/",
+                    "staging_location": "s3://tenant-bucket/staging/",
+                    "staging_url": "s3://tenant-bucket/staging/",
+                    "http_path": "/sql/1.0/warehouses/abc",
+                    "host": "db.example.internal",
+                    "hostname": "db.example.internal",
+                    "server": "db.example.internal",
+                    "endpoint": "https://example.invalid/warehouse",
+                    "database_name": "analytics",
+                }
+            },
+            "metadata": {"submission_path": "/Users/alice/submission.json"},
+        }
+        out = AnonymizationManager().anonymize_result_payload(payload)
+        cfg = out["platform"]["config"]
+        for key in (
+            "output_dir",
+            "output_directory",
+            "output_path",
+            "output_location",
+            "result_dir",
+            "result_path",
+            "log_path",
+            "log_file",
+            "file_path",
+            "path",
+            "source_root",
+            "credential_file",
+        ):
+            assert key not in cfg, f"residual local path key still present: {key}"
+        serialized = json.dumps(out, default=str)
+        assert "alice" not in serialized
+        # Remote-ish / intentional privacy hashes remain published as pseudonyms.
+        assert _is_public_pseudonym(cfg["sslrootcert"], "path")
+        assert _is_public_pseudonym(cfg["s3_staging_url"], "endpoint")  # *url suffix
+        assert _is_public_pseudonym(cfg["staging_location"], "path")
+        assert _is_public_pseudonym(cfg["staging_url"], "endpoint")
+        assert _is_public_pseudonym(cfg["http_path"], "path")
+        assert cfg["host"].startswith("host_")
+        assert cfg["hostname"].startswith("host_")
+        assert cfg["server"].startswith("host_")
+        assert _is_public_pseudonym(cfg["endpoint"], "endpoint")
+        assert _is_public_pseudonym(cfg["database_name"], "database")
+        assert _is_public_pseudonym(out["metadata"]["submission_path"], "path")
 
     def test_empty_client_host_omitted_after_machine_id_drop(self):
         """client_host that only held machine_id must not publish as {}."""

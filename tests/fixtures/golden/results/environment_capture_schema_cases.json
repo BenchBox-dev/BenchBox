@@ -278,11 +278,13 @@
           "prefix/",
           "athena_private"
         ],
+        "absent_keys": [
+          "output_location"
+        ],
         "prefixes": {
           "platform.cloud.account": "account_",
           "platform.compute.workgroup": "workgroup_",
-          "platform.storage.bucket": "bucket_",
-          "platform.raw_config.output_location": "path_"
+          "platform.storage.bucket": "bucket_"
         }
       }
     },
