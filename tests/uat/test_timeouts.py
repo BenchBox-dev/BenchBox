@@ -196,6 +196,110 @@ def test_run_with_timeout_kills_group_on_base_exception_before_reraising(monkeyp
     assert killpg_calls[-1] == (4242, sigkill)
 
 
+def test_run_with_timeout_kills_group_on_a_non_keyboardinterrupt_base_exception(monkeypatch):
+    """must_preserve: the guard is `except BaseException`, not `except KeyboardInterrupt`.
+
+    Every other cancellation rung in this module raises a
+    `KeyboardInterrupt` subclass, because that is what `SweepCancelled`
+    actually is. That makes them all survive a narrowing of the guard from
+    `BaseException` to `KeyboardInterrupt` -- the contract is asserted in the
+    module comment above and in `run_with_timeout`'s docstring, but nothing
+    tested it. This rung raises a `BaseException` that is deliberately NOT a
+    `KeyboardInterrupt`, so a narrowed guard lets it escape with the child
+    untouched and `killpg_calls` empty.
+
+    Concretely reachable, not hypothetical: `GeneratorExit` and `SystemExit`
+    are both plain `BaseException`s, and a `SystemExit` unwinding through a
+    cell (an `atexit`-triggered teardown, a nested `sys.exit()`) must reap
+    the group for the same reason a sweep cancellation must.
+    """
+
+    class _Unwound(BaseException):
+        """Not a KeyboardInterrupt, not an Exception -- a bare BaseException."""
+
+    class FakeProc:
+        pid = 5150
+        returncode = None
+
+        def communicate(self, timeout=None):
+            raise _Unwound("simulated non-KeyboardInterrupt unwind")
+
+        def kill(self):
+            pass
+
+        def wait(self, timeout=None):
+            return 0
+
+    sigterm = object()
+    sigkill = object()
+    killpg_calls: list[tuple[int, object]] = []
+
+    monkeypatch.setattr(timeouts.subprocess, "Popen", lambda *a, **k: FakeProc())
+    monkeypatch.setattr(timeouts.os, "killpg", lambda pid, sig: killpg_calls.append((pid, sig)), raising=False)
+    monkeypatch.setattr(timeouts.signal, "SIGTERM", sigterm, raising=False)
+    monkeypatch.setattr(timeouts.signal, "SIGKILL", sigkill, raising=False)
+
+    with pytest.raises(_Unwound):
+        timeouts.run_with_timeout([sys.executable, "-c", "pass"], timeout_s=5)
+
+    assert killpg_calls, (
+        "a BaseException that is not a KeyboardInterrupt escaped run_with_timeout without reaping the "
+        "process group -- the guard has been narrowed from `except BaseException` and the child tree is "
+        "orphaned on this path."
+    )
+    assert killpg_calls[0] == (5150, sigterm)
+    assert killpg_calls[-1] == (5150, sigkill)
+
+
+def test_timeout_path_drains_using_the_reap_timeout_constant(monkeypatch):
+    """must_preserve: the post-SIGKILL drain must honour `_REAP_TIMEOUT_S`.
+
+    `_REAP_TIMEOUT_S` was introduced for the reap in
+    `_kill_and_reap_process_group` but the timeout path's own drain kept a
+    hardcoded `1.0`. They were equal, so nothing observably differed -- which
+    is exactly why it needed a rung: the next person to tune the constant
+    would have moved one site and silently left the other behind. This pins
+    that both follow the constant, by setting it to a value no literal in
+    the module matches and asserting the drain used it.
+    """
+    monkeypatch.setattr(timeouts, "_REAP_TIMEOUT_S", 7.5)
+    drain_timeouts: list[float | None] = []
+
+    class FakeProc:
+        pid = 6060
+        returncode = -9
+
+        def __init__(self) -> None:
+            self._calls = 0
+
+        def communicate(self, timeout=None):
+            self._calls += 1
+            if self._calls == 1:
+                raise subprocess.TimeoutExpired(cmd="probe", timeout=timeout)
+            drain_timeouts.append(timeout)
+            return (b"", b"")
+
+        def kill(self):
+            pass
+
+        def wait(self, timeout=None):
+            return 0
+
+    monkeypatch.setattr(timeouts.subprocess, "Popen", lambda *a, **k: FakeProc())
+    monkeypatch.setattr(timeouts.os, "killpg", lambda pid, sig: None, raising=False)
+    # The ladder's real 200 ms grace sleep is left in place: `timeouts` imports
+    # `time` inside the function rather than at module scope, so there is no
+    # module attribute to patch, and 200 ms is not worth reshaping the module for.
+
+    result = timeouts.run_with_timeout([sys.executable, "-c", "pass"], timeout_s=1)
+
+    assert result.timed_out
+    assert drain_timeouts == [7.5], (
+        f"the post-SIGKILL drain used {drain_timeouts!r} instead of the patched _REAP_TIMEOUT_S (7.5) -- "
+        "it is back to a hardcoded literal, so tuning the constant no longer moves this site."
+    )
+
+
 def test_run_with_timeout_zero_timeout_kills_group_on_base_exception(monkeypatch):
     """The timeout_s == 0 branch must use the same guarded-kill Popen path as
     the timed branch, not the old bare subprocess.run with no teardown."""
@@ -330,6 +434,30 @@ _PRODUCTION_LIKE_TIMEOUT_S = 30
 _PROBE_TICK_S = 0.02
 _PROBE_MAX_TICKS = 500
 _STATE_TIMEOUT_S = 5.0
+
+# Minimum ratio of the product's grace window to the probe's tick period.
+# The gate-2 delivery must land INSIDE the ladder's 200 ms grace window, and
+# the only thing that guarantees it is the tick being much shorter than the
+# window. That relationship was assumed, never asserted: shrink
+# `timeouts._KILL_GRACE_S` (or lengthen the tick) far enough and the follow-up
+# signal starts landing after the ladder has already finished. The probe would
+# still deliver both signals and still pass -- while silently no longer
+# exercising the interrupted-ladder path it exists to cover. Assert the margin
+# statically so losing it fails loudly and immediately, with no timing flake.
+_MIN_GRACE_TO_TICK_RATIO = 5.0
+
+
+def test_cancel_probe_tick_leaves_margin_inside_the_kill_ladder_grace_window():
+    """must_preserve: gate 2 is only meaningful while tick << grace window."""
+    ratio = timeouts._KILL_GRACE_S / _PROBE_TICK_S
+    assert ratio >= _MIN_GRACE_TO_TICK_RATIO, (
+        f"the cancellation probe ticks every {_PROBE_TICK_S * 1000:.0f} ms against a "
+        f"{timeouts._KILL_GRACE_S * 1000:.0f} ms kill-ladder grace window (ratio {ratio:.1f}, minimum "
+        f"{_MIN_GRACE_TO_TICK_RATIO:.1f}). Gate 2's follow-up signal can no longer be relied on to land "
+        "inside the grace window, so the interrupted-ladder tests would keep passing without exercising "
+        "the path they exist to cover. Shorten _PROBE_TICK_S or restore the grace window."
+    )
+
 
 # Ignores SIGTERM, so its disappearance can only be the group SIGKILL rung.
 _GRANDCHILD_SRC = "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(600)"

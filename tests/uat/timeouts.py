@@ -95,7 +95,12 @@ def run_with_timeout(
     under 2x load, against an `execute.per_cell_timeout_s` that defaults to
     600 s and is rejected at `<= 0` (tests/uat/config.py), so an operator
     `kill` has to land inside roughly 3 ms out of every 600 s of cell, and
-    the result is one visible process rather than a silent leak.
+    the result is one recoverable session-leader root rather than a silent
+    leak. Not "one visible process": measured, 18/18 of those survivors
+    already owned a live grandchild of their own. What makes the residual
+    acceptable is that the survivor is a session LEADER -- so the operator
+    (or `make uat-docker-cleanup`) can reap the whole tree from that one pid
+    with a single `kill -- -PGID` -- not that the tree is a single process.
 
     What would close it, and why it is not done here: block SIGINT/SIGTERM
     with `signal.pthread_sigmask` around the `Popen()` call and unblock
@@ -185,7 +190,7 @@ def run_with_timeout(
             raise
         _kill_process_group(proc)
         try:
-            out, err = proc.communicate(timeout=1.0)
+            out, err = proc.communicate(timeout=_REAP_TIMEOUT_S)
         except subprocess.TimeoutExpired:
             # SIGKILL did not reap or output could not drain; keep timeout
             # classification stable and return without blocking the caller.
