@@ -13,12 +13,15 @@ three the working tree was clean when the PR was opened.
 
 #1567 moved the Makefile hold (`pr-open` withholds; `pr-ready` arms). The
 workflow `auto-merge-on-open.yml` still armed on `opened` for any non-draft
-PR, so bare `gh pr create` defeated the hold (#1568/#1569). The cross-layer
-policy is therefore:
+PR, so bare `gh pr create` defeated the hold (#1568/#1569). #1592 narrowed
+the workflow arm to `ready_for_review` — which then never fired once (drafts
+are unused; 0 events across 150 PRs), so the arm step was deleted outright
+(auto-merge-policy-consolidation-2026-08-06, D2). The cross-layer policy is
+therefore:
 
-- Local: `pr-open` withholds; `pr-ready` / `READY=1` arms.
-- Workflow: arm only on `ready_for_review`; never enable on
-  opened/reopened/synchronize. Soundness disable still runs on those events.
+- Local: `pr-open` withholds; `pr-ready` / `READY=1` is the ONLY arm path.
+- Workflow: revoke-only (soundness paths + `no-auto-merge` label); it never
+  arms on any event. Soundness disable runs on opened/reopened/synchronize.
 """
 
 from __future__ import annotations
@@ -38,13 +41,7 @@ AUTO_MERGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "auto-merge-on-open.
 
 ARM_COMMAND = "gh pr merge --auto --squash"
 
-# Exact enable/disable `if:` pins for auto-merge-on-open.yml (collapsed form).
-# Enable also requires the durable hold label absent (steps.hold).
-ENABLE_IF = (
-    "steps.soundness.outputs.soundness_path != 'true' "
-    "&& steps.hold.outputs.held != 'true' "
-    "&& github.event.action == 'ready_for_review'"
-)
+# Exact disable `if:` pins for auto-merge-on-open.yml (collapsed form).
 DISABLE_IF = "steps.soundness.outputs.soundness_path == 'true'"
 HOLD_DISABLE_IF = "steps.hold.outputs.held == 'true'"
 
@@ -68,10 +65,10 @@ def _triggers(workflow: dict[str, Any]) -> dict[str, Any]:
     return triggers
 
 
-def _enable_job(workflow: dict[str, Any]) -> dict[str, Any]:
+def _revoke_job(workflow: dict[str, Any]) -> dict[str, Any]:
     jobs = workflow.get("jobs") or {}
-    assert "enable" in jobs, "auto-merge workflow has no enable job"
-    return jobs["enable"]
+    assert "revoke" in jobs, "auto-merge workflow has no revoke job"
+    return jobs["revoke"]
 
 
 def _steps_by_name(job: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -148,73 +145,47 @@ def test_auto_merge_enablement_point_preserves_soundness_withholding() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Workflow layer (do not arm on opened; arm only on ready_for_review)
+# Workflow layer (revoke-only: never arms on any event)
 # ---------------------------------------------------------------------------
 
 
-def test_auto_merge_workflow_enable_if_is_exact_policy() -> None:
-    """Enable step must arm only for non-soundness ready_for_review.
+def test_auto_merge_workflow_never_arms() -> None:
+    """The workflow must contain no arm path at all.
 
-    Exact pin: opened/reopened/synchronize cannot arm even if someone later
-    rewrites the condition into a looser OR of event actions.
+    The historical defect was arming on `opened` (defeating the Makefile
+    hold — #1568/#1569); the #1592 fix narrowed arming to `ready_for_review`,
+    which never fired once (drafts unused). The step was deleted (D2): with
+    no arm command in the file, no event — opened, reopened, synchronize, or
+    a future looser condition — can arm.
     """
     workflow = _load_workflow()
-    steps = _steps_by_name(_enable_job(workflow))
-    enable = steps.get("Enable squash auto-merge")
-    assert enable is not None, "enable step missing from auto-merge-on-open.yml"
-    assert _collapsed_if(enable) == ENABLE_IF, (
-        f"enable step if: drifted from policy pin\n  got:  {_collapsed_if(enable)!r}\n  want: {ENABLE_IF!r}"
-    )
-    assert ARM_COMMAND in str(enable.get("run") or ""), "enable step no longer arms squash auto-merge"
+    text = AUTO_MERGE_WORKFLOW.read_text(encoding="utf-8")
+    assert "Enable squash auto-merge" not in text, "the dead arm step is back"
+    for step in _revoke_job(workflow).get("steps") or []:
+        run = str(step.get("run") or "")
+        assert ARM_COMMAND not in run, f"workflow step {step.get('name')!r} arms auto-merge"
 
 
-def test_auto_merge_workflow_does_not_enable_merely_because_pr_was_opened() -> None:
-    """No layer may arm auto-merge solely because a non-draft PR was opened.
-
-    After #1567 the Makefile held at pr-open, but this workflow still ran
-    `gh pr merge --auto --squash` on the `opened` event for any non-draft
-    develop PR. That is the defect under test.
-    """
-    workflow = _load_workflow()
-    steps = _steps_by_name(_enable_job(workflow))
-    condition = _collapsed_if(steps["Enable squash auto-merge"])
-    # Exact policy already asserted above; restate exclusions for the defect.
-    assert condition == ENABLE_IF
-    for forbidden in ("opened", "reopened", "synchronize"):
-        assert f"== '{forbidden}'" not in condition and f'== "{forbidden}"' not in condition, (
-            f"enable step still matches event action {forbidden!r}: {condition!r}"
-        )
-
-
-def test_auto_merge_workflow_keeps_opened_trigger_for_soundness_re_eval() -> None:
+def test_auto_merge_workflow_keeps_revocation_triggers() -> None:
     """opened/reopened/synchronize must still run for soundness disable.
 
-    Dropping those triggers would leave a soundness PR that was opened with
-    auto-merge already on (or that later gains a soundness commit) without a
-    revocation path from this workflow. `labeled` is also required so the
-    durable hold label revokes without needing a push.
+    Dropping those triggers would leave a soundness PR that later gains a
+    soundness commit without a revocation path from this workflow. `labeled`
+    is also required so the durable hold label revokes without needing a
+    push. `ready_for_review` must stay absent: a draft cannot carry
+    auto-merge (nothing to revoke), and its only historical use was the dead
+    arm point.
     """
     types = _triggers(_load_workflow())["pull_request"]["types"]
-    for required in ("opened", "reopened", "ready_for_review", "synchronize", "labeled"):
+    for required in ("opened", "reopened", "synchronize", "labeled"):
         assert required in types, f"pull_request types missing {required!r}: {types}"
-
-
-def test_auto_merge_workflow_does_not_re_enable_on_synchronize() -> None:
-    """synchronize must not re-arm auto-merge.
-
-    Re-enabling on every push would defeat the open-time hold as soon as the
-    first post-open push lands, restoring the partial-stack race.
-    """
-    workflow = _load_workflow()
-    condition = _collapsed_if(_steps_by_name(_enable_job(workflow))["Enable squash auto-merge"])
-    assert condition == ENABLE_IF
-    assert "synchronize" not in condition
+    assert "ready_for_review" not in types, "ready_for_review is back; the arm point must not return"
 
 
 def test_auto_merge_workflow_preserves_soundness_disable() -> None:
     """Must-preserve: soundness paths still revoke auto-merge."""
     workflow = _load_workflow()
-    steps = _steps_by_name(_enable_job(workflow))
+    steps = _steps_by_name(_revoke_job(workflow))
     disable = steps.get("Disable auto-merge for soundness PR")
     assert disable is not None, "soundness disable step is gone"
     assert "--disable-auto" in str(disable.get("run") or ""), "soundness disable no longer calls --disable-auto"
@@ -226,7 +197,7 @@ def test_auto_merge_workflow_preserves_soundness_disable() -> None:
 def test_auto_merge_workflow_preserves_explicit_hold_disable() -> None:
     """Must-preserve: no-auto-merge label revokes auto-merge independently."""
     workflow = _load_workflow()
-    steps = _steps_by_name(_enable_job(workflow))
+    steps = _steps_by_name(_revoke_job(workflow))
     disable = steps.get("Disable auto-merge for explicit hold")
     assert disable is not None, "explicit-hold disable step is gone"
     assert "--disable-auto" in str(disable.get("run") or "")

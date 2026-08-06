@@ -54,13 +54,17 @@ SOUNDNESS_PREFIXES = (
     # base-ref execution + self-touch override in auto-merge-on-open.yml is
     # best-effort only for same-repo PRs (GitHub runs the PR's OWN copy of a
     # pull_request-triggered workflow file, so a PR editing that workflow can
-    # delete those checks in the same commit). There is no repo-layer
-    # backstop: the develop ruleset's require_code_owner_review target was
-    # retired 2026-07-18 (self-approval deadlock -- the sole code owner
-    # authors every PR; see docs/operations/repo-admin-settings.md,
-    # "Soundness-path review enforcement (RETIRED 2026-07-18)"). Listing
-    # these files here still matters: it stops auto-merge so the owner
-    # personally reviews and merges any change to the gate machinery.
+    # delete those checks in the same commit). The repo-layer backstop is the
+    # develop ruleset's require_code_owner_review rule, re-enabled 2026-07-21
+    # with required approvals 0 (it was retired 2026-07-18 over a
+    # self-approval deadlock, then restored -- see
+    # docs/operations/repo-admin-settings.md, "Soundness-path review
+    # enforcement"). CODEOWNERS mirrors SOUNDNESS_PREFIXES 1:1, lockstep-
+    # pinned by tests/unit/test_auto_merge_soundness_paths.py. GitHub forbids
+    # self-approval, so the operative effect is that soundness PRs never
+    # merge hands-free: the owner reviews the diff and merges manually.
+    # Listing these files here still matters: it revokes/withholds auto-merge
+    # so that manual step is reached at all.
     # release.yml is included
     # because it publishes to PyPI. .github/workflows/pr.yml is deliberately
     # NOT included: it is high-churn (routine CI-lane edits), and the

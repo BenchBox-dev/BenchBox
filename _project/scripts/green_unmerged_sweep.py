@@ -42,7 +42,9 @@ and alerts only when all of the following hold:
     (f) prior arm intent     -- the issue/PR timeline shows evidence that
         auto-merge was requested or previously enabled, then lost. Signals
         (any one is enough):
-          * `ready_for_review` (draft → ready; workflow arm path)
+          * `ready_for_review` (draft → ready; historical workflow arm path,
+            deleted 2026-08-06 — still valid as arm-intent evidence in old
+            timelines)
           * `auto_squash_enabled` / `auto_merge_enabled` (arm succeeded once)
           * `auto_merge_disabled` (implies a prior enable that was dropped)
         Never-armed intentional holds have none of these events and are

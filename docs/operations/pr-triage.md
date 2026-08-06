@@ -106,8 +106,12 @@ a PR's mergeability — both only alert.
 
   - `make pr-ready` (or `make pr-arm-auto-merge`) on a finished branch
   - `make pr-open READY=1` to open and arm in one step
-  - draft → ready (`ready_for_review` in `auto-merge-on-open.yml`), and only
-    when the PR does **not** carry the `no-auto-merge` label
+
+  Those are the **only** arm paths: `auto-merge-on-open.yml` is revoke-only
+  and never arms (its draft→ready arm point never fired once and was deleted
+  — see `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`,
+  D2). Both Makefile paths refuse while the PR carries the `no-auto-merge`
+  label or touches soundness paths.
 
   **Classifier (arm intent):** a PR is stranded only when auto-merge is off
   *and* the issue/PR timeline includes at least one of
@@ -122,12 +126,12 @@ a PR's mergeability — both only alert.
 
   Do **not** remediate a green-unmerged alert by re-pushing "to re-trigger
   synchronize." That path no longer enables auto-merge. When the branch is
-  final, arm via `make pr-ready` / `READY=1` / draft → ready; if work
-  continues, leave auto-merge off (or apply a durable hold — see below).
+  final, arm via `make pr-ready` / `READY=1`; if work continues, leave
+  auto-merge off (or apply a durable hold — see below).
 
-  A green `enable`-job run is also not proof the PR's `auto_merge` field is
-  set — the sweep re-reads the PR field (and the timeline) rather than
-  trusting the workflow conclusion.
+  A green revocation-workflow run is also not proof of the PR's `auto_merge`
+  field either way — the sweep re-reads the PR field (and the timeline)
+  rather than trusting the workflow conclusion.
 
 ## Durable auto-merge holds
 
@@ -138,14 +142,14 @@ honour these durable holds (and neither re-arms on push or nightly `--apply`):
 | Hold | Who honours it | Effect |
 | --- | --- | --- |
 | **Draft** | `auto-merge-on-open.yml` (job skip), green-unmerged sweep | Not ready; no arm, not stranded |
-| **Label `no-auto-merge`** | `auto-merge-on-open.yml` (enable blocked + disable on apply/`labeled`), green-unmerged sweep | Non-draft intentional hold; revoke any enabled auto-merge; not stranded |
+| **Label `no-auto-merge`** | `make pr-arm-auto-merge` / `pr-ready` (refuse to arm), `auto-merge-on-open.yml` (disable on apply/`labeled`), green-unmerged sweep | Non-draft intentional hold; revoke any enabled auto-merge; not stranded |
 | **Never armed** | green-unmerged sweep (timeline arm-intent classifier) | Green + auto-merge OFF with no prior arm events is normal after the post-#1592 policy; not stranded |
 
 Use draft while the branch is incomplete. Use `no-auto-merge` when the PR
 should stay non-draft (CI/review as ready) but must not auto-merge — for
 example waiting on another PR, or after an explicit disable that must survive
-a later `ready_for_review` / re-arm attempt. Remove the label before arming
-with `make pr-ready` or draft → ready.
+a later re-arm attempt. Remove the label before arming with `make pr-ready`
+(which refuses to arm while the label is present).
 
 Both sweeps upsert a single marker-tagged tracking issue while their
 respective queue is non-empty, and patch it to the empty state exactly

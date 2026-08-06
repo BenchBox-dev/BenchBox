@@ -1,11 +1,11 @@
 """Guards against auto-merge landing a PR before its later commits are pushed.
 
 Auto-merge is no longer armed at bare PR creation (`make pr-open` withholds;
-`auto-merge-on-open.yml` arms only on `ready_for_review`). The partial-stack
+`auto-merge-on-open.yml` is revoke-only and never arms). The partial-stack
 race remains when a branch is marked final too early (`make pr-ready` /
-`READY=1` / draft→ready) and more commits follow: the PR can satisfy its
-checks and merge while a later commit is still being written, so develop
-receives a partial change and the remainder is orphaned on a closed branch.
+`READY=1`) and more commits follow: the PR can satisfy its checks and merge
+while a later commit is still being written, so develop receives a partial
+change and the remainder is orphaned on a closed branch.
 
 This is not hypothetical. PR #1503 merged carrying only its first commit; the
 `Results Explorer browser gate` job that its own PR body described never landed,
@@ -114,7 +114,10 @@ def test_auto_merge_partial_stack_soundness_revocation_is_unchanged() -> None:
     steps = [step for job in workflow["jobs"].values() for step in job.get("steps", [])]
     commands = [step.get("run", "") for step in steps]
     assert any("--disable-auto" in command for command in commands), "soundness revocation step is gone"
-    assert any("--auto --squash" in command for command in commands), (
+    # Hands-free auto-merge for ordinary PRs lives in the Makefile arm path
+    # (`make pr-ready`), not in this revoke-only workflow.
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+    assert "gh pr merge --auto --squash" in makefile, (
         "hands-free auto-merge for ordinary PRs is gone - the common case must stay hands-free"
     )
 
