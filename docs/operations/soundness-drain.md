@@ -33,9 +33,14 @@ mutations it performs are:
 `develop` and includes a PR in the digest when **all** of the following
 hold:
 
-- **(a) required-lane green** — the `ci-required-result` check run (the
-  aggregate required-check job defined in `.github/workflows/pr.yml`) on the
-  PR's head SHA completed with `conclusion: success`.
+- **(a) required-lane green** — **every** required status context of the
+  `develop-squash-only` ruleset has its latest check run on the PR's head
+  SHA completed with `conclusion: success`. Today that is both
+  `ci-required-result` (the aggregate required-check job defined in
+  `.github/workflows/pr.yml`) and `Results Explorer browser gate` (see
+  [`repo-admin-settings.md`](repo-admin-settings.md)). Partial green — one
+  context green while another is red or has never reported — is not green;
+  a missing run is fail-closed, not an absent requirement.
 - **(b) awaiting the owner** — auto-merge is currently OFF, **and** either
   the diff touches a soundness-critical path (reused via
   `any_soundness_path` imported from `auto_merge_soundness_paths.py` —
@@ -52,11 +57,14 @@ Draft PRs are always excluded regardless of the above.
 ### Park time
 
 Each qualifying PR also reports **park time**: hours since the PR became
-ready-and-green, anchored on the `ci-required-result` check run's
-`completed_at` (falling back to `updated_at` if that timestamp is
-unavailable). This is emitted per PR in both the text digest and `--json`
-output, and is the intended input for park-time re-measurement work (the
-WS9 re-measure references this field rather than recomputing it).
+ready-and-green, anchored on the `completed_at` of the **last** required
+context to finish (falling back to `updated_at` if any required context
+lacks that timestamp). The lane is only green once every context has
+finished, so anchoring on `ci-required-result` alone would overstate park
+time whenever the browser gate completes later — and trip the 24h gate
+early. This is emitted per PR in both the text digest and `--json` output,
+and is the intended input for park-time re-measurement work (the WS9
+re-measure references this field rather than recomputing it).
 
 ## Running locally
 
