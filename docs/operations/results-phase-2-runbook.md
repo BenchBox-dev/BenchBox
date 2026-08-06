@@ -51,14 +51,39 @@ back-ported) are left intact. A previous wipe-then-checkout strategy deleted
 those published-only submissions whenever develop was also ahead.
 Develop-side *path deletions* do not auto-propagate (a deleted seed path that
 still exists only on published-results becomes published-only and is kept).
-Remove those manually via a reviewed PR against `published-results` when the
-deletion is intentional privacy remediation. After overlay, the workflow
-regenerates `corpus-inventory.json` from the unioned tree so community-only
-paths remain inventory-listed. Other allowlist files (docs, validators) still
-use per-path checkout / removal. The scheduled
+After overlay, the workflow regenerates `corpus-inventory.json` from the
+unioned tree so community-only paths remain inventory-listed. Other allowlist
+files (docs, validators) still use per-path checkout / removal. The scheduled
 [`corpus-drift-check.yml`](../../.github/workflows/corpus-drift-check.yml)
 canary classifies develop-ahead vs published-only and never recommends a
 wipe-based full mirror while published-only paths exist.
+
+#### Public deletion / privacy takedown (intentional path removal)
+
+The union overlay **intentionally does not** propagate develop-side deletions
+inside `results-data/bundles/`. If a path is removed on `develop` but still
+exists only on `published-results`, it becomes **published-only** and is kept
+on the next mirror. That protects community submissions the automated sync
+must never wipe.
+
+When a maintainer must remove a path from the public corpus (privacy
+remediation, takedown, mistaken publish):
+
+1. **Do not** reintroduce a wipe-then-checkout of `results-data/bundles/` on
+   the sync workflow, and **do not** run a full-tree wipe of published bundles
+   while any published-only paths should survive. A full wipe would delete
+   every community submission that is not on develop.
+2. Open a **manual PR against `published-results`** that deletes only the
+   intended path(s) under `results-data/bundles/` (and any related docs if
+   needed).
+3. Regenerate inventory on that branch:
+   `uv run -- python scripts/generate_corpus_inventory.py --write`, then
+   stage `results-data/corpus-inventory.json` with the path removals.
+4. Merge after review. Leave develop in sync if the same path still exists
+   there (delete on develop in a separate PR if the seed/corpus copy must go
+   too); the next develop→published mirror will not resurrect a path that is
+   already gone from both trees, and will not re-delete other published-only
+   paths.
 
 If the workflow's heuristics ever miss a path (or a one-off mirror is
 needed outside the trigger conditions), trigger it manually via

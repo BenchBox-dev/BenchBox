@@ -207,8 +207,8 @@ def test_build_mirror_regenerates_inventory_after_union_overlay() -> None:
     assert "generate_corpus_inventory.py --write" in workflow
     build = workflow.split("name: Build mirror branch", 1)[1].split("name: ", 1)[0]
     assert "generate_corpus_inventory.py --write" in build
-    # Inventory is not in the blind FILE_PATHS overlay list (regenerated instead).
-    assert (
-        "corpus-inventory.json" not in build.split("FILE_PATHS=", 1)[1].split(")", 1)[0]
-        or "generate_corpus_inventory.py --write" in build
-    )
+    # Inventory artifact must not be blind-overlaid from develop (regenerated
+    # from the unioned tree instead). Assert against the FILE_PATHS block only.
+    assert "FILE_PATHS=" in build
+    file_paths_block = build.split("FILE_PATHS=", 1)[1].split(")", 1)[0]
+    assert "corpus-inventory.json" not in file_paths_block
