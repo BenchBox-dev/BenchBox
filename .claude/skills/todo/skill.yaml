@@ -1,4 +1,5 @@
 depends:
+  - SHARED/change-framework
   - SHARED/investigation-framework
   - SHARED/review-protocol
 tags:
@@ -8,3 +9,4 @@ category: workflow
 targets:
   claude: true
   codex: true
+standalone_only_commands: {}
