@@ -526,15 +526,14 @@ class AnonymizationManager:
                 else:
                     child_value = self._anonymize_public_value(child, child_path)
                 # After dropping identifier-only content (e.g. client_host with
-                # only machine_id), omit the empty optional block rather than
+                # only machine_id), omit empty optional blocks rather than
                 # publishing a hollow object. Non-empty profiles keep.
-                # Already-empty `{}` maps in stored corpus pass through so the
-                # publication fixed point is not broken without a re-derive.
+                # One-time corpus re-derive (rederive-prune-empty-client-host)
+                # also strips already-empty `{}` residuals so stored bytes match
+                # the fresh public shape.
                 if (
                     isinstance(child_value, dict)
                     and not child_value
-                    and isinstance(child, dict)
-                    and child
                     and _compact_key(str(key)) in _PUBLIC_EMPTY_OPTIONAL_MAP_KEYS
                 ):
                     continue
