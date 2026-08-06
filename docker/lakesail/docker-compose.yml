@@ -5,18 +5,25 @@ name: benchbox-lakesail
 # container so those paths resolve server-side. BenchBox creates LakeSail CSV
 # compatibility symlinks under that same data directory.
 #
-# BENCHBOX_DATA_DIR uses the FLAT $VARIABLE form only -- never a default
-# whose value itself contains another substitution, and never a required-
-# variable default (colon-question-mark syntax): mocker 0.7.2 has no
-# required-variable support at all -- an unresolved required-variable
-# expression is left as the literal unsubstituted string (not an error),
-# which mis-mounts identically to the nested-default bug this replaced
-# (lakesail-compose-nested-variable-default; see
-# tests/uat/docker_path_helpers.py for the exact broken forms). A checked-in
-# .env file in this directory supplies the fallback value for bare
-# `docker compose` runs; an exported BENCHBOX_DATA_DIR (which UAT always
-# sets, as an absolute path) overrides the .env value on both docker
-# compose and mocker.
+# BENCHBOX_DATA_DIR has NO default here, and must be an ABSOLUTE path: the
+# client sends the host-side path to the server over Spark Connect, so the
+# host path and the in-container mount path must be identical, and a
+# relative default could never equal an absolute host path (a checked-in
+# docker/lakesail/.env with a relative fallback was tried and reverted for
+# exactly this reason). Export BENCHBOX_DATA_DIR before running compose --
+# `make test-docker-up-lakesail` validates it is set and absolute before
+# invoking compose; a bare `docker compose` run must export it manually.
+#
+# The mount below uses the FLAT $VARIABLE form only -- never a default
+# whose value itself contains another substitution (mocker 0.7.2 misparses
+# that into a doubled, brace-mangled path; see
+# lakesail-compose-nested-variable-default and
+# tests/uat/docker_path_helpers.py for the exact broken forms), and never a
+# required-variable default (colon-question-mark syntax): mocker 0.7.2 has
+# no required-variable support at all -- an unresolved required-variable
+# expression is left as the literal unsubstituted string, even when the
+# variable IS set (not an error), which mis-mounts identically to the
+# nested-default bug.
 
 services:
   lakesail-connect:

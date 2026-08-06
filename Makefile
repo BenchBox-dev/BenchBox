@@ -462,19 +462,27 @@ DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
 CONTAINER_ENGINE ?= docker
 COMPOSE := $(CONTAINER_ENGINE) compose
 
-# Some docker/*/docker-compose.yml files (lakesail, velox) interpolate
-# BENCHBOX_DATA_DIR with no inline default -- a per-stack docker/<platform>/.env
-# supplies a directory-relative fallback for manual `docker compose` runs, but
-# that fallback resolves relative to the COMPOSE FILE's directory
-# (docker/<platform>/benchmark_runs), not the repo root these test-docker-*
-# targets run from. Export an explicit, repo-root-anchored value so `up` and
-# the later, separately-invoked `down` always agree -- an `up`/`down` pair that
-# disagreed on this value was a real teardown-leak risk
-# (lakesail-compose-nested-variable-default: a required-variable ${VAR:?...}
-# default made a `down` invoked without the same exported value fail outright,
-# orphaning the containers/volumes `down` was supposed to remove).
-BENCHBOX_DATA_DIR ?= $(CURDIR)/benchmark_runs
-export BENCHBOX_DATA_DIR
+# Some docker/*/docker-compose.yml files (lakesail, velox) mount
+# BENCHBOX_DATA_DIR with NO inline default -- see docker/lakesail/docker-compose.yml
+# and docker/velox/docker-compose.yml for why (mocker 0.7.2 misparses a
+# nested default, and silently leaves a required-variable default
+# (${VAR:?...}) unsubstituted even when the variable IS set). Two earlier
+# designs were tried here and reverted: a file-wide `BENCHBOX_DATA_DIR ?=
+# ...; export BENCHBOX_DATA_DIR` leaked an unrelated default into every one
+# of this Makefile's ~192 targets, not just the two that need it (and
+# BENCHBOX_DATA_DIR is a documented user-facing variable -- see
+# docs/reference/cli/configuration.md); and a per-stack docker/<platform>/.env
+# fallback could only supply a directory-relative default, which breaks the
+# host/container path-mirroring contract these two compose files rely on (a
+# relative value can never equal an absolute host path). There is
+# deliberately NO default here: callers must export an absolute
+# BENCHBOX_DATA_DIR themselves. require_data_dir_if_mounted below enforces
+# that -- non-empty and absolute -- scoped to just the lakesail/velox
+# bring-up targets, before compose is invoked.
+# $(1)=platform being brought up.
+define require_data_dir_if_mounted
+case " lakesail velox " in *" $(1) "*) case "$$BENCHBOX_DATA_DIR" in "") echo "ERROR: BENCHBOX_DATA_DIR must be exported before bringing up docker/$(1) -- its compose file binds the data directory at the SAME absolute path inside the container as on the host, because the server resolves client-sent file paths server-side; an unset value is silently accepted as an empty mount by both docker compose and mocker. Example: export BENCHBOX_DATA_DIR=$$HOME/benchbox-data" >&2; exit 1 ;; /*) : ;; *) echo "ERROR: BENCHBOX_DATA_DIR must be an ABSOLUTE path (got '$$BENCHBOX_DATA_DIR') -- docker/$(1)'s compose file binds it at the SAME path inside the container as on the host, so a relative value can never match. Example: export BENCHBOX_DATA_DIR=$$HOME/benchbox-data" >&2; exit 1 ;; esac ;; esac
+endef
 
 # `compose down -v` extended to also remove leaked named volumes on a SUCCESSFUL
 # down. mocker 0.5.4's `compose down -v` removes containers but LEAKS named
@@ -508,6 +516,7 @@ test-docker-up-%:
 			fi; \
 		}; \
 		trap cleanup EXIT INT TERM; \
+		$(call require_data_dir_if_mounted,$*); \
 		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
 		printf '%s\n' "$$project_name" > "$$project_file"; \
 		status=0
@@ -541,6 +550,7 @@ test-docker-%:
 		project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
 		cleanup() { { $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } || true; }; \
 		trap cleanup EXIT INT TERM; \
+		$(call require_data_dir_if_mounted,$*); \
 		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
 		uv run -- python -m pytest -m "live_$*" --tb=short -v -n 0
 
@@ -572,6 +582,7 @@ test-docker-up-all:
 				printf '%s\n' "$$project_name" > "$$project_file"; \
 			fi; \
 			echo "Starting $$p..."; \
+			$(call require_data_dir_if_mounted,$$p); \
 			$(COMPOSE) -p "$$project_name" -f docker/$$p/docker-compose.yml up -d --wait; \
 		done; \
 		status=0

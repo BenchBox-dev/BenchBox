@@ -28,25 +28,36 @@ name: benchbox-velox
 #   path-mirroring contract: the client-side absolute path MUST equal the
 #   server-side mount path or every load fails with file-not-found.
 #
-#   BENCHBOX_DATA_DIR uses the FLAT $VARIABLE form below only -- never a
-#   default whose value itself contains another substitution, and never a
-#   required-variable default (colon-question-mark syntax): mocker 0.7.2 has
-#   no required-variable support at all -- it leaves an unresolved required-
-#   variable expression as the literal unsubstituted string instead of
-#   erroring, which mis-mounts identically to the nested-default bug this
-#   replaced (lakesail-compose-nested-variable-default; see
-#   tests/uat/docker_path_helpers.py for the exact broken forms). A checked-
-#   in .env in this directory supplies the fallback for bare
-#   `docker compose` runs. UAT always exports an absolute BENCHBOX_DATA_DIR,
-#   which overrides .env on both docker compose and mocker, and is used as
-#   both the host path AND the in-container mount path:
+#   BENCHBOX_DATA_DIR has NO default here. It must be exported as an
+#   ABSOLUTE path before running compose: the client-side absolute path and
+#   the server-side mount path must be identical (see the path-mirroring
+#   contract above), and a relative default could never equal an absolute
+#   host path -- a checked-in docker/velox/.env with a relative fallback
+#   was tried and reverted for exactly this reason. `make
+#   test-docker-up-velox` validates BENCHBOX_DATA_DIR is set and absolute
+#   before invoking compose; a bare `docker compose` run must export it
+#   manually. The same value is used as both the host path AND the
+#   in-container mount path:
 #     BENCHBOX_DATA_DIR=/mnt/benchbox-data docker compose up -d velox-connect
 #   …and run benchbox so the absolute paths it sends point inside the mount.
 #
+#   The mount uses the FLAT $VARIABLE form only -- never a default whose
+#   value itself contains another substitution (mocker 0.7.2 misparses that
+#   into a doubled, brace-mangled path; see
+#   lakesail-compose-nested-variable-default and
+#   tests/uat/docker_path_helpers.py for the exact broken forms), and never
+#   a required-variable default (colon-question-mark syntax): mocker 0.7.2
+#   has no required-variable support at all -- it leaves an unresolved
+#   required-variable expression as the literal unsubstituted string, even
+#   when the variable IS set, instead of erroring, which mis-mounts
+#   identically to the nested-default bug.
+#
 #   Compose interpolates the WHOLE file regardless of which service you
 #   target, so `docker compose run --rm velox-runner` also needs
-#   BENCHBOX_DATA_DIR to resolve even though velox-runner itself has no data
-#   mount -- the .env fallback covers that case too.
+#   BENCHBOX_DATA_DIR to resolve even though velox-runner itself has no
+#   data mount -- export it before running velox-runner too, or compose
+#   will warn that the variable is unset (harmless for velox-runner, which
+#   has no mount referencing it, but export it to silence the warning).
 #
 #   Mounted :ro because Spark writes managed-table data to
 #   spark.sql.warehouse.dir (=/tmp/spark-warehouse, set in entrypoint.sh), not

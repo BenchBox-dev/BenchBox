@@ -29,14 +29,16 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 STATE_DIR="${DOCKER_TEST_STATE_DIR:-/tmp/benchbox-docker-projects}"
 fails=0
 
-# Passed explicitly (not just relied on as the Makefile's own default) so
-# `up` and `down` always agree on the same value even if the Makefile's
-# default changes later -- an up/down pair that disagreed here was the
-# teardown-leak risk that made lakesail-compose-nested-variable-default's
+# Passed explicitly (the Makefile has no BENCHBOX_DATA_DIR default of its
+# own -- see Makefile's require_data_dir_if_mounted) so `up` and `down`
+# always agree on the same value -- an up/down pair that disagreed here was
+# the teardown-leak risk that made lakesail-compose-nested-variable-default's
 # ${VAR:?...} required-variable form unsafe (a `down` invoked without the
 # same exported value refused to parse the file, orphaning the containers
-# and volumes it was supposed to remove). Only lakesail/velox compose files
-# reference this variable; it is a harmless no-op for every other platform.
+# and volumes it was supposed to remove). It must be absolute: `make
+# test-docker-up-<lakesail|velox>` now rejects a relative or unset value
+# before invoking compose. Only lakesail/velox compose files reference this
+# variable; it is a harmless no-op for every other platform.
 DATA_DIR="${BENCHBOX_DATA_DIR:-$ROOT/benchmark_runs}"
 
 # TCP connect check via bash /dev/tcp (no nc dependency). The subshell opens and

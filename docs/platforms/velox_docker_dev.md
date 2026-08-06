@@ -71,6 +71,7 @@ The host runs `benchbox`; the container runs the Gluten-enabled Spark-Connect se
 ```bash
 # 1. Start the server (detached)
 cd docker/velox
+export BENCHBOX_DATA_DIR=/absolute/path/to/your/data   # required -- no default, see below
 docker compose up -d velox-connect
 
 # 2. Wait for the health check to pass (~60-90 s on a cold JVM)
@@ -97,12 +98,15 @@ Container: /Users/joe/Developer/BenchBox/benchmark_runs/tpch_sf1/lineitem.parque
            └── same path, mounted :ro
 ```
 
-`BENCHBOX_DATA_DIR` is not defaulted inline in the compose file. A checked-in [`docker/velox/.env`](../../docker/velox/.env) supplies the `./benchmark_runs` fallback (resolved relative to `docker/velox/`, which is why Workflow A starts with `cd docker/velox`) for bare `docker compose` runs. This indirection exists because [mocker](../operations/uat-framework.md) — the Apple-silicon local Docker-compatible engine used by `make test-docker-* CONTAINER_ENGINE=mocker` — supports neither a nested default (`${VAR:-${OTHER}}`) nor the `${VAR:?message}` required-variable form; it silently leaves either one unresolved instead of substituting or erroring. If your data lives outside `docker/velox/benchmark_runs`, export `BENCHBOX_DATA_DIR` as an absolute path — it overrides `.env` on both `docker compose` and mocker:
+`BENCHBOX_DATA_DIR` has **no default** in the compose file — export it as an **absolute path** before running compose. There is deliberately no fallback: any default that could live in the compose file or a checked-in `.env` can only ever be a directory-relative path (e.g. `./benchmark_runs`), and a relative container mount target can never equal an absolute host path, breaking the exact contract above (`docker/velox/.env` shipped a relative fallback briefly and was reverted for this reason). `make test-docker-up-velox` validates the variable is set and absolute before invoking compose; a bare `docker compose` run must export it manually:
 
 ```bash
-BENCHBOX_DATA_DIR=/mnt/benchdata docker compose up -d velox-connect
+export BENCHBOX_DATA_DIR=/mnt/benchdata
+docker compose up -d velox-connect
 # Then run benchbox so the paths it sends are under /mnt/benchdata/
 ```
+
+The mount also stays a bare `${BENCHBOX_DATA_DIR}` reference with no inline default syntax at all, because [mocker](../operations/uat-framework.md) — the Apple-silicon local Docker-compatible engine used by `make test-docker-* CONTAINER_ENGINE=mocker` — supports neither a nested default (`${VAR:-${OTHER}}`) nor the `${VAR:?message}` required-variable form; it silently leaves either one unresolved instead of substituting or erroring.
 
 The mount is read-only (`:ro`). Spark's managed table warehouse is redirected to `/tmp/spark-warehouse` inside the container.
 
@@ -110,10 +114,11 @@ The mount is read-only (`:ro`). Spark's managed table warehouse is redirected to
 
 Run BenchBox entirely inside the container using an in-process (local) Gluten session. Simpler for one-shot benchmarks, CI jobs, and situations where you don't want to keep a server running.
 
-`velox-runner` has no data mount of its own, but compose interpolates the entire file regardless of which service you target, so `BENCHBOX_DATA_DIR` still has to resolve — `docker/velox/.env` covers that (see [Data Path Contract](#data-path-contract) above).
+`velox-runner` has no data mount of its own, but compose interpolates the entire file regardless of which service you target, so `BENCHBOX_DATA_DIR` still needs to be exported before running `velox-runner` too, or compose will warn that the variable is unset (harmless here since `velox-runner` has no mount referencing it — see [Data Path Contract](#data-path-contract) above).
 
 ```bash
 cd docker/velox
+export BENCHBOX_DATA_DIR=/absolute/path/to/your/data
 
 # TPC-H SF 0.01 smoke test
 docker compose run --rm velox-runner \
@@ -194,7 +199,7 @@ VELOX_OFFHEAP=16g SPARK_DRIVER_MEM=8g docker compose up -d velox-connect
 | `VELOX_OFFHEAP` | `8g` | Off-heap memory budget for Velox |
 | `SPARK_DRIVER_MEM` | `4g` | JVM driver heap |
 | `SPARK_CONNECT_PORT` | `50051` | Host port exposed for the Spark-Connect server |
-| `BENCHBOX_DATA_DIR` | `./benchmark_runs` (from `docker/velox/.env`, relative to that directory) | Bind-mounted at the same absolute path inside the container |
+| `BENCHBOX_DATA_DIR` | **none — required** | Must be exported as an absolute path; bind-mounted at that same path inside the container. `make test-docker-up-velox` enforces this before invoking compose. |
 
 ## CI Integration
 
