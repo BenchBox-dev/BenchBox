@@ -833,8 +833,6 @@ guards-fix:
 	@$(MAKE) -s parity-fixtures
 	@echo "-- sql_compat capability matrix / skip-reference docs --"
 	@$(MAKE) -s compat-docs
-	@echo "-- UAT spec module-LOC table --"
-	@uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py
 	@echo "-- skill-sync (no-ops with a notice if the skill-sync CLI is not installed) --"
 	@# Last regen step, contained: a failing skill-sync CLI (e.g. "unable to
 	@# read tree <sha>" in a fresh worktree) used to abort guards-fix here,
