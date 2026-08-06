@@ -84,4 +84,3 @@ policy was not expanded beyond empty optional map omission.
   `client_host` objects remain in primary bundles).
 - Spot check: `rg -n '"client_host": \{\}' results-data/bundles` should not
   match residual hollow maps in primary result JSON.
-
