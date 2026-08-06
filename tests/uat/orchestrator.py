@@ -98,11 +98,15 @@ def _install_sweep_sigterm_shim(log_dir: Path, phase_holder: list[str | None]) -
     Returns the previous SIGTERM handler to restore, or the not-installed
     sentinel when the shim could not be installed (not running in the main
     thread -- `signal.signal` raises there). Installing in the sweep's own
-    process does not touch cell subprocesses: `timeouts.py` owns their
-    process-group kill semantics, and those subprocesses never import this
-    shim. Returning the sentinel (rather than raising) keeps a sweep driven
-    from a worker thread working with default SIGTERM behavior; row durability
-    does not depend on the shim, only the orderly-teardown upgrade does.
+    process does not touch cell subprocesses directly: `timeouts.py` owns
+    their process-group kill semantics via `run_with_timeout`'s own
+    `except BaseException` guard (with `Popen()` itself inside that guarded
+    `try`, see its docstring), which fires as `SweepCancelled` unwinds
+    through wherever `run_with_timeout` currently is -- including a blocked
+    `communicate()` call. Returning the sentinel (rather than raising) keeps
+    a sweep driven from a worker thread working with default SIGTERM
+    behavior; row durability does not depend on the shim, only the
+    orderly-teardown upgrade does.
 
     The handler records the cancellation (signal name, phase in flight,
     timestamp) to uat_lifecycle.log before raising (w3), so a killed sweep

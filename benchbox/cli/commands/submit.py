@@ -24,6 +24,10 @@ from benchbox.cli.submit_service import (
     HostedSubmitUnauthorized,
     submit_hosted_bundle,
 )
+from benchbox.core.results.anonymization import (
+    MissingPublicPseudonymSaltError,
+    require_public_pseudonym_salt,
+)
 from benchbox.core.results.canonical_json import canonical_json_file_bytes, canonical_json_text
 from benchbox.core.results.loader import (
     ResultLoadError,
@@ -185,6 +189,15 @@ def _build_submission_manifest(
     if submission_notes:
         manifest["submission_notes"] = submission_notes
     return manifest
+
+
+def _refuse_missing_public_pseudonym_salt(ctx: click.Context) -> None:
+    """Hard-refuse community submit when the deployment salt is unset."""
+    try:
+        require_public_pseudonym_salt()
+    except MissingPublicPseudonymSaltError as exc:
+        console.print(f"\n[red]❌ Submission refused: {exc}[/red]")
+        ctx.exit(1)
 
 
 def _refuse_non_submittable_result(ctx: click.Context, result: object, submit_state: SubmitTerminalState) -> None:
@@ -670,6 +683,11 @@ def submit(
         console.print(f"[red]Unexpected error: {e}[/red]")
         ctx.exit(1)
         return
+
+    # Community publish requires a deployment-private public pseudonym salt.
+    # Empty OSS default remains for private/local export; submit is the
+    # community-facing gate (retained-field salt decision 2026-08-05).
+    _refuse_missing_public_pseudonym_salt(ctx)
 
     # Submit-classification policy is shared with UAT via
     # benchbox.core.results.submit_classification so the two surfaces cannot

@@ -28,6 +28,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 POST_MERGE = REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml"
 GAP_DETECTOR = REPO_ROOT / ".github" / "workflows" / "develop-post-merge-gap-detector.yml"
 SCRIPT = REPO_ROOT / "scripts" / "detect_develop_post_merge_gaps.py"
+GAPS_DOC = REPO_ROOT / "docs" / "operations" / "develop-post-merge-gaps.md"
+INVENTORY_DOC = REPO_ROOT / "docs" / "operations" / "develop-push-drop-inventory.md"
 
 MUTATION_JOBS = (
     "auto-revert-on-failure",
@@ -182,6 +184,71 @@ def test_gap_detector_concurrency_does_not_cancel_in_progress() -> None:
     concurrency = workflow.get("concurrency") or {}
     assert concurrency.get("cancel-in-progress") is False
     assert concurrency.get("group") == "develop-post-merge-gap-detector"
+
+
+# ---------------------------------------------------------------------------
+# Ops inventory for the broader develop-push class
+# ---------------------------------------------------------------------------
+def test_gaps_doc_links_push_drop_inventory() -> None:
+    """Incident doc must point maintainers at the full develop-push inventory."""
+    text = GAPS_DOC.read_text(encoding="utf-8")
+    assert "develop-push-drop-inventory" in text
+    assert "push-drop" in text or "schedule" in text
+
+
+def test_push_drop_inventory_names_develop_push_subjects() -> None:
+    """Inventory must name the post-merge backstop and the other develop-push subjects."""
+    assert INVENTORY_DOC.is_file(), f"missing inventory doc at {INVENTORY_DOC}"
+    text = INVENTORY_DOC.read_text(encoding="utf-8")
+    for needle in (
+        "develop-post-merge",
+        "orphaned-commit-detector",
+        "submission-validator-drift-check",
+        "sync-results-data-to-published",
+        "results-explorer-browser",
+        "corpus-drift-check",
+        "push-drop",
+        "schedule",
+    ):
+        assert needle in text, f"inventory missing {needle!r}"
+
+
+def test_push_drop_inventory_subject_set_matches_workflows() -> None:
+    """Table subject set must stay aligned with workflows that push to develop."""
+    subjects: list[str] = []
+    for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+        workflow = _load_workflow(path)
+        on = workflow.get(True) or workflow.get("on")
+        if not isinstance(on, dict) or "push" not in on:
+            continue
+        push = on["push"]
+        hits_develop = False
+        if push is None:
+            hits_develop = True
+        elif isinstance(push, dict):
+            if "tags" in push and "branches" not in push:
+                hits_develop = False
+            else:
+                branches = push.get("branches")
+                if branches is None and "branches-ignore" not in push:
+                    hits_develop = "tags" not in push
+                else:
+                    hits_develop = branches is not None and "develop" in list(branches)
+        if hits_develop:
+            subjects.append(path.name)
+
+    expected = {
+        "develop-post-merge.yml",
+        "orphaned-commit-detector.yml",
+        "results-explorer-browser.yml",
+        "submission-validator-drift-check.yml",
+        "sync-results-data-to-published.yml",
+    }
+    assert set(subjects) == expected, f"develop-push subject set drifted: {subjects}"
+
+    inventory = INVENTORY_DOC.read_text(encoding="utf-8")
+    for name in expected:
+        assert name in inventory, f"inventory does not list {name}"
 
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import signal
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
@@ -22,7 +23,18 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.uat import _cli as uat_cli, cells_io, docker_assets, orchestrator
+# `test_timeouts` is imported for its real-process probe script and
+# process-state predicates: they live with the module they exercise, and
+# sharing them keeps one implementation instead of the verbatim `_pid_exists`
+# copy this file used to carry.
+from tests.uat import (
+    _cli as uat_cli,
+    cells_io,
+    docker_assets,
+    orchestrator,
+    test_timeouts as timeouts_test,
+    timeouts,
+)
 from tests.uat.config import validate_config
 from tests.uat.conftest import docker_verb, healthy_ps_stdout, platform_reachability
 from tests.uat.phases import execute as exec_phase
@@ -319,3 +331,78 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
 
     assert "cell" in sequence and "down" in sequence
     assert sequence.index("down") > sequence.index("cell")
+
+
+# --------------------------------------------------------------------- w2/w4 (uat-cell-teardown-orphans-child-processes-20260805)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX signal/process-group behavior")
+def test_sweep_cancel_reaps_orphaned_child_no_survivor(tmp_path: Path):
+    """A cancelled sweep leaves no surviving descendant process.
+
+    The end-to-end wiring test: the real sweep-process SIGTERM shim
+    (`orchestrator._install_sweep_sigterm_shim`, the exact handler
+    `run_sweep` installs) raising the real `SweepCancelled` through the real
+    `timeouts.run_with_timeout` (the exact wrapper `exec_phase.run_cell`
+    uses), at the production timeout, around a real child that owns a real
+    grandchild and traps SIGTERM the way a cell's database server does.
+
+    The unit-level equivalents in test_timeouts.py pin the same behavior
+    against a locally defined `KeyboardInterrupt` subclass; this one proves
+    the orchestrator's actual exception type reaches the guard, which is the
+    whole premise of the fix -- `SweepCancelled` is not an `Exception`, so
+    `except subprocess.TimeoutExpired` never saw it and the descendant tree
+    survived.
+    """
+    phase_holder: list[str | None] = ["execute"]
+    previous_sigterm = orchestrator._install_sweep_sigterm_shim(tmp_path, phase_holder)
+    sigterm_handler = signal.getsignal(signal.SIGTERM)
+    ready_path = tmp_path / "child.ready"
+    child_pid_path = tmp_path / "child.pid"
+    grandchild_pid_path = tmp_path / "grandchild.pid"
+    argv = [
+        sys.executable,
+        "-c",
+        timeouts_test._CANCEL_PROBE_SRC,
+        str(child_pid_path),
+        str(grandchild_pid_path),
+        str(tmp_path / "child.sigterm"),
+        str(ready_path),
+        timeouts_test._GRANDCHILD_SRC,
+    ]
+    ticks = {"count": 0}
+
+    def _deliver_cancellation(signum: int, frame: FrameType | None) -> None:
+        # Fire the exact SIGTERM handler the orchestrator installed, from a
+        # SIGALRM tick landing while the main thread is blocked inside
+        # run_with_timeout's communicate() -- the same real scenario an
+        # operator `kill` on the sweep process produces. No-op until the
+        # probe reports ready so the grandchild is guaranteed to exist by
+        # the time the cancellation lands, on a loaded machine too.
+        ticks["count"] += 1
+        if not ready_path.exists():
+            if ticks["count"] >= timeouts_test._PROBE_MAX_TICKS:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                raise AssertionError("probe never reported readiness")
+            return
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        typed_handler = cast(Callable[[int, FrameType | None], None], sigterm_handler)
+        typed_handler(signal.SIGTERM, frame)
+
+    previous_alarm = signal.signal(signal.SIGALRM, _deliver_cancellation)
+    signal.setitimer(signal.ITIMER_REAL, timeouts_test._PROBE_TICK_S, timeouts_test._PROBE_TICK_S)
+    try:
+        with pytest.raises(orchestrator.SweepCancelled) as cancelled:
+            timeouts.run_with_timeout(argv, timeout_s=timeouts_test._PRODUCTION_LIKE_TIMEOUT_S)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_alarm)
+        orchestrator._restore_sweep_sigterm_shim(previous_sigterm)
+
+    child_pid = int(child_pid_path.read_text(encoding="utf-8"))
+    grandchild_pid = int(grandchild_pid_path.read_text(encoding="utf-8"))
+    assert timeouts_test._await_process_state(grandchild_pid, {timeouts_test._PROC_GONE}) == timeouts_test._PROC_GONE
+    assert timeouts_test._await_process_state(child_pid, {timeouts_test._PROC_GONE}) == timeouts_test._PROC_GONE
+    # Keeps run_with_timeout's `proc` local reachable through the traceback
+    # for the duration of the assertions above; see _run_cancelled_probe.
+    assert isinstance(cancelled.value, orchestrator.SweepCancelled)

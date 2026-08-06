@@ -5,12 +5,13 @@
   "prs": [
     {
       "number": 2001,
-      "title": "stranded hit: green, auto-merge off, aged past grace",
+      "title": "intentional hold: green, auto-merge off, aged, never armed",
       "html_url": "https://github.com/joeharris76/BenchBox/pull/2001",
       "draft": false,
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
+      "timeline_events": [],
       "changed_files": ["benchbox/platforms/duckdb/adapter.py"],
       "check_runs": [
         {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
@@ -18,12 +19,13 @@
     },
     {
       "number": 2002,
-      "title": "soundness-gated exclusion: otherwise identical to the stranded hit",
+      "title": "soundness-gated exclusion: otherwise identical to a true strand",
       "html_url": "https://github.com/joeharris76/BenchBox/pull/2002",
       "draft": false,
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
+      "timeline_events": [{"event": "ready_for_review"}],
       "changed_files": ["benchbox/core/equivalence/compare.py"],
       "check_runs": [
         {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
@@ -37,6 +39,7 @@
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": {"enabled_by": {"login": "joeharris76"}, "merge_method": "squash"},
+      "timeline_events": [{"event": "auto_squash_enabled"}],
       "changed_files": ["benchbox/platforms/snowflake/adapter.py"],
       "check_runs": [
         {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
@@ -50,6 +53,7 @@
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
+      "timeline_events": [],
       "changed_files": ["README.md"],
       "check_runs": [
         {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
@@ -63,6 +67,7 @@
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
+      "timeline_events": [{"event": "auto_squash_enabled"}],
       "changed_files": ["docs/development/adding-new-platforms.md"],
       "check_runs": [
         {"name": "ci-required-result", "status": "completed", "conclusion": "failure", "started_at": "2026-07-23T08:10:00Z"}
@@ -76,6 +81,7 @@
       "updated_at": "2026-07-23T11:30:00Z",
       "head_pushed_at": "2026-07-23T11:30:00Z",
       "auto_merge": null,
+      "timeline_events": [{"event": "ready_for_review"}],
       "changed_files": ["docs/development/adding-new-platforms.md"],
       "check_runs": [
         {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T11:35:00Z"}
@@ -83,12 +89,59 @@
     },
     {
       "number": 2007,
-      "title": "stale-conclusion guard: an older failed run must not shadow the latest success",
+      "title": "intentional hold + stale-conclusion: green latest run, never armed",
       "html_url": "https://github.com/joeharris76/BenchBox/pull/2007",
       "draft": false,
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
+      "timeline_events": [{"event": "committed"}, {"event": "reviewed"}],
+      "changed_files": ["benchbox/platforms/bigquery/adapter.py"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "failure", "started_at": "2026-07-23T07:00:00Z"},
+        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+      ]
+    },
+    {
+      "number": 2008,
+      "title": "true strand: ready_for_review arm intent, auto-merge still off",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2008",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "timeline_events": [{"event": "ready_for_review"}],
+      "changed_files": ["benchbox/platforms/duckdb/adapter.py"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+      ]
+    },
+    {
+      "number": 2009,
+      "title": "true strand: auto_squash enabled then dropped while still green",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2009",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "timeline_events": [
+        {"event": "auto_squash_enabled"},
+        {"event": "auto_merge_disabled"}
+      ],
+      "changed_files": ["benchbox/platforms/snowflake/adapter.py"],
+      "check_runs": [
+        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+      ]
+    },
+    {
+      "number": 2010,
+      "title": "true strand + stale-conclusion guard with arm intent",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2010",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "had_arm_intent": true,
       "changed_files": ["benchbox/platforms/bigquery/adapter.py"],
       "check_runs": [
         {"name": "ci-required-result", "status": "completed", "conclusion": "failure", "started_at": "2026-07-23T07:00:00Z"},
@@ -96,13 +149,15 @@
       ]
     }
   ],
-  "expected_stranded": [2001, 2007],
+  "expected_stranded": [2008, 2009, 2010],
   "expected_excluded_reasons": {
+    "2001": "intentional_hold",
     "2002": "soundness_gated",
     "2003": "auto_merge_on",
     "2004": "draft",
     "2005": "not_green",
-    "2006": "within_grace"
+    "2006": "within_grace",
+    "2007": "no_arm_intent"
   },
   "post_merge_run": {
     "status": "completed",
