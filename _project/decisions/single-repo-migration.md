@@ -380,3 +380,5 @@ released `main` so operators discover the production URL without silent
 local fallback.
 
 - **`main` only** (extension to A3): `.todo-db/`.
+
+This amendment is authoritative for the release-curation guard.
