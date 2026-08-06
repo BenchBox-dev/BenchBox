@@ -455,28 +455,31 @@ def test_sweep_leaked_mocker_volumes_swallows_individual_removal_failure(tmp_pat
 
 
 @pytest.mark.parametrize(
-    ("platform", "expected_service_count"),
+    ("platform", "expected_service_names"),
     [
-        # minio, minio-setup, databend -- the validated mocker failure is
-        # databend's minio service exiting under mocker (AGENTS.md).
-        ("databend", 3),
+        # The validated mocker failure is specifically databend's `minio`
+        # service exiting under mocker (AGENTS.md) -- `minio` is the
+        # load-bearing token in that guidance, not just "three services".
+        ("databend", frozenset({"minio", "minio-setup", "databend"})),
         # all-in-one FE+BE image -- single container, unaffected by mocker.
-        ("doris", 1),
+        ("doris", frozenset({"doris"})),
         # all-in-one image -- single container, unaffected by mocker.
-        ("starrocks", 1),
+        ("starrocks", frozenset({"starrocks"})),
     ],
 )
-def test_multi_service_platform_service_counts_match_documented_guidance(platform, expected_service_count):
-    """Pin the compose service counts AGENTS.md and uat-framework.md cite.
+def test_multi_service_platform_service_names_match_documented_guidance(platform, expected_service_names):
+    """Pin the compose service *identities* AGENTS.md and uat-framework.md cite.
 
     Guards against the mocker multi-service guidance drifting out of sync
     with the compose files it describes, the way it silently did once before
     (commit fd29aa77c0 compressed the specific databend/minio caveat into a
-    vague, unverifiable claim).
+    vague, unverifiable claim). A count-only assertion would stay green even
+    if databend's `minio` service were renamed to something else, so this
+    pins the actual service names, not just how many there are.
     """
     spec = docker_assets.docker_platform_spec(platform)
-    total_services = 0
+    service_names: set[str] = set()
     for compose_file in spec.compose_files:
         data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
-        total_services += len(data.get("services", {}))
-    assert total_services == expected_service_count
+        service_names.update(data.get("services", {}).keys())
+    assert service_names == expected_service_names

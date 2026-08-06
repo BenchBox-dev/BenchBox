@@ -245,19 +245,33 @@ lifecycle parity and end-to-end `test-docker-questdb` (load + query).
 
 NOT validated: multi-service stacks. `docker/databend/docker-compose.yml`
 declares three services (`minio`, `minio-setup`, `databend`); databend stays
-healthy on docker, but its `minio` service exits under mocker, so use
-`CONTAINER_ENGINE=docker` for databend. This is specific to databend's
-dependency on a separate MinIO container for S3-compatible storage -- it is
-not evidence that mocker cannot run multi-service compose stacks in general.
-`docker/doris/docker-compose.yml` and `docker/starrocks/docker-compose.yml`
-each declare exactly one service (the official all-in-one FE+BE image), so
-both are unaffected and fine under mocker.
+healthy on docker, but its `minio` service exits under mocker. This was last
+observed 2026-07-03 against a 4-service databend and 3-service doris/
+starrocks (TODO `migrate-test-docker-stacks-to-mocker`, w2); all three
+compose files have since been rewritten, and current service counts are
+pinned by the test below, but the failure has not been re-measured against
+today's compose files. Set the resolver override
+`BENCHBOX_CONTAINER_CLI=docker` for UAT's own compose lifecycle
+(`resolve_container_cli()`, above -- this is the path a macOS operator
+actually takes; on macOS it otherwise resolves to mocker when present).
+`CONTAINER_ENGINE=docker` is a different knob: it only feeds
+`make test-docker-*`'s `$(COMPOSE)` (`Makefile:462`) and is already the
+default there, so setting it is a no-op for that path. This databend/minio
+failure is specific to its dependency on a separate MinIO container for
+S3-compatible storage -- it is not evidence that mocker cannot run
+multi-service compose stacks in general. `docker/doris/docker-compose.yml`
+and `docker/starrocks/docker-compose.yml` each declare exactly one service
+(the official all-in-one FE+BE image); databend's separate-MinIO failure
+mode does not apply to them structurally, but they are not separately
+validated under mocker.
 
-`tests/uat/test_docker_assets.py` pins these three service counts against the
-compose files so this guidance cannot silently drift out of sync again (it
-drifted once, in commit `fd29aa77c0`, when a canonicalization pass compressed
-this section into a vague "unsuitable for certain multi-service stacks"
-claim with no named platform).
+`tests/uat/test_docker_assets.py` pins these compose files' service *names*
+(not just counts) so this guidance cannot silently drift out of sync again.
+It drifted once already: commit `fd29aa77c0` compressed AGENTS.md's former
+"Mocker as a local test-docker engine" section -- which is where this
+databend/minio caveat originally lived, not this file -- down to a vague
+"Mocker is local-only and unsuitable for the known multi-service stacks"
+line with no named platform.
 
 ## Explorer smoke (browser)
 
