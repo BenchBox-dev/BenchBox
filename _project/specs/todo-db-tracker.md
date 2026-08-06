@@ -411,8 +411,11 @@ historical archive deferrals).
 **Thin wrapper + UAT (2026-07-18, third round).** The wrapper was built
 TDD-first: `tests/unit/scripts/test_todo_wrapper.py` pins the contract
 (10 tests written red), then the implementation turned them green —
-`_project/scripts/todo` (7-line shim, works from any cwd, propagates gate
-exit codes) and `.claude/skills/todo-db/SKILL.md` (the thin skill). The
+`_project/scripts/todo` (shim resolves ROOT from its own path via
+`BASH_SOURCE`, not cwd/`git rev-parse --show-toplevel`, so an absolute
+path to another clone's shim still runs that clone's `todo_db.py`;
+propagates gate exit codes) and `.claude/skills/todo-db/SKILL.md` (the
+thin skill). The
 contract tests enforce thinness structurally: ≤40 non-empty body lines,
 every referenced `todo <cmd>` must exist in the CLI's handler table, the
 mandatory workflow verbs must be present, and schema/validation vocabulary
