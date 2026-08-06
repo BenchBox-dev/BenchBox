@@ -8,8 +8,10 @@ rejects any credential or identifier sentinel that survives.
 Coverage layers (R8 permanent invariant + expansion):
 
 * 47-adapter platform_config / raw_config construct-and-export sweep with
-  explicit optional-dependency skip accounting (45-pass / 2-ODBC-skip when
-  only pyodbc is missing under --all-extras).
+  explicit optional-dependency skip accounting: a platform may only skip when
+  benchbox.utils.dependencies (dependencies.yaml) recognizes it as carrying
+  an optional SDK/driver dependency; the pass/skip split otherwise tracks
+  whichever extras the CI ``uv sync --group dev`` closure happens to install.
 * raw_metadata + normalized deployment/cloud/compute/storage blocks.
 * URI query/fragment credentials through platform-options sanitization and
   result export chokepoints.
@@ -43,6 +45,7 @@ from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.core.results.schema import build_result_payload
 from benchbox.mcp.errors import make_execution_error
+from benchbox.utils.dependencies import DEPENDENCY_GROUPS, PLATFORM_TO_EXTRA
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
@@ -50,14 +53,31 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium]
 # updating the permanent egress invariant.
 EXPECTED_REGISTERED_PLATFORM_COUNT = 47
 
-# Optional ODBC-backed adapters that remain skippable even under
-# ``uv run --all-extras`` when the host lacks pyodbc (system driver). Any other
-# missing-dependency skip must still record the exact reason so a disappearing
-# adapter cannot make the sweep vacuous.
-OPTIONAL_ODBC_ADAPTER_DEPENDENCIES: dict[str, str] = {
-    "fabric-lakehouse": "pyodbc",
-    "synapse": "pyodbc",
-}
+
+def _catalog_required_packages(platform_name: str) -> tuple[str, ...] | None:
+    """Return the catalog-declared optional-dependency packages for a platform.
+
+    ``benchbox.utils.dependencies`` (backed by ``dependencies.yaml``) is the
+    project's own source of truth for which registered platforms carry an
+    optional SDK/driver dependency versus which are always constructible in
+    the CI ``uv sync --group dev`` environment (DuckDB, SQLite, DataFusion,
+    Polars, PySpark, ...). A platform with no catalog entry has no recognized
+    reason to skip -- its adapter must always construct. This replaces a
+    prior hardcoded ODBC-only allowlist that only recognized pyodbc-backed
+    adapters (fabric-lakehouse, synapse) and misclassified every other
+    optional-SDK platform's missing-dependency skip as unexpected.
+
+    Returns the pip package names (e.g. ``pyodbc``, ``boto3``,
+    ``google-cloud-dataproc``) that legitimately explain a missing-dependency
+    skip for ``platform_name``, or ``None`` if the platform has no catalog
+    entry.
+    """
+    extra_name = PLATFORM_TO_EXTRA.get(platform_name, platform_name)
+    dep_info = DEPENDENCY_GROUPS.get(extra_name)
+    if dep_info is None:
+        return None
+    return tuple(dep_info.packages)
+
 
 _CREDENTIAL_SENTINELS = (
     "EGRESS_PASSWORD_SENTINEL",
@@ -171,9 +191,9 @@ def _prepare_config_for_platform(platform_name: str, tmp_path: Path) -> dict[str
 def _construct_adapter_or_skip_reason(platform_name: str, tmp_path: Path) -> Any | str:
     """Return a constructed adapter, or a skip-reason string (never empty).
 
-    Only the known optional ODBC adapters may skip. Any other missing-dependency
-    failure is an unexpected skip and must fail the invariant (run under
-    ``uv run --all-extras`` so non-ODBC extras are present). Adapters are
+    Only platforms with a catalog-recognized optional dependency
+    (``_catalog_required_packages``) may skip. Any other missing-dependency
+    failure is an unexpected skip and must fail the invariant. Adapters are
     inconsistent about which exception carries a missing optional dependency:
     most raise ImportError, but the Spark-family adapters raise
     ConfigurationError with the same get_dependency_error_message() text.
@@ -186,17 +206,19 @@ def _construct_adapter_or_skip_reason(platform_name: str, tmp_path: Path) -> Any
         message = str(exc)
         if "Missing dependencies" not in message:
             raise
-        required = OPTIONAL_ODBC_ADAPTER_DEPENDENCIES.get(platform_name)
-        if required is None:
+        required_packages = _catalog_required_packages(platform_name)
+        if required_packages is None:
             raise AssertionError(
-                f"unexpected non-ODBC skip for {platform_name!r}: {message}. "
-                f"Only {sorted(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES)} may skip; "
-                "install optional extras (uv run --all-extras) or expand the "
-                "optional-ODBC allowlist deliberately."
+                f"unexpected skip for {platform_name!r}: {message}. This platform has no "
+                "optional-dependency catalog entry (benchbox.utils.dependencies); install "
+                "the missing extra or register the platform's extra in dependencies.yaml "
+                "deliberately."
             ) from exc
-        if required not in message.lower():
+        message_lower = message.lower()
+        if not any(package.lower() in message_lower for package in required_packages):
             raise AssertionError(
-                f"{platform_name} optional skip must cite missing dependency {required!r}; got: {message}"
+                f"{platform_name} optional skip must cite one of its catalog dependencies "
+                f"{required_packages}; got: {message}"
             ) from exc
         return f"skip:optional-dependency:{platform_name}:{message}"
 
@@ -234,12 +256,19 @@ def test_registered_platform_count_is_forty_seven() -> None:
 
 
 def test_adapter_construct_coverage_accounting(tmp_path: Path) -> None:
-    """Every registered adapter must construct or record an explicit ODBC skip.
+    """Every registered adapter must construct or record an explicit catalog skip.
 
-    Only ``OPTIONAL_ODBC_ADAPTER_DEPENDENCIES`` may skip. Under
-    ``uv run --all-extras`` without host pyodbc the reviewed partition is
-    45-pass / 2-skip; with pyodbc present it is 47-pass / 0-skip. Any other
-    missing-dependency outcome fails inside ``_construct_adapter_or_skip_reason``.
+    Only platforms with a ``benchbox.utils.dependencies`` catalog entry
+    (``_catalog_required_packages``) may skip -- e.g. cloud SDK/ODBC-backed
+    adapters absent from the CI ``uv sync --group dev`` closure. Platforms
+    with no catalog entry (DuckDB, SQLite, DataFusion, Polars, PySpark, ...)
+    must always construct; any other missing-dependency outcome fails inside
+    ``_construct_adapter_or_skip_reason``. The exact pass/skip split is
+    environment-dependent (it tracks whichever optional extras happen to be
+    installed), so this asserts the accounting invariant rather than a fixed
+    count -- a fixed count previously coupled the test to one specific
+    dependency closure (ODBC-only) and made every other legitimate
+    optional-dependency skip look like a regression.
     """
     names = _registered_platform_names()
     assert len(names) == EXPECTED_REGISTERED_PLATFORM_COUNT
@@ -251,40 +280,34 @@ def test_adapter_construct_coverage_accounting(tmp_path: Path) -> None:
         if isinstance(outcome, str):
             assert outcome.startswith("skip:optional-dependency:"), outcome
             assert "Missing dependencies" in outcome
-            assert platform_name in OPTIONAL_ODBC_ADAPTER_DEPENDENCIES, (
-                f"non-ODBC adapter {platform_name!r} must not skip; got {outcome}"
-            )
+            required_packages = _catalog_required_packages(platform_name)
+            assert required_packages is not None, f"non-catalog adapter {platform_name!r} must not skip; got {outcome}"
             skipped[platform_name] = outcome
             continue
         constructed.append(platform_name)
 
+    # Coverage cannot go vacuous: every skip must be individually justified by
+    # the dependency catalog, constructed/skipped must partition the full
+    # registered corpus, and each skip must cite its own catalog package(s).
     assert len(constructed) + len(skipped) == EXPECTED_REGISTERED_PLATFORM_COUNT
     assert not (set(constructed) & set(skipped))
-    assert set(skipped).issubset(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES)
 
     for name, reason in skipped.items():
-        required = OPTIONAL_ODBC_ADAPTER_DEPENDENCIES[name]
-        assert required in reason.lower(), f"{name} ODBC skip must cite {required}: {reason}"
-
-    # Reviewed partitions: both ODBC skip (45/2) or neither (47/0). A single
-    # ODBC install is allowed but still must stay inside the allowlist.
-    if not skipped:
-        assert len(constructed) == EXPECTED_REGISTERED_PLATFORM_COUNT
-        assert len(skipped) == 0
-    elif set(skipped) == set(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES):
-        assert len(constructed) == 45
-        assert len(skipped) == 2
-    else:
-        assert set(skipped).issubset(OPTIONAL_ODBC_ADAPTER_DEPENDENCIES)
-        assert len(constructed) == EXPECTED_REGISTERED_PLATFORM_COUNT - len(skipped)
+        required_packages = _catalog_required_packages(name)
+        assert required_packages is not None
+        reason_lower = reason.lower()
+        assert any(package.lower() in reason_lower for package in required_packages), (
+            f"{name} optional-dependency skip must cite one of {required_packages}: {reason}"
+        )
 
 
 @pytest.mark.parametrize("platform_name", _registered_platform_names())
 def test_registered_adapter_result_payload_redacts_credential_sentinels(platform_name: str, tmp_path: Path) -> None:
     outcome = _construct_adapter_or_skip_reason(platform_name, tmp_path)
     if isinstance(outcome, str):
-        # Only ODBC allowlist names reach here; others fail in construct.
-        assert platform_name in OPTIONAL_ODBC_ADAPTER_DEPENDENCIES
+        # Only catalog-recognized optional-dependency platforms reach here;
+        # anything else fails inside _construct_adapter_or_skip_reason.
+        assert _catalog_required_packages(platform_name) is not None
         pytest.skip(outcome.removeprefix("skip:optional-dependency:").split(":", 1)[-1])
 
     adapter = outcome
