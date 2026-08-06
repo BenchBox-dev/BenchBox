@@ -234,6 +234,10 @@ def test_hosted_and_pr_manifest_built_via_dispatch_call_sites(tmp_path: Path, mo
 
     sub = importlib.import_module("benchbox.cli.commands.submit")
 
+    # `benchbox submit` is community-facing end-to-end (both dispatch call
+    # sites exercised below) and hard-refuses without a deployment salt.
+    monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
+
     src = tmp_path / "tpch_duckdb.json"
     src.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
 

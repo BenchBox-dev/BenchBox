@@ -83,7 +83,7 @@ def populated_corpus(tmp_path: Path) -> Path:
     return bundles_dir
 
 
-def _package_via_submit(bundle_path: Path, output_dir: Path) -> Path:
+def _package_via_submit(bundle_path: Path, output_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Run `benchbox submit` to produce a manifest. Returns the manifest path."""
     repo_root = Path(__file__).resolve().parents[2]
     # Invoke via the click command directly (not the console script) so the
@@ -91,6 +91,10 @@ def _package_via_submit(bundle_path: Path, output_dir: Path) -> Path:
     from click.testing import CliRunner
 
     from benchbox.cli.commands.submit import submit
+
+    # `benchbox submit` is community-facing end-to-end and hard-refuses
+    # without a deployment salt.
+    monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
 
     runner = CliRunner()
     result = runner.invoke(
@@ -106,7 +110,9 @@ def _package_via_submit(bundle_path: Path, output_dir: Path) -> Path:
     return manifest
 
 
-def test_round_trip_validates_clean_submission(tmp_path: Path, populated_corpus: Path) -> None:
+def test_round_trip_validates_clean_submission(
+    tmp_path: Path, populated_corpus: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Package a bundle, drop it next to existing bundles, validate: must pass."""
     # 1. Generate a fresh bundle outside the corpus.
     source_dir = tmp_path / "fresh"
@@ -115,7 +121,7 @@ def test_round_trip_validates_clean_submission(tmp_path: Path, populated_corpus:
 
     # 2. Package via `benchbox submit`.
     out_dir = tmp_path / "submission"
-    manifest_src = _package_via_submit(bundle, out_dir)
+    manifest_src = _package_via_submit(bundle, out_dir, monkeypatch)
 
     # 3. Copy bundle + manifest into the populated corpus.
     submitted_bundle = out_dir / "bundle" / bundle.name
@@ -133,14 +139,16 @@ def test_round_trip_validates_clean_submission(tmp_path: Path, populated_corpus:
     assert "FAIL" not in proc.stdout, proc.stdout
 
 
-def test_round_trip_rejects_tampered_bundle(tmp_path: Path, populated_corpus: Path) -> None:
+def test_round_trip_rejects_tampered_bundle(
+    tmp_path: Path, populated_corpus: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Bundle mutated after the manifest hash is computed must be rejected."""
     source_dir = tmp_path / "fresh"
     source_dir.mkdir()
     bundle = _write_bundle(source_dir, "tpch_sf001_duckdb_tamper", "tamper")
 
     out_dir = tmp_path / "submission"
-    manifest_src = _package_via_submit(bundle, out_dir)
+    manifest_src = _package_via_submit(bundle, out_dir, monkeypatch)
 
     submitted_bundle = out_dir / "bundle" / bundle.name
     target_bundle = populated_corpus / bundle.name

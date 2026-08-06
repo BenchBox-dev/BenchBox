@@ -21,6 +21,12 @@ pytestmark = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def _community_publish_salt(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Community submit requires a deployment salt; tests use a private test value."""
+    monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "unit-test-community-publish-salt")
+
+
 def _fake_result() -> SimpleNamespace:
     return SimpleNamespace(
         benchmark_name="tpch",
@@ -86,6 +92,18 @@ def _canonical_file_bytes(path: Path) -> bytes:
 # ---------------------------------------------------------------------------
 # 1. No args - explains usage, exit 1
 # ---------------------------------------------------------------------------
+
+
+def test_submit_refuses_without_public_pseudonym_salt(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Community submit hard-refuses when BENCHBOX_MACHINE_ID_SALT is unset."""
+    monkeypatch.delenv("BENCHBOX_MACHINE_ID_SALT", raising=False)
+    src = tmp_path / "ok.json"
+    _write_valid_submission_bundle(src)
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+    result = CliRunner().invoke(sub.submit, [str(src), "--dry-run", "--output", str(tmp_path / "out")])
+    assert result.exit_code == 1
+    assert "Submission refused" in result.output
+    assert "BENCHBOX_MACHINE_ID_SALT" in result.output
 
 
 def test_submit_requires_file_or_last(monkeypatch: pytest.MonkeyPatch) -> None:
