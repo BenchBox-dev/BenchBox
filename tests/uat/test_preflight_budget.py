@@ -8,16 +8,21 @@ import pytest
 
 from tests.uat.config import validate_config
 from tests.uat.preflight_budget import (
+    DATABASE_STATUS_MEASURED,
+    DATABASE_STATUS_UNMEASURED,
+    DEFAULT_TABLE_PATH,
     DiskBudget,
     DiskRootFreeSpace,
+    assess_budget_coverage,
     check_disk_headroom,
-    check_platform_chunking_headroom,
     estimate_largest_scale_peak_disk,
     estimate_peak_disk,
-    estimate_platform_chunking_budget,
+    format_budget_coverage,
+    format_budget_verdict,
     format_disk_budget,
     format_disk_headroom_failure,
-    recommend_platform_chunking,
+    largest_scale_cells,
+    load_budget_table,
 )
 
 pytestmark = pytest.mark.fast
@@ -118,145 +123,214 @@ def test_disk_headroom_gate_reports_short_root(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
-# execute.platform_chunking: per-platform database term
-# (uat-disk-budget-and-platform-chunking).
+# The configured floor (`preflight.free_space_min_gib`) is enforced ONLY by
+# the `max(min_free_gib, ...)` inside `check_disk_headroom`. Nothing else in
+# the preflight path re-applies it once a disk-budget config is present, so
+# this is the single test standing between an operator's 5 GiB floor and a
+# sweep that starts with 0.2 GiB free.
 # ---------------------------------------------------------------------------
 
 
-def _three_platform_table(tmp_path: Path) -> Path:
-    """A table with a distinct largest-scale (1.0) database footprint per
-    platform, plus a smaller scale rung, so tests can prove the estimator
-    picks the LARGEST configured rung, groups by platform (not a flat sum),
-    and never falls back to a hardcoded constant."""
+def test_disk_headroom_gate_enforces_configured_floor(tmp_path: Path):
+    """A budget BELOW the configured floor must still gate at the floor.
+
+    Mutation killer: replacing `max(min_free_gib, budget.est_peak_gib)` with
+    a bare `budget.est_peak_gib` makes this test fail. That mutation is not
+    hypothetical -- the checked-in inventory's loaded-database term is
+    identically zero, so a real sweep's estimate routinely lands far below
+    the operator's floor and the `max` is the only thing holding.
+    """
+    budget = DiskBudget(cells=1, est_peak_gib=1.0, est_steady_gib=1.0, unknown_cells=())
+    roots = (DiskRootFreeSpace("output", tmp_path, 0.2),)
+
+    check = check_disk_headroom(budget, roots, min_free_gib=5.0)
+
+    assert check.required_gib == pytest.approx(5.0)
+    assert len(check.shortfalls) == 1
+    assert check.shortfalls[0].required_gib == pytest.approx(5.0)
+    assert "0.2 GiB free < 5.0 GiB required" in format_disk_headroom_failure(check)
+
+
+def test_disk_headroom_gate_uses_budget_when_it_exceeds_the_floor(tmp_path: Path):
+    """The other side of the same `max`: a budget above the floor wins.
+
+    Without this, replacing the `max` with a bare `min_free_gib` would also
+    survive -- the floor test alone does not pin both directions.
+    """
+    budget = DiskBudget(cells=1, est_peak_gib=40.0, est_steady_gib=35.0, unknown_cells=())
+    roots = (DiskRootFreeSpace("output", tmp_path, 12.0),)
+
+    check = check_disk_headroom(budget, roots, min_free_gib=5.0)
+
+    assert check.required_gib == pytest.approx(40.0)
+    assert len(check.shortfalls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Coverage disclosure: an estimate over a partially-measured inventory is a
+# lower bound, and must never render as "fits".
+# ---------------------------------------------------------------------------
+
+
+def _coverage_table(tmp_path: Path) -> Path:
+    """duckdb measured, lakesail present but database-unmeasured, datafusion absent."""
     table = tmp_path / "disk_budget.tsv"
     table.write_text(
-        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
-        "duckdb\ttpch\t0.01\t0.1\t0.2\t0.05\n"
-        "duckdb\ttpch\t1\t2.0\t20.0\t1.0\n"
-        "sqlite\ttpch\t1\t2.0\t30.0\t1.0\n"
-        "datafusion\ttpch\t1\t2.0\t15.0\t1.0\n",
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\t"
+        "peak_database_gib_status\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t1.0\t2.0\tmeasured\t0.5\n"
+        "lakesail\ttpch\t0.01\t1.0\t0.0\tunmeasured\t0.5\n",
         encoding="utf-8",
     )
     return table
 
 
-def _three_platform_config():
+def _coverage_config():
     return validate_config(
         {
-            "name": "chunk-budget-smoke",
-            "platforms": {"include": ["duckdb", "sqlite", "datafusion"]},
+            "name": "coverage-smoke",
+            "platforms": {"include": ["duckdb", "lakesail", "datafusion"]},
             "benchmarks": {"include": ["tpch"]},
-            "scales": {"rungs": [0.01, 1]},
+            "scales": {"rungs": [0.01]},
         }
     )
 
 
-def test_estimate_platform_chunking_budget_accounts_for_platform_count(tmp_path: Path):
-    table = _three_platform_table(tmp_path)
-    cfg = _three_platform_config()
+def test_load_budget_table_defaults_absent_status_column_to_measured(tmp_path: Path):
+    """A table without the column keeps its historical meaning."""
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t1.0\t2.0\t0.5\n",
+        encoding="utf-8",
+    )
 
-    budget = estimate_platform_chunking_budget(cfg, table_path=table)
+    rows = load_budget_table(table)
 
-    # Grouped by platform at the largest configured rung (1.0) -- not the
-    # smaller 0.01 rung, and not a flat sum over every cell regardless of
-    # platform.
-    assert budget.platform_count == 3
-    # datagen is shared/deduped once per (benchmark, scale) -- all three
-    # platforms' tpch@1.0 rows share the SAME 2.0 GiB, matching the flat
-    # estimator's dedup rule (`estimate_cells`), not summed once per
-    # platform (that would silently inflate concurrent_required_gib by
-    # double/triple-counting a file that is only ever generated once).
-    datagen_gib = 2.0
-    # per_platform_peak_gib is the worst platform's OWN database + transient
-    # only -- datagen is excluded because cleanup.preserve_datagen keeps it
-    # resident regardless of chunking, so pruning a platform's chunk never
-    # frees it (matches what cleanup.prune_platform_chunk actually frees).
-    assert budget.per_platform_peak_gib == pytest.approx(30.0 + 1.0)  # sqlite: worst platform
-    assert budget.concurrent_required_gib == pytest.approx(datagen_gib + (20.0 + 1.0) + (30.0 + 1.0) + (15.0 + 1.0))
-    assert budget.chunked_required_gib == pytest.approx(datagen_gib + budget.per_platform_peak_gib)
-    # Basis records the derivation (config scale rung + row provenance), not
-    # a bare number -- an operator reading the lifecycle log must be able to
-    # tell this wasn't a hardcoded constant.
-    assert "scale=1" in budget.basis
-    assert "3 platform" in budget.basis
+    assert rows[("duckdb", "tpch", 0.01)].database_status == DATABASE_STATUS_MEASURED
+    assert rows[("duckdb", "tpch", 0.01)].database_measured is True
 
 
-def test_estimate_platform_chunking_budget_concurrent_matches_flat_estimator(tmp_path: Path):
-    """concurrent_required_gib must never diverge from the existing flat gate.
+def test_assess_budget_coverage_separates_missing_rows_from_unmeasured_databases(tmp_path: Path):
+    table = load_budget_table(_coverage_table(tmp_path))
+    cells = largest_scale_cells(_coverage_config())
 
-    Regression guard for the datagen-dedup bug caught in review: grouping
-    per platform must not re-sum a shared datagen file once per platform
-    that reuses it. `estimate_largest_scale_peak_disk` is the existing,
-    already-trusted flat estimate `phases/preflight.py` gates on today --
-    `concurrent_required_gib` must equal it exactly, not merely be close.
+    coverage = assess_budget_coverage(cells, table=table)
+
+    assert coverage.cells_total == 3
+    # datafusion has no row at all; duckdb and lakesail do.
+    assert coverage.cells_with_rows == 2
+    # lakesail's row exists but declares its database footprint a placeholder,
+    # so only duckdb contributes a real loaded-database number.
+    assert coverage.cells_with_measured_database == 1
+    assert coverage.platforms_total == 3
+    assert coverage.measured_platforms == ("duckdb",)
+    assert coverage.unmeasured_platforms == ("datafusion", "lakesail")
+    assert coverage.is_lower_bound is True
+
+
+def test_assess_budget_coverage_is_complete_when_every_cell_is_measured(tmp_path: Path):
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\t"
+        "peak_database_gib_status\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t1.0\t2.0\tmeasured\t0.5\n",
+        encoding="utf-8",
+    )
+    cfg = validate_config(
+        {
+            "name": "coverage-complete",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+        }
+    )
+
+    coverage = assess_budget_coverage(largest_scale_cells(cfg), table=load_budget_table(table))
+
+    assert coverage.is_lower_bound is False
+    assert coverage.unmeasured_platforms == ()
+    assert "COMPLETE" in format_budget_coverage(coverage)
+
+
+def test_format_budget_coverage_partial_names_the_gap_and_never_claims_fit(tmp_path: Path):
+    coverage = assess_budget_coverage(
+        largest_scale_cells(_coverage_config()),
+        table=load_budget_table(_coverage_table(tmp_path)),
+    )
+
+    message = format_budget_coverage(coverage)
+
+    assert "LOWER BOUND" in message
+    assert "1 of 3 platform(s)" in message
+    assert "2 of 3 largest-scale cell(s) have any row" in message
+    assert "1 of 3 have a measured loaded-database footprint" in message
+    # The unmeasured platforms are named, not just counted -- an operator has
+    # to be able to see WHICH platforms the estimate knows nothing about.
+    assert "datafusion" in message
+    assert "lakesail" in message
+
+
+def test_format_budget_verdict_partial_is_not_a_certification(tmp_path: Path):
+    coverage = assess_budget_coverage(
+        largest_scale_cells(_coverage_config()),
+        table=load_budget_table(_coverage_table(tmp_path)),
+    )
+    check = check_disk_headroom(
+        DiskBudget(cells=3, est_peak_gib=4.0, est_steady_gib=3.5, unknown_cells=()),
+        (DiskRootFreeSpace("output", tmp_path, 100.0),),
+        min_free_gib=5.0,
+    )
+
+    verdict = format_budget_verdict(check, coverage)
+
+    assert "no shortfall detected" in verdict
+    assert "lower-bound" in verdict
+    assert "real demand may be higher" in verdict
+    # The word an operator would read as a certification must not appear.
+    assert "fits" not in verdict
+
+
+def test_format_budget_verdict_complete_may_state_the_requirement_fits(tmp_path: Path):
+    coverage = assess_budget_coverage((), table={})
+    coverage = type(coverage)(
+        cells_total=1,
+        cells_with_rows=1,
+        cells_with_measured_database=1,
+        platforms_total=1,
+        measured_platforms=("duckdb",),
+        unmeasured_platforms=(),
+    )
+    check = check_disk_headroom(
+        DiskBudget(cells=1, est_peak_gib=4.0, est_steady_gib=3.5, unknown_cells=()),
+        (DiskRootFreeSpace("output", tmp_path, 100.0),),
+        min_free_gib=5.0,
+    )
+
+    assert "fits" in format_budget_verdict(check, coverage)
+
+
+# ---------------------------------------------------------------------------
+# D3: the checked-in inventory's zero loaded-database column is UNMEASURED.
+# ---------------------------------------------------------------------------
+
+
+def test_checked_in_budget_table_declares_its_database_column_unmeasured():
+    """Guard the disclosure itself.
+
+    Every checked-in row carries `peak_database_gib = 0` because no sweep has
+    ever measured it -- not because loaded databases are free. This test fails
+    if someone drops the `peak_database_gib_status` marker, or flips a row to
+    `measured` while leaving its value at zero (which would silently convert a
+    disclosed gap into a fabricated measurement). Rows with a real non-zero
+    measurement may legitimately be marked `measured`.
     """
-    table = _three_platform_table(tmp_path)
-    cfg = _three_platform_config()
+    rows = load_budget_table(DEFAULT_TABLE_PATH)
 
-    budget = estimate_platform_chunking_budget(cfg, table_path=table)
-    flat = estimate_largest_scale_peak_disk(cfg, table_path=table)
-
-    assert budget.concurrent_required_gib == pytest.approx(flat.est_peak_gib)
-
-
-def test_check_platform_chunking_headroom_fails_unchunked_passes_chunked(tmp_path: Path):
-    table = _three_platform_table(tmp_path)
-    cfg = _three_platform_config()
-    budget = estimate_platform_chunking_budget(cfg, table_path=table)
-
-    # Enough room for the single worst platform's chunk (plus the
-    # always-resident datagen) but not for all three platforms coexisting
-    # (unchunked) -- the exact 2026-08-04 release-gate stage-1 shape (11
-    # platforms x ~15 GiB > free, but any single platform would have fit).
-    free_gib = budget.chunked_required_gib + 5.0
-    assert free_gib < budget.concurrent_required_gib
-    roots = (DiskRootFreeSpace("output", tmp_path, free_gib),)
-
-    unchunked = check_platform_chunking_headroom(budget, roots, min_free_gib=5.0, chunking_enabled=False)
-    chunked = check_platform_chunking_headroom(budget, roots, min_free_gib=5.0, chunking_enabled=True)
-
-    assert len(unchunked.shortfalls) == 1
-    assert unchunked.shortfalls[0].required_gib == pytest.approx(budget.concurrent_required_gib)
-    assert chunked.shortfalls == ()
-    assert chunked.required_gib == pytest.approx(budget.chunked_required_gib)
-
-
-def test_recommend_platform_chunking_not_required_when_concurrent_fits(tmp_path: Path):
-    table = _three_platform_table(tmp_path)
-    cfg = _three_platform_config()
-    budget = estimate_platform_chunking_budget(cfg, table_path=table)
-    roots = (DiskRootFreeSpace("output", tmp_path, budget.concurrent_required_gib + 10.0),)
-
-    message = recommend_platform_chunking(budget, roots, min_free_gib=5.0)
-
-    assert message.startswith("platform_chunking not required")
-
-
-def test_recommend_platform_chunking_recommended_when_only_chunked_fits(tmp_path: Path):
-    table = _three_platform_table(tmp_path)
-    cfg = _three_platform_config()
-    budget = estimate_platform_chunking_budget(cfg, table_path=table)
-    roots = (DiskRootFreeSpace("output", tmp_path, budget.chunked_required_gib + 5.0),)
-
-    message = recommend_platform_chunking(budget, roots, min_free_gib=5.0)
-
-    assert message.startswith("platform_chunking recommended")
-    assert "execute.platform_chunking: true" in message
-
-
-def test_recommend_platform_chunking_fails_with_computed_shortfall_even_chunked(tmp_path: Path):
-    table = _three_platform_table(tmp_path)
-    cfg = _three_platform_config()
-    budget = estimate_platform_chunking_budget(cfg, table_path=table)
-    # Not even the single worst platform's chunk fits.
-    free_gib = budget.chunked_required_gib - 5.0
-    roots = (DiskRootFreeSpace("output", tmp_path, free_gib),)
-
-    message = recommend_platform_chunking(budget, roots, min_free_gib=5.0)
-
-    assert message.startswith("insufficient disk even with execute.platform_chunking")
-    # The computed shortfall (not a vague "not enough disk") is present:
-    # required GiB, free GiB, and the root label all appear.
-    assert f"{budget.chunked_required_gib:.1f} GiB required" in message
-    assert f"{free_gib:.1f} GiB free" in message
-    assert "output" in message
+    assert rows, "checked-in disk budget table is empty"
+    zero_but_measured = [key for key, row in rows.items() if row.peak_database_gib == 0.0 and row.database_measured]
+    assert zero_but_measured == [], (
+        "rows claim a MEASURED zero loaded-database footprint: "
+        f"{sorted(zero_but_measured)[:5]}. Mark them "
+        f"{DATABASE_STATUS_UNMEASURED!r} until a real sweep measures them."
+    )

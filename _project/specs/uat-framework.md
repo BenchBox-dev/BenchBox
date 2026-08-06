@@ -129,10 +129,10 @@ tests/uat/
 | `__init__.py` | UAT package marker and documentation string | — | 6 |
 | `matrix.py` | Registry-driven benchmark enumeration, platform grouping, compose-derived TCP reachability probe (connection facts now owned by `docker_assets`) | 250 | 515 |
 | `runner.py` | Build `benchbox run` argv per cell; capture stdout+stderr to per-run log; extract result-JSON path; submit classification via shared `benchbox.core.results.submit_classification` | 120 | 354 |
-| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 761 |
+| `config.py` | Load YAML, validate against schema (Section 3), expose typed dataclass access | 180 | 751 |
 | `_cli.py` | UAT CLI entrypoint: argument parsing, sweep/execute/validate/report/package subcommands, output wiring | — | 806 |
 | `timeouts.py` | Signal-based timeout (POSIX process-group kill ladder) | 80 | 123 |
-| `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 | 167 |
+| `cleanup.py` | Track cell completions; prune `databases/` at safe reuse boundaries; preserve `datagen/` | 150 | 121 |
 | `compatibility.py` | Platform/benchmark compatibility rules; record compatibility-pruned cells with rule metadata | — | 198 |
 | `docker_assets.py` | Single connection registry: compose-file map, compose-derived host ports + platform options, safe project-scoped compose commands | 180 | 760 |
 | `docker_cleanup.py` | Docker stack teardown at platform boundaries; project-scoped down/volume handling | — | 426 |
@@ -142,11 +142,11 @@ tests/uat/
 | `gate_summary.py` | Writes/reads the versioned `uat_gate_summary.json` per-sweep evidence artifact; powers `make uat-gate-check` cross-stage aggregation | — | 274 |
 | `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — | 316 |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 | 83 |
-| `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 411 |
+| `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — | 425 |
 | `phases/__init__.py` | UAT phase package marker and phase contract documentation string | — | 17 |
-| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 522 |
+| `phases/preflight.py` | Disk space (configurable cutoff), docker reachability, host load reading | 80 | 529 |
 | `phases/enumerate.py` | Resolve final cell list for execute given config filters and registry truth; honour min/max scale | 100 | 296 |
-| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 | 1039 |
+| `phases/execute.py` | Sequential iteration over (platform, benchmark, rung); invokes runner+ladder+cleanup; owns Docker platform-boundary lifecycle | 220 | 997 |
 | `phases/validate.py` | Call `benchbox.validation.bundle` in-process; write validator TSV; compute clean-rate floor | 100 | 304 |
 | `phases/package.py` | Read `submit_terminal_state`; invoke `benchbox submit --output` or `--service`; `draft-pr`/`merged-to-published-results` are **stubs** (dispatcher only, per `PR_STUB_TERMINAL_STATES`) that emit the same argv as `local-stage` plus an operator warning -- PR-opening to `published-results` is not implemented | 130 | 180 |
 | `phases/explorer_smoke.py` | Branch-presence-guarded explorer smoke: always-on corpus contract, delegates build+Playwright to the Results Explorer | 60 | 387 |
@@ -175,9 +175,9 @@ remain hand-tracked.
 
 **Per-bucket production LOC** (auto-generated -- run the script to refresh):
 
-- plumbing (orchestrator/config/`_cli`): 2,473
-- core exercise (execute/matrix/runner/enumerate/cleanup/ladder): 2,454
-- preflight/compat/timeouts: 1,254
+- plumbing (orchestrator/config/`_cli`): 2,463
+- core exercise (execute/matrix/runner/enumerate/cleanup/ladder): 2,366
+- preflight/compat/timeouts: 1,275
 - Docker lifecycle (default-OFF, incl. `container_cleanup.py`): 1,743
 - chartered evidence artifacts (validate/report/package/cells_io/gate_summary): 1,684
 - explorer-prep: 387
@@ -185,7 +185,7 @@ remain hand-tracked.
 - artifact hygiene: 315
 - package init markers: 23
 
-**Total: 10,649 production LOC across 26 modules.**
+**Total: 10,572 production LOC across 26 modules.**
 
 <!-- UAT-LOC-SUMMARY:END -->
 
@@ -297,21 +297,6 @@ execute:
                                  # "throughput".
   seed: null                     # optional, int|null. Passed as --seed to
                                  # run-official when set.
-  platform_chunking: false       # optional, bool, default false. When
-                                 # true, run_execute force-prunes every
-                                 # database the just-finished platform
-                                 # loaded (tests.uat.cleanup.prune_platform_chunk,
-                                 # per (platform, benchmark, scale) via
-                                 # prune_database_dir) before starting the
-                                 # next platform. Platforms already run one
-                                 # at a time; this bounds concurrent disk
-                                 # demand to the single worst platform's
-                                 # footprint instead of every platform's
-                                 # database coexisting -- see
-                                 # uat-disk-budget-and-platform-chunking and
-                                 # tests/uat/preflight_budget.py's
-                                 # estimate_platform_chunking_budget /
-                                 # recommend_platform_chunking.
 
 cleanup:
   preserve_datagen: true         # optional, bool, default true. Reserved
@@ -377,17 +362,27 @@ preflight:
 # Disk-budget estimate --------------------------------------------------
 # `tests/uat/data/disk_budget_table.tsv` is an advisory, checked-in
 # inventory keyed by (platform, benchmark, scale_factor). Preflight
-# prints `Disk budget estimate: ... GiB` before workload execution, and
-# gates on it: the largest configured scale rung's estimated peak (summed
-# across every requested platform, i.e. what a non-chunked sweep needs if
-# every platform's database coexists) against every required root, and
-# (uat-disk-budget-and-platform-chunking) the smaller
-# execute.platform_chunking requirement instead once that field is set --
-# see docs/operations/uat-framework.md "Platform chunking". Unknown cells
-# are surfaced as a count, not treated as zero, and
-# `preflight.free_space_min_gib` remains the hard cutoff -- explicitly
-# setting it to 0 disables every disk gate here, including the
-# platform-chunking one.
+# prints `Disk budget estimate: ... GiB` before workload execution and
+# gates on it: the largest configured scale rung's estimated peak, summed
+# across every requested platform, against every required root.
+#
+# The estimate is a LOWER BOUND, never a certification. Cells with no row
+# contribute 0 GiB and are counted as unknown; rows may additionally
+# declare `peak_database_gib_status = unmeasured` (every checked-in row
+# currently does, so the loaded-database term is identically zero for want
+# of data). Preflight prints `Disk budget coverage:` and a
+# `Disk budget verdict:` line disclosing both gaps on EVERY run, warns
+# when coverage is partial, and renders the free-space requirement as
+# `required >= N GiB` in that case -- a passing gate means "no shortfall
+# detected against the measured subset", not "fits". Refusing on the
+# lower bound stays sound in either state.
+#
+# `preflight.free_space_min_gib` remains the hard cutoff via
+# `max(min_free_gib, estimate)` in `check_disk_headroom` -- the only
+# enforcement of the configured floor once a disk-budget config is passed
+# (which `preflight_kwargs_from_config` always does). Setting it to 0
+# disables every disk gate here. Never populate `peak_database_gib` by
+# estimating; only a measured sweep may flip a row to `measured`.
 
 # Resume (retired) -------------------------------------------------------
 # The resume manifest (`<log-dir>/resume.json`, `--resume <manifest>`)

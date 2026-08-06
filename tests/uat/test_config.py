@@ -120,21 +120,6 @@ def test_validate_config_accepts_execute_extra_args():
     assert cfg.execute.extra_args == ("--tuning", "tuned")
 
 
-def test_validate_config_platform_chunking_defaults_false():
-    cfg = config.validate_config({"name": "smoke"})
-    assert cfg.execute.platform_chunking is False
-
-
-def test_validate_config_accepts_platform_chunking_true():
-    cfg = config.validate_config({"name": "smoke", "execute": {"platform_chunking": True}})
-    assert cfg.execute.platform_chunking is True
-
-
-def test_validate_config_rejects_non_bool_platform_chunking():
-    with pytest.raises(config.ConfigError, match="platform_chunking"):
-        config.validate_config({"name": "smoke", "execute": {"platform_chunking": "yes"}})
-
-
 def test_validate_config_accepts_managed_docker_cleanup_contract():
     cfg = config.validate_config(
         {

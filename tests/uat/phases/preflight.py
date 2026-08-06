@@ -29,13 +29,10 @@ from tests.uat.matrix import (
 from tests.uat.phases import PhaseResult
 from tests.uat.preflight_budget import (
     DiskBudget,
+    DiskBudgetCoverage,
     DiskHeadroomCheck,
     DiskRootFreeSpace,
-    PlatformChunkingBudget,
-    check_platform_chunking_headroom,
-    estimate_platform_chunking_budget,
     free_space_gib as free_space_gib,
-    recommend_platform_chunking,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -215,17 +212,6 @@ def run_preflight(
         docker_data_root=docker_root,
     )
     free_space_entries = read_disk_root_free_space(disk_roots, free_space_reader=free_space_gib)
-    # Platform-chunking-aware gate (uat-disk-budget-and-platform-chunking):
-    # `budget_gate` above already gates on every platform's database
-    # coexisting -- numerically correct, but it cannot recognize that
-    # `execute.platform_chunking: true` bounds real disk demand to the
-    # single worst platform's chunk instead (estimate_platform_chunking_budget
-    # is regression-tested to match budget_gate's concurrent figure exactly
-    # when chunking is off). Computed in the SAME try block, over the SAME
-    # disk_budget_config/table, so a bad table row hard-fails preflight via
-    # the shared except below exactly like the flat estimate already does.
-    chunk_budget = None
-    chunk_check = None
     if disk_budget_config is not None:
         try:
             disk_budget_summary, budget_gate = estimate_disk_budget_summary_and_gate(
@@ -233,19 +219,8 @@ def run_preflight(
                 free_space_entries,
                 min_free_gib=free_space_min_gib,
             )
-            if budget_gate.budget.unknown_cells:
-                warnings.append(
-                    "disk budget gate has "
-                    f"{len(budget_gate.budget.unknown_cells)} unknown largest-scale cell(s); "
-                    "estimate may be low"
-                )
-            chunk_budget = estimate_platform_chunking_budget(disk_budget_config)
-            chunk_check = check_platform_chunking_headroom(
-                chunk_budget,
-                free_space_entries,
-                min_free_gib=free_space_min_gib,
-                chunking_enabled=disk_budget_config.execute.platform_chunking,
-            )
+            warnings.extend(_disk_budget_coverage_warnings(budget_gate.coverage))
+            disk_budget_summary = _disk_budget_report(disk_budget_summary, budget_gate)
         except (OSError, ValueError, TypeError, KeyError, csv.Error) as exc:
             # The estimator CRASHED (bad table row, unreadable TSV, a
             # malformed config field) -- distinct from the advisory
@@ -274,33 +249,18 @@ def run_preflight(
             )
     if free_space_min_gib <= 0:
         required_gib = 0.0
-    elif chunk_check is not None:
-        required_gib = chunk_check.required_gib
     elif budget_gate is not None:
         required_gib = budget_gate.headroom.required_gib
     else:
         required_gib = free_space_min_gib
-    free_space_report = format_free_space_report(free_space_entries, required_gib=required_gib)
+    free_space_report = format_free_space_report(
+        free_space_entries,
+        required_gib=required_gib,
+        lower_bound=_required_is_lower_bound(budget_gate, required_gib),
+    )
 
     abort_kind: str | None = None
-    if free_space_min_gib > 0 and chunk_check is not None:
-        # Fully supersedes the flat budget_gate branch below whenever the
-        # chunking-aware estimate is available -- an `elif` on
-        # `chunk_check.shortfalls` alone would let a stale, more
-        # conservative `budget_gate` shortfall still abort a sweep that
-        # `execute.platform_chunking: true` already makes fit.
-        chunk_abort_reason = _platform_chunking_abort_reason(
-            chunk_check=chunk_check,
-            chunk_budget=chunk_budget,
-            chunking_enabled=disk_budget_config is not None and disk_budget_config.execute.platform_chunking,
-            free_space_entries=free_space_entries,
-            free_space_min_gib=free_space_min_gib,
-        )
-        if chunk_abort_reason is not None:
-            aborted = True
-            abort_kind = "disk_floor"
-            abort_reason = chunk_abort_reason
-    elif free_space_min_gib > 0 and budget_gate is not None and budget_gate.headroom.shortfalls:
+    if free_space_min_gib > 0 and budget_gate is not None and budget_gate.headroom.shortfalls:
         aborted = True
         abort_reason = format_disk_headroom_failure(budget_gate.headroom)
         abort_kind = "disk_floor"
@@ -326,6 +286,17 @@ def run_preflight(
         warnings.append(f"host load {load_1m:.1f} > {noisy_neighbor_warn_load:.1f}")
     if not docker_ok and not docker_required:
         warnings.append("docker not reachable (any docker platforms will skip)")
+    if docker_manage_platforms and docker_ok and docker_root is None:
+        # `docker info --format {{.DockerRootDir}}` reported a path that does
+        # not exist on this host -- the normal case for a Linux-VM-backed
+        # engine on macOS, where the data root lives inside the VM. That root
+        # is then absent from `collect_disk_roots`, so container-resident
+        # images/volumes are neither budgeted nor free-space-checked. Disclose
+        # it rather than let a silent omission read as "nothing to check".
+        warnings.append(
+            "container data root is not host-visible (VM-backed engine); "
+            "container images/volumes are neither budgeted nor free-space-checked"
+        )
 
     if local_platforms_check and not aborted:
         checked, attempted, local_abort, local_warnings = _check_local_platforms(
@@ -411,36 +382,6 @@ def _run_make_bring_up(platform: str, *, benchmark_runs_dir: str | Path | None =
     return completed.returncode
 
 
-def _platform_chunking_abort_reason(
-    *,
-    chunk_check: DiskHeadroomCheck,
-    chunk_budget: PlatformChunkingBudget,
-    chunking_enabled: bool,
-    free_space_entries: Iterable[DiskRootFreeSpace],
-    free_space_min_gib: float,
-) -> str | None:
-    """Return the operator-facing abort reason for a platform-chunking shortfall, or None when it fits.
-
-    Split out of `run_preflight` to keep that function's branching flat --
-    see uat-disk-budget-and-platform-chunking w1. When `chunking_enabled` is
-    True (the operator already opted in), names the computed shortfall
-    against the smaller chunked requirement directly -- there is no further
-    remedy to suggest. When False, this deliberately fails loud rather than
-    silently turning chunking on for the operator: auto-enabling would
-    change execute's runtime pruning behavior (`prune_platform_chunk`)
-    without the operator's knowledge, so `recommend_platform_chunking`
-    either names chunking as the fix or, when even chunking would not help,
-    the computed shortfall against that smaller requirement.
-    """
-    if not chunk_check.shortfalls:
-        return None
-    if chunking_enabled:
-        return (
-            f"{format_disk_headroom_failure(chunk_check)} (execute.platform_chunking=true; basis: {chunk_budget.basis})"
-        )
-    return recommend_platform_chunking(chunk_budget, free_space_entries, min_free_gib=free_space_min_gib)
-
-
 def estimate_disk_budget_summary(config: UATConfig) -> str:
     """Return the advisory disk-budget line for a config."""
     from tests.uat.preflight_budget import estimate_peak_disk, format_disk_budget
@@ -454,6 +395,7 @@ class DiskBudgetGate:
 
     budget: DiskBudget
     headroom: DiskHeadroomCheck
+    coverage: DiskBudgetCoverage
 
 
 def estimate_disk_budget_summary_and_gate(
@@ -462,18 +404,70 @@ def estimate_disk_budget_summary_and_gate(
     *,
     min_free_gib: float,
 ) -> tuple[str, DiskBudgetGate]:
-    """Return the full advisory summary and largest-scale headroom gate."""
+    """Return the full advisory summary and largest-scale headroom gate.
+
+    The gate carries its own `coverage` because the estimate it gates on is
+    a lower bound over a partially-measured inventory: callers need to know
+    how much of it was measured to report a NON-refusing outcome honestly
+    (`_disk_budget_report`). The refusing outcome needs no such caveat.
+    """
     from tests.uat.preflight_budget import (
+        assess_budget_coverage,
         check_disk_headroom,
-        estimate_largest_scale_peak_disk,
+        estimate_cells,
         estimate_peak_disk,
         format_disk_budget,
+        largest_scale_cells,
+        load_budget_table,
     )
 
+    table = load_budget_table()
     summary = format_disk_budget(estimate_peak_disk(config))
-    budget = estimate_largest_scale_peak_disk(config)
+    gated_cells = largest_scale_cells(config)
+    budget = estimate_cells(gated_cells, table=table)
     headroom = check_disk_headroom(budget, free_space_entries, min_free_gib=min_free_gib)
-    return summary, DiskBudgetGate(budget=budget, headroom=headroom)
+    coverage = assess_budget_coverage(gated_cells, table=table)
+    return summary, DiskBudgetGate(budget=budget, headroom=headroom, coverage=coverage)
+
+
+def _disk_budget_coverage_warnings(coverage: DiskBudgetCoverage) -> tuple[str, ...]:
+    """Warnings for whatever the budget table could not measure.
+
+    Split from `run_preflight` so disclosing a new coverage dimension never
+    costs that function another branch (it is at the C901 cap).
+    """
+    if not coverage.is_lower_bound:
+        return ()
+    return (
+        f"disk budget gate is a LOWER BOUND: {coverage.cells_with_rows} of {coverage.cells_total} "
+        f"largest-scale cell(s) have an inventory row and "
+        f"{coverage.cells_with_measured_database} of {coverage.cells_total} have a measured "
+        "loaded-database footprint; real demand may exceed the gated figure",
+    )
+
+
+def _disk_budget_report(summary: str, gate: DiskBudgetGate) -> str:
+    """Compose the always-printed operator block for the disk-budget gate.
+
+    Coverage is always disclosed. The verdict line is added only when the
+    gate did not refuse, because that is the outcome an operator can
+    misread as "measured and fine" -- a refusal is unambiguous.
+    """
+    from tests.uat.preflight_budget import format_budget_coverage, format_budget_verdict
+
+    lines = [summary, format_budget_coverage(gate.coverage)]
+    if not gate.headroom.shortfalls:
+        lines.append(format_budget_verdict(gate.headroom, gate.coverage))
+    return "\n".join(lines)
+
+
+def _required_is_lower_bound(gate: DiskBudgetGate | None, required_gib: float) -> bool:
+    """True when the printed requirement understates real demand.
+
+    False when the gate is disabled (`required_gib == 0`): there is no
+    requirement to understate.
+    """
+    return gate is not None and required_gib > 0 and gate.coverage.is_lower_bound
 
 
 def collect_disk_roots(
@@ -507,10 +501,23 @@ def read_disk_root_free_space(
     return tuple(DiskRootFreeSpace(label, path, free_space_reader(path)) for label, path in roots)
 
 
-def format_free_space_report(entries: Iterable[DiskRootFreeSpace], *, required_gib: float) -> tuple[str, ...]:
-    """Return compact preflight table lines for required disk roots."""
+def format_free_space_report(
+    entries: Iterable[DiskRootFreeSpace],
+    *,
+    required_gib: float,
+    lower_bound: bool = False,
+) -> tuple[str, ...]:
+    """Return compact preflight table lines for required disk roots.
+
+    `lower_bound=True` renders the requirement as `>= X GiB`. This is the
+    line an operator actually reads, so a requirement derived from a
+    partially-measured budget table must not present itself as an exact
+    figure that free space comfortably clears.
+    """
+    marker = ">= " if lower_bound else ""
     return tuple(
-        f"Free space: {entry.label:<21} {entry.free_gib:7.2f} GiB (required {required_gib:.2f} GiB) {entry.path}"
+        f"Free space: {entry.label:<21} {entry.free_gib:7.2f} GiB "
+        f"(required {marker}{required_gib:.2f} GiB) {entry.path}"
         for entry in entries
     )
 

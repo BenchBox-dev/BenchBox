@@ -47,14 +47,6 @@ class ExecuteConfig:
     official: bool = False
     streams: int | None = None
     seed: int | None = None
-    # When true, run_execute prunes every database a platform loaded once
-    # that platform is fully done (tests.uat.cleanup.prune_platform_chunk)
-    # instead of relying only on the incremental same-platform reuse-graph
-    # check -- see uat-disk-budget-and-platform-chunking. Platforms already
-    # run one at a time (UAT W3 line 222); this only changes whether a
-    # completed platform's databases are unconditionally freed before the
-    # next platform starts.
-    platform_chunking: bool = False
 
 
 @dataclass(frozen=True)
@@ -379,7 +371,6 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
                 "official",
                 "streams",
                 "seed",
-                "platform_chunking",
             }
         ),
         "execute",
@@ -429,7 +420,6 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
         official=official,
         streams=streams,
         seed=seed,
-        platform_chunking=_require_bool(payload, "platform_chunking", default=False, section="execute"),
     )
 
 

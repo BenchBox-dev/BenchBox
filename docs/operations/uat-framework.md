@@ -370,73 +370,69 @@ full rerun cheap, and the abort-safe artifacts (`cells.jsonl`,
 `compatibility_pruned.jsonl`, `matrix_summary.partial.tsv`) from the
 aborted run remain on disk as evidence.
 
-### Platform chunking (`execute.platform_chunking`)
+### The disk budget is a lower bound, not a certification
 
-The 2026-08-04 release-gate stage-1 sweep exhausted disk twice (2.7 GiB and
-4 GiB free) and was killed mid-sweep. Loaded databases are per-platform
-and measured roughly 15 GiB each at that sweep's scale, so 11 platforms
-needing every database to coexist concurrently is a 90-150 GiB
-requirement the flat disk-budget estimate above does not surface as a
-per-platform term -- it can pass preflight and still die partway through
-the matrix. The only thing that completed that stage 1 was an out-of-tree
-shell driver running one platform at a time and pruning databases between
-platforms; that script was lost when the scratchpad was wiped.
+Every figure the disk gate produces comes from
+`tests/uat/data/disk_budget_table.tsv`, an operator-maintained inventory
+of prior sweeps. That inventory is partial in two independent ways, and
+preflight discloses both rather than letting either read as zero demand:
 
-`tests/uat/preflight_budget.estimate_platform_chunking_budget(config)`
-models this directly: grouped by platform (not summed flat) at the
-config's largest configured `scales.rungs` entry, using the same
-checked-in `disk_budget_table.tsv` rows as every other estimate in this
-module -- never a hardcoded flat per-platform constant. Datagen is deduped
-once globally (it is generated once and stays resident for the whole
-sweep under `cleanup.preserve_datagen: true`, regardless of chunking); only
-the loaded-database + transient-growth share is platform-specific. It
-returns:
+1. **Cells with no row.** They contribute 0 GiB and are counted as
+   `unknown_cells`. As of 2026-08 the table covers four platforms
+   (`clickhouse-local`, `datafusion`, `duckdb`, `lakesail`) of the ~21 a
+   default sweep enumerates.
+2. **Rows whose loaded-database footprint was never measured.** Every
+   checked-in row carries `peak_database_gib = 0.000000` and declares
+   `peak_database_gib_status = unmeasured`. The loaded-database term of
+   the estimate is therefore identically zero -- for want of data, not
+   because loaded databases are small. A default sweep's estimate is
+   essentially the datagen term alone (~22 GiB).
 
-- `concurrent_required_gib` -- every platform's database coexisting (what
-  a non-chunked sweep needs today, and the 2026-08-04 failure mode).
-  Numerically identical to the existing flat
-  `estimate_largest_scale_peak_disk(config).est_peak_gib` -- same cells,
-  same table, same dedup rule; a regression test pins the two together.
-- `chunked_required_gib` -- the single worst platform's own footprint plus
-  the always-resident datagen (what `execute.platform_chunking: true`
-  bounds disk to).
-- `basis` -- the scale rung and platform count the numbers were derived
-  from, for the lifecycle log.
-
-`check_platform_chunking_headroom(...)` gates free space against whichever
-of the two applies, and `recommend_platform_chunking(...)` turns that into
-an operator-facing message: chunking unnecessary, chunking recommended (set
-`execute.platform_chunking: true`), or a hard failure with the computed
-shortfall when even a single platform's chunk would not fit.
-
-The `preflight` phase gates on this directly (`phases/preflight.py`,
-`_platform_chunking_abort_reason`), superseding the flat headroom check
-whenever a disk-budget config is available: with `execute.platform_chunking`
-left at its default `false`, preflight fails the sweep before it starts
-whenever the CONCURRENT requirement exceeds free space, naming the computed
-concurrent and chunked figures and recommending `execute.platform_chunking:
-true` when chunking would make it fit. Preflight never turns chunking on by
-itself -- it fails loud and tells the operator, because auto-enabling it
-would silently change `run_execute`'s runtime pruning behavior. With
-`execute.platform_chunking: true` already set, preflight gates on the
-smaller CHUNKED requirement instead, and only fails (naming that smaller
-shortfall) when even a single platform's chunk would not fit. `preflight.
-free_space_min_gib: 0` disables this gate exactly like every other disk
-gate here -- there is no separate opt-out.
-
-When `execute.platform_chunking: true`, `run_execute` (already sequential,
-one platform at a time -- UAT W3 line 222) force-prunes every database the
-just-finished platform loaded before starting the next platform:
-`tests.uat.cleanup.prune_platform_chunk` calls the same reuse-aware
-`prune_database_dir` used by the existing incremental
-same-platform-consumer pruning, per (platform, benchmark, scale) -- it
-never deletes the shared `databases/` root or another platform's subtree,
-so cross-benchmark and cross-platform reuse for platforms still to run is
-untouched. Each chunk boundary is recorded to `uat_lifecycle.log`:
+`assess_budget_coverage(...)` measures both gaps over exactly the cells
+the gate gated on, and preflight prints the result on every run, alongside
+a verdict that is deliberately not the word "fits":
 
 ```text
-[chunk] platform=duckdb pruned 4 database dir(s), freed 14.82 GiB (basis: execute.platform_chunking boundary -- platform fully complete, no remaining same-platform cells this sweep)
+Disk budget estimate: 25.20 GiB peak (25.20 GiB steady; cells=1127; unknown=1000)
+Disk budget coverage: PARTIAL -- this estimate is a LOWER BOUND, not a certification that the sweep fits. Measured rows cover 0 of 21 platform(s); 41 of 419 largest-scale cell(s) have any row and 0 of 419 have a measured loaded-database footprint. Unmeasured platform(s): cedardb, clickhouse-local, ...
+Disk budget verdict: no shortfall detected against a lower-bound requirement of 22.04 GiB; real demand may be higher (see coverage above)
 ```
+
+The same partial-coverage state raises a preflight warning and marks the
+free-space table's requirement as a floor (`required >= 22.04 GiB`) rather
+than an exact figure the operator's free space comfortably clears. Once an
+inventory covers every gated cell with measured values, the block instead
+reads `Disk budget coverage: COMPLETE` and the verdict states plainly that
+the measured requirement fits.
+
+**Direction matters.** Refusing a sweep because even this lower bound does
+not fit is always sound -- a lower bound that already exceeds free space
+cannot shrink. Passing means only "no shortfall detected against the
+measured subset". Treat a `PARTIAL` verdict as "not yet ruled out", not as
+clearance, and keep watching `uat_lifecycle.log`: the mid-sweep free-space
+floor in `execute` is the backstop for what preflight could not know.
+
+Filling gap (2) needs a real measured sweep. Do not populate the column by
+estimating -- a guessed per-platform constant converts a disclosed gap
+into an undisclosed fabrication, and `check_disk_headroom`'s
+`max(preflight.free_space_min_gib, estimate)` already guarantees the
+configured floor holds regardless of how low the estimate runs.
+
+> **Withdrawn: `execute.platform_chunking`.** An earlier iteration of this
+> section proposed a config flag that pruned each platform's loaded
+> databases at the platform boundary, on the premise that the flat
+> estimate hides a per-platform term and that ~11 platforms' databases
+> coexist at 90-150 GiB. Both premises were wrong. `_maybe_prune_completed`
+> (`tests/uat/phases/execute.py`) already runs after every benchmark
+> including a platform's last, and `remaining_consumers` only counts
+> same-platform pending cells -- so at a platform boundary that platform's
+> databases are already pruned and the proposed step measured zero bytes
+> freed in every realistic case. And with the loaded-database column
+> unmeasured (gap 2 above), the "concurrent" and "chunked" figures differ
+> by under 1 MiB on every checked-in config, so the recommendation could
+> never fire. The flag, its execute wiring and its preflight branch were
+> removed; the honest disclosure above replaces them. Reopen this only
+> with measured per-platform database footprints in hand.
 
 ## Submission terminal states
 
@@ -533,8 +529,8 @@ just wastes the timeout window each attempt.
 |---|---|---|
 | Preflight aborts on disk | `<5 GiB free at ~/Developer/benchmark_runs` | free space, or override `preflight.free_space_min_gib` |
 | Mid-sweep execute aborts on disk | free space fell below `preflight.free_space_min_gib` after a platform | inspect `uat_lifecycle.log`; increase space or reduce the matrix before resuming |
-| Preflight aborts with `platform_chunking recommended` | concurrent per-platform database footprint (every platform's loaded database coexisting) exceeds free space, but the chunked (one-platform-at-a-time) requirement fits -- see "Platform chunking" | set `execute.platform_chunking: true` and rerun; preflight then gates on the smaller chunked requirement instead |
-| Preflight aborts with `insufficient disk even with execute.platform_chunking` | even the single worst platform's own database + datagen exceeds free space | free more space, reduce the scale ladder, or narrow the platform/benchmark matrix -- chunking alone cannot make this fit |
+| Preflight prints `Disk budget coverage: PARTIAL` and passes | the inventory does not measure every gated cell (as of 2026-08 no row has a measured loaded-database footprint) -- see "The disk budget is a lower bound" | expected, not an error: the estimate is a floor, so keep headroom beyond the printed requirement and watch the mid-sweep free-space floor. Do not silence it by guessing values into `disk_budget_table.tsv` |
+| Sweep passes preflight then exhausts disk mid-run | real demand exceeded the lower-bound estimate -- most likely the unmeasured loaded-database term | inspect `uat_lifecycle.log` for the last platform reached; narrow the matrix or scale ladder, and record the observed footprints into `disk_budget_table.tsv` with `peak_database_gib_status = measured` |
 | Skipped-unreachable platforms | local Docker / TCP services not running and Docker is externally managed | `docker compose up` for the relevant services, or set `execute.skip_unreachable: false` to surface as failures |
 | Docker daemon unavailable in managed mode | `cleanup.docker_manage_platforms: true` requires `docker ps` and `docker compose` | start Docker Desktop/daemon; preflight treats Docker as required in managed mode |
 | Compose stack startup timeout | image pull/build or healthcheck exceeded `cleanup.docker_start_timeout_s` | the sweep records the stack as failed and advances (see "Managed Docker startup failures are non-fatal"); inspect compose logs and raise the timeout only after measuring a healthy startup |
