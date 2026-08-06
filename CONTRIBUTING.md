@@ -44,11 +44,11 @@ This document provides guidelines and instructions for contributing.
 
 `develop` is the long-lived development branch and the repository's default branch; **all changes land via PR**. `release` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
 
-Required CI on `develop` reports through `ci-required-result`. The umbrella uses `.github/path-filters.yml` to classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; auto-merge handles landing.
+Required CI on `develop` reports through `ci-required-result`. The umbrella uses `.github/path-filters.yml` to classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; once a finished branch is armed, auto-merge lands it when required checks are green.
 
 ## Development Workflow
 
-The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto-merge takes the PR over the line once CI is green; you don't poll.
+The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready` (or open already-final work with `make pr-open READY=1`); then walk away — don't poll.
 
 1. **Create a feature branch off `develop`.** For parallel work, prefer a worktree so the main clone keeps `develop` checked out:
 
@@ -81,16 +81,26 @@ The canonical loop is **branch → edit → preflight → `make pr-open`**. Auto
    git commit -m "fix: resolve race in foo loader"
    ```
 
-4. **Run the local preflight, then open the PR with auto-merge in one shot:**
+4. **Run the local preflight, then open the PR (auto-merge withheld):**
 
    ```bash
    make pr-preflight      # local lint + path-aware content guard / fast tests
-   make pr-open           # push + gh pr create --base develop + gh pr merge --auto --squash
+   make pr-open           # push + gh pr create --base develop (does NOT arm auto-merge)
    ```
 
-   `make pr-open` refuses to run from `develop` or `release`. The PR will squash-merge the moment the required checks turn green. Don't poll for CI — auto-merge handles it.
+   `make pr-open` refuses to run from `develop` or `release`. The PR stays open without auto-merge so you can push follow-ups safely.
 
-5. **After merge**, the remote branch auto-deletes (repo setting `delete_branch_on_merge`). Sweep any stale local branches and worktrees with:
+5. **When the branch is final, arm auto-merge** (hands-free finish path):
+
+   ```bash
+   make pr-ready          # arm squash auto-merge on the open PR
+   # Or open and arm in one step when you already know the branch is done:
+   # make pr-open READY=1
+   ```
+
+   Equivalent UI path: open as draft, then mark ready for review (`ready_for_review`); the workflow arms only on that event, not on bare `opened` / `reopened` / `synchronize`. Once armed, the PR squash-merges when required checks turn green — don't poll. Soundness-critical paths stay withheld pending review (see `docs/operations/repo-admin-settings.md`).
+
+6. **After merge**, the remote branch auto-deletes (repo setting `delete_branch_on_merge`). Sweep any stale local branches and worktrees with:
 
    ```bash
    make worktree-prune    # removes worktrees whose branches are gone on origin
@@ -128,7 +138,7 @@ This runs the broader CI mirror:
 
 Or run any of those individually. Additional one-offs: `make security-audit`, `make spellcheck`, `make docstring-coverage`.
 
-Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. Auto-merge will block on any non-required check failure that *is* surfaced (e.g. doc build), so the cost of being wrong is just a re-push.
+Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. Once the PR is armed, auto-merge still blocks on any non-required check failure that *is* surfaced (e.g. doc build), so the cost of being wrong is just a re-push (and re-arm with `make pr-ready` if needed).
 
 ## Testing
 
