@@ -8,15 +8,22 @@ from pathlib import Path
 import pytest
 
 from tests.uat import _cli as uat_cli
+from tests.uat.gate_summary import PhaseAccounting
 from tests.uat.phases import report
-from tests.uat.runner import CellResult
+from tests.uat.runner import CellResult, SubmitTerminalState
 
 pytestmark = pytest.mark.fast
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "report-accounting-skipped-unreachable-cells.jsonl"
 
 
-def _cell(platform: str, benchmark: str, scale: float, status: str = "passed") -> CellResult:
+def _cell(
+    platform: str,
+    benchmark: str,
+    scale: float,
+    status: str = "passed",
+    submit_terminal_state: str = SubmitTerminalState.submittable.value,
+) -> CellResult:
     return CellResult(
         platform=platform,
         benchmark=benchmark,
@@ -26,6 +33,7 @@ def _cell(platform: str, benchmark: str, scale: float, status: str = "passed") -
         elapsed_s=1.0 if status in {"passed", "failed", "timed-out"} else 0.0,
         log_path=Path(f"/tmp/{platform}_{benchmark}_{scale}.log"),
         result_path=Path(f"/tmp/{platform}_{benchmark}_{scale}.json") if status == "passed" else None,
+        submit_terminal_state=submit_terminal_state,
     )
 
 
@@ -391,6 +399,84 @@ def test_write_report_threads_registry_pruned_count_into_total_defined(tmp_path:
 
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
     assert "registry_pruned=3" in text
+
+
+# ---------------------------------------------------------------------------
+# unvalidated-results-misclassified-as-schema-violations: an aggregate
+# unvalidated=N counter, visible in the matrix_summary.tsv footer and on
+# ReportSummary/PhaseAccounting, so a majority-unvalidated sweep (e.g. every
+# DataFrame platform in a release-gate stage) cannot pass as an ordinary
+# clean run purely because the per-row submit_terminal_state column went
+# unread. Per the parent fix's contract, this counter must NEVER affect
+# exit_code() -- unvalidated is still not a UAT cell failure.
+# ---------------------------------------------------------------------------
+
+
+def test_write_report_counts_unvalidated_cells_without_affecting_exit_code(tmp_path: Path):
+    summary = report.write_report(
+        [
+            _cell("polars-df", "tpch", 0.01, status="passed", submit_terminal_state="unvalidated"),
+            _cell("datafusion-df", "tpch", 0.01, status="passed", submit_terminal_state="unvalidated"),
+            _cell("duckdb", "tpch", 0.01, status="passed"),
+        ],
+        output_path=tmp_path / "matrix_summary.tsv",
+    )
+
+    assert summary.unvalidated_count == 2
+    # Already counted in pass_count/attempted_count -- not a fifth disjoint
+    # total_defined_count bucket alongside skipped/unreachable/startup_failed.
+    assert summary.pass_count == 3
+    assert summary.attempted_count == 3
+    assert summary.total_defined_count == 3
+    # The whole point of this fix: unvalidated must not turn a clean sweep red.
+    assert summary.exit_code() == 0
+
+    text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
+    assert "# UNVALIDATED_CELLS=2 release_gate_attention=required" in text
+
+
+def test_write_report_omits_unvalidated_footer_line_when_zero(tmp_path: Path):
+    summary = report.write_report(
+        [_cell("duckdb", "tpch", 0.01, status="passed")],
+        output_path=tmp_path / "matrix_summary.tsv",
+    )
+    assert summary.unvalidated_count == 0
+    text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
+    assert "UNVALIDATED_CELLS" not in text
+
+
+def test_write_report_unvalidated_count_ignores_non_passed_cells(tmp_path: Path):
+    """Defensive: a `failed` cell must never count toward unvalidated_count.
+
+    `run_cell` sets `submit_terminal_state` from the classifier regardless of
+    the cell's final status (e.g. a `query_failure` cell is still `failed`
+    with that state recorded), and `submit_state_is_cell_failure` guarantees
+    `unvalidated` never itself turns a cell `failed`. But this counter
+    shouldn't trust that invariant blindly -- a cell that is `failed` for an
+    unrelated reason (a real subprocess crash) while its stale/partial
+    exported result also happens to read as `unvalidated` must not be folded
+    into a "these are just fine, only unvalidated" count.
+    """
+    summary = report.write_report(
+        [_cell("duckdb", "tpch", 0.01, status="failed", submit_terminal_state="unvalidated")],
+        output_path=tmp_path / "matrix_summary.tsv",
+    )
+    assert summary.unvalidated_count == 0
+    assert summary.fail_count == 1
+
+
+def test_phase_accounting_carries_unvalidated_and_defaults_to_zero():
+    """PhaseAccounting gained an `unvalidated` field alongside unreachable/startup_failed/registry_pruned."""
+    default = PhaseAccounting()
+    assert default.unvalidated == 0
+
+    accounting = PhaseAccounting(attempted=5, passed=5, total_defined=5, unvalidated=2)
+    assert accounting.unvalidated == 2
+    # asdict()-based JSON round trip (gate_summary.write_gate_summary /
+    # read_gate_summary's _dataclass_from_payload) must carry the field.
+    from dataclasses import asdict
+
+    assert asdict(accounting)["unvalidated"] == 2
 
 
 # ---------------------------------------------------------------------------
