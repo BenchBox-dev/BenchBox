@@ -10,7 +10,10 @@
     "9102": "auto_merge_on",
     "9103": "too_young",
     "9104": "not_green",
-    "9106": "draft"
+    "9106": "draft",
+    "9108": "not_green",
+    "9109": "not_green",
+    "9110": "too_young"
   },
   "prs": [
     {
@@ -33,6 +36,12 @@
           "status": "completed",
           "conclusion": "success",
           "completed_at": "2026-07-16T08:00:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-16T07:55:00Z"
         }
       ]
     },
@@ -59,6 +68,12 @@
           "status": "completed",
           "conclusion": "success",
           "completed_at": "2026-07-15T08:30:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-15T08:25:00Z"
         }
       ]
     },
@@ -82,6 +97,12 @@
           "status": "completed",
           "conclusion": "success",
           "completed_at": "2026-07-23T09:45:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-23T09:40:00Z"
         }
       ]
     },
@@ -105,6 +126,12 @@
           "status": "completed",
           "conclusion": "failure",
           "completed_at": "2026-07-18T08:30:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-18T08:25:00Z"
         }
       ]
     },
@@ -128,6 +155,12 @@
           "status": "completed",
           "conclusion": "success",
           "completed_at": "2026-07-17T08:15:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-17T08:10:00Z"
         }
       ]
     },
@@ -151,6 +184,12 @@
           "status": "completed",
           "conclusion": "success",
           "completed_at": "2026-07-13T08:30:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-13T08:25:00Z"
         }
       ]
     },
@@ -175,6 +214,93 @@
           "conclusion": "success",
           "started_at": "2026-07-18T08:00:00Z",
           "completed_at": "2026-07-18T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-18T08:05:00Z"
+        }
+      ]
+    },
+    {
+      "number": 9108,
+      "title": "partial green: umbrella green, browser gate never reported",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/9108",
+      "draft": false,
+      "created_at": "2026-07-15T09:00:00Z",
+      "updated_at": "2026-07-16T09:00:00Z",
+      "auto_merge": null,
+      "requested_reviewers": [
+        "joeharris76"
+      ],
+      "changed_files": [
+        "benchbox/core/equivalence/comparator.py"
+      ],
+      "check_runs": [
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-16T08:00:00Z"
+        }
+      ]
+    },
+    {
+      "number": 9109,
+      "title": "partial green: umbrella green, browser gate red",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/9109",
+      "draft": false,
+      "created_at": "2026-07-15T09:00:00Z",
+      "updated_at": "2026-07-16T09:00:00Z",
+      "auto_merge": null,
+      "requested_reviewers": [
+        "joeharris76"
+      ],
+      "changed_files": [
+        "benchbox/core/equivalence/comparator.py"
+      ],
+      "check_runs": [
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-16T08:00:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "failure",
+          "completed_at": "2026-07-16T08:05:00Z"
+        }
+      ]
+    },
+    {
+      "number": 9110,
+      "title": "park time anchors on the last required context to finish",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/9110",
+      "draft": false,
+      "created_at": "2026-07-15T09:00:00Z",
+      "updated_at": "2026-07-23T02:30:00Z",
+      "auto_merge": null,
+      "requested_reviewers": [
+        "joeharris76"
+      ],
+      "changed_files": [
+        "benchbox/core/equivalence/comparator.py"
+      ],
+      "check_runs": [
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-21T08:00:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "completed_at": "2026-07-23T02:00:00Z"
         }
       ]
     }
