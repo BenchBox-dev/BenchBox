@@ -32,7 +32,7 @@ pytestmark = [
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SHIM_PATH = REPO_ROOT / "_project" / "scripts" / "todo"
-SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "todo-db" / "SKILL.md"
+SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "todo" / "SKILL.md"
 
 
 def _read_skill_package() -> str:
@@ -42,7 +42,7 @@ def _read_skill_package() -> str:
 
 
 def _declared_standalone_only() -> set[str]:
-    """Commands the skill declares as standalone todo-db only (never wrapper)."""
+    """Commands the skill declares as standalone `todo` CLI only (never wrapper)."""
     meta = yaml.safe_load((SKILL_PATH.parent / "skill.yaml").read_text(encoding="utf-8")) or {}
     declared = meta.get("standalone_only_commands") or {}
     assert isinstance(declared, dict), "standalone_only_commands must map command -> minimum version"
@@ -179,11 +179,11 @@ class TestShim:
 
 class TestSkillThinness:
     def test_skill_exists_with_frontmatter(self):
-        assert SKILL_PATH.exists(), "thin skill .claude/skills/todo-db/SKILL.md is missing"
+        assert SKILL_PATH.exists(), "thin skill .claude/skills/todo/SKILL.md is missing"
         text = SKILL_PATH.read_text(encoding="utf-8")
         assert text.startswith("---\n")
         frontmatter = text.split("---", 2)[1]
-        assert "name: todo-db" in frontmatter
+        assert "name: todo" in frontmatter
         assert "description:" in frontmatter
 
     def test_skill_body_is_thin(self):
