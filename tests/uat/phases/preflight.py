@@ -29,6 +29,7 @@ from tests.uat.matrix import (
 from tests.uat.phases import PhaseResult
 from tests.uat.preflight_budget import (
     DiskBudget,
+    DiskBudgetCoverage,
     DiskHeadroomCheck,
     DiskRootFreeSpace,
     free_space_gib as free_space_gib,
@@ -218,12 +219,10 @@ def run_preflight(
                 free_space_entries,
                 min_free_gib=free_space_min_gib,
             )
-            if budget_gate.budget.unknown_cells:
-                warnings.append(
-                    "disk budget gate has "
-                    f"{len(budget_gate.budget.unknown_cells)} unknown largest-scale cell(s); "
-                    "estimate may be low"
-                )
+            warnings.extend(_disk_budget_coverage_warnings(budget_gate.coverage))
+            disk_budget_summary = _disk_budget_report(
+                disk_budget_summary, budget_gate, free_space_min_gib=free_space_min_gib
+            )
         except (OSError, ValueError, TypeError, KeyError, csv.Error) as exc:
             # The estimator CRASHED (bad table row, unreadable TSV, a
             # malformed config field) -- distinct from the advisory
@@ -256,7 +255,11 @@ def run_preflight(
         required_gib = budget_gate.headroom.required_gib
     else:
         required_gib = free_space_min_gib
-    free_space_report = format_free_space_report(free_space_entries, required_gib=required_gib)
+    free_space_report = format_free_space_report(
+        free_space_entries,
+        required_gib=required_gib,
+        lower_bound=_required_is_lower_bound(budget_gate, required_gib),
+    )
 
     abort_kind: str | None = None
     if free_space_min_gib > 0 and budget_gate is not None and budget_gate.headroom.shortfalls:
@@ -285,6 +288,17 @@ def run_preflight(
         warnings.append(f"host load {load_1m:.1f} > {noisy_neighbor_warn_load:.1f}")
     if not docker_ok and not docker_required:
         warnings.append("docker not reachable (any docker platforms will skip)")
+    if docker_manage_platforms and docker_ok and docker_root is None:
+        # `docker info --format {{.DockerRootDir}}` reported a path that does
+        # not exist on this host -- the normal case for a Linux-VM-backed
+        # engine on macOS, where the data root lives inside the VM. That root
+        # is then absent from `collect_disk_roots`, so container-resident
+        # images/volumes are neither budgeted nor free-space-checked. Disclose
+        # it rather than let a silent omission read as "nothing to check".
+        warnings.append(
+            "container data root is not host-visible (VM-backed engine); "
+            "container images/volumes are neither budgeted nor free-space-checked"
+        )
 
     if local_platforms_check and not aborted:
         checked, attempted, local_abort, local_warnings = _check_local_platforms(
@@ -383,6 +397,7 @@ class DiskBudgetGate:
 
     budget: DiskBudget
     headroom: DiskHeadroomCheck
+    coverage: DiskBudgetCoverage
 
 
 def estimate_disk_budget_summary_and_gate(
@@ -391,18 +406,89 @@ def estimate_disk_budget_summary_and_gate(
     *,
     min_free_gib: float,
 ) -> tuple[str, DiskBudgetGate]:
-    """Return the full advisory summary and largest-scale headroom gate."""
+    """Return the full advisory summary and largest-scale headroom gate.
+
+    The gate carries its own `coverage` because the estimate it gates on is
+    a lower bound over a partially-measured inventory: callers need to know
+    how much of it was measured to report a NON-refusing outcome honestly
+    (`_disk_budget_report`). The refusing outcome needs no such caveat.
+    """
     from tests.uat.preflight_budget import (
+        assess_budget_coverage,
         check_disk_headroom,
-        estimate_largest_scale_peak_disk,
+        estimate_cells,
         estimate_peak_disk,
         format_disk_budget,
+        largest_scale_cells,
+        load_budget_table,
     )
 
+    table = load_budget_table()
     summary = format_disk_budget(estimate_peak_disk(config))
-    budget = estimate_largest_scale_peak_disk(config)
+    gated_cells = largest_scale_cells(config)
+    budget = estimate_cells(gated_cells, table=table)
     headroom = check_disk_headroom(budget, free_space_entries, min_free_gib=min_free_gib)
-    return summary, DiskBudgetGate(budget=budget, headroom=headroom)
+    coverage = assess_budget_coverage(gated_cells, table=table)
+    return summary, DiskBudgetGate(budget=budget, headroom=headroom, coverage=coverage)
+
+
+def _disk_budget_coverage_warnings(coverage: DiskBudgetCoverage) -> tuple[str, ...]:
+    """Warnings for whatever the budget table could not measure.
+
+    Split from `run_preflight` so disclosing a new coverage dimension never
+    costs that function another branch (it is at the C901 cap).
+    """
+    if not coverage.is_lower_bound:
+        return ()
+    return (
+        f"disk budget gate is a LOWER BOUND: {coverage.cells_with_rows} of {coverage.cells_total} "
+        f"largest-scale cell(s) have an inventory row and "
+        f"{coverage.cells_with_measured_database} of {coverage.cells_total} have a measured "
+        "loaded-database footprint; real demand may exceed the gated figure",
+    )
+
+
+def _disk_budget_report(summary: str, gate: DiskBudgetGate, *, free_space_min_gib: float) -> str:
+    """Compose the always-printed operator block for the disk-budget gate.
+
+    Coverage is always disclosed. `gate.headroom` is always computed against
+    the estimate ALONE (`estimate_disk_budget_summary_and_gate` calls
+    `check_disk_headroom` with the raw configured `free_space_min_gib`,
+    unadjusted), so when `free_space_min_gib <= 0` disables the gate
+    (`run_preflight`'s own abort checks are guarded by `free_space_min_gib >
+    0`), `gate.headroom.required_gib`/`shortfalls` still describe a
+    requirement that was never going to be enforced. Printing
+    `format_budget_verdict` unmodified in that case would (a) assert "no
+    shortfall"/"fits" against a requirement the free-space table right below
+    it correctly prints as `0.00 GiB`, and (b) vanish entirely with no
+    explanation whenever the estimate exceeded free space, since the verdict
+    line is otherwise gated on `not gate.headroom.shortfalls` and a disabled
+    floor still won't abort. State plainly that the gate is off instead.
+
+    Otherwise the verdict line is added only when the gate did not refuse,
+    because that is the outcome an operator can misread as "measured and
+    fine" -- a refusal is unambiguous.
+    """
+    from tests.uat.preflight_budget import format_budget_coverage, format_budget_verdict
+
+    lines = [summary, format_budget_coverage(gate.coverage)]
+    if free_space_min_gib <= 0:
+        lines.append(
+            "Disk budget verdict: gate disabled (preflight.free_space_min_gib <= 0); "
+            "the estimate above is informational only and was not enforced"
+        )
+    elif not gate.headroom.shortfalls:
+        lines.append(format_budget_verdict(gate.headroom, gate.coverage))
+    return "\n".join(lines)
+
+
+def _required_is_lower_bound(gate: DiskBudgetGate | None, required_gib: float) -> bool:
+    """True when the printed requirement understates real demand.
+
+    False when the gate is disabled (`required_gib == 0`): there is no
+    requirement to understate.
+    """
+    return gate is not None and required_gib > 0 and gate.coverage.is_lower_bound
 
 
 def collect_disk_roots(
@@ -436,10 +522,23 @@ def read_disk_root_free_space(
     return tuple(DiskRootFreeSpace(label, path, free_space_reader(path)) for label, path in roots)
 
 
-def format_free_space_report(entries: Iterable[DiskRootFreeSpace], *, required_gib: float) -> tuple[str, ...]:
-    """Return compact preflight table lines for required disk roots."""
+def format_free_space_report(
+    entries: Iterable[DiskRootFreeSpace],
+    *,
+    required_gib: float,
+    lower_bound: bool = False,
+) -> tuple[str, ...]:
+    """Return compact preflight table lines for required disk roots.
+
+    `lower_bound=True` renders the requirement as `>= X GiB`. This is the
+    line an operator actually reads, so a requirement derived from a
+    partially-measured budget table must not present itself as an exact
+    figure that free space comfortably clears.
+    """
+    marker = ">= " if lower_bound else ""
     return tuple(
-        f"Free space: {entry.label:<21} {entry.free_gib:7.2f} GiB (required {required_gib:.2f} GiB) {entry.path}"
+        f"Free space: {entry.label:<21} {entry.free_gib:7.2f} GiB "
+        f"(required {marker}{required_gib:.2f} GiB) {entry.path}"
         for entry in entries
     )
 

@@ -332,6 +332,58 @@ def test_preflight_disk_headroom_gate_respects_zero_override(tmp_path: Path, mon
     assert all("(required 0.00 GiB)" in line for line in result.free_space_report)
 
 
+def test_preflight_disk_budget_verdict_states_gate_disabled_when_floor_is_zero(tmp_path: Path, monkeypatch):
+    """`free_space_min_gib: 0` must not print a verdict that implies enforcement.
+
+    Regression for finding F3 (uat-disk-budget-platform-chunking review):
+    `gate.headroom` is always computed against the estimate alone, so a
+    disabled floor used to still produce `Disk budget verdict: no shortfall
+    detected against a lower-bound requirement of 22.00 GiB` right above a
+    free-space line that (correctly) said `required 0.00 GiB` -- two
+    contradictory requirements on one screen. Here free space (1 GiB) is
+    also set BELOW the 22 GiB estimate, so `gate.headroom.shortfalls` is
+    non-empty and the OLD code's verdict line would have vanished entirely
+    with no explanation and no abort -- the other half of F3.
+    """
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t20.0\t0.0\t2.0\n",
+        encoding="utf-8",
+    )
+    cfg = config.validate_config(
+        {
+            "name": "zero-floor-smoke",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "preflight": {"free_space_min_gib": 0},
+        }
+    )
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 1.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        free_space_min_gib=0,
+        disk_budget_config=cfg,
+    )
+
+    assert result.aborted is False
+    assert result.abort_reason is None
+    summary = result.disk_budget_summary or ""
+    verdict = next(line for line in summary.splitlines() if line.startswith("Disk budget verdict:"))
+    assert "disabled" in verdict
+    assert "22.00 GiB" not in verdict
+    assert "fits" not in verdict
+    assert "no shortfall detected" not in verdict
+    assert all("(required 0.00 GiB)" in line for line in result.free_space_report)
+
+
 def test_requested_platforms_from_config_matches_uat_defaults():
     assert preflight.requested_platforms_from_config(
         config.validate_config({"name": "smoke", "platforms": {"include": ["postgresql"]}})
@@ -406,3 +458,204 @@ def _load_bring_up_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+# ---------------------------------------------------------------------------
+# The disk gate is a LOWER BOUND over a partially-measured inventory. Refusing
+# stays sound; passing must never read as a certification that the sweep fits.
+# ---------------------------------------------------------------------------
+
+
+def _partial_coverage_table(tmp_path: Path) -> Path:
+    """duckdb datagen measured, loaded-database footprint declared unmeasured."""
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\t"
+        "peak_database_gib_status\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t1.0\t0.0\tunmeasured\t0.5\n",
+        encoding="utf-8",
+    )
+    return table
+
+
+def _measured_table(tmp_path: Path) -> Path:
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\t"
+        "peak_database_gib_status\ttransient_growth_gib\n"
+        "duckdb\ttpch\t0.01\t1.0\t2.0\tmeasured\t0.5\n",
+        encoding="utf-8",
+    )
+    return table
+
+
+def _duckdb_tpch_config(**overrides):
+    payload = {
+        "name": "coverage-smoke",
+        "platforms": {"include": ["duckdb"]},
+        "benchmarks": {"include": ["tpch"]},
+        "scales": {"rungs": [0.01]},
+    }
+    payload.update(overrides)
+    return config.validate_config(payload)
+
+
+def test_preflight_enforces_configured_floor_when_budget_is_below_it(tmp_path: Path, monkeypatch):
+    """`preflight.free_space_min_gib` must gate even when the estimate is tiny.
+
+    End-to-end companion to `test_disk_headroom_gate_enforces_configured_floor`.
+    Once `disk_budget_config` is passed -- which `preflight_kwargs_from_config`
+    always does -- the flat `elif free_space_min_gib > 0` cutoff below is
+    unreachable, so the configured floor survives ONLY through the
+    `max(min_free_gib, ...)` inside `check_disk_headroom`. Deleting that
+    `max` starts a real sweep with 0.2 GiB free against a 5.0 GiB floor.
+    """
+    table = _partial_coverage_table(tmp_path)
+    cfg = _duckdb_tpch_config()
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 0.2)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        free_space_min_gib=5.0,
+        disk_budget_config=cfg,
+    )
+
+    # The estimate itself is 1.5 GiB -- well under 0.2 GiB free would NOT be
+    # a shortfall against the estimate alone.
+    assert result.aborted is True
+    assert result.abort_kind == "disk_floor"
+    assert "0.2 GiB free < 5.0 GiB required" in (result.abort_reason or "")
+
+
+def test_preflight_plain_shortfall_reports_a_plain_message(tmp_path: Path, monkeypatch):
+    """A plain free-space shortfall must not be dressed up as anything else.
+
+    Regression guard: the abort text for the common production path (the
+    estimate is far below the configured floor, so the floor is what bites)
+    must name the shortfall and nothing more -- no remedy the operator did
+    not ask about, no all-zeros basis for a term nobody measured.
+    """
+    table = _partial_coverage_table(tmp_path)
+    cfg = _duckdb_tpch_config()
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 0.2)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        free_space_min_gib=5.0,
+        disk_budget_config=cfg,
+    )
+
+    reason = result.abort_reason or ""
+    assert reason.startswith("disk headroom gate failed: ")
+    assert "chunking" not in reason
+    assert "basis" not in reason
+
+
+def test_preflight_passing_verdict_discloses_partial_coverage(tmp_path: Path, monkeypatch):
+    """Passing the gate on unmeasured data must say so, not say "fits"."""
+    table = _partial_coverage_table(tmp_path)
+    cfg = _duckdb_tpch_config()
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 500.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        disk_budget_config=cfg,
+    )
+
+    assert result.aborted is False
+    summary = result.disk_budget_summary or ""
+    # Coverage and verdict reach the operator on the PASSING path -- the whole
+    # point, since a refusal is already unambiguous.
+    assert "Disk budget coverage: PARTIAL" in summary
+    assert "LOWER BOUND" in summary
+    verdict = next(line for line in summary.splitlines() if line.startswith("Disk budget verdict:"))
+    assert "no shortfall detected" in verdict
+    # The verdict line is the one an operator skims for a yes/no. It must not
+    # assert a fit -- the only place "fits" may appear is the coverage line's
+    # explicit denial that this certifies one.
+    assert "fits" not in verdict
+    assert "not a certification that the sweep fits" in summary
+    # And the gap is a warning, not just prose buried in a summary block.
+    assert any("LOWER BOUND" in warning for warning in result.warnings)
+    # The requirement an operator reads off the free-space table is marked as
+    # a floor, not an exact figure their free space comfortably clears.
+    assert all("(required >= " in line for line in result.free_space_report)
+
+
+def test_preflight_fully_measured_coverage_reports_a_measured_verdict(tmp_path: Path, monkeypatch):
+    """The honest "fits" case: every gated cell measured, so say it plainly.
+
+    Without this the disclosure could be a constant string that never
+    distinguishes "measured and fine" from "mostly unmeasured" -- which is
+    the exact confusion it exists to prevent.
+    """
+    table = _measured_table(tmp_path)
+    cfg = _duckdb_tpch_config()
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 500.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        disk_budget_config=cfg,
+    )
+
+    assert result.aborted is False
+    summary = result.disk_budget_summary or ""
+    assert "Disk budget coverage: COMPLETE" in summary
+    assert "fits every required root" in summary
+    assert not any("LOWER BOUND" in warning for warning in result.warnings)
+    assert all("(required >= " not in line for line in result.free_space_report)
+
+
+def test_preflight_warns_when_container_data_root_is_not_host_visible(tmp_path: Path, monkeypatch):
+    """macOS/VM-backed engines report a data root that does not exist here.
+
+    `collect_disk_roots` then omits it, so container images/volumes are
+    neither budgeted nor free-space-checked. That omission must be disclosed
+    rather than read as "nothing to check".
+    """
+    table = _measured_table(tmp_path)
+    cfg = _duckdb_tpch_config()
+
+    monkeypatch.setattr(preflight, "free_space_gib", lambda path: 500.0)
+    monkeypatch.setattr(preflight, "docker_reachable", lambda: True)
+    monkeypatch.setattr(preflight, "host_load_1m", lambda: 0.5)
+    monkeypatch.setattr(preflight, "docker_data_root", lambda: None)
+    monkeypatch.setattr(preflight_budget, "DEFAULT_TABLE_PATH", table)
+
+    result = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        disk_budget_config=cfg,
+        docker_manage_platforms=True,
+    )
+
+    assert any("container data root is not host-visible" in warning for warning in result.warnings)
+
+    monkeypatch.setattr(preflight, "docker_data_root", lambda: tmp_path / "docker-root")
+    visible = preflight.run_preflight(
+        free_space_path=tmp_path / "runs",
+        benchmark_runs_dir=tmp_path / "runs",
+        disk_budget_config=cfg,
+        docker_manage_platforms=True,
+    )
+    assert not any("container data root" in warning for warning in visible.warnings)

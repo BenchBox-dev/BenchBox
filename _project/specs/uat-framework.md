@@ -364,9 +364,27 @@ preflight:
 # Disk-budget estimate --------------------------------------------------
 # `tests/uat/data/disk_budget_table.tsv` is an advisory, checked-in
 # inventory keyed by (platform, benchmark, scale_factor). Preflight
-# prints `Disk budget estimate: ... GiB` before workload execution.
-# The estimate never gates execution; unknown cells are surfaced as a
-# count and `preflight.free_space_min_gib` remains the hard cutoff.
+# prints `Disk budget estimate: ... GiB` before workload execution and
+# gates on it: the largest configured scale rung's estimated peak, summed
+# across every requested platform, against every required root.
+#
+# The estimate is a LOWER BOUND, never a certification. Cells with no row
+# contribute 0 GiB and are counted as unknown; rows may additionally
+# declare `peak_database_gib_status = unmeasured` (every checked-in row
+# currently does, so the loaded-database term is identically zero for want
+# of data). Preflight prints `Disk budget coverage:` and a
+# `Disk budget verdict:` line disclosing both gaps on EVERY run, warns
+# when coverage is partial, and renders the free-space requirement as
+# `required >= N GiB` in that case -- a passing gate means "no shortfall
+# detected against the measured subset", not "fits". Refusing on the
+# lower bound stays sound in either state.
+#
+# `preflight.free_space_min_gib` remains the hard cutoff via
+# `max(min_free_gib, estimate)` in `check_disk_headroom` -- the only
+# enforcement of the configured floor once a disk-budget config is passed
+# (which `preflight_kwargs_from_config` always does). Setting it to 0
+# disables every disk gate here. Never populate `peak_database_gib` by
+# estimating; only a measured sweep may flip a row to `measured`.
 
 # Resume (retired) -------------------------------------------------------
 # The resume manifest (`<log-dir>/resume.json`, `--resume <manifest>`)
