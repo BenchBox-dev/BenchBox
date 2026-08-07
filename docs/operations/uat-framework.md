@@ -245,6 +245,66 @@ is empty for them; mocker tracks its own compose-created volumes separately.
 Use `ENGINE=docker` (the default) for volume cleanup and `ENGINE=container`
 for everything else.
 
+### Compose project naming and the container-id limit
+
+`compose_project_name()` builds a deterministic project name from
+`docker_project_prefix`, the config name, and the platform, then truncates
+(sha1-suffixed for determinism) so it fits under a length budget. That budget
+is *not* simply compose's own 63-char project-name ceiling: compose derives
+the actual CONTAINER name as `<project>-<service>-<replica>`, and mocker
+rejects any container id over 64 chars. A project name that itself fits under
+63 chars can still produce an oversized container id once the longest
+service name a platform starts (e.g. `lakesail-connect`) and the replica
+suffix are appended.
+
+The budget is therefore derived per platform: `min(63, 64 - <longest started
+service name> - <replica suffix headroom> - 1)`. The replica suffix headroom
+reserves room for a two-digit index (`-10`..`-99`), not just `-1`, so a
+scaled service does not silently overflow the moment it reaches its 10th
+replica. Every registered `DockerPlatformSpec.services` tuple is populated at
+module load from the platform's compose file(s) (the full set for platforms
+that start everything, a documented host-run-only subset for lakesail and
+velox), so this lookup never parses YAML on the hot teardown path.
+
+A guard test (`tests/uat/test_docker_assets.py::test_container_name_budget_fits_every_config_and_platform`)
+enumerates every checked-in `tests/uat/configs/*.yaml` config against every
+registered Docker platform and asserts the resulting container id fits.
+`docker_project_prefix` stays fully operator-configurable -- a longer prefix
+still produces a valid, distinct project name, just truncated sooner.
+
+**Migration note (container-id budget tightening, 2026-08).** Deriving the
+budget from the 64-char container-id limit instead of compose's looser
+63-char project-name ceiling is strictly tighter, so it renames roughly half
+of the checked-in (config, platform) project names -- always shorter, never
+longer, so it never reintroduces an overflow. The rename itself is safe, but
+teardown matches by exact `-p <project-name>`: containers started by a
+pre-upgrade sweep are registered under the OLD, longer project name, so the
+first post-upgrade sweep's teardown will not match and stop them, and they
+keep holding their host ports. They are not lost -- `make uat-docker-cleanup`
+inventories by the `benchbox-uat` project-label *prefix* (see above), which
+every generation of this name has always shared, old and new alike. Every
+affected operator is on macOS/mocker (this overflow is mocker-only), so the
+default `ENGINE=docker` pass alone is NOT sufficient: as "Container engine
+resolution" above explains, that mode's inventory listing degrades to
+named-volumes-only when the resolved engine is mocker and reports no
+containers at all -- an operator who runs only that pass sees a clean
+"applied" report while the orphaned containers keep holding ports (5432,
+8080, 9000, ...), and the next sweep's `compose up --wait` then fails on a
+port conflict, the exact symptom this note exists to prevent. After
+upgrading, run BOTH passes once to catch any pre-upgrade leftovers:
+
+```bash
+make uat-docker-cleanup ENGINE=container APPLY=1
+make uat-docker-cleanup APPLY=1
+```
+
+The first pass (`ENGINE=container`) removes containers, networks, and
+images via the native `container` CLI. The second (default `ENGINE=docker`)
+pass sweeps mocker-managed named volumes, which `ENGINE=container` cannot
+see. Together they remove only `benchbox-uat`-prefixed resources and leave
+everything else for manual review, per the recovery command's normal
+`APPLY=1` semantics above.
+
 ### Mocker validation status
 
 Apple silicon + macOS 26, LOCAL DEV ONLY -- never CI (CI runs `test-docker-*`

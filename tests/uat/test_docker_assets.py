@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tests.uat import docker_assets, matrix
+from tests.uat import config, docker_assets, matrix
 from tests.uat.docker_path_helpers import compose_path_ends_with
 
 pytestmark = pytest.mark.fast
@@ -97,6 +97,176 @@ def test_compose_project_name_sanitizes_and_bounds_length():
         "pg.duckdb",
         "BenchBox_UAT",
     )
+
+
+# --------------------------------------------------------------------------
+# uat-compose-project-name-overflows-container-id-limit-20260805
+#
+# The constrained identifier is the derived CONTAINER id
+# (<project>-<service>-<replica>), which mocker caps at 64 chars -- not the
+# project name alone (compose's own ceiling is 63). The project-name budget
+# must derive from the container-id limit and the platform's longest started
+# service name, with headroom for a multi-digit replica suffix.
+# --------------------------------------------------------------------------
+
+
+def test_docker_platform_services_populated_and_match_compose_files():
+    """w0: every registered spec declares its compose services explicitly, and
+    those tuples match the compose file's non-profile-gated declared services
+    exactly -- the services a plain `docker compose up` starts without an
+    explicit `--profile` selection.
+
+    This is an equality check for every platform, with no per-platform
+    exemption list: lakesail declares exactly one service, so a `<=` subset
+    exemption for it would never actually be exercised (vacuous). velox's
+    documented host-run-only subset (see its spec.notes) is expressed in the
+    compose file itself -- velox-runner carries `profiles: [runner]`, so it is
+    excluded from "declared" here the same way `docker compose up` (no
+    `--profile`) would exclude it, rather than via a hardcoded name check."""
+    specs = docker_assets.docker_platform_specs()
+    assert not [platform for platform, spec in specs.items() if not spec.services]
+
+    for platform, spec in specs.items():
+        declared: list[str] = []
+        for compose_file in spec.compose_files:
+            data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+            services = (data.get("services") or {}) if isinstance(data, dict) else {}
+            for name, definition in services.items():
+                if isinstance(definition, dict) and definition.get("profiles"):
+                    continue  # profile-gated: not started by a plain `docker compose up`
+                declared.append(name)
+        assert set(spec.services) == set(declared), (platform, spec.services, declared)
+
+
+def test_compose_project_name_container_name_budget_derives_from_service_len():
+    """w1: the project budget tightens for a platform with a longer service
+    name, and loosens back toward the compose ceiling for a short one -- it
+    must not be a fixed magic-number cut regardless of which service starts."""
+    long_config = "x" * 80
+    short_service_name = docker_assets.compose_project_name(long_config, "cedardb")  # service "cedardb", len 7
+    long_service_name = docker_assets.compose_project_name(
+        long_config, "lakesail"
+    )  # service "lakesail-connect", len 16
+
+    assert len(long_service_name) < len(short_service_name)
+    assert len(short_service_name) <= 63
+    assert len(long_service_name) <= 63
+
+
+def _longest_declared_service_name(spec: docker_assets.DockerPlatformSpec) -> str:
+    """Return the longest compose service name for `spec`, parsed straight from its
+    compose YAML files -- deliberately NOT from `spec.services`.
+
+    Finding 3 (uat-compose-project-name-budget-review-20260806): reading the
+    registry here would make `test_container_name_budget_fits_every_config_and_platform`
+    red only when the registry itself is broken/empty (pre-fix `spec.services` is
+    empty, so `max()` raises `ValueError: max() arg is an empty sequence`), never
+    when a container id actually overflows. Parsing the compose file directly keeps
+    this guard's failure mode pinned to the overflow assertion, independent of the
+    registry it audits. Filtering matches
+    `test_docker_platform_services_populated_and_match_compose_files`: a
+    profile-gated service (e.g. velox-runner) is not started by a plain
+    `docker compose up` and must not count toward the budget.
+    """
+    longest = ""
+    for compose_file in spec.compose_files:
+        data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+        services = (data.get("services") or {}) if isinstance(data, dict) else {}
+        for name, definition in services.items():
+            if isinstance(definition, dict) and definition.get("profiles"):
+                continue  # profile-gated: not started by a plain `docker compose up`
+            if len(name) > len(longest):
+                longest = name
+    assert longest, f"no non-profile-gated service found in {spec.compose_files}"
+    return longest
+
+
+@pytest.mark.parametrize("replica_index", ["1", "10"])
+def test_container_name_budget_fits_every_config_and_platform(replica_index):
+    """The enumerating guard (w2): every checked-in UAT config crossed with
+    every registered Docker platform must yield a container id
+    (<project>-<longest-started-service>-<replica>) within mocker's 64-char
+    limit -- including a double-digit replica index, not just index 1.
+
+    Finding 1 (uat-compose-project-name-budget-review-20260806): calls
+    `compose_project_name` with each config's *actual*
+    `cleanup.docker_project_prefix`, not the three-arg default -- five
+    checked-in configs (release-gate-02/03, uat-enabled-platforms-full,
+    uat-lakesail-failing-benchmarks, uat-throughput-postgresql-nightly)
+    declare a non-default prefix, and the real production caller
+    (`tests/uat/phases/execute.py::_start_docker_platform_if_needed`) always
+    passes `config.cleanup.docker_project_prefix` explicitly. A prior version
+    of this rung asserted a property of names production never generates and
+    let `budget = ... if prefix == "benchbox-uat" else _PROJECT_NAME_MAX_LEN`
+    survive as a mutant. A deliberately over-long prefix is layered in too, so
+    the guard is not limited to the exact checked-in prefix set.
+    """
+    config_dir = docker_assets.REPO_ROOT / "tests" / "uat" / "configs"
+    config_paths = sorted(config_dir.glob("*.yaml"))
+    assert config_paths, "expected at least one checked-in UAT config"
+
+    specs = docker_assets.docker_platform_specs()
+    assert len(specs) == 16, "expected all 16 registered Docker platforms"
+
+    configs = [config.load_config(p) for p in config_paths]
+    over_long_prefix = "benchbox-uat-" + "x" * 40
+
+    overflows = []
+    for cfg in configs:
+        for platform, spec in specs.items():
+            service = _longest_declared_service_name(spec)
+            for prefix in (cfg.cleanup.docker_project_prefix, over_long_prefix):
+                project = docker_assets.compose_project_name(cfg.name, platform, prefix)
+                container_id = f"{project}-{service}-{replica_index}"
+                if len(container_id) > 64:
+                    overflows.append((cfg.name, platform, prefix, len(container_id)))
+
+    assert not overflows, f"{len(overflows)} (config, platform, prefix) pairs overflow: {overflows[:5]}"
+
+
+# --------------------------------------------------------------------------
+# Finding 4 (uat-compose-project-name-budget-review-20260806): compose_project_name()
+# always returns a name within budget, but an operator-supplied project name (e.g.
+# `--project-name` on scripts/uat-bring-up/uat_bring_up.py) never goes through it.
+# The budget must be enforced at the _compose_base_command chokepoint every
+# UAT-managed compose verb routes through, not just at the generator.
+# --------------------------------------------------------------------------
+
+
+def test_validate_project_name_budget_rejects_operator_supplied_overflow():
+    spec = docker_assets.docker_platform_spec("lakesail")  # longest service "lakesail-connect", len 16
+    budget = docker_assets._project_name_budget("lakesail")
+    over_budget_name = "x" * (budget + 1)
+
+    with pytest.raises(docker_assets.DockerAssetError, match=str(budget)) as excinfo:
+        docker_assets.validate_project_name_budget(spec, over_budget_name)
+    assert str(len(over_budget_name)) in str(excinfo.value)
+    assert "lakesail" in str(excinfo.value)
+
+    within_budget_name = "x" * budget
+    docker_assets.validate_project_name_budget(spec, within_budget_name)  # must not raise
+
+
+@pytest.mark.parametrize(
+    "command_fn",
+    [
+        lambda spec, project: docker_assets.compose_up_command(spec, project),
+        lambda spec, project: docker_assets.compose_pull_command(spec, project),
+        lambda spec, project: docker_assets.compose_build_command(spec, project),
+        lambda spec, project: docker_assets.compose_down_command(spec, project, "containers"),
+        lambda spec, project: docker_assets.compose_ps_command(spec, project),
+    ],
+    ids=["up", "pull", "build", "down", "ps"],
+)
+def test_every_compose_command_rejects_operator_supplied_project_name_overflow(command_fn):
+    """Every consumer of _compose_base_command (up/pull/build/down/ps) is covered
+    from the one chokepoint -- not just compose_project_name()'s generator."""
+    spec = docker_assets.docker_platform_spec("lakesail")
+    budget = docker_assets._project_name_budget("lakesail")
+    over_budget_name = "x" * (budget + 1)
+
+    with pytest.raises(docker_assets.DockerAssetError, match=str(budget)):
+        command_fn(spec, over_budget_name)
 
 
 def test_matrix_docker_specs_are_project_scoped_for_managed_start():

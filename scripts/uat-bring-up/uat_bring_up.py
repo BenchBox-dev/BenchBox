@@ -106,6 +106,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"UAT bring-up failed for {platform}: {exc}", file=sys.stderr)
         return 2
 
+    # An operator-supplied `--project-name` bypasses compose_project_name()'s budget
+    # entirely, so validate it up front -- a clear, actionable error here beats an
+    # oversized-container-id failure minutes into `compose up`/`pull`/`build`.
+    try:
+        docker_assets.validate_project_name_budget(spec, project_name)
+    except docker_assets.DockerAssetError as exc:
+        print(f"platform {platform!r} project name {project_name!r} is invalid: {exc}", file=sys.stderr)
+        return 2
+
     if args.prepull_only:
         prepull_steps = (
             ("pull", docker_assets.compose_pull_command(spec, project_name)),
