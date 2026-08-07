@@ -448,6 +448,15 @@ def _start_docker_platform_if_needed(
             spec,
             config.cleanup.docker_fixed_container_name_policy,
         )
+        # A relative/empty BENCHBOX_DATA_DIR for a path-mirroring platform
+        # (lakesail, velox) is a config problem, not a per-cell/per-query
+        # failure -- it would break EVERY cell on this platform identically.
+        # Treat it like validate_managed_start_allowed above: fail before
+        # ever invoking compose, same DockerAssetError contract, same
+        # abort-worthy handling below (uat-fail-advance-consistency:
+        # pre-flight config errors abort, runtime compose-up failures
+        # advance-past).
+        compose_env = docker_assets.compose_environment(spec, benchmark_runs_dir=benchmark_runs_dir)
     except docker_assets.DockerAssetError as exc:
         return _DockerPlatformState(spec=spec, project_name=project_name), str(exc)
 
@@ -460,7 +469,7 @@ def _start_docker_platform_if_needed(
         dry_run=config.dry_run,
         timeout_s=config.cleanup.docker_start_timeout_s,
         cwd=docker_assets.REPO_ROOT,
-        env=docker_assets.compose_environment(spec, benchmark_runs_dir=benchmark_runs_dir),
+        env=compose_env,
     )
     _record_docker_event(
         docker_events,
@@ -739,6 +748,19 @@ def _run_docker_teardown(
         )
         return "off", None
 
+    try:
+        compose_env = docker_assets.compose_environment(docker_state.spec, benchmark_runs_dir=benchmark_runs_dir)
+    except docker_assets.DockerAssetError:
+        # Teardown must never fail (or worse, raise out of run_execute's
+        # `finally`) just because BENCHBOX_DATA_DIR is unset or relative --
+        # `down` never mounts anything, so any absolute value lets compose
+        # parse the file. A throwaway placeholder is fine here; the
+        # Makefile's compose_down_fresh does the identical substitution for
+        # `make test-docker-down-*`, for the identical reason (a stack
+        # whose own startup failed for this exact config problem must still
+        # be torn down -- uat-fail-advance-consistency w4).
+        compose_env = {"BENCHBOX_DATA_DIR": str(docker_assets.REPO_ROOT)}
+
     down_result = docker_runner(
         docker_assets.compose_down_command(
             docker_state.spec,
@@ -748,7 +770,7 @@ def _run_docker_teardown(
         dry_run=config.dry_run,
         timeout_s=config.cleanup.docker_start_timeout_s,
         cwd=docker_assets.REPO_ROOT,
-        env=docker_assets.compose_environment(docker_state.spec, benchmark_runs_dir=benchmark_runs_dir),
+        env=compose_env,
     )
     cleanup_status = "ok" if down_result.succeeded else "failed"
     _record_docker_event(
