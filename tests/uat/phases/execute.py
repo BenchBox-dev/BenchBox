@@ -29,7 +29,11 @@ from tests.uat import docker_assets
 from tests.uat.cleanup import CellKey, can_prune, prune_database_dir, source_reuse_graph
 from tests.uat.config import OutputConfig, UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
-from tests.uat.matrix import invalidate_reachability_cache_after_lifecycle_change, platform_is_reachable
+from tests.uat.matrix import (
+    invalidate_reachability_cache_after_lifecycle_change,
+    platform_is_reachable,
+    probe_platform_reachability,
+)
 from tests.uat.phases import PhaseResult
 from tests.uat.phases.enumerate import (
     Cell,
@@ -38,6 +42,8 @@ from tests.uat.phases.enumerate import (
 )
 from tests.uat.preflight_budget import (
     MemorySnapshot,
+    check_memory_headroom,
+    format_memory_headroom_failure,
     free_space_gib as default_free_space_reader,
     read_memory_snapshot as default_free_memory_reader,
 )
@@ -110,6 +116,21 @@ class ExecuteOutcome(PhaseResult):
     # can tell "stack failed to start" from "TCP probe found nothing
     # listening" -- see uat-fail-advance-consistency w3.
     startup_failed: tuple[Cell, ...] = ()
+    # Cells not run because the platform's stack was reachable when the
+    # platform started and had STOPPED being reachable by the time the cell
+    # was about to run -- the 2026-08-04 CedarDB failure mode, where the
+    # container died ~29s after `up --wait` returned and all 171 remaining
+    # cells were recorded as ordinary cell failures.
+    #
+    # Its own bucket, deliberately not folded into any existing one:
+    #   - not `results`: these cells never ran, and recording them as
+    #     failures is the exact miscount this exists to stop;
+    #   - not `startup_failed`: the stack DID start, and saying otherwise is
+    #     a second false claim about the same incident;
+    #   - not `skipped_unreachable`: that means "never found listening", a
+    #     platform we skipped over. This one was up and then died, which is
+    #     an infrastructure fault worth surfacing, not a clean skip.
+    died_mid_platform: tuple[Cell, ...] = ()
     compatibility_pruned: tuple[CompatibilityPrunedCell, ...] = ()
     docker_events: tuple[DockerLifecycleEvent, ...] = ()
     # Typed cause for `aborted` -- e.g. "disk_floor", "docker_startup",
@@ -132,7 +153,33 @@ class ExecuteOutcome(PhaseResult):
         # cells count as "skipped", not failures, in ReportSummary.exit_code()).
         if not self.results:
             return 1
+        # A stack dying mid-platform is a real failure of the sweep, not a
+        # clean skip: cells that were supposed to run did not, because the
+        # infrastructure under them went away. It must not be possible for a
+        # sweep to lose a platform mid-run and still exit 0 -- that is the
+        # quiet-and-wrong shape of the original bug, just relocated.
+        if self.died_mid_platform:
+            return 1
         return 0 if all(result.status == "passed" for result in self.results) else 1
+
+
+class _PlatformDiedMidRun(Exception):
+    """Internal control-flow signal: a platform's stack died partway through its cells.
+
+    Raised by `_run_platform_benchmark`'s per-cell liveness probe and caught
+    by `_run_or_skip_platform`, which is the only scope that can see the
+    platform's remaining benchmarks. An exception rather than a return flag
+    because unwinding is the point: the interrupted benchmark must NOT fall
+    through to its `completed_pairs.add(...)` / database-pruning tail, which
+    would mark a half-run pair as finished.
+
+    Never escapes `_run_or_skip_platform`.
+    """
+
+    def __init__(self, *, platform: str, remaining_cells: list[Cell]) -> None:
+        super().__init__(f"{platform} stopped being reachable mid-run")
+        self.platform = platform
+        self.remaining_cells = remaining_cells
 
 
 @dataclass(frozen=True)
@@ -231,6 +278,7 @@ def run_execute(
     pruned: list[Cell] = []
     skipped_unreachable: list[Cell] = []
     startup_failed: list[Cell] = []
+    died_mid_platform: list[Cell] = []
     docker_events: list[DockerLifecycleEvent] = []
     completed_pairs: set[tuple[str, str]] = set()
     already_pruned: set[tuple[str, str, float]] = set()
@@ -298,6 +346,7 @@ def run_execute(
                         results=results,
                         pruned=pruned,
                         skipped_unreachable=skipped_unreachable,
+                        died_mid_platform=died_mid_platform,
                         completed_pairs=completed_pairs,
                         already_pruned=already_pruned,
                         databases_root=databases_root,
@@ -319,6 +368,7 @@ def run_execute(
                         exc,
                         skipped_unreachable=skipped_unreachable,
                         startup_failed=startup_failed,
+                        died_mid_platform=died_mid_platform,
                         compatibility_pruned=enumeration.compatibility_pruned,
                     )
                     raise
@@ -353,6 +403,7 @@ def run_execute(
         pruned=tuple(pruned),
         skipped_unreachable=tuple(skipped_unreachable),
         startup_failed=tuple(startup_failed),
+        died_mid_platform=tuple(died_mid_platform),
         compatibility_pruned=enumeration.compatibility_pruned,
         docker_events=tuple(docker_events),
         aborted=abort_reason is not None,
@@ -510,20 +561,34 @@ def _check_docker_platform_readiness(
     benchmark_runs_dir: Path,
     sleep_fn: SleepFn,
 ) -> str | None:
-    """Re-check a stack `up --wait` already reported as started.
+    """Immediate-crash detector for a stack `up --wait` already reported started.
 
-    Settles for `cleanup.docker_settle_s` (default 10s), then re-checks
-    `compose ps` service state and re-probes host reachability via
-    `platform_is_reachable` -- the same tcp_probe +
-    `docker_assets.host_reachability_endpoint` reachability primitive
-    `_run_or_skip_platform`'s skip_unreachable check already uses, reused
-    here rather than probing directly so the two checks can never disagree
-    about what "reachable" means, and so a pass here populates the
-    reachability cache for that later check instead of probing twice (the
-    caller invalidates the cache right after `up --wait` succeeds, before
-    this runs, so the read here is fresh for the container that just
-    started). A stack that fails either check here is reported exactly like
-    a compose-up failure (same `startup-failed` routing in the caller): the
+    Settles for `cleanup.docker_settle_s` (default 10s), then checks
+    `compose ps -a` service state and probes host reachability.
+
+    SCOPE -- read this before changing `docker_settle_s`. This check runs
+    EXACTLY ONCE and has rendered its verdict about twelve seconds after
+    `up --wait` returned. It therefore catches a container that is already
+    dead by then: an immediate crash. It does NOT catch a container that
+    dies later, and no value of `docker_settle_s` makes it: a one-shot
+    check cannot cover an unbounded window. Concretely, it would NOT have
+    caught the 2026-08-04 CedarDB incident, where the container died ~29s
+    after `up --wait` returned -- do not claim otherwise. Deaths at
+    arbitrary latency are covered by the per-cell liveness probe in
+    `_run_platform_benchmark` (`execute.liveness_probe_timeout_s`), which
+    is a separate mechanism; this one exists because failing a platform in
+    twelve seconds is much cheaper than discovering it one cell later.
+
+    Probes via `probe_platform_reachability`, the NO-CACHE variant,
+    deliberately. Using the cached `platform_is_reachable` here wrote
+    `True` into `matrix._REACHABILITY_CACHE`, which
+    `_run_or_skip_platform`'s skip_unreachable check then read instead of
+    probing -- so adding this check silently disabled the next check
+    downstream of it. The cache is cleared only on lifecycle changes, never
+    between here and the cells.
+
+    A stack that fails either check here is reported exactly like a
+    compose-up failure (same `startup-failed` routing in the caller): the
     platform's cells go to `startup_failed` and the sweep advances to the
     next stack instead of running cells against a dead stack (see
     uat-container-readiness-and-memory-headroom-gate w0/w1, and
@@ -555,15 +620,28 @@ def _check_docker_platform_readiness(
             f"{config.cleanup.docker_settle_s}s after `up --wait` reported success: "
             f"{_docker_result_message(ps_result)}"
         )
+    if not docker_assets.compose_ps_service_rows(ps_result.stdout):
+        # Fail CLOSED on an empty table. `up --wait` just reported success
+        # for this project and `ps -a` includes stopped containers, so "no
+        # rows at all" means the project has no containers: they were
+        # removed, or the project name does not match what was started.
+        # Neither is a state to run a platform's whole cell list against,
+        # and passing here would be the same fail-open shape as the missing
+        # `-a` -- an empty result read as a healthy one.
+        return (
+            f"UAT-managed Docker readiness check failed for {platform} project {project_name}: "
+            f"`compose ps -a` listed no services {config.cleanup.docker_settle_s}s "
+            "after `up --wait` reported success"
+        )
     unhealthy = docker_assets.compose_ps_unhealthy_services(ps_result.stdout)
     if unhealthy:
         return (
             f"UAT-managed Docker readiness check failed for {platform} project {project_name}: "
-            f"service(s) {', '.join(unhealthy)} Exited/Restarting {config.cleanup.docker_settle_s}s "
+            f"service(s) {', '.join(unhealthy)} not ready {config.cleanup.docker_settle_s}s "
             "after `up --wait` reported success"
         )
 
-    if platform_is_reachable(platform):
+    if probe_platform_reachability(platform, timeout_s=config.execute.liveness_probe_timeout_s or 2.0):
         return None
     endpoint = docker_assets.host_reachability_endpoint(platform) or platform
     return (
@@ -755,6 +833,7 @@ def _run_or_skip_platform(
     results: list[CellResult],
     pruned: list[Cell],
     skipped_unreachable: list[Cell],
+    died_mid_platform: list[Cell],
     completed_pairs: set[tuple[str, str]],
     already_pruned: set[tuple[str, str, float]],
     databases_root: Path | None,
@@ -767,23 +846,47 @@ def _run_or_skip_platform(
     if config.execute.skip_unreachable and not platform_is_reachable(platform):
         skipped_unreachable.extend(platform_cells)
         return
-    for benchmark, pb_cells in platform_pairs:
-        _run_platform_benchmark(
-            config,
-            platform=platform,
-            benchmark=benchmark,
-            pb_cells=pb_cells,
-            by_pb=by_pb,
-            results=results,
-            pruned=pruned,
-            completed_pairs=completed_pairs,
-            already_pruned=already_pruned,
-            databases_root=databases_root,
-            cleanup_enabled=cleanup_enabled,
-            runner=runner,
-            log_dir=log_dir,
-            benchmark_runs_dir=benchmark_runs_dir,
-        )
+    # Arm the per-cell liveness probe only for a platform that is reachable
+    # RIGHT NOW, at the start of its cell list. The bucket means "was up,
+    # then died"; arming against a platform that was never reachable would
+    # relabel an ordinary never-listening platform (which `skip_unreachable:
+    # false` configs deliberately still attempt) as a mid-run death. A
+    # platform with no reachability endpoint at all (duckdb, ...) probes
+    # True here and True forever after, so the probe never fires for it.
+    liveness_armed = (
+        config.execute.liveness_probe_timeout_s > 0
+        and not config.dry_run
+        and probe_platform_reachability(platform, timeout_s=config.execute.liveness_probe_timeout_s)
+    )
+    for index, (benchmark, pb_cells) in enumerate(platform_pairs):
+        try:
+            _run_platform_benchmark(
+                config,
+                platform=platform,
+                benchmark=benchmark,
+                pb_cells=pb_cells,
+                by_pb=by_pb,
+                results=results,
+                pruned=pruned,
+                completed_pairs=completed_pairs,
+                already_pruned=already_pruned,
+                databases_root=databases_root,
+                cleanup_enabled=cleanup_enabled,
+                runner=runner,
+                log_dir=log_dir,
+                benchmark_runs_dir=benchmark_runs_dir,
+                liveness_armed=liveness_armed,
+            )
+        except _PlatformDiedMidRun as died:
+            # Everything this platform still owed: the rest of the benchmark
+            # that was interrupted, plus every benchmark after it. The pair
+            # is deliberately NOT added to `completed_pairs` (that happens
+            # at the end of `_run_platform_benchmark`, which we skipped), so
+            # database pruning does not treat a half-run pair as finished.
+            died_mid_platform.extend(died.remaining_cells)
+            for _later_benchmark, later_cells in platform_pairs[index + 1 :]:
+                died_mid_platform.extend(later_cells)
+            return
 
 
 def _run_platform_benchmark(
@@ -802,10 +905,11 @@ def _run_platform_benchmark(
     runner,
     log_dir: Path | None,
     benchmark_runs_dir: Path,
+    liveness_armed: bool,
 ) -> None:
     ladder_rungs = [c.scale for c in pb_cells]
     observed: list[LadderRung] = []
-    for cell in pb_cells:
+    for index, cell in enumerate(pb_cells):
         _, pruned_rungs = plan_ladder(
             ladder_rungs,
             observed,
@@ -815,6 +919,22 @@ def _run_platform_benchmark(
         if cell.scale in pruned_rungs:
             pruned.append(cell)
             continue
+        # Liveness probe, immediately before handing this cell to the
+        # runner. This is the check that covers a stack dying at ARBITRARY
+        # latency: the post-start readiness check renders its verdict once,
+        # seconds after `up --wait`, and cannot see a death that happens an
+        # hour into a platform's cell list.
+        if liveness_armed and not probe_platform_reachability(
+            platform, timeout_s=config.execute.liveness_probe_timeout_s
+        ):
+            endpoint = docker_assets.host_reachability_endpoint(platform) or platform
+            append_lifecycle_log(
+                log_dir,
+                f"[liveness] {platform}/{benchmark}: probe to {endpoint} failed before cell "
+                f"scale={cell.scale}; stack was reachable when the platform started. "
+                f"Recording this and every remaining {platform} cell as died-mid-platform.",
+            )
+            raise _PlatformDiedMidRun(platform=platform, remaining_cells=list(pb_cells[index:]))
         cell_result = runner(
             cell.platform,
             cell.benchmark,
@@ -985,6 +1105,7 @@ def _annotate_disk_floor_abort(
     *,
     skipped_unreachable: list[Cell],
     startup_failed: list[Cell],
+    died_mid_platform: list[Cell],
     compatibility_pruned: tuple[CompatibilityPrunedCell, ...],
 ) -> None:
     """Attach accounting the orchestrator needs to thread into abort artifacts.
@@ -1005,6 +1126,11 @@ def _annotate_disk_floor_abort(
     if not hasattr(exc, "startup_failed_count"):
         try:
             exc.startup_failed_count = len(startup_failed)  # type: ignore[attr-defined]
+        except (AttributeError, TypeError):
+            pass
+    if not hasattr(exc, "died_mid_platform_count"):
+        try:
+            exc.died_mid_platform_count = len(died_mid_platform)  # type: ignore[attr-defined]
         except (AttributeError, TypeError):
             pass
     if not hasattr(exc, "compatibility_pruned"):
@@ -1113,6 +1239,17 @@ def _free_memory_abort_reason(
     memory request to uat_lifecycle.log on every call where the gate is
     enabled, regardless of pass/fail -- see
     uat-container-readiness-and-memory-headroom-gate w3.
+
+    The comparison and the operator-facing message both come from
+    `preflight_budget.check_memory_headroom` /
+    `format_memory_headroom_failure` rather than being open-coded here, so
+    the shipped message and the unit-tested one cannot diverge (the disk
+    gate routes through `check_disk_headroom` /
+    `format_disk_headroom_failure` the same way, at
+    phases/preflight.py:264). This function contributes only the
+    call-site context the primitives cannot know: which platform boundary
+    it fired at, the resolved container engine, and that platform's
+    declared VM memory request.
     """
     min_gib = config.preflight.free_memory_min_gib
     if min_gib <= 0 or not config.cleanup.docker_manage_platforms or not docker_assets.is_docker_platform(platform):
@@ -1125,6 +1262,7 @@ def _free_memory_abort_reason(
     vm_request = _describe_platform_vm_request(platform)
 
     snapshot = reader()
+    check = check_memory_headroom(snapshot, min_free_gib=min_gib)
     swap_note = f", swap {snapshot.swap_used_percent:.1f}% used" if snapshot.swap_used_percent is not None else ""
     if snapshot.free_gib is None:
         # Free memory could not be measured on this host -- degrade safely:
@@ -1146,21 +1284,28 @@ def _free_memory_abort_reason(
         f"[free-memory] {context}: engine={engine} vm_request={vm_request} "
         f"{snapshot.free_gib:.2f} GiB free (threshold {min_gib:.2f} GiB{swap_note})",
     )
-    if snapshot.free_gib >= min_gib:
+    if not check.shortfall:
         return None
-    return (
-        f"free memory {snapshot.free_gib:.2f} GiB < cutoff {min_gib:.2f} GiB {context} "
-        f"(engine={engine}, vm_request={vm_request}{swap_note})"
-    )
+    return f"{format_memory_headroom_failure(check)} {context} (engine={engine}, vm_request={vm_request})"
 
 
 def _describe_platform_vm_request(platform: str) -> str:
-    """One-line description of a Docker platform's declared memory request, for logging."""
+    """One-line description of a Docker platform's declared memory request, for logging.
+
+    Never raises. This value is pure log/message decoration on the memory
+    gate's hot path, so any failure to derive it must degrade to a string --
+    an exception escaping here would propagate out of `run_execute` and
+    abort an entire multi-hour sweep because a compose file could not be
+    summarized for one log line.
+    """
     try:
         spec = docker_assets.docker_platform_spec(platform)
     except docker_assets.DockerAssetError:
         return "unknown (no compose spec)"
-    limits = docker_assets.compose_declared_memory_limits(spec)
+    try:
+        limits = docker_assets.compose_declared_memory_limits(spec)
+    except Exception as exc:  # noqa: BLE001 - decoration must never abort the sweep
+        return f"unknown (could not read declared limits: {exc})"
     if not limits:
         return "no declared memory limit (engine default)"
     return ", ".join(f"{service}={limit}" for service, limit in sorted(limits.items()))

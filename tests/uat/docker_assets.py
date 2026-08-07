@@ -469,45 +469,81 @@ def compose_up_command(
 
 
 def compose_ps_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
-    """Build `docker compose ps` argv for a UAT-owned platform project.
+    """Build `docker compose ps -a` argv for a UAT-owned platform project.
 
-    Post-start readiness check (uat-container-readiness-and-memory-headroom-gate
-    w0): `up --wait` exiting 0 only proves the container reported
-    started/healthy at that instant -- live-observed 2026-08-04, mocker
-    reported CedarDB Started and `mocker compose ps` showed it Exited ~29s
-    later. Deliberately NOT `--format json`: mocker's `--format json` output
-    is non-Docker-compatible for several inventory verbs (see
+    `-a`/`--all` is load-bearing, not defensive. Plain `compose ps` lists
+    only RUNNING containers, so the one state this readiness check exists to
+    detect -- a service that started and then died -- is simply absent from
+    the output, and the check passes on an empty table. Live-observed
+    2026-08-04: mocker reported CedarDB Started, and `mocker compose ps -a`
+    showed it Exited.
+
+    Deliberately NOT `--format json`: mocker's `--format json` output is
+    non-Docker-compatible for several inventory verbs (see
     `list_mocker_volumes_matching`'s docstring and docker_cleanup.py's
-    `--format json` note), so the readiness check greps the STATUS column of
+    `--format json` note), so the readiness check parses the STATUS column of
     the default table output instead (`compose_ps_unhealthy_services`).
     """
     argv = _compose_base_command(spec, project_name)
-    argv.append("ps")
+    argv.extend(["ps", "-a"])
     return argv
 
 
-# `compose ps`'s default table STATUS column renders e.g. "Up 5 seconds",
-# "Exited (1) 2 seconds ago", "Restarting (1) 3 seconds ago". Matched as a
-# whole word so a service/container NAME that happens to contain "Exited" (or
-# similar) in the first column cannot false-positive.
-_UNHEALTHY_PS_STATE_RE = re.compile(r"\b(?:Exited|Restarting)\b")
+# Every `compose ps` STATUS that is not "this service is up and serving".
+#
+#   Exited      -- compose v2, the 2026-08-04 CedarDB state
+#   Exit 1      -- compose v1 spelling of the same thing
+#   Restarting  -- crash-looping; may be briefly listening, never stably
+#   Created     -- container exists but was never started
+#   Dead        -- engine could not remove/stop it cleanly
+#   Paused      -- SIGSTOPped; the port accepts nothing
+#   (unhealthy) -- "Up 30 seconds (unhealthy)": the engine's OWN healthcheck
+#                  says no. `(healthy)` and a bare `Up` do not match, since
+#                  the pattern requires the literal "un".
+#
+# Previously only Exited/Restarting were treated as not-ready, so the other
+# five states all passed the check.
+_UNHEALTHY_PS_STATE_RE = re.compile(r"\b(?:Exited|Restarting|Created|Dead|Paused)\b|\bExit\s+\d+|\(unhealthy\)")
+
+# Table headers: docker compose v2 emits "NAME  IMAGE  ...", compose v1
+# emits "Name  Command  ..." followed by a dashed separator row.
+_PS_HEADER_RE = re.compile(r"^\s*(?:NAME|Name)\b")
+_PS_SEPARATOR_RE = re.compile(r"^[\s\-+]+$")
+
+
+def compose_ps_service_rows(ps_stdout: str) -> tuple[str, ...]:
+    """Return the per-service rows of a `compose ps` table, header/separator stripped."""
+    rows: list[str] = []
+    for line in ps_stdout.splitlines():
+        if not line.strip():
+            continue
+        if _PS_HEADER_RE.match(line) or _PS_SEPARATOR_RE.match(line):
+            continue
+        rows.append(line)
+    return tuple(rows)
 
 
 def compose_ps_unhealthy_services(ps_stdout: str) -> tuple[str, ...]:
-    """Return the leading (name) column of every `compose ps` row whose STATUS is Exited or Restarting.
+    """Return the name column of every `compose ps -a` row whose STATUS is not up-and-serving.
 
-    Empty stdout, a header-only table, or a table with only "Up ..." rows
-    all return `()` -- readiness passes. Best-effort text parsing (not a
-    strict table parser): a malformed or unexpected `compose ps` layout
-    that never mentions Exited/Restarting simply reports no unhealthy
-    services rather than raising.
+    The state vocabulary is `_UNHEALTHY_PS_STATE_RE` above. Matching is done
+    against the row with its FIRST column removed, so a container whose NAME
+    happens to contain a state word (`benchbox-uat-Created-1`) cannot
+    false-positive; only the status/command columns are considered.
+
+    Best-effort text parsing, not a strict table parser: an unexpected
+    `compose ps` layout that mentions none of these states reports no
+    unhealthy services rather than raising. Note that "no unhealthy rows" is
+    NOT by itself sufficient for readiness -- see
+    `compose_ps_service_rows`, and the empty-table branch in
+    `execute.py::_check_docker_platform_readiness`, which treats a project
+    with no rows at all as not ready.
     """
     unhealthy: list[str] = []
-    for line in ps_stdout.splitlines():
-        if not _UNHEALTHY_PS_STATE_RE.search(line):
-            continue
-        columns = line.split()
-        if columns:
+    for line in compose_ps_service_rows(ps_stdout):
+        columns = line.split(None, 1)
+        remainder = columns[1] if len(columns) > 1 else ""
+        if _UNHEALTHY_PS_STATE_RE.search(remainder):
             unhealthy.append(columns[0])
     return tuple(unhealthy)
 
@@ -543,7 +579,18 @@ def compose_declared_memory_limits(spec: DockerPlatformSpec) -> dict[str, str]:
                 continue
             deploy = service.get("deploy")
             resources = deploy.get("resources") if isinstance(deploy, dict) else None
-            declared = resources.get("limits", {}).get("memory") if isinstance(resources, dict) else None
+            # Every level is isinstance-guarded rather than relying on
+            # `.get(key, {})` defaults: a default only applies when the key
+            # is ABSENT, so a compose file that writes `limits:` with no
+            # children yields an explicit None and `.get("memory")` on it
+            # raises AttributeError. That would escape this function's
+            # `except (OSError, yaml.YAMLError)` AND the caller's
+            # `except DockerAssetError` (execute.py's
+            # `_describe_platform_vm_request`) and abort the whole sweep
+            # from a logging helper. Same reasoning for a scalar or list
+            # under `limits:`.
+            limits_block = resources.get("limits") if isinstance(resources, dict) else None
+            declared = limits_block.get("memory") if isinstance(limits_block, dict) else None
             if declared:
                 limits[str(name)] = str(declared)
     return limits

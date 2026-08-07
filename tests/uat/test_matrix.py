@@ -507,3 +507,27 @@ def test_release_gate_platforms_resolve_from_dev_venv_or_have_uv_extra():
         f"importable from the dev venv: {unresolved} -- add a PLATFORM_UV_EXTRA entry "
         f"(tests/uat/matrix.py) or a dev dependency-group requirement (pyproject.toml)"
     )
+
+
+def test_probe_platform_reachability_never_touches_the_cache():
+    """The no-cache probe must neither read nor write `_REACHABILITY_CACHE`.
+
+    Writing would let one caller silently satisfy the next caller's check --
+    the defect that made the post-start readiness check disable the
+    skip_unreachable check downstream of it. Reading would defeat the
+    liveness probe, whose entire job is to notice that a previously
+    reachable stack has died.
+    """
+    matrix._REACHABILITY_CACHE["postgresql"] = True
+    with patch.object(matrix, "tcp_probe", return_value=False) as probe:
+        assert matrix.probe_platform_reachability("postgresql") is False
+    assert probe.called
+    # Untouched: the stale True is still there, unread and unmodified.
+    assert matrix._REACHABILITY_CACHE == {"postgresql": True}
+
+
+def test_platform_is_reachable_still_caches():
+    with patch.object(matrix, "tcp_probe", return_value=False) as probe:
+        assert matrix.platform_is_reachable("postgresql") is False
+        assert matrix.platform_is_reachable("postgresql") is False
+    assert probe.call_count == 1

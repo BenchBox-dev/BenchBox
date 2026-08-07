@@ -129,8 +129,15 @@ cleanup:
   docker_platform_switch: "volumes"   # down -v --remove-orphans at platform switch
   docker_project_prefix: "benchbox-uat"
   docker_start_timeout_s: 300
-  docker_settle_s: 10                 # post-`up --wait` readiness settle window, see below
+  docker_settle_s: 10                 # settle before the one-shot post-`up --wait`
+                                      # readiness check; catches immediate crashes
+                                      # only, see below
   docker_fixed_container_name_policy: "fail"
+
+execute:
+  liveness_probe_timeout_s: 2.0       # per-cell liveness probe; 0 disables.
+                                      # This is what catches a stack dying
+                                      # LATER, see below
 ```
 
 `preserve_datagen: false` is deliberately rejected by the config
@@ -574,45 +581,110 @@ confirm the service becomes healthy, time it, and set
 healthy time. Do not raise it blindly — a longer timeout on a broken service
 just wastes the timeout window each attempt.
 
-### Post-start readiness re-check (settle + `compose ps` + reachability)
+### Detecting a stack that dies after `up --wait` succeeds
 
 `docker compose up -d --wait` exiting 0 only proves the stack reported
 started/healthy **at that instant**. It does not prove the stack is still
-running a few seconds later. Live-observed 2026-08-04: `mocker compose up
---wait` reported CedarDB `Started`, and `mocker compose ps` showed
-`diag-net-cedardb-1 Exited` roughly 29 seconds later — the container's own
-log showed why (`Running under cgroup memory limit: 1024 MB`, then
+running afterwards. Live-observed 2026-08-04: `mocker compose up --wait`
+reported CedarDB `Started`, and `mocker compose ps` showed
+`diag-net-cedardb-1 Exited` roughly **29 seconds** later — the container's
+own log showed why (`Running under cgroup memory limit: 1024 MB`, then
 `FATAL: unable to register fixed io_uring buffer`, a host-memory-exhaustion
-failure, see "Memory headroom gate" below). Because nothing re-checked
-container state after `up --wait` returned, UAT ran all 171 cells against
-the dead stack and recorded every one as a **cell failure** instead of a
-**startup failure** — hiding the real cause behind 171 misleading rows.
+failure, see "Memory headroom gate" below). Because nothing re-checked the
+stack after `up --wait` returned, UAT ran all 171 remaining cells against
+the dead stack and recorded every one as a **cell failure** — hiding the
+real cause behind 171 misleading rows.
 
-To close that gap, a successful `up --wait` is no longer trusted on its own.
-The execute phase now:
+Two separate mechanisms now cover this, and they cover **different windows**.
+Neither replaces the other.
 
-1. Waits `cleanup.docker_settle_s` seconds (default 10) after `up --wait`
-   reports success.
-2. Re-runs `compose ps` and fails the platform block if any service's
-   STATUS column shows `Exited` or `Restarting`.
-3. Re-probes host reachability (the same TCP-probe primitive
-   `execute.skip_unreachable` already uses for `_run_or_skip_platform`).
+#### 1. Post-start readiness check — immediate crashes only
 
-A stack that fails either check is routed into the **same** `startup_failed`
-path as a `compose up` failure: recorded in `uat_lifecycle.log`
-(`action=readiness status=failed`, plus the raw `action=ps` result), its
-cells are NOT run and are NOT counted as cell failures, and the sweep
-advances to the next stack rather than aborting. This is not a replacement
-for `docker_start_timeout_s`: `up --wait` already reported the stack
-Started/healthy by the time this runs, so raising
-`docker_start_timeout_s` in response to a readiness failure just waits
-longer on something the engine already declared done — see "Managed Docker
-startup failures are non-fatal" above for the actual timeout-tuning
-guidance.
+After a successful `up --wait`, the execute phase waits
+`cleanup.docker_settle_s` seconds (default 10), then:
 
-This check only runs for `cleanup.docker_manage_platforms: true` (UAT
-started the stack) and is skipped entirely for `dry_run: true` (nothing was
-actually started to settle or probe).
+1. runs `compose ps -a` and fails the platform if any service's STATUS is
+   not up-and-serving: `Exited`, compose-v1 `Exit N`, `Restarting`,
+   `Created`, `Dead`, `Paused`, or `Up … (unhealthy)`. `-a` is required —
+   plain `compose ps` lists only *running* containers, so a service that
+   started and then died is simply absent and an empty table reads as
+   healthy. An empty table is likewise treated as **not ready**: `ps -a`
+   finding nothing for a project that was just `up`'d means the containers
+   are gone.
+2. probes host reachability once.
+
+**What this can and cannot catch.** It runs exactly once and has rendered
+its verdict roughly twelve seconds after `up --wait` returned. It catches a
+container that is *already dead by then* — an immediate crash. It does not
+catch a container that dies later, and **no value of `docker_settle_s`
+changes that**, because the check does not repeat. Concretely: this check
+would **not** have caught the 2026-08-04 incident above. Raising
+`docker_settle_s` to chase a late death only lengthens every platform
+boundary; it buys no additional coverage.
+
+It is also not a substitute for `docker_start_timeout_s` — `up --wait`
+already reported the stack Started/healthy by the time this runs, so raising
+that timeout in response to a readiness failure just waits longer on
+something the engine already declared done.
+
+This check runs only for `cleanup.docker_manage_platforms: true` and is
+skipped for `dry_run: true`.
+
+#### 2. Per-cell liveness probe — deaths at any later time
+
+This is the mechanism that actually covers the 2026-08-04 failure mode.
+
+At the start of a platform's cell list, UAT probes reachability once. If the
+platform *is* reachable, the liveness probe is **armed** for that platform,
+and a fresh (never cached) reachability probe runs immediately before every
+single cell. The first probe that fails ends the platform: the cell about to
+run, the rest of its benchmark, and every benchmark still queued for that
+platform are recorded in a dedicated `died_mid_platform` bucket, a
+`[liveness]` line is written to `uat_lifecycle.log`, the stack is torn down,
+and the sweep advances to the next platform.
+
+Arming matters: a platform that was *never* reachable is not armed, so
+`skip_unreachable: false` configs that deliberately attempt unreachable
+platforms are unaffected. `died_mid_platform` means "was up, then died", and
+nothing else.
+
+`died_mid_platform` is deliberately its own bucket, disjoint from the
+neighbours it could have been folded into:
+
+| Bucket | Meaning |
+|---|---|
+| `startup_failed` | the stack never started (`compose up` or readiness check failed) |
+| `skipped_unreachable` | a reachability probe never found anything listening |
+| `died_mid_platform` | the stack started, served cells, then went away mid-run |
+| cell `failed` rows | a cell ran and the benchmark itself failed |
+
+Recording a mid-run death as cell failures is the original bug; recording it
+as `startup_failed` would assert the stack never started, which is false.
+The count appears in `matrix_summary.tsv` (`died_mid_platform=N` in the
+footer plus a `# DIED_MID_PLATFORM_CELLS=N release_gate_attention=required`
+line), in `uat_gate_summary.json` (`accounting.died_mid_platform`), in
+`cells.jsonl`'s accounting sidecar (`died_mid_platform_count`), and in
+`uat report --json` (`died_mid_platform`). It feeds `total_defined` and
+makes the report exit nonzero, exactly like `unreachable` and
+`startup_failed` do — losing a platform mid-sweep is a real failure, not a
+clean skip.
+
+**Cost.** One loopback TCP connect per cell. Measured on the 2026-08-05 dev
+host: **0.074 ms** for a successful connect, 0.034 ms for a refused one.
+The three release-gate stages define 525 + 215 + 251 = 991 cells, of which
+only the 466 Docker-stage cells open a socket at all (a platform with no
+reachability endpoint, e.g. `duckdb`, short-circuits without a syscall), so
+the added cost of a full three-stage release gate is about **35 ms** against
+a run measured in hours. The pathological case — a probe that times out
+rather than being refused — is bounded by
+`execute.liveness_probe_timeout_s` (default 2.0 s) and can happen at most
+once per platform, since the first failure ends that platform.
+
+**Disabling it.** `execute.liveness_probe_timeout_s: 0` turns the probe off
+entirely, the same 0-disables convention as `preflight.free_space_min_gib`
+and `preflight.free_memory_min_gib`. With it off, a stack dying mid-platform
+is invisible again and its cells are recorded as ordinary cell failures —
+which is precisely why the default is not 0.
 
 ## Memory headroom gate
 

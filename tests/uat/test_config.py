@@ -49,6 +49,7 @@ def test_validate_config_minimal():
     assert cfg.cleanup.docker_manage_platforms is False
     assert cfg.cleanup.docker_platform_switch == "off"
     assert cfg.cleanup.docker_settle_s == 10
+    assert cfg.execute.liveness_probe_timeout_s == 2.0
     assert cfg.platforms.groups is None
     assert cfg.benchmarks.groups is None
     assert cfg.scales.rungs == (0.01,)
@@ -140,6 +141,22 @@ def test_validate_config_accepts_managed_docker_cleanup_contract():
     assert cfg.cleanup.docker_platform_switch == "volumes"
     assert cfg.cleanup.docker_project_prefix == "benchbox-uat-test"
     assert cfg.cleanup.docker_start_timeout_s == 42
+
+
+def test_validate_config_accepts_liveness_probe_timeout_s():
+    cfg = config.validate_config({"name": "smoke", "execute": {"liveness_probe_timeout_s": 0.5}})
+    assert cfg.execute.liveness_probe_timeout_s == 0.5
+
+
+def test_validate_config_liveness_probe_timeout_zero_disables_probe():
+    """0-disables, same convention as the two *_min_gib floors."""
+    cfg = config.validate_config({"name": "smoke", "execute": {"liveness_probe_timeout_s": 0}})
+    assert cfg.execute.liveness_probe_timeout_s == 0.0
+
+
+def test_validate_config_rejects_negative_liveness_probe_timeout_s():
+    with pytest.raises(config.ConfigError, match="liveness_probe_timeout_s"):
+        config.validate_config({"name": "smoke", "execute": {"liveness_probe_timeout_s": -1}})
 
 
 def test_validate_config_accepts_docker_settle_s():

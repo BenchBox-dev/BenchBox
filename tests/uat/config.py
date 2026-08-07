@@ -40,6 +40,19 @@ class ExecuteConfig:
     extra_args: tuple[str, ...] = ()
     skip_unreachable: bool = True
     parallel_platforms: bool = False  # reserved; must remain False
+    # Per-cell liveness probe: TCP timeout, in seconds, for the fresh
+    # reachability probe run before each cell of a platform that WAS
+    # reachable when the platform started. 0 disables the probe entirely --
+    # the same 0-disables convention as free_space_min_gib /
+    # free_memory_min_gib, so every gate this change adds is switched off
+    # the same way.
+    #
+    # This is the mechanism that catches a stack dying at arbitrary latency
+    # mid-platform; the post-start readiness check
+    # (cleanup.docker_settle_s) covers only immediate crashes. Cost is one
+    # loopback TCP connect per cell against multi-minute cells, and zero
+    # syscalls for platforms with no reachability endpoint.
+    liveness_probe_timeout_s: float = 2.0
     # official/streams/seed drive a real multi-stream throughput cell via
     # `benchbox run-official --streams N` instead of the default `benchbox
     # run` -- see tests.uat.throughput for why `run-official` is the only
@@ -79,6 +92,22 @@ class PreflightConfig:
     # 2026-08-04 postmortem host had 72 MB free of 16 GB when a 1024 MB
     # cgroup-limited container failed to start. See
     # uat-container-readiness-and-memory-headroom-gate w2.
+    #
+    # CALIBRATION PROVENANCE -- read before retuning this number. The floor
+    # is compared against `psutil.virtual_memory().available`
+    # (preflight_budget.read_memory_snapshot), but the motivating "72 MB
+    # free of 16 GB" observation is a macOS *free*-style figure, and those
+    # are NOT the same metric: measured on the 2026-08-05 dev host,
+    # `.available` read 6.888 GiB against `.free` 1.076 GiB -- a ~6.4:1
+    # spread. So 2.0 GiB-of-`.available` is NOT "the incident value plus
+    # margin"; the incident number cannot be converted into an `.available`
+    # threshold after the fact, and this floor has deliberately NOT been
+    # silently re-derived from it. `.available` is still the correct metric
+    # to gate on (a `.free` gate would refuse to start on a perfectly
+    # healthy machine -- 1.076 GiB < 2.0 GiB on the host above); what is
+    # unproven is the exact value. Treat 2.0 as a placeholder pending a
+    # `.available` reading captured during a real memory-starved incident,
+    # and record any change against a measured `.available` figure.
     free_memory_min_gib: float = 2.0
 
 
@@ -410,6 +439,7 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
                 "extra_args",
                 "skip_unreachable",
                 "parallel_platforms",
+                "liveness_probe_timeout_s",
                 "official",
                 "streams",
                 "seed",
@@ -459,6 +489,12 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
         extra_args=extra_args,
         skip_unreachable=_require_bool(payload, "skip_unreachable", default=True, section="execute"),
         parallel_platforms=parallel_platforms,
+        liveness_probe_timeout_s=_require_nonnegative_float(
+            payload,
+            "liveness_probe_timeout_s",
+            default=2.0,
+            section="execute",
+        ),
         official=official,
         streams=streams,
         seed=seed,

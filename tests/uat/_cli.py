@@ -204,6 +204,11 @@ def _handle_report(args: argparse.Namespace) -> int:
     accounting, sidecar_present = read_accounting_sidecar(Path(args.cells_jsonl))
     skipped_unreachable_count = coerce_accounting_count(accounting.get("skipped_unreachable_count", 0))
     startup_failed_count = coerce_accounting_count(accounting.get("startup_failed_count", 0))
+    # Same sidecar, same estimated-ness caveat: cells whose platform died
+    # partway through its own cell list are not JSONL rows either, so a
+    # regenerated report reads their count from here or `total_defined`
+    # silently loses them (uat-container-readiness-and-memory-headroom-gate).
+    died_mid_platform_count = coerce_accounting_count(accounting.get("died_mid_platform_count", 0))
     # Prune counts are not cells.jsonl rows either; read them back from the
     # sidecar so a regenerated report reconstructs the same total_defined the
     # live report had, and registry drops stay in their own bucket instead of
@@ -222,6 +227,7 @@ def _handle_report(args: argparse.Namespace) -> int:
         registry_pruned_count=registry_pruned_count,
         skipped_unreachable_count=skipped_unreachable_count,
         startup_failed_count=startup_failed_count,
+        died_mid_platform_count=died_mid_platform_count,
         unreachable_count_is_estimated=not sidecar_present,
         finalized=finalized,
     )
@@ -236,6 +242,13 @@ def _handle_report(args: argparse.Namespace) -> int:
                 "unreachable": summary.unreachable_count,
                 "unreachable_is_estimated": summary.unreachable_count_is_estimated,
                 "startup_failed": summary.startup_failed_count,
+                # The third machine-readable surface built from this same
+                # ReportSummary (matrix_summary.tsv's DIED_MID_PLATFORM_CELLS
+                # footer and uat_gate_summary.json's
+                # accounting.died_mid_platform are the other two). All three
+                # move together or a mid-sweep stack death is visible in some
+                # artifacts and invisible in the one tooling actually reads.
+                "died_mid_platform": summary.died_mid_platform_count,
                 "total_defined": summary.total_defined_count,
                 "registry_pruned": summary.registry_pruned_count,
                 "passed": summary.pass_count,
@@ -572,6 +585,7 @@ def _handle_execute(args: argparse.Namespace) -> int:
             "compatibility_pruned": 0,
             "skipped_unreachable": 0,
             "startup_failed": 0,
+            "died_mid_platform": 0,
             "docker_events": 0,
             "aborted": aborted,
             "abort_reason": result.abort_reason,
@@ -601,6 +615,7 @@ def _handle_execute(args: argparse.Namespace) -> int:
         "compatibility_pruned": len(getattr(outcome, "compatibility_pruned", ())),
         "skipped_unreachable": len(outcome.skipped_unreachable),
         "startup_failed": len(getattr(outcome, "startup_failed", ())),
+        "died_mid_platform": len(getattr(outcome, "died_mid_platform", ())),
         "docker_events": len(outcome.docker_events),
         "aborted": outcome.aborted,
         "abort_reason": outcome.abort_reason,

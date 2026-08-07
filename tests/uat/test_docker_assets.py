@@ -560,3 +560,142 @@ def test_multi_service_platform_service_names_match_documented_guidance(platform
         data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
         service_names.update(data.get("services", {}).keys())
     assert service_names == expected_service_names
+
+
+# ---------------------------------------------------------------------------
+# compose_declared_memory_limits: static compose-file parsing for the
+# free-memory gate's log decoration.
+# ---------------------------------------------------------------------------
+
+
+def _spec_for_compose(tmp_path: Path, body: str) -> docker_assets.DockerPlatformSpec:
+    compose_file = tmp_path / "docker-compose.yml"
+    compose_file.write_text(body, encoding="utf-8")
+    return docker_assets.DockerPlatformSpec(platform="fake", compose_files=(compose_file,))
+
+
+def test_compose_declared_memory_limits_reads_mem_limit(tmp_path: Path):
+    spec = _spec_for_compose(tmp_path, "services:\n  db:\n    mem_limit: 4g\n")
+    assert docker_assets.compose_declared_memory_limits(spec) == {"db": "4g"}
+
+
+def test_compose_declared_memory_limits_reads_deploy_resources_limits(tmp_path: Path):
+    spec = _spec_for_compose(
+        tmp_path,
+        "services:\n  db:\n    deploy:\n      resources:\n        limits:\n          memory: 2G\n",
+    )
+    assert docker_assets.compose_declared_memory_limits(spec) == {"db": "2G"}
+
+
+def test_compose_declared_memory_limits_empty_when_nothing_declared(tmp_path: Path):
+    spec = _spec_for_compose(tmp_path, "services:\n  db:\n    image: postgres:16\n")
+    assert docker_assets.compose_declared_memory_limits(spec) == {}
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # `limits:` present with NO children -> yaml gives an explicit None.
+        # `.get("limits", {})` returns that None (a default applies only when
+        # the key is ABSENT), and `None.get("memory")` raises AttributeError.
+        "services:\n  db:\n    deploy:\n      resources:\n        limits:\n",
+        # Same trap one level up.
+        "services:\n  db:\n    deploy:\n      resources:\n",
+        "services:\n  db:\n    deploy:\n",
+        # Non-mapping values where a mapping is expected.
+        "services:\n  db:\n    deploy:\n      resources:\n        limits: 2G\n",
+        "services:\n  db:\n    deploy:\n      resources:\n        limits:\n          - memory\n",
+    ],
+)
+def test_compose_declared_memory_limits_survives_degenerate_limits_blocks(tmp_path: Path, body: str):
+    """Regression: this helper only decorates a log line, but it ran inside a
+    `try` catching just (OSError, yaml.YAMLError) and its caller
+    (`execute.py::_describe_platform_vm_request`) caught only
+    DockerAssetError -- so an AttributeError here propagated out of
+    run_execute and aborted an entire sweep. No compose file in the repo
+    triggers it today; one `limits:` with no children would have.
+    """
+    spec = _spec_for_compose(tmp_path, body)
+    assert docker_assets.compose_declared_memory_limits(spec) == {}
+
+
+def test_compose_declared_memory_limits_ignores_unparseable_file(tmp_path: Path):
+    spec = _spec_for_compose(tmp_path, "services: [oops\n")
+    assert docker_assets.compose_declared_memory_limits(spec) == {}
+
+
+# ---------------------------------------------------------------------------
+# compose ps readiness parsing.
+# ---------------------------------------------------------------------------
+
+
+def test_compose_ps_command_passes_all_so_stopped_containers_are_listed():
+    """Without `-a`, a container that started and then died is simply absent
+    from the output and the readiness check passes on an empty table -- the
+    exact state the check exists to detect."""
+    spec = docker_assets.docker_platform_spec("postgresql")
+    argv = docker_assets.compose_ps_command(spec, "benchbox-uat-smoke-postgresql")
+    assert argv[-2:] == ["ps", "-a"]
+    assert "-p" in argv and "benchbox-uat-smoke-postgresql" in argv
+
+
+@pytest.mark.parametrize(
+    ("status", "why"),
+    [
+        ("Exited (137) 5 seconds ago", "compose v2 dead container -- the 2026-08-04 CedarDB state"),
+        ("Exit 1", "compose v1 spelling of the same state"),
+        ("Restarting (1) 3 seconds ago", "crash-looping"),
+        ("Created", "never started"),
+        ("Dead", "engine could not clean it up"),
+        ("Paused", "SIGSTOPped; the port accepts nothing"),
+        ("Up 30 seconds (unhealthy)", "the engine's own healthcheck says no"),
+    ],
+)
+def test_compose_ps_unhealthy_services_flags_every_not_ready_state(status: str, why: str):
+    stdout = f"NAME      IMAGE     COMMAND   STATUS\nsvc       img       cmd       {status}\n"
+    assert docker_assets.compose_ps_unhealthy_services(stdout) == ("svc",), why
+
+
+@pytest.mark.parametrize("status", ["Up 5 seconds", "Up 2 hours (healthy)", "Up About a minute"])
+def test_compose_ps_unhealthy_services_passes_a_serving_container(status: str):
+    stdout = f"NAME      IMAGE     COMMAND   STATUS\nsvc       img       cmd       {status}\n"
+    assert docker_assets.compose_ps_unhealthy_services(stdout) == ()
+
+
+def test_compose_ps_unhealthy_services_ignores_state_words_in_the_name_column():
+    """A container NAME containing a state word must not false-positive; only
+    the status/command columns are considered."""
+    stdout = "NAME               IMAGE     COMMAND   STATUS\nbenchbox-Created   img       cmd       Up 5 seconds\n"
+    assert docker_assets.compose_ps_unhealthy_services(stdout) == ()
+
+
+def test_compose_ps_unhealthy_services_reports_every_bad_row():
+    stdout = (
+        "NAME      IMAGE     COMMAND   STATUS\n"
+        "alpha     img       cmd       Up 5 seconds\n"
+        "beta      img       cmd       Exited (1) 2 seconds ago\n"
+        "gamma     img       cmd       Restarting (1) 1 second ago\n"
+    )
+    assert docker_assets.compose_ps_unhealthy_services(stdout) == ("beta", "gamma")
+
+
+@pytest.mark.parametrize(
+    "stdout",
+    [
+        "",
+        "NAME      IMAGE     COMMAND   STATUS\n",
+        "Name   Command   State   Ports\n--------------------------------\n",
+        "\n\n",
+    ],
+)
+def test_compose_ps_service_rows_is_empty_for_no_service_rows(stdout: str):
+    """Header-only and blank output carry no services. The caller treats this
+    as NOT ready: `ps -a` finding nothing for a project that was just `up`'d
+    means the containers are gone, which is not a state to run a whole cell
+    list against."""
+    assert docker_assets.compose_ps_service_rows(stdout) == ()
+
+
+def test_compose_ps_service_rows_keeps_real_rows():
+    stdout = "NAME      IMAGE     COMMAND   STATUS\nsvc       img       cmd       Up 5 seconds\n"
+    assert len(docker_assets.compose_ps_service_rows(stdout)) == 1

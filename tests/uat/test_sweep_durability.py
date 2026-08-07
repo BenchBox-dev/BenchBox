@@ -36,6 +36,7 @@ from tests.uat import (
     timeouts,
 )
 from tests.uat.config import validate_config
+from tests.uat.conftest import docker_verb, healthy_ps_stdout, platform_reachability
 from tests.uat.phases import execute as exec_phase
 from tests.uat.runner import CellResult
 
@@ -304,19 +305,16 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
     sequence: list[str] = []
 
     def fake_docker(argv, **_kwargs):
-        # Classify up/ps/down, not just up/down: the post-start readiness
-        # `compose ps` re-check must not be recorded as a teardown, or the
-        # ordering assertion below matches that instead of the real `down`
-        # (same three-way classify as test_phases.py's `_docker_verb`).
-        action = "up" if "up" in argv else ("ps" if "ps" in argv else "down")
+        action = docker_verb(argv)
         sequence.append(action)
-        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+        stdout = healthy_ps_stdout() if action == "ps" else ""
+        return docker_assets.DockerCommandResult(tuple(argv), 0, stdout, "")
 
     def interrupting_runner(platform, benchmark, scale, **_kwargs):
         sequence.append("cell")
         raise KeyboardInterrupt
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         with pytest.raises(KeyboardInterrupt):
             exec_phase.run_execute(
                 cfg,
@@ -325,6 +323,9 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
                 runner=interrupting_runner,
                 docker_runner=fake_docker,
                 free_space_checks_enabled=False,
+                # Without this the post-start readiness check runs a REAL
+                # time.sleep(cleanup.docker_settle_s) -- 10s, which made this
+                # the slowest test in the package by 8x.
                 sleep_fn=lambda _s: None,
             )
 

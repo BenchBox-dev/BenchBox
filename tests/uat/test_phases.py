@@ -11,6 +11,7 @@ import pytest
 
 from tests.uat import docker_assets, matrix
 from tests.uat.config import ExecuteConfig, UATConfig, validate_config
+from tests.uat.conftest import docker_verb as _docker_verb, healthy_ps_stdout, platform_reachability
 from tests.uat.docker_path_helpers import compose_path_ends_with
 from tests.uat.phases import (
     enumerate as enum_phase,
@@ -18,6 +19,11 @@ from tests.uat.phases import (
     package as package_phase,
     preflight as preflight_phase,
     report as report_phase,
+)
+from tests.uat.preflight_budget import (
+    MemorySnapshot,
+    check_memory_headroom,
+    format_memory_headroom_failure,
 )
 from tests.uat.runner import CellResult, classify_for_submit, submit_state_is_cell_failure
 
@@ -449,7 +455,7 @@ def test_execute_skips_unreachable_platform(tmp_path):
             "scales": {"rungs": [0.01]},
         }
     )
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=False):
+    with platform_reachability(False):
         runner = _stub_runner_factory({}, {})
         outcome = exec_phase.run_execute(
             cfg,
@@ -475,23 +481,9 @@ def _docker_platform_from_argv(argv: list[str]) -> str:
     return compose_file
 
 
-def _docker_verb(argv: list[str]) -> str:
-    """Classify a compose argv into "up"/"ps"/"down" for fake docker_runner fixtures.
-
-    `compose_up_command`, `compose_ps_command`, and `compose_down_command`
-    argvs each contain exactly one of these three literal verb tokens (see
-    docker_assets.py), so order does not matter here.
-    """
-    if "up" in argv:
-        return "up"
-    if "ps" in argv:
-        return "ps"
-    return "down"
-
-
 def _healthy_ps_result(argv: list[str]) -> docker_assets.DockerCommandResult:
-    """A `compose ps` result with no Exited/Restarting rows -- readiness passes."""
-    return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+    """A `compose ps -a` result whose single service is Up -- readiness passes."""
+    return docker_assets.DockerCommandResult(tuple(argv), 0, healthy_ps_stdout(), "")
 
 
 def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path):
@@ -526,7 +518,7 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
             result_path=None,
         )
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -600,7 +592,7 @@ def test_execute_teardown_sweeps_leaked_mocker_volumes_when_resolved_engine_is_m
                 result_path=None,
             )
 
-        with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        with platform_reachability(True):
             outcome = exec_phase.run_execute(
                 cfg,
                 log_dir=tmp_path,
@@ -656,7 +648,7 @@ def test_execute_teardown_skips_mocker_volume_sweep_for_containers_mode(tmp_path
                 result_path=None,
             )
 
-        with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+        with platform_reachability(True):
             outcome = exec_phase.run_execute(
                 cfg,
                 log_dir=tmp_path,
@@ -693,7 +685,7 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
             return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -849,7 +841,7 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
             result_path=None,
         )
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -939,7 +931,7 @@ def test_execute_readiness_settle_reprobes_compose_ps_after_up_wait_reports_succ
             result_path=None,
         )
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -968,7 +960,7 @@ def test_execute_readiness_settle_reprobes_compose_ps_after_up_wait_reports_succ
     )
     readiness_event = next(e for e in outcome.docker_events if e.action == "readiness")
     assert "clickhouse-server" in readiness_event.message
-    assert "Exited/Restarting" in readiness_event.message
+    assert "not ready" in readiness_event.message
 
 
 def test_execute_readiness_check_fails_when_platform_unreachable_after_settle(tmp_path):
@@ -995,7 +987,7 @@ def test_execute_readiness_check_fails_when_platform_unreachable_after_settle(tm
     def fail_runner(platform, benchmark, scale, **kwargs):  # pragma: no cover - assertion helper
         raise AssertionError("no cell should run against an unreachable stack")
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=False):
+    with platform_reachability(False):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -1035,7 +1027,7 @@ def test_execute_readiness_settle_uses_configured_docker_settle_s(tmp_path):
             return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -1068,7 +1060,7 @@ def test_execute_readiness_check_skipped_for_dry_run(tmp_path):
     def fake_docker(argv, **kwargs):  # pragma: no cover - dry_run short-circuits before any real call
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "", dry_run=True)
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -1081,6 +1073,216 @@ def test_execute_readiness_check_skipped_for_dry_run(tmp_path):
     assert outcome.aborted is False
     assert sleep_calls == []
     assert not any(event.action in {"ps", "readiness"} for event in outcome.docker_events)
+
+
+def _memory_reader(free_gib, swap_used_percent=0.0):
+    """A `memory_reader` for run_execute that returns a fixed host reading."""
+    return lambda: MemorySnapshot(free_gib=free_gib, swap_used_percent=swap_used_percent)
+
+
+def _managed_docker_cfg(name, **overrides):
+    payload = {
+        "name": name,
+        "platforms": {"include": ["clickhouse-server"]},
+        "benchmarks": {"include": ["tpch"]},
+        "scales": {"rungs": [0.01]},
+        "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+    }
+    for section, values in overrides.items():
+        payload.setdefault(section, {}).update(values)
+    return validate_config(payload)
+
+
+def _healthy_fake_docker(argv, **kwargs):
+    if _docker_verb(argv) == "ps":
+        return _healthy_ps_result(argv)
+    return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+
+def test_execute_memory_floor_aborts_the_platform_before_starting_it(tmp_path):
+    """End-to-end: a host below the free-memory floor aborts the sweep at the
+    platform boundary, with abort_kind="memory_floor".
+
+    The gate had zero end-to-end coverage: inserting `return None` as the
+    first statement of `_free_memory_abort_reason` (making the gate
+    incapable of ever aborting) left the whole suite green. This test, and
+    the three below, are what make that mutation fail.
+    """
+    cfg = _managed_docker_cfg("memory floor abort")
+    started: list[str] = []
+
+    def fake_docker(argv, **kwargs):  # pragma: no cover - gate fires before any compose call
+        started.append(_docker_verb(argv))
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def fail_runner(platform, benchmark, scale, **kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError("no cell may run once the memory floor has aborted")
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=fail_runner,
+        docker_runner=fake_docker,
+        memory_reader=_memory_reader(0.07, swap_used_percent=88.0),
+        sleep_fn=lambda _s: None,
+    )
+
+    assert outcome.aborted is True
+    assert outcome.abort_kind == "memory_floor"
+    assert outcome.results == ()
+    # The abort happens BEFORE the stack is started: the whole point is to
+    # not ask a starved host for another container VM.
+    assert "up" not in started
+
+
+def test_execute_memory_floor_abort_reason_carries_the_shipped_failure_message(tmp_path):
+    """The abort reason is the message `format_memory_headroom_failure`
+    renders, plus this call site's context -- not a second, divergent
+    open-coded string (see preflight_budget.format_memory_headroom_failure)."""
+    cfg = _managed_docker_cfg("memory floor message")
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+        docker_runner=_healthy_fake_docker,
+        memory_reader=_memory_reader(0.07, swap_used_percent=88.0),
+        sleep_fn=lambda _s: None,
+    )
+
+    reason = outcome.abort_reason
+    assert reason is not None
+    expected_core = format_memory_headroom_failure(
+        check_memory_headroom(MemorySnapshot(free_gib=0.07, swap_used_percent=88.0), min_free_gib=2.0)
+    )
+    assert reason.startswith(expected_core)
+    assert "before starting platform clickhouse-server" in reason
+    assert "engine=docker" in reason
+    # Single source of truth: the swap note comes from the shared formatter
+    # and must not be appended a second time by the call site.
+    assert reason.count("swap 88.0% used") == 1
+    # And the same reading is on the lifecycle log for the operator.
+    lifecycle = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
+    assert "[free-memory]" in lifecycle
+    assert "0.07 GiB free" in lifecycle
+
+
+def test_execute_memory_floor_passes_when_host_has_headroom(tmp_path):
+    cfg = _managed_docker_cfg("memory floor ok")
+
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            memory_reader=_memory_reader(8.0),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert outcome.abort_kind is None
+    assert any(r.platform == "clickhouse-server" and r.status == "passed" for r in outcome.results)
+
+
+def test_execute_memory_floor_disabled_by_zero_never_aborts(tmp_path):
+    """0-disables convention: `free_memory_min_gib: 0` turns the gate off even
+    on a host with essentially no free memory."""
+    cfg = _managed_docker_cfg("memory floor off", preflight={"free_memory_min_gib": 0})
+
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            memory_reader=_memory_reader(0.01),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert any(r.status == "passed" for r in outcome.results)
+    # Gate off means no reading is logged either -- nothing was measured.
+    lifecycle_path = tmp_path / "uat_lifecycle.log"
+    lifecycle = lifecycle_path.read_text(encoding="utf-8") if lifecycle_path.exists() else ""
+    assert "[free-memory]" not in lifecycle
+
+
+def test_execute_memory_floor_unmeasurable_host_does_not_gate(tmp_path):
+    """A host where free memory cannot be read must neither abort nor pass
+    silently: it logs "could not be measured" and lets the sweep proceed."""
+    cfg = _managed_docker_cfg("memory unmeasurable")
+
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            memory_reader=_memory_reader(None, swap_used_percent=None),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    lifecycle = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
+    assert "could not be measured" in lifecycle
+
+
+def test_execute_memory_floor_ignores_non_docker_platforms(tmp_path):
+    """The gate exists to protect a container VM start. A native platform
+    asks the host for no VM, so a low reading must not abort it."""
+    cfg = validate_config(
+        {
+            "name": "memory native",
+            "platforms": {"include": ["duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            memory_reader=_memory_reader(0.01),
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert any(r.platform == "duckdb" and r.status == "passed" for r in outcome.results)
+
+
+def test_execute_disk_floor_takes_precedence_over_memory_floor(tmp_path):
+    """Both gates short at the same boundary; disk wins, matching the
+    disk-before-docker_required precedence in run_preflight."""
+    cfg = _managed_docker_cfg("both floors")
+
+    outcome = exec_phase.run_execute(
+        cfg,
+        log_dir=tmp_path,
+        databases_root=tmp_path / "databases",
+        runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+        docker_runner=_healthy_fake_docker,
+        free_space_checks_enabled=True,
+        free_space_path=tmp_path,
+        free_space_min_gib=100.0,
+        free_space_reader=lambda _p: 1.0,
+        memory_reader=_memory_reader(0.01),
+        sleep_fn=lambda _s: None,
+    )
+
+    assert outcome.aborted is True
+    assert outcome.abort_kind == "disk_floor"
+    assert "free space" in (outcome.abort_reason or "")
 
 
 def test_execute_teardown_failure_after_startup_failure_advances_instead_of_aborting(tmp_path):
@@ -1130,7 +1332,7 @@ def test_execute_teardown_failure_after_startup_failure_advances_instead_of_abor
             result_path=None,
         )
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -1194,7 +1396,7 @@ def test_execute_healthy_stack_teardown_failure_still_aborts_after_startup_faile
             return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -1228,7 +1430,7 @@ def test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails(tmp_path)
     )
 
     def fake_docker(argv, **kwargs):
-        action = "up" if "up" in argv else "down"
+        action = _docker_verb(argv)
         if action == "up":
             return docker_assets.DockerCommandResult(
                 tuple(argv), 1, "", "docker command timed out after 300s", timed_out=True
@@ -1238,7 +1440,7 @@ def test_execute_outcome_exit_code_nonzero_when_every_compose_up_fails(tmp_path)
     def fail_runner(platform, benchmark, scale, **kwargs):  # pragma: no cover - assertion helper
         raise AssertionError("no cell should run when the only compose-up failed")
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -1319,7 +1521,7 @@ def test_execute_unmanaged_docker_keeps_skip_probe_without_commands(tmp_path):
     def fail_docker(argv, **kwargs):  # pragma: no cover - assertion helper
         raise AssertionError(f"unexpected Docker command: {argv}")
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=False):
+    with platform_reachability(False):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -1357,6 +1559,8 @@ def test_execute_scopes_local_managed_platform_options_to_managed_docker(
     seen: dict[str, bool] = {}
 
     def fake_docker(argv, **kwargs):
+        if _docker_verb(argv) == "ps":
+            return _healthy_ps_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def recording_runner(platform, benchmark, scale, **kwargs):
@@ -1372,7 +1576,7 @@ def test_execute_scopes_local_managed_platform_options_to_managed_docker(
             result_path=None,
         )
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -1409,7 +1613,7 @@ def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
         raise RuntimeError("cell exploded")
 
     with (
-        patch("tests.uat.phases.execute.platform_is_reachable", return_value=True),
+        platform_reachability(True),
         pytest.raises(RuntimeError, match="cell exploded"),
     ):
         exec_phase.run_execute(
@@ -1480,7 +1684,7 @@ def test_execute_free_space_abort_reports_context_after_docker_teardown(tmp_path
     def fake_docker(argv, **kwargs):
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
-    with patch("tests.uat.phases.execute.platform_is_reachable", return_value=True):
+    with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,
             log_dir=tmp_path,
@@ -1982,3 +2186,324 @@ def test_execute_does_not_prune_source_while_consumer_pending(tmp_path):
     # the tpch DB must NOT have been pruned because read_primitives is
     # the consumer that gates the prune.
     assert (db_root / "duckdb" / "tpch" / "0.01").exists()
+
+
+# ---------------------------------------------------------------------------
+# Per-cell liveness probe: the 2026-08-04 incident, reproduced.
+#
+# `up --wait` returns 0, the readiness check passes, and the container dies
+# ~29s later, partway through the platform's cell list. Before the probe
+# existed, every remaining cell ran against the dead stack and was recorded
+# as a CELL FAILURE -- 171 of them. The post-start readiness check cannot
+# catch this: it has rendered its verdict ~12s after `up --wait`.
+# ---------------------------------------------------------------------------
+
+
+def _probe_dying_after(alive_calls: int):
+    """Reachability probe that reports True `alive_calls` times, then False forever.
+
+    Call order for a managed Docker platform, so the counts below are
+    readable rather than magic:
+      1. the post-start readiness check
+      2. arming the liveness probe at the start of the platform's cell list
+      3+ the per-cell liveness probe, once before each cell
+    """
+    calls = {"n": 0}
+
+    def probe(_platform, **_kwargs):
+        calls["n"] += 1
+        return calls["n"] <= alive_calls
+
+    return probe
+
+
+def test_execute_stack_dying_mid_platform_records_remaining_cells_as_died_not_failures(tmp_path):
+    """The headline regression. Stack is up at platform start and for the
+    first cell, then dies. Remaining cells must land in `died_mid_platform`
+    and must NOT appear as cell failures."""
+    cfg = validate_config(
+        {
+            "name": "mid platform death",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01, 0.1, 1.0]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+    ran: list[float] = []
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        ran.append(scale)
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / f"{platform}-{scale}.log",
+            result_path=None,
+        )
+
+    # readiness + arm + the 0.01 cell all see it alive; it dies before 0.1.
+    with platform_reachability(True, probe=_probe_dying_after(3)):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=_healthy_fake_docker,
+            sleep_fn=lambda _s: None,
+        )
+
+    assert ran == [0.01]
+    died = [(c.platform, c.scale) for c in outcome.died_mid_platform]
+    assert died == [("clickhouse-server", 0.1), ("clickhouse-server", 1.0)]
+    # The whole point: NOT cell failures, and not silently dropped either.
+    assert [r.status for r in outcome.results] == ["passed"]
+    assert not any(r.status == "failed" for r in outcome.results)
+    assert outcome.startup_failed == ()
+    assert outcome.skipped_unreachable == ()
+    # A lost platform is a real failure of the sweep, not a clean skip.
+    assert outcome.exit_code() == 1
+    lifecycle = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
+    assert "[liveness]" in lifecycle
+    assert "died-mid-platform" in lifecycle
+
+
+def test_execute_stack_death_also_claims_the_platforms_later_benchmarks(tmp_path):
+    """The bucket is per-PLATFORM: benchmarks queued after the one that was
+    interrupted never run either, and must be accounted, not vanish."""
+    cfg = validate_config(
+        {
+            "name": "death spans benchmarks",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch", "tpcds"]},
+            "scales": {"rungs": [0.01, 0.1]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def recording_runner(platform, benchmark, scale, **kwargs):
+        return CellResult(
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            status="passed",
+            exit_code=0,
+            elapsed_s=1.0,
+            log_path=tmp_path / "cell.log",
+            result_path=None,
+        )
+
+    # readiness + arm + the first cell; dead from the second cell onward.
+    with platform_reachability(True, probe=_probe_dying_after(3)):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=recording_runner,
+            docker_runner=_healthy_fake_docker,
+            sleep_fn=lambda _s: None,
+        )
+
+    assert len(outcome.results) == 1
+    # Every cell the platform still owed: the rest of tpch plus all of tpcds.
+    assert len(outcome.died_mid_platform) == 3
+    assert {c.benchmark for c in outcome.died_mid_platform} == {"tpch", "tpcds"}
+    # No cell count is lost: 4 defined = 1 run + 3 died.
+    assert len(outcome.results) + len(outcome.died_mid_platform) == 4
+
+
+def test_execute_stack_death_does_not_stop_the_next_platform(tmp_path):
+    """One platform dying must not truncate the sweep -- same advance policy
+    as a startup failure (uat-docker-stack-recovery w2)."""
+    cfg = validate_config(
+        {
+            "name": "death advances",
+            "platforms": {"include": ["clickhouse-server", "duckdb"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01, 0.1]},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    def probe(platform, **_kwargs):
+        # clickhouse is up to arm, then dead; duckdb is always fine.
+        if platform != "clickhouse-server":
+            return True
+        probe.calls += 1  # type: ignore[attr-defined]
+        return probe.calls <= 2  # type: ignore[attr-defined]  # readiness + arm only
+
+    probe.calls = 0  # type: ignore[attr-defined]
+
+    with platform_reachability(True, probe=probe):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0, 0.1: 1.0}, {0.01: True, 0.1: True}),
+            docker_runner=_healthy_fake_docker,
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert {c.platform for c in outcome.died_mid_platform} == {"clickhouse-server"}
+    assert any(r.platform == "duckdb" and r.status == "passed" for r in outcome.results)
+
+
+def test_execute_liveness_probe_disabled_by_zero_timeout(tmp_path):
+    """0 disables the probe -- the same opt-out shape as the two *_min_gib
+    floors. With it off, a dead stack is invisible again (cells run and the
+    runner reports whatever it reports), which is exactly why the default is
+    not 0."""
+    cfg = validate_config(
+        {
+            "name": "liveness off",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01, 0.1]},
+            "execute": {"liveness_probe_timeout_s": 0},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    with platform_reachability(True, probe=_probe_dying_after(1)):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0, 0.1: 1.0}, {0.01: True, 0.1: True}),
+            docker_runner=_healthy_fake_docker,
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.died_mid_platform == ()
+    assert len(outcome.results) == 2
+
+
+def test_execute_liveness_probe_not_armed_for_a_platform_that_was_never_reachable(tmp_path):
+    """`died_mid_platform` means "was up, then died". A platform that never
+    listened (skip_unreachable: false, so cells are attempted anyway) must
+    not be relabelled as a mid-run death."""
+    cfg = validate_config(
+        {
+            "name": "never reachable",
+            "platforms": {"include": ["clickhouse-server"]},
+            "benchmarks": {"include": ["tpch"]},
+            "scales": {"rungs": [0.01, 0.1]},
+            "execute": {"skip_unreachable": False},
+            "cleanup": {"docker_manage_platforms": True, "docker_platform_switch": "volumes"},
+        }
+    )
+
+    # Readiness passes (ps is healthy and its probe is the first call), but
+    # the platform is not reachable when the cell list starts.
+    with platform_reachability(True, probe=_probe_dying_after(1)):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0, 0.1: 1.0}, {0.01: True, 0.1: True}),
+            docker_runner=_healthy_fake_docker,
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.died_mid_platform == ()
+    assert len(outcome.results) == 2
+
+
+def test_execute_readiness_check_does_not_poison_the_reachability_cache(tmp_path):
+    """Regression guard for the defect that made adding the readiness check a
+    net LOSS of coverage.
+
+    The readiness check originally probed via the CACHED
+    `platform_is_reachable`, which writes True into
+    `matrix._REACHABILITY_CACHE`. `_run_or_skip_platform`'s skip_unreachable
+    check then read that cached True instead of probing -- so the new check
+    silently disabled the existing check downstream of it, and the cache is
+    cleared only on lifecycle changes, never in between.
+
+    Asserted directly: when the skip_unreachable check runs, the cache must
+    still be empty, i.e. it is about to do real work rather than read
+    somebody else's answer.
+    """
+    cfg = _managed_docker_cfg("no cache poisoning")
+    cache_when_skip_check_ran: list[dict] = []
+    real_is_reachable = matrix.platform_is_reachable
+
+    def spy(platform, *args, **kwargs):
+        cache_when_skip_check_ran.append(dict(matrix._REACHABILITY_CACHE))
+        return real_is_reachable(platform, *args, **kwargs)
+
+    with (
+        patch.object(matrix, "tcp_probe", return_value=True),
+        patch.object(exec_phase, "platform_is_reachable", side_effect=spy),
+    ):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    # The cached entry point is reached exactly once (the skip_unreachable
+    # check), and nothing had populated the cache before it.
+    assert cache_when_skip_check_ran == [{}]
+
+
+def test_execute_readiness_check_fails_closed_on_an_empty_compose_ps_table(tmp_path):
+    """`ps -a` finding no rows for a project that was just `up`'d means the
+    containers are gone. Passing there would be the same fail-open shape as
+    the missing `-a` flag: an empty result read as a healthy one."""
+    cfg = _managed_docker_cfg("empty ps table")
+
+    def fake_docker(argv, **kwargs):
+        if _docker_verb(argv) == "ps":
+            return docker_assets.DockerCommandResult(tuple(argv), 0, "NAME   IMAGE   STATUS\n", "")
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    def fail_runner(platform, benchmark, scale, **kwargs):  # pragma: no cover - assertion helper
+        raise AssertionError("no cell may run when compose ps -a lists no services")
+
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=fail_runner,
+            docker_runner=fake_docker,
+            sleep_fn=lambda _s: None,
+        )
+
+    assert outcome.aborted is False
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
+    readiness_event = next(e for e in outcome.docker_events if e.action == "readiness")
+    assert "listed no services" in readiness_event.message
+
+
+def test_execute_readiness_check_requests_ps_all(tmp_path):
+    """Regression guard: without `-a` the dead container is not in the output."""
+    cfg = _managed_docker_cfg("ps all argv")
+    ps_argvs: list[tuple[str, ...]] = []
+
+    def fake_docker(argv, **kwargs):
+        if _docker_verb(argv) == "ps":
+            ps_argvs.append(tuple(argv))
+            return _healthy_ps_result(argv)
+        return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
+
+    with platform_reachability(True):
+        exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=fake_docker,
+            sleep_fn=lambda _s: None,
+        )
+
+    assert ps_argvs and all(argv[-2:] == ("ps", "-a") for argv in ps_argvs)
