@@ -50,6 +50,16 @@ builds a `benchbox-lakesail` image from the public PySail package and starts `sa
 `sc://localhost:50051`. Like other Spark Connect backends, the server reads files by absolute path; the compose
 workflow mounts `BENCHBOX_DATA_DIR` at the same absolute path inside the container.
 
+`BENCHBOX_DATA_DIR` has **no default** and must be exported as an **absolute path** before invoking compose
+directly (`make uat-bring-up PLATFORM=lakesail` and the UAT harness set it for you). A relative value or a
+directory-relative default can never equal an absolute host path, breaking the mount above, so
+`make test-docker-up-lakesail` validates the variable is set and absolute before starting the stack:
+
+```bash
+export BENCHBOX_DATA_DIR=/absolute/path/to/your/data
+cd docker/lakesail && docker compose up -d lakesail-connect
+```
+
 ### Configuration Methods
 
 **CLI Options:**

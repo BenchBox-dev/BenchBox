@@ -13,13 +13,19 @@ the missing "someone should look at this" signal:
 
 - It classifies every OPEN PR targeting ``develop`` as qualifying for the
   drain queue when ALL of the following hold:
-    (a) required-lane green  -- the ``ci-required-result`` check run on the
-        PR's head SHA completed with conclusion ``success``.
+    (a) required-lane green  -- EVERY develop-ruleset required status
+        context in ``REQUIRED_CHECK_NAMES`` has its LATEST check run on the
+        PR's head SHA completed with conclusion ``success``. Today that is
+        both ``ci-required-result`` and ``Results Explorer browser gate``
+        (docs/operations/repo-admin-settings.md; live ruleset
+        develop-squash-only). Partial green -- one context success, another
+        red or never reported -- is NOT required-green; a missing run is
+        fail-closed not-green.
     (b) awaiting the owner   -- auto-merge is OFF *and* (the PR touches a
         soundness-critical path per ``SOUNDNESS_PREFIXES``, OR the owner is
         a requested reviewer).
     (c) parked > 24h          -- more than 24 hours of park time (anchored
-        on the required lane going green, NOT ``updated_at``: the label
+        on the LAST required context to finish, NOT ``updated_at``: the label
         writes below and ordinary human comments bump ``updated_at``, and a
         gate based on it would flap a genuinely parked PR out of the queue).
 - The only mutations it ever performs (and only under ``--apply``) are:
@@ -73,7 +79,20 @@ FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "soundness_drain_fixture.json"
 OWNER_LOGIN = "joeharris76"
 
 DEFAULT_REPO = "joeharris76/BenchBox"
-REQUIRED_CHECK_NAME = "ci-required-result"
+# Develop ruleset `develop-squash-only` required status contexts. Pin must
+# match docs/operations/repo-admin-settings.md and the live ruleset
+# (id 15611785). Partial membership is incomplete green. Prefer this constant
+# over re-deriving from path-filters or workflow names: ruleset contexts are
+# the merge gate, not subordinate jobs.
+#
+# Kept deliberately identical to green_unmerged_sweep.py's copy: both scripts
+# classify the same lane, and the two implementations converge into one shared
+# helper once PR #1633 lands (tracked separately). Changing one without the
+# other reintroduces the split this comment exists to prevent.
+REQUIRED_CHECK_NAMES: tuple[str, ...] = (
+    "ci-required-result",
+    "Results Explorer browser gate",
+)
 DRAIN_LABEL = "awaiting-owner"
 DRAIN_LABEL_COLOR = "b60205"
 DRAIN_LABEL_DESCRIPTION = "Green, gated on owner review, parked >24h (see docs/operations/soundness-drain.md)"
@@ -113,23 +132,56 @@ def _parse_iso(value: str) -> dt.datetime:
     return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def required_lane_check_run(check_runs: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Return the latest ``ci-required-result`` check run, if present.
+def latest_check_run(check_runs: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
+    """Return the latest check run for *name*, if present.
 
     A re-run can leave multiple same-named runs on one SHA; pick the most
     recently started so a stale conclusion never wins.
     """
-    matches = [run for run in check_runs if run.get("name") == REQUIRED_CHECK_NAME]
+    matches = [run for run in check_runs if run.get("name") == name]
     if not matches:
         return None
     return max(matches, key=lambda run: run.get("started_at") or "")
 
 
-def is_required_lane_green(check_runs: list[dict[str, Any]]) -> bool:
-    run = required_lane_check_run(check_runs)
+def is_check_run_success(run: dict[str, Any] | None) -> bool:
+    """True when *run* completed with conclusion ``success`` (not skipped/neutral)."""
     if run is None:
         return False
     return run.get("status") == "completed" and run.get("conclusion") == "success"
+
+
+def is_required_lane_green(check_runs: list[dict[str, Any]]) -> bool:
+    """True when every develop-ruleset required context is latest-success.
+
+    Partial green (e.g. ``ci-required-result`` success but browser gate red
+    or never reported) returns False. Missing runs are fail-closed not-green;
+    the browser gate always reports on develop PRs (success when the explorer
+    suite is not needed), so silence is a real signal, not an expected gap.
+    """
+    if not REQUIRED_CHECK_NAMES:
+        return False
+    return all(is_check_run_success(latest_check_run(check_runs, name)) for name in REQUIRED_CHECK_NAMES)
+
+
+def required_lane_green_at(check_runs: list[dict[str, Any]]) -> str | None:
+    """Timestamp at which the required lane went green: the LAST context to finish.
+
+    A PR is only green once *every* required context has completed, so the
+    park-time anchor is the maximum ``completed_at`` across them -- not
+    ``ci-required-result``'s alone, which would overstate park time whenever
+    the browser gate finishes later and trip the >24h gate early. Returns
+    None when any required context lacks a completion timestamp, leaving the
+    caller to fall back rather than anchor on a half-finished lane.
+    """
+    stamps: list[str] = []
+    for name in REQUIRED_CHECK_NAMES:
+        stamp = (latest_check_run(check_runs, name) or {}).get("completed_at")
+        if not stamp:
+            return None
+        stamps.append(stamp)
+    # RFC3339 UTC ("...Z") sorts lexicographically in chronological order.
+    return max(stamps) if stamps else None
 
 
 def is_soundness_gated(changed_files: list[str]) -> bool:
@@ -153,18 +205,17 @@ def idle_hours(updated_at: str, now: dt.datetime) -> float:
 def park_time_hours(pr: dict[str, Any], now: dt.datetime, *, required_green: bool) -> float | None:
     """Hours since the PR became ready-and-green.
 
-    Anchored on the ``ci-required-result`` check run's ``completed_at`` --
-    the point the PR became green (the soundness-path/auto-merge-off state
+    Anchored on the ``completed_at`` of the LAST required context to finish
+    -- the point the PR became green (the soundness-path/auto-merge-off state
     is static from the diff and typically already true by then, so "went
     green" is the later, load-bearing event in practice). Falls back to
-    ``updated_at`` if the check run lacks a completion timestamp. Returns
-    None when the required lane is not green (park time is undefined until
-    it is).
+    ``updated_at`` if any required context lacks a completion timestamp.
+    Returns None when the required lane is not green (park time is undefined
+    until it is).
     """
     if not required_green:
         return None
-    run = required_lane_check_run(pr.get("check_runs") or [])
-    anchor = (run or {}).get("completed_at") or pr.get("updated_at")
+    anchor = required_lane_green_at(pr.get("check_runs") or []) or pr.get("updated_at")
     if not anchor:
         return None
     return (now - _parse_iso(anchor)).total_seconds() / 3600.0

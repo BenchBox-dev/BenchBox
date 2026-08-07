@@ -462,6 +462,28 @@ DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
 CONTAINER_ENGINE ?= docker
 COMPOSE := $(CONTAINER_ENGINE) compose
 
+# Some docker/*/docker-compose.yml files (lakesail, velox) mount
+# BENCHBOX_DATA_DIR with NO inline default -- see docker/lakesail/docker-compose.yml
+# and docker/velox/docker-compose.yml for why (mocker 0.7.2 misparses a
+# nested default, and silently leaves a required-variable default
+# (${VAR:?...}) unsubstituted even when the variable IS set). Two earlier
+# designs were tried here and reverted: a file-wide `BENCHBOX_DATA_DIR ?=
+# ...; export BENCHBOX_DATA_DIR` leaked an unrelated default into every one
+# of this Makefile's ~192 targets, not just the two that need it (and
+# BENCHBOX_DATA_DIR is a documented user-facing variable -- see
+# docs/reference/cli/configuration.md); and a per-stack docker/<platform>/.env
+# fallback could only supply a directory-relative default, which breaks the
+# host/container path-mirroring contract these two compose files rely on (a
+# relative value can never equal an absolute host path). There is
+# deliberately NO default here: callers must export an absolute
+# BENCHBOX_DATA_DIR themselves. require_data_dir_if_mounted below enforces
+# that -- non-empty and absolute -- scoped to just the lakesail/velox
+# bring-up targets, before compose is invoked.
+# $(1)=platform being brought up.
+define require_data_dir_if_mounted
+case " lakesail velox " in *" $(1) "*) case "$$BENCHBOX_DATA_DIR" in "") echo "ERROR: BENCHBOX_DATA_DIR must be exported before bringing up docker/$(1) -- its compose file binds the data directory at the SAME absolute path inside the container as on the host, because the server resolves client-sent file paths server-side; an unset value is silently accepted as an empty mount by both docker compose and mocker. Example: export BENCHBOX_DATA_DIR=$$HOME/benchbox-data" >&2; exit 1 ;; /*) : ;; *) echo "ERROR: BENCHBOX_DATA_DIR must be an ABSOLUTE path (got '$$BENCHBOX_DATA_DIR') -- docker/$(1)'s compose file binds it at the SAME path inside the container as on the host, so a relative value can never match. Example: export BENCHBOX_DATA_DIR=$$HOME/benchbox-data" >&2; exit 1 ;; esac ;; esac
+endef
+
 # `compose down -v` extended to also remove leaked named volumes on a SUCCESSFUL
 # down. mocker 0.5.4's `compose down -v` removes containers but LEAKS named
 # volumes (a stale-data risk across runs); this removes the project's volumes
@@ -472,13 +494,27 @@ COMPOSE := $(CONTAINER_ENGINE) compose
 # name-prefix grep here would also match a sibling project whose name extends
 # this one (`p` vs `p-ha`) and delete its data -- same fix as
 # tests/uat/docker_assets.py sweep_leaked_mocker_volumes.
+#
+# BENCHBOX_DATA_DIR is deliberately NOT validated here the way
+# require_data_dir_if_mounted validates it for `up`: `down` is called from
+# every one of this file's teardown paths (test-docker-down-%,
+# test-docker-down-all, and the failure-cleanup traps in test-docker-up-%,
+# test-docker-%, test-docker-firebolt, test-docker-up-all -- some of which
+# fire even when `up` never ran, e.g. require_data_dir_if_mounted itself
+# rejecting the value), so a hard failure here would risk exactly the
+# teardown leak this macro exists to close. `down` never re-mounts anything
+# (it only needs the compose file to interpolate/parse), so an unset or
+# relative BENCHBOX_DATA_DIR is replaced with a throwaway absolute
+# placeholder instead of erroring -- a no-op for every platform other than
+# lakesail/velox, whose compose files are the only ones that reference it.
 # $(1)=project $(2)=compose file.
 define compose_down_fresh
-$(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then awk '/^volumes:/{f=1;next} f&&/^[^ ]/{f=0} f&&/^  [A-Za-z0-9._-]+:/{k=$$1;sub(/:.*/,"",k);print k}' "$(2)" 2>/dev/null | while read -r _k; do mocker volume rm "$(1)-$$_k" >/dev/null 2>&1 || true; mocker volume rm "$(1)"_"$$_k" >/dev/null 2>&1 || true; done; fi
+case "$$BENCHBOX_DATA_DIR" in /*) ;; *) BENCHBOX_DATA_DIR="/tmp/benchbox-teardown-placeholder"; export BENCHBOX_DATA_DIR ;; esac; $(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then awk '/^volumes:/{f=1;next} f&&/^[^ ]/{f=0} f&&/^  [A-Za-z0-9._-]+:/{k=$$1;sub(/:.*/,"",k);print k}' "$(2)" 2>/dev/null | while read -r _k; do mocker volume rm "$(1)-$$_k" >/dev/null 2>&1 || true; mocker volume rm "$(1)"_"$$_k" >/dev/null 2>&1 || true; done; fi
 endef
 
 test-docker-up-%:
 	@set -e; \
+		$(call require_data_dir_if_mounted,$*); \
 		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
 		project_file="$$state_dir/$*.project"; \
 		mkdir -p "$$state_dir"; \
@@ -527,9 +563,15 @@ test-docker-%:
 		project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
 		cleanup() { { $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } || true; }; \
 		trap cleanup EXIT INT TERM; \
+		$(call require_data_dir_if_mounted,$*); \
 		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
 		uv run -- python -m pytest -m "live_$*" --tb=short -v -n 0
 
+# No require_data_dir_if_mounted call in the loop below: DOCKER_PLATFORMS
+# (above) never includes lakesail or velox, so the call would be
+# permanently dead here -- coverage that reads as real but never fires.
+# `make test-docker-up-lakesail` / `test-docker-up-velox` (test-docker-up-%)
+# is the supported bring-up path for those two and IS guarded.
 test-docker-up-all:
 	@set -e; \
 		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
@@ -833,8 +875,6 @@ guards-fix:
 	@$(MAKE) -s parity-fixtures
 	@echo "-- sql_compat capability matrix / skip-reference docs --"
 	@$(MAKE) -s compat-docs
-	@echo "-- UAT spec module-LOC table --"
-	@uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py
 	@echo "-- skill-sync (no-ops with a notice if the skill-sync CLI is not installed) --"
 	@# Last regen step, contained: a failing skill-sync CLI (e.g. "unable to
 	@# read tree <sha>" in a fresh worktree) used to abort guards-fix here,

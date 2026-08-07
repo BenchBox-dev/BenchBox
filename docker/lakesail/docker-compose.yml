@@ -4,6 +4,26 @@ name: benchbox-lakesail
 # absolute path. Mount BENCHBOX_DATA_DIR at the same absolute path inside the
 # container so those paths resolve server-side. BenchBox creates LakeSail CSV
 # compatibility symlinks under that same data directory.
+#
+# BENCHBOX_DATA_DIR has NO default here, and must be an ABSOLUTE path: the
+# client sends the host-side path to the server over Spark Connect, so the
+# host path and the in-container mount path must be identical, and a
+# relative default could never equal an absolute host path (a checked-in
+# docker/lakesail/.env with a relative fallback was tried and reverted for
+# exactly this reason). Export BENCHBOX_DATA_DIR before running compose --
+# `make test-docker-up-lakesail` validates it is set and absolute before
+# invoking compose; a bare `docker compose` run must export it manually.
+#
+# The mount below uses the FLAT $VARIABLE form only -- never a default
+# whose value itself contains another substitution (mocker 0.7.2 misparses
+# that into a doubled, brace-mangled path; see
+# lakesail-compose-nested-variable-default and
+# tests/uat/docker_path_helpers.py for the exact broken forms), and never a
+# required-variable default (colon-question-mark syntax): mocker 0.7.2 has
+# no required-variable support at all -- an unresolved required-variable
+# expression is left as the literal unsubstituted string, even when the
+# variable IS set (not an error), which mis-mounts identically to the
+# nested-default bug.
 
 services:
   lakesail-connect:
@@ -20,7 +40,7 @@ services:
     environment:
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
-      - "${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:${BENCHBOX_DATA_DIR:-${PWD}/benchmark_runs}:ro"
+      - "${BENCHBOX_DATA_DIR}:${BENCHBOX_DATA_DIR}:ro"
     tmpfs:
       - /tmp:size=2g
     healthcheck:

@@ -12,8 +12,15 @@ off" alone as stranded.
 It is a read-only external observer that classifies every OPEN develop PR
 and alerts only when all of the following hold:
 
-    (a) required-lane green -- the LATEST `ci-required-result` check run
-        on the PR's head SHA completed with conclusion `success`.
+    (a) required-lane green -- EVERY develop-ruleset required status
+        context in `REQUIRED_CHECK_NAMES` has its LATEST check run on the
+        PR's head SHA completed with conclusion `success`. Today that is
+        both `ci-required-result` and `Results Explorer browser gate`
+        (docs/operations/repo-admin-settings.md; live ruleset
+        develop-squash-only). Partial green (one context success, another
+        missing or red) is NOT required-green. The browser gate always
+        reports (path-aware skip still concludes success); a missing run
+        is fail-closed not-green.
     (b) auto-merge is OFF    -- the PR's own `auto_merge` field is falsy
         (null or an explicit off), re-read from REST (never inferred from
         a workflow run's conclusion; see "Known timing behavior" below).
@@ -111,7 +118,15 @@ from auto_merge_soundness_paths import any_soundness_path  # noqa: E402
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "green_unmerged_fixture.json"
 
 DEFAULT_REPO = "joeharris76/BenchBox"
-REQUIRED_CHECK_NAME = "ci-required-result"
+# Develop ruleset `develop-squash-only` required status contexts.
+# Pin must match docs/operations/repo-admin-settings.md and the live
+# ruleset (id 15611785). Partial membership is incomplete green.
+# Prefer this constant over re-deriving from path-filters or workflow
+# names: ruleset contexts are the merge gate, not subordinate jobs.
+REQUIRED_CHECK_NAMES: tuple[str, ...] = (
+    "ci-required-result",
+    "Results Explorer browser gate",
+)
 GRACE_PERIOD_HOURS = 2.0
 API_ROOT = "https://api.github.com"
 DEVELOP_POST_MERGE_WORKFLOW = "develop-post-merge.yml"
@@ -173,23 +188,39 @@ def _parse_iso(value: str) -> dt.datetime:
     return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def required_lane_check_run(check_runs: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Return the latest ``ci-required-result`` check run, if present.
+def latest_check_run(check_runs: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
+    """Return the latest check run for *name*, if present.
 
     A re-run can leave multiple same-named runs on one SHA; pick the most
     recently started so a stale conclusion never wins.
     """
-    matches = [run for run in check_runs if run.get("name") == REQUIRED_CHECK_NAME]
+    matches = [run for run in check_runs if run.get("name") == name]
     if not matches:
         return None
     return max(matches, key=lambda run: run.get("started_at") or "")
 
 
-def is_required_lane_green(check_runs: list[dict[str, Any]]) -> bool:
-    run = required_lane_check_run(check_runs)
+def is_check_run_success(run: dict[str, Any] | None) -> bool:
+    """True when *run* completed with conclusion ``success`` (not skipped/neutral)."""
     if run is None:
         return False
     return run.get("status") == "completed" and run.get("conclusion") == "success"
+
+
+def is_required_lane_green(check_runs: list[dict[str, Any]]) -> bool:
+    """True when every develop-ruleset required context is latest-success.
+
+    Partial green (e.g. ``ci-required-result`` success but browser gate
+    missing or red) returns False. Missing runs are fail-closed not-green;
+    the browser gate always reports on develop PRs (success when the
+    explorer suite is not needed).
+    """
+    if not REQUIRED_CHECK_NAMES:
+        return False
+    for name in REQUIRED_CHECK_NAMES:
+        if not is_check_run_success(latest_check_run(check_runs, name)):
+            return False
+    return True
 
 
 def is_soundness_gated(changed_files: list[str]) -> bool:
