@@ -9,7 +9,8 @@ into something an agent has to rediscover from a hand-carried prompt again.
 
 Covers:
   * dependency inventory (_project/scripts/dependency_audit/parse_deps.py)
-  * UAT LOC table (_project/scripts/uat_loc_table.py)
+  * UAT production-LOC ceiling gate (_project/scripts/uat_loc_table.py) --
+    NOT a regen guard; pins that its message says so.
   * module-size guard (tests/system/test_module_size_thresholds.py) -- no
     regen mode; pins the ready-to-paste ALLOWLIST entry instead.
   * DDL governance drift (benchbox/sql_compat/inventory.py --check-ddl-drift)
@@ -23,6 +24,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import json
 import sys
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -77,25 +79,27 @@ def test_parse_deps_check_message_names_exact_regen_command(tmp_path, monkeypatc
     assert "make guards-fix" in message
 
 
-def test_uat_loc_table_check_message_names_exact_regen_command(tmp_path, monkeypatch):
-    """uat_loc_table.py --check's drift message must name the exact regen
-    invocation and point at `make guards-fix`."""
-    real_spec = uat_loc_table.SPEC_PATH.read_text(encoding="utf-8")
-    begin = real_spec.find(uat_loc_table.SUMMARY_BEGIN)
-    end = real_spec.find(uat_loc_table.SUMMARY_END) + len(uat_loc_table.SUMMARY_END)
-    assert begin != -1 and end != -1, "fixture assumption: real spec has the summary markers"
+def test_uat_loc_budget_breach_message_names_the_budget_file_and_denies_regen(tmp_path, monkeypatch):
+    """uat_loc_table.py --check's breach message must name the ceiling file and
+    the offending bucket, and must explicitly say `make guards-fix` will NOT fix
+    it.
 
-    stale_spec = (
-        real_spec[:begin]
-        + uat_loc_table.SUMMARY_BEGIN
-        + "\n\n(deliberately stale for test_guard_messages)\n\n"
-        + uat_loc_table.SUMMARY_END
-        + real_spec[end:]
-    )
-    stale_path = tmp_path / "uat-framework.md"
-    stale_path.write_text(stale_spec, encoding="utf-8")
+    must_preserve: this guard is deliberately NOT a regen guard (it replaced
+    one -- uat-spec-module-loc-ceiling-gate). Every sibling guard in this module
+    is fixed by a mechanical regen command, and `guards-fix` used to run this
+    very script, so the standing assumption in this repo is "check guard failed
+    -> run guards-fix". Here that is wrong and would waste the reader's time:
+    exceeding a charter ceiling is fixed by removing code or by deliberately
+    raising the ceiling. The denial has to be in the message itself."""
+    budget = json.loads(uat_loc_table.BUDGET_PATH.read_text(encoding="utf-8"))
+    # Squeeze one bucket's ceiling below its real size to force a breach.
+    victim = uat_loc_table.BUCKETS[0][0]
+    measured, _total = uat_loc_table.measure()
+    budget["budgets"]["buckets"][victim] = measured[victim] - 1
+    breached_path = tmp_path / "uat-loc-budget.json"
+    breached_path.write_text(json.dumps(budget), encoding="utf-8")
 
-    monkeypatch.setattr(uat_loc_table, "SPEC_PATH", stale_path)
+    monkeypatch.setattr(uat_loc_table, "BUDGET_PATH", breached_path)
     monkeypatch.setattr(sys, "argv", ["uat_loc_table.py", "--check"])
 
     buf = io.StringIO()
@@ -104,8 +108,22 @@ def test_uat_loc_table_check_message_names_exact_regen_command(tmp_path, monkeyp
 
     assert exit_code == 1
     message = buf.getvalue()
-    assert "uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py" in message
-    assert "make guards-fix" in message
+    assert "_project/specs/uat-loc-budget.json" in message
+    assert "OVER BUDGET" in message and victim in message
+    assert "`make guards-fix` will NOT fix it" in message
+
+
+def test_uat_loc_budget_check_passes_on_the_real_tree():
+    """The committed ceilings must actually hold for the tree as shipped --
+    otherwise the gate above is failing for everyone and the ceilings, not the
+    code, are what needs attention."""
+    monkey_argv = ["uat_loc_table.py", "--check"]
+    original = sys.argv
+    sys.argv = monkey_argv
+    try:
+        assert uat_loc_table.main() == 0
+    finally:
+        sys.argv = original
 
 
 def test_module_size_allowlist_snippet_is_pasteable():

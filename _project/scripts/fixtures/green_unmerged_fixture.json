@@ -12,9 +12,22 @@
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
       "timeline_events": [],
-      "changed_files": ["benchbox/platforms/duckdb/adapter.py"],
+      "changed_files": [
+        "benchbox/platforms/duckdb/adapter.py"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     },
     {
@@ -25,10 +38,27 @@
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
-      "timeline_events": [{"event": "ready_for_review"}],
-      "changed_files": ["benchbox/core/equivalence/compare.py"],
+      "timeline_events": [
+        {
+          "event": "ready_for_review"
+        }
+      ],
+      "changed_files": [
+        "benchbox/core/equivalence/compare.py"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     },
     {
@@ -38,11 +68,33 @@
       "draft": false,
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
-      "auto_merge": {"enabled_by": {"login": "joeharris76"}, "merge_method": "squash"},
-      "timeline_events": [{"event": "auto_squash_enabled"}],
-      "changed_files": ["benchbox/platforms/snowflake/adapter.py"],
+      "auto_merge": {
+        "enabled_by": {
+          "login": "joeharris76"
+        },
+        "merge_method": "squash"
+      },
+      "timeline_events": [
+        {
+          "event": "auto_squash_enabled"
+        }
+      ],
+      "changed_files": [
+        "benchbox/platforms/snowflake/adapter.py"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     },
     {
@@ -54,9 +106,22 @@
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
       "timeline_events": [],
-      "changed_files": ["README.md"],
+      "changed_files": [
+        "README.md"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     },
     {
@@ -67,10 +132,27 @@
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
-      "timeline_events": [{"event": "auto_squash_enabled"}],
-      "changed_files": ["docs/development/adding-new-platforms.md"],
+      "timeline_events": [
+        {
+          "event": "auto_squash_enabled"
+        }
+      ],
+      "changed_files": [
+        "docs/development/adding-new-platforms.md"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "failure", "started_at": "2026-07-23T08:10:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     },
     {
@@ -81,10 +163,27 @@
       "updated_at": "2026-07-23T11:30:00Z",
       "head_pushed_at": "2026-07-23T11:30:00Z",
       "auto_merge": null,
-      "timeline_events": [{"event": "ready_for_review"}],
-      "changed_files": ["docs/development/adding-new-platforms.md"],
+      "timeline_events": [
+        {
+          "event": "ready_for_review"
+        }
+      ],
+      "changed_files": [
+        "docs/development/adding-new-platforms.md"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T11:35:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T11:35:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     },
     {
@@ -95,11 +194,36 @@
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
-      "timeline_events": [{"event": "committed"}, {"event": "reviewed"}],
-      "changed_files": ["benchbox/platforms/bigquery/adapter.py"],
+      "timeline_events": [
+        {
+          "event": "committed"
+        },
+        {
+          "event": "reviewed"
+        }
+      ],
+      "changed_files": [
+        "benchbox/platforms/bigquery/adapter.py"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "failure", "started_at": "2026-07-23T07:00:00Z"},
-        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-07-23T07:00:00Z"
+        },
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     },
     {
@@ -110,10 +234,27 @@
       "updated_at": "2026-07-23T08:00:00Z",
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
-      "timeline_events": [{"event": "ready_for_review"}],
-      "changed_files": ["benchbox/platforms/duckdb/adapter.py"],
+      "timeline_events": [
+        {
+          "event": "ready_for_review"
+        }
+      ],
+      "changed_files": [
+        "benchbox/platforms/duckdb/adapter.py"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     },
     {
@@ -125,12 +266,29 @@
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
       "timeline_events": [
-        {"event": "auto_squash_enabled"},
-        {"event": "auto_merge_disabled"}
+        {
+          "event": "auto_squash_enabled"
+        },
+        {
+          "event": "auto_merge_disabled"
+        }
       ],
-      "changed_files": ["benchbox/platforms/snowflake/adapter.py"],
+      "changed_files": [
+        "benchbox/platforms/snowflake/adapter.py"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     },
     {
@@ -142,14 +300,92 @@
       "head_pushed_at": "2026-07-23T08:00:00Z",
       "auto_merge": null,
       "had_arm_intent": true,
-      "changed_files": ["benchbox/platforms/bigquery/adapter.py"],
+      "changed_files": [
+        "benchbox/platforms/bigquery/adapter.py"
+      ],
       "check_runs": [
-        {"name": "ci-required-result", "status": "completed", "conclusion": "failure", "started_at": "2026-07-23T07:00:00Z"},
-        {"name": "ci-required-result", "status": "completed", "conclusion": "success", "started_at": "2026-07-23T08:10:00Z"}
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-07-23T07:00:00Z"
+        },
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
+      ]
+    },
+    {
+      "number": 2011,
+      "title": "partial-green exclusion: umbrella green, browser gate never reported",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2011",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "timeline_events": [
+        {
+          "event": "ready_for_review"
+        }
+      ],
+      "changed_files": [
+        "benchbox/platforms/duckdb/adapter.py"
+      ],
+      "check_runs": [
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        }
+      ]
+    },
+    {
+      "number": 2012,
+      "title": "partial-green exclusion: umbrella green, browser gate red",
+      "html_url": "https://github.com/joeharris76/BenchBox/pull/2012",
+      "draft": false,
+      "updated_at": "2026-07-23T08:00:00Z",
+      "head_pushed_at": "2026-07-23T08:00:00Z",
+      "auto_merge": null,
+      "timeline_events": [
+        {
+          "event": "ready_for_review"
+        }
+      ],
+      "changed_files": [
+        "benchbox/platforms/duckdb/adapter.py"
+      ],
+      "check_runs": [
+        {
+          "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-07-23T08:12:00Z"
+        }
       ]
     }
   ],
-  "expected_stranded": [2008, 2009, 2010],
+  "expected_stranded": [
+    2008,
+    2009,
+    2010
+  ],
   "expected_excluded_reasons": {
     "2001": "intentional_hold",
     "2002": "soundness_gated",
@@ -157,7 +393,9 @@
     "2004": "draft",
     "2005": "not_green",
     "2006": "within_grace",
-    "2007": "no_arm_intent"
+    "2007": "no_arm_intent",
+    "2011": "not_green",
+    "2012": "not_green"
   },
   "post_merge_run": {
     "status": "completed",

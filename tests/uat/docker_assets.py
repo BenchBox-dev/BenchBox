@@ -745,10 +745,53 @@ def compose_environment(
     *,
     benchmark_runs_dir: Path | str | None = None,
 ) -> dict[str, str]:
-    """Return environment overrides needed by a compose spec."""
-    if spec.platform not in {"lakesail", "velox"} or benchmark_runs_dir is None:
+    """Return environment overrides needed by a compose spec.
+
+    Raises DockerAssetError when ``benchmark_runs_dir`` is missing or not
+    absolute for a path-mirroring platform (lakesail, velox): their compose
+    files bind-mount BENCHBOX_DATA_DIR at the SAME absolute path inside the
+    container as on the host (the server resolves client-sent file paths
+    server-side), so a relative value -- or a caller that never resolved a
+    value at all -- silently breaks every file load instead of failing
+    loudly (lakesail-compose-nested-variable-default). A `None`
+    benchmark_runs_dir must NOT fall through to returning `{}` for these two
+    platforms: `run_docker_command` fills an omitted/empty ``env`` with
+    `os.environ.copy()`, so a `{}` return here would let the child process
+    silently inherit whatever ambient BENCHBOX_DATA_DIR happens to be set
+    (or unset) in the caller's shell instead of the resolved run directory.
+
+    This is the single choke point every UAT-managed bring-up path funnels
+    through -- tests/uat/phases/execute.py's up AND down calls, and
+    scripts/uat-bring-up/uat_bring_up.py -- unlike the Makefile's
+    require_data_dir_if_mounted, which only guards direct
+    `make test-docker-up-<platform>` invocations that never call this
+    function. Keep both: the Makefile check is defence-in-depth for the
+    shell entry point, this one is the enforcement point every Python entry
+    point actually reaches. Teardown callers that must not fail just because
+    BENCHBOX_DATA_DIR is unset or relative (``down`` never mounts anything)
+    should catch DockerAssetError and substitute a throwaway absolute value
+    rather than skip this validation.
+    """
+    if spec.platform not in {"lakesail", "velox"}:
         return {}
-    return {"BENCHBOX_DATA_DIR": str(Path(benchmark_runs_dir).expanduser())}
+    if benchmark_runs_dir is None:
+        raise DockerAssetError(
+            f"benchmark_runs_dir is required for platform {spec.platform!r} -- its compose "
+            "file mounts BENCHBOX_DATA_DIR at the SAME absolute path inside the container as "
+            "on the host, so omitting it would let the child process silently inherit "
+            "whatever ambient BENCHBOX_DATA_DIR (if any) is set in the caller's environment "
+            "instead of the resolved run directory. Pass an absolute benchmark_runs_dir / "
+            "--benchmark-runs-dir."
+        )
+    data_dir = Path(benchmark_runs_dir).expanduser()
+    if not data_dir.is_absolute():
+        raise DockerAssetError(
+            f"BENCHBOX_DATA_DIR must be an absolute path for platform {spec.platform!r} "
+            f"(got {str(benchmark_runs_dir)!r}) -- its compose file mounts BENCHBOX_DATA_DIR "
+            "at the SAME absolute path inside the container as on the host, so a relative "
+            "value can never match. Pass an absolute benchmark_runs_dir / --benchmark-runs-dir."
+        )
+    return {"BENCHBOX_DATA_DIR": str(data_dir)}
 
 
 _FORBIDDEN_PRUNE_VERBS: frozenset[tuple[str, str]] = frozenset(

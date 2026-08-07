@@ -100,7 +100,11 @@ def main(argv: list[str] | None = None) -> int:
 
     project_name = args.project_name or docker_assets.compose_project_name("manual", platform)
     benchmark_runs_dir = _benchmark_runs_dir(args.benchmark_runs_dir)
-    compose_env = docker_assets.compose_environment(spec, benchmark_runs_dir=benchmark_runs_dir)
+    try:
+        compose_env = docker_assets.compose_environment(spec, benchmark_runs_dir=benchmark_runs_dir)
+    except docker_assets.DockerAssetError as exc:
+        print(f"UAT bring-up failed for {platform}: {exc}", file=sys.stderr)
+        return 2
 
     # An operator-supplied `--project-name` bypasses compose_project_name()'s budget
     # entirely, so validate it up front -- a clear, actionable error here beats an

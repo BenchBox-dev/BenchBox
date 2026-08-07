@@ -25,15 +25,19 @@ _SCRIPT = _ROOT / "_project" / "scripts" / "green_unmerged_sweep.py"
 _FIXTURE = _ROOT / "_project" / "scripts" / "fixtures" / "green_unmerged_fixture.json"
 
 
-def _load():
-    spec = importlib.util.spec_from_file_location("_green_unmerged_sweep", _SCRIPT)
+def _load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None and spec.loader is not None
-    mod = importlib.util.module_from_spec(spec)
+    module = importlib.util.module_from_spec(spec)
     # Register in sys.modules before exec: the module uses @dataclass, whose
     # field-type resolution looks the module up by name in sys.modules.
-    sys.modules[spec.name] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load():
+    return _load_module("_green_unmerged_sweep", _SCRIPT)
 
 
 mod = _load()
@@ -44,24 +48,57 @@ def _now() -> dt.datetime:
 
 
 # ------------------------------------------------------------------ #
-# required_lane_check_run / is_required_lane_green                    #
+# latest_check_run / is_required_lane_green                           #
 # ------------------------------------------------------------------ #
+def _run(name: str, conclusion: str, started_at: str = "2026-07-23T08:00:00Z") -> dict[str, str]:
+    return {
+        "name": name,
+        "status": "completed",
+        "conclusion": conclusion,
+        "started_at": started_at,
+    }
+
+
+def _all_required_green() -> list[dict[str, str]]:
+    """One passing run per develop-ruleset required context."""
+    return [_run(name, "success") for name in mod.REQUIRED_CHECK_NAMES]
+
+
+def test_required_check_names_match_the_documented_ruleset() -> None:
+    # The pin that makes this module's green/not-green verdict trustworthy:
+    # it must track the `develop-squash-only` required contexts. Parse them
+    # from the same runbook block ruleset_drift_check.py reads, rather than
+    # restating the names here -- a second hardcoded copy would drift
+    # silently and reintroduce the false-green gap this classifier exists to
+    # close. Order is not asserted: every context is required, so the tuple
+    # order carries no meaning.
+    drift = _load_module("_ruleset_drift_check", _ROOT / "scripts" / "ruleset_drift_check.py")
+    runbook = (_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text(encoding="utf-8")
+    expected = drift.parse_expected_rulesets(runbook)["develop-squash-only"]
+    assert set(mod.REQUIRED_CHECK_NAMES) == set(expected.required_checks)
+    assert len(mod.REQUIRED_CHECK_NAMES) == len(set(mod.REQUIRED_CHECK_NAMES)), "duplicate context"
+
+
+def test_required_lane_green_when_every_context_succeeds() -> None:
+    assert mod.is_required_lane_green(_all_required_green()) is True
+
+
 def test_required_lane_picks_latest_started_run() -> None:
     runs = [
-        {
-            "name": "ci-required-result",
-            "status": "completed",
-            "conclusion": "failure",
-            "started_at": "2026-07-23T07:00:00Z",
-        },
-        {
-            "name": "ci-required-result",
-            "status": "completed",
-            "conclusion": "success",
-            "started_at": "2026-07-23T08:00:00Z",
-        },
+        _run("ci-required-result", "failure", "2026-07-23T07:00:00Z"),
+        _run("ci-required-result", "success", "2026-07-23T08:00:00Z"),
+        _run("Results Explorer browser gate", "success"),
     ]
     assert mod.is_required_lane_green(runs) is True
+
+
+def test_required_lane_stale_success_does_not_beat_latest_failure() -> None:
+    runs = [
+        _run("ci-required-result", "success", "2026-07-23T07:00:00Z"),
+        _run("ci-required-result", "failure", "2026-07-23T08:00:00Z"),
+        _run("Results Explorer browser gate", "success"),
+    ]
+    assert mod.is_required_lane_green(runs) is False
 
 
 def test_required_lane_missing_run_is_not_green() -> None:
@@ -69,15 +106,41 @@ def test_required_lane_missing_run_is_not_green() -> None:
 
 
 def test_required_lane_ignores_unrelated_check_names() -> None:
-    runs = [
+    assert mod.is_required_lane_green([_run("some-other-check", "success")]) is False
+
+
+@pytest.mark.parametrize("missing", list(mod.REQUIRED_CHECK_NAMES))
+def test_required_lane_not_green_when_any_context_never_reported(missing: str) -> None:
+    # Fail closed: a required context with no run at all is not green, no
+    # matter how many sibling contexts passed.
+    runs = [run for run in _all_required_green() if run["name"] != missing]
+    assert mod.is_required_lane_green(runs) is False
+
+
+@pytest.mark.parametrize("failing", list(mod.REQUIRED_CHECK_NAMES))
+@pytest.mark.parametrize("conclusion", ["failure", "cancelled", "timed_out", "skipped", "neutral"])
+def test_required_lane_not_green_when_any_context_is_not_success(failing: str, conclusion: str) -> None:
+    # Partial green is the exact false-green gap: `ci-required-result` alone
+    # passing must not classify the PR as required-lane green.
+    runs = [_run(name, conclusion if name == failing else "success") for name in mod.REQUIRED_CHECK_NAMES]
+    assert mod.is_required_lane_green(runs) is False
+
+
+def test_required_lane_not_green_while_a_context_is_still_running() -> None:
+    runs = [_run(name, "success") for name in mod.REQUIRED_CHECK_NAMES[1:]]
+    runs.append(
         {
-            "name": "some-other-check",
-            "status": "completed",
-            "conclusion": "success",
+            "name": mod.REQUIRED_CHECK_NAMES[0],
+            "status": "in_progress",
+            "conclusion": None,
             "started_at": "2026-07-23T08:00:00Z",
         }
-    ]
+    )
     assert mod.is_required_lane_green(runs) is False
+
+
+def test_latest_check_run_returns_none_for_unknown_name() -> None:
+    assert mod.latest_check_run(_all_required_green(), "no-such-check") is None
 
 
 # ------------------------------------------------------------------ #
@@ -203,14 +266,7 @@ def test_classify_pr_intentional_hold_not_stranded() -> None:
         "timeline_events": [],
         "changed_files": ["docs/readme.md"],
         "head_pushed_at": "2026-07-23T08:00:00Z",
-        "check_runs": [
-            {
-                "name": "ci-required-result",
-                "status": "completed",
-                "conclusion": "success",
-                "started_at": "2026-07-23T08:10:00Z",
-            }
-        ],
+        "check_runs": _all_required_green(),
     }
     c = mod.classify_pr(pr, _now(), grace_hours=2.0)
     assert c.required_green is True
@@ -232,14 +288,7 @@ def test_classify_pr_explicit_hold_label_not_stranded() -> None:
         "timeline_events": [{"event": "ready_for_review"}, {"event": "auto_squash_enabled"}],
         "changed_files": ["docs/readme.md"],
         "head_pushed_at": "2026-07-23T08:00:00Z",
-        "check_runs": [
-            {
-                "name": "ci-required-result",
-                "status": "completed",
-                "conclusion": "success",
-                "started_at": "2026-07-23T08:10:00Z",
-            }
-        ],
+        "check_runs": _all_required_green(),
     }
     c = mod.classify_pr(pr, _now(), grace_hours=2.0)
     assert c.had_arm_intent is True
@@ -257,14 +306,7 @@ def test_classify_pr_true_strand_ready_for_review() -> None:
         "timeline_events": [{"event": "ready_for_review"}],
         "changed_files": ["docs/readme.md"],
         "head_pushed_at": "2026-07-23T08:00:00Z",
-        "check_runs": [
-            {
-                "name": "ci-required-result",
-                "status": "completed",
-                "conclusion": "success",
-                "started_at": "2026-07-23T08:10:00Z",
-            }
-        ],
+        "check_runs": _all_required_green(),
     }
     c = mod.classify_pr(pr, _now(), grace_hours=2.0)
     assert c.had_arm_intent is True
@@ -285,18 +327,40 @@ def test_classify_pr_true_strand_auto_merge_dropped() -> None:
         ],
         "changed_files": ["docs/readme.md"],
         "head_pushed_at": "2026-07-23T08:00:00Z",
-        "check_runs": [
-            {
-                "name": "ci-required-result",
-                "status": "completed",
-                "conclusion": "success",
-                "started_at": "2026-07-23T08:10:00Z",
-            }
-        ],
+        "check_runs": _all_required_green(),
     }
     c = mod.classify_pr(pr, _now(), grace_hours=2.0)
     assert c.had_arm_intent is True
     assert c.stranded is True
+
+
+@pytest.mark.parametrize(
+    ("case", "gate_runs"),
+    [
+        ("never_reported", []),
+        ("red", [_run("Results Explorer browser gate", "failure")]),
+    ],
+)
+def test_classify_pr_partial_green_is_not_stranded(case: str, gate_runs: list[dict[str, str]]) -> None:
+    # End-to-end guard on the false-green gap: a PR that would otherwise be a
+    # textbook strand (arm intent, auto-merge off, aged, not soundness-gated)
+    # must NOT be alerted while a second required context is red or absent --
+    # it is genuinely not mergeable yet, so there is nothing stranded about it.
+    pr = {
+        "number": 4,
+        "title": f"partial green: {case}",
+        "html_url": "https://example.invalid/4",
+        "draft": False,
+        "auto_merge": None,
+        "timeline_events": [{"event": "ready_for_review"}],
+        "changed_files": ["docs/readme.md"],
+        "head_pushed_at": "2026-07-23T08:00:00Z",
+        "check_runs": [_run("ci-required-result", "success"), *gate_runs],
+    }
+    c = mod.classify_pr(pr, _now(), grace_hours=2.0)
+    assert c.had_arm_intent is True
+    assert c.required_green is False
+    assert c.stranded is False
 
 
 # ------------------------------------------------------------------ #
