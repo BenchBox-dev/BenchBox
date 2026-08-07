@@ -342,9 +342,18 @@ def test_sweep_cancel_reaps_orphaned_child_no_survivor(tmp_path: Path):
     The end-to-end wiring test: the real sweep-process SIGTERM shim
     (`orchestrator._install_sweep_sigterm_shim`, the exact handler
     `run_sweep` installs) raising the real `SweepCancelled` through the real
-    `timeouts.run_with_timeout` (the exact wrapper `exec_phase.run_cell`
-    uses), at the production timeout, around a real child that owns a real
-    grandchild and traps SIGTERM the way a cell's database server does.
+    `timeouts.run_with_timeout` (the exact wrapper `runner.run_cell` uses --
+    the call site is `tests/uat/runner.py`, NOT `phases/execute.py`, which
+    never imports it), at the production timeout, around a real child that
+    owns a real grandchild and traps SIGTERM the way a cell's database
+    server does.
+
+    Note what this test does NOT cover: it calls `run_with_timeout`
+    directly, so it says nothing about whether `run_cell` is still wired to
+    it. That consumer is pinned separately in
+    `tests/uat/test_runner_timeout_process_group.py`; without it,
+    re-pointing runner's import at a pre-#1630 implementation left this test
+    (and 600 others) green.
 
     The unit-level equivalents in test_timeouts.py pin the same behavior
     against a locally defined `KeyboardInterrupt` subclass; this one proves
