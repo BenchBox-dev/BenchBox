@@ -91,7 +91,11 @@ a PR's mergeability — both only alert.
   `.github/workflows/nightly.yml`) — alerts only on **true stranding**:
   non-draft, non-soundness, non-hold-label PRs whose required lane is green,
   auto-merge is still off more than 2 hours after the head commit, **and**
-  the PR timeline shows prior arm intent that was lost. `--apply` only
+  the PR timeline shows prior arm intent that was lost. "Required lane
+  green" means **every** `develop-squash-only` required context is
+  latest-success — today both `ci-required-result` and `Results Explorer
+  browser gate` — so a PR that is green on one and red or silent on the
+  other is not green and is not alerted. `--apply` only
   upserts the digest issue; it **never** enables auto-merge and must not
   re-arm a hold it did not set.
 
