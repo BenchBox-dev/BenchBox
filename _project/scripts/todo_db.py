@@ -2972,6 +2972,10 @@ def stats(conn: sqlite3.Connection) -> dict[str, Any]:
         # a claim check cannot see `create`/`defer`/`promote`/`block`/config,
         # none of which take a claim. See write_activity().
         "events": write_activity(conn),
+        # Additive stale flag for quiescence probe (phase 5). True when the embedded
+        # replica sync failed and reads degraded to stale data; false otherwise.
+        # Existing keys above are untouched; hosted and local callers both see the flag.
+        "stale": bool(getattr(conn, "stale", False)),
     }
 
 

@@ -29,6 +29,7 @@ COMMANDS = frozenset(
         "migrate",
         "create",
         "update",
+        "scope-update",
         "show",
         "claim",
         "renew",
@@ -53,6 +54,10 @@ COMMANDS = frozenset(
         "config",
         "import-yaml",
         "sweep-stale",
+        "freeze",
+        "finding",
+        "audit",
+        "doctor",
     }
 )
 
@@ -91,6 +96,10 @@ def _has_option(argv: Iterable[str], name: str) -> bool:
 
 def _has_database_environment() -> bool:
     return any(os.environ.get(name) for name in ("TODO_DB_PATH", "TODO_DB_URL"))
+
+
+def _has_config_json(root: Path) -> bool:
+    return (root / ".todo-db" / "config.json").is_file()
 
 
 def _with_identity(argv: list[str], command_index: int) -> list[str]:
@@ -323,9 +332,25 @@ def _main(argv: list[str] | None = None) -> int:
         return result.returncode
     command_index, command = located
     root = _repo_root()
-    if not _has_option(args, "--db") and not _has_database_environment():
-        args[command_index:command_index] = ["--db", str(root / ".todo-db" / "todo.sqlite")]
-        command_index += 2
+    # w2/w3: Map RO/RW tokens + drafts dir; refuse unroutable verbs loudly; never create a fork DB.
+    # Legacy default path (no BENCHBOX_TODO_DB_STANDALONE) is byte-identical — only standalone mode changes.
+    is_standalone = os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1"
+    if is_standalone:
+        # Refuse loudly if no DB is configured via env, --db, or config.json; honor config.json as configured.
+        # w5: doctor without DB must diagnose no-backend-configured, not refuse exit-2.
+        has_db = _has_database_environment() or _has_option(args, "--db") or _has_config_json(root)
+        if not has_db and command != "doctor":
+            print(
+                f"error: standalone shim cannot route '{command}' without explicit --db, TODO_DB_PATH/URL, or .todo-db/config.json; refusing to create fork DB at {root / '.todo-db' / 'todo.sqlite'}",
+                file=sys.stderr,
+            )
+            return 2
+        # RO/RW token mapping and drafts dir are via env passthrough in _delegate (os.environ.copy) —
+        # standalone reads TODO_DB_AUTH_TOKEN / TODO_DB_RO_AUTH_TOKEN / TODO_DB_FINDING_DRAFTS_DIR directly.
+    else:
+        if not _has_option(args, "--db") and not _has_database_environment():
+            args[command_index:command_index] = ["--db", str(root / ".todo-db" / "todo.sqlite")]
+            command_index += 2
     if command == "export":
         return _export(args, root)
     delegated = _with_identity(args, command_index)

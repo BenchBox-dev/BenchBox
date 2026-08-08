@@ -199,6 +199,7 @@ _project/DONE/_indexes/
 .todo-db/*.sqlite-*
 .todo-db/replica*
 .todo-db/export/
+.todo-db/archive/
 _project/blind-spots/_indexes/
 
 # Ephemeral review/audit evidence. Commit durable markdown summaries instead.
