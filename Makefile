@@ -2367,9 +2367,31 @@ worktree-list:
 	@git worktree list
 
 
-# Remove worktrees whose branches are gone on origin (already merged).
+# Remove worktrees whose branches are BOTH gone on origin AND merged into
+# origin/develop. The merged check matters: "gone on origin" alone also
+# matches never-pushed local branches, which are live work, not leftovers.
 # Legacy cleanup only. Pool worktrees are retained and released instead.
+# Guarded against running from a container vantage (see AGENTS.md
+# "Worktree safety"): inside a sandbox with this repo's .git bind-mounted,
+# every host worktree reads as prunable and pruning destroys real host
+# registrations. Locked worktrees ("agentbox mount guard") are unlocked
+# only at the moment this target has decided, by the merged check, that
+# removal is safe.
 worktree-prune:
+	@case "$$(hostname)" in agentbox-*) \
+		echo "REFUSING: this looks like a sandbox container (hostname $$(hostname))." >&2; \
+		echo "Inside a container the shared .git records absolute host paths that are" >&2; \
+		echo "not mounted, so every host worktree reads as prunable and pruning would" >&2; \
+		echo "destroy real host registrations. Run this target on the host only." >&2; \
+		exit 1 ;; esac
+	@PRUNABLE=$$(git worktree list --porcelain | grep -c '^prunable' || true); \
+	if [ "$${PRUNABLE:-0}" -gt 3 ]; then \
+		echo "REFUSING: $$PRUNABLE worktrees read as prunable. On a healthy host that" >&2; \
+		echo "number is ~0; a large count means this vantage cannot see the worktree" >&2; \
+		echo "paths (container, moved checkout) and pruning would destroy live" >&2; \
+		echo "registrations. Investigate before overriding." >&2; \
+		exit 1; \
+	fi
 	@git fetch --prune --quiet
 	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
 	git worktree list --porcelain | awk 'function emit(){if (wt != "") print wt "|" br} /^worktree /{emit(); wt=$$2; br=""} /^branch /{br=$$2} END{emit()}' | \
@@ -2379,13 +2401,37 @@ worktree-prune:
 			case "$$base" in *.pool-[0-9][0-9]) pool=$${base##*.}; echo "Skipping pool worktree $$pool (retained)"; continue ;; esac; \
 			[ -n "$$br" ] || continue; \
 			short=$${br#refs/heads/}; \
-			if ! git ls-remote --exit-code --heads origin "$$short" >/dev/null 2>&1; then \
-				echo "Removing worktree (branch gone on origin): $$wt [$$short]"; \
-				git worktree remove "$$wt" 2>/dev/null || git worktree remove --force "$$wt"; \
-				git branch -D "$$short" 2>/dev/null || true; \
+			if git ls-remote --exit-code --heads origin "$$short" >/dev/null 2>&1; then continue; fi; \
+			if ! git merge-base --is-ancestor "$$short" origin/develop 2>/dev/null; then \
+				echo "Keeping $$wt [$$short]: gone on origin but NOT merged into origin/develop (likely never pushed)"; \
+				continue; \
 			fi; \
+			echo "Removing worktree (branch merged into origin/develop, gone on origin): $$wt [$$short]"; \
+			git worktree unlock "$$wt" 2>/dev/null || true; \
+			git worktree remove "$$wt" 2>/dev/null || git worktree remove --force "$$wt"; \
+			git branch -D "$$short" 2>/dev/null || true; \
 		done
 	@git worktree prune
+
+# Lock every linked worktree against `git worktree prune` / `git gc` run
+# from a vantage that cannot see the worktree paths (a sandbox container
+# with this repo's .git bind-mounted; see AGENTS.md "Worktree safety").
+# Locks do NOT affect claiming or normal work (status/checkout/commit all
+# work in a locked worktree); they only block worktree remove/move until
+# `git worktree unlock`, and make prune skip the entry. Re-run after
+# creating new worktrees; locking is idempotent (already-locked is OK).
+worktree-lock-all:
+	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
+	git worktree list --porcelain | awk '/^worktree /{print substr($$0,10)}' | \
+		while IFS= read -r wt; do \
+			[ "$$wt" = "$$MAIN_CLONE" ] && continue; \
+			if git worktree lock --reason "agentbox mount guard: .git may be bind-mounted into a container where this entry reads prunable but is live. Never prune. Unlock: git worktree unlock" "$$wt" 2>/dev/null; then \
+				echo "locked: $$wt"; \
+			else \
+				echo "already locked (or missing): $$wt"; \
+			fi; \
+		done
+	@git worktree list | grep -c 'locked' | sed 's/^/locked total: /'
 
 # Blind-spot finding triage (file-first capture; see _project/blind-spots/README.md).
 blind-spots-list:
