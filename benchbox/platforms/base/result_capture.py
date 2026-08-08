@@ -536,7 +536,7 @@ class ResultCaptureMixin:
         }
 
         try:
-            import psutil  # type: ignore
+            import psutil
         except ImportError:
             snapshot["reason"] = "psutil not installed"
             return snapshot
