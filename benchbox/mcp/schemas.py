@@ -404,6 +404,9 @@ _DASK_DEFAULT_THREADS_PER_WORKER = 2
 _DASK_DEFAULT_MEMORY_PER_WORKER_BYTES = float(2 << 30)
 
 # Server-owned aggregate budget.  Deliberately far below the per-field maxima:
+# Defaults are static for determinism; host-derived clamping is available via
+# operator env overrides, not implicit psutil. See docs/operations/mcp-remote-security.md
+# Envelope tradeoffs. Envelope is enforced even when use_distributed=false (fail-closed).
 # n_workers=256 x threads_per_worker=256 would otherwise admit a 65,536-thread
 # cluster advertising 256 TB of memory from a single request.
 MCP_DASK_MAX_WORKERS_ENV = "BENCHBOX_MCP_DASK_MAX_WORKERS"
