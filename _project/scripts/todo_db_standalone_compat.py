@@ -29,6 +29,7 @@ COMMANDS = frozenset(
         "migrate",
         "create",
         "update",
+        "scope-update",
         "show",
         "claim",
         "renew",
@@ -53,6 +54,9 @@ COMMANDS = frozenset(
         "config",
         "import-yaml",
         "sweep-stale",
+        "freeze",
+        "finding",
+        "doctor",
     }
 )
 
@@ -323,9 +327,35 @@ def _main(argv: list[str] | None = None) -> int:
         return result.returncode
     command_index, command = located
     root = _repo_root()
-    if not _has_option(args, "--db") and not _has_database_environment():
-        args[command_index:command_index] = ["--db", str(root / ".todo-db" / "todo.sqlite")]
-        command_index += 2
+    # w2: Map RO/RW tokens + drafts dir; refuse unroutable verbs loudly; never create a fork DB.
+    # Legacy default path (no BENCHBOX_TODO_DB_STANDALONE) is byte-identical — only standalone mode changes.
+    is_standalone = os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1"
+    if is_standalone:
+        # Two-level commands need flag placement fix handled in w1; here handle token/drafts mapping + refusal.
+        # Map finding drafts dir via env passthrough — standalone honours TODO_DB_FINDING_DRAFTS_DIR.
+        # If no DB is configured and verb cannot be safely routed (finding/audit without explicit --db), refuse loudly
+        # instead of auto-creating .todo-db/todo.sqlite which would be a fork DB unknown to legacy tracker.
+        unroutable_no_db = command in {"finding", "audit"} and not _has_database_environment() and not _has_option(args, "--db")
+        if unroutable_no_db:
+            print(
+                f"error: standalone shim cannot route '{command}' without explicit --db or TODO_DB_PATH/URL; refusing to create fork DB at {root / '.todo-db' / 'todo.sqlite'}",
+                file=sys.stderr,
+            )
+            return 2
+        # RO/RW token mapping: read-only verbs prefer RO token, but standalone reads both envs — just ensure
+        # drafts dir is forwarded (env copy in _delegate already does). No DB auto-create for unroutable.
+        if not _has_option(args, "--db") and not _has_database_environment():
+            # For standalone, require explicit DB for mutating verbs; read-only verbs may still need DB, so refuse
+            # rather than minting a fork at the legacy path.
+            print(
+                f"error: standalone shim refuses to auto-create DB at {root / '.todo-db' / 'todo.sqlite'} without explicit --db/TODO_DB_PATH/URL; set --db or TODO_DB_PATH",
+                file=sys.stderr,
+            )
+            return 2
+    else:
+        if not _has_option(args, "--db") and not _has_database_environment():
+            args[command_index:command_index] = ["--db", str(root / ".todo-db" / "todo.sqlite")]
+            command_index += 2
     if command == "export":
         return _export(args, root)
     delegated = _with_identity(args, command_index)

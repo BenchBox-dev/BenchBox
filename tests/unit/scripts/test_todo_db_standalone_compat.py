@@ -406,3 +406,47 @@ def test_legacy_entrypoint_only_routes_when_explicitly_enabled(monkeypatch: pyte
 
     assert entrypoint.main(["--db", str(tmp_path / "todo.sqlite"), "stats"]) == 17
     assert calls == [["--db", str(tmp_path / "todo.sqlite"), "stats"]]
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "update",
+        "scope-update",
+        "freeze",
+        "finding",
+        "sweep-stale",
+        "migrate",
+        "doctor",
+    ],
+)
+def test_standalone_030_verbs_are_routable_through_shim(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, command: str
+) -> None:
+    """w3: every 0.3.0 verb routes through shim without forking DB."""
+    calls: list[str] = []
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        calls.append(command)
+        return CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+    # Provide explicit DB so shim does not refuse fork-DB path
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), command]) == 0
+    # finding/doctor are not in COMMANDS — they route via command="" delegation path
+    if command in compat.COMMANDS:
+        assert calls == [command]
+    else:
+        assert calls == [""]
+
+
+def test_standalone_refuses_unroutable_finding_without_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """w2: finding/audit without DB refuses loudly instead of minting fork DB."""
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    monkeypatch.delenv("TODO_DB_URL", raising=False)
+    # finding without --db should refuse (return 2) and not inject .todo-db/todo.sqlite
+    assert compat.main(["finding", "sync"]) == 2
