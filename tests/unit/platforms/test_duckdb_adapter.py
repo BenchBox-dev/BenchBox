@@ -382,12 +382,12 @@ class TestDuckDBAdapter:
 
         # Check DuckDB settings were applied
         expected_calls = [
-            call("SET memory_limit = '2GB'"),
-            call("SET threads TO 2"),
+            call("SET memory_limit = ?", ["2GB"]),
+            call("SET threads TO ?", [2]),
             call("SET default_order = 'ASC'"),
         ]
         for expected_call in expected_calls:
-            mock_connection.execute.assert_any_call(expected_call.args[0])
+            mock_connection.execute.assert_any_call(*expected_call.args)
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_connection_file_database(self, mock_duckdb):
@@ -1263,14 +1263,14 @@ class TestDuckDBAdapter:
 
         # Verify optimization settings were applied
         expected_calls = [
-            call("SET memory_limit = '8GB'"),
-            call("SET threads TO 8"),
+            call("SET memory_limit = ?", ["8GB"]),
+            call("SET threads TO ?", [8]),
             call("SET enable_progress_bar = true"),
             call("SET default_order = 'ASC'"),
         ]
 
         for expected_call in expected_calls:
-            mock_connection.execute.assert_any_call(expected_call.args[0])
+            mock_connection.execute.assert_any_call(*expected_call.args)
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_table_loading_order(self, mock_duckdb):
@@ -1656,7 +1656,7 @@ class TestMCPThreadsReachTheEffectiveSetting:
             duckdb_module.connect.return_value = connection
             adapter.create_connection()
 
-        assert call("SET threads TO 7") in connection.execute.call_args_list
+        assert call("SET threads TO ?", [7]) in connection.execute.call_args_list
 
     def test_a_real_connection_reports_the_requested_thread_count(self, tmp_path: Path):
         """The strongest evidence: DuckDB itself reports the setting."""

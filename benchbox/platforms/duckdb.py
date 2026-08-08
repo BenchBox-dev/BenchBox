@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -33,6 +34,11 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import TuningColumn
 
 logger = logging.getLogger(__name__)
+
+# Mirrors benchbox/mcp/schemas.py MEMORY_LIMIT_PATTERN. Duplicated rather than
+# imported to keep platforms below surfaces (core < platforms < cli); see
+# duckdb-set-statement-value-hardening.
+_MEMORY_LIMIT_PATTERN = re.compile(r"^(?:[1-9]\d{0,5}(?:\.\d{1,2})?)(?:B|KB|MB|GB|TB)$", re.IGNORECASE)
 
 
 def _normalize_duckdb_version(raw_version: Any) -> str | None:
@@ -662,9 +668,23 @@ class DuckDBAdapter(PlatformAdapter):
         self._duckdb_module = self._initialize_duckdb_runtime(config)
         # DuckDB configuration
         self.database_path = config.get("database_path", ":memory:")
-        self.memory_limit = config.get("memory_limit", "4GB")
-        self.max_temp_directory_size = config.get("max_temp_directory_size")
-        self.thread_limit = config.get("thread_limit")
+        raw_memory = config.get("memory_limit", "4GB")
+        if raw_memory is not None:
+            if not isinstance(raw_memory, str) or not _MEMORY_LIMIT_PATTERN.fullmatch(raw_memory):
+                raise ValueError("memory_limit must use a bounded memory size (e.g., '4GB')")
+        self.memory_limit = raw_memory
+        raw_temp = config.get("max_temp_directory_size")
+        if raw_temp is not None:
+            if not isinstance(raw_temp, str) or not _MEMORY_LIMIT_PATTERN.fullmatch(raw_temp):
+                raise ValueError("max_temp_directory_size must use a bounded memory size (e.g., '4GB')")
+        self.max_temp_directory_size = raw_temp
+        raw_threads = config.get("thread_limit")
+        if raw_threads is not None:
+            try:
+                raw_threads = int(raw_threads)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("thread_limit must be an integer") from exc
+        self.thread_limit = raw_threads
         self.enable_progress_bar = config.get("progress_bar", False)
 
     def _initialize_duckdb_runtime(self, config: dict[str, Any]):
@@ -787,17 +807,17 @@ class DuckDBAdapter(PlatformAdapter):
         # Apply DuckDB settings
         config_applied = []
         if self.memory_limit:
-            conn.execute(f"SET memory_limit = '{self.memory_limit}'")
+            conn.execute("SET memory_limit = ?", [self.memory_limit])
             config_applied.append(f"memory_limit={self.memory_limit}")
             self.log_very_verbose(f"DuckDB memory limit set to: {self.memory_limit}")
 
         if self.max_temp_directory_size:
-            conn.execute(f"SET max_temp_directory_size = '{self.max_temp_directory_size}'")
+            conn.execute("SET max_temp_directory_size = ?", [self.max_temp_directory_size])
             config_applied.append(f"max_temp_directory_size={self.max_temp_directory_size}")
             self.log_very_verbose(f"DuckDB max temp directory size set to: {self.max_temp_directory_size}")
 
-        if self.thread_limit:
-            conn.execute(f"SET threads TO {self.thread_limit}")
+        if self.thread_limit is not None:
+            conn.execute("SET threads TO ?", [self.thread_limit])
             config_applied.append(f"threads={self.thread_limit}")
             self.log_very_verbose(f"DuckDB thread limit set to: {self.thread_limit}")
 
