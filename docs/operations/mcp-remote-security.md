@@ -98,6 +98,19 @@ Callers select a profile with `platform_options`:
 {"platform": "clickhouse-server", "platform_options": {"connection_profile": "analytics"}}
 ```
 
+### Velox remote deployment
+
+Velox `deployment` is not part of the MCP allow-list. The only deployment MCP
+can fully describe is `local`; `remote` would require a caller-supplied
+`sc://` endpoint and additional runtime configuration that would let an
+authenticated caller steer the server at a listener the operator never approved
+(the default `sc://localhost:50051` is host-local). Until a server-owned
+Velox endpoint registry with execution-time resolution exists, both `remote`
+and `docker` are rejected at admission (see `docs/reference/mcp.md` omission
+ledger, security-scoped). Direct `VeloxAdapter(deployment='remote',
+endpoint=...)` construction outside MCP keeps working for CLI and Python-API
+callers.
+
 On the `clickhouse` platform a profile additionally requires
 `deployment_mode: "server"` — local mode runs chDB in-process and must not gain
 a network path. Requests, including persisted durable jobs, carry only the

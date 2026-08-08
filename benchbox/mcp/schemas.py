@@ -176,7 +176,6 @@ MCP_PLATFORM_OPTION_ALLOWLIST: dict[str, dict[str, MCPPlatformOptionSpec]] = {
     },
     "velox": {
         "adaptive_enabled": _MCP_OPTION("bool"),
-        "deployment": _MCP_OPTION("string", choices=("local", "remote")),
         "driver_memory": _MCP_OPTION("string"),
         "offheap_size": _MCP_OPTION("string"),
         "shuffle_partitions": _MCP_OPTION("int", minimum=1, maximum=1_024),
@@ -273,7 +272,6 @@ MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = 
     },
     "velox": {
         "adaptive_enabled": _contract("Velox execution options", "execution"),
-        "deployment": _contract("Velox local/remote deployment selector", "connection"),
         "driver_memory": _contract("Velox driver resource envelope", "resource"),
         "offheap_size": _contract("Velox off-heap resource envelope", "resource"),
         "shuffle_partitions": _contract("Velox shuffle resource envelope", "resource"),

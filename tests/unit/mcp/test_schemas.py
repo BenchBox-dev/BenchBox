@@ -267,11 +267,24 @@ class TestPlatformOptionAdmission:
             validate_platform_options("databricks", {"liquid_clustering_columns": "event_time;DROP"})
 
     def test_mcp_platform_choices_match_adapter_contracts(self):
+        # Velox deployment is not exposed over MCP; both remote and docker are rejected
+        # at admission to avoid caller-controlled destination selection (see omission ledger).
         with pytest.raises(MCPValidationError):
             validate_platform_options("velox", {"deployment": "docker"})
-        assert validate_platform_options("velox", {"deployment": "remote"}) == {"deployment": "remote"}
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("velox", {"deployment": "remote"})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("velox", {"deployment": "local"})
         with pytest.raises(MCPValidationError):
             validate_platform_options("modin", {"engine": "pandas"})
+
+    def test_velox_remote_cannot_reach_an_unapproved_endpoint(self):
+        """MCP cannot produce a Velox adapter aimed at an unapproved endpoint."""
+        # Any Velox deployment value is now rejected at admission; the adapter itself
+        # still supports remote via direct construction, but MCP admission must fail closed.
+        for deployment in ("remote", "local", "docker"):
+            with pytest.raises(MCPValidationError, match="not authorized"):
+                validate_platform_options("velox", {"deployment": deployment})
 
     def test_connection_class_covers_every_destination_changing_option(self):
         """Every option that can change the server's endpoint is classified 'connection'."""
@@ -282,7 +295,6 @@ class TestPlatformOptionAdmission:
             ("clickhouse", "deployment_mode"),
             ("clickhouse", "connection_profile"),
             ("clickhouse-server", "connection_profile"),
-            ("velox", "deployment"),
         }
         for platform, option in must_be_connection:
             assert MCP_PLATFORM_OPTION_CONTRACT[platform][option].security_class == "connection", (

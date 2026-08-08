@@ -45,7 +45,6 @@ never be able to change the endpoint.
 | SQLite | `check_same_thread` | SQLite connection safety setting | execution | Reject database paths and URI query controls. |
 | SQLite | `timeout` | SQLite connection timeout | resource | Reject arbitrary connection strings. |
 | Velox | `adaptive_enabled` | Velox execution options | execution | Reject unreviewed execution flags. |
-| Velox | `deployment` | Velox local/remote deployment selector | connection | Only `local`/`remote`; reject implicit Docker or arbitrary endpoint routing. |
 | Velox | `driver_memory`, `offheap_size`, `shuffle_partitions` | Velox resource envelope | resource | Reject paths, scheduler endpoints, and unbounded values. |
 
 ## Change protocol
