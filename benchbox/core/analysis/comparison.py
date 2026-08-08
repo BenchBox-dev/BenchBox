@@ -10,10 +10,11 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import json
 import logging
+import math
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Mapping, Optional, Union
 
 from benchbox.core.analysis.models import (
     ComparisonOutcome,
@@ -36,6 +37,12 @@ from benchbox.core.analysis.statistics import (
 from benchbox.core.results.models import BenchmarkResults
 
 logger = logging.getLogger(__name__)
+
+# Query results built in memory currently carry both precise seconds and an
+# integer millisecond compatibility value.  Allow the sub-millisecond
+# difference introduced by that conversion while still rejecting conflicting
+# units instead of silently preferring one representation.
+_DURATION_CONSISTENCY_TOLERANCE_MS = 1.0
 
 
 @dataclass
@@ -677,15 +684,19 @@ class PlatformComparison:
         """
         cost_data = {}
         perf_data = {}
+        query_counts = {}
 
         for result in self.results:
             if result.cost_summary and "total_cost" in result.cost_summary:
                 total_cost = result.cost_summary["total_cost"]
                 if total_cost > 0:
                     cost_data[result.platform] = total_cost
+                    query_counts[result.platform] = result.total_queries
 
                     # Calculate queries per second
-                    total_time_sec = result.total_execution_time / 1000 if result.total_execution_time else 1.0
+                    # BenchmarkResults stores aggregate execution time in seconds
+                    # (both the lifecycle builder and the v2 loader use that unit).
+                    total_time_sec = result.total_execution_time if result.total_execution_time else 1.0
                     qps = result.total_queries / total_time_sec if total_time_sec > 0 else 0
 
                     # Performance per dollar (QPS / cost)
@@ -696,9 +707,9 @@ class PlatformComparison:
 
         # Cost per query
         cost_per_query = {
-            p: cost / self.results[i].total_queries
-            for i, (p, cost) in enumerate(cost_data.items())
-            if self.results[i].total_queries > 0
+            platform: cost / query_counts[platform]
+            for platform, cost in cost_data.items()
+            if query_counts[platform] > 0
         }
 
         # Rankings
@@ -937,6 +948,69 @@ def _extract_query_ids(result: BenchmarkResults) -> list[str]:
     return sorted(query_ids)
 
 
+def _normalize_execution_time_ms(timing: Mapping[str, Any]) -> float | None:
+    """Return one query duration in milliseconds.
+
+    ``execution_time_ms`` is the canonical comparison representation.
+    ``execution_time_seconds`` and the legacy bare ``execution_time`` field
+    are seconds and are converted explicitly.  The latter convention matches
+    ``BenchmarkResultBuilder`` and the result plotting compatibility path; no
+    unit is inferred from the value's magnitude.
+
+    When multiple representations are present, they must agree within one
+    millisecond.  This tolerance admits the integer-millisecond value emitted
+    alongside precise seconds by ``BenchmarkResultBuilder``.  A larger
+    disagreement is rejected because choosing either value would hide corrupt
+    or unit-confused input.
+
+    Args:
+        timing: Query result or legacy per-query timing mapping.
+
+    Returns:
+        Duration in milliseconds, including ``0.0``, or ``None`` when no
+        duration representation is present.
+
+    Raises:
+        ValueError: If a duration is not numeric or representations conflict.
+    """
+    normalized: list[tuple[str, float]] = []
+    for field, multiplier in (
+        ("execution_time_ms", 1.0),
+        ("execution_time_seconds", 1000.0),
+        ("execution_time", 1000.0),
+    ):
+        raw_value = timing.get(field)
+        if raw_value is None:
+            continue
+        if isinstance(raw_value, bool):
+            raise ValueError(f"{field} must be numeric, got {raw_value!r}")
+        try:
+            value_ms = float(raw_value) * multiplier
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{field} must be numeric, got {raw_value!r}") from exc
+        if not math.isfinite(value_ms) or value_ms < 0:
+            raise ValueError(f"{field} must be a finite non-negative duration, got {raw_value!r}")
+        normalized.append((field, value_ms))
+
+    if not normalized:
+        return None
+
+    canonical_field, canonical_ms = normalized[0]
+    for field, value_ms in normalized[1:]:
+        if not math.isclose(
+            canonical_ms,
+            value_ms,
+            rel_tol=0.0,
+            abs_tol=_DURATION_CONSISTENCY_TOLERANCE_MS,
+        ):
+            raise ValueError(
+                "Conflicting query duration representations: "
+                f"{canonical_field}={canonical_ms} ms, {field}={value_ms} ms"
+            )
+
+    return canonical_ms
+
+
 def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
     """Extract query execution times from benchmark results.
 
@@ -946,29 +1020,23 @@ def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
     Returns:
         Dictionary of query_id to execution time in ms
     """
-    times: dict[str, float] = {}
+    samples: dict[str, list[float]] = {}
 
     # From query_results
     for qr in result.query_results or []:
         query_id = str(qr.get("query_id", ""))
-        time_ms = qr.get("execution_time_ms") or qr.get("execution_time_seconds", qr.get("execution_time", 0))
-        if query_id and time_ms > 0:
-            times[query_id] = float(time_ms)
+        time_ms = _normalize_execution_time_ms(qr)
+        if query_id and time_ms is not None:
+            samples.setdefault(query_id, []).append(time_ms)
 
     # From per_query_timings (may have multiple runs)
     for timing in result.per_query_timings or []:
         query_id = str(timing.get("query_id", ""))
-        time_ms = timing.get("execution_time_ms") or timing.get(
-            "execution_time_seconds", timing.get("execution_time", 0)
-        )
-        if query_id and time_ms > 0:
-            # Average if we already have a time
-            if query_id in times:
-                times[query_id] = (times[query_id] + float(time_ms)) / 2
-            else:
-                times[query_id] = float(time_ms)
+        time_ms = _normalize_execution_time_ms(timing)
+        if query_id and time_ms is not None:
+            samples.setdefault(query_id, []).append(time_ms)
 
-    return times
+    return {query_id: sum(query_samples) / len(query_samples) for query_id, query_samples in samples.items()}
 
 
 def _get_query_times_for_query(
@@ -991,18 +1059,16 @@ def _get_query_times_for_query(
     # From query_results
     for qr in result.query_results or []:
         if str(qr.get("query_id", "")) == query_id:
-            time_ms = qr.get("execution_time_ms") or qr.get("execution_time_seconds", qr.get("execution_time", 0))
-            if time_ms > 0:
-                times.append(float(time_ms))
+            time_ms = _normalize_execution_time_ms(qr)
+            if time_ms is not None:
+                times.append(time_ms)
 
     # From per_query_timings
     for timing in result.per_query_timings or []:
         if str(timing.get("query_id", "")) == query_id:
-            time_ms = timing.get("execution_time_ms") or timing.get(
-                "execution_time_seconds", timing.get("execution_time", 0)
-            )
-            if time_ms > 0:
-                times.append(float(time_ms))
+            time_ms = _normalize_execution_time_ms(timing)
+            if time_ms is not None:
+                times.append(time_ms)
 
     return times
 

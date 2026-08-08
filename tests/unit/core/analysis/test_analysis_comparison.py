@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import json
 from datetime import datetime
 
 import pytest
@@ -12,6 +13,9 @@ import pytest
 from benchbox.core.analysis.comparison import (
     ComparisonConfig,
     PlatformComparison,
+    _extract_query_times,
+    _get_query_times_for_query,
+    _normalize_execution_time_ms,
 )
 from benchbox.core.results.models import BenchmarkResults
 
@@ -85,6 +89,73 @@ class TestComparisonConfig:
         assert config.significance_level == 0.01
         assert config.outlier_method == "zscore"
         assert config.apply_bonferroni is False
+
+
+class TestExecutionTimeNormalization:
+    """Tests for the comparison boundary's explicit millisecond contract."""
+
+    @pytest.mark.parametrize(
+        ("timing", "expected_ms"),
+        [
+            ({"execution_time_ms": 2000.0}, 2000.0),
+            ({"execution_time_seconds": 2.0}, 2000.0),
+            ({"execution_time": 2.0}, 2000.0),
+            ({"execution_time_ms": 0, "execution_time_seconds": 0}, 0.0),
+            (
+                {
+                    "execution_time_ms": 2000,
+                    "execution_time_seconds": 2.0009,
+                    "execution_time": 2.0009,
+                },
+                2000.0,
+            ),
+        ],
+    )
+    def test_normalizes_explicit_units(self, timing, expected_ms):
+        assert _normalize_execution_time_ms(timing) == expected_ms
+
+    def test_missing_duration_is_not_changed_to_zero(self):
+        assert _normalize_execution_time_ms({}) is None
+
+    def test_conflicting_representations_fail_closed(self):
+        with pytest.raises(ValueError, match="Conflicting query duration representations"):
+            _normalize_execution_time_ms(
+                {
+                    "execution_time_ms": 2.0,
+                    "execution_time_seconds": 2.0,
+                }
+            )
+
+    def test_seconds_are_normalized_in_both_comparison_extractors(self):
+        result = create_mock_result("duckdb", {})
+        result.query_results = [{"query_id": "Q1", "execution_time_seconds": 2.0}]
+        result.per_query_timings = [{"query_id": "Q2", "execution_time": 3.0}]
+
+        assert _extract_query_times(result) == {"Q1": 2000.0, "Q2": 3000.0}
+        assert _get_query_times_for_query(result, "Q1") == [2000.0]
+        assert _get_query_times_for_query(result, "Q2") == [3000.0]
+
+    def test_zero_is_preserved_in_both_comparison_extractors(self):
+        result = create_mock_result("duckdb", {})
+        result.query_results = [{"query_id": "Q1", "execution_time_ms": 0}]
+        result.per_query_timings = [{"query_id": "Q2", "execution_time_seconds": 0}]
+
+        assert _extract_query_times(result) == {"Q1": 0.0, "Q2": 0.0}
+        assert _get_query_times_for_query(result, "Q1") == [0.0]
+        assert _get_query_times_for_query(result, "Q2") == [0.0]
+
+    def test_repeated_query_samples_use_order_independent_arithmetic_mean(self):
+        result = create_mock_result("duckdb", {})
+        result.query_results = [{"query_id": "Q1", "execution_time_ms": 100.0}]
+        result.per_query_timings = [
+            {"query_id": "Q1", "execution_time_seconds": 0.2},
+            {"query_id": "Q1", "execution_time": 0.3},
+        ]
+
+        assert _extract_query_times(result) == {"Q1": 200.0}
+
+        result.per_query_timings.reverse()
+        assert _extract_query_times(result) == {"Q1": 200.0}
 
 
 class TestPlatformComparison:
@@ -162,6 +233,50 @@ class TestPlatformComparison:
         """Test scale_factor property."""
         comparison = PlatformComparison([duckdb_result])
         assert comparison.scale_factor == 10.0
+
+    def test_direct_constructor_converts_query_seconds_to_milliseconds(self):
+        """Fresh in-memory results use seconds but reports expose millisecond metrics."""
+        seconds_result = create_mock_result("duckdb", {})
+        seconds_result.query_results = [{"query_id": "Q1", "execution_time_seconds": 2.0}]
+        milliseconds_result = create_mock_result("sqlite", {"Q1": 2500.0})
+
+        report = PlatformComparison([seconds_result, milliseconds_result]).compare()
+        rankings = {ranking.platform: ranking for ranking in report.rankings}
+
+        assert rankings["duckdb"].geometric_mean_time == pytest.approx(2000.0)
+        assert report.query_comparisons["Q1"].metrics["duckdb"].mean == 2000.0
+
+    def test_from_files_preserves_canonical_v2_milliseconds(self, tmp_path):
+        """The already-safe canonical file path must not receive a second conversion."""
+
+        def write_result(platform: str, duration_ms: float):
+            path = tmp_path / f"{platform}.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "version": "2.0",
+                        "run": {"id": f"{platform}-run", "timestamp": "2026-08-08T00:00:00"},
+                        "benchmark": {"name": "TPC-H", "scale_factor": 1.0},
+                        "platform": {"name": platform},
+                        "summary": {"queries": {"total": 1, "passed": 1, "failed": 0}},
+                        "queries": [{"id": "Q1", "ms": duration_ms}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return path
+
+        comparison = PlatformComparison.from_files(
+            [
+                write_result("duckdb", 2000.0),
+                write_result("sqlite", 2500.0),
+            ]
+        )
+        report = comparison.compare()
+        rankings = {ranking.platform: ranking for ranking in report.rankings}
+
+        assert rankings["duckdb"].geometric_mean_time == pytest.approx(2000.0)
+        assert report.query_comparisons["Q1"].metrics["duckdb"].mean == 2000.0
 
 
 class TestPlatformComparisonValidation:
@@ -383,12 +498,32 @@ class TestComparisonWithCost:
             {"Q1": 200.0},
             cost_summary={"total_cost": 2.00},
         )
+        duckdb.total_execution_time = 2.0
+        snowflake.total_execution_time = 4.0
         comparison = PlatformComparison([duckdb, snowflake])
 
         cost_analysis = comparison.compare_cost_performance()
 
         assert cost_analysis is not None
         assert cost_analysis.best_value == "duckdb"
+        assert cost_analysis.performance_per_dollar == {
+            "duckdb": 1.0,
+            "snowflake": 0.125,
+        }
+
+    def test_cost_per_query_uses_the_cost_platforms_query_count(self):
+        no_cost = create_mock_result("duckdb", {"Q1": 100.0})
+        with_cost = create_mock_result(
+            "snowflake",
+            {"Q1": 200.0, "Q2": 250.0},
+            cost_summary={"total_cost": 2.0},
+        )
+        with_cost.total_execution_time = 4.0
+
+        cost_analysis = PlatformComparison([no_cost, with_cost]).compare_cost_performance()
+
+        assert cost_analysis is not None
+        assert cost_analysis.cost_per_query == {"snowflake": 1.0}
 
 
 class TestComparisonReportSerialization:
