@@ -490,6 +490,25 @@ def _validate_dask_options(normalized: Mapping[str, object]) -> None:
         raise MCPValidationError("Dask 'n_workers' x 'memory_limit' exceeds the server's total memory budget")
 
 
+def resolve_platform_policy_key(platform: str) -> str:
+    """Return the allow-list key whose policy governs a platform name.
+
+    A "-df" request falls back to its base platform only when the full name
+    is absent from the allow-list. This keeps the value specs, contract matrix,
+    and cross-field rules on the same platform and ensures a future "foo-df"
+    allow-list entry can carry its own policy.
+    """
+    name = validate_platform_name(platform)
+    if name not in MCP_PLATFORM_OPTION_ALLOWLIST and name.endswith("-df"):
+        return name[:-3]
+    return name
+
+
+def is_dataframe_alias(platform: str) -> bool:
+    """Return True if the normalized name ends with the dataframe suffix."""
+    return validate_platform_name(platform).endswith("-df")
+
+
 def validate_platform_options(platform: str, options: Mapping[str, object] | None) -> dict[str, object]:
     """Return canonical, bounded MCP platform options or fail closed."""
     # An omitted request and an empty one must validate identically.  Returning
@@ -503,13 +522,7 @@ def validate_platform_options(platform: str, options: Mapping[str, object] | Non
     if len(options) > MAX_PLATFORM_OPTIONS:
         raise MCPValidationError(f"Too many platform options (maximum {MAX_PLATFORM_OPTIONS})")
 
-    platform_name = validate_platform_name(platform)
-    # A "-df" request falls back to the base platform's records, so the policy
-    # key must fall back with it: resolving the fallback once keeps the value
-    # specs, the contract matrix, and the cross-field rules on the same platform.
-    policy_name = platform_name
-    if platform_name not in MCP_PLATFORM_OPTION_ALLOWLIST and platform_name.endswith("-df"):
-        policy_name = platform_name[:-3]
+    policy_name = resolve_platform_policy_key(platform)
     specs = MCP_PLATFORM_OPTION_ALLOWLIST.get(policy_name) or {}
     contracts = MCP_PLATFORM_OPTION_CONTRACT.get(policy_name) or {}
     normalized: dict[str, object] = {}

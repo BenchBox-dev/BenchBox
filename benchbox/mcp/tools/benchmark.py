@@ -98,7 +98,9 @@ def _get_platform_adapter(platform: str, mode: str | None = None, **config):
 def _prepare_adapter_platform_options(platform: str, options: Mapping[str, object]) -> dict[str, object]:
     """Translate MCP option names to the adapter and tuning contracts."""
     normalized = dict(options)
-    platform_name = platform.lower().removesuffix("-df")
+    from benchbox.mcp.schemas import resolve_platform_policy_key
+
+    platform_name = resolve_platform_policy_key(platform)
 
     if platform_name in {"clickhouse", "clickhouse-server"} and "connection_profile" in normalized:
         # The request carries only a profile name.  Port and TLS policy are read
@@ -159,7 +161,9 @@ def _validate_and_resolve_mode(platform: str, mode: str | None) -> tuple[str, di
             return mode, make_unsupported_mode_error(platform, mode, supported)
         return mode, None
 
-    if platform_lower.endswith("-df"):
+    from benchbox.mcp.schemas import is_dataframe_alias
+
+    if is_dataframe_alias(platform_lower):
         return "dataframe", None
     return caps.default_mode, None
 
