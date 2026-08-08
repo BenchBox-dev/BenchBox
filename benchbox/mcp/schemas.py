@@ -217,7 +217,7 @@ _CLICKHOUSE_PROFILE_CONTRACT = _contract(
 MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = {
     "clickhouse": {
         "connection_profile": _CLICKHOUSE_PROFILE_CONTRACT,
-        "deployment_mode": _contract("ClickHouseAdapter.from_config(deployment_mode)", "execution"),
+        "deployment_mode": _contract("ClickHouseAdapter.from_config(deployment_mode)", "connection"),
     },
     "clickhouse-server": {
         "connection_profile": _CLICKHOUSE_PROFILE_CONTRACT,

@@ -273,6 +273,29 @@ class TestPlatformOptionAdmission:
         with pytest.raises(MCPValidationError):
             validate_platform_options("modin", {"engine": "pandas"})
 
+    def test_connection_class_covers_every_destination_changing_option(self):
+        """Every option that can change the server's endpoint is classified 'connection'."""
+        # The rule: 'connection' = option can change which endpoint the server talks to.
+        # Both velox.deployment and clickhouse.deployment_mode flip an in-process engine
+        # to a network client, and connection_profile names a server-owned destination.
+        must_be_connection = {
+            ("clickhouse", "deployment_mode"),
+            ("clickhouse", "connection_profile"),
+            ("clickhouse-server", "connection_profile"),
+            ("velox", "deployment"),
+        }
+        for platform, option in must_be_connection:
+            assert MCP_PLATFORM_OPTION_CONTRACT[platform][option].security_class == "connection", (
+                f"{platform}.{option} must be 'connection' per the security_class rule"
+            )
+        # No other option should be 'connection' under the current allow-list
+        for platform, contracts in MCP_PLATFORM_OPTION_CONTRACT.items():
+            for option, contract in contracts.items():
+                if (platform, option) not in must_be_connection:
+                    assert contract.security_class != "connection" or (platform, option) in must_be_connection, (
+                        f"Unexpected 'connection' classification for {platform}.{option}"
+                    )
+
 
 class TestDatabricksClusteringOptions:
     """Contradictory layout intent must fail at admission, not in a worker."""
