@@ -59,6 +59,7 @@ from benchbox.core.results.platform_info import (
     format_platform_display_name,
 )
 from benchbox.core.results.platform_options import sanitize_platform_options
+from benchbox.core.results.query_execution import query_execution_to_legacy_dict
 from benchbox.core.results.query_normalizer import (
     QueryResultInput,
     format_query_id,
@@ -602,7 +603,9 @@ class ResultBuilder:
         failed_queries = [r for r in results_for_stats if r.status in ("FAILED", "VALIDATION_FAILED")]
 
         # Use measurement execution times for aggregate timing metrics when possible
-        exec_times_all = [r.execution_time_seconds for r in results_for_stats if r.execution_time_seconds > 0]
+        exec_times_all = [
+            seconds for r in results_for_stats if (seconds := r.execution_time_seconds) is not None and seconds > 0
+        ]
 
         # Calculate timing statistics
         timing_stats = TimingStatsCalculator.calculate_seconds(exec_times_all)
@@ -751,7 +754,7 @@ class ResultBuilder:
             return delta.total_seconds()
 
         # Fall back to sum of query times plus loading time
-        total_query_time = sum(r.execution_time_seconds for r in self._query_results)
+        total_query_time = sum(r.execution_time_seconds or 0.0 for r in self._query_results)
         return total_query_time + (self._loading_time_ms / 1000.0)
 
     def _calculate_tpc_metrics(self) -> dict[str, float | None]:
@@ -829,7 +832,7 @@ class ResultBuilder:
         if any(r.status != "SUCCESS" for r in final_results):
             return None
 
-        times = [r.execution_time_seconds for r in final_results if r.execution_time_seconds > 0]
+        times = [seconds for r in final_results if (seconds := r.execution_time_seconds) is not None and seconds > 0]
         if not times:
             return None
         return TPCMetricsCalculator.calculate_power_at_size(times, self._benchmark.scale_factor)
@@ -905,7 +908,7 @@ class ResultBuilder:
                     query_id=format_query_id(result.query_id),
                     stream_id=str(result.stream_id),
                     execution_order=i + 1,
-                    execution_time_ms=int(result.execution_time_seconds * 1000),
+                    execution_time_ms=result.execution_time_ms,
                     status=result.status,
                     rows_returned=result.rows_returned,
                     error_message=result.error_message,
@@ -922,7 +925,7 @@ class ResultBuilder:
             geometric_mean = TPCMetricsCalculator.calculate_geometric_mean(exec_times_seconds)
 
         # Calculate total duration
-        total_duration_ms = sum(int(r.execution_time_seconds * 1000) for r in self._query_results)
+        total_duration_ms = sum(int(r.execution_time_ms or 0.0) for r in self._query_results)
 
         now_iso = datetime.now().isoformat()
 
@@ -963,7 +966,7 @@ class ResultBuilder:
                         query_id=format_query_id(result.query_id),
                         stream_id=str(stream_id),
                         execution_order=i + 1,
-                        execution_time_ms=int(result.execution_time_seconds * 1000),
+                        execution_time_ms=result.execution_time_ms,
                         status=result.status,
                         rows_returned=result.rows_returned,
                         error_message=result.error_message,
@@ -996,44 +999,19 @@ class ResultBuilder:
         )
 
     def _format_query_results(self) -> list[dict[str, Any]]:
-        """Format query results as list of dictionaries."""
+        """Format canonical executions as producer compatibility dictionaries."""
         results = []
         for result in self._query_results:
-            result_dict: dict[str, Any] = {
-                "query_id": format_query_id(result.query_id),
-                "execution_time_seconds": result.execution_time_seconds,
-                "execution_time": result.execution_time_seconds,
-                "execution_time_ms": int(result.execution_time_seconds * 1000),
-                "status": result.status,
-                "rows_returned": result.rows_returned,
-                "iteration": result.iteration,
-                "stream_id": result.stream_id,
-            }
-
-            if result.error_message:
-                result_dict["error_message"] = result.error_message
-            if result.cost is not None:
-                result_dict["cost"] = result.cost
-            if result.run_type:
-                result_dict["run_type"] = result.run_type
-            if result.row_count_validation:
-                result_dict["row_count_validation"] = result.row_count_validation
-            if result.dataframe_skip_summary:
-                result_dict["dataframe_skip_summary"] = result.dataframe_skip_summary
-            if result.query_plan is not None:
-                result_dict["query_plan"] = result.query_plan
-            if result.plan_fingerprint is not None:
-                result_dict["plan_fingerprint"] = result.plan_fingerprint
-            if result.plan_fingerprint_normalized is not None:
-                result_dict["plan_fingerprint_normalized"] = result.plan_fingerprint_normalized
-            if result.plan_capture_time_ms is not None:
-                result_dict["plan_capture_time_ms"] = result.plan_capture_time_ms
-            if result.plan_capture_error is not None:
-                result_dict["plan_capture_error"] = result.plan_capture_error
-            if result.result_digest is not None:
-                result_dict["result_digest"] = result.result_digest
-            if result.test_type:
-                result_dict["test_type"] = result.test_type
+            result_dict = query_execution_to_legacy_dict(
+                result,
+                include_seconds=True,
+                include_legacy_seconds_alias=True,
+            )
+            result_dict["query_id"] = format_query_id(result.query_id)
+            if result.execution_time_ms is not None:
+                # Preserve the established compatibility dictionary exactly;
+                # schema-v2 export retains its own sub-millisecond rounding.
+                result_dict["execution_time_ms"] = int(result.execution_time_ms)
 
             results.append(result_dict)
 

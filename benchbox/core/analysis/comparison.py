@@ -10,7 +10,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import json
 import logging
-import math
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -35,6 +34,10 @@ from benchbox.core.analysis.statistics import (
     welchs_t_test,
 )
 from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.results.query_execution import (
+    DURATION_CONSISTENCY_TOLERANCE_MS,
+    query_execution_from_legacy_dict,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +45,7 @@ logger = logging.getLogger(__name__)
 # integer millisecond compatibility value.  Allow the sub-millisecond
 # difference introduced by that conversion while still rejecting conflicting
 # units instead of silently preferring one representation.
-_DURATION_CONSISTENCY_TOLERANCE_MS = 1.0
+_DURATION_CONSISTENCY_TOLERANCE_MS = DURATION_CONSISTENCY_TOLERANCE_MS
 
 
 @dataclass
@@ -937,13 +940,15 @@ def _extract_query_ids(result: BenchmarkResults) -> list[str]:
 
     # From query_results
     for qr in result.query_results or []:
-        if "query_id" in qr:
-            query_ids.add(str(qr["query_id"]))
+        execution = query_execution_from_legacy_dict(qr)
+        if execution.query_id:
+            query_ids.add(execution.query_id)
 
     # From per_query_timings
     for timing in result.per_query_timings or []:
-        if "query_id" in timing:
-            query_ids.add(str(timing["query_id"]))
+        execution = query_execution_from_legacy_dict(timing)
+        if execution.query_id:
+            query_ids.add(execution.query_id)
 
     return sorted(query_ids)
 
@@ -951,7 +956,7 @@ def _extract_query_ids(result: BenchmarkResults) -> list[str]:
 def _normalize_execution_time_ms(timing: Mapping[str, Any]) -> float | None:
     """Return one query duration in milliseconds.
 
-    ``execution_time_ms`` is the canonical comparison representation.
+    Milliseconds are the canonical comparison representation.
     ``execution_time_seconds`` and the legacy bare ``execution_time`` field
     are seconds and are converted explicitly.  The latter convention matches
     ``BenchmarkResultBuilder`` and the result plotting compatibility path; no
@@ -959,7 +964,9 @@ def _normalize_execution_time_ms(timing: Mapping[str, Any]) -> float | None:
 
     When multiple representations are present, they must agree within one
     millisecond.  This tolerance admits the integer-millisecond value emitted
-    alongside precise seconds by ``BenchmarkResultBuilder``.  A larger
+    alongside precise seconds by ``BenchmarkResultBuilder``; after validation,
+    the seconds-derived millisecond value is retained so sub-millisecond
+    precision is not erased.  A larger
     disagreement is rejected because choosing either value would hide corrupt
     or unit-confused input.
 
@@ -973,42 +980,7 @@ def _normalize_execution_time_ms(timing: Mapping[str, Any]) -> float | None:
     Raises:
         ValueError: If a duration is not numeric or representations conflict.
     """
-    normalized: list[tuple[str, float]] = []
-    for field, multiplier in (
-        ("execution_time_ms", 1.0),
-        ("execution_time_seconds", 1000.0),
-        ("execution_time", 1000.0),
-    ):
-        raw_value = timing.get(field)
-        if raw_value is None:
-            continue
-        if isinstance(raw_value, bool):
-            raise ValueError(f"{field} must be numeric, got {raw_value!r}")
-        try:
-            value_ms = float(raw_value) * multiplier
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"{field} must be numeric, got {raw_value!r}") from exc
-        if not math.isfinite(value_ms) or value_ms < 0:
-            raise ValueError(f"{field} must be a finite non-negative duration, got {raw_value!r}")
-        normalized.append((field, value_ms))
-
-    if not normalized:
-        return None
-
-    canonical_field, canonical_ms = normalized[0]
-    for field, value_ms in normalized[1:]:
-        if not math.isclose(
-            canonical_ms,
-            value_ms,
-            rel_tol=0.0,
-            abs_tol=_DURATION_CONSISTENCY_TOLERANCE_MS,
-        ):
-            raise ValueError(
-                "Conflicting query duration representations: "
-                f"{canonical_field}={canonical_ms} ms, {field}={value_ms} ms"
-            )
-
-    return canonical_ms
+    return query_execution_from_legacy_dict(timing).execution_time_ms
 
 
 def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
@@ -1024,15 +996,17 @@ def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
 
     # From query_results
     for qr in result.query_results or []:
-        query_id = str(qr.get("query_id", ""))
-        time_ms = _normalize_execution_time_ms(qr)
+        execution = query_execution_from_legacy_dict(qr)
+        query_id = execution.query_id
+        time_ms = execution.execution_time_ms
         if query_id and time_ms is not None:
             samples.setdefault(query_id, []).append(time_ms)
 
     # From per_query_timings (may have multiple runs)
     for timing in result.per_query_timings or []:
-        query_id = str(timing.get("query_id", ""))
-        time_ms = _normalize_execution_time_ms(timing)
+        execution = query_execution_from_legacy_dict(timing)
+        query_id = execution.query_id
+        time_ms = execution.execution_time_ms
         if query_id and time_ms is not None:
             samples.setdefault(query_id, []).append(time_ms)
 
@@ -1058,15 +1032,17 @@ def _get_query_times_for_query(
 
     # From query_results
     for qr in result.query_results or []:
-        if str(qr.get("query_id", "")) == query_id:
-            time_ms = _normalize_execution_time_ms(qr)
+        execution = query_execution_from_legacy_dict(qr)
+        if execution.query_id == query_id:
+            time_ms = execution.execution_time_ms
             if time_ms is not None:
                 times.append(time_ms)
 
     # From per_query_timings
     for timing in result.per_query_timings or []:
-        if str(timing.get("query_id", "")) == query_id:
-            time_ms = _normalize_execution_time_ms(timing)
+        execution = query_execution_from_legacy_dict(timing)
+        if execution.query_id == query_id:
+            time_ms = execution.execution_time_ms
             if time_ms is not None:
                 times.append(time_ms)
 

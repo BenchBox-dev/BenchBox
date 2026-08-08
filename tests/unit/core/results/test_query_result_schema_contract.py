@@ -9,6 +9,7 @@ import pytest
 
 from benchbox.core.results.loader import reconstruct_benchmark_results
 from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.results.query_execution import QueryExecutionContractError
 from benchbox.core.results.schema import build_result_payload
 from benchbox.core.schemas import QueryResult
 
@@ -80,10 +81,8 @@ def _result_with_row_fields(row_fields: dict[str, Any]) -> BenchmarkResults:
         pytest.param({"result_count": 9}, 9, id="legacy-alias-positive"),
         pytest.param({"rows_returned": None, "rows": 10}, 10, id="canonical-null-falls-back"),
         pytest.param({"rows_returned": None, "rows": None, "result_count": 11}, 11, id="null-aliases-fall-back"),
-        pytest.param({"rows_returned": 0, "rows": 12, "result_count": 13}, 0, id="canonical-zero-wins"),
-        pytest.param({"rows_returned": 14, "rows": 15, "result_count": 16}, 14, id="canonical-positive-wins"),
-        pytest.param({"rows_returned": None, "rows": 0, "result_count": 17}, 0, id="compact-zero-wins"),
-        pytest.param({"rows_returned": None, "rows": 18, "result_count": 19}, 18, id="compact-positive-wins"),
+        pytest.param({"rows_returned": 0, "rows": 0, "result_count": 0}, 0, id="equal-zero-aliases"),
+        pytest.param({"rows_returned": 14, "rows": 14, "result_count": 14}, 14, id="equal-positive-aliases"),
     ],
 )
 def test_result_export_preserves_non_none_row_count_alias_precedence(
@@ -92,6 +91,19 @@ def test_result_export_preserves_non_none_row_count_alias_precedence(
     payload = build_result_payload(_result_with_row_fields(row_fields))
 
     assert payload["queries"][0]["rows"] == expected_rows
+
+
+@pytest.mark.parametrize(
+    "row_fields",
+    [
+        pytest.param({"rows_returned": 0, "rows": 12}, id="zero-vs-positive"),
+        pytest.param({"rows_returned": 14, "result_count": 16}, id="canonical-vs-legacy"),
+        pytest.param({"rows_returned": None, "rows": 0, "result_count": 17}, id="compact-vs-legacy"),
+    ],
+)
+def test_result_export_rejects_conflicting_row_count_aliases(row_fields: dict[str, Any]) -> None:
+    with pytest.raises(QueryExecutionContractError, match="Conflicting row count representations"):
+        build_result_payload(_result_with_row_fields(row_fields))
 
 
 @pytest.mark.parametrize(

@@ -6,6 +6,8 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from benchbox.core.results.models import QueryExecution
+from benchbox.core.results.query_execution import query_execution_to_legacy_dict
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 logger = logging.getLogger(__name__)
@@ -109,14 +111,24 @@ def execute_sql_query(
                 real_conn.rollback()
         except Exception:
             pass
-        return {
-            "query_id": query_id,
-            "status": "FAILED",
-            "execution_time_seconds": execution_time,
-            "rows_returned": 0,
-            "error": str(exc),
-            "error_type": type(exc).__name__,
-        }
+        execution = QueryExecution(
+            query_id=query_id,
+            stream_id=None,
+            execution_order=None,
+            execution_time_seconds=execution_time,
+            status="FAILED",
+            rows_returned=0,
+            error_message=str(exc),
+            error_type=type(exc).__name__,
+            iteration=None,
+            run_type=None,
+        )
+        return query_execution_to_legacy_dict(
+            execution,
+            include_milliseconds=False,
+            include_seconds=True,
+            error_field="error",
+        )
     finally:
         if _owns_cursor:
             cursor.close()

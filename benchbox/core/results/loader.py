@@ -24,6 +24,10 @@ from benchbox.core.results.models import (
     NativeComparisonEntry,
     SetupPhase,
 )
+from benchbox.core.results.query_execution import (
+    query_execution_from_compact_v2,
+    query_execution_to_legacy_dict,
+)
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.core.results.query_plan_models import QueryPlanDAG
 from benchbox.core.results.schema_policy import LOADER_SCHEMA_POLICY, is_loader_supported_result_schema
@@ -567,28 +571,16 @@ def _reconstruct_query_results(
     consumed_error_ids: set[int] = set()
 
     for q in queries_list:
-        query_id = q.get("id")
-        status = q.get("status", "SUCCESS")
-        result: dict[str, Any] = {
-            "query_id": query_id,
-            "execution_time_ms": q.get("ms"),
-            "rows_returned": q.get("rows"),
-            "status": status,
-        }
-        if q.get("iter") is not None:
-            result["iteration"] = q["iter"]
-        if q.get("stream") is not None:
-            result["stream_id"] = q["stream"]
-        if q.get("run_type") is not None:
-            result["run_type"] = q["run_type"]
-        if q.get("test_type"):
-            result["test_type"] = q["test_type"]
-        if q.get("plan_capture_error") is not None:
-            # Real DataFrame plan-capture-error cause (qpc-05 / F4.4, #1052
-            # review): without this, the export -> load -> re-export round
-            # trip silently drops it again even though it survives the JSON
-            # export itself.
-            result["plan_capture_error"] = q["plan_capture_error"]
+        execution = query_execution_from_compact_v2(q)
+        query_id = execution.query_id
+        status = execution.status
+        result = query_execution_to_legacy_dict(execution)
+        # Preserve the established loader API shape even when compact v2 omits
+        # optional numeric fields.  Schema re-export still omits these None
+        # values through the legacy adapter, while callers that index the
+        # reconstructed dictionary retain their historical contract.
+        result.setdefault("execution_time_ms", None)
+        result.setdefault("rows_returned", None)
 
         if status not in ("SUCCESS", "SKIPPED") and query_id is not None:
             error_queue = query_errors_by_id.get(normalize_query_id(query_id))

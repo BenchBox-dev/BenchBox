@@ -11,13 +11,13 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from typing import Any
 
 from benchbox.core.results.models import (
     QUERY_RUN_TYPE_MEASUREMENT,
-    QUERY_RUN_TYPE_WARMUP,
+    QueryExecution,
 )
+from benchbox.core.results.query_execution import query_execution_from_legacy_dict
 
 
 def normalize_query_id(query_id: str | int) -> str:
@@ -87,44 +87,92 @@ def format_query_id(query_id: str | int, with_prefix: bool = True) -> str:
     return normalized
 
 
-@dataclass
-class QueryResultInput:
-    """Normalized input for a single query execution.
+class QueryResultInput(QueryExecution):
+    """Compatibility constructor for producer-facing seconds results.
 
-    This dataclass represents the standardized format for query results
-    regardless of whether they come from SQL or DataFrame execution.
+    This class adds no fields or behavior to the canonical QueryExecution
+    model.  It preserves the historical constructor defaults while serving as
+    an explicit boundary adapter for callers that still import
+    ``QueryResultInput``.
     """
 
-    query_id: str  # Always numeric string: "1", "21" (no prefix)
-    execution_time_seconds: float
-    rows_returned: int
-    status: str  # "SUCCESS" or "FAILED"
-    iteration: int = 1  # 0 = warmup, 1+ = measurement
-    stream_id: int = 0  # TPC stream ID (0 = power test default)
-    run_type: str = QUERY_RUN_TYPE_MEASUREMENT  # canonical values from core.results.models
-    error_message: str | None = None
-    # Optional extended metadata
-    cost: float | None = None  # Cloud platform cost estimation
-    row_count_validation: dict[str, Any] | None = None  # Validation results
-    dataframe_skip_summary: dict[str, Any] | None = None  # DataFrame skip metadata
-    # Query plan capture (passed through to BenchmarkResults.query_results for companion file)
-    query_plan: Any | None = None
-    plan_fingerprint: str | None = None
-    plan_fingerprint_normalized: str | None = None
-    plan_capture_time_ms: float | None = None
-    # Real capture-failure cause (qpc-05 / F4.4), e.g. an exception message
-    # from a DataFrame plan-capture attempt. None on success or when capture
-    # wasn't attempted.
-    plan_capture_error: str | None = None
-    # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): full-result
-    # digest of a stream-0 query. None on a normal run (no payload change).
-    result_digest: str | None = None
-    # Phase discriminator ("power"/"throughput"/"maintenance") for combined runs,
-    # where the same query_id executes in more than one phase and each phase's
-    # stream_id counter independently starts at 0 - stream_id alone can't
-    # disambiguate a cross-phase collision in the .plans.json companion (see
-    # build_plans_payload). None for standard single-phase runs.
-    test_type: str | None = None
+    def __init__(
+        self,
+        query_id: str,
+        execution_time_seconds: float | None,
+        rows_returned: int | None,
+        status: str,
+        iteration: int | None = 1,
+        stream_id: int | str | None = 0,
+        run_type: str | None = QUERY_RUN_TYPE_MEASUREMENT,
+        error_message: str | None = None,
+        cost: float | None = None,
+        row_count_validation: dict[str, Any] | None = None,
+        dataframe_skip_summary: dict[str, Any] | None = None,
+        query_plan: Any | None = None,
+        plan_fingerprint: str | None = None,
+        plan_fingerprint_normalized: str | None = None,
+        plan_capture_time_ms: float | None = None,
+        plan_capture_error: str | None = None,
+        result_digest: str | None = None,
+        test_type: str | None = None,
+        error_type: str | None = None,
+        resource_usage: dict[str, Any] | None = None,
+        execution_order: int | None = None,
+        execution_time_ms: float | None = None,
+    ) -> None:
+        super().__init__(
+            query_id=query_id,
+            stream_id=stream_id,
+            execution_order=execution_order,
+            execution_time_ms=execution_time_ms,
+            execution_time_seconds=execution_time_seconds,
+            status=status,
+            rows_returned=rows_returned,
+            resource_usage=resource_usage,
+            error_message=error_message,
+            iteration=iteration,
+            run_type=run_type,
+            row_count_validation=row_count_validation,
+            cost=cost,
+            query_plan=query_plan,
+            plan_fingerprint=plan_fingerprint,
+            plan_fingerprint_normalized=plan_fingerprint_normalized,
+            plan_capture_time_ms=plan_capture_time_ms,
+            plan_capture_error=plan_capture_error,
+            dataframe_skip_summary=dataframe_skip_summary,
+            result_digest=result_digest,
+            test_type=test_type,
+            error_type=error_type,
+        )
+
+    @classmethod
+    def from_execution(cls, execution: QueryExecution) -> QueryResultInput:
+        """Wrap a canonical execution with the legacy constructor type."""
+        return cls(
+            query_id=execution.query_id,
+            execution_time_seconds=None,
+            execution_time_ms=execution.execution_time_ms,
+            rows_returned=execution.rows_returned,
+            status=execution.status,
+            iteration=execution.iteration,
+            stream_id=execution.stream_id,
+            run_type=execution.run_type,
+            error_message=execution.error_message,
+            cost=execution.cost,
+            row_count_validation=execution.row_count_validation,
+            dataframe_skip_summary=execution.dataframe_skip_summary,
+            query_plan=execution.query_plan,
+            plan_fingerprint=execution.plan_fingerprint,
+            plan_fingerprint_normalized=execution.plan_fingerprint_normalized,
+            plan_capture_time_ms=execution.plan_capture_time_ms,
+            plan_capture_error=execution.plan_capture_error,
+            result_digest=execution.result_digest,
+            test_type=execution.test_type,
+            error_type=execution.error_type,
+            resource_usage=execution.resource_usage,
+            execution_order=execution.execution_order,
+        )
 
 
 def normalize_query_result(
@@ -145,73 +193,13 @@ def normalize_query_result(
     Returns:
         Normalized QueryResultInput instance
     """
-    # Extract query ID - try multiple field names
-    query_id = raw_result.get("query_id") or raw_result.get("id") or raw_result.get("query") or ""
-    query_id = normalize_query_id(query_id)
-
-    # Extract execution time from canonical seconds key, then explicit ms keys.
-    time_seconds = raw_result.get("execution_time_seconds")
-    if time_seconds is None:
-        time_ms = raw_result.get("execution_time_ms") or raw_result.get("ms") or 0
-        time_seconds = time_ms / 1000.0
-
-    # Extract rows returned
-    rows_returned = raw_result.get("rows_returned") or raw_result.get("rows") or raw_result.get("result_count") or 0
-
-    # Extract status
-    status = raw_result.get("status", "SUCCESS")
-    # Normalize status values
-    if status.upper() in ("SUCCESS", "SUCCEEDED", "OK", "PASS", "PASSED"):
-        status = "SUCCESS"
-    elif status.upper() in ("FAILED", "FAIL", "ERROR"):
-        status = "FAILED"
-
-    # Extract iteration and stream
-    if raw_result.get("iteration") is not None:
-        iteration = raw_result.get("iteration")
-    elif raw_result.get("iter") is not None:
-        iteration = raw_result.get("iter")
-    else:
-        iteration = default_iteration
-
-    if raw_result.get("stream_id") is not None:
-        stream_id = raw_result.get("stream_id")
-    elif raw_result.get("stream") is not None:
-        stream_id = raw_result.get("stream")
-    else:
-        stream_id = default_stream_id
-
-    run_type = raw_result.get("run_type") or raw_result.get("runType")
-    if not run_type:
-        # Backward-compatibility fallback for historical artifacts and legacy
-        # producer paths. New producer code should stamp run_type explicitly.
-        if raw_result.get("is_warmup") or int(iteration) == 0:
-            run_type = QUERY_RUN_TYPE_WARMUP
-        else:
-            run_type = QUERY_RUN_TYPE_MEASUREMENT
-
-    # Extract error message
-    error_message = raw_result.get("error_message") or raw_result.get("error") or raw_result.get("message")
-
-    return QueryResultInput(
-        query_id=query_id,
-        execution_time_seconds=float(time_seconds) if time_seconds else 0.0,
-        rows_returned=int(rows_returned) if rows_returned else 0,
-        status=status,
-        iteration=int(iteration),
-        stream_id=int(stream_id),
-        run_type=str(run_type),
-        error_message=str(error_message) if error_message else None,
-        cost=raw_result.get("cost"),
-        row_count_validation=raw_result.get("row_count_validation"),
-        dataframe_skip_summary=raw_result.get("dataframe_skip_summary"),
-        query_plan=raw_result.get("query_plan"),
-        plan_fingerprint=raw_result.get("plan_fingerprint"),
-        plan_fingerprint_normalized=raw_result.get("plan_fingerprint_normalized"),
-        plan_capture_time_ms=raw_result.get("plan_capture_time_ms"),
-        plan_capture_error=raw_result.get("plan_capture_error"),
-        result_digest=raw_result.get("result_digest"),
-        test_type=raw_result.get("test_type"),
+    return QueryResultInput.from_execution(
+        query_execution_from_legacy_dict(
+            raw_result,
+            default_iteration=default_iteration,
+            default_stream_id=default_stream_id,
+            normalize_query_id=normalize_query_id,
+        )
     )
 
 

@@ -178,14 +178,29 @@ class SetupPhase:
     statistics_gathering: StatisticsGatheringPhase | None = None
 
 
-@dataclass
+@dataclass(init=False)
 class QueryExecution:
-    """Result and timing metadata for a single query execution."""
+    """Canonical in-memory result for one query execution.
+
+    Milliseconds are the stored duration unit because they are also the schema-v2
+    artifact unit.  ``execution_time_seconds`` remains an accepted constructor
+    argument and a computed property for the producer APIs that historically
+    reported seconds.  Passing both representations is allowed only when they
+    agree within one millisecond; matching seconds retain their additional
+    precision and conflicting aliases fail closed.
+
+    Compatibility dictionaries and compact schema-v2 rows are converted by the
+    explicit adapters in :mod:`benchbox.core.results.query_execution`.  Keeping
+    those boundary rules out of this model prevents a third result
+    representation from accumulating its own precedence and defaulting rules.
+    Missing and explicit-null optional values both remain ``None`` internally;
+    adapters never turn them into numeric zero, false, or an empty collection.
+    """
 
     query_id: str
-    stream_id: str
-    execution_order: int
-    execution_time_ms: int
+    stream_id: str | int | None
+    execution_order: int | None
+    execution_time_ms: float | None
     status: str
     rows_returned: int | None = None
     resource_usage: dict[str, Any] | None = None
@@ -197,10 +212,86 @@ class QueryExecution:
     # Cost estimation
     cost: float | None = None  # Compute cost in USD for this query
     # Query plan capture (structured DAG representation)
-    query_plan: QueryPlanDAG | None = None  # Captured query execution plan
+    query_plan: QueryPlanDAG | dict[str, Any] | str | None = None  # Typed or compatibility plan payload
     plan_fingerprint: str | None = None  # SHA256 hash for fast plan comparison
     plan_fingerprint_normalized: str | None = None  # Literal-normalized fingerprint (opt-in)
     plan_capture_time_ms: float | None = None  # Time spent capturing plan (EXPLAIN + parse)
+    plan_capture_error: str | None = None
+    dataframe_skip_summary: dict[str, Any] | None = None
+    result_digest: str | None = None
+    test_type: str | None = None
+    error_type: str | None = None
+
+    def __init__(
+        self,
+        query_id: str,
+        stream_id: str | int | None = None,
+        execution_order: int | None = None,
+        execution_time_ms: float | None = None,
+        status: str = "UNKNOWN",
+        rows_returned: int | None = None,
+        resource_usage: dict[str, Any] | None = None,
+        error_message: str | None = None,
+        iteration: int | None = None,
+        run_type: str | None = None,
+        row_count_validation: dict[str, Any] | None = None,
+        cost: float | None = None,
+        query_plan: QueryPlanDAG | dict[str, Any] | str | None = None,
+        plan_fingerprint: str | None = None,
+        plan_fingerprint_normalized: str | None = None,
+        plan_capture_time_ms: float | None = None,
+        plan_capture_error: str | None = None,
+        dataframe_skip_summary: dict[str, Any] | None = None,
+        result_digest: str | None = None,
+        test_type: str | None = None,
+        error_type: str | None = None,
+        *,
+        execution_time_seconds: float | None = None,
+    ) -> None:
+        from benchbox.core.results.query_execution import (
+            normalize_duration_ms,
+            normalize_non_negative_integer,
+            normalize_status,
+            normalize_stream_id,
+        )
+
+        self.query_id = str(query_id)
+        self.stream_id = normalize_stream_id(stream_id)
+        self.execution_order = (
+            normalize_non_negative_integer("execution_order", execution_order) if execution_order is not None else None
+        )
+        self.execution_time_ms = normalize_duration_ms(
+            execution_time_ms=execution_time_ms,
+            execution_time_seconds=execution_time_seconds,
+        )
+        self.status = normalize_status(status)
+        self.rows_returned = (
+            normalize_non_negative_integer("rows_returned", rows_returned) if rows_returned is not None else None
+        )
+        self.resource_usage = resource_usage
+        self.error_message = error_message
+        self.iteration = normalize_non_negative_integer("iteration", iteration) if iteration is not None else None
+        self.run_type = run_type
+        self.row_count_validation = row_count_validation
+        self.cost = cost
+        self.query_plan = query_plan
+        self.plan_fingerprint = plan_fingerprint
+        self.plan_fingerprint_normalized = plan_fingerprint_normalized
+        self.plan_capture_time_ms = (
+            normalize_duration_ms(execution_time_ms=plan_capture_time_ms) if plan_capture_time_ms is not None else None
+        )
+        self.plan_capture_error = plan_capture_error
+        self.dataframe_skip_summary = dataframe_skip_summary
+        self.result_digest = result_digest
+        self.test_type = test_type
+        self.error_type = error_type
+
+    @property
+    def execution_time_seconds(self) -> float | None:
+        """Return the canonical duration converted to producer-facing seconds."""
+        if self.execution_time_ms is None:
+            return None
+        return self.execution_time_ms / 1000.0
 
 
 @dataclass
@@ -342,6 +433,10 @@ class BenchmarkResults:
     successful_queries: int
     failed_queries: int
     # Summary of queries (flattened list for basic consumers)
+    # Runtime compatibility dictionaries remain the public container shape;
+    # schema/comparison boundaries accept QueryExecution directly as an
+    # incremental migration aid without widening every downstream consumer at
+    # once.
     query_results: list[dict[str, Any]] = field(default_factory=list)
     # Summary metrics
     total_execution_time: float = 0.0

@@ -107,12 +107,14 @@ class TestExecutionTimeNormalization:
                     "execution_time_seconds": 2.0009,
                     "execution_time": 2.0009,
                 },
-                2000.0,
+                2000.9,
             ),
+            ({"execution_time_ms": 0, "execution_time_seconds": 0.0009}, 0.9),
+            ({"execution_time_ms": 1, "execution_time_seconds": 0.0019}, 1.9),
         ],
     )
     def test_normalizes_explicit_units(self, timing, expected_ms):
-        assert _normalize_execution_time_ms(timing) == expected_ms
+        assert _normalize_execution_time_ms(timing) == pytest.approx(expected_ms)
 
     def test_missing_duration_is_not_changed_to_zero(self):
         assert _normalize_execution_time_ms({}) is None
