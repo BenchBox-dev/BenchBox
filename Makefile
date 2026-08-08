@@ -2378,7 +2378,7 @@ worktree-list:
 # only at the moment this target has decided, by the merged check, that
 # removal is safe.
 worktree-prune:
-	@case "$$(hostname)" in agentbox-*) \
+	@case "$$(hostname)" in agentbox-*|obento-*) \
 		echo "REFUSING: this looks like a sandbox container (hostname $$(hostname))." >&2; \
 		echo "Inside a container the shared .git records absolute host paths that are" >&2; \
 		echo "not mounted, so every host worktree reads as prunable and pruning would" >&2; \
@@ -2425,7 +2425,7 @@ worktree-lock-all:
 	git worktree list --porcelain | awk '/^worktree /{print substr($$0,10)}' | \
 		while IFS= read -r wt; do \
 			[ "$$wt" = "$$MAIN_CLONE" ] && continue; \
-			if git worktree lock --reason "agentbox mount guard: .git may be bind-mounted into a container where this entry reads prunable but is live. Never prune. Unlock: git worktree unlock" "$$wt" 2>/dev/null; then \
+			if git worktree lock --reason "obento mount guard (formerly agentbox): .git may be bind-mounted into a container where this entry reads prunable but is live. Never prune. Unlock: git worktree unlock" "$$wt" 2>/dev/null; then \
 				echo "locked: $$wt"; \
 			else \
 				echo "already locked (or missing): $$wt"; \
