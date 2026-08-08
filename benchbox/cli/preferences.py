@@ -90,6 +90,8 @@ def save_last_run_config(
     compression_type: str = "zstd",
     compression_level: Optional[int] = None,
     test_execution_type: str = "power",
+    queries: Optional[list[str]] = None,
+    mode: Optional[str] = None,
     seed: Optional[int] = None,
     output: Optional[str] = None,
     additional_options: Optional[dict[str, Any]] = None,
@@ -107,6 +109,8 @@ def save_last_run_config(
         compression_type: Compression algorithm (gzip, zstd, none)
         compression_level: Compression level (algorithm-specific)
         test_execution_type: Test type (power, throughput, combined, etc.)
+        queries: Explicit query subset, or None for all queries
+        mode: Resolved platform execution mode
         seed: RNG seed for reproducibility
         output: Cloud storage output location (for cloud platforms)
         additional_options: Any additional configuration options
@@ -122,6 +126,8 @@ def save_last_run_config(
         "compression_type": compression_type,
         "compression_level": compression_level,
         "test_execution_type": test_execution_type,
+        "queries": queries,
+        "mode": mode,
         "seed": seed,
         "timestamp": datetime.now().isoformat(),
     }

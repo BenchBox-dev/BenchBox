@@ -162,7 +162,10 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
         display_name="TPC-H",
         scale_factor=0.01,
         queries=None,
-        concurrency=1,
+        concurrency=4,
+        compress_data=True,
+        compression_type="gzip",
+        compression_level=6,
         options={},
     )
     bench_manager = Mock()
@@ -255,6 +258,12 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
     assert benchmark_config.options["table_format_compression"] == "zstd"
     assert benchmark_config.options["unified_tuning_configuration"] is guided_config
     assert benchmark_config.options["tuning_enabled"] is True
+    assert (
+        benchmark_config.concurrency,
+        benchmark_config.compress_data,
+        benchmark_config.compression_type,
+        benchmark_config.compression_level,
+    ) == (4, True, "gzip", 6)
     assert database_config.options["tuning_enabled"] is True
     assert database_config.tuning_enabled is True
     # unified_tuning_configuration is deliberately NOT promoted onto database_config
@@ -265,7 +274,11 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
     assert database_config.tuning_source == "wizard"
     assert database_config.tuning_source_file is None
     mock_preview.assert_called_once()
+    assert mock_preview.call_args.kwargs["benchmark_config"] is benchmark_config
+    assert mock_preview.call_args.kwargs["benchmark_config"].concurrency == 4
     orchestrator.set_custom_output_dir.assert_called_once_with(str(tmp_path / "normalized"))
+    assert mock_execute.call_args.args[1] is benchmark_config
+    assert mock_execute.call_args.args[1].compression_type == "gzip"
     assert mock_execute.call_args.args[4] == ["generate", "load", "power"]
     assert mock_execute.call_args.kwargs["execution_context"].query_subset == ["Q1", "Q6"]
     mock_save_last_run.assert_called_once()
@@ -275,6 +288,14 @@ def test_interactive_guided_flow_uses_prompted_values_and_saves_preferences(tmp_
     assert save_kwargs["seed"] == 77
     assert save_kwargs["output"] == str(tmp_path / "chosen-output")
     assert save_kwargs["phases"] == ["generate", "load", "power"]
+    assert save_kwargs["queries"] == ["Q1", "Q6"]
+    assert save_kwargs["mode"] == "sql"
+    assert save_kwargs["concurrency"] == 4
+    assert (save_kwargs["compress_data"], save_kwargs["compression_type"], save_kwargs["compression_level"]) == (
+        True,
+        "gzip",
+        6,
+    )
 
 
 def test_interactive_stats_controls_reach_benchmark_config(tmp_path: Path):

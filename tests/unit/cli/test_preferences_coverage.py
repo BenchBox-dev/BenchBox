@@ -48,6 +48,8 @@ def test_last_run_save_load_clear_cycle(monkeypatch: pytest.MonkeyPatch, tmp_pat
         scale=0.01,
         tuning_mode="tuned",
         phases=["load", "power"],
+        queries=["Q1", "Q6"],
+        mode="dataframe",
         additional_options={"x_opt": "1", "table_mode": "external"},
     )
 
@@ -56,6 +58,8 @@ def test_last_run_save_load_clear_cycle(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert loaded["database"] == "duckdb"
     assert loaded["x_opt"] == "1"
     assert loaded["table_mode"] == "external"
+    assert loaded["queries"] == ["Q1", "Q6"]
+    assert loaded["mode"] == "dataframe"
 
     prefs.clear_last_run_config()
     assert prefs.load_last_run_config() is None

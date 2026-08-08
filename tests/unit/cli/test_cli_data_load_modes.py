@@ -63,6 +63,44 @@ def _mock_run_command_components(*, include_db_manager: bool = False):
         yield mocks
 
 
+@contextmanager
+def _mock_quick_restart(saved_config):
+    """Provide an accepted quick-restart session with no live execution dependencies."""
+    mock_sys = Mock()
+    mock_sys.stdin.isatty.return_value = True
+    mock_sys.stdout.isatty.return_value = True
+
+    with (
+        _mock_run_command_components(include_db_manager=True) as mocks,
+        patch.object(_run_module, "sys", mock_sys),
+        patch("benchbox.cli.onboarding.check_and_run_first_time_setup", return_value=False),
+        patch("benchbox.cli.preferences.load_last_run_config", return_value=saved_config),
+        patch("benchbox.cli.preferences.format_last_run_summary", return_value="saved run"),
+        patch.object(_run_module.Confirm, "ask", side_effect=lambda prompt, default=False: True),
+        patch("benchbox.cli.preferences.save_last_run_config"),
+    ):
+        profile = Mock(
+            cpu_cores_logical=8,
+            cpu_cores_physical=4,
+            memory_total_gb=16,
+            is_apple_silicon=False,
+            architecture="x86_64",
+            os_type="darwin",
+            numa_nodes=None,
+        )
+        mocks["profiler"].return_value.get_system_profile.return_value = profile
+        database_config = Mock(
+            type="duckdb",
+            options={},
+            driver_version_actual="1.4.3",
+            driver_version_resolved="1.4.3",
+            execution_mode="sql",
+        )
+        assert mocks["db_mgr"] is not None
+        mocks["db_mgr"].return_value.create_config.return_value = database_config
+        yield mocks
+
+
 class TestCLIDataLoadModes:
     """Test data-only and load-only execution modes."""
 
@@ -317,6 +355,149 @@ class TestCLIDataLoadModes:
             config = mocks["orchestrator"].return_value.execute_benchmark.call_args[0][0]
             assert isinstance(config, BenchmarkConfig)
             assert config.options.get("table_mode") == "external"
+
+    def test_quick_restart_atomically_refreshes_execution_significant_state(self):
+        """Saved selectors are re-resolved; explicit current CLI values win."""
+        saved = {
+            "database": "duckdb",
+            "benchmark": "tpch",
+            "scale": 0.01,
+            "phases": ["load", "power"],
+            "tuning_mode": "notuning",
+            "table_mode": "native",
+            "seed": 41,
+            "compress_data": False,
+            "compression_type": "none",
+            "concurrency": 3,
+            "test_execution_type": "maintenance",
+        }
+        with _mock_quick_restart(saved) as mocks:
+            result = self.runner.invoke(
+                cli,
+                [
+                    "run",
+                    "--phases",
+                    "throughput",
+                    "--seed",
+                    "99",
+                    "--compression",
+                    "gzip:6",
+                    "--presort",
+                    "parquet-sorted",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        execute = mocks["orchestrator"].return_value.execute_benchmark
+        execute.assert_called_once()
+        config, _profile, database_config, phases = execute.call_args.args[:4]
+        execution_context = execute.call_args.kwargs["execution_context"]
+
+        assert config.name == "tpch"
+        assert config.scale_factor == 0.01
+        assert config.concurrency == 3
+        assert config.test_execution_type == "throughput"
+        assert config.compress_data is True
+        assert config.compression_type == "gzip"
+        assert config.compression_level == 6
+        assert config.options["seed"] == 99
+        assert config.options["tuning_enabled"] is False
+        assert config.options["unified_tuning_configuration"] is not None
+        assert config.options["data_organization"]["table_configs"]
+        assert "df_tuning_config" not in config.options
+        assert database_config is mocks["db_mgr"].return_value.create_config.return_value
+        assert mocks["db_mgr"].return_value.create_config.call_args.args[0] == "duckdb"
+        database_overrides = mocks["db_mgr"].return_value.create_config.call_args.args[2]
+        assert database_overrides["tuning_enabled"] is False
+        assert database_overrides["execution_mode"] == "sql"
+        assert phases == ["throughput"]
+        assert execution_context.phases == ["throughput"]
+        assert execution_context.seed == 99
+        assert execution_context.mode == "sql"
+        assert execution_context.tuning_mode == "notuning"
+
+    @pytest.mark.parametrize(
+        ("saved_compression", "expected"),
+        [
+            (
+                {"compress_data": False, "compression_type": "none", "compression_level": None},
+                (False, "none", None),
+            ),
+            (
+                {"compress_data": True, "compression_type": "gzip", "compression_level": 6},
+                (True, "gzip", 6),
+            ),
+        ],
+    )
+    def test_quick_restart_saved_compression_reaches_config_and_result_metadata(
+        self,
+        saved_compression,
+        expected,
+    ):
+        """Saved compression is executable state, not display-only restart metadata."""
+        saved = {
+            "database": "duckdb",
+            "benchmark": "tpch",
+            "scale": 0.01,
+            "phases": ["load", "power"],
+            "queries": None,
+            "tuning_mode": "notuning",
+            "table_mode": "native",
+            "mode": "sql",
+            "seed": 41,
+            "concurrency": 1,
+            **saved_compression,
+        }
+
+        with _mock_quick_restart(saved) as mocks:
+            result = self.runner.invoke(cli, ["run"])
+
+        assert result.exit_code == 0, result.output
+        execute = mocks["orchestrator"].return_value.execute_benchmark
+        config = execute.call_args.args[0]
+        execution_context = execute.call_args.kwargs["execution_context"]
+        enabled, compression_type, level = expected
+        assert (config.compress_data, config.compression_type, config.compression_level) == expected
+        assert (
+            execution_context.compression_enabled,
+            execution_context.compression_type,
+            execution_context.compression_level,
+        ) == (enabled, compression_type, level)
+
+    def test_quick_restart_without_saved_seed_is_labeled_non_exact(self):
+        saved = {
+            "database": "duckdb",
+            "benchmark": "tpch",
+            "scale": 0.01,
+            "phases": ["power"],
+            "tuning_mode": "notuning",
+        }
+        with _mock_quick_restart(saved) as mocks:
+            result = self.runner.invoke(cli, ["run"])
+
+        assert result.exit_code == 0, result.output
+        assert "not an exact" in result.output
+        assert "replay." in result.output
+        execution_context = mocks["orchestrator"].return_value.execute_benchmark.call_args.kwargs["execution_context"]
+        assert execution_context.seed is None
+
+    def test_quick_restart_invalid_tuning_fails_closed_without_execution(self):
+        """Negative control: swallowing re-resolution failure would execute stale state."""
+        saved = {
+            "database": "duckdb",
+            "benchmark": "tpch",
+            "scale": 0.01,
+            "phases": ["power"],
+            "tuning_mode": "missing-quick-restart-tuning.yaml",
+            "seed": 7,
+        }
+        with _mock_quick_restart(saved) as mocks:
+            result = self.runner.invoke(cli, ["run"])
+
+        assert result.exit_code != 0
+        assert "Tuning file not found" in result.output
+        mocks["orchestrator"].return_value.execute_benchmark.assert_not_called()
+        mocks["db_mgr"].return_value.create_config.assert_not_called()
 
     def test_table_mode_external_rejects_tuned_in_quick_restart(self):
         """Quick-restart should still reject external table mode with tuned mode."""
