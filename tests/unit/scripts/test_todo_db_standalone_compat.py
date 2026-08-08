@@ -152,7 +152,7 @@ def test_option_values_that_match_commands_are_not_parsed_as_commands() -> None:
 
 def test_destructive_standalone_only_commands_are_not_routable() -> None:
     assert compat._command_index(["restore", "--input", "backup.json"]) is None
-    assert compat._command_index(["audit", "verify"]) == (1, "verify")
+    assert compat._command_index(["audit", "verify"]) == (0, "audit")
 
 
 def test_missing_db_is_pinned_to_benchbox_database(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -443,10 +443,79 @@ def test_standalone_030_verbs_are_routable_through_shim(
 
 
 def test_standalone_refuses_unroutable_finding_without_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """w2: finding/audit without DB refuses loudly instead of minting fork DB."""
+    """w2/w3: finding without DB refuses loudly and does not create fork DB."""
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
     monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     monkeypatch.delenv("TODO_DB_PATH", raising=False)
     monkeypatch.delenv("TODO_DB_URL", raising=False)
-    # finding without --db should refuse (return 2) and not inject .todo-db/todo.sqlite
     assert compat.main(["finding", "sync"]) == 2
+    assert not (tmp_path / ".todo-db" / "todo.sqlite").exists()
+
+    # honors config.json — with config present, refusal must not trigger
+    (tmp_path / ".todo-db").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".todo-db" / "config.json").write_text('{"url": "libsql://example.turso.io"}', encoding="utf-8")
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        return CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    assert compat.main(["finding", "sync"]) == 0
+
+
+def test_env_passthrough_includes_finding_drafts_and_ro_token(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """w4: TODO_DB_FINDING_DRAFTS_DIR and TODO_DB_RO_AUTH_TOKEN are forwarded via _delegate env."""
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+    monkeypatch.setenv("TODO_DB_FINDING_DRAFTS_DIR", "/tmp/drafts")
+    monkeypatch.setenv("TODO_DB_RO_AUTH_TOKEN", "ro-secret-xyz")
+
+    captured: dict[str, str] = {}
+
+    def fake_run(cmd, *, cwd, env, capture_output, text, check):
+        captured.update(
+            {
+                k: v
+                for k, v in env.items()
+                if k in ("TODO_DB_FINDING_DRAFTS_DIR", "TODO_DB_RO_AUTH_TOKEN", "TODO_DB_AUTH_TOKEN")
+            }
+        )
+        if "--version" in cmd:
+            return CompletedProcess(cmd, 0, stdout="todo-db 1.0.0\n", stderr="")
+        return CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat.subprocess, "run", fake_run)
+    # Use explicit DB so refusal path not taken; command will delegate with env passthrough
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "finding", "sync"]) == 0
+    assert captured.get("TODO_DB_FINDING_DRAFTS_DIR") == "/tmp/drafts"
+    assert captured.get("TODO_DB_RO_AUTH_TOKEN") == "ro-secret-xyz"
+
+
+def test_standalone_doctor_without_db_diagnoses_not_refuse(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """w5: standalone doctor without DB diagnoses, not exit-2 refusal; legacy doctor works."""
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    monkeypatch.delenv("TODO_DB_URL", raising=False)
+    # Remove config.json if present
+    config = tmp_path / ".todo-db" / "config.json"
+    if config.exists():
+        config.unlink()
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        assert command == "doctor"
+        return CompletedProcess(argv, 0, stdout="doctor OK no-backend-configured\n", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    assert compat.main(["doctor"]) == 0
+
+    # legacy (no standalone) should still route doctor via --db pin, not refuse
+    monkeypatch.delenv("BENCHBOX_TODO_DB_STANDALONE", raising=False)
+
+    def fake_delegate_legacy(
+        argv: list[str], *, command: str, cwd: Path, capture: bool = True
+    ) -> CompletedProcess[str]:
+        assert "--db" in argv
+        return CompletedProcess(argv, 0, stdout="legacy doctor\n", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate_legacy)
+    assert compat.main(["doctor"]) == 0
