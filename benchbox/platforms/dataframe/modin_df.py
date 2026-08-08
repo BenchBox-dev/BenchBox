@@ -93,9 +93,6 @@ def _initialize_ray_for_local_execution(num_cpus: int | None = None) -> bool:
     return True
 
 
-# Check if we should use Ray or Dask based on environment
-_MODIN_ENGINE = os.environ.get("MODIN_ENGINE", "ray").lower()
-
 # NOTE: We do NOT initialize Ray at module import time. Ray initialization is
 # deferred to when the adapter is actually instantiated (in __init__). This
 # prevents Ray from starting up just to check if Modin is available (e.g.,
@@ -264,11 +261,11 @@ class ModinDataFrameAdapter(PandasFamilyAdapter[ModinDF]):
     def _resolve_effective_engine(self) -> str:
         """Return the backend Modin will actually use, or fail closed.
 
-        A pre-set ``MODIN_ENGINE`` wins over the constructor argument, because
-        ``_configure_engine`` uses ``setdefault`` and Modin reads the variable
-        directly.  That precedence is preserved -- an operator's environment
-        still decides -- but the value it names must be a reviewed backend, so
-        an unreviewed one is rejected instead of silently taking effect.
+        A pre-set ``MODIN_ENGINE`` wins over the constructor argument because
+        Modin reads the variable directly: whatever the environment names is
+        what actually runs. The adapter's job is to reconcile ``self.engine``
+        with it and reject an unreviewed value rather than report one backend
+        while running another.
 
         Raises:
             ValueError: If ``MODIN_ENGINE`` names an unsupported backend.
