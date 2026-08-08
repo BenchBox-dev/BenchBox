@@ -359,7 +359,9 @@ An omission that is absent from this ledger is a defect, not a decision.
 | `--plan-config` | Omitted | not-yet-demanded | MCP exposes only the `capture_plans` boolean; per-query plan-capture selection is promotable. |
 | `--no-monitoring` | Omitted | not-yet-demanded | Metrics-collection toggle; bounded boolean, no client demand yet. |
 
-### Discovery Tools
+#
+The textcharts MCP server remains a separate-client integration, not a bundled or proxied part of `benchbox-mcp`. See `docs/design/textcharts-mcp-boundary.md` for the accepted separate textcharts configuration and the rejected bundle/proxy alternatives.
+## Discovery Tools
 
 #### `list_available`
 
