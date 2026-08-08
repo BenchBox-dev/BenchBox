@@ -34,7 +34,10 @@ FILENAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+$")  # Safe filename characters
 PLATFORM_OPTION_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 MEMORY_LIMIT_PATTERN = re.compile(r"^(?:[1-9]\d{0,5}(?:\.\d{1,2})?)(?:B|KB|MB|GB|TB)$", re.IGNORECASE)
 IDENTIFIER_LIST_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*(?:,[a-zA-Z_][a-zA-Z0-9_]*)*$")
-CLICKHOUSE_PROFILE_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+# Intentionally the same pattern as PLATFORM_OPTION_NAME_PATTERN: both are lowercase
+# snake_case with the same length bound, but they are different domains that may
+# diverge. Aliased rather than duplicated to make the shared origin explicit.
+CLICKHOUSE_PROFILE_NAME_PATTERN = PLATFORM_OPTION_NAME_PATTERN
 
 # Server-owned ClickHouse connection profiles, as JSON:
 #   {"analytics": {"port": 9440, "secure": true}}
@@ -279,6 +282,10 @@ MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = 
 }
 
 
+_CLICKHOUSE_PROFILES_CACHE: dict[str, dict[str, dict[str, object]]] = {}
+_CACHED_CLICKHOUSE_RAW: str | None = None
+
+
 def _load_clickhouse_connection_profiles() -> dict[str, dict[str, object]]:
     """Return the operator-defined ClickHouse connection profiles.
 
@@ -288,16 +295,27 @@ def _load_clickhouse_connection_profiles() -> dict[str, dict[str, object]]:
     reviewed destination but can never describe one.  A malformed registry
     yields no profiles rather than a partially trusted one.
     """
+    global _CACHED_CLICKHOUSE_RAW
     raw = os.environ.get(MCP_CLICKHOUSE_PROFILE_ENV, "").strip()
     if not raw:
+        _CACHED_CLICKHOUSE_RAW = raw
         return {}
+    # Cache keyed on raw env string so a repeated malformed value logs once.
+    # Resolution is still per-request (via resolve_clickhouse_connection_profile)
+    # so a withdrawn profile fails closed on durable replay.
+    if raw == _CACHED_CLICKHOUSE_RAW and raw in _CLICKHOUSE_PROFILES_CACHE:
+        return dict(_CLICKHOUSE_PROFILES_CACHE[raw])
     try:
         decoded = json.loads(raw)
     except json.JSONDecodeError:
         logger.error("Ignoring malformed %s: value is not valid JSON", MCP_CLICKHOUSE_PROFILE_ENV)
+        _CLICKHOUSE_PROFILES_CACHE[raw] = {}
+        _CACHED_CLICKHOUSE_RAW = raw
         return {}
     if not isinstance(decoded, dict):
         logger.error("Ignoring malformed %s: value is not a JSON object", MCP_CLICKHOUSE_PROFILE_ENV)
+        _CLICKHOUSE_PROFILES_CACHE[raw] = {}
+        _CACHED_CLICKHOUSE_RAW = raw
         return {}
 
     profiles: dict[str, dict[str, object]] = {}
@@ -327,6 +345,8 @@ def _load_clickhouse_connection_profiles() -> dict[str, dict[str, object]]:
             logger.error("Ignoring %s profile '%s': 'secure' must be a boolean", MCP_CLICKHOUSE_PROFILE_ENV, name)
             continue
         profiles[name] = {"port": port, "secure": secure}
+    _CLICKHOUSE_PROFILES_CACHE[raw] = dict(profiles)
+    _CACHED_CLICKHOUSE_RAW = raw
     return profiles
 
 
@@ -473,7 +493,8 @@ def _validate_dask_options(normalized: Mapping[str, object]) -> None:
 
     workers = normalized.get("n_workers", _DASK_DEFAULT_WORKERS)
     threads_per_worker = normalized.get("threads_per_worker", _DASK_DEFAULT_THREADS_PER_WORKER)
-    assert isinstance(workers, int) and isinstance(threads_per_worker, int)
+    if not isinstance(workers, int) or not isinstance(threads_per_worker, int):
+        raise MCPValidationError("Dask 'n_workers' and 'threads_per_worker' must be integers")
 
     if workers > envelope.max_workers:
         raise MCPValidationError("Dask 'n_workers' exceeds the server's worker budget")
@@ -487,7 +508,8 @@ def _validate_dask_options(normalized: Mapping[str, object]) -> None:
     per_worker_bytes = (
         _memory_size_bytes(str(memory_limit)) if memory_limit is not None else _DASK_DEFAULT_MEMORY_PER_WORKER_BYTES
     )
-    assert per_worker_bytes is not None  # already bounded by _validate_memory_limit
+    if per_worker_bytes is None:
+        raise MCPValidationError("Platform option 'memory_limit' must use a bounded memory size")
     if workers * per_worker_bytes > envelope.max_total_memory_bytes:
         # memory_limit is per worker, so the advertised total scales with n_workers.
         raise MCPValidationError("Dask 'n_workers' x 'memory_limit' exceeds the server's total memory budget")
