@@ -115,6 +115,15 @@ def _normalize_query_result(qr: Any) -> dict[str, Any]:
     return result
 
 
+def _resolve_row_count(qr: Mapping[str, Any]) -> Any:
+    """Return the first non-None row count in canonical compatibility order."""
+    for key in ("rows_returned", "rows", "result_count"):
+        value = qr.get(key)
+        if value is not None:
+            return value
+    return None
+
+
 def _round_duration_ms_for_export(value: float) -> float:
     """Round milliseconds for schema-v2 export without erasing measured sub-ms durations."""
     rounded = round(value, 1)
@@ -335,7 +344,11 @@ def _build_query_results_section(
         if exec_time_ms is None and exec_time_seconds is not None:
             exec_time_ms = float(exec_time_seconds) * 1000.0
 
-        rows = qr.get("rows_returned") or qr.get("rows") or qr.get("result_count")
+        # Row counts are numeric data, so zero is a valid result rather than a
+        # signal to try the next compatibility alias. Keep the established
+        # canonical -> compact -> legacy precedence while falling back only
+        # when a value is absent or explicitly None.
+        rows = _resolve_row_count(qr)
         iteration = int(qr.get("iteration", 1))
         stream_id = int(qr.get("stream_id", 0))
         run_type = qr.get("run_type")
