@@ -123,9 +123,7 @@ def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None
         if result.returncode != 0 and not qualified_failed:
             sys.stdout.write(output)
             sys.stderr.write(result.stderr or "")
-            raise subprocess.CalledProcessError(
-                result.returncode, command, output=result.stdout, stderr=result.stderr
-            )
+            raise subprocess.CalledProcessError(result.returncode, command, output=result.stdout, stderr=result.stderr)
         # P2: require exact baseline match, not just subset, for every scenario
         if set(qualified_failed) != set(expected_for_scenario):
             # Covers both unexpected and missing (stale) IDs
@@ -144,9 +142,7 @@ def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None
             # Baseline expected failures but tool exited 0 -> stale baseline
             sys.stdout.write(output)
             sys.stderr.write(result.stderr or "")
-            raise subprocess.CalledProcessError(
-                result.returncode, command, output=result.stdout, stderr=result.stderr
-            )
+            raise subprocess.CalledProcessError(result.returncode, command, output=result.stdout, stderr=result.stderr)
         # If we reach here, the scenario passed with exact expected failures
         if result.returncode != 0:
             sys.stdout.write(output)
