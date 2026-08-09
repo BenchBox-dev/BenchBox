@@ -34,6 +34,11 @@ class ClickHouseSetupMixin:
         self.max_execution_time = config.get("max_execution_time", 300)
         self.max_threads = config.get("max_threads", 8)
 
+        # Orphaned: max_server_memory_usage_ratio has no live ClickHouse consumer
+        # since the session-setting cleanup. Keep as None for backwards compat;
+        # do not reintroduce the removed session setting to consume it.
+        self.max_server_memory_usage_ratio = None
+
         # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
 
@@ -51,9 +56,10 @@ class ClickHouseSetupMixin:
         self.max_execution_time = config.get("max_execution_time", 300)
         self.max_threads = config.get("max_threads", 4)  # Lower default for local
 
-        # NOTE: max_server_memory_usage_ratio removed (was orphaned after
-        # session-setting cleanup - no live ClickHouse setting consumed it).
-        # Kept documented here to avoid reintroducing removed settings.
+        # Orphaned: max_server_memory_usage_ratio has no live ClickHouse consumer
+        # since the session-setting cleanup. Keep as None for backwards compat;
+        # do not reintroduce the removed session setting to consume it.
+        self.max_server_memory_usage_ratio = None
 
         # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
@@ -121,6 +127,8 @@ class ClickHouseSetupMixin:
         self.strict_validation = config.get("strict_validation", True)
 
         # Cloud-specific settings
+        # Orphaned: max_server_memory_usage_ratio has no live ClickHouse consumer
+        # in any mode. Kept as None for backwards compat in all three modes.
         self.max_server_memory_usage_ratio = None  # Not applicable for cloud
 
         # Cloud storage staging configuration for data loading

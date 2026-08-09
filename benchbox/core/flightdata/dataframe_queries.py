@@ -32,12 +32,13 @@ from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRe
 # (benchbox/core/flightdata/downloader_specs.yaml).  The SQL catalog derives
 # its date literals from the same constant via FlightDataBenchmark's
 # query window, so the DataFrame default must match it -- otherwise the
-# window matches zero rows (2024 data vs 2018 window).  Import lazily to
-# avoid a hard cycle; fall back to the known default if the spec is
-# unavailable in a partial install.
+# window matches zero rows (2024 data vs 2018 window).  Imported at module
+# load; fallback is the last known value from the spec and is covered by
+# the verification that asserts the default year is in the SQL window, so
+# a spec bump without a code bump fails fast.
 try:
     from benchbox.core.flightdata.downloader import LAST_AVAILABLE_YEAR as _LAST_YEAR
-except Exception:  # pragma: no cover - import guard
+except (ImportError, FileNotFoundError, KeyError, ValueError):  # pragma: no cover - import guard for partial installs
     _LAST_YEAR = 2024
 
 FLIGHTDATA_DEFAULT_PARAMS: dict[str, Any] = {
