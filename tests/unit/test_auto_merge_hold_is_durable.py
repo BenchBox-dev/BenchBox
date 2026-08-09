@@ -6,13 +6,18 @@ auto-merge (historically: synchronize re-enable; nightly --apply if it ever
 armed). Draft was the only durable hold. This suite pins the durable-hold
 contract across workflow + sweep layers:
 
-1. Synchronize never re-enables auto-merge (only revokes).
-2. Label ``no-auto-merge`` blocks enable and triggers disable.
+1. The workflow never arms at all (revoke-only since
+   auto-merge-policy-consolidation-2026-08-06, D2); in particular no event —
+   synchronize included — can re-enable auto-merge.
+2. Label ``no-auto-merge`` triggers workflow disable AND blocks the one live
+   arm path, ``make pr-arm-auto-merge`` (D3 — before that check, #1626 was
+   armed 52s after being labeled because only never-arming layers honoured
+   the label).
 3. Draft remains a job-level hold.
 4. Nightly green-unmerged ``--apply`` never enables auto-merge and does not
    classify an explicit hold as stranded.
-5. Soundness disable unions base-ref + PR-copy predicates (enable still needs
-   both false so a PR cannot weaken its own gate).
+5. Soundness disable unions base-ref + PR-copy predicates so a PR cannot
+   weaken its own gate.
 """
 
 from __future__ import annotations
@@ -38,15 +43,12 @@ HOLD_LABEL = "no-auto-merge"
 ARM_COMMAND = "gh pr merge --auto --squash"
 DISABLE_COMMAND = "gh pr merge --disable-auto"
 
-# Exact enable/disable `if:` pins (collapsed form). Keep lockstep with
+# Exact disable `if:` pins (collapsed form). Keep lockstep with
 # tests/unit/workflows/test_auto_merge_enablement_point.py.
-ENABLE_IF = (
-    "steps.soundness.outputs.soundness_path != 'true' "
-    "&& steps.hold.outputs.held != 'true' "
-    "&& github.event.action == 'ready_for_review'"
-)
 SOUNDNESS_DISABLE_IF = "steps.soundness.outputs.soundness_path == 'true'"
 HOLD_DISABLE_IF = "steps.hold.outputs.held == 'true'"
+
+MAKEFILE = REPO_ROOT / "Makefile"
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -73,11 +75,19 @@ def _collapsed_if(step: dict[str, Any]) -> str:
     return re.sub(r"\s+", " ", raw)
 
 
-def _enable_job() -> dict[str, Any]:
+def _revoke_job() -> dict[str, Any]:
     workflow = _load_yaml(AUTO_MERGE_WORKFLOW)
     jobs = workflow.get("jobs") or {}
-    assert "enable" in jobs
-    return jobs["enable"]
+    assert "revoke" in jobs
+    return jobs["revoke"]
+
+
+def _makefile_target_body(name: str) -> str:
+    """Return the recipe lines of a Makefile target."""
+    text = MAKEFILE.read_text(encoding="utf-8")
+    match = re.search(rf"^{re.escape(name)}:.*?\n((?:\t.*\n|\n)*)", text, re.MULTILINE)
+    assert match, f"Makefile has no target {name!r}"
+    return match.group(1)
 
 
 def _load_sweep():
@@ -90,32 +100,31 @@ def _load_sweep():
 
 
 # ---------------------------------------------------------------------------
-# Workflow: never re-arm on synchronize; hold label + draft are durable
+# Workflow: revoke-only (never arms); hold label + draft are durable
 # ---------------------------------------------------------------------------
 
 
-def test_workflow_never_enables_on_synchronize() -> None:
-    """Push must not re-arm auto-merge (historical defect class)."""
-    steps = _steps_by_name(_enable_job())
-    enable = steps["Enable squash auto-merge"]
-    condition = _collapsed_if(enable)
-    assert condition == ENABLE_IF
-    assert "synchronize" not in condition
-    assert ARM_COMMAND in str(enable.get("run") or "")
+def test_workflow_never_arms_auto_merge_at_all() -> None:
+    """The workflow is revoke-only: no step may arm auto-merge on any event.
 
-
-def test_workflow_enable_requires_absence_of_hold_label() -> None:
-    """ready_for_review must not arm while no-auto-merge is present."""
-    steps = _steps_by_name(_enable_job())
-    enable = steps["Enable squash auto-merge"]
-    assert _collapsed_if(enable) == ENABLE_IF
-    assert "steps.hold.outputs.held != 'true'" in _collapsed_if(enable)
+    This subsumes the historical synchronize/opened re-arm defect class: with
+    no arm command in the file, no event can re-enable auto-merge. Arming is
+    exclusively `make pr-ready` / `pr-arm-auto-merge` (D2).
+    """
+    text = AUTO_MERGE_WORKFLOW.read_text(encoding="utf-8")
+    for step in _revoke_job().get("steps") or []:
+        run = str(step.get("run") or "")
+        assert ARM_COMMAND not in run, f"workflow step {step.get('name')!r} arms auto-merge"
+        assert "--auto" not in run.replace("--disable-auto", ""), (
+            f"workflow step {step.get('name')!r} contains an arming flag"
+        )
+    assert "Enable squash auto-merge" not in text, "the dead arm step is back"
 
 
 def test_workflow_hold_step_matches_exact_label() -> None:
     """Hold detection must be exact-name (grep -qxF), shared constant name."""
     text = AUTO_MERGE_WORKFLOW.read_text(encoding="utf-8")
-    steps = _steps_by_name(_enable_job())
+    steps = _steps_by_name(_revoke_job())
     hold = steps.get("Check explicit hold label")
     assert hold is not None, "hold check step missing"
     assert hold.get("id") == "hold"
@@ -128,7 +137,7 @@ def test_workflow_hold_step_matches_exact_label() -> None:
 
 def test_workflow_disables_on_explicit_hold() -> None:
     """Applying the hold label must revoke any enabled auto-merge."""
-    steps = _steps_by_name(_enable_job())
+    steps = _steps_by_name(_revoke_job())
     disable = steps.get("Disable auto-merge for explicit hold")
     assert disable is not None, "explicit-hold disable step missing"
     assert _collapsed_if(disable) == HOLD_DISABLE_IF
@@ -137,7 +146,7 @@ def test_workflow_disables_on_explicit_hold() -> None:
 
 def test_workflow_disables_on_soundness() -> None:
     """Soundness revocation must remain independent of the hold path."""
-    steps = _steps_by_name(_enable_job())
+    steps = _steps_by_name(_revoke_job())
     disable = steps.get("Disable auto-merge for soundness PR")
     assert disable is not None
     assert _collapsed_if(disable) == SOUNDNESS_DISABLE_IF
@@ -148,14 +157,45 @@ def test_workflow_listens_for_labeled_to_make_hold_durable() -> None:
     """Without `labeled`, applying no-auto-merge would not revoke until a push."""
     types = _triggers(_load_yaml(AUTO_MERGE_WORKFLOW))["pull_request"]["types"]
     assert "labeled" in types
-    for required in ("opened", "reopened", "ready_for_review", "synchronize"):
+    for required in ("opened", "reopened", "synchronize"):
         assert required in types
+    # Revoke-only workflow: draft→ready has nothing to revoke and must not
+    # become an arm point again (D2).
+    assert "ready_for_review" not in types
 
 
 def test_workflow_skips_drafts_at_job_level() -> None:
-    job = _enable_job()
+    job = _revoke_job()
     assert "draft" in str(job.get("if") or "")
     assert "false" in str(job.get("if") or "")
+
+
+# ---------------------------------------------------------------------------
+# Makefile: the one live arm path honours the hold label (D3)
+# ---------------------------------------------------------------------------
+
+
+def test_makefile_arm_path_refuses_hold_label() -> None:
+    """`make pr-arm-auto-merge` must check the label before arming.
+
+    Before this guard the label was only honoured by layers that never arm
+    (workflow revocation + report-only sweep), while the one live arm path
+    ignored it: #1626 was armed at 2026-08-06T13:48:46Z, 52s after the label
+    was applied. A durable hold the arm path ignores is not a hold.
+    """
+    body = _makefile_target_body("pr-arm-auto-merge")
+    assert f"grep -qxF '{HOLD_LABEL}'" in body, "arm path no longer checks the hold label"
+    assert ARM_COMMAND in body
+    label_index = body.index(f"grep -qxF '{HOLD_LABEL}'")
+    arm_index = body.index(ARM_COMMAND)
+    assert label_index < arm_index, "label check runs after arming, so it cannot withhold"
+    # Exact-match semantics stay lockstep with the workflow's grep -qxF.
+    assert "--json labels" in body
+    # Fail closed: an unreadable label list (gh auth/rate-limit failure) must
+    # abort the arm, not fall through as "no label". Without this, a transient
+    # gh error piped into grep reads as label-absent and arms through the hold.
+    assert "refusing to arm (fail closed)" in body, "label read no longer fails closed"
+    assert body.index("refusing to arm (fail closed)") < arm_index
 
 
 def test_soundness_unions_base_ref_and_pr_copy_predicates() -> None:
