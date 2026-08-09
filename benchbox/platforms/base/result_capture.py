@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import math
 import os
 import platform
 import re
@@ -47,6 +46,7 @@ from benchbox.core.results.builder import (
     _BENCHMARK_FAMILY,
     normalize_benchmark_id,
 )
+from benchbox.core.results.metrics import percentile_ms, sample_stdev_ms
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT
 from benchbox.core.results.query_plan_models import (
     DEFAULT_PLAN_MAX_DEPTH,
@@ -287,41 +287,29 @@ def _coerce_time_seconds(result: Any) -> float | None:
     return seconds
 
 
-def _percentile(values: list[float], percentile: float) -> float:
-    """Linear-interpolation percentile on a sorted list."""
-    if not values:
-        return 0.0
-    if len(values) == 1:
-        return values[0]
-
-    rank = (percentile / 100) * (len(values) - 1)
-    lower_idx = math.floor(rank)
-    upper_idx = math.ceil(rank)
-
-    if lower_idx == upper_idx:
-        return values[int(rank)]
-
-    weight = rank - lower_idx
-    return values[lower_idx] + weight * (values[upper_idx] - values[lower_idx])
-
-
 def _build_latency_stats(values: list[float]) -> dict[str, Any] | None:
     """Compute latency stats (min/max/mean/median/p90/p95/p99/stdev) in both units."""
+
     if not values:
         return None
 
     sorted_values = sorted(values)
     count = len(sorted_values)
+    # Percentiles and stdev delegate to the canonical core helpers so that
+    # result bundles and CLI/MCP surfaces report the same numbers.  Values
+    # are in seconds; convert to milliseconds for percentile_ms /
+    # sample_stdev_ms, then back to seconds for the seconds block.
+    values_ms = [v * 1000.0 for v in sorted_values]
     stats_seconds = {
         "count": count,
         "min": sorted_values[0],
         "max": sorted_values[-1],
         "mean": statistics.fmean(sorted_values),
         "median": statistics.median(sorted_values),
-        "p90": _percentile(sorted_values, 90),
-        "p95": _percentile(sorted_values, 95),
-        "p99": _percentile(sorted_values, 99),
-        "stdev": statistics.pstdev(sorted_values) if count > 1 else 0.0,
+        "p90": percentile_ms(values_ms, 0.90) / 1000.0,
+        "p95": percentile_ms(values_ms, 0.95) / 1000.0,
+        "p99": percentile_ms(values_ms, 0.99) / 1000.0,
+        "stdev": sample_stdev_ms(values_ms) / 1000.0,
     }
 
     stats_milliseconds = {key: (value * 1000.0 if key != "count" else value) for key, value in stats_seconds.items()}
@@ -336,15 +324,20 @@ def _build_numeric_stats(values: list[float]) -> dict[str, Any] | None:
 
     sorted_values = sorted(values)
     count = len(sorted_values)
+    # Row-count percentiles use the same nearest-rank definition as timing
+    # percentiles; percentile_ms is reused for its rank math (unit is
+    # irrelevant to the percentile) and sample_stdev_ms for stdev so that
+    # every surface shares one stdev definition (sample, not population).
+    values_float = [float(v) for v in sorted_values]
     return {
         "count": count,
         "min": sorted_values[0],
         "max": sorted_values[-1],
         "mean": statistics.fmean(sorted_values),
         "median": statistics.median(sorted_values),
-        "p90": _percentile(sorted_values, 90),
-        "p95": _percentile(sorted_values, 95),
-        "stdev": statistics.pstdev(sorted_values) if count > 1 else 0.0,
+        "p90": percentile_ms(values_float, 0.90),
+        "p95": percentile_ms(values_float, 0.95),
+        "stdev": sample_stdev_ms(values_float),
     }
 
 
