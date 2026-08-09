@@ -1007,7 +1007,7 @@ class TestPhasesMapping:
 
     def test_power_phase_maps_to_power_type(self):
         """Phases containing 'power' should map to power test_execution_type."""
-        from benchbox.mcp.tools.benchmark import _map_phases_to_test_execution_type
+        from benchbox.core.run_service import _map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["power"]) == "power"
         assert _map_phases_to_test_execution_type(["load", "power"]) == "power"
@@ -1015,32 +1015,32 @@ class TestPhasesMapping:
 
     def test_throughput_phase_maps_to_throughput_type(self):
         """Phases containing only 'throughput' should map to throughput type."""
-        from benchbox.mcp.tools.benchmark import _map_phases_to_test_execution_type
+        from benchbox.core.run_service import _map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["throughput"]) == "throughput"
         assert _map_phases_to_test_execution_type(["load", "throughput"]) == "throughput"
 
     def test_combined_phases_map_to_combined_type(self):
         """All three query phases together should map to combined type."""
-        from benchbox.mcp.tools.benchmark import _map_phases_to_test_execution_type
+        from benchbox.core.run_service import _map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["power", "throughput", "maintenance"]) == "combined"
 
     def test_load_only_phase_maps_to_load_only_type(self):
         """Load-only phase should map to load_only type."""
-        from benchbox.mcp.tools.benchmark import _map_phases_to_test_execution_type
+        from benchbox.core.run_service import _map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["load"]) == "load_only"
 
     def test_generate_only_phase_maps_to_data_only_type(self):
         """Generate-only phase should map to data_only type."""
-        from benchbox.mcp.tools.benchmark import _map_phases_to_test_execution_type
+        from benchbox.core.run_service import _map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["generate"]) == "data_only"
 
     def test_empty_phases_maps_to_standard(self):
         """Empty or unrecognized phases should map to standard type."""
-        from benchbox.mcp.tools.benchmark import _map_phases_to_test_execution_type
+        from benchbox.core.run_service import _map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type([]) == "standard"
         assert _map_phases_to_test_execution_type(["warmup"]) == "standard"

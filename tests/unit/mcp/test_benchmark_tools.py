@@ -397,7 +397,9 @@ class TestRunBenchmarkTool:
         get_adapter.assert_not_called()
 
     def test_databricks_layout_options_build_unified_tuning_config(self):
-        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+        from benchbox.core.run_service import (
+            _translate_platform_options_for_adapter as _prepare_adapter_platform_options,
+        )
 
         options = _prepare_adapter_platform_options(
             "databricks",
@@ -411,7 +413,9 @@ class TestRunBenchmarkTool:
         assert tuning.platform_optimizations.liquid_clustering_columns == ["event_time", "id"]
 
     def test_databricks_columns_infer_liquid_clustering_strategy(self):
-        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+        from benchbox.core.run_service import (
+            _translate_platform_options_for_adapter as _prepare_adapter_platform_options,
+        )
 
         options = _prepare_adapter_platform_options("databricks", {"liquid_clustering_columns": "customer_id,order_id"})
 
@@ -425,13 +429,15 @@ class TestRunBenchmarkTool:
         import json
         from unittest.mock import MagicMock, patch
 
+        from benchbox.core.run_service import (
+            _translate_platform_options_for_adapter as _prepare_adapter_platform_options,
+        )
         from benchbox.mcp.schemas import (
             MCP_CLICKHOUSE_PROFILE_ENV,
             MCP_PLATFORM_OPTION_ALLOWLIST,
             MCP_PLATFORM_OPTION_CONTRACT,
             validate_platform_options,
         )
-        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
 
         monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"reviewed": {"port": 9440, "secure": True}}))
 

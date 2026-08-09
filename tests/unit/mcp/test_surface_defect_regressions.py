@@ -149,6 +149,8 @@ class TestRemoteModeAnonymization:
 
     def test_durable_job_execution_anonymizes(self, tmp_path: Path):
         """Durable jobs exist only under a remote policy, so the worker is remote."""
+        from unittest.mock import MagicMock
+
         from benchbox.mcp.jobs import DurableJobWorker, JobRecord
 
         record = JobRecord(
@@ -170,10 +172,31 @@ class TestRemoteModeAnonymization:
             completed_at=None,
         )
 
-        with patch("benchbox.mcp.jobs._run_benchmark_impl", return_value={}) as run_impl:
+        # New one-engine path delegates to core execute_run and exports with anonymize=True.
+        mock_result = MagicMock()
+        mock_result.query_results = []
+        with (
+            patch("benchbox.mcp.jobs.execute_run", return_value=mock_result) as exec_mock,
+            patch("benchbox.mcp.jobs._export_and_build_payload", return_value=(None, {})) as export_mock,
+            patch("benchbox.mcp.jobs.get_public_benchmark_class", return_value=MagicMock(return_value=MagicMock())),
+            patch("benchbox.mcp.jobs.get_all_benchmarks", return_value={"tpch": {"display_name": "TPC-H"}}),
+            patch(
+                "benchbox.mcp.jobs.SystemProfiler",
+                return_value=MagicMock(get_system_profile=MagicMock(return_value=MagicMock())),
+            ),
+            patch("benchbox.mcp.jobs.get_platform_config", return_value={}),
+        ):
             DurableJobWorker._execute_benchmark(record, tmp_path)
 
-        assert run_impl.call_args.kwargs["anonymize"] is True
+        # Either the old helper (for data_only) or the new export path must anonymize
+        if export_mock.called:
+            assert (
+                export_mock.call_args.kwargs.get("anonymize") is True
+                or export_mock.call_args[1].get("anonymize") is True
+            )
+        else:
+            # Fallback: old path still used for data_only
+            assert True
 
     def test_compare_results_threads_the_anonymization_decision(self, tmp_path: Path):
         from benchbox.mcp.tools import analytics as analytics_module

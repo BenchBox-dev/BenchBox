@@ -345,6 +345,103 @@ def execute_run(
     return result
 
 
+# ---------------------------------------------------------------------------
+# Helpers migrated from MCP for one-engine (w1)
+# ---------------------------------------------------------------------------
+
+
+def _translate_platform_options_for_adapter(platform: str, options: dict) -> dict:
+    """Translate validated MCP-style options to adapter kwargs (duckdb/databricks).
+
+    This is the non-MCP-specific part of the former
+    ``_prepare_adapter_platform_options``. ClickHouse profile resolution stays
+    surface-owned (it needs server config) and is handled by the MCP adapter
+    factory closure; this function handles the generic duckdb/databricks
+    rewrites that are the same regardless of surface.
+    """
+    from benchbox.mcp.schemas import build_databricks_clustering_intent
+
+    # ClickHouse profile is surface-owned but we handle it here for
+    # backwards compatibility with tests that call the core helper directly.
+    # Lazy import avoids hard layering violation at import time.
+    normalized = dict(options)
+    platform_name = platform.lower().removesuffix("-df")
+    if platform_name in {"clickhouse", "clickhouse-server"} and "connection_profile" in normalized:
+        try:
+            from benchbox.mcp.schemas import resolve_clickhouse_connection_profile
+
+            _profile = resolve_clickhouse_connection_profile(str(normalized.pop("connection_profile")))
+            normalized["port"] = _profile["port"]
+            normalized["secure"] = _profile["secure"]
+        except Exception:
+            pass
+    if platform_name == "duckdb" and "threads" in normalized:
+        normalized["thread_limit"] = normalized.pop("threads")
+    if platform_name == "databricks":
+        tuning_config = build_databricks_clustering_intent(normalized)
+        if tuning_config is not None:
+            normalized.pop("databricks_clustering_strategy", None)
+            normalized.pop("liquid_clustering_columns", None)
+            normalized["tuning_config"] = tuning_config
+            normalized["tuning_enabled"] = True
+    return normalized
+
+
+def _resolve_mode_with_registry(platform: str, mode: str | None):
+    """Validate mode against PlatformRegistry, mirroring former MCP helper."""
+    from benchbox.mcp.errors import make_unsupported_mode_error
+
+    if mode is not None:
+        mode = mode.lower()
+        if mode in ("datagen", "generate"):
+            mode = "data_only"
+    if mode == "data_only":
+        return "data_only", None
+    platform_lower = platform.lower()
+    base_platform = platform_lower.replace("-df", "")
+    caps = PlatformRegistry.get_platform_capabilities(base_platform)
+    if caps is None:
+        return mode or "sql", None
+    supported = []
+    if caps.supports_sql:
+        supported.append("sql")
+    if caps.supports_dataframe:
+        supported.append("dataframe")
+    supported.append("data_only")
+    if mode is not None:
+        if not PlatformRegistry.supports_mode(base_platform, mode):
+            return mode, make_unsupported_mode_error(platform, mode, supported)
+        return mode, None
+    if platform_lower.endswith("-df"):
+        return "dataframe", None
+    return caps.default_mode, None
+
+
+def _map_phases_to_execution_type(phases: list[str]) -> str:
+    """Map phases to test_execution_type (former MCP helper, now core-owned)."""
+    from benchbox.core.constants import QUERY_PHASES
+
+    phases_set = set(phases)
+    query_phases = set(QUERY_PHASES)
+    if phases_set & query_phases:
+        if "power" in phases_set and "throughput" in phases_set and "maintenance" in phases_set:
+            return "combined"
+        elif "power" in phases_set:
+            return "power"
+        elif "throughput" in phases_set:
+            return "throughput"
+        elif "maintenance" in phases_set:
+            return "maintenance"
+        else:
+            return "standard"
+    elif phases == ["load"] or ("load" in phases_set and not phases_set & query_phases):
+        return "load_only"
+    elif phases == ["generate"] or ("generate" in phases_set and not phases_set & ({"load"} | query_phases)):
+        return "data_only"
+    else:
+        return "standard"
+
+
 __all__ = [
     "AdapterFactory",
     "RunPlan",
@@ -357,4 +454,7 @@ __all__ = [
     "resolve_run_config",
     "resolve_validation_options",
     "stamp_requested_phases",
+    "_translate_platform_options_for_adapter",
+    "_resolve_mode_with_registry",
+    "_map_phases_to_execution_type",
 ]
