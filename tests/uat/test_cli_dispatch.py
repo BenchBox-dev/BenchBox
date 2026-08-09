@@ -564,11 +564,85 @@ def _write_stage(tmp_path: Path, index: int, name: str, completed_at: str, **ove
         "explorer_smoke_status": "ran",
         "verdict": "green",
     }
+    # Pre-compute digests for stable seed bytes so the stored GateSummary
+    # already matches what _cli recomputes from the stage dirs at gate-check
+    # time. Using actual bytes (not the hex string itself) avoids the
+    # mismatch where sha256(b"a"*64) != "a"*64.
+    if "artifact_digests" not in overrides:
+        import hashlib
+
+        seeds = {
+            "cells_jsonl": f"cells-stage{index}\n".encode(),
+            "accounting_sidecar": f"sidecar-stage{index}\n".encode(),
+            "lifecycle_log": f"lifecycle-stage{index}\n".encode(),
+        }
+        kwargs["artifact_digests"] = {k: hashlib.sha256(v).hexdigest() for k, v in seeds.items()}
     kwargs.update(overrides)
+    # Allow tests that explicitly want an old-evidence shape to pass artifact_digests=None.
     stage_dir = tmp_path / f"stage{index}"
     stage_dir.mkdir(exist_ok=True)
+    # Seed the artifact files BEFORE writing the summary, then write the
+    # summary that matches them — except when the test will overwrite a file
+    # after _write_stage returns (e.g. green test writes lifecycle docker
+    # lines), in which case the caller patches the stored digests after.
+    if kwargs.get("artifact_digests") is not None:
+        for key, file_name in (
+            ("cells_jsonl", "cells.jsonl"),
+            ("accounting_sidecar", "cells.jsonl.accounting.json"),
+            ("lifecycle_log", "uat_lifecycle.log"),
+        ):
+            hex_digest = kwargs["artifact_digests"].get(key)
+            target = stage_dir / file_name
+            if hex_digest is None:
+                target.unlink(missing_ok=True)
+            else:
+                # Write seed bytes whose digest matches the summary entry.
+                # For lifecycle_log the green test overwrites this right after,
+                # so we plant placeholder bytes; the test's update_digests call
+                # will fix the stored digest to match the final bytes.
+                if key == "cells_jsonl":
+                    target.write_bytes(f"cells-stage{index}\n".encode())
+                elif key == "accounting_sidecar":
+                    target.write_bytes(f"sidecar-stage{index}\n".encode())
+                else:
+                    target.write_bytes(f"lifecycle-stage{index}\n".encode())
     gate_summary.write_gate_summary(stage_dir, gate_summary.GateSummary(**kwargs))
     return stage_dir
+
+
+def _patch_lifecycle_digest_to_absent(stage_dir: Path) -> None:
+    """Patched: lifecycle absence is honest provenance (orchestrator's None)."""
+    from tests.uat import gate_summary
+
+    summary_path = stage_dir / gate_summary.GATE_SUMMARY_FILENAME
+    summary = gate_summary.read_gate_summary(summary_path)
+    digests = dict(summary.artifact_digests or {})
+    digests["lifecycle_log"] = None
+    patched = gate_summary.GateSummary(
+        **{**summary.to_json_dict(), "artifact_digests": digests, "accounting": summary.accounting}
+    )
+    gate_summary.write_gate_summary(stage_dir, patched)
+
+
+def _update_digests(stage_dir: Path) -> None:
+    """Fix the stored GateSummary's lifecycle_log digest to match the actual file bytes.
+
+    The seed written by _write_stage is overwritten by the green test's docker lines,
+    so the artifact_digests etched at sweep time must be refreshed to the final bytes
+    or gate-check's recomputation would HOLD on a fresh test artifact that is meant to be green.
+    """
+    import hashlib
+
+    from tests.uat import gate_summary
+
+    summary_path = stage_dir / gate_summary.GATE_SUMMARY_FILENAME
+    summary = gate_summary.read_gate_summary(summary_path)
+    digests = dict(summary.artifact_digests or {})
+    digests["lifecycle_log"] = hashlib.sha256((stage_dir / "uat_lifecycle.log").read_bytes()).hexdigest()
+    patched = gate_summary.GateSummary(
+        **{**summary.to_json_dict(), "artifact_digests": digests, "accounting": summary.accounting}
+    )
+    gate_summary.write_gate_summary(stage_dir, patched)
 
 
 def test_gate_check_green_writes_combined_evidence(tmp_path: Path, capsys):
@@ -581,6 +655,8 @@ def test_gate_check_green_writes_combined_evidence(tmp_path: Path, capsys):
     (s3 / "uat_lifecycle.log").write_text(
         "2026-07-10T13:00:00 [docker] platform=postgresql action=up status=ok\n", encoding="utf-8"
     )
+    _update_digests(s2)
+    _update_digests(s3)
     output = tmp_path / "evidence" / "uat-gate-summary.json"
 
     rc = _cli.main(
@@ -693,6 +769,9 @@ def test_gate_check_docker_stage_without_lifecycle_log_is_red(tmp_path: Path):
     """C1: a Docker stage (2/3) with no uat_lifecycle.log cannot verify ordering -- HOLD, not silent pass."""
     s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
     s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    # Stage 2 must be absent for the ordering C1 HOLD. Remove its seeded file and fix its digest.
+    (s2 / "uat_lifecycle.log").unlink(missing_ok=True)
+    _patch_lifecycle_digest_to_absent(s2)
     s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
     # Stage 3 has a log; stage 2 does not. Stage 1 never needs one.
     (s3 / "uat_lifecycle.log").write_text(
@@ -713,3 +792,93 @@ def test_gate_check_docker_stage_without_lifecycle_log_is_red(tmp_path: Path):
     assert not any(
         "stage3" in violation and "missing lifecycle log" in violation for violation in payload["ordering_violations"]
     )
+
+
+# ---- provenance-binding (uat-evidence-provenance-binding) ----
+
+
+def test_gate_check_rejects_unknown_sha(tmp_path: Path, capsys):
+    """sha='unknown' (git failure swallowed at sweep start) must not pass locally.
+
+    The task's anti-pattern is 'don't keep APPROVing sha=unknown locally because CI fails closed later'.
+    """
+    s1 = _write_stage(
+        tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00", source_commit_sha="unknown"
+    )
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00", source_commit_sha="unknown")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00", source_commit_sha="unknown")
+    output = tmp_path / "evidence.json"
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+    assert any("unknown" in reason.lower() for reason in payload["reasons"])
+
+
+def test_gate_check_rejects_digest_mismatch(tmp_path: Path, capsys):
+    """Edited cells.jsonl after sweep must make gate-check HOLD with a mismatch HOLD.
+
+    Complements the unknown-SHA test: the same checksum-on-stage-dirs recomputation
+    that gate-check does should HOLD on a tampered artifact (integrity against drift).
+    """
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00")
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00")
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00")
+    # Tamper s1's cells.jsonl after _write_stage etched the digest.
+    (s1 / "cells.jsonl").write_text('{"tampered": true}\n', encoding="utf-8")
+    output = tmp_path / "evidence.json"
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "red"
+    assert any("digest mismatch" in reason.lower() for reason in payload["reasons"])
+    assert any("cells_jsonl" in reason for reason in payload["reasons"])
+
+
+def test_gate_check_rejects_old_evidence_without_digests(tmp_path: Path, capsys):
+    """Older evidence without digests must HOLD with a regenerate message, not crash."""
+    s1 = _write_stage(tmp_path, 1, "release-gate-01-native-dataframe", "2026-07-10T10:00:00", artifact_digests=None)
+    s2 = _write_stage(tmp_path, 2, "release-gate-02-docker-nonoltp", "2026-07-10T12:00:00", artifact_digests=None)
+    s3 = _write_stage(tmp_path, 3, "release-gate-03-docker-oltp", "2026-07-10T14:00:00", artifact_digests=None)
+    output = tmp_path / "evidence.json"
+    rc = _cli.main(
+        ["gate-check", "--stage1", str(s1), "--stage2", str(s2), "--stage3", str(s3), "--output", str(output)]
+    )
+    assert rc == 1
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert any("regenerate evidence" in reason.lower() for reason in payload["reasons"])
+
+
+def test_completeness_gate_digest_provenance(tmp_path: Path):
+    """End-to-end: a real sweep-produced GateSummary carries cell/sidecar/lifecycle digests."""
+    from tests.uat import orchestrator
+    from tests.uat.config import validate_config
+
+    cfg = validate_config({"name": "digest-provenance-e2e", "phases": ["execute", "report"]})
+    # Minimal execute so cells.jsonl + sidecar + gap_summary are written.
+    # Using 0-scale tpch with local-only platform keeps the sweep cheap.
+    log_dir = tmp_path / "logs"
+    orchestrator.run_sweep(cfg, log_dir_override=log_dir)
+    # The summary written by orchestrator should carry digests.
+    from tests.uat.gate_summary import read_gate_summary
+
+    summary = read_gate_summary(log_dir / "uat_gate_summary.json")
+    assert summary.artifact_digests is not None
+    assert set(summary.artifact_digests.keys()) == {"cells_jsonl", "accounting_sidecar", "lifecycle_log"}
+    import hashlib
+
+    for key, expected in summary.artifact_digests.items():
+        path = {
+            "cells_jsonl": log_dir / "cells.jsonl",
+            "accounting_sidecar": log_dir / "cells.jsonl.accounting.json",
+            "lifecycle_log": log_dir / "uat_lifecycle.log",
+        }[key]
+        if expected is None:
+            assert not path.exists(), f"expected absent {key} -> no file"
+        else:
+            assert path.is_file()
+            assert hashlib.sha256(path.read_bytes()).hexdigest() == expected
