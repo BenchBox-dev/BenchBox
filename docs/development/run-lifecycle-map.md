@@ -15,7 +15,6 @@ For real benchmark execution, `benchbox/cli/commands/run.py` delegates to:
 1. `BenchmarkOrchestrator.execute_benchmark(...)` in `benchbox/cli/orchestrator.py`
 2. `run_benchmark_lifecycle(...)` in `benchbox/core/runner/runner.py`
 
-`benchbox/cli/execution_pipeline.py` is not the default path used by `run.py`.
 
 ## Branch Matrix (`benchbox/cli/commands/run.py`)
 
@@ -39,7 +38,6 @@ These blocks are the target for unification in the refactor.
 ## Metadata Wiring Gap Identified
 
 Driver/runtime metadata enrichment currently exists in `ExecutionEngine._enrich_driver_metadata(...)`
-inside `benchbox/cli/execution_pipeline.py`.
 
 Because `run.py` executes through orchestrator/lifecycle, metadata wired only in pipeline code may be
 missing from real exported CLI artifacts unless enrichment is moved to canonical post-processing.
