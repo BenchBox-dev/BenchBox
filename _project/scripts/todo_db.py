@@ -1821,6 +1821,13 @@ def migrate_backend(backend: Path | str, actor: str | None = None) -> list[int]:
                     for statement in MIGRATIONS[target]:
                         conn.execute(statement)
                     conn.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(target),))
+                    log_event(
+                        conn,
+                        actor or default_actor(),
+                        None,
+                        "migrate",
+                        {"from": current, "to": target},
+                    )
                 version = target
                 applied.append(target)
         return applied
@@ -1861,6 +1868,13 @@ def migrate_db(db_path: Path, *, actor: str | None = None) -> list[int]:
                     for statement in MIGRATIONS[target]:
                         raw.execute(statement)
                     raw.execute("UPDATE meta SET value = ? WHERE key = 'schema_version'", (str(target),))
+                    log_event(
+                        raw,
+                        actor or default_actor(),
+                        None,
+                        "migrate",
+                        {"from": current, "to": target},
+                    )
                 version = target
                 applied.append(target)
         return applied

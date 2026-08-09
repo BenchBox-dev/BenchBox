@@ -340,32 +340,53 @@ class TPCCompiler:
             with open(binary_path, "rb") as f:
                 binary_hash = hashlib.md5(f.read()).hexdigest()
 
-            # Read and parse checksums.md5 file
+            # Read and parse checksums.md5 file. Formats:
+            #   GNU: "hash  filename" (two columns, also used without the type prefix)
+            #   BSD: "MD5 (filename) = hash"  (darwin-x86_64, darwin tpc-ds x86, ...)
+            def _parse_manifest_line(raw: str) -> tuple[str, str] | None:
+                s = raw.strip()
+                if not s:
+                    return None
+                # BSD: MD5 (filename) = hash  — may also carry ./ prefix
+                if s.startswith("MD5") and "(" in s and ")" in s and "=" in s:
+                    try:
+                        lpar = s.index("(")
+                        rpar = s.index(")", lpar)
+                        eq = s.index("=", rpar)
+                        filename = s[lpar + 1 : rpar].strip().lstrip("./")
+                        expected_hash = s[eq + 1 :].strip().split()[0]
+                        if filename and expected_hash:
+                            return expected_hash, filename
+                    except ValueError:
+                        pass
+                # GNU: hash<space>filename (the manifest may also include the
+                # optional file-type indicator: "hash *filename" or "hash  filename")
+                parts = s.split()
+                if len(parts) >= 2:
+                    expected_hash = parts[0]
+                    filename = parts[-1].lstrip("*./")
+                    # A lone hash with no plausible filename (e.g. hash-only line)
+                    # is not a valid entry for a named binary.
+                    if expected_hash and filename:
+                        return expected_hash, filename
+                return None
+
             with open(checksum_file, encoding="utf-8") as f:
                 for line in f:
-                    line = line.strip()
-                    if not line:
+                    parsed = _parse_manifest_line(line)
+                    if parsed is None:
                         continue
-
-                    # Handle both formats: "hash filename" and "hash  filename"
-                    parts = line.split()
-                    if len(parts) >= 2:
-                        expected_hash = parts[0]
-                        filename = parts[-1]  # Take last part as filename
-
-                        # Normalize filenames - remove ./ prefix if present
-                        normalized_filename = filename.lstrip("./")
-                        if normalized_filename == binary_path.name:
-                            if binary_hash == expected_hash:
-                                logger.debug(f"Checksum verified for {binary_path.name}")
-                                _checksum_cache[binary_path] = True
-                                return True
-                            else:
-                                logger.warning(
-                                    f"Checksum mismatch for {binary_path.name}: expected {expected_hash}, got {binary_hash}"
-                                )
-                                _checksum_cache[binary_path] = False
-                                return False
+                    expected_hash, filename = parsed
+                    if filename == binary_path.name:
+                        if binary_hash == expected_hash:
+                            logger.debug(f"Checksum verified for {binary_path.name}")
+                            _checksum_cache[binary_path] = True
+                            return True
+                        logger.warning(
+                            f"Checksum mismatch for {binary_path.name}: expected {expected_hash}, got {binary_hash}"
+                        )
+                        _checksum_cache[binary_path] = False
+                        return False
 
             logger.warning(f"No checksum entry found for {binary_path.name}")
             _checksum_cache[binary_path] = True
