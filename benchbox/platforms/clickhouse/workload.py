@@ -134,6 +134,12 @@ class ClickHouseWorkloadMixin:
         statement = re.sub(r"\bFLOAT\s*\[\s*\d+\s*\]", "Array(Float32)", statement, flags=re.IGNORECASE)
         statement = re.sub(r"\bDOUBLE\s*\[\s*\d+\s*\]", "Array(Float64)", statement, flags=re.IGNORECASE)
 
+        # ClickHouse TIME requires enable_time_time64_type=1 (experimental).
+        # Portable remap to String ("HH:MM:SS") preserves semantics for benchmark
+        # data (coffeeshop order_time, tpcdi DIMTIME). Platform-level rule per
+        # preserves: do not add benchmark-name-only hacks.
+        statement = re.sub(r"\bTIME\b", "String", statement, flags=re.IGNORECASE)
+
         tuning_clauses = self._resolve_tuned_ddl_clauses(statement, table_tunings)
         if nullable_columns:
             key_columns = self._resolve_key_columns(statement, tuning_clauses, nullable_columns)
