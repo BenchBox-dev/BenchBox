@@ -17,12 +17,28 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
+from benchbox.core.results import analytics as _core_analytics
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.mcp.errors import ErrorCode, make_error, make_not_found_error
 from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
 
 logger = logging.getLogger(__name__)
+
+# Keep the historical private names available to local parity tests and
+# downstream callers while keeping one implementation in the core layer.
+_classify_query_changes = _core_analytics._classify_query_changes
+_compute_group_stats = _core_analytics._compute_group_stats
+_extract_keyed_timings = _core_analytics._extract_keyed_timings
+_extract_measurement_timings = _core_analytics._extract_measurement_timings
+_extract_run_identity = _core_analytics._extract_run_identity
+_list_result_files = _core_analytics._list_result_files
+_load_regression_runs = _core_analytics._load_regression_runs
+_load_trend_data_point = _core_analytics._load_trend_data_point
+_matches_filters = _core_analytics._matches_filters
+_resolve_date_group_key = _core_analytics._resolve_date_group_key
+_resolve_group_key = _core_analytics._resolve_group_key
+_resolve_timestamp_str = _core_analytics._resolve_timestamp_str
 
 # Tool annotations for read-only analytics tools
 ANALYTICS_READONLY_ANNOTATIONS = ToolAnnotations(
