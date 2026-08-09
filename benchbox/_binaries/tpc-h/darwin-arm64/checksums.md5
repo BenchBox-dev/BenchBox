@@ -1,3 +1,3 @@
-60fd091f0b5dfdfdafcd352a73c81eb8 dbgen
-f56daf0bc329d1da241291ce3758ff8d qgen
-878d277d8f6989bf5a3ec0d45f1b4696 dists.dss
+47d2822feb2c00fbf3bbe606e5837418 benchbox/_binaries/tpc-h/darwin-arm64/dbgen
+944c637af7b0601dbe9dee3abde994c6 benchbox/_binaries/tpc-h/darwin-arm64/qgen
+878d277d8f6989bf5a3ec0d45f1b4696 benchbox/_binaries/tpc-h/darwin-arm64/dists.dss
