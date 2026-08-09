@@ -136,9 +136,14 @@ class ClickHouseWorkloadMixin:
 
         # ClickHouse TIME requires enable_time_time64_type=1 (experimental).
         # Portable remap to String ("HH:MM:SS") preserves semantics for benchmark
-        # data (coffeeshop order_time, tpcdi DIMTIME). Platform-level rule per
-        # preserves: do not add benchmark-name-only hacks.
-        statement = re.sub(r"\bTIME\b", "String", statement, flags=re.IGNORECASE)
+        # data (coffeeshop order_time, tpcdi DIMTIME). Restrict this to column type
+        # positions so identifiers such as ``time`` in keys remain unchanged.
+        statement = re.sub(
+            r"(?P<prefix>[,(]\s*(?:\"[^\"]+\"|`[^`]+`|[A-Za-z_]\w*)\s+)TIME\b",
+            r"\g<prefix>String",
+            statement,
+            flags=re.IGNORECASE,
+        )
 
         tuning_clauses = self._resolve_tuned_ddl_clauses(statement, table_tunings)
         if nullable_columns:

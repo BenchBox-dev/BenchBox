@@ -609,6 +609,16 @@ class TestClickHouseAdapter:
             assert "my_float_col INT" in mixed_out
             assert "FLOAT[" not in mixed_out
 
+            time_ddl = (
+                "CREATE TABLE metrics (time TIMESTAMP, metric_time TIME, hostname VARCHAR(64), "
+                "PRIMARY KEY (time, hostname))"
+            )
+            time_out = adapter._optimize_table_definition(time_ddl)
+            assert "time TIMESTAMP" in time_out
+            assert "metric_time String" in time_out
+            assert "PRIMARY KEY (time, hostname)" in time_out
+            assert "String TIMESTAMP" not in time_out
+
             # Nullable wrapping is confined to selected type spans. A nested
             # comma in DECIMAL must not consume the following compact column.
             compact = "CREATE TABLE t (amount DECIMAL(10,2), next_col INTEGER, tail VARCHAR(5))"
