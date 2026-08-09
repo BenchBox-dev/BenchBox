@@ -343,7 +343,7 @@ tool.
 | MCP Tool | Category | CLI counterpart(s) | Notes |
 |---|---|---|---|
 | `list_available` | discovery | `benchbox platforms list`, `benchbox benchmarks list` | Discovery inventory. CLI lists are the authoritative registry read path; MCP exposes the same metadata via registry. |
-| `get_benchmark_info` | discovery | `benchbox benchmarks info <id>` | Single-benchmark metadata, query counts, and scale constraints. |
+| `get_benchmark_info` | discovery | `benchbox benchmarks list` | Single-benchmark metadata, query counts, and scale constraints. CLI `list` is the registry read path; MCP returns enriched per-ID detail via `get_benchmark_info`. |
 | `system_profile` | discovery | `benchbox profile` | Host, CPU, memory, and package facts. |
 | `check_dependencies` | discovery | `benchbox check-deps [platform]` | Dependency availability and install guidance. |
 | `run_benchmark` | execution | `benchbox run` | Scoped subset of `benchbox run`; omission details are in the run-surface ledger below. |
@@ -351,7 +351,7 @@ tool.
 | `get_results` | results | `benchbox results`, `benchbox export` | Lists, reads, and exports result bundles; MCP inline-reads while CLI renders to stdout/files and supports cloud export. |
 | `analyze_results` | analytics | `benchbox compare`, `benchbox report`, `benchbox aggregate` | Comparison, regression, trend, and aggregation over result bundles. |
 | `get_query_plan` | analytics | `benchbox show-plan`, `benchbox compare-plans` | Reads captured plans from a result bundle; CLI also renders live plans. |
-| `validate_results` | analytics | `benchbox validate` | Result JSON integrity and believability checks. |
+| `validate_results` | analytics | `_project/scripts/validate_results.py` | Result JSON integrity and believability checks (`benchbox validate` checks config YAML, not result bundles). |
 | `suggest_charts` | visualization | `benchbox visualize` | Suggests semantic chart types for result files. |
 | `generate_chart` | visualization | `benchbox visualize` | Generates ASCII charts; MCP is inline-only by contract, CLI may write files. |
 
@@ -369,6 +369,7 @@ tool.
 | `benchbox tuning` | not-yet-demanded | Tuning template discovery and validation; promotion would be the enum subset (`tuned`/`notuning`/`auto`), not YAML paths. |
 | `benchbox plan-history` | not-yet-demanded | Plan evolution history over multiple runs; bounded read, no client demand yet. |
 | `benchbox download-answers` | security-scoped | Fetches external TPC answer keys from a remote source; network fetch with no tenant budget. |
+| `benchbox metrics` | not-yet-demanded | QphH composite metric calculation; bounded, no MCP client has demanded it. |
 | `benchbox config` / `benchbox validate` (config file) | not-yet-demanded | Config-file syntax and completeness check; file-path input outside the MCP result-registry surface. |
 
 ### Scoped-Surface Omission Ledger — `benchbox run` Flags

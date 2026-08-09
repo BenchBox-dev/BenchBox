@@ -181,7 +181,7 @@ _EXPECTED_TOOL_CLI_MAP: dict[str, str] = {
     # tool -> representative CLI counterpart substring that must appear in the
     # table's CLI column.  ``none`` is the literal sentinel for MCP-only tools.
     "list_available": "benchbox platforms list",
-    "get_benchmark_info": "benchbox benchmarks info",
+    "get_benchmark_info": "benchbox benchmarks list",
     "system_profile": "benchbox profile",
     "check_dependencies": "benchbox check-deps",
     "run_benchmark": "benchbox run",
@@ -189,7 +189,7 @@ _EXPECTED_TOOL_CLI_MAP: dict[str, str] = {
     "get_results": "benchbox results",
     "analyze_results": "benchbox compare",
     "get_query_plan": "benchbox show-plan",
-    "validate_results": "benchbox validate",
+    "validate_results": "validate_results",
     "suggest_charts": "benchbox visualize",
     "generate_chart": "benchbox visualize",
 }
@@ -205,6 +205,7 @@ _EXPECTED_OMITTED_CLI_FAMILIES: dict[str, str] = {
     "benchbox tuning": "not-yet-demanded",
     "benchbox plan-history": "not-yet-demanded",
     "benchbox download-answers": "security-scoped",
+    "benchbox metrics": "not-yet-demanded",
 }
 
 
