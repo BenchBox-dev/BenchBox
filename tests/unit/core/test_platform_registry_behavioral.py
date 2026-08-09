@@ -30,7 +30,7 @@ from benchbox.core.platform_registry import (
 )
 from benchbox.platforms.base import PlatformAdapter
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 PLATFORM_MANIFEST_GENERATOR = Path(__file__).resolve().parents[3] / "_project" / "scripts" / "platform_manifest.py"
 requires_dev_manifest_generator = pytest.mark.skipif(

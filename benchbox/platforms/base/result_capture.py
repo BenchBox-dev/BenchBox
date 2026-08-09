@@ -1553,7 +1553,17 @@ class ResultCaptureMixin:
 
             query_executions: list[QueryExecution] = []
             for idx, query_result in enumerate(stream_result.query_results, start=1):
-                execution_order = query_result.get("position") or query_result.get("execution_order") or idx
+                # ``position`` is the stream-local slot. It is deliberately
+                # distinct from the flattened result's global execution order;
+                # preserve an explicit zero instead of using truthiness.
+                position = query_result.get("position")
+                execution_order_value = query_result.get("execution_order")
+                if position is not None:
+                    execution_order = position
+                elif execution_order_value is not None:
+                    execution_order = execution_order_value
+                else:
+                    execution_order = idx
                 execution_time_ms = int(float(query_result.get("execution_time_seconds", 0.0)) * 1000)
 
                 query_executions.append(

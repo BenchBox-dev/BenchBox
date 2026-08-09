@@ -152,6 +152,29 @@ def test_legacy_adapter_preserves_typed_metadata_without_truthiness_loss() -> No
     assert restored == legacy
 
 
+def test_stream_position_is_operational_and_does_not_conflict_with_execution_order() -> None:
+    execution = query_execution_from_legacy_dict(
+        {
+            "query_id": "Q1",
+            "execution_order": 19,
+            "position": 1,
+            "execution_time_seconds": 0.25,
+            "status": "SUCCESS",
+        }
+    )
+
+    assert execution.execution_order == 19
+    assert execution.execution_time_ms == 250.0
+
+
+def test_position_only_input_does_not_promote_stream_slot_to_execution_order() -> None:
+    execution = query_execution_from_legacy_dict(
+        {"query_id": "Q1", "position": 0, "execution_time_seconds": 0.25, "status": "SUCCESS"}
+    )
+
+    assert execution.execution_order is None
+
+
 def test_missing_and_null_optional_values_do_not_become_zero() -> None:
     for legacy in ({"query_id": "Q1", "status": "SUCCESS"}, {"query_id": "Q1", "status": "SUCCESS", "rows": None}):
         execution = query_execution_from_legacy_dict(legacy)

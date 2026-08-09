@@ -1422,6 +1422,23 @@ class TestStandardExecutionPhase:
         assert result[0].query_id == "Q1"  # Default
         assert result[0].run_type == "measurement"
 
+    def test_create_standard_execution_phase_keeps_global_order_when_position_is_present(self):
+        adapter = MockPlatformAdapter()
+
+        result = adapter._create_standard_execution_phase(
+            [
+                {
+                    "query_id": "Q19",
+                    "execution_order": 19,
+                    "position": 1,
+                    "execution_time_seconds": 0.25,
+                    "status": "SUCCESS",
+                }
+            ]
+        )
+
+        assert result[0].execution_order == 19
+
 
 class TestThroughputPhaseCreation:
     """Tests for throughput phase creation."""
@@ -1504,6 +1521,33 @@ class TestThroughputPhaseCreation:
 
         assert result is not None
         assert result.streams[0].query_executions[0].run_type == "warmup"
+
+    def test_create_throughput_phase_preserves_explicit_zero_position(self):
+        adapter = MockPlatformAdapter()
+        stream = Mock()
+        stream.stream_id = 0
+        stream.start_time = "2025-01-01T10:00:00"
+        stream.end_time = "2025-01-01T10:01:00"
+        stream.duration = 60.0
+        stream.query_results = [{"query_id": "Q1", "position": 0, "execution_time_seconds": 1.0, "success": True}]
+        stream.queries_executed = 1
+        stream.success = True
+        stream.error = None
+
+        throughput_result = Mock()
+        throughput_result.stream_results = [stream]
+        throughput_result.total_time = 60.0
+        throughput_result.start_time = stream.start_time
+        throughput_result.end_time = stream.end_time
+        throughput_result.config = Mock(num_streams=1)
+        throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 1
+        throughput_result.errors = []
+
+        result = adapter._create_throughput_phase(throughput_result)
+
+        assert result.streams[0].query_executions[0].execution_order == 0
 
 
 class TestGetExistingTables:

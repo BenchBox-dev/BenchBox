@@ -938,16 +938,21 @@ def _extract_query_ids(result: BenchmarkResults) -> list[str]:
     """
     query_ids = set()
 
+    def is_comparable(execution) -> bool:
+        # Older in-memory results omit status; retain those rows for backwards
+        # compatibility while excluding explicitly failed or skipped work.
+        return execution.status in {"SUCCESS", "UNKNOWN"}
+
     # From query_results
     for qr in result.query_results or []:
         execution = query_execution_from_legacy_dict(qr)
-        if execution.query_id:
+        if execution.query_id and is_comparable(execution):
             query_ids.add(execution.query_id)
 
     # From per_query_timings
     for timing in result.per_query_timings or []:
         execution = query_execution_from_legacy_dict(timing)
-        if execution.query_id:
+        if execution.query_id and is_comparable(execution):
             query_ids.add(execution.query_id)
 
     return sorted(query_ids)
@@ -994,12 +999,17 @@ def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
     """
     samples: dict[str, list[float]] = {}
 
+    def is_comparable(execution) -> bool:
+        # Older in-memory results omit status; retain those rows for backwards
+        # compatibility while excluding explicitly failed or skipped work.
+        return execution.status in {"SUCCESS", "UNKNOWN"}
+
     # From query_results
     for qr in result.query_results or []:
         execution = query_execution_from_legacy_dict(qr)
         query_id = execution.query_id
         time_ms = execution.execution_time_ms
-        if query_id and time_ms is not None:
+        if query_id and is_comparable(execution) and time_ms is not None:
             samples.setdefault(query_id, []).append(time_ms)
 
     # From per_query_timings (may have multiple runs)
@@ -1007,7 +1017,7 @@ def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
         execution = query_execution_from_legacy_dict(timing)
         query_id = execution.query_id
         time_ms = execution.execution_time_ms
-        if query_id and time_ms is not None:
+        if query_id and is_comparable(execution) and time_ms is not None:
             samples.setdefault(query_id, []).append(time_ms)
 
     return {query_id: sum(query_samples) / len(query_samples) for query_id, query_samples in samples.items()}
@@ -1030,10 +1040,15 @@ def _get_query_times_for_query(
     """
     times = []
 
+    def is_comparable(execution) -> bool:
+        # Older in-memory results omit status; retain those rows for backwards
+        # compatibility while excluding explicitly failed or skipped work.
+        return execution.status in {"SUCCESS", "UNKNOWN"}
+
     # From query_results
     for qr in result.query_results or []:
         execution = query_execution_from_legacy_dict(qr)
-        if execution.query_id == query_id:
+        if execution.query_id == query_id and is_comparable(execution):
             time_ms = execution.execution_time_ms
             if time_ms is not None:
                 times.append(time_ms)
@@ -1041,7 +1056,7 @@ def _get_query_times_for_query(
     # From per_query_timings
     for timing in result.per_query_timings or []:
         execution = query_execution_from_legacy_dict(timing)
-        if execution.query_id == query_id:
+        if execution.query_id == query_id and is_comparable(execution):
             time_ms = execution.execution_time_ms
             if time_ms is not None:
                 times.append(time_ms)

@@ -146,6 +146,19 @@ class TestExecutionTimeNormalization:
         assert _get_query_times_for_query(result, "Q1") == [0.0]
         assert _get_query_times_for_query(result, "Q2") == [0.0]
 
+    def test_failed_queries_are_excluded_from_comparison_samples(self):
+        result = create_mock_result("duckdb", {})
+        result.query_results = [
+            {"query_id": "Q1", "execution_time_ms": 100.0, "status": "FAILED"},
+            {"query_id": "Q2", "execution_time_ms": 0.0, "status": "SUCCESS"},
+        ]
+        result.per_query_timings = [{"query_id": "Q3", "execution_time_seconds": 0.5, "status": "failed"}]
+
+        assert _extract_query_times(result) == {"Q2": 0.0}
+        assert _get_query_times_for_query(result, "Q1") == []
+        assert _get_query_times_for_query(result, "Q2") == [0.0]
+        assert _get_query_times_for_query(result, "Q3") == []
+
     def test_repeated_query_samples_use_order_independent_arithmetic_mean(self):
         result = create_mock_result("duckdb", {})
         result.query_results = [{"query_id": "Q1", "execution_time_ms": 100.0}]

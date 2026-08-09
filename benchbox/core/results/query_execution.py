@@ -16,6 +16,8 @@ rows                       rows_returned, rows,        rows
 status                     status                     status
 iteration                  iteration, iter            iter
 stream                     stream_id, stream          stream
+execution order            execution_order           (not serialized)
+stream query position      position (operational)    (not serialized)
 role / phase               run_type, runType /        run_type / test_type
                             test_type
 digest                     result_digest, digest      digest
@@ -28,7 +30,11 @@ plan                       query_plan and plan fields .plans.json companion
 Compact v2 intentionally omits null optional values.  Numeric zero, boolean
 false, and empty dictionaries are retained when the schema has a key for them.
 When aliases are simultaneously populated they must agree; the adapter rejects
-conflicts instead of relying on truthiness or field order.
+conflicts instead of relying on truthiness or field order.  ``position`` is not
+an alias for ``execution_order``: throughput streams use it as a stream-local
+slot, while the canonical execution order is the ordering of the flattened
+result.  The throughput phase consumes ``position`` explicitly; generic result
+normalization ignores it as operational metadata.
 
 Unknown-field policy is boundary-specific.  Compact-v2 rows are canonical
 artifacts, so every key must be in ``COMPACT_V2_QUERY_FIELDS``; unknown keys are
@@ -176,6 +182,9 @@ LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
         "platform",
         "platform_metrics",
         "platform_type",
+        # Throughput producers use this as a stream-local query slot. It is
+        # intentionally distinct from the flattened canonical execution order.
+        "position",
         "query_info",
         "query_name",
         "query_text",
@@ -627,7 +636,7 @@ def query_execution_from_legacy_dict(
             _resolve_alias(
                 source,
                 "execution order",
-                ("execution_order", "position"),
+                ("execution_order",),
                 transform=lambda raw: normalize_non_negative_integer("execution_order", raw),
             )
         ),
