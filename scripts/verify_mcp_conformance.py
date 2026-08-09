@@ -98,39 +98,62 @@ def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None
             protocol_version,
         ]
         result = subprocess.run(command, capture_output=True, text=True, timeout=600)  # noqa: S603
-        if result.returncode != 0:
-            output = (result.stdout or "") + (result.stderr or "")
-            # The four revision-bound IDs are the only allowed failures; any other
-            # failure (or a run with no allowed failures but non-zero exit) keeps
-            # the gate fail-closed. Warnings (SHOULD) do not contribute to the
-            # failure set and are already surfaced in the conformance log.
-            failed_ids = []
-            for line in output.splitlines():
-                if "FAILURE" in line:
-                    # Extract the bracketed ID, e.g. [sep-2575-server-rejects-undeclared-capability]
-                    import re
+        output = (result.stdout or "") + (result.stderr or "")
+        # Parse all FAILURE lines regardless of exit code so we can validate
+        # the exact baseline and also detect unparseable nonzero exits.
+        failed_ids: list[str] = []
+        for line in output.splitlines():
+            if "FAILURE" in line:
+                import re
 
-                    m = re.search(r"\[(sep-[^\]]+)\]", line)
-                    if m:
-                        failed_ids.append(m.group(1).strip())
-                    else:
-                        failed_ids.append(line.strip())
-            # Map short IDs to fully-qualified server-stateless IDs for comparison
-            qualified_failed = []
-            for fid in failed_ids:
-                if ":" not in fid:
-                    qualified_failed.append(f"{scenario}:{fid}")
+                m = re.search(r"\[(sep-[^\]]+)\]", line)
+                if m:
+                    failed_ids.append(m.group(1).strip())
                 else:
-                    qualified_failed.append(fid)
+                    failed_ids.append(line.strip())
+        qualified_failed: list[str] = []
+        for fid in failed_ids:
+            if ":" not in fid:
+                qualified_failed.append(f"{scenario}:{fid}")
+            else:
+                qualified_failed.append(fid)
+
+        expected_for_scenario = [fid for fid in EXPECTED_FAILURE_IDS if fid.startswith(f"{scenario}:")]
+        # P1: nonzero exit with no parseable FAILURE is an unparseable transport/startup error
+        if result.returncode != 0 and not qualified_failed:
+            sys.stdout.write(output)
+            sys.stderr.write(result.stderr or "")
+            raise subprocess.CalledProcessError(
+                result.returncode, command, output=result.stdout, stderr=result.stderr
+            )
+        # P2: require exact baseline match, not just subset, for every scenario
+        if set(qualified_failed) != set(expected_for_scenario):
+            # Covers both unexpected and missing (stale) IDs
             unexpected = [fid for fid in qualified_failed if fid not in EXPECTED_FAILURE_IDS]
-            if unexpected:
+            missing = [fid for fid in expected_for_scenario if fid not in qualified_failed]
+            if unexpected or missing:
                 sys.stdout.write(output)
                 sys.stderr.write(result.stderr or "")
                 raise subprocess.CalledProcessError(
                     result.returncode, command, output=result.stdout, stderr=result.stderr
                 )
-            # Only expected failures: treat as pass but surface the log for audit
+        # For the expected non-zero case (server-stateless with 4 baseline failures),
+        # also ensure the exit code is non-zero; a zero exit with the baseline
+        # would indicate the baseline is no longer exercised.
+        if expected_for_scenario and result.returncode == 0:
+            # Baseline expected failures but tool exited 0 -> stale baseline
             sys.stdout.write(output)
+            sys.stderr.write(result.stderr or "")
+            raise subprocess.CalledProcessError(
+                result.returncode, command, output=result.stdout, stderr=result.stderr
+            )
+        # If we reach here, the scenario passed with exact expected failures
+        if result.returncode != 0:
+            sys.stdout.write(output)
+        else:
+            # Success case with no expected failures (most scenarios) - still surface log
+            if output.strip():
+                sys.stdout.write(output)
 
 
 def _run_inspector(url: str) -> None:
