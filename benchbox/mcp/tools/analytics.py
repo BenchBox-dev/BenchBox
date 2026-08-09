@@ -18,19 +18,16 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.metrics import calculate_named_metric, percentile_ms, sample_stdev_ms
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.core.results.regression_policy import (
     classify_change,
     classify_severity,
-    classify_trend,
     percent_change,
 )
 from benchbox.mcp.errors import ErrorCode, make_error, make_not_found_error
 from benchbox.mcp.security import PathProvider, resolve_path_provider
 from benchbox.mcp.tools.path_utils import resolve_result_file_path
-from benchbox.utils.printing import get_quiet_console
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
@@ -402,20 +399,14 @@ def _compare_results_impl(
     *,
     anonymize: bool,
 ) -> dict[str, Any]:
-    """Compare two benchmark runs.
+    """Compare two benchmark runs (transport wrapper; core owns assembly)."""
+    from benchbox.core.results.analytics import compare_results as _core_compare
 
-    ``anonymize`` is required rather than defaulted: it governs a trust
-    boundary, and a permissive default fails open on the remote path.
-    """
     # egress-reviewed: local stdio serves a same-trust-boundary agent that
     # needs real paths/hostnames to act on results; secrets are already
     # redacted at capture time by sanitize_platform_options, and exception
     # text is scrubbed in mcp/errors.py. Remote/tenant mode is a different
     # trust boundary, so the caller sets anonymize=True there.
-    exporter = ResultExporter(
-        anonymize=anonymize,
-        console=get_quiet_console(),
-    )
     path1 = resolve_result_file_path(file1, results_dir)
     path2 = resolve_result_file_path(file2, results_dir)
 
@@ -432,7 +423,7 @@ def _compare_results_impl(
             details={"file_type": "comparison", "requested_file": file2},
         )
 
-    comparison = exporter.compare_results(path1, path2)
+    comparison = _core_compare(path1, path2, threshold_percent, anonymize=anonymize)
     if "error" in comparison:
         return make_error(
             ErrorCode.INTERNAL_ERROR,
@@ -442,29 +433,6 @@ def _compare_results_impl(
                 "current_loaded": comparison.get("current_loaded"),
             },
         )
-
-    regressions: list[str] = []
-    improvements: list[str] = []
-    stable: list[str] = []
-
-    for entry in comparison.get("query_comparisons", []):
-        change_pct = entry.get("change_percent", 0)
-        if change_pct > threshold_percent:
-            regressions.append(entry.get("query_id"))
-        elif change_pct < -threshold_percent:
-            improvements.append(entry.get("query_id"))
-        else:
-            stable.append(entry.get("query_id"))
-
-    comparison["summary"] = {
-        "total_queries_compared": len(comparison.get("query_comparisons", [])),
-        "regressions": len(regressions),
-        "improvements": len(improvements),
-        "stable": len(stable),
-        "threshold_percent": threshold_percent,
-    }
-    comparison["regressions"] = [q for q in regressions if q]
-    comparison["improvements"] = [q for q in improvements if q]
 
     return comparison
 
@@ -580,68 +548,10 @@ def _detect_regressions_impl(
     lookback_runs: int,
     results_dir: Path,
 ) -> dict[str, Any]:
-    """Detect performance regressions across recent runs."""
-    if not results_dir.exists():
-        return {"status": "no_data", "message": f"No results directory found at {results_dir}", "regressions": []}
+    """Detect performance regressions across recent runs (transport wrapper)."""
+    from benchbox.core.results.analytics import detect_regressions as _core_detect
 
-    result_files = _list_result_files(results_dir)
-    if len(result_files) < 2:
-        return {
-            "status": "insufficient_data",
-            "message": f"Need at least 2 benchmark runs for comparison, found {len(result_files)}",
-            "regressions": [],
-        }
-
-    runs = _load_regression_runs(result_files, platform, benchmark, lookback_runs)
-
-    if len(runs) < 2:
-        return {
-            "status": "insufficient_data",
-            "message": f"Need at least 2 comparable runs, found {len(runs)} matching filters",
-            "filters_applied": {"platform": platform, "benchmark": benchmark},
-            "regressions": [],
-        }
-
-    newer_run = runs[0]
-    older_run = runs[1]
-
-    older_timings = _extract_keyed_timings(older_run["data"])
-    newer_timings = _extract_keyed_timings(newer_run["data"])
-
-    regressions, improvements, stable = _classify_query_changes(older_timings, newer_timings, threshold_percent)
-
-    all_queries = set(older_timings.keys()) | set(newer_timings.keys())
-    total_old = sum(older_timings.values())
-    total_new = sum(newer_timings.values())
-    total_delta_pct = ((total_new - total_old) / total_old * 100) if total_old > 0 else 0
-
-    return {
-        "status": "completed",
-        "comparison": {
-            "baseline": {
-                "file": older_run["file"],
-                "platform": older_run["platform"],
-                "benchmark": older_run["benchmark"],
-                "timestamp": older_run["timestamp"],
-            },
-            "current": {
-                "file": newer_run["file"],
-                "platform": newer_run["platform"],
-                "benchmark": newer_run["benchmark"],
-                "timestamp": newer_run["timestamp"],
-            },
-        },
-        "summary": {
-            "total_queries": len(all_queries),
-            "regressions": len(regressions),
-            "improvements": len(improvements),
-            "stable": len(stable),
-            "total_runtime_delta_percent": round(total_delta_pct, 1),
-            "threshold_percent": threshold_percent,
-        },
-        "regressions": regressions,
-        "improvements": improvements[:5],
-    }
+    return _core_detect(results_dir, platform, benchmark, threshold_percent, lookback_runs)
 
 
 def _resolve_timestamp_str(timestamp: Any, file_path: Path) -> str:
@@ -707,53 +617,18 @@ def _get_performance_trends_impl(
     limit: int,
     results_dir: Path,
 ) -> dict[str, Any]:
-    """Get performance trends over multiple benchmark runs."""
-    valid_metrics = ["geometric_mean", "p50", "p95", "p99", "total_time"]
-    metric_lower = metric.lower()
-    if metric_lower not in valid_metrics:
+    """Get performance trends over multiple benchmark runs (transport wrapper)."""
+    from benchbox.core.results.analytics import get_performance_trends as _core_trends
+
+    result = _core_trends(results_dir, platform, benchmark, metric, limit)
+    # Map core error sentinel to MCP error envelope for invalid-metric case.
+    if "error" in result and result.get("error_code") == "VALIDATION_ERROR":
         return make_error(
             ErrorCode.VALIDATION_ERROR,
-            f"Invalid metric: {metric}",
-            details={"valid_metrics": valid_metrics},
+            result["error"],
+            details=result.get("details", {}),
         )
-
-    if not results_dir.exists():
-        return {"status": "no_data", "message": f"No results directory found at {results_dir}", "trends": []}
-
-    result_files = _list_result_files(results_dir)
-
-    runs: list[dict[str, Any]] = []
-    for file_path in result_files:
-        if len(runs) >= limit:
-            break
-        data_point = _load_trend_data_point(file_path, platform, benchmark, metric_lower)
-        if data_point is not None:
-            runs.append(data_point)
-
-    if not runs:
-        return {
-            "status": "no_matching_data",
-            "message": "No benchmark runs match the specified filters",
-            "filters_applied": {"platform": platform, "benchmark": benchmark},
-            "trends": [],
-        }
-
-    runs.reverse()
-    trend_direction, trend_pct = classify_trend([run["value"] for run in runs])
-
-    return {
-        "status": "success",
-        "metric": metric_lower,
-        "filters_applied": {"platform": platform, "benchmark": benchmark, "limit": limit},
-        "summary": {
-            "run_count": len(runs),
-            "first_run": runs[0]["timestamp"] if runs else None,
-            "last_run": runs[-1]["timestamp"] if runs else None,
-            "trend_direction": trend_direction,
-            "trend_percent": round(trend_pct, 1),
-        },
-        "data_points": runs,
-    }
+    return result
 
 
 def _resolve_date_group_key(data: dict[str, Any], file_path: Path) -> str:
@@ -815,71 +690,17 @@ def _aggregate_results_impl(
     group_by: str,
     results_dir: Path,
 ) -> dict[str, Any]:
-    """Aggregate multiple benchmark results into summary statistics."""
-    valid_group_by = ["platform", "benchmark", "date"]
-    group_by_lower = group_by.lower()
-    if group_by_lower not in valid_group_by:
+    """Aggregate multiple benchmark results (transport wrapper; core owns assembly)."""
+    from benchbox.core.results.analytics import aggregate_results as _core_aggregate
+
+    result = _core_aggregate(results_dir, platform, benchmark, group_by)
+    if "error" in result and result.get("error_code") == "VALIDATION_ERROR":
         return make_error(
             ErrorCode.VALIDATION_ERROR,
-            f"Invalid group_by: {group_by}",
-            details={"valid_options": valid_group_by},
+            result["error"],
+            details=result.get("details", {}),
         )
-
-    if not results_dir.exists():
-        return {"status": "no_data", "message": f"No results directory found at {results_dir}", "aggregates": {}}
-
-    result_files = _list_result_files(results_dir)
-    groups: dict[str, list[dict[str, Any]]] = {}
-
-    for file_path in result_files:
-        try:
-            with open(file_path, encoding="utf-8") as f:
-                data = json.load(f)
-
-            run_platform, benchmark_block, run_benchmark = _extract_run_identity(data)
-
-            if not _matches_filters(run_platform, run_benchmark, platform, benchmark):
-                continue
-
-            timings = _extract_measurement_timings(data)
-            if not timings:
-                continue
-
-            group_key = _resolve_group_key(group_by_lower, run_platform, run_benchmark, data, file_path)
-            groups.setdefault(group_key, []).append(
-                {
-                    "file": file_path.name,
-                    "timings": timings,
-                    "total_time": sum(timings),
-                    "query_count": len(timings),
-                    "scale_factor": benchmark_block.get("scale_factor"),
-                }
-            )
-
-        except Exception as e:
-            logger.warning("Could not parse result file %s (%s)", file_path.name, type(e).__name__)
-            continue
-
-    if not groups:
-        return {
-            "status": "no_matching_data",
-            "message": "No benchmark runs match the specified filters",
-            "filters_applied": {"platform": platform, "benchmark": benchmark},
-            "aggregates": {},
-        }
-
-    aggregates = {key: _compute_group_stats(runs) for key, runs in sorted(groups.items())}
-
-    return {
-        "status": "success",
-        "group_by": group_by_lower,
-        "filters_applied": {"platform": platform, "benchmark": benchmark},
-        "summary": {
-            "total_groups": len(aggregates),
-            "total_runs": sum(a["run_count"] for a in aggregates.values()),
-        },
-        "aggregates": aggregates,
-    }
+    return result
 
 
 def _extract_plan_summary(plan: dict) -> dict[str, Any]:

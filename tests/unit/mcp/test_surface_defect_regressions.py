@@ -178,10 +178,15 @@ class TestRemoteModeAnonymization:
     def test_compare_results_threads_the_anonymization_decision(self, tmp_path: Path):
         from benchbox.mcp.tools import analytics as analytics_module
 
-        with patch.object(analytics_module, "ResultExporter") as exporter_cls:
+        # After sinking, anonymization is threaded via core compare_results, not
+        # via a direct ResultExporter construction at the MCP layer.
+        (tmp_path / "a.json").write_text('{"platform": {"name": "duckdb"}, "benchmark": {"id": "tpch"}}')
+        (tmp_path / "b.json").write_text('{"platform": {"name": "duckdb"}, "benchmark": {"id": "tpch"}}')
+        with patch("benchbox.core.results.analytics.compare_results") as core_compare:
+            core_compare.return_value = {"status": "success", "query_comparisons": []}
             analytics_module._compare_results_impl("a.json", "b.json", 10.0, tmp_path, anonymize=True)
 
-        assert exporter_cls.call_args.kwargs["anonymize"] is True
+        assert core_compare.call_args.kwargs["anonymize"] is True
 
     @pytest.mark.parametrize(
         ("module_path", "function_name"),
