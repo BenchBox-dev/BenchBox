@@ -114,10 +114,6 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # fix-datafusion-df-mode-erasure: comment-only clarification of
     # PLATFORM_ALIASES' -df entries; no click surface in this module.
     "benchbox/cli/platform.py",
-    # cli-tuning-presort-hint: the interactive wizard body now derives its
-    # sorting hint/default from the core presort registry. This module has no
-    # Click decorators, so the change cannot alter the public CLI surface.
-    "benchbox/cli/tuning.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # pr-review-followup-1394: SingleStore credential setup is intentionally
