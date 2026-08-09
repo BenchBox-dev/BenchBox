@@ -77,7 +77,7 @@ def _mock_quick_restart(saved_config):
         patch("benchbox.cli.preferences.load_last_run_config", return_value=saved_config),
         patch("benchbox.cli.preferences.format_last_run_summary", return_value="saved run"),
         patch.object(_run_module.Confirm, "ask", side_effect=lambda prompt, default=False: True),
-        patch("benchbox.cli.preferences.save_last_run_config"),
+        patch("benchbox.cli.preferences.save_last_run_config") as save_last_run,
     ):
         profile = Mock(
             cpu_cores_logical=8,
@@ -98,6 +98,7 @@ def _mock_quick_restart(saved_config):
         )
         assert mocks["db_mgr"] is not None
         mocks["db_mgr"].return_value.create_config.return_value = database_config
+        mocks["save_last_run"] = save_last_run
         yield mocks
 
 
@@ -463,6 +464,38 @@ class TestCLIDataLoadModes:
             execution_context.compression_type,
             execution_context.compression_level,
         ) == (enabled, compression_type, level)
+
+    def test_quick_restart_saved_power_iterations_reach_execution_config(self):
+        """A five-iteration run must not silently restart with the three-iteration default."""
+        saved = {
+            "database": "duckdb",
+            "benchmark": "tpch",
+            "scale": 0.01,
+            "phases": ["power"],
+            "queries": None,
+            "tuning_mode": "notuning",
+            "table_mode": "native",
+            "mode": "sql",
+            "seed": 41,
+            "concurrency": 1,
+            "compress_data": True,
+            "compression_type": "zstd",
+            "compression_level": None,
+            "iterations": 5,
+            "replay_schema_version": 1,
+            "non_replayable_options": [],
+        }
+
+        with _mock_quick_restart(saved) as mocks:
+            result = self.runner.invoke(cli, ["run"])
+
+        assert result.exit_code == 0, result.output
+        config = mocks["orchestrator"].return_value.execute_benchmark.call_args.args[0]
+        assert config.options["power_iterations"] == 5
+        saved_call = mocks["save_last_run"].call_args.kwargs
+        assert saved_call["iterations"] == 5
+        assert saved_call["non_replayable_options"] == []
+        assert "not an exact replay" not in result.output
 
     def test_quick_restart_without_saved_seed_is_labeled_non_exact(self):
         saved = {

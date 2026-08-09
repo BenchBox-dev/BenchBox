@@ -93,6 +93,8 @@ def save_last_run_config(
     queries: Optional[list[str]] = None,
     mode: Optional[str] = None,
     seed: Optional[int] = None,
+    iterations: Optional[int] = None,
+    non_replayable_options: Optional[list[str]] = None,
     output: Optional[str] = None,
     additional_options: Optional[dict[str, Any]] = None,
 ) -> None:
@@ -112,6 +114,8 @@ def save_last_run_config(
         queries: Explicit query subset, or None for all queries
         mode: Resolved platform execution mode
         seed: RNG seed for reproducibility
+        iterations: Number of power measurement iterations, or None for the default
+        non_replayable_options: Active execution controls intentionally omitted from automatic replay
         output: Cloud storage output location (for cloud platforms)
         additional_options: Any additional configuration options
     """
@@ -129,6 +133,9 @@ def save_last_run_config(
         "queries": queries,
         "mode": mode,
         "seed": seed,
+        "iterations": iterations,
+        "replay_schema_version": 1,
+        "non_replayable_options": sorted(set(non_replayable_options or [])),
         "timestamp": datetime.now().isoformat(),
     }
 
@@ -311,6 +318,10 @@ def format_last_run_summary(config: dict[str, Any]) -> str:
     concurrency = config.get("concurrency", 1)
     if concurrency > 1:
         parts.append(f"{concurrency} streams")
+
+    iterations = config.get("iterations")
+    if iterations is not None:
+        parts.append(f"{iterations} power iterations")
 
     if "timestamp" in config:
         relative_time = _format_relative_time(config["timestamp"])

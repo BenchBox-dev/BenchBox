@@ -45,7 +45,9 @@ class RunRequest:
     compression_enabled: bool
     compression_type: str
     compression_level: int | None
+    iterations: int | None = None
     concurrency: int = 1
+    non_replayable_options: tuple[str, ...] = ()
     exact_replay: bool = True
     compatibility_notes: tuple[str, ...] = ()
 
@@ -81,8 +83,79 @@ class ResolvedRunPlan:
     compression_enabled: bool
     compression_type: str
     compression_level: int | None
+    iterations: int | None
     concurrency: int
     seed: int | None
+    non_replayable_options: tuple[str, ...]
+
+
+_NON_REPLAYABLE_OPTION_NAMES = frozenset(
+    {
+        "analyze_plans",
+        "benchmark_options",
+        "capture_plans",
+        "force",
+        "global_cache",
+        "ignore_memory_warnings",
+        "no_monitoring",
+        "normalize_plan_literals",
+        "official",
+        "plan_config",
+        "platform_options",
+        "presort",
+        "show_plans",
+        "sorted_ingestion_method",
+        "sorted_ingestion_mode",
+        "stats_per_table_timing",
+        "stats_reset",
+        "strict_translation",
+        "table_format",
+        "validation",
+    }
+)
+
+
+def _active_non_replayable_options(state: types.SimpleNamespace) -> tuple[str, ...]:
+    """Identify active execution controls that quick restart does not serialize.
+
+    Platform option values are deliberately excluded because option payloads may
+    contain credentials. Force regeneration is likewise never replayed
+    implicitly. The remaining controls require a future typed persistence
+    contract before they can safely be advertised as exact replay inputs.
+    """
+    checks = {
+        "analyze_plans": getattr(state, "analyze_plans", None) is not None,
+        "benchmark_options": bool(getattr(state, "benchmark_option_pairs", ())),
+        "capture_plans": bool(getattr(state, "capture_plans", False)),
+        "force": bool(getattr(getattr(state, "force_config", None) or getattr(state, "force", None), "any", False)),
+        "global_cache": bool(getattr(state, "global_cache", False)),
+        "ignore_memory_warnings": bool(getattr(state, "ignore_memory_warnings", False)),
+        "no_monitoring": bool(getattr(state, "no_monitoring", False)),
+        "normalize_plan_literals": bool(getattr(state, "normalize_plan_literals", False)),
+        "official": bool(getattr(state, "official", False)),
+        "plan_config": bool(getattr(state, "plan_config", None)),
+        "platform_options": bool(getattr(state, "platform_option_pairs", ())),
+        "presort": getattr(state, "presort", None) is not None,
+        "show_plans": bool(getattr(state, "show_plans", False)),
+        "sorted_ingestion_method": getattr(state, "sorted_ingestion_method", None) is not None,
+        "sorted_ingestion_mode": getattr(state, "sorted_ingestion_mode", None) is not None,
+        "stats_per_table_timing": bool(getattr(state, "stats_per_table_timing", False)),
+        "stats_reset": getattr(state, "stats_reset", None) is not None,
+        "strict_translation": bool(getattr(state, "strict_translation", False)),
+        "table_format": getattr(state, "table_format", None) is not None,
+        "validation": getattr(state, "validation", None) is not None,
+    }
+    return tuple(name for name, active in checks.items() if active)
+
+
+def _saved_non_replayable_options(saved: Mapping[str, Any]) -> tuple[str, ...]:
+    raw = saved.get("non_replayable_options", ())
+    if not isinstance(raw, (list, tuple)) or any(not isinstance(name, str) for name in raw):
+        raise ValueError("Saved quick-restart non_replayable_options must be a list of names")
+    unknown = set(raw) - _NON_REPLAYABLE_OPTION_NAMES
+    if unknown:
+        raise ValueError(f"Saved quick-restart contains unknown non-replayable options: {sorted(unknown)}")
+    return tuple(sorted(set(raw)))
 
 
 def current_run_request(state: types.SimpleNamespace) -> RunRequest:
@@ -103,7 +176,9 @@ def current_run_request(state: types.SimpleNamespace) -> RunRequest:
         compression_enabled=bool(compression.enabled),
         compression_type=compression.type,
         compression_level=compression.level,
+        iterations=getattr(state, "iterations", None),
         concurrency=int(getattr(state, "concurrency", 1)),
+        non_replayable_options=_active_non_replayable_options(state),
     )
 
 
@@ -139,8 +214,10 @@ def capture_resolved_run_plan(
         compression_enabled=state.compress_data,
         compression_type=state.compression_type,
         compression_level=state.compression_level,
+        iterations=request.iterations,
         concurrency=request.concurrency,
         seed=state.seed,
+        non_replayable_options=request.non_replayable_options,
     )
 
 
@@ -193,8 +270,12 @@ def _saved_compression(
     return raw_enabled, compression_type, compression_level
 
 
-def _saved_concurrency(saved: Mapping[str, Any]) -> int:
-    raw_concurrency = saved.get("concurrency", 1)
+def _saved_concurrency(
+    current: RunRequest,
+    saved: Mapping[str, Any],
+    explicit_fields: frozenset[str],
+) -> int:
+    raw_concurrency = current.concurrency if "concurrency" in explicit_fields else saved.get("concurrency", 1)
     if raw_concurrency is None:
         raw_concurrency = 1
     try:
@@ -206,7 +287,33 @@ def _saved_concurrency(saved: Mapping[str, Any]) -> int:
     return concurrency
 
 
+def _saved_iterations(
+    current: RunRequest,
+    saved: Mapping[str, Any],
+    explicit_fields: frozenset[str],
+) -> int | None:
+    raw_iterations = current.iterations if "iterations" in explicit_fields else saved.get("iterations")
+    if raw_iterations is None:
+        return None
+    if isinstance(raw_iterations, bool) or (isinstance(raw_iterations, float) and not raw_iterations.is_integer()):
+        raise ValueError("Saved quick-restart iterations must be an integer")
+    try:
+        iterations = int(raw_iterations)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Saved quick-restart iterations must be an integer") from exc
+    if iterations < 1:
+        raise ValueError("Saved quick-restart iterations must be at least one")
+    return iterations
+
+
+def _validate_replay_schema(saved: Mapping[str, Any]) -> None:
+    version = saved.get("replay_schema_version")
+    if version is not None and (isinstance(version, bool) or version != 1):
+        raise ValueError(f"Saved quick-restart replay schema is unsupported: {version!r}")
+
+
 def _replay_compatibility_notes(
+    current: RunRequest,
     saved: Mapping[str, Any],
     explicit_fields: frozenset[str],
     *,
@@ -224,6 +331,8 @@ def _replay_compatibility_notes(
         "mode": "mode",
         "seed": "seed",
         "compression": "compress_data",
+        "iterations": "iterations",
+        "concurrency": "concurrency",
     }
     notes = []
     for field in sorted(explicit_fields & saved_field_names.keys()):
@@ -237,6 +346,7 @@ def _replay_compatibility_notes(
         ("mode", "mode", "saved run did not record execution mode; used platform default"),
         ("compression", "compress_data", "saved run did not record compression enablement; assumed enabled"),
         ("concurrency", "concurrency", "saved run did not record concurrency; assumed one"),
+        ("iterations", "iterations", "saved run did not record power iterations; used the default"),
     )
     notes.extend(
         note
@@ -249,6 +359,10 @@ def _replay_compatibility_notes(
         notes.append("saved run did not record compression type; assumed zstd")
     if "compression" not in explicit_fields and compression_enabled and "compression_level" not in saved:
         notes.append("saved run did not record compression level; used algorithm default")
+    if saved.get("replay_schema_version") != 1:
+        notes.append("saved run predates complete execution-option replay accounting")
+    active_non_replayable = sorted(set(_saved_non_replayable_options(saved)) | set(current.non_replayable_options))
+    notes.extend(f"execution option is not persisted for automatic replay: {name}" for name in active_non_replayable)
     return tuple(notes)
 
 
@@ -276,6 +390,7 @@ def merge_quick_restart_request(
             return saved[saved_field]
         raise ValueError(f"Saved quick-restart configuration is missing: {saved_field}")
 
+    _validate_replay_schema(saved)
     platform = required("platform", "database", current.platform)
     benchmark = required("benchmark", "benchmark", current.benchmark)
     if not isinstance(platform, str) or not platform.strip():
@@ -305,10 +420,12 @@ def merge_quick_restart_request(
         except (TypeError, ValueError) as exc:
             raise ValueError("Saved quick-restart seed must be an integer") from exc
 
-    compression_enabled, compression_type, compression_level = _saved_compression(current, saved, explicit_fields)
-    concurrency = _saved_concurrency(saved)
+    iterations = _saved_iterations(current, saved, explicit_fields)
 
-    notes = _replay_compatibility_notes(saved, explicit_fields, compression_enabled=compression_enabled)
+    compression_enabled, compression_type, compression_level = _saved_compression(current, saved, explicit_fields)
+    concurrency = _saved_concurrency(current, saved, explicit_fields)
+
+    notes = _replay_compatibility_notes(current, saved, explicit_fields, compression_enabled=compression_enabled)
 
     raw_queries = current.queries if "queries" in explicit_fields else saved.get("queries")
     if raw_queries is None:
@@ -337,7 +454,11 @@ def merge_quick_restart_request(
         compression_enabled=compression_enabled,
         compression_type=compression_type,
         compression_level=compression_level,
+        iterations=iterations,
         concurrency=concurrency,
+        non_replayable_options=tuple(
+            sorted(set(_saved_non_replayable_options(saved)) | set(current.non_replayable_options))
+        ),
         exact_replay=not notes,
         compatibility_notes=notes,
     )
@@ -366,6 +487,7 @@ def apply_run_request(state: types.SimpleNamespace, request: RunRequest) -> None
     state.no_compression = not compression.enabled
     state.compression_type = compression.type
     state.compression_level = compression.level
+    state.iterations = request.iterations
     state.concurrency = request.concurrency
     state.run_request = request
 

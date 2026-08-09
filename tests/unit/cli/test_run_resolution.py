@@ -11,7 +11,13 @@ import click
 import pytest
 
 from benchbox.cli.benchmarks import BenchmarkConfig
-from benchbox.cli.composite_params import CompressionConfig, ForceConfig, ValidationConfig
+from benchbox.cli.composite_params import (
+    CompressionConfig,
+    ForceConfig,
+    PlanCaptureConfig,
+    TableFormatConfig,
+    ValidationConfig,
+)
 from benchbox.cli.run_resolution import ResolvedRunPlan, RunRequest, merge_quick_restart_request, parse_saved_phases
 
 __import__("benchbox.cli.commands.run")
@@ -82,10 +88,12 @@ def test_saved_request_uses_documented_compatibility_defaults_and_marks_missing_
     assert merged.phases == ("load", "power")
     assert merged.tuning == "tuned"
     assert merged.table_mode == "native"
+    assert merged.concurrency == 1
     assert merged.exact_replay is False
     assert "saved run did not record a seed" in merged.compatibility_notes
     assert "saved run did not record phases; assumed load,power" in merged.compatibility_notes
     assert "saved run did not record execution mode; used platform default" in merged.compatibility_notes
+    assert "saved run did not record concurrency; assumed one" in merged.compatibility_notes
 
 
 def test_explicit_current_values_override_saved_preferences():
@@ -152,12 +160,183 @@ def test_fully_recorded_saved_request_is_exact():
             "compression_type": "zstd",
             "compression_level": None,
             "concurrency": 1,
+            "iterations": None,
+            "replay_schema_version": 1,
+            "non_replayable_options": [],
         },
         explicit_fields=frozenset(),
     )
 
     assert merged.exact_replay is True
     assert merged.compatibility_notes == ()
+
+
+def test_saved_power_iterations_are_replayed_exactly():
+    merged = merge_quick_restart_request(
+        _request(),
+        {
+            "database": "duckdb",
+            "benchmark": "tpch",
+            "scale": 1,
+            "phases": ["power"],
+            "queries": None,
+            "tuning_mode": "notuning",
+            "table_mode": "native",
+            "mode": "sql",
+            "seed": 7,
+            "compress_data": True,
+            "compression_type": "zstd",
+            "compression_level": None,
+            "concurrency": 1,
+            "iterations": 5,
+            "replay_schema_version": 1,
+            "non_replayable_options": [],
+        },
+        explicit_fields=frozenset(),
+    )
+
+    assert merged.iterations == 5
+    assert merged.exact_replay is True
+
+
+def test_explicit_iterations_override_saved_value_and_mark_replay_non_exact():
+    merged = merge_quick_restart_request(
+        _request(iterations=7),
+        {"database": "duckdb", "benchmark": "tpch", "scale": 1, "iterations": 5},
+        explicit_fields=frozenset({"iterations"}),
+    )
+
+    assert merged.iterations == 7
+    assert "current CLI overrides saved iterations" in merged.compatibility_notes
+
+
+@pytest.mark.parametrize("saved", [{"concurrency": 3}, {}], ids=["overrides-saved", "supplies-legacy-missing"])
+def test_explicit_concurrency_wins_and_marks_replay_non_exact(saved):
+    merged = merge_quick_restart_request(
+        _request(concurrency=7),
+        {"database": "duckdb", "benchmark": "tpch", "scale": 1, **saved},
+        explicit_fields=frozenset({"concurrency"}),
+    )
+
+    assert merged.concurrency == 7
+    action = "overrides saved" if saved else "supplies missing saved"
+    assert f"current CLI {action} concurrency" in merged.compatibility_notes
+    assert merged.exact_replay is False
+
+
+def test_explicit_invalid_concurrency_still_fails_closed():
+    with pytest.raises(ValueError, match="at least one"):
+        merge_quick_restart_request(
+            _request(concurrency=0),
+            {"database": "duckdb", "benchmark": "tpch", "scale": 1, "concurrency": 3},
+            explicit_fields=frozenset({"concurrency"}),
+        )
+
+
+def test_explicit_field_detection_is_symmetric_for_persisted_concurrency():
+    ctx = Mock()
+    ctx.get_parameter_source.side_effect = lambda field: (
+        click.core.ParameterSource.COMMANDLINE if field == "concurrency" else click.core.ParameterSource.DEFAULT
+    )
+
+    assert _run_module._explicit_run_fields(SimpleNamespace(ctx=ctx)) == frozenset({"concurrency"})
+
+
+def test_legacy_saved_request_without_iterations_is_compatible_but_non_exact():
+    merged = merge_quick_restart_request(
+        _request(iterations=9),
+        {"database": "duckdb", "benchmark": "tpch", "scale": 1},
+        explicit_fields=frozenset(),
+    )
+
+    assert merged.iterations is None
+    assert merged.exact_replay is False
+    assert "saved run did not record power iterations; used the default" in merged.compatibility_notes
+    assert "saved run predates complete execution-option replay accounting" in merged.compatibility_notes
+
+
+def test_active_unserializable_execution_option_is_named_and_never_claimed_exact():
+    merged = merge_quick_restart_request(
+        _request(non_replayable_options=("platform_options",)),
+        {
+            "database": "duckdb",
+            "benchmark": "tpch",
+            "scale": 1,
+            "iterations": None,
+            "replay_schema_version": 1,
+            "non_replayable_options": ["force"],
+        },
+        explicit_fields=frozenset(),
+    )
+
+    assert merged.exact_replay is False
+    assert merged.non_replayable_options == ("force", "platform_options")
+    assert "execution option is not persisted for automatic replay: force" in merged.compatibility_notes
+    assert "execution option is not persisted for automatic replay: platform_options" in merged.compatibility_notes
+
+
+def test_current_request_accounts_for_every_active_non_replayable_execution_control():
+    state = SimpleNamespace(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=1.0,
+        phases="power",
+        queries=None,
+        tuning="notuning",
+        table_mode="native",
+        output=None,
+        mode="sql",
+        seed=7,
+        compression=CompressionConfig(),
+        concurrency=1,
+        iterations=5,
+        analyze_plans=False,
+        benchmark_option_pairs=(("skew_preset", "heavy"),),
+        capture_plans=True,
+        force=ForceConfig(datagen=True),
+        global_cache=True,
+        ignore_memory_warnings=True,
+        no_monitoring=True,
+        normalize_plan_literals=True,
+        official=True,
+        plan_config=PlanCaptureConfig(strict=True),
+        platform_option_pairs=(("driver_version", "1.2.3"),),
+        presort="parquet-sorted",
+        show_plans=True,
+        sorted_ingestion_method="ctas",
+        sorted_ingestion_mode="force",
+        stats_per_table_timing=True,
+        stats_reset=False,
+        strict_translation=True,
+        table_format=TableFormatConfig(format="delta"),
+        validation=ValidationConfig(mode="full"),
+    )
+
+    request = _run_module._current_run_request(state)
+
+    assert request.iterations == 5
+    assert request.non_replayable_options == (
+        "analyze_plans",
+        "benchmark_options",
+        "capture_plans",
+        "force",
+        "global_cache",
+        "ignore_memory_warnings",
+        "no_monitoring",
+        "normalize_plan_literals",
+        "official",
+        "plan_config",
+        "platform_options",
+        "presort",
+        "show_plans",
+        "sorted_ingestion_method",
+        "sorted_ingestion_mode",
+        "stats_per_table_timing",
+        "stats_reset",
+        "strict_translation",
+        "table_format",
+        "validation",
+    )
 
 
 @pytest.mark.parametrize(
@@ -244,6 +423,18 @@ def test_missing_required_selector_without_explicit_override_fails(field, saved_
         },
         {"database": "duckdb", "benchmark": "tpch", "scale": 1, "compression_type": "brotli"},
         {"database": "duckdb", "benchmark": "tpch", "scale": 1, "concurrency": 0},
+        {"database": "duckdb", "benchmark": "tpch", "scale": 1, "iterations": 0},
+        {"database": "duckdb", "benchmark": "tpch", "scale": 1, "iterations": "many"},
+        {"database": "duckdb", "benchmark": "tpch", "scale": 1, "iterations": 2.5},
+        {"database": "duckdb", "benchmark": "tpch", "scale": 1, "iterations": True},
+        {"database": "duckdb", "benchmark": "tpch", "scale": 1, "replay_schema_version": 2},
+        {"database": "duckdb", "benchmark": "tpch", "scale": 1, "non_replayable_options": "force"},
+        {
+            "database": "duckdb",
+            "benchmark": "tpch",
+            "scale": 1,
+            "non_replayable_options": ["unknown-option"],
+        },
         {"database": "duckdb", "benchmark": "tpch", "scale": 1, "queries": {"Q1": True}},
     ],
 )

@@ -1340,7 +1340,7 @@ def _build_benchmark_config(
         **({"df_tuning_config": plan.dataframe_tuning_config} if plan.dataframe_tuning_config else {}),
         **({"data_organization": dict(plan.data_organization)} if plan.data_organization is not None else {}),
         **({"seed": plan.seed} if plan.seed is not None else {}),
-        **({"power_iterations": s.iterations} if s.iterations is not None else {}),
+        **({"power_iterations": plan.iterations} if plan.iterations is not None else {}),
         **({"validation_mode": s.validation_mode} if s.validation_mode is not None else {}),
         **({"cache_dir": str(Path.home() / ".benchbox" / "datagen")} if s.global_cache else {}),
         **({"table_format": s.table_format_value} if s.table_format_value is not None else {}),
@@ -1724,6 +1724,8 @@ def _direct_handle_result(
             queries=list(benchmark_config.queries) if getattr(benchmark_config, "queries", None) is not None else None,
             mode=getattr(s, "resolved_mode", None),
             seed=s.seed,
+            iterations=s.resolved_run_plan.iterations,
+            non_replayable_options=list(s.resolved_run_plan.non_replayable_options),
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
@@ -1919,6 +1921,8 @@ def _data_or_load_handle_result(
             queries=list(benchmark_config.queries) if getattr(benchmark_config, "queries", None) is not None else None,
             mode=getattr(s, "resolved_mode", None),
             seed=s.seed,
+            iterations=s.resolved_run_plan.iterations,
+            non_replayable_options=list(s.resolved_run_plan.non_replayable_options),
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
@@ -1994,6 +1998,8 @@ def _explicit_run_fields(s: types.SimpleNamespace) -> frozenset[str]:
         "mode",
         "seed",
         "compression",
+        "iterations",
+        "concurrency",
     ):
         try:
             if s.ctx.get_parameter_source(field) == click.core.ParameterSource.COMMANDLINE:
@@ -2705,6 +2711,8 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
             ),
             mode=getattr(s, "resolved_mode", None),
             seed=s.seed,
+            iterations=s.resolved_run_plan.iterations,
+            non_replayable_options=list(s.resolved_run_plan.non_replayable_options),
             output=s.output,
             additional_options={"table_mode": s.table_mode},
         )
