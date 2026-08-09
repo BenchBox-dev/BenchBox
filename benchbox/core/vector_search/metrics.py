@@ -13,6 +13,8 @@ from __future__ import annotations
 import statistics
 from typing import Sequence
 
+from benchbox.core.results.metrics import percentile_ms
+
 
 def recall_at_k(ground_truth: Sequence[int], approximate: Sequence[int], k: int) -> float:
     """Compute recall@k between an exact ground truth and an approximate result.
@@ -41,6 +43,11 @@ def latency_percentiles(
 ) -> dict[str, float]:
     """Compute p50, p95, and p99 latency percentiles.
 
+    Delegates to :func:`benchbox.core.results.metrics.percentile_ms` so
+    that vector-search surfaces and result bundles share one
+    nearest-rank definition. Values are in seconds; convert to
+    milliseconds for the canonical helper, then back to seconds.
+
     Args:
         latencies_seconds: List of per-query latency values in seconds.
 
@@ -50,21 +57,11 @@ def latency_percentiles(
     """
     if not latencies_seconds:
         return {"p50": 0.0, "p95": 0.0, "p99": 0.0}
-    sorted_lat = sorted(latencies_seconds)
-    n = len(sorted_lat)
-
-    def _percentile(p: float) -> float:
-        idx = (p / 100.0) * (n - 1)
-        low = int(idx)
-        frac = idx - low
-        if low + 1 < n:
-            return sorted_lat[low] + frac * (sorted_lat[low + 1] - sorted_lat[low])
-        return sorted_lat[low]
-
+    latencies_ms = [v * 1000.0 for v in latencies_seconds]
     return {
-        "p50": _percentile(50),
-        "p95": _percentile(95),
-        "p99": _percentile(99),
+        "p50": percentile_ms(latencies_ms, 0.50) / 1000.0,
+        "p95": percentile_ms(latencies_ms, 0.95) / 1000.0,
+        "p99": percentile_ms(latencies_ms, 0.99) / 1000.0,
     }
 
 

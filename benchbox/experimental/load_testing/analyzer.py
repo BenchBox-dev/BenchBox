@@ -12,6 +12,8 @@ import statistics
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from benchbox.core.results.metrics import percentile_ms
+
 if TYPE_CHECKING:
     from benchbox.experimental.load_testing.executor import ConcurrentLoadResult
 
@@ -161,9 +163,9 @@ class LoadAnalyzer:
             max_wait_ms=max(wait_times_ms),
             avg_wait_ms=statistics.mean(wait_times_ms),
             median_wait_ms=statistics.median(wait_times_ms),
-            p90_wait_ms=self._percentile(wait_times_ms, 90),
-            p95_wait_ms=self._percentile(wait_times_ms, 95),
-            p99_wait_ms=self._percentile(wait_times_ms, 99),
+            p90_wait_ms=percentile_ms(wait_times_ms, 0.90),
+            p95_wait_ms=percentile_ms(wait_times_ms, 0.95),
+            p99_wait_ms=percentile_ms(wait_times_ms, 0.99),
             stdev_wait_ms=statistics.stdev(wait_times_ms) if len(wait_times_ms) > 1 else 0,
             max_queue_depth=self._result.max_concurrency_reached,
             avg_queue_depth=len(self._result.streams) / max(1, self._result.total_duration_seconds),
@@ -429,12 +431,3 @@ class LoadAnalyzer:
                 "optimal_concurrency": scaling_analysis.optimal_concurrency,
             },
         }
-
-    @staticmethod
-    def _percentile(sorted_data: list[float], p: float) -> float:
-        """Calculate percentile from sorted data."""
-        if not sorted_data:
-            return 0.0
-        index = int((p / 100) * len(sorted_data))
-        index = min(index, len(sorted_data) - 1)
-        return sorted_data[index]
