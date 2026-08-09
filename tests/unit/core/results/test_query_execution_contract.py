@@ -19,6 +19,7 @@ from benchbox.core.results.query_execution import (
     LEGACY_IGNORED_EXTRA_FIELDS,
     LEGACY_QUERY_FIELDS,
     QueryExecutionContractError,
+    query_duration_ms_from_legacy,
     query_execution_from_compact_v2,
     query_execution_from_legacy_dict,
     query_execution_to_compact_v2,
@@ -106,6 +107,19 @@ def test_explicit_attribute_object_compatibility_is_preserved() -> None:
 
     assert execution.execution_time_ms == 250.0
     assert execution.rows_returned == 0
+
+
+def test_field_specific_duration_normalization_ignores_invalid_row_count() -> None:
+    legacy = {
+        "query_id": "Q1",
+        "execution_time_seconds": 0.5,
+        "rows_returned": "not-a-row-count",
+        "status": "SUCCESS",
+    }
+
+    assert query_duration_ms_from_legacy(legacy) == 500.0
+    with pytest.raises(QueryExecutionContractError, match="rows_returned must be an integer"):
+        query_execution_from_legacy_dict(legacy)
 
 
 def test_legacy_adapter_preserves_typed_metadata_without_truthiness_loss() -> None:

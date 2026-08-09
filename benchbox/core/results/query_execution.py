@@ -331,6 +331,33 @@ def normalize_duration_ms(
     return reference_ms
 
 
+def _legacy_duration_ms(source: Mapping[str, Any]) -> float | None:
+    """Normalize only the duration aliases from a validated legacy mapping."""
+    duration_ms_alias = _resolve_alias(
+        source,
+        "millisecond duration",
+        ("execution_time_ms", "ms"),
+        transform=lambda raw: _finite_non_negative_number("execution_time_ms", raw),
+    )
+    return normalize_duration_ms(
+        execution_time_ms=duration_ms_alias,
+        execution_time_seconds=source.get("execution_time_seconds"),
+        execution_time=source.get("execution_time"),
+        duration=source.get("duration"),
+    )
+
+
+def query_duration_ms_from_legacy(value: Any) -> float | None:
+    """Normalize duration aliases without validating unrelated result fields.
+
+    Field-specific compatibility consumers such as performance summaries need
+    canonical unit and alias handling, but must not fail because an unrelated
+    legacy field is malformed. The complete ``QueryExecution`` adapter remains
+    the fail-closed boundary for constructing or serializing canonical results.
+    """
+    return _legacy_duration_ms(legacy_query_execution_mapping(value))
+
+
 def _resolve_alias(
     source: Mapping[str, Any],
     semantic_name: str,
@@ -542,18 +569,7 @@ def query_execution_from_legacy_dict(
     if normalize_query_id is not None:
         query_id = normalize_query_id(query_id)
 
-    duration_ms_alias = _resolve_alias(
-        source,
-        "millisecond duration",
-        ("execution_time_ms", "ms"),
-        transform=lambda raw: _finite_non_negative_number("execution_time_ms", raw),
-    )
-    duration_ms = normalize_duration_ms(
-        execution_time_ms=duration_ms_alias,
-        execution_time_seconds=source.get("execution_time_seconds"),
-        execution_time=source.get("execution_time"),
-        duration=source.get("duration"),
-    )
+    duration_ms = _legacy_duration_ms(source)
     rows_returned = _resolve_alias(
         source,
         "row count",
@@ -738,6 +754,7 @@ __all__ = [
     "normalize_non_negative_integer",
     "normalize_status",
     "normalize_stream_id",
+    "query_duration_ms_from_legacy",
     "query_execution_from_compact_v2",
     "query_execution_from_legacy_dict",
     "query_execution_to_compact_v2",

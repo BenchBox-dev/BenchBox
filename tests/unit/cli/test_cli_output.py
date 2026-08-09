@@ -811,14 +811,18 @@ class TestResultExporter:
         # Create baseline result
         baseline_result = self.create_cli_result()
         baseline_result.query_results[0].execution_time_ms = 1000.0  # Q1: 1000ms
+        baseline_result.query_results[0].execution_time_seconds = 1.0
         baseline_result.query_results[1].execution_time_ms = 2000.0  # Q2: 2000ms
+        baseline_result.query_results[1].execution_time_seconds = 2.0
         baseline_exported = self.exporter.export_result(baseline_result, formats=["json"])
 
         # Create current result with different timings and execution_id
         current_result = self.create_cli_result()
         current_result.execution_id = "exec_456"  # Different execution_id to avoid filename collision
         current_result.query_results[0].execution_time_ms = 800.0  # Q1: 800ms (improved)
+        current_result.query_results[0].execution_time_seconds = 0.8
         current_result.query_results[1].execution_time_ms = 2500.0  # Q2: 2500ms (regressed)
+        current_result.query_results[1].execution_time_seconds = 2.5
         current_exported = self.exporter.export_result(current_result, formats=["json"])
 
         comparison = self.exporter.compare_results(baseline_exported["json"], current_exported["json"])

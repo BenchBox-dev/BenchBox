@@ -50,6 +50,7 @@ from benchbox.core.results.builder import (
 )
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT
 from benchbox.core.results.query_execution import (
+    query_duration_ms_from_legacy,
     query_execution_from_legacy_dict,
     query_execution_to_legacy_dict,
 )
@@ -268,11 +269,12 @@ def _extract_result_field(result: Any, attr: str, default: Any = None) -> Any:
 def _coerce_time_seconds(result: Any) -> float | None:
     """Convert an explicitly-unit-tagged query duration to seconds.
 
-    The canonical adapter validates every simultaneously populated duration
-    alias.  In particular, values are never reinterpreted as milliseconds by
-    magnitude.
+    Duration aliases retain the canonical adapter's validation and explicit
+    units without coupling this field-specific summary to unrelated legacy
+    fields such as ``rows_returned``.
     """
-    return query_execution_from_legacy_dict(result).execution_time_seconds
+    duration_ms = query_duration_ms_from_legacy(result)
+    return None if duration_ms is None else duration_ms / 1000.0
 
 
 def _percentile(values: list[float], percentile: float) -> float:

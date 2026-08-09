@@ -48,7 +48,7 @@ def _write_submit_result(path: Path, *, failed: int = 0) -> None:
             "queries": {"total": 1, "passed": 0 if failed else 1, "failed": failed},
             "validation": {"status": "failed" if failed else "passed"},
         },
-        "queries": [{"id": "Q1", "status": "ERROR" if failed else "SUCCESS", "execution_time_ms": 1}],
+        "queries": [{"id": "Q1", "status": "ERROR" if failed else "SUCCESS", "ms": 1}],
         "phases": {},
     }
     path.write_text(json.dumps(payload), encoding="utf-8")

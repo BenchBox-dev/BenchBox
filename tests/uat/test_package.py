@@ -128,7 +128,7 @@ def _write_minimal_result(path: Path, *, validation: str = "passed", compliance_
             "queries": {"total": 1, "passed": 1, "failed": 0},
             "validation": {"status": validation},
         },
-        "queries": [{"id": "Q1", "status": "SUCCESS", "execution_time_ms": 1}],
+        "queries": [{"id": "Q1", "status": "SUCCESS", "ms": 1}],
         "phases": {},
     }
     if compliance_class is not None:
