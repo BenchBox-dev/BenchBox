@@ -332,8 +332,12 @@ class TestVerifyRun:
     def test_verify_rung_lock_contention_is_indeterminate(self, conn, tmp_path, monkeypatch):
         """A lock timeout records an environmental non-verdict, not a failure."""
         fcntl = pytest.importorskip("fcntl")
-        _mk(conn, verifications=[{"description": "blocked", "command": "false"}])
+        _mk(conn, verifications=[{"description": "blocked", "command": "true"}])
         todo_db.claim_item(conn, "tester", "sample-item")
+        assert todo_db.run_verification(conn, "tester", "sample-item", 1)[0] == "pass"
+        before = conn.execute(
+            "SELECT last_run, last_result FROM verifications WHERE item_id='sample-item' AND seq=1"
+        ).fetchone()
         lock_dir = tmp_path / "lock"
         lock_dir.mkdir()
         lock_path = lock_dir / "test.lock"
@@ -350,8 +354,10 @@ class TestVerifyRun:
 
         assert result == "indeterminate"
         assert "verification command was not run" in output
-        row = conn.execute("SELECT last_result FROM verifications WHERE item_id='sample-item' AND seq=1").fetchone()
-        assert row["last_result"] is None
+        row = conn.execute(
+            "SELECT last_run, last_result FROM verifications WHERE item_id='sample-item' AND seq=1"
+        ).fetchone()
+        assert (row["last_run"], row["last_result"]) == (before["last_run"], before["last_result"])
         event = conn.execute("SELECT detail FROM events WHERE action='verify' ORDER BY seq DESC LIMIT 1").fetchone()
         assert '"result": "indeterminate"' in event["detail"]
 

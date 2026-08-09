@@ -76,12 +76,17 @@ todo_db = _load_script()
 
 
 def _run_shim(args: list[str], db_path: Path, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    env = {"PATH": os.environ["PATH"], "TODO_DB_PATH": str(db_path), "HOME": str(Path.home())}
+    if worker := os.environ.get("PYTEST_XDIST_WORKER"):
+        # Keep the CLI's documented xdist self-contention escape visible to the
+        # subprocess when this contract test itself runs under a worker.
+        env["PYTEST_XDIST_WORKER"] = worker
     return subprocess.run(
         [str(SHIM_PATH), *args],
         capture_output=True,
         text=True,
         cwd=cwd or REPO_ROOT,
-        env={"PATH": os.environ["PATH"], "TODO_DB_PATH": str(db_path), "HOME": str(Path.home())},
+        env=env,
         check=False,
         timeout=120,
     )

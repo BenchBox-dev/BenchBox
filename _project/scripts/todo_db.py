@@ -42,6 +42,7 @@ import argparse
 import difflib
 import fnmatch
 import getpass
+import importlib.util
 import json
 import math
 import os
@@ -53,17 +54,23 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
-import time
 from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from time import sleep
 from typing import Any
 
 # Make this script's own directory importable so the findings sibling resolves
 # whether todo_db runs via `uv run ... todo_db.py` (dir already on sys.path[0])
 # or is loaded by file path in tests (spec_from_file_location adds nothing).
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _SCRIPT_DIR.parents[1]
+sys.path.insert(0, str(_SCRIPT_DIR))
+# The standalone `todo` shim uses the scripts-only uv project, not BenchBox's
+# package environment. Add the repository root so shared production helpers
+# (such as the monotonic clock) remain importable in that execution mode.
+sys.path.insert(0, str(_REPO_ROOT))
 
 # Alias THIS module as "todo_db" so the findings sibling's `import todo_db`
 # binds this exact instance instead of re-executing the file under the canonical
@@ -85,6 +92,21 @@ if _self_module is not None:
 # single instance, and todo_findings defines its schema constants before it first
 # touches todo_db. See todo_findings.py's header.
 import todo_findings  # noqa: E402
+
+try:
+    from benchbox.utils.clock import elapsed_seconds, mono_time  # noqa: E402
+except ModuleNotFoundError:
+    # The scripts-only uv environment intentionally does not install BenchBox's
+    # optional runtime dependencies. Load the same repository-owned helper
+    # directly instead of importing benchbox/__init__.py and its full surface.
+    _clock_spec = importlib.util.spec_from_file_location("_benchbox_clock", _REPO_ROOT / "benchbox/utils/clock.py")
+    if _clock_spec is None or _clock_spec.loader is None:
+        raise RuntimeError("cannot load repository clock helpers") from None
+    _clock_module = importlib.util.module_from_spec(_clock_spec)
+    sys.modules[_clock_spec.name] = _clock_module
+    _clock_spec.loader.exec_module(_clock_module)
+    elapsed_seconds = _clock_module.elapsed_seconds
+    mono_time = _clock_module.mono_time
 
 SCHEMA_VERSION = 5
 
@@ -3128,7 +3150,7 @@ def _verification_test_lock():
         return
 
     acquired = False
-    deadline = time.monotonic() + timeout
+    started_at = mono_time()
     try:
         try:
             import fcntl
@@ -3139,9 +3161,9 @@ def _verification_test_lock():
                     acquired = True
                     break
                 except BlockingIOError:
-                    if time.monotonic() >= deadline:
+                    if elapsed_seconds(started_at) >= timeout:
                         break
-                    time.sleep(0.1)
+                    sleep(0.1)
         except ImportError:  # pragma: no cover - Windows uses msvcrt below
             import msvcrt
 
@@ -3152,9 +3174,9 @@ def _verification_test_lock():
                     acquired = True
                     break
                 except OSError:
-                    if time.monotonic() >= deadline:
+                    if elapsed_seconds(started_at) >= timeout:
                         break
-                    time.sleep(0.1)
+                    sleep(0.1)
 
         if not acquired:
             try:
@@ -3206,14 +3228,12 @@ def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: in
     with _write_txn(conn):
         if not _touch_lease(conn, actor, item_id):
             raise TodoError(f"{item_id!r}'s lease is expired, missing, or held by another actor; re-acquire it")
-        if result == "indeterminate":
-            # The existing schema intentionally admits only pass/fail. Keep an
-            # environmental non-verdict out of last_result and retain the
-            # durable distinction in the audit event and CLI output.
-            conn.execute(
-                "UPDATE verifications SET last_run = ? WHERE item_id = ? AND seq = ?", (utc_now(), item_id, seq)
-            )
-        else:
+        # The existing schema intentionally admits only pass/fail. Keep an
+        # environmental non-verdict out of last_result and retain the durable
+        # distinction in the audit event and CLI output. The verification did
+        # not run, so its previous verdict and timestamp remain the last
+        # completed observation.
+        if result != "indeterminate":
             conn.execute(
                 "UPDATE verifications SET last_run = ?, last_result = ? WHERE item_id = ? AND seq = ?",
                 (utc_now(), result, item_id, seq),
