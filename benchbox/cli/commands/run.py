@@ -1439,6 +1439,9 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
+    # run-official concurrency override (first-class run-service param)
+    if getattr(s, "concurrency", None) is not None:
+        benchmark_config.concurrency = s.concurrency
 
     if logger:
         logger.debug(f"Benchmark config created: {benchmark_config}")
@@ -1627,6 +1630,8 @@ def _run_direct(s: types.SimpleNamespace) -> None:
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
+    if getattr(s, "concurrency", None) is not None:
+        benchmark_config.concurrency = s.concurrency
 
     profiler = SystemProfiler()
     system_profile = profiler.get_system_profile()
@@ -1876,6 +1881,8 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
             **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
         },
     )
+    if getattr(s, "concurrency", None) is not None:
+        benchmark_config.concurrency = s.concurrency
 
     profiler = SystemProfiler()
     system_profile = profiler.get_system_profile()
@@ -2527,6 +2534,10 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
     ctx = s.ctx
     assert s.database_config is not None
     assert s.benchmark_config is not None
+    # run-official forwards --streams as --concurrency; apply it here so
+    # BenchmarkConfig.concurrency reflects the request before execution.
+    if getattr(s, "concurrency", None) is not None:
+        s.benchmark_config.concurrency = s.concurrency
     # The interactive wizard builds s.benchmark_config in _interactive_normal_flow
     # (bench_manager.select_benchmark()) / _interactive_try_quick_restart, neither
     # of which knows about --stats-reset/--stats-per-table-timing - those are
@@ -2946,6 +2957,13 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 )
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
 @advanced_option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=None,
+    hidden=True,
+    help="Concurrent streams (hidden; for run-official)",
+)
+@advanced_option(
     "--iterations",
     type=click.IntRange(min=1),
     default=None,
@@ -3035,6 +3053,7 @@ def run(
     benchmark_option_pairs: tuple[tuple[str, str], ...],
     mode: str | None,
     seed: int | None,
+    concurrency: int | None,
     iterations: int | None,
     no_monitoring: bool,
     no_progress: bool,
@@ -3099,6 +3118,7 @@ def run(
         benchmark_option_pairs=benchmark_option_pairs,
         mode=mode,
         seed=seed,
+        concurrency=concurrency,
         iterations=iterations,
         no_monitoring=no_monitoring,
         no_progress=no_progress,
