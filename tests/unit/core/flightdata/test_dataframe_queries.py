@@ -121,6 +121,7 @@ class TestParameterOverrides:
 
     def test_parameter_override(self):
         from benchbox.core.flightdata.dataframe_queries import (
+            FLIGHTDATA_DEFAULT_PARAMS,
             get_flightdata_parameters,
             set_parameter_overrides,
         )
@@ -136,7 +137,7 @@ class TestParameterOverrides:
         # Restore defaults
         set_parameter_overrides(None)
         params = get_flightdata_parameters()
-        assert params["start_date"] == date(2018, 1, 1)
+        assert params["start_date"] == FLIGHTDATA_DEFAULT_PARAMS["start_date"]
 
     def test_clear_overrides(self):
         from benchbox.core.flightdata.dataframe_queries import (
