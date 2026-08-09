@@ -1,65 +1,17 @@
 """Deprecated run-official compatibility command."""
 
-import contextlib
-import functools
 import sys
-from collections.abc import Iterator
 
 import click
 
 from benchbox.cli.commands.run import PlatformOptionParamType, run
 from benchbox.cli.composite_params import ValidationConfig
-from benchbox.cli.orchestrator import BenchmarkOrchestrator
 from benchbox.cli.shared import console
-
-TPC_ALLOWED_SCALE_FACTORS = {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000}
-
-
-@contextlib.contextmanager
-def _forward_requested_streams(streams: int | None) -> Iterator[None]:
-    """Make ``--streams`` actually reach the throughput driver for this call.
-
-    ``run()`` (``benchbox/cli/commands/run.py``) has no ``--streams``/
-    ``--concurrency`` option of its own, so ``streams`` cannot be forwarded as
-    a keyword argument via ``ctx.invoke(run, ...)`` below -- there is no
-    matching parameter on ``run()``'s signature to receive it. Instead, this
-    patches the one seam every direct (non-interactive) ``run()`` invocation
-    passes through -- ``BenchmarkOrchestrator.execute_benchmark`` -- to set
-    ``concurrency`` on the ``BenchmarkConfig`` right before execution. That is
-    the *same* field (``BenchmarkConfig.concurrency`` ->
-    ``RunConfig.concurrent_streams``) the throughput drivers in
-    ``benchbox/platforms/base/execution.py`` now read, so this maps the
-    user's request onto the canonical schema field rather than inventing a
-    parallel one. Scoped to this single call via try/finally: `run-official`
-    is a synchronous, deprecated compatibility shim (not a hot path), so a
-    transient class-level patch is safe here.
-    """
-    if not streams:
-        yield
-        return
-
-    original = BenchmarkOrchestrator.execute_benchmark
-
-    @functools.wraps(original)
-    def _patched(self, *args, **kwargs):
-        # Forward everything via *args/**kwargs (rather than a hardcoded
-        # execute_benchmark(config, system_profile, database_config, ...)
-        # signature) so a future signature change to execute_benchmark can't
-        # silently break this monkeypatch or drop a parameter. `config` is
-        # always the first argument callers pass -- positionally by every
-        # production call site, or by keyword if a caller ever changes that.
-        if args:
-            config = args[0]
-        else:
-            config = kwargs["config"]
-        config.concurrency = streams
-        return original(self, *args, **kwargs)
-
-    BenchmarkOrchestrator.execute_benchmark = _patched
-    try:
-        yield
-    finally:
-        BenchmarkOrchestrator.execute_benchmark = original
+from benchbox.core.run_service import (
+    TPC_ALLOWED_SCALE_FACTORS,
+    validate_stream_count,
+    validate_tpc_scale_factor,
+)
 
 
 @click.command("run-official", hidden=True, deprecated=True)
@@ -94,7 +46,9 @@ def run_official(
     validate_results,
 ):
     """Run TPC-compliant official benchmark tests. Deprecated; use `benchbox run --official`."""
-    if scale not in TPC_ALLOWED_SCALE_FACTORS:
+    try:
+        validate_tpc_scale_factor(scale)
+    except ValueError:
         console.print(f"[red]Error: Scale factor {scale} is not TPC-compliant[/red]")
         console.print(f"Allowed scale factors: {sorted(TPC_ALLOWED_SCALE_FACTORS)}")
         sys.exit(1)
@@ -103,29 +57,10 @@ def run_official(
         console.print("[yellow]Warning: No seed specified. Official TPC runs require a random seed.[/yellow]")
         console.print("Use --seed <N> for reproducible results")
 
-    if "throughput" in {phase.strip().lower() for phase in phases.split(",")} and streams is None:
-        console.print("[red]Error: --streams is required for throughput test[/red]")
-        sys.exit(1)
-
-    # Guard here (the forwarding boundary) rather than letting a negative
-    # value silently reach BenchmarkConfig.concurrency: _forward_requested_streams
-    # only no-ops on falsy (None/0) values, so a negative --streams would
-    # otherwise set concurrency to a negative number and only fail later, deep
-    # in RunConfig/BenchmarkConfig field validation, with a raw pydantic error.
-    if streams is not None and streams < 0:
-        console.print(f"[red]Error: --streams must be a non-negative integer, got: {streams}[/red]")
-        sys.exit(1)
-
-    # Reject an explicit --streams 1 outright rather than letting it silently
-    # become 2: _resolve_requested_stream_count() (benchbox/platforms/base/
-    # execution.py) floors any resolved value to the TPC throughput minimum
-    # of 2 because there is no wire-level way to distinguish "explicitly
-    # requested 1" from the schema's own default of 1 at that boundary. A
-    # user who explicitly typed --streams 1 here would otherwise see their
-    # own value silently overridden with no error, so catch it at the one
-    # place we still know it was explicit.
-    if streams == 1:
-        console.print("[red]Error: --streams must be >= 2 (TPC throughput minimum); got: 1[/red]")
+    try:
+        validate_stream_count(streams, phases)
+    except ValueError as exc:
+        console.print(f"[red]Error: {exc}[/red]")
         sys.exit(1)
 
     console.print("[bold blue]TPC-Compliant Official Benchmark Run[/bold blue]")
@@ -144,20 +79,22 @@ def run_official(
         console.print(f"[green]Concurrency: {streams} concurrent stream(s) will run the throughput phase[/green]")
 
     try:
-        with _forward_requested_streams(streams):
-            ctx.invoke(
-                run,
-                platform=platform,
-                benchmark=benchmark,
-                scale=scale,
-                phases=phases,
-                official=True,
-                seed=seed,
-                output=output_dir,
-                verbose=verbose,
-                validation=ValidationConfig.parse("full") if validate_results else None,
-                platform_option_pairs=platform_option_pairs,
-            )
+        # Streams is now a first-class run parameter — forwarded as ``concurrency``
+        # so the run service sets ``BenchmarkConfig.concurrency`` directly.
+        ctx.invoke(
+            run,
+            platform=platform,
+            benchmark=benchmark,
+            scale=scale,
+            phases=phases,
+            official=True,
+            seed=seed,
+            output=output_dir,
+            verbose=verbose,
+            validation=ValidationConfig.parse("full") if validate_results else None,
+            platform_option_pairs=platform_option_pairs,
+            concurrency=streams,
+        )
     except Exception as e:
         console.print(f"[red]Benchmark execution failed: {e}[/red]")
         sys.exit(1)

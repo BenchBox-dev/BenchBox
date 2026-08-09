@@ -1347,6 +1347,9 @@ class TestGenerateCliCommandCompleteness:
     """Introspection test: assert generate_cli_command covers all behavior-affecting CLI params."""
 
     # Params that are cosmetic/output-only and intentionally excluded from generate_cli_command
+    # ``concurrency`` is a hidden internal forwarding param for ``run-official``
+    # (``--streams`` -> ``--concurrency``) and intentionally not surfaced in
+    # ``generate_cli_command``.
     COSMETIC_PARAMS = frozenset(
         {
             "dry_run",
@@ -1358,6 +1361,7 @@ class TestGenerateCliCommandCompleteness:
             "ignore_memory_warnings",
             "help",
             "help_topic",
+            "concurrency",
         }
     )
 

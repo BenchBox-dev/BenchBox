@@ -20,10 +20,10 @@ from pathlib import Path
 import click
 
 from benchbox.cli.shared import console
+from benchbox.core.publishing.admission import publish_admission
 from benchbox.core.publishing.bundle_publisher import COMPANION_SUFFIXES, VALID_LABELS, BundlePublisher
 from benchbox.core.publishing.store import PublicationStore
 from benchbox.core.results.loader import ResultLoadError, UnsupportedSchemaError, load_result_file
-from benchbox.core.results.status import result_non_clean_reason
 
 # ---------------------------------------------------------------------------
 # publish group
@@ -94,25 +94,25 @@ def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_
     if source_path is None:
         return
 
-    # Compliance guardrail: unofficial results require --label unofficial-research
-    _unofficial_classes = {"unofficial_nonstandard", "unofficial_subscale"}
+    # Publish admission policy lives in core so any surface inherits it.
+    # CLI maps the structured decision to its user-facing messages/exit codes.
     try:
         _result, _ = load_result_file(source_path)
-        _compliance_class = getattr(_result, "compliance_class", None)
-        if _compliance_class in _unofficial_classes and label != "unofficial-research":
-            console.print(
-                f"\n[red]❌ Publish refused: compliance_class={_compliance_class}[/red]\n"
-                "   This result was produced with an unofficial TPC-DS configuration.\n"
-                "   To publish anyway, add: [bold]--label unofficial-research[/bold]\n"
-                "   Note: unofficial results must not be used for comparative benchmarking.\n"
-                "   See _sources/tpcds-subscale-contract.md for details."
-            )
-            raise SystemExit(1)
-        if _non_clean_reason := result_non_clean_reason(_result):
-            console.print(
-                f"\n[red]❌ Publish refused: result is not a clean pass ({_non_clean_reason})[/red]\n"
-                "   Partial runs remain available as local artifacts but are not publishable."
-            )
+        _decision = publish_admission(_result, label)
+        if not _decision.allowed:
+            if _decision.code == "unofficial_compliance":
+                console.print(
+                    f"\n[red]❌ Publish refused: compliance_class={_decision.reason}[/red]\n"
+                    "   This result was produced with an unofficial TPC-DS configuration.\n"
+                    "   To publish anyway, add: [bold]--label unofficial-research[/bold]\n"
+                    "   Note: unofficial results must not be used for comparative benchmarking.\n"
+                    "   See _sources/tpcds-subscale-contract.md for details."
+                )
+            else:
+                console.print(
+                    f"\n[red]❌ Publish refused: result is not a clean pass ({_decision.reason})[/red]\n"
+                    "   Partial runs remain available as local artifacts but are not publishable."
+                )
             raise SystemExit(1)
     except (ResultLoadError, UnsupportedSchemaError, FileNotFoundError):
         pass  # Let the publisher surface the error with a better message
@@ -355,24 +355,23 @@ def publish_bundle(
         )
         return None
 
-    # Guard: unofficial TPC-DS results require the explicit unofficial-research label.
-    _unofficial_classes = {"unofficial_nonstandard", "unofficial_subscale"}
+    # Publish admission policy lives in core; programmatic entry mirrors the CLI gate.
     try:
         _result, _ = load_result_file(source_bundle)
-        _compliance_class = getattr(_result, "compliance_class", None)
-        if _compliance_class in _unofficial_classes and label.lower() != "unofficial-research":
-            console.print(
-                "[red]Publish refused:[/red] This result has compliance_class "
-                f"'{_compliance_class}' and cannot be published under label "
-                f"'{label}'. Add [bold]--label unofficial-research[/bold] to "
-                "publish unofficial TPC-DS results."
-            )
-            return None
-        if _non_clean_reason := result_non_clean_reason(_result):
-            console.print(
-                "[red]Publish refused:[/red] This result is not a clean pass "
-                f"({_non_clean_reason}) and cannot be published."
-            )
+        _decision = publish_admission(_result, label)
+        if not _decision.allowed:
+            if _decision.code == "unofficial_compliance":
+                console.print(
+                    "[red]Publish refused:[/red] This result has compliance_class "
+                    f"'{_decision.reason}' and cannot be published under label "
+                    f"'{label}'. Add [bold]--label unofficial-research[/bold] to "
+                    "publish unofficial TPC-DS results."
+                )
+            else:
+                console.print(
+                    "[red]Publish refused:[/red] This result is not a clean pass "
+                    f"({_decision.reason}) and cannot be published."
+                )
             return None
     except (ResultLoadError, UnsupportedSchemaError, FileNotFoundError):
         pass

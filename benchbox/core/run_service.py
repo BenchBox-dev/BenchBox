@@ -28,6 +28,46 @@ from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
     QUERY_PHASES,
 )
+
+# TPC-compliant scale factors — moved from ``benchbox.cli.commands.run_official``
+# so the validation lives in core beside the run service.
+TPC_ALLOWED_SCALE_FACTORS: frozenset[int | float] = frozenset({1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000})
+
+
+def validate_tpc_scale_factor(scale: float) -> None:
+    """Validate that ``scale`` is TPC-compliant.
+
+    Raises:
+        ValueError: If scale is not in :data:`TPC_ALLOWED_SCALE_FACTORS`.
+    """
+    if scale not in TPC_ALLOWED_SCALE_FACTORS:
+        raise ValueError(f"Scale factor {scale} is not TPC-compliant. Allowed: {sorted(TPC_ALLOWED_SCALE_FACTORS)}")
+
+
+def validate_stream_count(streams: int | None, phases: str | None = None) -> None:
+    """Validate ``--streams`` for official runs.
+
+    Mirrors the CLI guardrails in ``run_official``:
+    - ``--streams`` is required when throughput is requested.
+    - Negative values are rejected.
+    - Explicit ``1`` is rejected (TPC minimum is 2; the driver floors 1→2
+      without an error, so callers must be told here).
+
+    Raises:
+        ValueError: On invalid stream count.
+    """
+    phase_set: set[str] = set()
+    if phases:
+        phase_set = {p.strip().lower() for p in phases.split(",")}
+
+    if "throughput" in phase_set and streams is None:
+        raise ValueError("--streams is required for throughput test")
+    if streams is not None and streams < 0:
+        raise ValueError(f"--streams must be a non-negative integer, got: {streams}")
+    if streams == 1:
+        raise ValueError("--streams must be >= 2 (TPC throughput minimum); got: 1")
+
+
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.runner.dataframe_runner import is_dataframe_execution
