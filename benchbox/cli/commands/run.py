@@ -9,7 +9,6 @@ import sys
 import types
 from collections.abc import Iterable
 from pathlib import Path
-from types import MappingProxyType
 from typing import Any
 
 import click
@@ -49,7 +48,12 @@ from benchbox.cli.platform_checks import check_and_setup_platform_credentials
 from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionError
 from benchbox.cli.presentation.system import display_system_recommendations
 from benchbox.cli.progress import BenchmarkProgress, should_show_progress
-from benchbox.cli.run_resolution import ResolvedRunPlan, RunRequest, merge_quick_restart_request
+from benchbox.cli.run_resolution import (
+    ResolvedRunPlan,
+    capture_resolved_run_plan,
+    current_run_request as _current_run_request,
+    resolve_quick_restart_atomically,
+)
 from benchbox.cli.shared import console, set_quiet_output, silence_output
 from benchbox.cli.system import SystemProfiler
 from benchbox.cli.tuning_resolver import (
@@ -1245,59 +1249,9 @@ def _resolve_compression_settings(s: types.SimpleNamespace) -> None:
         s.compression_level = None
 
 
-def _current_run_request(s: types.SimpleNamespace) -> RunRequest:
-    """Capture user intent without including fields derived by the resolver."""
-    phases = s.phases if isinstance(s.phases, (list, tuple)) else str(s.phases).split(",")
-    compression = getattr(s, "comp_config", None) or s.compression or CompressionConfig()
-    return RunRequest(
-        platform=s.platform,
-        benchmark=s.benchmark,
-        scale=float(s.scale),
-        phases=tuple(str(phase).strip() for phase in phases if str(phase).strip()),
-        queries=s.queries,
-        tuning=s.tuning,
-        table_mode=s.table_mode,
-        output=s.output,
-        mode=s.mode,
-        seed=s.seed,
-        compression_enabled=bool(compression.enabled),
-        compression_type=compression.type,
-        compression_level=compression.level,
-        concurrency=int(getattr(s, "concurrency", 1)),
-    )
-
-
 def _capture_resolved_run_plan(s: types.SimpleNamespace) -> ResolvedRunPlan:
     """Take one immutable snapshot after all run-resolution stages succeed."""
-    request = getattr(s, "run_request", None) or _current_run_request(s)
-    organization = (
-        MappingProxyType(dict(s.data_organization_payload)) if s.data_organization_payload is not None else None
-    )
-    return ResolvedRunPlan(
-        request=request,
-        platform_key=s.platform_key,
-        benchmark=s.benchmark,
-        scale=s.scale,
-        phases=tuple(s.phases_to_run),
-        queries=tuple(s.queries_to_run) if s.queries_to_run is not None else None,
-        test_execution_type=s.test_execution_type,
-        execution_mode=s.execution_mode,
-        resolved_mode=s.resolved_mode,
-        table_mode=s.table_mode,
-        tuning_resolution=s.tuning_resolution,
-        canonical_tuning_mode=_canonical_tuning_mode(s),
-        tuning_enabled=s.tuning_enabled,
-        tuning_config_file=s.tuning_config_file,
-        use_auto_tuning=s.use_auto_tuning,
-        loaded_unified_config=s.loaded_unified_config,
-        data_organization=organization,
-        dataframe_tuning_config=s.df_tuning_config,
-        compression_enabled=s.compress_data,
-        compression_type=s.compression_type,
-        compression_level=s.compression_level,
-        concurrency=request.concurrency,
-        seed=s.seed,
-    )
+    return capture_resolved_run_plan(s, canonical_tuning_mode=_canonical_tuning_mode(s))
 
 
 def _resolve_run_request(
@@ -2049,70 +2003,25 @@ def _explicit_run_fields(s: types.SimpleNamespace) -> frozenset[str]:
     return frozenset(explicit)
 
 
-def _apply_run_request(s: types.SimpleNamespace, request: RunRequest) -> None:
-    """Apply raw intent only; derived fields are owned by ``_resolve_run_request``."""
-    s.platform = request.platform
-    s.benchmark = request.benchmark
-    s.scale = request.scale
-    s.phases = ",".join(request.phases)
-    s.queries = request.queries
-    s.tuning = request.tuning
-    s.table_mode = request.table_mode
-    s.output = request.output
-    s.mode = request.mode
-    s.seed = request.seed
-    compression = CompressionConfig(
-        enabled=request.compression_enabled,
-        type=request.compression_type,
-        level=request.compression_level,
-    )
-    s.compression = compression
-    s.comp_config = compression
-    s.compression_cli_set = True
-    s.no_compression = not compression.enabled
-    s.compression_type = compression.type
-    s.compression_level = compression.level
-    s.concurrency = request.concurrency
-    s.run_request = request
-
-
 def _resolve_quick_restart_atomically(
     s: types.SimpleNamespace,
     last_run: dict[str, Any],
 ) -> ResolvedRunPlan:
     """Merge and resolve saved intent, rolling back every field on failure."""
-    current_request = getattr(s, "run_request", None) or _current_run_request(s)
-    request = merge_quick_restart_request(
-        current_request,
+    return resolve_quick_restart_atomically(
+        s,
         last_run,
+        current_request=getattr(s, "run_request", None) or _current_run_request(s),
         explicit_fields=_explicit_run_fields(s),
+        # Saved scale is resolved input; reapplying Click's DEFAULT provenance
+        # would replace it with the benchmark registry default.
+        resolve=lambda state: _resolve_run_request(
+            state,
+            apply_default_scale=False,
+            tuning_non_interactive=True,
+        ),
+        data_organization_environment=DATA_ORGANIZATION_ENV,
     )
-
-    previous_state = vars(s).copy()
-    missing_environment = object()
-    previous_environment = os.environ.get(DATA_ORGANIZATION_ENV, missing_environment)
-    previous_non_interactive_environment = os.environ.get("BENCHBOX_NON_INTERACTIVE", missing_environment)
-    try:
-        _apply_run_request(s, request)
-        # The saved scale is already resolved input. Re-applying Click's DEFAULT
-        # provenance here would replace it with the benchmark registry default.
-        _resolve_run_request(s, apply_default_scale=False, tuning_non_interactive=True)
-    except BaseException:
-        vars(s).clear()
-        vars(s).update(previous_state)
-        if previous_environment is missing_environment:
-            os.environ.pop(DATA_ORGANIZATION_ENV, None)
-        else:
-            assert isinstance(previous_environment, str)
-            os.environ[DATA_ORGANIZATION_ENV] = previous_environment
-        raise
-    finally:
-        if previous_non_interactive_environment is missing_environment:
-            os.environ.pop("BENCHBOX_NON_INTERACTIVE", None)
-        else:
-            assert isinstance(previous_non_interactive_environment, str)
-            os.environ["BENCHBOX_NON_INTERACTIVE"] = previous_non_interactive_environment
-    return s.resolved_run_plan
 
 
 def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:

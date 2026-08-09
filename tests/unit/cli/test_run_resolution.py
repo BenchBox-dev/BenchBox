@@ -291,6 +291,7 @@ def test_successful_quick_restart_preserves_non_interactive_environment(monkeypa
     ctx = Mock()
     ctx.get_parameter_source.return_value = click.core.ParameterSource.DEFAULT
     state = SimpleNamespace(ctx=ctx, run_request=_request(), non_interactive=False)
+    monkeypatch.setenv(_run_module.DATA_ORGANIZATION_ENV, '{"original": true}')
     if existing_non_interactive is None:
         monkeypatch.delenv("BENCHBOX_NON_INTERACTIVE", raising=False)
     else:
@@ -300,6 +301,7 @@ def test_successful_quick_restart_preserves_non_interactive_environment(monkeypa
     def resolve_successfully(subject, *, apply_default_scale, tuning_non_interactive):
         assert apply_default_scale is False
         assert tuning_non_interactive is True
+        os.environ[_run_module.DATA_ORGANIZATION_ENV] = '{"resolved": true}'
         os.environ["BENCHBOX_NON_INTERACTIVE"] = "partial"
         subject.resolved_run_plan = resolved_plan
 
@@ -311,6 +313,7 @@ def test_successful_quick_restart_preserves_non_interactive_environment(monkeypa
     )
 
     assert result is resolved_plan
+    assert os.environ[_run_module.DATA_ORGANIZATION_ENV] == '{"resolved": true}'
     assert os.environ.get("BENCHBOX_NON_INTERACTIVE") == existing_non_interactive
 
 

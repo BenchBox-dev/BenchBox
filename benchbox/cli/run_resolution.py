@@ -8,8 +8,13 @@ snapshot to use for configuration and execution metadata.
 
 from __future__ import annotations
 
+import os
+import types
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Mapping
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, Callable, Mapping
+
+from benchbox.cli.composite_params import CompressionConfig
 
 if TYPE_CHECKING:
     from benchbox.cli.tuning_resolver import TuningResolution
@@ -78,6 +83,65 @@ class ResolvedRunPlan:
     compression_level: int | None
     concurrency: int
     seed: int | None
+
+
+def current_run_request(state: types.SimpleNamespace) -> RunRequest:
+    """Capture user intent without including fields derived by the resolver."""
+    phases = state.phases if isinstance(state.phases, (list, tuple)) else str(state.phases).split(",")
+    compression = getattr(state, "comp_config", None) or state.compression or CompressionConfig()
+    return RunRequest(
+        platform=state.platform,
+        benchmark=state.benchmark,
+        scale=float(state.scale),
+        phases=tuple(str(phase).strip() for phase in phases if str(phase).strip()),
+        queries=state.queries,
+        tuning=state.tuning,
+        table_mode=state.table_mode,
+        output=state.output,
+        mode=state.mode,
+        seed=state.seed,
+        compression_enabled=bool(compression.enabled),
+        compression_type=compression.type,
+        compression_level=compression.level,
+        concurrency=int(getattr(state, "concurrency", 1)),
+    )
+
+
+def capture_resolved_run_plan(
+    state: types.SimpleNamespace,
+    *,
+    canonical_tuning_mode: str | None,
+) -> ResolvedRunPlan:
+    """Take one immutable snapshot after all run-resolution stages succeed."""
+    request = getattr(state, "run_request", None) or current_run_request(state)
+    organization = (
+        MappingProxyType(dict(state.data_organization_payload)) if state.data_organization_payload is not None else None
+    )
+    return ResolvedRunPlan(
+        request=request,
+        platform_key=state.platform_key,
+        benchmark=state.benchmark,
+        scale=state.scale,
+        phases=tuple(state.phases_to_run),
+        queries=tuple(state.queries_to_run) if state.queries_to_run is not None else None,
+        test_execution_type=state.test_execution_type,
+        execution_mode=state.execution_mode,
+        resolved_mode=state.resolved_mode,
+        table_mode=state.table_mode,
+        tuning_resolution=state.tuning_resolution,
+        canonical_tuning_mode=canonical_tuning_mode,
+        tuning_enabled=state.tuning_enabled,
+        tuning_config_file=state.tuning_config_file,
+        use_auto_tuning=state.use_auto_tuning,
+        loaded_unified_config=state.loaded_unified_config,
+        data_organization=organization,
+        dataframe_tuning_config=state.df_tuning_config,
+        compression_enabled=state.compress_data,
+        compression_type=state.compression_type,
+        compression_level=state.compression_level,
+        concurrency=request.concurrency,
+        seed=state.seed,
+    )
 
 
 def parse_saved_phases(value: object) -> tuple[str, ...]:
@@ -279,4 +343,76 @@ def merge_quick_restart_request(
     )
 
 
-__all__ = ["ResolvedRunPlan", "RunRequest", "merge_quick_restart_request", "parse_saved_phases"]
+def apply_run_request(state: types.SimpleNamespace, request: RunRequest) -> None:
+    """Apply raw intent only; derived fields remain owned by the resolver."""
+    state.platform = request.platform
+    state.benchmark = request.benchmark
+    state.scale = request.scale
+    state.phases = ",".join(request.phases)
+    state.queries = request.queries
+    state.tuning = request.tuning
+    state.table_mode = request.table_mode
+    state.output = request.output
+    state.mode = request.mode
+    state.seed = request.seed
+    compression = CompressionConfig(
+        enabled=request.compression_enabled,
+        type=request.compression_type,
+        level=request.compression_level,
+    )
+    state.compression = compression
+    state.comp_config = compression
+    state.compression_cli_set = True
+    state.no_compression = not compression.enabled
+    state.compression_type = compression.type
+    state.compression_level = compression.level
+    state.concurrency = request.concurrency
+    state.run_request = request
+
+
+def resolve_quick_restart_atomically(
+    state: types.SimpleNamespace,
+    last_run: Mapping[str, Any],
+    *,
+    current_request: RunRequest,
+    explicit_fields: frozenset[str],
+    resolve: Callable[[types.SimpleNamespace], None],
+    data_organization_environment: str,
+) -> ResolvedRunPlan:
+    """Merge and resolve saved intent, rolling back state and environment on failure."""
+    request = merge_quick_restart_request(current_request, last_run, explicit_fields=explicit_fields)
+    previous_state = vars(state).copy()
+    missing_environment = object()
+    previous_data_organization = os.environ.get(data_organization_environment, missing_environment)
+    previous_non_interactive = os.environ.get("BENCHBOX_NON_INTERACTIVE", missing_environment)
+    try:
+        apply_run_request(state, request)
+        resolve(state)
+    except BaseException:
+        vars(state).clear()
+        vars(state).update(previous_state)
+        if previous_data_organization is missing_environment:
+            os.environ.pop(data_organization_environment, None)
+        else:
+            assert isinstance(previous_data_organization, str)
+            os.environ[data_organization_environment] = previous_data_organization
+        raise
+    finally:
+        if previous_non_interactive is missing_environment:
+            os.environ.pop("BENCHBOX_NON_INTERACTIVE", None)
+        else:
+            assert isinstance(previous_non_interactive, str)
+            os.environ["BENCHBOX_NON_INTERACTIVE"] = previous_non_interactive
+    return state.resolved_run_plan
+
+
+__all__ = [
+    "ResolvedRunPlan",
+    "RunRequest",
+    "apply_run_request",
+    "capture_resolved_run_plan",
+    "current_run_request",
+    "merge_quick_restart_request",
+    "parse_saved_phases",
+    "resolve_quick_restart_atomically",
+]
