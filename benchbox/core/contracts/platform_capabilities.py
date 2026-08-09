@@ -125,11 +125,6 @@ class DataFrameQueryRuntime(Protocol):
         table_name: str,
         file_paths: list[Path],
         column_names: list[str] | None = None,
-        delimiter: str | None = None,
-        format_hint: str | None = None,
-        *,
-        data_source: Any | None = None,
-        benchmark: Any | None = None,
     ) -> int: ...
 
     def execute_query(self, ctx: Any, query: Any, query_id: str | None = None) -> dict[str, Any]: ...
