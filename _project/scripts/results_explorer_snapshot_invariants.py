@@ -55,6 +55,17 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
     },
 }
 
+# These are the same required non-empty scans used by the browser during
+# snapshot initialisation. Keeping the list here makes an empty or partially
+# populated candidate fail before it can replace the last known-good output.
+REQUIRED_NONEMPTY_SCANS: tuple[tuple[str, str], ...] = (
+    ("results", "SELECT COUNT(*) FROM results"),
+    ("platform_index_rows", "SELECT COUNT(*) FROM platform_index_rows"),
+    ("benchmark_rankings", "SELECT COUNT(*) FROM benchmark_rankings"),
+    ("benchmark_matrix_cells", "SELECT COUNT(*) FROM benchmark_matrix_cells"),
+    ("result_detail_metrics", "SELECT COUNT(*) FROM result_detail_metrics"),
+)
+
 
 def _count(con: Any, sql: str) -> int:
     row = con.execute(sql).fetchone()
@@ -68,6 +79,15 @@ def _required_column_errors(con: Any) -> list[str]:
         missing = sorted(required - actual)
         if missing:
             errors.append(f"{table} missing required eligibility columns: {', '.join(missing)}")
+    return errors
+
+
+def _required_nonempty_scan_errors(con: Any) -> list[str]:
+    errors: list[str] = []
+    for label, sql in REQUIRED_NONEMPTY_SCANS:
+        count = _count(con, sql)
+        if count < 1:
+            errors.append(f"required browser scan {label} must be non-empty: {count} row(s)")
     return errors
 
 
@@ -86,6 +106,7 @@ def check_snapshot(db_path: Path) -> list[str]:
         errors.extend(_required_column_errors(con))
         if errors:
             return errors
+        errors.extend(_required_nonempty_scan_errors(con))
 
         checks = [
             (
@@ -105,13 +126,13 @@ def check_snapshot(db_path: Path) -> list[str]:
                 "public snapshot must expose at least one compare-eligible display row",
                 """
                 SELECT CASE
-                    WHEN COUNT(*) > 0
-                     AND SUM(CASE WHEN comparison_exclusion_reason IS NULL THEN 1 ELSE 0 END) = 0
+                    WHEN COUNT(*) = 0
                     THEN 1
                     ELSE 0
                 END
                 FROM results
                 WHERE has_display_timing = TRUE
+                  AND comparison_exclusion_reason IS NULL
                 """,
             ),
             (

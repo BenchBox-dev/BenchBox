@@ -122,6 +122,22 @@ class TestExplorerPipelineRun:
         results = _duckdb_results(output)
         assert len(results) == 1
 
+    def test_one_usable_row_populates_every_required_browser_scan(self, data_dir: Path, tmp_path: Path) -> None:
+        output = tmp_path / "out"
+        ExplorerPipeline().run(data_dir, output)
+
+        required_scans = (
+            "results",
+            "platform_index_rows",
+            "benchmark_rankings",
+            "benchmark_matrix_cells",
+            "result_detail_metrics",
+        )
+        with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
+            counts = {table: con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in required_scans}
+
+        assert all(count >= 1 for count in counts.values()), counts
+
     def test_result_row_fields_from_bundle(self, data_dir: Path, tmp_path: Path) -> None:
         output = tmp_path / "out"
         ExplorerPipeline().run(data_dir, output)
@@ -321,22 +337,52 @@ class TestExplorerPipelineRun:
 
         assert len(_duckdb_results(output)) == 1
 
-    def test_empty_data_dir_produces_empty_duckdb(self, tmp_path: Path) -> None:
+    def test_empty_data_dir_is_rejected_before_promotion(self, tmp_path: Path) -> None:
         data_dir = tmp_path / "empty_data"
         data_dir.mkdir()
         # No bundles/ sub-directory at all
         output = tmp_path / "out"
-        ExplorerPipeline().run(data_dir, output)
+        with pytest.raises(ValueError, match="required browser scan"):
+            ExplorerPipeline().run(data_dir, output)
 
-        assert _duckdb_results(output) == []
+        assert not output.exists()
 
-    def test_empty_bundles_dir_produces_empty_duckdb(self, tmp_path: Path) -> None:
+    def test_empty_bundles_dir_is_rejected_before_promotion(self, tmp_path: Path) -> None:
         data_dir = tmp_path / "data"
         (data_dir / "bundles").mkdir(parents=True)
         output = tmp_path / "out"
-        ExplorerPipeline().run(data_dir, output)
+        with pytest.raises(ValueError, match="required browser scan"):
+            ExplorerPipeline().run(data_dir, output)
 
-        assert _duckdb_results(output) == []
+        assert not output.exists()
+
+    def test_all_skipped_corpus_fails_before_promotion(self, tmp_path: Path) -> None:
+        data_dir = tmp_path / "data"
+        bundles_dir = data_dir / "bundles"
+        bundles_dir.mkdir(parents=True)
+        (bundles_dir / "invalid.json").write_text("{not valid json", encoding="utf-8")
+        output = tmp_path / "out"
+
+        with pytest.raises(ValueError, match="required browser scan"):
+            ExplorerPipeline().run(data_dir, output)
+
+        assert not output.exists()
+
+    def test_unpublishable_rebuild_preserves_last_known_good_output(self, data_dir: Path, tmp_path: Path) -> None:
+        output = tmp_path / "out"
+        ExplorerPipeline().run(data_dir, output)
+        before_db = (output / "results.duckdb").read_bytes()
+        before_bundles = sorted(path.name for path in (output / "bundles").iterdir())
+
+        invalid_data_dir = tmp_path / "invalid_data"
+        (invalid_data_dir / "bundles").mkdir(parents=True)
+        (invalid_data_dir / "bundles" / "invalid.json").write_text("{not valid json", encoding="utf-8")
+
+        with pytest.raises(ValueError, match="required browser scan"):
+            ExplorerPipeline().run(invalid_data_dir, output)
+
+        assert (output / "results.duckdb").read_bytes() == before_db
+        assert sorted(path.name for path in (output / "bundles").iterdir()) == before_bundles
 
     def test_submission_manifest_sidecar_overrides_trust_label(self, tmp_path: Path) -> None:
         """A bundle with a submission-manifest.json sidecar gets community-submission trust."""
