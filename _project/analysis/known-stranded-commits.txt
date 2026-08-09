@@ -68,3 +68,12 @@ cc01856f9da6f3dc815c0810936a88e3897132e7
 # remain unreachable from develop by construction, exactly like b5c56ea9 above.
 670fc009f932fe75110cb0ff5cb01cbd8b7648a0
 62fa013178bc620c21fbbc5a6991703a32af2766
+# fix/one-engine-parity-ledger — rebased 2026-08-09 (8c2702a830/1fa5972b9f removed); content re-landed via #1650 (8e9a040103)
+24522bcbc57c2bf1478d869a5d47b2300065ede9
+# fix/batch-security-gates-batch1 — stranded after squash-merge, re-landed separately
+65a5ebc51adcfb6c9ec4cfae47381f34c172d974
+906e2f9e4771121da4837f45e362fbde8ca8fd7c
+# fix/pr-review-followup-20260809 — stranded after merge
+193e125543378ffd81b0838d04fd8f983a1f0ff6
+# fix/required-lane-helper-converge — stranded after rebase/merge
+9e9df6e3a98553bf103b8e410e2b8cf03670927c
