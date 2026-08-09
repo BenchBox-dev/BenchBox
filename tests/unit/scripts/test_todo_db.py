@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 import textwrap
 from pathlib import Path
@@ -327,6 +328,45 @@ class TestVerifyRun:
             "SELECT seq, last_result FROM verifications WHERE item_id='sample-item' ORDER BY seq"
         ).fetchall()
         assert [(r["seq"], r["last_result"]) for r in rows] == [(1, "pass"), (2, "fail")]
+
+    def test_verify_rung_lock_contention_is_indeterminate(self, conn, tmp_path, monkeypatch):
+        """A lock timeout records an environmental non-verdict, not a failure."""
+        fcntl = pytest.importorskip("fcntl")
+        _mk(conn, verifications=[{"description": "blocked", "command": "false"}])
+        todo_db.claim_item(conn, "tester", "sample-item")
+        lock_dir = tmp_path / "lock"
+        lock_dir.mkdir()
+        lock_path = lock_dir / "test.lock"
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        monkeypatch.setenv("BENCHBOX_TEST_LOCK_DIR", str(lock_dir))
+        monkeypatch.setenv("BENCHBOX_VERIFY_LOCK_TIMEOUT", "0")
+        monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+        try:
+            result, output = todo_db.run_verification(conn, "tester", "sample-item", 1)
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            os.close(fd)
+
+        assert result == "indeterminate"
+        assert "verification command was not run" in output
+        row = conn.execute("SELECT last_result FROM verifications WHERE item_id='sample-item' AND seq=1").fetchone()
+        assert row["last_result"] is None
+        event = conn.execute("SELECT detail FROM events WHERE action='verify' ORDER BY seq DESC LIMIT 1").fetchone()
+        assert '"result": "indeterminate"' in event["detail"]
+
+    def test_verify_run_ignores_stale_lock_diagnostic(self, conn, tmp_path, monkeypatch):
+        """A dead owner's leftover diagnostic file does not block acquisition."""
+        _mk(conn, verifications=[{"description": "passes", "command": "true"}])
+        todo_db.claim_item(conn, "tester", "sample-item")
+        lock_dir = tmp_path / "lock"
+        lock_dir.mkdir()
+        (lock_dir / "test.lock").write_text("pid:999999 started:never\n", encoding="utf-8")
+        monkeypatch.setenv("BENCHBOX_TEST_LOCK_DIR", str(lock_dir))
+
+        result, _ = todo_db.run_verification(conn, "tester", "sample-item", 1)
+
+        assert result == "pass"
 
     def test_verify_expected_is_human_acceptance_text(self, conn):
         """`expected` documents a rung; it must never be graded.
