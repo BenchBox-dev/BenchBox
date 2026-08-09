@@ -44,7 +44,7 @@ from benchbox.cli.exceptions import (
 from benchbox.cli.help import BenchBoxCommand, advanced_option
 from benchbox.cli.orchestrator import BenchmarkOrchestrator, resolved_deployment_mode
 from benchbox.cli.output import ResultExporter
-from benchbox.cli.platform import get_platform_manager, normalize_platform_name
+from benchbox.cli.platform import get_platform_alias_mode, get_platform_manager, normalize_platform_name
 from benchbox.cli.platform_checks import check_and_setup_platform_credentials
 from benchbox.cli.platform_hooks import PlatformHookRegistry, PlatformOptionError
 from benchbox.cli.presentation.system import display_system_recommendations
@@ -629,8 +629,8 @@ def _apply_dataframe_suffix_mode(s: types.SimpleNamespace) -> None:
     the SQL adapter. An explicit --mode flag still wins, matching adapter-factory
     precedence (explicit mode > -df suffix > platform default).
     """
-    if s.mode is None and s.platform and s.platform.lower().endswith("-df"):
-        s.mode = "dataframe"
+    if s.mode is None and s.platform:
+        s.mode = get_platform_alias_mode(s.platform)
 
 
 def _apply_ducklake_deployment_suffix(s: types.SimpleNamespace) -> None:

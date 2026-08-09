@@ -297,22 +297,17 @@ def _get_dataframe_adapter(platform: str, **config: Any) -> Any:
     resolved_version = resolution.resolved or driver_version_resolved
     requested = driver_version or resolution.requested
 
-    adapter_mapping = {
-        "polars": (_df.PolarsDataFrameAdapter, _df.POLARS_AVAILABLE, "pip install polars"),
-        "pandas": (_df.PandasDataFrameAdapter, _df.PANDAS_AVAILABLE, "pip install pandas"),
-        "modin": (_df.ModinDataFrameAdapter, _df.MODIN_AVAILABLE, "pip install modin[ray]"),
-        "cudf": (_df.CuDFDataFrameAdapter, _df.CUDF_AVAILABLE, "pip install cudf-cu12"),
-        "dask": (_df.DaskDataFrameAdapter, _df.DASK_AVAILABLE, "pip install dask[distributed]"),
-        "pyspark": (_df.PySparkDataFrameAdapter, _df.PYSPARK_AVAILABLE, "pip install pyspark"),
-        "lakesail": (_df.LakeSailDataFrameAdapter, _df.PYSPARK_AVAILABLE, "pip install pyspark"),
-        "datafusion": (_df.DataFusionDataFrameAdapter, _df.DATAFUSION_DF_AVAILABLE, "pip install datafusion"),
-    }
+    from benchbox.platforms import _DATAFRAME_PLATFORM_INFO
 
-    if platform not in adapter_mapping:
-        available = ", ".join(sorted(adapter_mapping.keys()))
+    dataframe_spelling = f"{platform}-df"
+    adapter_info = _DATAFRAME_PLATFORM_INFO.get(dataframe_spelling)
+    if adapter_info is None:
+        available = ", ".join(sorted(name.removesuffix("-df") for name in _DATAFRAME_PLATFORM_INFO))
         raise ValueError(f"Unknown DataFrame platform: {platform}. Available: {available}")
 
-    adapter_class, is_available, install_cmd = adapter_mapping[platform]
+    adapter_name, availability_name, install_cmd = adapter_info
+    adapter_class = getattr(_df, adapter_name, None)
+    is_available = bool(getattr(_df, availability_name, False))
 
     if not is_available or adapter_class is None:
         raise ImportError(

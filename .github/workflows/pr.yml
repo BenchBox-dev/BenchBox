@@ -374,6 +374,11 @@ jobs:
         continue-on-error: true
         run: make compat-docs-check
 
+      - name: Platform manifest drift check
+        id: guard-platform-manifest
+        continue-on-error: true
+        run: make platform-manifest-check
+
       - name: Oracle coverage map drift check
         id: guard-oracle-coverage-map
         continue-on-error: true

@@ -49,7 +49,7 @@ def build_plan(name: str, kind: PlatformKind) -> ScaffoldPlan:
     cli_name = slug.replace("_", "-")
 
     common_files = (
-        "benchbox/core/platform_registry.py",
+        "benchbox/platforms/manifest.py",
         "pyproject.toml",
         f"docs/platforms/{cli_name}.md",
         "docs/platforms/comparison-matrix.md",
@@ -65,12 +65,13 @@ def build_plan(name: str, kind: PlatformKind) -> ScaffoldPlan:
         )
         checklist = (
             "Add adapter with lazy/guarded SDK imports.",
-            "Add _OPTIONAL_ADAPTERS registration and registry metadata.",
-            "Add exactly one support_status distinct from dependency availability.",
+            "Add one manifest entry with canonical key, scoped aliases, adapter coordinates/order, metadata, and capabilities.",
+            "Assign the next contiguous adapter registration_order; never reorder existing adapters.",
+            "Declare exactly one support_status distinct from dependency availability in that manifest entry.",
             "Add or reuse an optional dependency extra.",
             "Add SQL compatibility rules or explicit DDL/query exemptions.",
             "Add focused unit tests and define smoke/UAT scope.",
-            "Update docs without hand-maintained count drift.",
+            "Run make platform-manifest and make platform-manifest-check.",
         )
     else:
         files = (
@@ -85,11 +86,13 @@ def build_plan(name: str, kind: PlatformKind) -> ScaffoldPlan:
         checklist = (
             "Choose expression, pandas, Spark, or new DataFrame family.",
             "Add native DataFrame adapter and factory routing.",
-            "Add registry metadata with supports_sql=False unless dual-mode is real.",
-            "Add exactly one support_status distinct from dependency availability.",
+            "Add one manifest entry; make -df aliases CLI-scoped with implied_mode=dataframe.",
+            "Add adapter class, availability constant, and nonempty install guidance to the DataFrame lazy/factory surfaces.",
+            "Set supports_sql=False unless dual-mode is real.",
+            "Declare exactly one support_status distinct from dependency availability in that manifest entry.",
             "Add native query coverage or benchmark-gate unsupported workloads.",
             "Validate parity against DuckDB SQL at SF=0.01 where applicable.",
-            "Update docs without hand-maintained count drift.",
+            "Run make platform-manifest and make platform-manifest-check.",
         )
 
     return ScaffoldPlan(name=cli_name, kind=kind, files=files, checklist=checklist)
