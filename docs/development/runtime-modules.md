@@ -13,7 +13,6 @@ This guide summarizes the organization of the runtime-focused modules after the 
 - `benchbox/cli/shared.py`: shared console helpers (`console`, `set_quiet_output`, `silence_output`).
 - `benchbox/cli/main.py`: thin compatibility layer that re-exports the new modules for legacy imports and tests.
 - `benchbox/cli/orchestrator.py`: canonical runtime bridge from CLI to core lifecycle (`run_benchmark_lifecycle`).
-- `benchbox/cli/execution_pipeline.py`: legacy compatibility/test module; not the default `benchbox run` runtime path.
 
 ### Extension notes
 
