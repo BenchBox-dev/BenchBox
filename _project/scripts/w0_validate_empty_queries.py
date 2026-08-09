@@ -51,9 +51,7 @@ def main() -> int:
                 print(f"  WARN: missing {csv.name}; skipping")
                 continue
             con.execute(schema.get_create_table_sql(table, dialect="duckdb"))
-            con.execute(
-                f"COPY {table} FROM '{csv}' (FORMAT CSV, HEADER FALSE, NULL '')"
-            )
+            con.execute(f"COPY {table} FROM '{csv}' (FORMAT CSV, HEADER FALSE, NULL '')")
             loaded.append(table)
         print(f"  loaded {len(loaded)}/{len(schema.get_table_names())} tables")
 

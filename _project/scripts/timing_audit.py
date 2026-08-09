@@ -123,7 +123,8 @@ def main() -> int:
         unresolved = [
             f
             for f in findings
-            if f.classification in {"elapsed_or_timeout_wall_clock", "wall_clock_unknown"} and f.symbol in {"time.time", "datetime.now"}
+            if f.classification in {"elapsed_or_timeout_wall_clock", "wall_clock_unknown"}
+            and f.symbol in {"time.time", "datetime.now"}
         ]
         print(f"\nPotential policy violations: {len(unresolved)}")
         for finding in unresolved[:200]:

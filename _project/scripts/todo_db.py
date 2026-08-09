@@ -580,9 +580,7 @@ def _load_config_url() -> str | None:
         raise TodoError(f"todo backend config {path}: 'url' must be a non-empty string")
     url = _normalize_url(raw)
     if not _is_hosted_url(url):
-        raise TodoError(
-            f"todo backend config {path}: 'url' must be a libsql:// or https:// hosted URL, got {url!r}"
-        )
+        raise TodoError(f"todo backend config {path}: 'url' must be a libsql:// or https:// hosted URL, got {url!r}")
     return _require_secure_url(url)
 
 
@@ -1601,9 +1599,7 @@ def run_doctor(
     # a batch run that silently used it would write real work to a throwaway DB.
     if hosted:
         backend_detail = (
-            "hosted (auto-provisioned via turso CLI, URL withheld)"
-            if auto_provisioned
-            else "hosted (URL withheld)"
+            "hosted (auto-provisioned via turso CLI, URL withheld)" if auto_provisioned else "hosted (URL withheld)"
         )
         identity_status, identity_detail = (
             ("OK", "hosted backend auto-provisioned via turso CLI")
@@ -1742,9 +1738,7 @@ def _preconnect_command(
 
     if implicit_default_local and _command_mutates_tracker(args):
         provision_note = (
-            f" (turso auto-provision was attempted but failed: {provision_failure})"
-            if provision_failure
-            else ""
+            f" (turso auto-provision was attempted but failed: {provision_failure})" if provision_failure else ""
         )
         print(
             "error: refusing to write through the implicit local fallback"
@@ -2245,9 +2239,7 @@ def _update_metadata_fields(
     return changes
 
 
-def _update_edit_work(
-    conn: sqlite3.Connection, item_id: str, edits: dict[str, str]
-) -> dict[str, dict[str, str]]:
+def _update_edit_work(conn: sqlite3.Connection, item_id: str, edits: dict[str, str]) -> dict[str, dict[str, str]]:
     work_edited: dict[str, dict[str, str]] = {}
     for wid, summary in edits.items():
         unit = _require_unit(conn, item_id, wid)
@@ -2268,9 +2260,7 @@ def _update_edit_work(
     return work_edited
 
 
-def _update_add_work(
-    conn: sqlite3.Connection, item_id: str, adds: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def _update_add_work(conn: sqlite3.Connection, item_id: str, adds: list[dict[str, Any]]) -> list[dict[str, Any]]:
     wid_rows = conn.execute("SELECT wid FROM work_units WHERE item_id = ?", (item_id,))
     wids = {row["wid"] for row in wid_rows}
     work_added: list[dict[str, Any]] = []
@@ -3603,6 +3593,7 @@ def lint_item(conn: sqlite3.Connection, item_id: str, *, item: dict[str, Any] | 
     if get_config(conn, "lint.require_scope_test_files") == "on" and item["state"] in ("planning", "active"):
         findings.extend(_missing_scope_test_files(item))
     return findings
+
 
 # ---------------------------------------------------------------------------
 # Export
