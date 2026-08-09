@@ -34,9 +34,10 @@ class ClickHouseSetupMixin:
         self.max_execution_time = config.get("max_execution_time", 300)
         self.max_threads = config.get("max_threads", 8)
 
-        # Server-wide memory limit (overrides ClickHouse default 0.9 ratio)
-        # Set conservatively to 0.8 (80%) to leave headroom for OS and prevent OOM killer on macOS
-        self.max_server_memory_usage_ratio = config.get("max_server_memory_usage_ratio", 0.8)
+        # Orphaned: max_server_memory_usage_ratio has no live ClickHouse consumer
+        # since the session-setting cleanup. Keep as None for backwards compat;
+        # do not reintroduce the removed session setting to consume it.
+        self.max_server_memory_usage_ratio = None
 
         # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
@@ -55,9 +56,10 @@ class ClickHouseSetupMixin:
         self.max_execution_time = config.get("max_execution_time", 300)
         self.max_threads = config.get("max_threads", 4)  # Lower default for local
 
-        # Server-wide memory limit (overrides ClickHouse default 0.9 ratio)
-        # Set conservatively to 0.8 (80%) to leave headroom for OS and prevent OOM killer on macOS
-        self.max_server_memory_usage_ratio = config.get("max_server_memory_usage_ratio", 0.8)
+        # Orphaned: max_server_memory_usage_ratio has no live ClickHouse consumer
+        # since the session-setting cleanup. Keep as None for backwards compat;
+        # do not reintroduce the removed session setting to consume it.
+        self.max_server_memory_usage_ratio = None
 
         # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
@@ -125,6 +127,8 @@ class ClickHouseSetupMixin:
         self.strict_validation = config.get("strict_validation", True)
 
         # Cloud-specific settings
+        # Orphaned: max_server_memory_usage_ratio has no live ClickHouse consumer
+        # in any mode. Kept as None for backwards compat in all three modes.
         self.max_server_memory_usage_ratio = None  # Not applicable for cloud
 
         # Cloud storage staging configuration for data loading

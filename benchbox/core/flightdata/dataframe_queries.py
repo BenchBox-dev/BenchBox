@@ -28,9 +28,22 @@ from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRe
 # Default parameters
 # ---------------------------------------------------------------------------
 
+# Single source of truth: the generated data covers up to LAST_AVAILABLE_YEAR
+# (benchbox/core/flightdata/downloader_specs.yaml).  The SQL catalog derives
+# its date literals from the same constant via FlightDataBenchmark's
+# query window, so the DataFrame default must match it -- otherwise the
+# window matches zero rows (2024 data vs 2018 window).  Imported at module
+# load; fallback is the last known value from the spec and is covered by
+# the verification that asserts the default year is in the SQL window, so
+# a spec bump without a code bump fails fast.
+try:
+    from benchbox.core.flightdata.downloader import LAST_AVAILABLE_YEAR as _LAST_YEAR
+except (ImportError, FileNotFoundError, KeyError, ValueError):  # pragma: no cover - import guard for partial installs
+    _LAST_YEAR = 2024
+
 FLIGHTDATA_DEFAULT_PARAMS: dict[str, Any] = {
-    "start_date": date(2018, 1, 1),
-    "end_date": date(2019, 1, 1),
+    "start_date": date(_LAST_YEAR, 12, 1),
+    "end_date": date(_LAST_YEAR + 1, 1, 1),
 }
 
 _parameter_overrides: dict[str, Any] | None = None
