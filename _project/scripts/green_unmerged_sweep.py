@@ -115,10 +115,10 @@ sys.path.insert(0, str(SCRIPT_DIR))
 
 from auto_merge_soundness_paths import any_soundness_path  # noqa: E402
 from required_lane import (  # noqa: E402
-    REQUIRED_CHECK_NAMES,
-    is_check_run_success,
+    REQUIRED_CHECK_NAMES,  # noqa: F401 - re-exported for tests
+    is_check_run_success,  # noqa: F401 - re-exported for compat
     is_required_lane_green,
-    latest_check_run,
+    latest_check_run,  # noqa: F401 - re-exported for tests
 )
 
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "green_unmerged_fixture.json"
@@ -183,7 +183,7 @@ class ClassifiedPR:
 def _parse_iso(value: str) -> dt.datetime:
     # Re-export for fixture/tests that import via the sweep module. Real logic
     # lives in required_lane to keep timestamp handling consistent.
-    from required_lane import _parse_iso as _rl_parse_iso
+    from required_lane import _parse_iso as _rl_parse_iso  # noqa: E402
 
     return _rl_parse_iso(value)
 

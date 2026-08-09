@@ -2071,7 +2071,7 @@ worktree-release-locked:
 	fi; \
 	git checkout --detach origin/develop; \
 	git reset --hard origin/develop; \
-	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
+	if [ -n "$$branch" ]; then \
 		case "$$branch" in develop|main|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
 	fi; \
 	git remote prune origin; \

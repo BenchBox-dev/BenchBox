@@ -73,7 +73,7 @@ from auto_merge_soundness_paths import any_soundness_path  # noqa: E402
 from required_lane import (  # noqa: E402
     REQUIRED_CHECK_NAMES,
     _parse_iso,
-    is_check_run_success,
+    is_check_run_success,  # noqa: F401 - re-exported for compat
     is_required_lane_green,
     latest_check_run,
 )
