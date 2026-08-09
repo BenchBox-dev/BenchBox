@@ -98,6 +98,19 @@ Callers select a profile with `platform_options`:
 {"platform": "clickhouse-server", "platform_options": {"connection_profile": "analytics"}}
 ```
 
+### Velox remote deployment
+
+Velox `deployment` is not part of the MCP allow-list. The only deployment MCP
+can fully describe is `local`; `remote` would require a caller-supplied
+`sc://` endpoint and additional runtime configuration that would let an
+authenticated caller steer the server at a listener the operator never approved
+(the default `sc://localhost:50051` is host-local). Until a server-owned
+Velox endpoint registry with execution-time resolution exists, both `remote`
+and `docker` are rejected at admission (see `docs/reference/mcp.md` omission
+ledger, security-scoped). Direct `VeloxAdapter(deployment='remote',
+endpoint=...)` construction outside MCP keeps working for CLI and Python-API
+callers.
+
 On the `clickhouse` platform a profile additionally requires
 `deployment_mode: "server"` — local mode runs chDB in-process and must not gain
 a network path. Requests, including persisted durable jobs, carry only the
@@ -139,6 +152,32 @@ to the default instead of silently disabling the memory ceiling.
 
 This envelope is an additional per-run guard. The server-wide and per-principal
 concurrency limits in `admission` remain enforced independently.
+
+### Envelope tradeoffs
+
+Two tradeoffs were accepted when the envelope landed:
+
+1. **Host-derived budget.** The defaults (`16` workers, `64` total threads,
+   `64GB` total) are static constants chosen for determinism and testability,
+   not derived from `psutil` host capacity. On a 4-core runner the default
+   still admits a 64-thread request; on a 64-core host it under-uses the
+   machine. Operators can retune via `BENCHBOX_MCP_DASK_MAX_WORKERS` /
+   `_MAX_TOTAL_THREADS` / `_MAX_TOTAL_MEMORY`, which are the explicit operator
+   ceiling. The effective budget is therefore `min(configured, operator ceiling)`;
+   host capacity is not an implicit additional ceiling, keeping the envelope
+   deterministic under test (host capacity is injected in tests rather than read
+   inside the validator).
+
+2. **Inert-field handling.** The envelope is applied even when
+   `use_distributed` is `false`, where `DaskDataFrameAdapter` creates no
+   `LocalCluster`. A request that would consume nothing can still be rejected
+   for its worker count. Fail-closed was the deliberate choice: `use_distributed=false`
+   combined with a large `n_workers` is a contradictory request, and making the
+   guard conditional would add a bypass shape. If relaxed in the future, the
+   relaxation should reject the contradiction explicitly (an explicit
+   `n_workers`/`threads_per_worker` with `use_distributed=false`) rather than
+   silently skipping the envelope, so no bypass is introduced.
+
 
 ## Durable remote benchmark jobs
 

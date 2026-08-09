@@ -265,12 +265,7 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
-- Velox `deployment` accepts only `local` and `remote`, enumerated in both the
-  allow-list and the adapter. Unknown values are rejected rather than treated as
-  remote, so a request can never redirect execution to an endpoint it did not
-  name. `docker` is rejected: the `docker/velox/` tree is packaging
-  infrastructure for local development, not a deployment mode with its own
-  lifecycle, endpoint, isolation, and cleanup contract.
+- Velox `deployment` is not exposed over MCP. Local execution is the only deployment MCP can fully describe; `remote` would require an operator-approved endpoint (`sc://`) and additional packaging/runtime controls that are not part of the MCP allow-list. Both `remote` and `docker` are rejected at admission, so a request can never redirect execution to an endpoint it did not name via a server-owned profile. `docker` is rejected: the `docker/velox/` tree is packaging infrastructure for local development, not a deployment mode with its own lifecycle, endpoint, isolation, and cleanup contract. See the omission ledger below.
 - Modin `engine` accepts only `ray` and `dask` over MCP. The adapter itself also
   supports `unidist`, which stays documented for CLI and Python-API callers but
   is deliberately outside the MCP surface while it is experimental. `pandas` is
@@ -360,9 +355,11 @@ An omission that is absent from this ledger is a defect, not a decision.
 | `--table-mode` | Omitted | not-yet-demanded | Bounded `native`/`external` enum; no client demand yet. |
 | `--sorted-ingestion-*` | Omitted | not-yet-demanded | Bounded ingestion-ordering controls; no client demand yet. |
 | `--validation` | Omitted | not-yet-demanded | MCP exposes only the `validate_only` boolean; the validation-strictness enum is promotable. |
+| Velox `deployment` (`remote`/`docker`) | Omitted | security-scoped | Remote Velox would require an operator-approved endpoint and runtime controls; only local Velox is exposed over MCP to avoid caller-controlled destination selection. |
 | `--plan-config` | Omitted | not-yet-demanded | MCP exposes only the `capture_plans` boolean; per-query plan-capture selection is promotable. |
 | `--no-monitoring` | Omitted | not-yet-demanded | Metrics-collection toggle; bounded boolean, no client demand yet. |
 
+The textcharts MCP server remains a separate-client integration, not a bundled or proxied part of `benchbox-mcp`. See `docs/design/textcharts-mcp-boundary.md` for the accepted separate textcharts configuration and the rejected bundle/proxy alternatives.
 ### Discovery Tools
 
 #### `list_available`

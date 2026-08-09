@@ -267,11 +267,86 @@ class TestPlatformOptionAdmission:
             validate_platform_options("databricks", {"liquid_clustering_columns": "event_time;DROP"})
 
     def test_mcp_platform_choices_match_adapter_contracts(self):
+        # Velox deployment is not exposed over MCP; both remote and docker are rejected
+        # at admission to avoid caller-controlled destination selection (see omission ledger).
         with pytest.raises(MCPValidationError):
             validate_platform_options("velox", {"deployment": "docker"})
-        assert validate_platform_options("velox", {"deployment": "remote"}) == {"deployment": "remote"}
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("velox", {"deployment": "remote"})
+        with pytest.raises(MCPValidationError):
+            validate_platform_options("velox", {"deployment": "local"})
         with pytest.raises(MCPValidationError):
             validate_platform_options("modin", {"engine": "pandas"})
+
+    def test_velox_remote_cannot_reach_an_unapproved_endpoint(self):
+        """MCP cannot produce a Velox adapter aimed at an unapproved endpoint."""
+        # Any Velox deployment value is now rejected at admission; the adapter itself
+        # still supports remote via direct construction, but MCP admission must fail closed.
+        for deployment in ("remote", "local", "docker"):
+            with pytest.raises(MCPValidationError, match="not authorized"):
+                validate_platform_options("velox", {"deployment": deployment})
+
+    def test_df_suffixed_allowlist_key_resolves_to_itself(self, monkeypatch):
+        """A -df-suffixed allow-list key must resolve to itself on both sides."""
+        from benchbox.mcp.schemas import (
+            MCP_PLATFORM_OPTION_ALLOWLIST,
+            MCP_PLATFORM_OPTION_CONTRACT,
+            MCPPlatformOptionContract,
+            MCPPlatformOptionSpec,
+            resolve_platform_policy_key,
+            validate_platform_options,
+        )
+        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
+
+        # Inject a synthetic -df allow-list entry that would be shadowed by the base name
+        # if the resolver were unconditional.
+        fake_platform = "polars-df-synthetic-test"
+        # Ensure no collision with existing keys
+        assert fake_platform not in MCP_PLATFORM_OPTION_ALLOWLIST
+        # Use a distinct option name to avoid collision
+        opt_name = "synthetic_opt"
+        monkeypatch.setitem(
+            MCP_PLATFORM_OPTION_ALLOWLIST,
+            fake_platform,
+            {opt_name: MCPPlatformOptionSpec(kind="bool", choices=(), minimum=None, maximum=None)},
+        )
+        monkeypatch.setitem(
+            MCP_PLATFORM_OPTION_CONTRACT,
+            fake_platform,
+            {opt_name: MCPPlatformOptionContract(consumer="test consumer", security_class="execution")},
+        )
+        # Also ensure base platform exists for comparison (polars exists)
+        # The resolver must return the -df key itself, not the base
+        assert resolve_platform_policy_key(fake_platform) == fake_platform
+        # Admission should validate against the -df key's own spec
+        normalized = validate_platform_options(fake_platform, {opt_name: True})
+        assert normalized[opt_name] is True
+        # Preparation should also resolve to the -df key, not the base
+        prepared = _prepare_adapter_platform_options(fake_platform, normalized)
+        # For a generic bool option, preparation is identity
+        assert prepared[opt_name] is True
+
+    def test_connection_class_covers_every_destination_changing_option(self):
+        """Every option that can change the server's endpoint is classified 'connection'."""
+        # The rule: 'connection' = option can change which endpoint the server talks to.
+        # Both velox.deployment and clickhouse.deployment_mode flip an in-process engine
+        # to a network client, and connection_profile names a server-owned destination.
+        must_be_connection = {
+            ("clickhouse", "deployment_mode"),
+            ("clickhouse", "connection_profile"),
+            ("clickhouse-server", "connection_profile"),
+        }
+        for platform, option in must_be_connection:
+            assert MCP_PLATFORM_OPTION_CONTRACT[platform][option].security_class == "connection", (
+                f"{platform}.{option} must be 'connection' per the security_class rule"
+            )
+        # No other option should be 'connection' under the current allow-list
+        for platform, contracts in MCP_PLATFORM_OPTION_CONTRACT.items():
+            for option, contract in contracts.items():
+                if (platform, option) not in must_be_connection:
+                    assert contract.security_class != "connection" or (platform, option) in must_be_connection, (
+                        f"Unexpected 'connection' classification for {platform}.{option}"
+                    )
 
 
 class TestDatabricksClusteringOptions:

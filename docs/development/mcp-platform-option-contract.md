@@ -10,9 +10,24 @@ The matrix is intentionally narrower than the CLI option registry. `consumer`
 identifies the code path that must consume the normalized value; it is not
 permission to expose the underlying adapter's full configuration surface.
 
+### Security classification
+
+`security_class` states the review signal. `connection` means the option can
+change which endpoint the server talks to. Any option able to steer the server
+from an in-process engine to a network client, to choose among network
+destinations, or to alter the transport policy (TLS, authentication) is
+`connection` and must name a server-owned destination rather than describe one
+(for example, a profile name resolved via `BENCHBOX_MCP_CLICKHOUSE_PROFILES`,
+not a caller-supplied host, port, or `secure` flag). No additional option may
+be introduced that lets an MCP caller describe a destination or downgrade a
+transport; new `connection` options require a server-owned registry and
+execution-time resolution. `resource`, `execution`, `device`, and `layout`
+encode aggregate budget, mode, device, and storage-layout intents and must
+never be able to change the endpoint.
+
 | Platform | Option(s) | Consumer | Security class | Compatibility alias / rejected alternatives |
 |---|---|---|---|---|
-| ClickHouse | `deployment_mode` | `ClickHouseAdapter.from_config` | execution | Connection destinations and transport policy remain server-owned. |
+| ClickHouse | `deployment_mode` | `ClickHouseAdapter.from_config` | connection | Flips an in-process engine to a network client; destinations and transport policy remain server-owned, caller names a profile rather than describes a destination. |
 | ClickHouse | `connection_profile` | `ClickHouseAdapter.from_config(port, secure)` resolved from `BENCHBOX_MCP_CLICKHOUSE_PROFILES` | connection | Reject caller-supplied `port`/`secure`, arbitrary destinations, and TLS downgrade. Only the profile name is accepted and persisted. |
 | cuDF | `device_id`, `spill_to_host` | cuDF runtime and memory policy | device/resource | Reject device paths, scheduler endpoints, and package controls. |
 | Dask | `memory_limit`, `n_workers`, `threads_per_worker` | LocalCluster resource envelope, bounded in aggregate by `load_dask_resource_envelope()` before adapter construction | resource | Per-field maxima are insufficient: worker count, `n_workers` x `threads_per_worker`, and `n_workers` x `memory_limit` are each capped by a server-owned budget. Reject scheduler endpoints and spill paths. |
@@ -30,7 +45,6 @@ permission to expose the underlying adapter's full configuration surface.
 | SQLite | `check_same_thread` | SQLite connection safety setting | execution | Reject database paths and URI query controls. |
 | SQLite | `timeout` | SQLite connection timeout | resource | Reject arbitrary connection strings. |
 | Velox | `adaptive_enabled` | Velox execution options | execution | Reject unreviewed execution flags. |
-| Velox | `deployment` | Velox local/remote deployment selector | connection | Only `local`/`remote`; reject implicit Docker or arbitrary endpoint routing. |
 | Velox | `driver_memory`, `offheap_size`, `shuffle_partitions` | Velox resource envelope | resource | Reject paths, scheduler endpoints, and unbounded values. |
 
 ## Change protocol

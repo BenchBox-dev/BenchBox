@@ -387,7 +387,7 @@ class TestDuckDBAdapter:
             call("SET default_order = 'ASC'"),
         ]
         for expected_call in expected_calls:
-            mock_connection.execute.assert_any_call(expected_call.args[0])
+            mock_connection.execute.assert_any_call(*expected_call.args)
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_create_connection_file_database(self, mock_duckdb):
@@ -1270,7 +1270,7 @@ class TestDuckDBAdapter:
         ]
 
         for expected_call in expected_calls:
-            mock_connection.execute.assert_any_call(expected_call.args[0])
+            mock_connection.execute.assert_any_call(*expected_call.args)
 
     @patch("benchbox.platforms.duckdb.duckdb")
     def test_table_loading_order(self, mock_duckdb):
