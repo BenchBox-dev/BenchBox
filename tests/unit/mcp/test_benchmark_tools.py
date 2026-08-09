@@ -761,27 +761,27 @@ class TestGetQueryDetailsTool:
     """Tests for get_query_details tool functionality."""
 
     def test_tpch_query_complexity_hints(self):
-        """Test that TPC-H query complexity hints are available."""
-        from benchbox.mcp.tools.benchmark import _get_query_complexity_hints
+        """Test that TPC-H query complexity hints are available (now core-owned)."""
+        from benchbox.core.query_hints import get_query_complexity_hints
 
         # Test Q6 - known simple query
-        hints = _get_query_complexity_hints("tpch", "6")
+        hints = get_query_complexity_hints("tpch", "6")
         assert hints["type"] == "scan_filter"
         assert hints["complexity"] == "simple"
         assert hints["joins"] == 0
         assert "lineitem" in hints["tables"]
 
         # Test Q2 - known complex query
-        hints = _get_query_complexity_hints("tpch", "2")
+        hints = get_query_complexity_hints("tpch", "2")
         assert hints["type"] == "correlated_subquery"
         assert hints["complexity"] == "complex"
         assert hints["joins"] >= 4
 
     def test_unknown_query_returns_default(self):
-        """Test that unknown queries return default hints."""
-        from benchbox.mcp.tools.benchmark import _get_query_complexity_hints
+        """Test that unknown queries return default hints (now core-owned)."""
+        from benchbox.core.query_hints import get_query_complexity_hints
 
-        hints = _get_query_complexity_hints("unknown_benchmark", "99")
+        hints = get_query_complexity_hints("unknown_benchmark", "99")
         assert hints["type"] == "unknown"
         assert hints["complexity"] == "unknown"
         assert "note" in hints

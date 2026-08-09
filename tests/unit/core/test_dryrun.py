@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from benchbox.core.dryrun import DryRunExecutor
+from benchbox.core.dryrun import DryRunExecutor, preview_benchmark_run
 
 pytestmark = [
     pytest.mark.unit,
@@ -673,6 +673,22 @@ class TestDryRunPlatformConfigInjection:
             )
 
         assert mock_core.call_args[0][2] == "tpch"
+
+
+def test_preview_defaults_df_alias_to_dataframe_mode():
+    result = MagicMock(execution_mode="dataframe", warnings=[], query_preview={}, estimated_resources={})
+
+    with (
+        patch("benchbox.core.benchmark_registry.get_all_benchmarks", return_value={"tpch": {"display_name": "TPC-H"}}),
+        patch(
+            "benchbox.core.platform_registry.PlatformRegistry.get_platform_info", return_value=MagicMock(available=True)
+        ),
+        patch("benchbox.core.system.SystemProfiler.get_system_profile", return_value=MagicMock()),
+        patch.object(DryRunExecutor, "execute_dry_run", return_value=result),
+    ):
+        response = preview_benchmark_run("datafusion-df", "tpch", 0.01, None, None)
+
+    assert response["execution_mode"] == "dataframe"
 
 
 # ---------------------------------------------------------------------------

@@ -497,24 +497,13 @@ class DryRunExecutor:
 
             if benchmark_id == "tpcds":
                 return self._execute_tpcds_test_class(
-                    benchmark,
-                    benchmark_config,
-                    test_execution_type,
-                    scale_factor,
-                    connection,
-                    platform_adapter,
+                    benchmark, benchmark_config, test_execution_type, scale_factor, connection, platform_adapter
                 )
-            elif benchmark_id == "tpch":
+            if benchmark_id == "tpch":
                 return self._execute_tpch_test_class(
-                    benchmark,
-                    benchmark_config,
-                    test_execution_type,
-                    scale_factor,
-                    connection,
-                    platform_adapter,
+                    benchmark, benchmark_config, test_execution_type, scale_factor, connection, platform_adapter
                 )
-            else:
-                return self._extract_standard_queries(benchmark)
+            return self._extract_standard_queries(benchmark)
 
         except Exception:
             return self._extract_standard_queries(benchmark)
@@ -528,30 +517,10 @@ class DryRunExecutor:
         connection,
         platform_adapter,
     ) -> dict[str, str]:
-        try:
-            # For TPC-DS tests, extract queries from the benchmark directly
-            # Test classes don't expose get_all_queries(), but benchmarks do
-            return self._extract_standard_queries(benchmark)
+        """Extract query text from the TPC-DS benchmark object."""
+        return self._extract_standard_queries(benchmark)
 
-        except Exception:
-            return {}
-
-    def _execute_tpch_test_class(
-        self,
-        benchmark,
-        benchmark_config,
-        test_execution_type: str,
-        scale_factor: float,
-        connection,
-        platform_adapter,
-    ) -> dict[str, str]:
-        try:
-            # For TPC-H tests, extract queries from the benchmark directly
-            # Test classes don't expose get_all_queries(), but benchmarks do
-            return self._extract_standard_queries(benchmark)
-
-        except Exception:
-            return {}
+    _execute_tpch_test_class = _execute_tpcds_test_class
 
     def _extract_standard_queries(self, benchmark) -> dict[str, str]:
         if hasattr(benchmark, "get_queries"):
@@ -1135,6 +1104,7 @@ class DryRunExecutor:
         return ddl_preview, post_load_statements
 
     def _get_execution_context(self, benchmark_config: BenchmarkConfig, query_count: int) -> str:
+        """Describe the execution context represented by a dry-run preview."""
         test_execution_type = getattr(benchmark_config, "test_execution_type", "standard")
         benchmark_name = getattr(benchmark_config, "name", "").lower()
 
@@ -1157,3 +1127,151 @@ class DryRunExecutor:
                 return "Maintenance test execution (data operations)"
         else:
             return f"Standard sequential execution ({query_count} queries)"
+
+
+def preview_benchmark_run(  # noqa: C901
+    platform: str,
+    benchmark: str,
+    scale_factor: float,
+    queries: str | None,
+    mode: str | None,
+) -> dict[str, Any]:
+    """Core-owned dry-run preview for a benchmark run (shared by MCP and CLI).
+
+    Mirrors the previous ``benchbox.mcp.tools.benchmark._dry_run_impl``
+    behaviour -- validates platform/benchmark, resolves execution mode,
+    builds :class:`BenchmarkConfig` / :class:`DatabaseConfig`, calls
+    :class:`DryRunExecutor`, and shapes the response dict.  Transport layers
+    (MCP, CLI) should call this and add only transport-specific error wrapping
+    if needed.
+    """
+    import logging as _logging
+
+    from benchbox.core.benchmark_registry import get_all_benchmarks
+    from benchbox.core.platform_registry import PlatformRegistry
+    from benchbox.core.schemas import BenchmarkConfig as _BenchmarkConfig, DatabaseConfig as _DatabaseConfig
+    from benchbox.core.system import SystemProfiler as _SystemProfiler
+
+    _logger = _logging.getLogger(__name__)
+
+    try:
+        benchmark_lower = benchmark.lower()
+        all_benchmarks = get_all_benchmarks()
+
+        if benchmark_lower not in all_benchmarks:
+            return {
+                "status": "error",
+                "error": f"Benchmark '{benchmark}' not found",
+                "error_code": "RESOURCE_NOT_FOUND",
+                "details": {"requested": benchmark, "available": list(all_benchmarks.keys())},
+            }
+
+        platform_lower = platform.lower()
+        base_platform = platform_lower.replace("-df", "")
+        platform_info = PlatformRegistry.get_platform_info(base_platform)
+
+        warnings: list[str] = []
+        if platform_info is None:
+            warnings.append(f"Unknown platform: {platform}")
+        elif not platform_info.available:
+            warnings.append(f"Platform '{platform}' dependencies not installed: {platform_info.installation_command}")
+
+        # Resolve mode — core-owned; do not import from MCP (avoids circular dep).
+        resolved_mode: str
+        if mode is not None:
+            m_lower = mode.lower()
+            if m_lower in ("datagen", "generate"):
+                m_lower = "data_only"
+            if m_lower not in ("sql", "dataframe", "data_only"):
+                return {
+                    "status": "error",
+                    "error": f"Invalid mode: {mode}. Must be 'sql', 'dataframe', or 'data_only'",
+                    "error_code": "VALIDATION_ERROR",
+                }
+            if m_lower == "data_only":
+                resolved_mode = "data_only"
+            elif platform_info is not None and not PlatformRegistry.supports_mode(base_platform, m_lower):
+                supported = [m for m in ["sql", "dataframe"] if PlatformRegistry.supports_mode(base_platform, m)]
+                supported.append("data_only")
+                return {
+                    "status": "error",
+                    "error": f"Platform '{platform}' does not support {m_lower} mode",
+                    "error_code": "VALIDATION_UNSUPPORTED_MODE",
+                    "details": {
+                        "platform": platform,
+                        "requested_mode": m_lower,
+                        "supported_modes": supported,
+                    },
+                }
+            else:
+                resolved_mode = m_lower
+        elif platform_lower.endswith("-df"):
+            resolved_mode = "dataframe"
+        else:
+            # Default from registry, fall back to sql.
+            try:
+                resolved_mode = PlatformRegistry.get_default_mode(base_platform)
+            except Exception:
+                resolved_mode = "sql"
+
+        meta = all_benchmarks[benchmark_lower]
+        display_name = meta.get("display_name", benchmark_lower.upper())
+
+        benchmark_config = _BenchmarkConfig(
+            name=benchmark_lower,
+            display_name=display_name,
+            scale_factor=scale_factor,
+            queries=[q.strip() for q in queries.split(",")] if queries else None,
+        )
+
+        database_config = _DatabaseConfig(
+            type=platform_lower,
+            name=f"mcp_dryrun_{platform_lower}",
+            execution_mode=resolved_mode,
+        )
+
+        profiler = _SystemProfiler()
+        system_profile = profiler.get_system_profile()
+
+        executor = DryRunExecutor(output_dir=None)
+        result = executor.execute_dry_run(benchmark_config, system_profile, database_config)
+
+        warnings.extend(result.warnings)
+
+        response: dict[str, Any] = {
+            "status": "dry_run",
+            "platform": platform,
+            "benchmark": benchmark,
+            "scale_factor": scale_factor,
+            "execution_mode": result.execution_mode,
+        }
+
+        if result.query_preview:
+            query_ids = result.query_preview.get("queries", [])
+            response["execution_plan"] = {
+                "phases": ["load", "power"],
+                "total_queries": result.query_preview.get("query_count", 0),
+                "query_ids": query_ids[:30],
+                "query_ids_truncated": len(query_ids) > 30,
+            }
+
+        if result.estimated_resources:
+            data_size_mb = result.estimated_resources.get("estimated_data_size_mb", 0)
+            response["resource_estimates"] = {
+                "data_size_gb": round(data_size_mb / 1024, 2),
+                "memory_recommended_gb": max(2, round(data_size_mb / 1024 * 2, 1)),
+            }
+
+        if warnings:
+            response["warnings"] = warnings
+
+        return response
+
+    except Exception as e:
+        _logger.error("Dry run preview failed (%s)", type(e).__name__)
+        return {
+            "status": "error",
+            "error": f"Dry run failed: {e}",
+            "error_code": "INTERNAL_ERROR",
+            "details": {"exception_type": type(e).__name__},
+        }
