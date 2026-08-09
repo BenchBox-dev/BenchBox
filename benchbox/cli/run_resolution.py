@@ -415,6 +415,8 @@ def merge_quick_restart_request(
 
     seed = choose("seed", "seed", current.seed)
     if seed is not None:
+        if isinstance(seed, bool) or (isinstance(seed, float) and not seed.is_integer()):
+            raise ValueError("Saved quick-restart seed must be an integer")
         try:
             seed = int(seed)
         except (TypeError, ValueError) as exc:

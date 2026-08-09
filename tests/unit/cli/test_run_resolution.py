@@ -171,6 +171,16 @@ def test_fully_recorded_saved_request_is_exact():
     assert merged.compatibility_notes == ()
 
 
+@pytest.mark.parametrize("seed", [True, 1.5, "1.5"])
+def test_saved_request_rejects_non_integral_seed(seed):
+    with pytest.raises(ValueError, match="seed must be an integer"):
+        merge_quick_restart_request(
+            _request(),
+            {"database": "duckdb", "benchmark": "tpch", "scale": 1, "seed": seed},
+            explicit_fields=frozenset(),
+        )
+
+
 def test_saved_power_iterations_are_replayed_exactly():
     merged = merge_quick_restart_request(
         _request(),
