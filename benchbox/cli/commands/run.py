@@ -2534,6 +2534,9 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
         # Quick restart already finalized both configs from the atomic plan.
         s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
         s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
+        # Quick restart already finalized concurrency in its resolved plan.
+        if getattr(s, "concurrency", None) is not None:
+            s.benchmark_config.concurrency = s.concurrency
     if _run_stages_through_cloud_storage(s) and not s.output:
         console.print()
         console.print("[red]❌ Error: Cloud platform requires --output parameter[/red]")
@@ -2937,6 +2940,13 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 )
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
 @advanced_option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=None,
+    hidden=True,
+    help="Concurrent streams (hidden; for run-official)",
+)
+@advanced_option(
     "--iterations",
     type=click.IntRange(min=1),
     default=None,
@@ -3026,6 +3036,7 @@ def run(
     benchmark_option_pairs: tuple[tuple[str, str], ...],
     mode: str | None,
     seed: int | None,
+    concurrency: int | None,
     iterations: int | None,
     no_monitoring: bool,
     no_progress: bool,
@@ -3090,6 +3101,7 @@ def run(
         benchmark_option_pairs=benchmark_option_pairs,
         mode=mode,
         seed=seed,
+        concurrency=concurrency,
         iterations=iterations,
         no_monitoring=no_monitoring,
         no_progress=no_progress,

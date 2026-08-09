@@ -215,6 +215,126 @@ class TPCMetricsCalculator:
         """
         return geometric_mean_ms(times)
 
+    @staticmethod
+    def resolve_scale_factor(
+        power_data: dict,
+        throughput_data: dict,
+        scale_factor: float | None = None,
+    ) -> float:
+        """Resolve scale factor from result data or explicit value.
+
+        Moved from ``benchbox.cli.commands.metrics`` so the policy lives in
+        core and any surface (CLI, MCP) uses the same resolution. The CLI
+        translates ``ValueError`` to its console message + ``sys.exit(1)``.
+
+        Args:
+            power_data: Power test result dict.
+            throughput_data: Throughput test result dict.
+            scale_factor: Explicit SF when supplied, otherwise auto-detected.
+
+        Returns:
+            Resolved scale factor.
+
+        Raises:
+            ValueError: If SF cannot be auto-detected or the two files
+                disagree.
+        """
+        if scale_factor is not None:
+            return scale_factor
+        sf_power = power_data.get("environment", {}).get("scale_factor")
+        sf_throughput = throughput_data.get("environment", {}).get("scale_factor")
+        if sf_power and sf_throughput:
+            if sf_power != sf_throughput:
+                raise ValueError(f"Scale factor mismatch: power={sf_power}, throughput={sf_throughput}")
+            return sf_power
+        raise ValueError("Could not auto-detect scale factor. Please specify --scale-factor")
+
+    @staticmethod
+    def derive_tpc_metrics(
+        power_data: dict,
+        throughput_data: dict,
+        scale_factor: float,
+    ) -> tuple[float | None, float | None, float | None, float | None]:
+        """Extract or derive Power@Size and Throughput@Size.
+
+        Core relocation of ``benchbox.cli.commands.metrics._derive_tpc_metrics``
+        so derivation policy is not CLI-only. Returns ``(power_at_size,
+        throughput_at_size, power_time, throughput_time)``.
+
+        The method first consults ``summary.tpc_metrics`` on each file; when
+        absent and the run is not ``unofficial_subscale``, it derives the
+        metric via :meth:`calculate_power_at_size` /
+        :meth:`calculate_throughput_at_size`.
+        """
+        power_metrics = power_data.get("summary", {}).get("tpc_metrics", {})
+        throughput_metrics = throughput_data.get("summary", {}).get("tpc_metrics", {})
+
+        power_time_ms = power_data.get("summary", {}).get("timing", {}).get("total_ms")
+        throughput_time_ms = throughput_data.get("summary", {}).get("timing", {}).get("total_ms")
+        power_time = (power_time_ms / 1000.0) if power_time_ms else None
+        throughput_time = (throughput_time_ms / 1000.0) if throughput_time_ms else None
+
+        power_at_size = power_metrics.get("power_at_size")
+        throughput_at_size = throughput_metrics.get("throughput_at_size")
+
+        compliance_class = power_data.get("benchmark", {}).get("compliance_class")
+        is_subscale = compliance_class == "unofficial_subscale"
+
+        if power_at_size is None or throughput_at_size is None:
+            if power_at_size is None and not is_subscale:
+                power_query_times = [
+                    q["ms"] / 1000.0
+                    for q in power_data.get("queries", [])
+                    if q.get("run_type") == "measurement" and q.get("status") == "SUCCESS"
+                ]
+                if power_query_times:
+                    power_at_size = TPCMetricsCalculator.calculate_power_at_size(power_query_times, scale_factor)
+            if throughput_at_size is None and not is_subscale:
+                t_summary = throughput_data.get("summary", {}).get("queries", {})
+                total_queries = t_summary.get("total")
+                t_time_ms = throughput_data.get("summary", {}).get("timing", {}).get("total_ms")
+                if total_queries and t_time_ms:
+                    num_streams = throughput_data.get("run", {}).get("streams", 1)
+                    throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
+                        total_queries,
+                        t_time_ms / 1000.0,
+                        scale_factor,
+                        num_streams,
+                    )
+        return power_at_size, throughput_at_size, power_time, throughput_time
+
+    @staticmethod
+    def compute_qphh_result(
+        power_data: dict,
+        throughput_data: dict,
+        scale_factor: float | None = None,
+    ) -> dict:
+        """Compute the QphH result dict from loaded power/throughput dicts.
+
+        Pure core helper so CLI keeps parsing/emission only. Raises
+        ``ValueError`` when derivation fails; CLI maps it to a console error.
+        """
+        sf = TPCMetricsCalculator.resolve_scale_factor(power_data, throughput_data, scale_factor)
+        power_at_size, throughput_at_size, power_time, throughput_time = TPCMetricsCalculator.derive_tpc_metrics(
+            power_data, throughput_data, sf
+        )
+        if power_at_size is None or throughput_at_size is None:
+            raise ValueError("Could not derive Power@Size or Throughput@Size from result data")
+        num_streams = throughput_data.get("run", {}).get("streams") or throughput_data.get("environment", {}).get(
+            "num_streams", 1
+        )
+        qphh_at_size = TPCMetricsCalculator.calculate_qph(power_at_size, throughput_at_size)
+        return {
+            "benchmark": "TPC-H",
+            "scale_factor": sf,
+            "num_streams": num_streams,
+            "power_test_time": power_time,
+            "throughput_test_time": throughput_time,
+            "power_at_size": power_at_size,
+            "throughput_at_size": throughput_at_size,
+            "qphh_at_size": qphh_at_size,
+        }
+
 
 class TimingStatsCalculator:
     """Calculate timing statistics for query results."""

@@ -6,6 +6,7 @@ import click
 
 from benchbox.cli.commands.run import run
 from benchbox.cli.shared import console
+from benchbox.core.run_service import resolve_lifecycle_phases
 
 
 @click.command("datagen")
@@ -74,43 +75,80 @@ def datagen(ctx, benchmark, scale, output_dir, data_format, seed, verbose):
     if output_dir:
         console.print(f"Output: {output_dir}")
 
-    # Build arguments for the run command
-    # We use a dummy platform since --phases generate doesn't actually connect to a platform
-    run_args = [
-        "--platform",
-        "duckdb",  # Dummy platform (not used for generate phase)
-        "--benchmark",
-        benchmark,
-        "--scale",
-        str(scale),
-        "--phases",
-        "generate",
-    ]
-
-    if output_dir:
-        run_args.extend(["--output", output_dir])
-
-    if seed is not None:
-        run_args.extend(["--seed", str(seed)])
-
-    if verbose:
-        run_args.append("--verbose")
-
     # Note: data_format is not directly supported by run command yet
-    # This would need to be added to the run command implementation
     if data_format and data_format != "parquet":
         console.print(
             f"[yellow]Note: Format '{data_format}' requested but may not be supported. "
             "Default format will be used.[/yellow]"
         )
 
-    # Invoke the run command with generate phase
-    ctx.invoke(run, **_parse_run_args(run_args))
+    # Direct run-service delegation for generate-only: no dummy platform,
+    # no argv round-trip. ``phases="generate"`` is the data-only lifecycle;
+    # the run service resolves it to ``LifecyclePhases(generate=True, ...)``
+    # without requiring a platform adapter.
+    _phases = resolve_lifecycle_phases(["generate"])
+    # Validate that generate is a valid phase early, before invoking run.
+    assert _phases.generate, "generate phase must be enabled for datagen"
+
+    ctx.invoke(
+        run,
+        platform=None,
+        benchmark=benchmark,
+        scale=scale,
+        output=output_dir,
+        phases="generate",
+        queries=None,
+        tuning="notuning",
+        table_mode="native",
+        sorted_ingestion_mode=None,
+        sorted_ingestion_method=None,
+        dry_run=None,
+        force=None,
+        verbose=1 if verbose else 0,
+        quiet=False,
+        non_interactive=True,
+        official=False,
+        capture_plans=False,
+        analyze_plans=None,
+        show_plans=False,
+        strict_translation=False,
+        plan_config=None,
+        normalize_plan_literals=False,
+        stats_reset=None,
+        stats_per_table_timing=False,
+        compression=None,
+        table_format=None,
+        presort=None,
+        validation=None,
+        platform_option_pairs=(),
+        benchmark_option_pairs=(),
+        mode=None,
+        seed=seed,
+        concurrency=None,
+        iterations=None,
+        no_monitoring=False,
+        no_progress=False,
+        ignore_memory_warnings=False,
+        global_cache=False,
+        publish=False,
+        publish_target="benchmark_runs/published",
+        publish_label="maintainer-run",
+        funding=None,
+        result_source=None,
+    )
 
 
 def _parse_run_args(args: list[str]) -> dict:
-    """Parse run command arguments into a dict for context.invoke()."""
-    parsed = {}
+    """Compatibility shim for tests that still import this helper.
+
+    Previously datagen built an argv list with a dummy ``--platform duckdb``
+    and round-tripped it through this parser before ``ctx.invoke(run, ...)``.
+    The helper is retained for backwards compatibility with
+    ``tests/unit/cli/test_new_commands.py`` but is no longer used by the
+    datagen command itself, which now calls ``run`` directly with structured
+    kwargs and no dummy platform.
+    """
+    parsed: dict[str, object] = {}
     i = 0
     while i < len(args):
         arg = args[i]
@@ -119,7 +157,6 @@ def _parse_run_args(args: list[str]) -> dict:
             if i + 1 < len(args) and not args[i + 1].startswith("--"):
                 value = args[i + 1]
                 i += 2
-                # Convert types
                 if key == "scale":
                     parsed[key] = float(value)
                 elif key == "seed":
@@ -127,12 +164,10 @@ def _parse_run_args(args: list[str]) -> dict:
                 else:
                     parsed[key] = value
             else:
-                # Boolean flag
                 parsed[key] = True
                 i += 1
         else:
             i += 1
-
     return parsed
 
 

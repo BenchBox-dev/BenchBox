@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -534,6 +535,29 @@ def test_env_passthrough_includes_finding_drafts_and_ro_token(monkeypatch: pytes
     assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "finding", "sync"]) == 0
     assert captured.get("TODO_DB_FINDING_DRAFTS_DIR") == "/tmp/drafts"
     assert captured.get("TODO_DB_RO_AUTH_TOKEN") == "ro-secret-xyz"
+
+
+def test_finding_sync_defaults_to_benchbox_drafts_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Standalone finding sync must read the same drafts directory as BenchBox."""
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+    monkeypatch.setenv("TODO_DB_COMMAND", "todo-db")
+    monkeypatch.setenv("TODO_DB_PATH", str(tmp_path / "todo.sqlite"))
+    monkeypatch.delenv("TODO_DB_FINDING_DRAFTS_DIR", raising=False)
+
+    captured: dict[str, str] = {}
+
+    def fake_run(cmd, *, cwd, env, capture_output, text, check):
+        captured.update({"TODO_DB_FINDING_DRAFTS_DIR": env["TODO_DB_FINDING_DRAFTS_DIR"]})
+        if "--version" in cmd:
+            return CompletedProcess(cmd, 0, stdout="todo-db 1.0.0\n", stderr="")
+        return CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat.subprocess, "run", fake_run)
+
+    assert compat.main(["finding", "sync"]) == 0
+    assert captured["TODO_DB_FINDING_DRAFTS_DIR"] == str(Path.home() / ".benchbox" / "finding-drafts")
+    assert "TODO_DB_FINDING_DRAFTS_DIR" not in os.environ
 
 
 def test_standalone_doctor_without_db_diagnoses_not_refuse(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

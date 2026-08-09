@@ -370,7 +370,14 @@ def _main(argv: list[str] | None = None) -> int:
             import_index = _command_index(delegated)
             assert import_index is not None
             delegated[import_index[0] + 1 : import_index[0] + 1] = ["--done-dir", str(root / "_project" / "DONE")]
-    result = _delegate(delegated, command=command, cwd=root)
+    finding_drafts_env_was_missing = command == "finding" and not os.environ.get("TODO_DB_FINDING_DRAFTS_DIR")
+    if finding_drafts_env_was_missing:
+        os.environ["TODO_DB_FINDING_DRAFTS_DIR"] = str(Path.home() / ".benchbox" / "finding-drafts")
+    try:
+        result = _delegate(delegated, command=command, cwd=root)
+    finally:
+        if finding_drafts_env_was_missing:
+            os.environ.pop("TODO_DB_FINDING_DRAFTS_DIR", None)
     secrets = (os.environ.get("TODO_DB_AUTH_TOKEN", ""), os.environ.get("TODO_DB_RO_AUTH_TOKEN", ""))
     if result.stdout:
         sys.stdout.write(_redact(result.stdout, secrets))

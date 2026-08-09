@@ -35,9 +35,10 @@ from benchbox.core.dataframe.tuning import (
     save_dataframe_tuning,
     validate_dataframe_tuning,
 )
-
-# DataFrame platforms supported by the tuning system
-DATAFRAME_PLATFORMS = {"polars", "pandas", "dask", "modin", "cudf"}
+from benchbox.core.dataframe.tuning.profiles import (
+    DATAFRAME_CAPABILITY_ROWS,
+    DATAFRAME_PLATFORMS,
+)
 
 
 @click.group("tuning")
@@ -211,41 +212,16 @@ def _init_dataframe_tuning(
 
 
 def _create_profile_config(platform: str, profile: str) -> DataFrameTuningConfiguration:
-    """Create a DataFrameTuningConfiguration based on profile."""
-    config = DataFrameTuningConfiguration()
+    """Thin CLI wrapper over :func:`benchbox.core.dataframe.tuning.profiles.create_profile_config`.
 
-    if profile == "optimized":
-        config.execution.lazy_evaluation = True
-        if platform == "polars":
-            config.execution.engine_affinity = "in-memory"
-        elif platform == "dask":
-            config.parallelism.worker_count = 4
-            config.parallelism.threads_per_worker = 2
-        elif platform == "cudf":
-            config.gpu.enabled = True
-            config.gpu.pool_type = "pool"
+    Keeps the CLI's warning for the only profile with a platform restriction
+    (``gpu`` on non-cuDF) so the user-facing message stays at the surface.
+    """
+    if profile == "gpu" and platform != "cudf":
+        console.print("[yellow]Warning: GPU profile is only applicable to cuDF[/yellow]")
+    from benchbox.core.dataframe.tuning.profiles import create_profile_config as _core_create
 
-    elif profile == "streaming":
-        config.execution.streaming_mode = True
-        config.memory.chunk_size = 100_000
-        if platform == "polars":
-            config.execution.engine_affinity = "streaming"
-
-    elif profile == "memory-constrained":
-        config.execution.streaming_mode = True
-        config.memory.chunk_size = 50_000
-        config.memory.spill_to_disk = True
-        if platform == "dask":
-            config.memory.memory_limit = "2GB"
-
-    elif profile == "gpu":
-        if platform != "cudf":
-            console.print("[yellow]Warning: GPU profile is only applicable to cuDF[/yellow]")
-        config.gpu.enabled = True
-        config.gpu.pool_type = "pool"
-        config.gpu.spill_to_host = True
-
-    return config
+    return _core_create(platform, profile)
 
 
 @tuning_group.command("validate")
@@ -557,7 +533,7 @@ def list_platforms() -> None:
 
     console.print(sql_table)
 
-    # DataFrame Platforms
+    # DataFrame Platforms — rows come from core so the table cannot drift.
     console.print("\n[bold]DataFrame Platforms:[/bold]")
     df_table = Table(show_header=True)
     df_table.add_column("Platform", style="cyan")
@@ -565,15 +541,7 @@ def list_platforms() -> None:
     df_table.add_column("Key Features", style="yellow")
     df_table.add_column("GPU", style="green")
 
-    df_platforms = [
-        ("polars", "Expression", "Lazy evaluation, streaming, thread control", "No"),
-        ("pandas", "Pandas", "dtype_backend, categorical strings", "No"),
-        ("dask", "Pandas", "Distributed, worker/thread control, spill to disk", "No"),
-        ("modin", "Pandas", "Engine selection (ray/dask), parallelization", "No"),
-        ("cudf", "Pandas", "GPU acceleration, memory pools, spill to host", "Yes"),
-    ]
-
-    for name, family, features, gpu in df_platforms:
+    for name, family, features, gpu in DATAFRAME_CAPABILITY_ROWS:
         df_table.add_row(name, family, features, gpu)
 
     console.print(df_table)
