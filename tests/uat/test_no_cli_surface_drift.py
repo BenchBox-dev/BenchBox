@@ -114,6 +114,14 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # fix-datafusion-df-mode-erasure: comment-only clarification of
     # PLATFORM_ALIASES' -df entries; no click surface in this module.
     "benchbox/cli/platform.py",
+    # typed-run-plan-single-resolution-boundary: preferences now persists the
+    # query subset and execution mode needed for an honest quick restart, and
+    # run_resolution owns typed request/plan state transformations extracted
+    # from commands/run.py. Neither module declares a Click command, option,
+    # argument, or group; the AST surface comparison below still fails if one
+    # is introduced later.
+    "benchbox/cli/preferences.py",
+    "benchbox/cli/run_resolution.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # pr-review-followup-1394: SingleStore credential setup is intentionally

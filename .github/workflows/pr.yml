@@ -290,6 +290,11 @@ jobs:
         continue-on-error: true
         run: uv run ty check
 
+      - name: Strict type check for quality-governance island
+        id: guard-quality-governance-typecheck
+        continue-on-error: true
+        run: make quality-governance-typecheck
+
       - name: Validate test marker annotations
         id: guard-lint-markers
         continue-on-error: true
@@ -374,6 +379,11 @@ jobs:
         continue-on-error: true
         run: make compat-docs-check
 
+      - name: Platform manifest drift check
+        id: guard-platform-manifest
+        continue-on-error: true
+        run: make platform-manifest-check
+
       - name: Oracle coverage map drift check
         id: guard-oracle-coverage-map
         continue-on-error: true
@@ -420,13 +430,14 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: make duplicate-check-delta
 
-      - name: Complexity report (advisory)
-        # Surfaces functions in the warn band (CC 12–18). Hard ceiling remains
-        # ruff C901 max-complexity=18; this step is log visibility only
-        # (`make complexity-report` always exits 0 via --no-fail).
-        id: guard-complexity-report
+      - name: Complexity policy and report
+        # Keeps CC >=12 visible and fails stale/expired exception metadata or
+        # unexcepted CC >20. Configured Ruff above remains the stricter
+        # production-scope C901 gate (it fails CC >18); the mechanisms do not
+        # share exceptions or silently weaken one another.
+        id: guard-complexity-policy
         continue-on-error: true
-        run: make complexity-report
+        run: make complexity-check
 
       # --- Aggregator ---------------------------------------------------
       # Reports every guard's pass/fail in one CI cycle instead of stopping

@@ -27,6 +27,7 @@ from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
+from benchbox.core.contracts import DataFrameQueryRuntime, as_tuning_ledger_writer
 from benchbox.core.dataframe import (
     check_sufficient_memory,
     format_memory_warning,
@@ -170,7 +171,7 @@ class DataFrameRunOptions:
 
 def run_dataframe_benchmark(
     benchmark_config: BenchmarkConfig,
-    adapter: Any,
+    adapter: DataFrameQueryRuntime,
     system_profile: SystemProfile | None = None,
     *,
     data_dir: Path | None = None,
@@ -339,7 +340,7 @@ def run_dataframe_benchmark(
         return builder.build()
 
 
-def _attach_applied_tuning_ledger(adapter: Any, builder: Any) -> None:
+def _attach_applied_tuning_ledger(adapter: object, builder: Any) -> None:
     """Feed the adapter's applied-tuning ledger into ``builder`` before build.
 
     Parity with the production adapter path: delegates to
@@ -349,11 +350,11 @@ def _attach_applied_tuning_ledger(adapter: Any, builder: Any) -> None:
     """
     writer = getattr(adapter, "_write_applied_tuning_ledger", None)
     if callable(writer):
-        writer(builder)
+        as_tuning_ledger_writer(adapter)._write_applied_tuning_ledger(builder)
 
 
 def _load_dataframe_data(
-    adapter: Any,
+    adapter: DataFrameQueryRuntime,
     ctx: Any,
     benchmark_config: BenchmarkConfig,
     benchmark_instance: Any | None,
@@ -444,7 +445,7 @@ def _load_dataframe_data(
 
 
 def _execute_dataframe_queries(
-    adapter: Any,
+    adapter: DataFrameQueryRuntime,
     ctx: Any,
     benchmark_config: BenchmarkConfig,
     benchmark_instance: Any | None,

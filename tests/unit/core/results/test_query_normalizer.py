@@ -11,6 +11,7 @@ from benchbox.core.results.models import (
     QUERY_RUN_TYPE_WARMUP,
     QUERY_RUN_TYPES,
 )
+from benchbox.core.results.query_execution import QueryExecutionContractError
 from benchbox.core.results.query_normalizer import (
     QueryResultInput,
     format_query_id,
@@ -228,8 +229,8 @@ class TestNormalizeQueryResult:
         assert result.rows_returned == 100
         assert result.status == "SUCCESS"  # Normalized
 
-    def test_normalize_prefers_execution_time_seconds_when_multiple_keys(self) -> None:
-        """Canonical execution_time_seconds should win over legacy timing keys."""
+    def test_normalize_rejects_conflicting_duration_aliases(self) -> None:
+        """Conflicting units must not be resolved by silent field precedence."""
         raw = {
             "query_id": "Q1",
             "execution_time_seconds": 1.25,
@@ -238,12 +239,11 @@ class TestNormalizeQueryResult:
             "rows_returned": 100,
             "status": "SUCCESS",
         }
-        result = normalize_query_result(raw)
+        with pytest.raises(QueryExecutionContractError, match="Conflicting query duration representations"):
+            normalize_query_result(raw)
 
-        assert result.execution_time_seconds == 1.25
-
-    def test_normalize_ignores_legacy_execution_time_without_explicit_units(self) -> None:
-        """Legacy execution_time is ignored to avoid unit ambiguity."""
+    def test_normalize_treats_documented_legacy_execution_time_as_seconds(self) -> None:
+        """The builder's legacy execution_time field has a documented seconds unit."""
         raw = {
             "query_id": "Q1",
             "execution_time": 1.5,
@@ -252,7 +252,20 @@ class TestNormalizeQueryResult:
         }
         result = normalize_query_result(raw)
 
-        assert result.execution_time_seconds == 0.0
+        assert result.execution_time_seconds == 1.5
+
+    @pytest.mark.parametrize("field", ["rows_returned", "rows", "result_count"])
+    def test_normalize_preserves_zero_row_aliases(self, field: str) -> None:
+        result = normalize_query_result(
+            {
+                "query_id": "Q1",
+                "execution_time_seconds": 0.0,
+                field: 0,
+                "status": "SUCCESS",
+            }
+        )
+
+        assert result.rows_returned == 0
 
     def test_normalize_failed_result(self) -> None:
         """Test normalizing a failed query result."""

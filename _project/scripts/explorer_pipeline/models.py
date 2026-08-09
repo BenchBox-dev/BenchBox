@@ -60,6 +60,7 @@ def canonical_phase(raw: str | None) -> str:
     normalized = (raw or "").strip().lower()
     return normalized if normalized else "unknown"
 
+
 # Provenance suffixes appended to platform.name that are NOT part of the
 # canonical engine identity (trust source, not platform variant).
 # Only strip the "-trust-{source}" provenance suffix pattern. The original

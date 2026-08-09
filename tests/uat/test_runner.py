@@ -65,7 +65,7 @@ def _write_result_json(
             "queries": {"total": 1, "passed": passed, "failed": failed},
             "validation": {"status": validation},
         },
-        "queries": [{"id": "Q1", "status": "SUCCESS" if failed == 0 else "ERROR", "execution_time_ms": 1}],
+        "queries": [{"id": "Q1", "status": "SUCCESS" if failed == 0 else "ERROR", "ms": 1}],
         "phases": {},
     }
     if compliance_class is not None:

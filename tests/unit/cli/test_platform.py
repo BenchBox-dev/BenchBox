@@ -281,12 +281,10 @@ class TestPlatformManager:
         assert lib_info.installed is False
         assert "No module named" in lib_info.import_error
 
-    @patch("importlib.import_module")
-    def test_detect_platforms_all_available(self, mock_import):
+    @patch.object(PlatformRegistry, "_detect_library")
+    def test_detect_platforms_all_available(self, mock_detect_library):
         """Test platform detection when all libraries are available."""
-        mock_module = Mock()
-        mock_module.__version__ = "1.0.0"
-        mock_import.return_value = mock_module
+        mock_detect_library.side_effect = lambda spec: LibraryInfo(name=spec["name"], version="1.0.0", installed=True)
 
         platforms = self.manager.detect_platforms()
 
@@ -299,19 +297,20 @@ class TestPlatformManager:
             assert platform_info.enabled is True
             assert len(platform_info.libraries) > 0
 
-    @patch("importlib.import_module")
-    def test_detect_platforms_some_missing(self, mock_import):
+    @patch.object(PlatformRegistry, "_detect_library")
+    def test_detect_platforms_some_missing(self, mock_detect_library):
         """Test platform detection when some libraries are missing."""
 
-        def side_effect(module_name):
-            if module_name in ["duckdb", "sqlite3"]:
-                mock_module = Mock()
-                mock_module.__version__ = "1.0.0"
-                return mock_module
-            else:
-                raise ImportError(f"No module named '{module_name}'")
+        def side_effect(spec):
+            installed = spec["name"] in {"duckdb", "sqlite3"}
+            return LibraryInfo(
+                name=spec["name"],
+                version="1.0.0" if installed else None,
+                installed=installed,
+                import_error=None if installed else f"No module named '{spec['name']}'",
+            )
 
-        mock_import.side_effect = side_effect
+        mock_detect_library.side_effect = side_effect
 
         platforms = self.manager.detect_platforms()
 

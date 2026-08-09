@@ -1,0 +1,41 @@
+{
+  "monolith": {
+    "contract_sha256": "b6ad0ba39f8e3d3b9df33205738648b76db04eb6709cb410e7c224108a767c33",
+    "default_goal": "test",
+    "public_target_count": 195,
+    "semantic_sha256": "02033fa486629ed64b0a0ba9a67ca64d22daeff03097d4e067b3298d6f6dbbf9",
+    "target_count": 198
+  },
+  "reviewed_delta": {
+    "added_phony_targets": [
+      "makefile-inventory-check"
+    ],
+    "added_release_curated_tests": [
+      "tests/unit/scripts/test_check_complexity.py"
+    ],
+    "added_targets": [
+      "makefile-inventory-check"
+    ],
+    "added_variables": [
+      "BENCHBOX_MAKEFILE_ROOT"
+    ],
+    "help_recipe_line": "\t@echo \"  make makefile-inventory-check Verify public Make contract inventory and ordering\"",
+    "include_order": [
+      "make/platform-tests.mk",
+      "make/documentation.mk",
+      "make/worktrees.mk",
+      "make/worktree-pool.mk",
+      "make/worktree-maintenance.mk",
+      "make/help.mk"
+    ]
+  },
+  "reviewed_split": {
+    "contract_sha256": "e9a205513e47049054ffbc583626b567d52190e1be802e80e5e8b980928aecd7",
+    "default_goal": "test",
+    "normalized_semantic_sha256": "02033fa486629ed64b0a0ba9a67ca64d22daeff03097d4e067b3298d6f6dbbf9",
+    "public_target_count": 196,
+    "semantic_sha256": "5a41de9f3c3ae72946e9043eb6247655e591d31071b814a78dac2f269a188425",
+    "target_count": 199
+  },
+  "schema_version": 1
+}

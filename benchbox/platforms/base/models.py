@@ -32,7 +32,7 @@ from benchbox.core.results.models import (
 try:  # Optional import for type checking without runtime requirement
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 except ImportError:  # pragma: no cover - fallback for minimal installs
-    UnifiedTuningConfiguration = None  # type: ignore
+    UnifiedTuningConfiguration = None
 
 
 @dataclass

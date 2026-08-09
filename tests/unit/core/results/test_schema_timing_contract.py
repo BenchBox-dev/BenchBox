@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from benchbox.core.results.models import ExecutionPhases, SetupPhase, ThroughputStream, ThroughputTestPhase
+from benchbox.core.results.query_execution import QueryExecutionContractError
 from benchbox.core.results.schema import build_result_payload
 
 pytestmark = [
@@ -90,15 +91,15 @@ def test_build_result_payload_redacts_platform_metadata_credential_sentinels() -
     assert "o_orderkey" in text
 
 
-def test_build_result_payload_prefers_execution_time_seconds() -> None:
+def test_build_result_payload_accepts_consistent_duration_aliases() -> None:
     result = _result_with_queries(
         [
             {
                 "query_id": "Q1",
                 "status": "SUCCESS",
                 "execution_time_seconds": 1.25,
-                "execution_time": 9.99,
-                "execution_time_ms": None,
+                "execution_time": 1.25,
+                "execution_time_ms": 1250,
                 "rows_returned": 10,
                 "iteration": 1,
                 "stream_id": 5,
@@ -136,6 +137,23 @@ def test_build_result_payload_prefers_execution_time_seconds() -> None:
         "errors": ["Stream 5 failed: worker died"],
     }
     assert "throughput_at_size" not in payload["summary"].get("tpc_metrics", {})
+
+
+def test_build_result_payload_rejects_conflicting_duration_aliases() -> None:
+    result = _result_with_queries(
+        [
+            {
+                "query_id": "Q1",
+                "status": "SUCCESS",
+                "execution_time_seconds": 1.25,
+                "execution_time": 9.99,
+                "rows_returned": 10,
+            }
+        ]
+    )
+
+    with pytest.raises(QueryExecutionContractError, match="Conflicting query duration representations"):
+        build_result_payload(result)
 
 
 def test_build_result_payload_preserves_positive_sub_ms_measurements() -> None:

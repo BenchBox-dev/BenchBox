@@ -65,6 +65,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from benchbox.core.contracts import PlanCaptureRuntime, as_connection_factory, as_plan_capture_runtime
+
 
 @dataclass
 class PlanCapturePhaseResult:
@@ -98,7 +100,7 @@ def _normalize_queries(queries: Mapping[str, str] | Iterable[tuple[str, str]]) -
 
 
 def run_plan_capture_phase(
-    adapter: Any,
+    adapter: PlanCaptureRuntime,
     queries: Mapping[str, str] | Iterable[tuple[str, str]],
     *,
     connection: Any | None = None,
@@ -135,10 +137,12 @@ def run_plan_capture_phase(
     Returns:
         A :class:`PlanCapturePhaseResult` with plans, fingerprints, and timing.
     """
+    adapter = as_plan_capture_runtime(adapter)
     items = _normalize_queries(queries)
     result = PlanCapturePhaseResult()
 
     owns_connection = connection is None
+    connection_factory = as_connection_factory(adapter) if owns_connection else None
     # The caller-supplied path passes the measurement connection precisely so an
     # in-memory database / temporary tables / session-scoped state stay visible
     # during EXPLAIN. A fresh connection cannot see that state, so we must never
@@ -159,7 +163,8 @@ def run_plan_capture_phase(
     phase_start = time.perf_counter()
     try:
         if owns_connection:
-            connection = adapter.create_connection(**(dict(connection_config) if connection_config else {}))
+            assert connection_factory is not None
+            connection = connection_factory.create_connection(**(dict(connection_config) if connection_config else {}))
             owned_connections.append(connection)
 
         adapter.analyze_plans = analyze_plans
@@ -193,7 +198,10 @@ def run_plan_capture_phase(
                 if owns_connection and connection is not None:
                     with contextlib.suppress(Exception):
                         connection.close()
-                connection = adapter.create_connection(**(dict(connection_config) if connection_config else {}))
+                assert connection_factory is not None
+                connection = connection_factory.create_connection(
+                    **(dict(connection_config) if connection_config else {})
+                )
                 owned_connections.append(connection)
                 owns_connection = True
     finally:

@@ -57,8 +57,7 @@ def main() -> int:
         )
     else:
         print(
-            f"pylint duplicate-code: {cluster_count} cluster pairs "
-            f"(baseline {BASELINE_CLUSTER_PAIRS}).",
+            f"pylint duplicate-code: {cluster_count} cluster pairs (baseline {BASELINE_CLUSTER_PAIRS}).",
         )
     return 0
 

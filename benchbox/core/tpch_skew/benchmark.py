@@ -18,6 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.contracts import SQLBenchmarkExecutor, as_sql_benchmark_executor
 from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tpch_skew.generator import TPCHSkewDataGenerator
 from benchbox.core.tpch_skew.skew_config import (
@@ -297,7 +298,7 @@ class TPCHSkewBenchmark(TPCHBenchmark):
 
     def _run_benchmark_phase(
         self,
-        adapter: Any,
+        adapter: SQLBenchmarkExecutor,
         benchmark: Any,
         query_subset: list[str],
         target_results: dict[str, Any],
@@ -309,7 +310,7 @@ class TPCHSkewBenchmark(TPCHBenchmark):
         start = mono_time()
 
         try:
-            run_results = adapter.run_benchmark(
+            run_results = as_sql_benchmark_executor(adapter).run_benchmark(
                 benchmark,
                 benchmark_name="tpch_skew",
                 query_subset=query_subset,

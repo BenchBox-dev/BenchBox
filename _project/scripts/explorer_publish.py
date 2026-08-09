@@ -18,8 +18,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from benchbox.cli.shared import console
 from _project.scripts.explorer_pipeline.contract import EXPLORER_BUILD_CONTRACT
+from benchbox.cli.shared import console
 
 
 @click.group()

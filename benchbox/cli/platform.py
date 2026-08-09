@@ -22,60 +22,29 @@ from benchbox.cli.platform_readiness import (
     check_platform_readiness,
     has_readiness_failures,
 )
+from benchbox.core.platform_manifest import DefaultMode, get_platform_alias_modes, get_platform_aliases
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.schemas import LibraryInfo, PlatformInfo
 from benchbox.utils.printing import quiet_console
 
 console = quiet_console
 
-# Platform name aliases - maps common variations to canonical names
-PLATFORM_ALIASES: dict[str, str] = {
-    # PostgreSQL variations
-    "postgres": "postgresql",
-    "pg": "postgresql",
-    "pgsql": "postgresql",
-    # Trino/Presto ecosystem
-    "trinodb": "trino",
-    "prestodb": "presto",
-    # ClickHouse (bare 'clickhouse' was removed after its deprecation window;
-    # 'ch' shorthand now resolves to the default first-class local platform)
-    "ch": "clickhouse-local",
-    # BigQuery
-    "bq": "bigquery",
-    "gbq": "bigquery",
-    # Databricks
-    "dbx": "databricks",
-    # Snowflake
-    "snow": "snowflake",
-    # Redshift
-    "rs": "redshift",
-    # DuckDB
-    "duck": "duckdb",
-    # DataFusion
-    "fusion": "datafusion",
-    # DataFrame CLI aliases. Mapping -df names to the base platform erases the
-    # DataFrame-mode request the suffix carries; `benchbox run` re-applies it
-    # via _apply_dataframe_suffix_mode before this normalization runs.
-    "polars-df": "polars",
-    "pandas-df": "pandas",
-    "pyspark-df": "pyspark",
-    "datafusion-df": "datafusion",
-    "dask-df": "dask",
-    "modin-df": "modin",
-    "cudf-df": "cudf",
-    "lakesail-df": "lakesail",
-    # Azure Synapse
-    "azure-synapse": "synapse",
-    "azuresynapse": "synapse",
-    # Microsoft Fabric Warehouse (hyphen form is preferred; underscore form is legacy)
-    "fabric-dw": "fabric_dw",
-}
+# CLI spellings are a scoped platform-manifest projection. DataFrame ``-df``
+# aliases carry explicit mode semantics in the manifest; ``benchbox run``
+# captures that suffix before calling this normalizer.
+PLATFORM_ALIASES: dict[str, str] = get_platform_aliases("cli")
+PLATFORM_ALIAS_MODES: dict[str, DefaultMode] = get_platform_alias_modes("cli")
 
 
 def normalize_platform_name(name: str) -> str:
     """Normalize platform name: lowercase and resolve aliases."""
     normalized = name.lower()
     return PLATFORM_ALIASES.get(normalized, normalized)
+
+
+def get_platform_alias_mode(name: str) -> DefaultMode | None:
+    """Return an execution mode explicitly implied by a scoped CLI alias."""
+    return PLATFORM_ALIAS_MODES.get(name.lower())
 
 
 class NumberedSelectPrompt(Prompt):

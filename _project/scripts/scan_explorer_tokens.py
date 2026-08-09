@@ -70,9 +70,7 @@ LITERAL_RE = re.compile(
     r"-(?:" + "|".join(PALETTES) + r")"
     r"-(?:" + "|".join(STOPS) + r")\b"
 )
-ARBITRARY_COLOR_RE = re.compile(
-    r"\b(?:" + "|".join(UTILITIES) + r")-\[(?:#[^\]]+|rgba?\([^\]]+\)|hsla?\([^\]]+\))\]"
-)
+ARBITRARY_COLOR_RE = re.compile(r"\b(?:" + "|".join(UTILITIES) + r")-\[(?:#[^\]]+|rgba?\([^\]]+\)|hsla?\([^\]]+\))\]")
 HEX_RE = re.compile(r"(?<![\w-])#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?\b")
 RGB_RE = re.compile(r"\brgba?\([^)]+\)")
 
@@ -140,8 +138,7 @@ def main() -> int:
     missing = [path for path in roots if not path.exists()]
     if missing:
         print(
-            "scan_explorer_tokens: missing path(s): "
-            + ", ".join(str(path) for path in missing),
+            "scan_explorer_tokens: missing path(s): " + ", ".join(str(path) for path in missing),
             file=sys.stderr,
         )
         return 2

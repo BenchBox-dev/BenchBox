@@ -31,12 +31,16 @@ from benchbox.core.results.environment import (
     build_platform_metadata_payload,
 )
 from benchbox.core.results.platform_options import sanitize_platform_options
+from benchbox.core.results.query_execution import (
+    query_execution_from_legacy_dict,
+    query_execution_to_compact_v2,
+)
 from benchbox.core.results.query_normalizer import normalize_query_id
 from benchbox.core.results.schema_policy import CURRENT_SCHEMA_VERSION, RUNTIME_SCHEMA_POLICY
 from benchbox.validation.bundle import REQUIRED_TOP_KEYS
 
 if TYPE_CHECKING:
-    from benchbox.core.results.models import BenchmarkResults
+    from benchbox.core.results.models import BenchmarkResults, QueryExecution
 
 SCHEMA_VERSION = CURRENT_SCHEMA_VERSION
 
@@ -72,47 +76,9 @@ def order_dict(d: dict[str, Any], key_order: list[str]) -> dict[str, Any]:
     return ordered
 
 
-def _normalize_query_result(qr: Any) -> dict[str, Any]:
-    """Normalize a query result entry to a dictionary.
-
-    Handles dict, dataclass, Pydantic model, or object with attributes.
-    """
-    if isinstance(qr, dict):
-        return qr
-    if is_dataclass(qr) and not isinstance(qr, type):
-        return asdict(qr)
-    # Handle Pydantic models (have model_dump method)
-    if hasattr(qr, "model_dump"):
-        return qr.model_dump()
-    # Handle older Pydantic models (have dict method)
-    if hasattr(qr, "dict"):
-        return qr.dict()
-    # Fallback: try to extract common attributes
-    result: dict[str, Any] = {}
-    for attr in (
-        "query_id",
-        "id",
-        "status",
-        "execution_time_seconds",
-        "execution_time_ms",
-        "rows_returned",
-        "iteration",
-        "stream_id",
-        "error_message",
-        "run_type",
-        "error",
-        "error_type",
-        "query_plan",
-        "plan_fingerprint",
-        "plan_fingerprint_normalized",
-        "dataframe_skip_summary",
-        "result_digest",
-    ):
-        if hasattr(qr, attr):
-            val = getattr(qr, attr)
-            if val is not None:
-                result[attr] = val
-    return result
+def _normalize_query_result(qr: Any) -> QueryExecution:
+    """Normalize a supported result boundary to canonical QueryExecution."""
+    return query_execution_from_legacy_dict(qr, default_iteration=1, default_stream_id=0)
 
 
 def _round_duration_ms_for_export(value: float) -> float:
@@ -317,30 +283,20 @@ def _build_query_results_section(
     normalized_results = [_normalize_query_result(qr) for qr in (result.query_results or [])]
 
     for qr in normalized_results:
-        iteration = qr.get("iteration", 1)
-        stream_id = qr.get("stream_id", 0)
+        iteration = qr.iteration
+        stream_id = qr.stream_id
         if iteration is not None:
             iterations_set.add(int(iteration))
         if stream_id is not None:
             streams_set.add(int(stream_id))
 
     for qr in normalized_results:
-        raw_id = qr.get("query_id") or qr.get("id") or qr.get("query") or ""
-        query_id = normalize_query_id(raw_id)
-        status = qr.get("status", "UNKNOWN")
-
-        # Get execution time in ms, preferring canonical seconds key.
-        exec_time_ms = qr.get("execution_time_ms")
-        exec_time_seconds = qr.get("execution_time_seconds")
-        if exec_time_ms is None and exec_time_seconds is not None:
-            exec_time_ms = float(exec_time_seconds) * 1000.0
-
-        rows = qr.get("rows_returned") or qr.get("rows") or qr.get("result_count")
-        iteration = int(qr.get("iteration", 1))
-        stream_id = int(qr.get("stream_id", 0))
-        run_type = qr.get("run_type")
-        if not run_type:
-            run_type = "warmup" if iteration == 0 else "measurement"
+        query_id = normalize_query_id(qr.query_id)
+        status = qr.status
+        exec_time_ms = qr.execution_time_ms
+        iteration = int(qr.iteration if qr.iteration is not None else 1)
+        stream_id = int(qr.stream_id if qr.stream_id is not None else 0)
+        run_type = qr.run_type if qr.run_type is not None else ("warmup" if iteration == 0 else "measurement")
 
         if status == "SUCCESS":
             if exec_time_ms is not None and run_type == "measurement":
@@ -350,51 +306,18 @@ def _build_query_results_section(
                 "phase": "query",
                 "query_id": str(query_id),
             }
-            error_type = (
-                qr.get("error_type") or qr.get("error_message", "").split(":")[0]
-                if qr.get("error_message")
-                else "UnknownError"
-            )
+            error_type = qr.error_type or (qr.error_message.split(":")[0] if qr.error_message else "UnknownError")
             error_entry["type"] = error_type or "UnknownError"
-            error_entry["message"] = qr.get("error_message") or qr.get("error") or "Query failed"
+            error_entry["message"] = qr.error_message or "Query failed"
             errors_list.append(error_entry)
 
-        entry: dict[str, Any] = {"id": str(query_id)}
+        entry = query_execution_to_compact_v2(qr)
+        entry["id"] = str(query_id)
         if exec_time_ms is not None:
             entry["ms"] = _round_duration_ms_for_export(float(exec_time_ms))
-        if rows is not None:
-            entry["rows"] = rows
         entry["iter"] = iteration
         entry["stream"] = stream_id
         entry["run_type"] = run_type
-        entry["status"] = status
-        # Additive, present only for phased runs (power/throughput/maintenance):
-        # a combined run executes the same public query_id in more than one
-        # phase, each with its own independent stream_id counter, so stream_id
-        # alone cannot always disambiguate which phase's .plans.json entry a
-        # reconstructed row belongs to (see build_plans_payload). Standard
-        # single-phase runs never set this, so their compact entries are
-        # unchanged.
-        test_type = qr.get("test_type")
-        if test_type:
-            entry["test_type"] = test_type
-        # Gate-only value-digest oracle (BENCHBOX_EMIT_RESULT_DIGEST): present only
-        # when the runner emitted a full-result digest, so a normal run's payload
-        # shape is unchanged. Explicit None checks (not `or`) so a digest is never
-        # dropped by a falsy value.
-        result_digest = qr.get("result_digest")
-        if result_digest is None:
-            result_digest = qr.get("digest")
-        if result_digest is not None:
-            entry["digest"] = result_digest
-        if qr.get("dataframe_skip_summary"):
-            entry["dataframe_skip_summary"] = qr["dataframe_skip_summary"]
-        # Real DataFrame plan-capture-error cause (qpc-05 / F4.4, #1038 review):
-        # this is the JSON export path, a separate serialization from
-        # ResultBuilder._format_query_results (in-memory only) - without this,
-        # the field was lost on export/reload despite being carried in memory.
-        if qr.get("plan_capture_error") is not None:
-            entry["plan_capture_error"] = qr["plan_capture_error"]
 
         queries_list.append(order_dict(entry, QUERY_KEY_ORDER))
 

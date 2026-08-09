@@ -35,11 +35,12 @@ class TestBenchmarkOrchestrator:
         """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_orchestrator_initialization(self):
+    def test_orchestrator_initialization(self, tmp_path: Path):
         """Test BenchmarkOrchestrator initialization."""
         # Test with base directory
-        orchestrator = BenchmarkOrchestrator(base_dir="/tmp/test")
-        assert orchestrator.directory_manager.base_dir == Path("/tmp/test")
+        base_dir = tmp_path / "benchmark-output"
+        orchestrator = BenchmarkOrchestrator(base_dir=base_dir)
+        assert orchestrator.directory_manager.base_dir == base_dir
         assert orchestrator.custom_output_dir is None
 
         # Test without base directory

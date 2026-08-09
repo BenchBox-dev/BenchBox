@@ -24,6 +24,14 @@ from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
+from benchbox.core.contracts import (
+    as_connection_lifecycle,
+    as_dataframe_benchmark_executor,
+    as_external_table_loader,
+    as_native_table_loader,
+    as_sql_benchmark_executor,
+    as_statistics_phase_runner,
+)
 from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.results.models import (
     BenchmarkResults,
@@ -184,7 +192,7 @@ def _run_manifest_validation(benchmark: Any, benchmark_config: BenchmarkConfig) 
 
 
 def _run_postload_validation(
-    adapter: Any,
+    adapter: object | None,
     benchmark_config: BenchmarkConfig,
     platform_config: dict[str, Any] | None,
 ) -> ValidationResult | None:
@@ -197,10 +205,11 @@ def _run_postload_validation(
 
     if not hasattr(adapter, "create_connection") or not hasattr(adapter, "close_connection"):
         return None
+    connection_lifecycle = as_connection_lifecycle(adapter)
 
     connection = None
     try:
-        connection = adapter.create_connection(**(platform_config or {}))
+        connection = connection_lifecycle.create_connection(**(platform_config or {}))
         engine = DatabaseValidationEngine()
         return engine.validate_loaded_data(connection, benchmark_config.name.lower(), benchmark_config.scale_factor)
     except Exception as exc:  # pragma: no cover - defensive safeguard
@@ -213,7 +222,7 @@ def _run_postload_validation(
     finally:
         if connection is not None:
             try:
-                adapter.close_connection(connection)
+                connection_lifecycle.close_connection(connection)
             except Exception:  # pragma: no cover - defensive safeguard
                 pass
 
@@ -387,7 +396,7 @@ def _execute_load_only_mode(
     *,
     benchmark: Any,
     benchmark_config: BenchmarkConfig,
-    adapter: Any,
+    adapter: object,
     platform_config: dict[str, Any] | None,
     validation_opts: ValidationOptions,
     table_mode: str = "native",
@@ -401,8 +410,9 @@ def _execute_load_only_mode(
     schema_time = 0.0
     postload_result: ValidationResult | None = None
 
+    connection_lifecycle = as_connection_lifecycle(adapter)
     try:
-        connection = adapter.create_connection(**(platform_config or {}))
+        connection = connection_lifecycle.create_connection(**(platform_config or {}))
 
         if table_mode == "external":
             if not getattr(adapter, "supports_external_tables", False):
@@ -421,7 +431,9 @@ def _execute_load_only_mode(
             raise RuntimeError("Benchmark output directory not configured; cannot perform load-only operations")
 
         if table_mode == "external":
-            table_stats, load_time, per_table_timings = adapter.create_external_tables(benchmark, connection, data_dir)
+            table_stats, load_time, per_table_timings = as_external_table_loader(adapter).create_external_tables(
+                benchmark, connection, data_dir
+            )
             schema_phase = {
                 "status": "SKIPPED",
                 "duration_ms": 0,
@@ -429,8 +441,9 @@ def _execute_load_only_mode(
             }
         else:
             # Create schema before loading data in native table mode.
-            schema_time = adapter.create_schema(benchmark, connection)
-            table_stats, load_time, per_table_timings = adapter.load_data(benchmark, connection, data_dir)
+            native_loader = as_native_table_loader(adapter)
+            schema_time = native_loader.create_schema(benchmark, connection)
+            table_stats, load_time, per_table_timings = native_loader.load_data(benchmark, connection, data_dir)
             schema_phase = {
                 "status": "COMPLETED",
                 "duration_ms": int(schema_time * 1000),
@@ -461,7 +474,7 @@ def _execute_load_only_mode(
         statistics_time_seconds = 0.0
         run_statistics_phase = getattr(adapter, "run_statistics_phase", None)
         if gather_statistics and callable(run_statistics_phase):
-            statistics_phase = run_statistics_phase(
+            statistics_phase = as_statistics_phase_runner(adapter).run_statistics_phase(
                 benchmark,
                 connection,
                 benchmark_name=benchmark_config.name,
@@ -516,7 +529,7 @@ def _execute_load_only_mode(
         return result_obj, postload_result
     finally:
         if connection is not None:
-            adapter.close_connection(connection)
+            connection_lifecycle.close_connection(connection)
 
 
 def _get_table_schemas_from_benchmark(benchmark: Any) -> dict[str, dict[str, Any]]:
@@ -755,7 +768,7 @@ def _build_run_config_from_options(
 
 
 def _execute_via_adapter(
-    adapter: Any,
+    adapter: object,
     benchmark: Any,
     benchmark_config: BenchmarkConfig,
     system_profile: SystemProfile | None,
@@ -786,7 +799,7 @@ def _execute_via_adapter(
             verbose=verbosity_settings.verbose,
             very_verbose=verbosity_settings.very_verbose,
         )
-        return adapter.run_benchmark(
+        return as_dataframe_benchmark_executor(adapter).run_benchmark(
             benchmark,
             benchmark_config=benchmark_config,
             system_profile=system_profile,
@@ -803,7 +816,7 @@ def _execute_via_adapter(
     kwargs = {k: v for k, v in run_config.__dict__.items() if k != "benchmark"}
     if run_config.benchmark is not None:
         kwargs.setdefault("benchmark_name", run_config.benchmark)
-    return adapter.run_benchmark(benchmark, **kwargs)
+    return as_sql_benchmark_executor(adapter).run_benchmark(benchmark, **kwargs)
 
 
 def _run_data_generation_phase(
@@ -916,7 +929,7 @@ def _run_load_only_mode(
     benchmark: Any,
     benchmark_config: BenchmarkConfig,
     system_profile: SystemProfile | None,
-    adapter: Any,
+    adapter: object,
     platform_config: dict[str, Any] | None,
     validation_opts: ValidationOptions,
     table_mode: str,
@@ -950,7 +963,7 @@ def _run_load_only_mode(
             verbose=verbosity_settings.verbose,
             very_verbose=verbosity_settings.very_verbose,
         )
-        return adapter.run_benchmark(
+        return as_dataframe_benchmark_executor(adapter).run_benchmark(
             benchmark,
             benchmark_config=benchmark_config,
             system_profile=system_profile,

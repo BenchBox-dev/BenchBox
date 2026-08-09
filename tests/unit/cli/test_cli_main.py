@@ -8,6 +8,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import json
 import sys
 import sys as _sys
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
@@ -285,6 +286,7 @@ class TestRunCommand:
         mock_benchmark_manager_class,
         mock_database_manager_class,
         mock_get_cfg,
+        tmp_path: Path,
     ):
         """Test run command quick mode with complete arguments."""
         cfg = Mock()
@@ -336,15 +338,15 @@ class TestRunCommand:
                     mock_result.validation_status = "PASSED"
                     mock_result.execution_id = "test_id"
                     mock_orchestrator.execute_benchmark.return_value = mock_result
-                    from pathlib import Path as _Path
-
                     mock_orchestrator.directory_manager = Mock()
-                    mock_orchestrator.directory_manager.get_result_path.return_value = _Path("/tmp/test.json")
-                    mock_orchestrator.directory_manager.results_dir = "/tmp"
+                    result_path = tmp_path / "test.json"
+                    output_dir = tmp_path / "output"
+                    mock_orchestrator.directory_manager.get_result_path.return_value = result_path
+                    mock_orchestrator.directory_manager.results_dir = tmp_path
                     mock_orchestrator_class.return_value = mock_orchestrator
 
                     mock_exporter = Mock()
-                    mock_exporter.export_result.return_value = {"json": "/tmp/test.json"}
+                    mock_exporter.export_result.return_value = {"json": result_path}
                     mock_exporter_class.return_value = mock_exporter
 
                     result = runner.invoke(
@@ -358,7 +360,7 @@ class TestRunCommand:
                             "--scale",
                             "0.01",
                             "--output",
-                            "/tmp/test",
+                            str(output_dir),
                         ],
                     )
 

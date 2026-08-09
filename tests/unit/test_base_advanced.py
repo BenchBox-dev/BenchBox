@@ -800,6 +800,19 @@ class TestMockBaseBenchmarkBackwardCompatibility:
 
         assert queries == {"custom": "SELECT 'custom' as result"}
 
+    def test_run_with_platform_keeps_structural_third_party_adapter_compatibility(self):
+        """External adapters keep working without inheriting capability protocols."""
+
+        class ThirdPartyAdapter:
+            def run_benchmark(self, benchmark, **run_config):
+                return {"benchmark": benchmark, "run_config": run_config}
+
+        benchmark = MockBaseBenchmark()
+        result = benchmark.run_with_platform(ThirdPartyAdapter(), query_subset=["q1"])
+
+        assert result["benchmark"] is benchmark
+        assert result["run_config"] == {"query_subset": ["q1"], "benchmark_type": "olap"}
+
     def test_load_data_override_works(self):
         """Test that _load_data can be overridden properly."""
 

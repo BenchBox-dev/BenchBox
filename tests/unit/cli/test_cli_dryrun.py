@@ -328,11 +328,12 @@ class TestDryRunExecutor:
         """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_dry_run_executor_initialization(self):
+    def test_dry_run_executor_initialization(self, tmp_path: Path):
         """Test DryRunExecutor initialization."""
         # Test with output directory
-        executor = DryRunExecutor(output_dir="/tmp/test")
-        assert executor.output_dir == Path("/tmp/test")
+        output_dir = tmp_path / "output"
+        executor = DryRunExecutor(output_dir=output_dir)
+        assert executor.output_dir == output_dir
 
         # Test without output directory (should use temp)
         executor_temp = DryRunExecutor()

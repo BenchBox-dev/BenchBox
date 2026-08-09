@@ -1,6 +1,10 @@
 # BenchBox Makefile
 # This makefile provides commands for building, testing and development
 
+# Freeze the root before includes change MAKEFILE_LIST; realpath preserves make -f/symlink consumers.
+# `override` reserves this bootstrap variable against command-line and `make -e` environment injection.
+override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+
 PR_FANOUT_JOBS ?= 4
 PR_REVIEW_BASE ?= develop
 PR_REVIEW_PR_LIMIT ?= 1000
@@ -39,7 +43,7 @@ POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
 # truth instead of repeating the four-deep nested expansion.
 POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -331,6 +335,7 @@ test-window:
 	uv run -- python -m pytest -m "window_functions" --tb=short
 
 # CI/CD testing
+# Maintained broad local CI profile (literal root-text compatibility contract).
 test-ci:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or flaky or local_only)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml
 
@@ -349,294 +354,7 @@ test-parallel:
 test-parallel-fast:
 	uv run -- python -m pytest -n auto -m "fast" --tb=short
 
-# Live integration tests (require cloud credentials)
-test-live:
-	@echo "Running live integration tests (requires cloud credentials)"
-	@echo "See .env.example for credential setup"
-	uv run -- python -m pytest -m "live_integration" --tb=short -v
-
-test-live-databricks:
-	@echo "Running Databricks live tests (requires DATABRICKS_TOKEN)"
-	uv run -- python -m pytest -m "live_databricks" --tb=short -v
-
-test-live-snowflake:
-	@echo "Running Snowflake live tests (requires SNOWFLAKE_PASSWORD)"
-	uv run -- python -m pytest -m "live_snowflake" --tb=short -v
-
-test-live-bigquery:
-	@echo "Running BigQuery live tests (requires BIGQUERY_PROJECT)"
-	uv run -- python -m pytest -m "live_bigquery" --tb=short -v
-
-test-live-all:
-	@echo "Running all live integration tests (requires credentials for all platforms)"
-	uv run -- python -m pytest -m "live_integration" --tb=short -v
-
-test-live-redshift:
-	@echo "Running Redshift live tests (requires REDSHIFT_HOST)"
-	uv run -- python -m pytest -m "live_redshift" --tb=short -v
-
-test-live-athena:
-	@echo "Running Athena live tests (requires ATHENA_REGION)"
-	uv run -- python -m pytest -m "live_athena" --tb=short -v
-
-test-live-firebolt:
-	@echo "Running Firebolt live tests (requires FIREBOLT_CLIENT_ID)"
-	uv run -- python -m pytest -m "live_firebolt" --tb=short -v
-
-test-live-firebolt-core:
-	@echo "Running Firebolt Core live tests (requires Docker - make test-docker-up-firebolt)"
-	uv run -- python -m pytest -m "live_firebolt_core" --tb=short -v -n 0
-
-test-live-starburst:
-	@echo "Running Starburst Galaxy live tests (requires STARBURST_HOST)"
-	uv run -- python -m pytest -m "live_starburst" --tb=short -v
-
-test-live-motherduck:
-	@echo "Running MotherDuck live tests (requires MOTHERDUCK_TOKEN)"
-	uv run -- python -m pytest -m "live_motherduck" --tb=short -v
-
-test-live-pg-duckdb:
-	@echo "Running pg_duckdb live tests (requires Docker PostgreSQL with pg_duckdb)"
-	uv run -- python -m pytest -m "live_pg_duckdb" --tb=short -v
-
-test-live-pg-mooncake:
-	@echo "Running pg_mooncake live tests (requires Docker PostgreSQL with pg_mooncake)"
-	uv run -- python -m pytest -m "live_pg_mooncake" --tb=short -v
-
-test-live-cedardb:
-	@echo "Running CedarDB live tests (requires Docker CedarDB - make test-docker-up-cedardb)"
-	uv run -- python -m pytest -m "live_cedardb" --tb=short -v -n 0
-
-test-docker-up-pg-extensions:
-	@echo "Starting pg_duckdb (port 5432) and pg_mooncake (port 5433)..."
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		project_file="$$state_dir/pg-extensions.project"; \
-		mkdir -p "$$state_dir"; \
-		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-		if [ -z "$$project_name" ]; then \
-			project_name="benchbox-pg-extensions-test-$$(date +%s)-$$RANDOM"; \
-		fi; \
-		status=1; \
-		cleanup() { \
-			if [ $$status -ne 0 ]; then \
-				docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml down -v >/dev/null 2>&1 || true; \
-				rm -f "$$project_file"; \
-			fi; \
-		}; \
-		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml up -d --wait; \
-		printf '%s\n' "$$project_name" > "$$project_file"; \
-		status=0
-
-test-docker-down-pg-extensions:
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		project_file="$$state_dir/pg-extensions.project"; \
-		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-		if [ -z "$$project_name" ]; then \
-			echo "No tracked Docker test stack for pg-extensions"; \
-			exit 0; \
-		fi; \
-		docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml down -v; \
-		rm -f "$$project_file"
-
-test-docker-pg-extensions:
-	@echo "Running pg_duckdb and pg_mooncake Docker integration tests"
-	@set -e; \
-		project_name="benchbox-pg-extensions-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml down -v || true; }; \
-		trap cleanup EXIT INT TERM; \
-		docker compose -p "$$project_name" -f docker/postgres-extensions/docker-compose.yml up -d --wait; \
-		uv run -- python -m pytest -m "live_pg_duckdb or live_pg_mooncake" --tb=short -v -n 0
-
-# Docker-based integration tests (requires Docker and docker compose)
-DOCKER_PLATFORMS := clickhouse trino presto postgresql starrocks doris databend influxdb cedardb firebolt questdb singlestore
-DOCKER_TEST_STATE_DIR ?= /tmp/benchbox-docker-projects
-
-# Container engine for local test-docker-* compose stacks: `docker` (default,
-# and the ONLY engine CI uses) or `mocker` (Docker-compatible CLI over Apple
-# `container`; Apple-silicon/macOS-26 LOCAL DEV ONLY, MUST NOT run in CI). The
-# docker/*/docker-compose.yml files stay unmodified; only the driver swaps.
-# See AGENTS.md "Mocker as a local test-docker engine".
-CONTAINER_ENGINE ?= docker
-COMPOSE := $(CONTAINER_ENGINE) compose
-
-# Some docker/*/docker-compose.yml files (lakesail, velox) mount
-# BENCHBOX_DATA_DIR with NO inline default -- see docker/lakesail/docker-compose.yml
-# and docker/velox/docker-compose.yml for why (mocker 0.7.2 misparses a
-# nested default, and silently leaves a required-variable default
-# (${VAR:?...}) unsubstituted even when the variable IS set). Two earlier
-# designs were tried here and reverted: a file-wide `BENCHBOX_DATA_DIR ?=
-# ...; export BENCHBOX_DATA_DIR` leaked an unrelated default into every one
-# of this Makefile's ~192 targets, not just the two that need it (and
-# BENCHBOX_DATA_DIR is a documented user-facing variable -- see
-# docs/reference/cli/configuration.md); and a per-stack docker/<platform>/.env
-# fallback could only supply a directory-relative default, which breaks the
-# host/container path-mirroring contract these two compose files rely on (a
-# relative value can never equal an absolute host path). There is
-# deliberately NO default here: callers must export an absolute
-# BENCHBOX_DATA_DIR themselves. require_data_dir_if_mounted below enforces
-# that -- non-empty and absolute -- scoped to just the lakesail/velox
-# bring-up targets, before compose is invoked.
-# $(1)=platform being brought up.
-define require_data_dir_if_mounted
-case " lakesail velox " in *" $(1) "*) case "$$BENCHBOX_DATA_DIR" in "") echo "ERROR: BENCHBOX_DATA_DIR must be exported before bringing up docker/$(1) -- its compose file binds the data directory at the SAME absolute path inside the container as on the host, because the server resolves client-sent file paths server-side; an unset value is silently accepted as an empty mount by both docker compose and mocker. Example: export BENCHBOX_DATA_DIR=$$HOME/benchbox-data" >&2; exit 1 ;; /*) : ;; *) echo "ERROR: BENCHBOX_DATA_DIR must be an ABSOLUTE path (got '$$BENCHBOX_DATA_DIR') -- docker/$(1)'s compose file binds it at the SAME path inside the container as on the host, so a relative value can never match. Example: export BENCHBOX_DATA_DIR=$$HOME/benchbox-data" >&2; exit 1 ;; esac ;; esac
-endef
-
-# `compose down -v` extended to also remove leaked named volumes on a SUCCESSFUL
-# down. mocker 0.5.4's `compose down -v` removes containers but LEAKS named
-# volumes (a stale-data risk across runs); this removes the project's volumes
-# afterward. A no-op beyond `down -v` on docker (which already removes them).
-# EXACT-NAME matching: volume keys are read from the compose file's top-level
-# `volumes:` block and joined as <project>-<key> (mocker's live-verified
-# joiner) and <project>_<key> (docker compose's, future-proofing). A
-# name-prefix grep here would also match a sibling project whose name extends
-# this one (`p` vs `p-ha`) and delete its data -- same fix as
-# tests/uat/docker_assets.py sweep_leaked_mocker_volumes.
-#
-# BENCHBOX_DATA_DIR is deliberately NOT validated here the way
-# require_data_dir_if_mounted validates it for `up`: `down` is called from
-# every one of this file's teardown paths (test-docker-down-%,
-# test-docker-down-all, and the failure-cleanup traps in test-docker-up-%,
-# test-docker-%, test-docker-firebolt, test-docker-up-all -- some of which
-# fire even when `up` never ran, e.g. require_data_dir_if_mounted itself
-# rejecting the value), so a hard failure here would risk exactly the
-# teardown leak this macro exists to close. `down` never re-mounts anything
-# (it only needs the compose file to interpolate/parse), so an unset or
-# relative BENCHBOX_DATA_DIR is replaced with a throwaway absolute
-# placeholder instead of erroring -- a no-op for every platform other than
-# lakesail/velox, whose compose files are the only ones that reference it.
-# $(1)=project $(2)=compose file.
-define compose_down_fresh
-case "$$BENCHBOX_DATA_DIR" in /*) ;; *) BENCHBOX_DATA_DIR="/tmp/benchbox-teardown-placeholder"; export BENCHBOX_DATA_DIR ;; esac; $(COMPOSE) -p "$(1)" -f "$(2)" down -v; if [ "$(CONTAINER_ENGINE)" = "mocker" ]; then awk '/^volumes:/{f=1;next} f&&/^[^ ]/{f=0} f&&/^  [A-Za-z0-9._-]+:/{k=$$1;sub(/:.*/,"",k);print k}' "$(2)" 2>/dev/null | while read -r _k; do mocker volume rm "$(1)-$$_k" >/dev/null 2>&1 || true; mocker volume rm "$(1)"_"$$_k" >/dev/null 2>&1 || true; done; fi
-endef
-
-test-docker-up-%:
-	@set -e; \
-		$(call require_data_dir_if_mounted,$*); \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		project_file="$$state_dir/$*.project"; \
-		mkdir -p "$$state_dir"; \
-		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-		if [ -z "$$project_name" ]; then \
-			project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
-		fi; \
-		status=1; \
-		cleanup() { \
-			if [ $$status -ne 0 ]; then \
-				{ $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } >/dev/null 2>&1 || true; \
-				rm -f "$$project_file"; \
-			fi; \
-		}; \
-		trap cleanup EXIT INT TERM; \
-		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
-		printf '%s\n' "$$project_name" > "$$project_file"; \
-		status=0
-
-test-docker-down-%:
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		project_file="$$state_dir/$*.project"; \
-		project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-		if [ -z "$$project_name" ]; then \
-			echo "No tracked Docker test stack for $*"; \
-			exit 0; \
-		fi; \
-		$(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml); \
-		rm -f "$$project_file"
-
-# Explicit override: generic test-docker-% expands to -m "live_firebolt" (cloud tests).
-# Firebolt Core Docker tests use the separate live_firebolt_core marker.
-test-docker-firebolt:
-	@echo "Running Firebolt Core Docker integration tests"
-	@set -e; \
-		project_name="benchbox-firebolt-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { { $(call compose_down_fresh,$$project_name,docker/firebolt/docker-compose.yml) ; } || true; }; \
-		trap cleanup EXIT INT TERM; \
-		$(COMPOSE) -p "$$project_name" -f docker/firebolt/docker-compose.yml up -d --wait; \
-		uv run -- python -m pytest -m "live_firebolt_core" --tb=short -v -n 0
-
-test-docker-%:
-	@echo "Running $* Docker integration tests"
-	@set -e; \
-		project_name="benchbox-$*-test-$$(date +%s)-$$RANDOM"; \
-		cleanup() { { $(call compose_down_fresh,$$project_name,docker/$*/docker-compose.yml) ; } || true; }; \
-		trap cleanup EXIT INT TERM; \
-		$(call require_data_dir_if_mounted,$*); \
-		$(COMPOSE) -p "$$project_name" -f docker/$*/docker-compose.yml up -d --wait; \
-		uv run -- python -m pytest -m "live_$*" --tb=short -v -n 0
-
-# No require_data_dir_if_mounted call in the loop below: DOCKER_PLATFORMS
-# (above) never includes lakesail or velox, so the call would be
-# permanently dead here -- coverage that reads as real but never fires.
-# `make test-docker-up-lakesail` / `test-docker-up-velox` (test-docker-up-%)
-# is the supported bring-up path for those two and IS guarded.
-test-docker-up-all:
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		mkdir -p "$$state_dir"; \
-		run_id="$$(date +%s)-$$RANDOM"; \
-		status=1; \
-		cleanup() { \
-			if [ $$status -ne 0 ]; then \
-				echo "Cleaning up partially started Docker services..."; \
-				for p in $(DOCKER_PLATFORMS); do \
-					project_file="$$state_dir/$$p.project"; \
-					project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-					if [ -n "$$project_name" ]; then \
-						{ $(call compose_down_fresh,$$project_name,docker/$$p/docker-compose.yml) ; } >/dev/null 2>&1 || true; \
-						rm -f "$$project_file"; \
-					fi; \
-				done; \
-			fi; \
-		}; \
-		trap cleanup EXIT INT TERM; \
-		for p in $(DOCKER_PLATFORMS); do \
-			project_file="$$state_dir/$$p.project"; \
-			project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-			if [ -z "$$project_name" ]; then \
-				project_name="benchbox-$$p-test-$$run_id"; \
-				printf '%s\n' "$$project_name" > "$$project_file"; \
-			fi; \
-			echo "Starting $$p..."; \
-			$(COMPOSE) -p "$$project_name" -f docker/$$p/docker-compose.yml up -d --wait; \
-		done; \
-		status=0
-
-test-docker-down-all:
-	@set -e; \
-		state_dir="$(DOCKER_TEST_STATE_DIR)"; \
-		for p in $(DOCKER_PLATFORMS); do \
-			project_file="$$state_dir/$$p.project"; \
-			project_name="$$(cat "$$project_file" 2>/dev/null || true)"; \
-			if [ -z "$$project_name" ]; then \
-				echo "Skipping $$p (no tracked Docker test stack)"; \
-				continue; \
-			fi; \
-			echo "Stopping $$p..."; \
-			$(call compose_down_fresh,$$project_name,docker/$$p/docker-compose.yml); \
-			rm -f "$$project_file"; \
-		done
-
-test-docker-all:
-	@echo "Running all Docker integration tests (requires Docker)"
-	@for p in $(DOCKER_PLATFORMS); do \
-		echo "=== Testing $$p ==="; \
-		$(MAKE) test-docker-$$p || exit 1; \
-	done
-
-# Compose-lifecycle parity acceptance test: asserts up --wait health-gating,
-# published-port reachability, and the down -v fresh-state guarantee (no leaked
-# container/volume) for the selected engine. Same asserts on docker and mocker so
-# parity is measured. Usage:
-#   make test-docker-parity                             # docker (default)
-#   make test-docker-parity CONTAINER_ENGINE=mocker     # Apple container backend
-#   make test-docker-parity PARITY_PLATFORMS="questdb postgresql doris"
-PARITY_PLATFORMS ?= questdb postgresql
-.PHONY: test-docker-parity
-test-docker-parity:
-	@bash _project/scripts/mocker_compose_parity.sh $(CONTAINER_ENGINE) $(PARITY_PLATFORMS)
+include $(BENCHBOX_MAKEFILE_ROOT)make/platform-tests.mk
 
 # Coverage commands using pytest
 coverage-fast:
@@ -656,10 +374,15 @@ coverage-report:
 
 # Cyclomatic complexity checks
 complexity-check:
-	uv run -- python scripts/check_complexity.py
+	uv run -- python _project/scripts/check_complexity.py
 
 complexity-report:
-	uv run -- python scripts/check_complexity.py --no-fail --top 30
+	uv run -- python _project/scripts/check_complexity.py --no-fail --top 30
+
+# Strict type island for governance code owned by this policy. Production and
+# architecture islands remain governed by the repository-wide permissive pass.
+quality-governance-typecheck:
+	uv run ty check --error all _project/scripts/check_complexity.py
 
 # Install and development
 install:
@@ -828,6 +551,9 @@ duplicate-check-json:
 duplicate-check-delta:
 	uv run -- python scripts/check_duplicate_code.py --delta-vs "$(if $(BASE_REF),$(BASE_REF),origin/develop)"
 
+makefile-inventory-check:
+	uv run -- python make/check_makefile_inventory.py
+
 mutation-test:
 	@echo "Running mutation tests on critical modules..."
 	uv run -- mutmut run
@@ -950,6 +676,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed ruff-format"; \
 	uv run ty check; \
 	[ $$? -eq 0 ] || failed="$$failed ty-check"; \
+	$(MAKE) quality-governance-typecheck; \
+	[ $$? -eq 0 ] || failed="$$failed quality-governance-typecheck"; \
 	$(MAKE) uv-lock-revision-check; \
 	[ $$? -eq 0 ] || failed="$$failed uv-lock-revision"; \
 	$(MAKE) lint-markers; \
@@ -984,6 +712,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed uat-loc-table"; \
 	$(MAKE) compat-docs-check; \
 	[ $$? -eq 0 ] || failed="$$failed compat-docs-check"; \
+	$(MAKE) platform-manifest-check; \
+	[ $$? -eq 0 ] || failed="$$failed platform-manifest-check"; \
 	$(MAKE) oracle-coverage-map-check; \
 	[ $$? -eq 0 ] || failed="$$failed oracle-coverage-map-check"; \
 	uv run -- python scripts/check_public_contract_drift.py; \
@@ -998,8 +728,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed skill-mirror-drift"; \
 	$(MAKE) duplicate-check-delta; \
 	[ $$? -eq 0 ] || failed="$$failed duplicate-delta"; \
-	$(MAKE) complexity-report; \
-	[ $$? -eq 0 ] || failed="$$failed complexity-report"; \
+	$(MAKE) complexity-check; \
+	[ $$? -eq 0 ] || failed="$$failed complexity-check"; \
 	$(MAKE) spellcheck; \
 	[ $$? -eq 0 ] || failed="$$failed spellcheck"; \
 	if [ -n "$$failed" ]; then \
@@ -1193,101 +923,8 @@ dependency-check:
 format:
 	uv run ruff format .
 
-##@ Documentation
+include $(BENCHBOX_MAKEFILE_ROOT)make/documentation.mk
 
-# Build Sphinx documentation locally
-docs-build:
-	@echo "Building documentation..."
-	@cd docs && uv run sphinx-build -b html --keep-going . _build/html
-	@echo "✅ Docs built: docs/_build/html/index.html"
-
-# Build and serve documentation on http://localhost:8000
-docs-serve: docs-build
-	@echo "Serving docs at http://localhost:8000"
-	@echo "Press Ctrl+C to stop"
-	@cd docs/_build/html && uv run -- python -m http.server 8000
-
-# Clean documentation build artifacts
-docs-clean:
-	@echo "Cleaning documentation build artifacts..."
-	@rm -rf docs/_build
-	@echo "✅ Documentation artifacts cleaned"
-
-# Check for broken links in documentation
-docs-linkcheck:
-	@echo "Checking documentation for broken links..."
-	@cd docs && uv run sphinx-build -b linkcheck . _build/linkcheck
-	@echo ""
-	@echo "Link check results:"
-	@cat docs/_build/linkcheck/output.txt || echo "No broken links found!"
-
-# Validate example file references
-docs-validate:
-	@echo "Validating example file references..."
-	@uv run -- python scripts/validate_example_references.py
-	@echo ""
-	@echo "Checking example file syntax..."
-	@uv run -- python scripts/check_example_syntax.py
-	@echo ""
-	@echo "Validating visualization screenshot sync..."
-	@uv run -- python scripts/validate_visualization_images.py
-	@echo ""
-	@echo "Checking repo-local doc relative links..."
-	@uv run -- python scripts/check_doc_relative_links.py
-
-# Refresh generated visualization screenshots and sync shared docs/blog copies
-docs-images:
-	@echo "Capturing visualization screenshots..."
-	@uv run -- python scripts/capture_chart_images.py
-
-# Regenerate the /prompts/ landing route catalog include from catalog.yaml.
-prompt-quickstarts-write:
-	@uv run -- python scripts/generate_landing_quickstarts.py --write
-
-# Fail if landing/prompts/catalog.generated.js is stale or invalid.
-# Wired into docs CI by `landing-prompts-launch-gates`.
-prompt-quickstarts-check:
-	@uv run -- python scripts/generate_landing_quickstarts.py --check
-
-# Run all documentation checks (build, linkcheck, validate)
-docs-check: docs-validate docs-linkcheck docs-build
-	@echo ""
-	@echo "✅ All documentation checks passed!"
-
-# Compile TPC-DS (and TPC-H) binaries from patched sources for the current
-# platform and deploy them into benchbox/_binaries/ so they are used at runtime.
-# No Docker required - builds natively on macOS ARM64/x86_64.
-# Run this whenever _sources/tpc-ds/tools/ patches change.
-compile-tpcds-binaries:
-	bash _sources/compilation/scripts/compile-all-platforms.sh --native
-
-# ---------------------------------------------------------------------------
-# Visualization parity fixtures (CLI↔explorer contract)
-# ---------------------------------------------------------------------------
-
-# Regenerate fixtures from the canonical Python implementation.
-# This CHANGES the contract - commit the resulting diff after review.
-parity-fixtures:
-	uv run python tests/parity/generate_visualization_fixtures.py
-
-# Regenerate sql_compat capability matrix and skip reference docs from the registry.
-compat-docs:
-	uv run -- python scripts/generate_compat_docs.py
-
-# Verify committed compat docs and DDL governance match the registry/source.
-compat-docs-check:
-	uv run -- python scripts/generate_compat_docs.py --check
-	uv run -- python -m benchbox.sql_compat.inventory --output /tmp/benchbox-compat-inventory.jsonl --check-ddl-drift
-
-# Verify fixtures match the current Python implementation without overwriting.
-# Fails if any fixture is out of date (drift detected).
-parity-check:
-	@tmpdir=$$(mktemp -d) && \
-	uv run -- python tests/parity/generate_visualization_fixtures.py --out $$tmpdir && \
-	diff -r --exclude='.gitkeep' tests/parity/fixtures $$tmpdir && \
-	echo "parity-check: fixtures match Python source" && \
-	rm -rf $$tmpdir || \
-	(echo "parity-check FAILED: fixtures are out of date - run 'make parity-fixtures' to regenerate (or 'make guards-fix' to regenerate every mechanical drift-guard artifact)" && rm -rf $$tmpdir && exit 1)
 
 # Create distribution packages
 dist: clean
@@ -1404,9 +1041,9 @@ release-cut:
 	@# Tests that import _project/dev-only tooling or test curated-out surfaces
 	@# cannot collect on the release tree (found by the v0.3.1 release PR CI).
 	git rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer
-	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
+	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
 	@# Post-curation guard: every curated path must be gone from the index.
-	@LEFTOVER=$$(git ls-files _project _blog results-data results-explorer .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
+	@LEFTOVER=$$(git ls-files _project _blog results-data results-explorer .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
 	if [ -n "$$LEFTOVER" ]; then \
 		echo "ERROR: release curation incomplete; dev-only paths still tracked:" >&2; \
 		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \
@@ -1866,196 +1503,7 @@ dev-loop-metrics:
 	echo "Dev-loop PR metrics (CI-failure baseline, see dev-loop-metrics-ci-failure-baseline-2):"; \
 	test -f _project/scripts/dev_loop_pr_metrics.py && uv run -- python _project/scripts/dev_loop_pr_metrics.py --days "$(DEV_LOOP_METRICS_DAYS)" || true
 
-# Initialize retained pool worktrees. Existing pool-NN paths are left untouched.
-worktree-pool-init:
-	@git fetch origin develop --quiet
-	@set -e; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		if [ -e "$$wt" ]; then \
-			git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { \
-				echo "Path exists but is not a git worktree: $$wt" >&2; \
-				exit 1; \
-			}; \
-			echo "$$pool exists: $$wt"; \
-		else \
-			echo "$$pool create: $$wt"; \
-			git worktree add --detach "$$wt" origin/develop; \
-			( cd "$$wt" && uv sync --group dev && uv run -- pre-commit install ); \
-		fi; \
-		i=$$((i + 1)); \
-	done
-	@POOL_REPO=$$($(POOL_REPO_CMD)); \
-	printf '%-8s | %-60s | %s\n' "pool" "path" "branch"; \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		if [ -d "$$wt/.git" ] || git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-			branch=$$(git -C "$$wt" branch --show-current 2>/dev/null); \
-			[ -n "$$branch" ] || branch="(detached)"; \
-		else \
-			branch="(missing)"; \
-		fi; \
-		printf '%-8s | %-60s | %s\n' "$$pool" "$$wt" "$$branch"; \
-		i=$$((i + 1)); \
-	done
-
-# Claim the first free pool worktree for a feature branch.
-#
-# Concurrency: every pool-mutating target (claim, release, pool-reset,
-# pool-sweep-stale) acquires the same `.git/pool.lock` via
-# scripts/_with_pool_lock.sh. They serialize against each other so
-# concurrent operations cannot leave a slot in a torn state. The lock
-# does NOT cover read-only inspection (worktree-pool-status), which is
-# safe to run anytime.
-worktree-claim:
-	@test -n "$(BRANCH)" || { echo "Usage: make worktree-claim BRANCH=<branch-name>"; exit 1; }
-	@case "$(BRANCH)" in chore/?*|fix/?*|feat/?*|docs/?*) ;; *) echo "BRANCH must match ^(chore|fix|feat|docs)/.+"; exit 1 ;; esac
-	@git check-ref-format --branch "$(BRANCH)" >/dev/null || { echo "Invalid git branch name: $(BRANCH)"; exit 1; }
-	@if [ "$(POOL_MIN_FREE_KB)" -gt 0 ]; then \
-		FREE_KB=$$(df -k "$(WORKTREE_POOL_PARENT)" 2>/dev/null | awk 'NR==2 {print $$4}'); \
-		if [ -n "$$FREE_KB" ] && [ "$$FREE_KB" -lt "$(POOL_MIN_FREE_KB)" ]; then \
-			echo "Refusing to claim: $$FREE_KB KB free on $(WORKTREE_POOL_PARENT) < $(POOL_MIN_FREE_KB) KB required." >&2; \
-			echo "Hint: run \`make worktree-pool-disk-clean\` to drop pytest/coverage caches," >&2; \
-			echo "      or override with \`POOL_MIN_FREE_KB=0 make worktree-claim BRANCH=...\`." >&2; \
-			exit 1; \
-		fi; \
-	fi
-	@git fetch origin develop --quiet
-	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
-	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-claim-locked BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
-
-# Orchestrator: try once, then auto-sweep stale slots, then try again.
-# The auto-sweep means routine pool exhaustion (forgotten releases) is
-# self-healing without operator intervention.
-#
-# The whole recipe runs in ONE shell (line continuations + a single `@`).
-# Each `@`-prefixed make recipe line otherwise spawns its own subshell, so
-# `if ... ; then exit 0; fi` would only exit that line's subshell — make
-# would happily continue to the auto-sweep retry path even after a
-# successful first attempt, falsely reporting failure to the caller.
-worktree-claim-locked:
-	@if $(MAKE) -s worktree-claim-attempt BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; then \
-		exit 0; \
-	fi; \
-	echo "No free pool worktree on first pass — auto-sweeping stale slots..." >&2; \
-	$(MAKE) -s worktree-pool-sweep-stale-locked POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)" >&2 || true; \
-	if $(MAKE) -s worktree-claim-attempt BRANCH="$(BRANCH)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"; then \
-		exit 0; \
-	fi; \
-	echo "Still no free pool worktree available after auto-sweep." >&2; \
-	echo "Hint: dirty or claim-aborted slots are not auto-recovered (they may have valuable state)." >&2; \
-	echo "      Run \`make worktree-pool-status\` to inspect, then \`make worktree-pool-reset POOL=NN\`" >&2; \
-	echo "      as a last-resort manual escape hatch after reviewing what will be discarded." >&2; \
-	exit 1
-
-# Single-pass claim attempt. Iterates the pool once; on the first
-# detached, clean, non-claim-aborted slot, hard-resets it to
-# origin/develop (scrubbing any residual INDEX/working-tree skew from
-# an interrupted release or manual `git checkout`) and mutates it to
-# the requested branch under an EXIT trap that rolls back on any failure
-# (including SIGINT/SIGTERM). EXIT is POSIX (works in dash/sh/bash); ERR
-# is not.
-# A `.benchbox/claim_in_progress` marker is written before mutation and
-# removed on success or rollback; if the process is SIGKILL'd between
-# write and removal, the marker survives and `worktree-pool-status`
-# reports the slot as `aborted` so the operator knows it needs reset.
-#
-# The `reset --hard` immediately before the final emptiness check is the
-# hardening for a subtle prior bug: `git status --porcelain` could return
-# empty on a slot whose INDEX still had stale staged entries from a
-# previous tenant (when the stale blob coincidentally matched HEAD's blob
-# for that path). The gate accepted the slot as "clean detached", but
-# the resulting worktree carried the previous tenant's INDEX into the new
-# branch. Resetting before the final emptiness check normalizes the slot.
-#
-# Ordering: a normal porcelain gate runs before mutation so dirty
-# detached slots are preserved for manual recovery. The marker is then
-# written BEFORE `reset --hard` so the EXIT trap can roll back a slot
-# whose reset is interrupted mid-flight (SIGINT/SIGTERM during the reset
-# would otherwise leave the slot in a partial state with no
-# aborted-marker signal). Slots skipped by the post-reset porcelain
-# check or a transient reset failure remove the marker before `continue`
-# so the trap's cleanup does not target the wrong slot on a later
-# iteration. The cleanup function itself runs an extra `reset --hard` so
-# an interrupted reset is fully normalized.
-worktree-claim-attempt:
-	@set -e; \
-	marker=""; wt=""; pool=""; claim_ok=0; \
-	cleanup() { \
-		trap '' INT TERM; \
-		if [ "$$claim_ok" != "1" ] && [ -n "$$marker" ]; then \
-			cleanup_marker="$$marker"; cleanup_wt="$$wt"; cleanup_pool="$$pool"; \
-			marker=""; \
-			rm -f "$$cleanup_marker"; \
-			git -C "$$cleanup_wt" checkout --detach origin/develop >/dev/null 2>&1 || true; \
-			git -C "$$cleanup_wt" reset --hard origin/develop >/dev/null 2>&1 || true; \
-			git -C "$$cleanup_wt" branch -D "$(BRANCH)" >/dev/null 2>&1 || true; \
-			echo "claim of $$cleanup_pool failed; slot returned to detached origin/develop" >&2; \
-		fi; \
-	}; \
-	on_int() { cleanup; exit 130; }; \
-	on_term() { cleanup; exit 143; }; \
-	trap cleanup EXIT; \
-	trap on_int INT; \
-	trap on_term TERM; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		i=$$((i + 1)); \
-		git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue; \
-		[ -f "$$wt/.benchbox/claim_in_progress" ] && continue; \
-		branch=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-		[ -z "$$branch" ] || continue; \
-		pre_status=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-		if [ -n "$$pre_status" ]; then \
-			echo "claim skip $$pool: porcelain non-empty before reset" >&2; \
-			continue; \
-		fi; \
-		marker="$$wt/.benchbox/claim_in_progress"; \
-		mkdir -p "$$wt/.benchbox"; \
-		printf 'pid=%s started=%s branch=%s\n' "$$$$" "$$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(BRANCH)" > "$$marker"; \
-		if ! git -C "$$wt" reset --hard origin/develop >/dev/null 2>&1; then \
-			rm -f "$$marker"; marker=""; \
-			echo "claim skip $$pool: reset --hard origin/develop failed" >&2; \
-			continue; \
-		fi; \
-		status=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-		if [ -n "$$status" ]; then \
-			rm -f "$$marker"; marker=""; \
-			echo "claim skip $$pool: post-reset porcelain non-empty (untracked residue)" >&2; \
-			continue; \
-		fi; \
-		git -C "$$wt" checkout -b "$(BRANCH)" >/dev/null; \
-		if [ ! -f "$$wt/.venv/pyvenv.cfg" ] \
-			|| [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
-			( cd "$$wt" && uv sync --group dev >/dev/null ); \
-		fi; \
-		if [ -f "$$wt/.pre-commit-config.yaml" ]; then \
-			( cd "$$wt" && uv run -- pre-commit install >/dev/null 2>&1 ) \
-				|| echo "note: pre-commit install failed/unavailable in $$wt; codespell etc. won't run at commit time (run \`uv run -- pre-commit install\` manually)" >&2; \
-		fi; \
-		scripts/set_worktree_identity.sh "$$wt" >&2 \
-			|| echo "note: could not pin worktree Git identity in $$wt; commits there resolve identity from the shared config (make agent-write-preflight still refuses an agent author)" >&2; \
-		rm -f "$$marker"; \
-		marker=""; \
-		claim_ok=1; \
-		printf 'WORKTREE_PATH=%s\n' "$$(cd "$$wt" && pwd -P)"; \
-		exit 0; \
-	done; \
-	exit 1
-
-worktree-release:
-	@top=$$(git rev-parse --show-toplevel); \
-	case "$$top" in *.pool-[0-9][0-9]) ;; *) echo "Refusing: worktree-release must run inside a pool-NN worktree."; exit 1 ;; esac; \
-	LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
-	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-release-locked FORCE="$(FORCE)"
+include $(BENCHBOX_MAKEFILE_ROOT)make/worktrees.mk
 
 worktree-release-locked:
 	@set -e; \
@@ -2087,177 +1535,7 @@ worktree-release-locked:
 	rm -rf "$$top/.venv"; \
 	echo "Released $$branch; worktree is detached at origin/develop (.venv cleared; next claim will re-sync)."
 
-## worktree-pool-status: report pool slot state + venv health + disk usage.
-##
-## Columns:
-##   pool, path, branch, state, claim_age, venv, size
-##
-## State semantics:
-##   free     — detached HEAD, working tree clean
-##   claimed  — on a feature branch, no PR or PR is open
-##   stale    — on a feature branch, PR is MERGED (release/sweep candidate)
-##   dirty    — uncommitted changes (filtered against .benchbox/ scratch
-##              dir which is the only expected non-ignored untracked path;
-##              .venv/ is .gitignored, so it does not appear in --untracked-files=normal)
-##   aborted  — `.benchbox/claim_in_progress` marker survived from a
-##              previous claim that was SIGKILL'd or otherwise died
-##              before its trap could clean up. Run pool-reset to recover.
-##   unknown  — gh pr view/list lookup failed (auth / network / rate limit)
-##              — distinguished from claimed-no-PR-yet
-##   missing  — pool slot directory absent
-##
-## Venv health:
-##   ok           — .venv/pyvenv.cfg exists and is at least as new as uv.lock + pyproject.toml
-##   stale        — .venv exists but uv.lock or pyproject.toml is newer (next claim will re-sync)
-##   missing      — .venv absent (claim will recreate; expected for free
-##                  slots, since release/sweep clears `.venv/`)
-##
-## PR-state lookup is batched: a single `gh pr list --state all` runs up
-## front and an associative awk lookup per slot replaces N per-slot
-## `gh pr view` calls. The bulk window is bumped to 1000 (gh's
-## effective max for one page); for any pool branch whose PR falls
-## outside the window, a per-branch `gh pr view` fallback fills in the
-## state so long-lived stale slots don't get misclassified as `claimed`.
-worktree-pool-status:
-	@POOL_REPO=$$($(POOL_REPO_CMD)); \
-	pr_table=$$(gh pr list --state all --base develop --limit 1000 \
-		--json headRefName,state \
-		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' 2>/dev/null); \
-	pr_lookup_failed=0; \
-	if [ -z "$$pr_table" ]; then pr_lookup_failed=1; fi; \
-	printf '%-8s | %-58s | %-28s | %-8s | %-13s | %-7s | %s\n' "pool" "path" "branch" "state" "claim_age" "venv" "size"; \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		branch="-"; state="missing"; age="-"; venv="-"; size="-"; \
-		if git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-			current=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-			dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-			aborted=0; \
-			[ -f "$$wt/.benchbox/claim_in_progress" ] && aborted=1; \
-			if [ ! -f "$$wt/.venv/pyvenv.cfg" ]; then \
-				venv="missing"; \
-			elif [ -n "$$(find "$$wt/uv.lock" "$$wt/pyproject.toml" -newer "$$wt/.venv/pyvenv.cfg" 2>/dev/null | head -n 1)" ]; then \
-				venv="stale"; \
-			else \
-				venv="ok"; \
-			fi; \
-			size=$$(du -sh "$$wt" 2>/dev/null | awk '{print $$1}'); \
-			[ -n "$$size" ] || size="-"; \
-			if [ "$$aborted" = "1" ]; then \
-				state="aborted"; \
-				[ -n "$$current" ] && branch="$$current" || branch="(detached)"; \
-				age=$$(git -C "$$wt" log -1 --format=%ar 2>/dev/null || echo "-"); \
-			elif [ -z "$$current" ]; then \
-				branch="(detached)"; \
-				if [ -z "$$dirty" ]; then state="free"; else state="dirty"; fi; \
-			else \
-				branch="$$current"; \
-				age=$$(git -C "$$wt" log -1 --format=%ar 2>/dev/null || echo "-"); \
-				if [ -n "$$dirty" ]; then \
-					state="dirty"; \
-				else \
-					pr_state=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$current" '$$1 == b {print $$2; exit}'); \
-					if [ -z "$$pr_state" ] && [ "$$pr_lookup_failed" = "0" ]; then \
-						pr_state=$$(gh pr view "$$current" --json state --jq .state 2>/dev/null || true); \
-					fi; \
-					if [ "$$pr_lookup_failed" = "1" ]; then \
-						state="unknown"; \
-					elif [ "$$pr_state" = "MERGED" ]; then \
-						state="stale"; \
-					else \
-						state="claimed"; \
-					fi; \
-				fi; \
-			fi; \
-		fi; \
-		printf '%-8s | %-58s | %-28s | %-8s | %-13s | %-7s | %s\n' "$$pool" "$$wt" "$$branch" "$$state" "$$age" "$$venv" "$$size"; \
-		i=$$((i + 1)); \
-	done; \
-	if [ "$$pr_lookup_failed" = "1" ]; then \
-		printf '\nNote: state=unknown — \`gh pr list\` returned no data.\n'; \
-		printf '  Check \`gh auth status\` and \`gh api rate_limit\` to recover.\n'; \
-	fi
-
-## worktree-pool-check: assert pool invariants and exit non-zero on drift.
-##
-## Fails if:
-##   - any slot directory is missing (count < POOL_SIZE)
-##   - extra `pool-NN` directories exist beyond POOL_SIZE in WORKTREE_POOL_PARENT
-##   - any slot is in `aborted` state (.benchbox/claim_in_progress survived)
-##
-## NOT a PR-CI gate. Intended use:
-##   - pre-release sanity check (catch drift before cutting a release)
-##   - periodic local cron / agent-loop hook
-##
-## Performance: avoids the gh PR lookup that worktree-pool-status uses, so
-## it is fast and safe to run frequently. Runs read-only — never mutates.
-##
-## See `_project/blind-spots/2026-04-30-214358-pool-size-not-codified-as-contract.md`.
-worktree-pool-check:
-	@POOL_REPO=$$($(POOL_REPO_CMD)); \
-	violations=""; \
-	missing_count=0; \
-	aborted_count=0; \
-	i=1; \
-	now_epoch=$$(date +%s); \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		if ! git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-			violations="$$violations  - $$pool: missing ($$wt is not a git worktree)\n"; \
-			missing_count=$$((missing_count + 1)); \
-		elif [ -f "$$wt/.benchbox/claim_in_progress" ]; then \
-			marker_mtime_epoch=$$(stat -c %Y "$$wt/.benchbox/claim_in_progress" 2>/dev/null || stat -f %m "$$wt/.benchbox/claim_in_progress" 2>/dev/null || echo 0); \
-			case "$$marker_mtime_epoch" in ''|*[!0-9]*) marker_mtime_epoch=0 ;; esac; \
-			marker_age_seconds=$$((now_epoch - marker_mtime_epoch)); \
-			marker_age=$$(date -u -r "$$wt/.benchbox/claim_in_progress" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "?"); \
-			if [ "$$marker_age_seconds" -ge "$(POOL_CLAIM_MARKER_STALE_SECONDS)" ]; then \
-				violations="$$violations  - $$pool: aborted (claim_in_progress marker present, mtime $$marker_age, age $${marker_age_seconds}s >= $(POOL_CLAIM_MARKER_STALE_SECONDS)s)\n"; \
-				aborted_count=$$((aborted_count + 1)); \
-			fi; \
-		fi; \
-		i=$$((i + 1)); \
-	done; \
-	extras=""; \
-	for wt in "$(WORKTREE_POOL_PARENT)/$$POOL_REPO."pool-*; do \
-		[ -d "$$wt" ] || continue; \
-		base=$$(basename "$$wt"); \
-		num=$${base##*pool-}; \
-		case "$$num" in [0-9][0-9]) ;; *) continue ;; esac; \
-		num_dec=$$(expr "$$num" + 0); \
-		if [ "$$num_dec" -gt "$(POOL_SIZE)" ]; then \
-			extras="$$extras  - $$base (number > POOL_SIZE=$(POOL_SIZE))\n"; \
-		fi; \
-	done; \
-	if [ -n "$$extras" ]; then \
-		violations="$$violations  Extra pool slots beyond POOL_SIZE:\n$$extras"; \
-	fi; \
-	if [ -n "$$violations" ]; then \
-		printf 'Pool invariant check FAILED (POOL_SIZE=%s):\n' "$(POOL_SIZE)" >&2; \
-		printf '%b' "$$violations" >&2; \
-		printf 'Recover with `make worktree-pool-status` to inspect, then\n' >&2; \
-		printf '`make worktree-pool-reset POOL=NN` (last resort) or\n' >&2; \
-		printf '`make worktree-pool-init` to recreate missing slots.\n' >&2; \
-		exit 1; \
-	fi; \
-	printf 'Pool invariant check OK: %d slot(s), no aborted markers.\n' "$(POOL_SIZE)"
-
-## worktree-pool-reset POOL=NN [FORCE=1]: hard-reset a stuck pool slot to
-## origin/develop. Without FORCE=1, refuses if the slot has uncommitted
-## tracked changes. With FORCE=1, prompts for "RESET" then discards
-## tracked changes AND scrubs untracked + ignored content (including
-## `.venv/`, `benchmark_runs/`, build outputs) so the slot is reclaimed
-## clean. The `.benchbox/` cache directory is preserved across reset.
-## Use as an escape hatch when worktree-pool-sweep-stale won't release a
-## slot (e.g., dirty working tree, no merged PR), or to reclaim disk
-## from orphan benchmark output left by previous claims.
-worktree-pool-reset:
-	@test -n "$(POOL)" || { echo "Usage: make worktree-pool-reset POOL=NN"; exit 1; }
-	@case "$(POOL)" in [0-9][0-9]) ;; *) echo "POOL must be two digits, e.g. POOL=03"; exit 1 ;; esac
-	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
-	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-pool-reset-locked POOL="$(POOL)" FORCE="$(FORCE)" POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
+include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-pool.mk
 
 worktree-pool-reset-locked:
 	@set -e; \
@@ -2291,183 +1569,7 @@ worktree-pool-reset-locked:
 	fi; \
 	echo "Reset pool-$(POOL): $$wt"
 
-## worktree-pool-sweep-stale: auto-release pool slots whose branch's PR
-## is MERGED on origin and whose working tree is clean. Idempotent;
-## refuses to touch slots that are dirty, claimed-no-PR, claimed-with-open-PR,
-## or where the gh API lookup failed (state=unknown). Run after a busy day
-## to recover slots that died between work and `make worktree-release`.
-##
-## Also drops `.venv/` from each released slot to free disk on inactive
-## pool worktrees; the next `worktree-claim` re-syncs from `~/.cache/uv/`.
-##
-## Acquires the pool lock for the duration of the sweep so concurrent
-## claims/releases cannot race with the per-slot reset operations.
-worktree-pool-sweep-stale:
-	@LOCK="$$(realpath "$$(git rev-parse --git-common-dir)")/pool.lock"; \
-	scripts/_with_pool_lock.sh "$$LOCK" $(MAKE) -s worktree-pool-sweep-stale-locked POOL_SIZE="$(POOL_SIZE)" WORKTREE_POOL_PARENT="$(WORKTREE_POOL_PARENT)"
-
-worktree-pool-sweep-stale-locked:
-	@set -e; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	pr_table=$$(gh pr list --state all --base develop --limit 1000 \
-		--json headRefName,state \
-		--template '{{range .}}{{.headRefName}}{{"\t"}}{{.state}}{{"\n"}}{{end}}' 2>/dev/null); \
-	if [ -z "$$pr_table" ]; then \
-		echo "gh pr list returned no data; refusing to sweep without PR-state visibility" >&2; \
-		exit 1; \
-	fi; \
-	swept=0; \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		i=$$((i + 1)); \
-		git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue; \
-		current=$$(git -C "$$wt" symbolic-ref -q --short HEAD 2>/dev/null || true); \
-		[ -n "$$current" ] || continue; \
-		dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-		if [ -n "$$dirty" ]; then \
-			echo "skip $$pool: dirty (branch=$$current)"; \
-			continue; \
-		fi; \
-		pr_state=$$(printf '%s\n' "$$pr_table" | awk -F'\t' -v b="$$current" '$$1 == b {print $$2; exit}'); \
-		if [ -z "$$pr_state" ]; then \
-			pr_state=$$(gh pr view "$$current" --json state --jq .state 2>/dev/null || true); \
-		fi; \
-		if [ "$$pr_state" != "MERGED" ]; then \
-			echo "skip $$pool: PR not merged (state=$${pr_state:-none})"; \
-			continue; \
-		fi; \
-		echo "sweep $$pool: releasing $$current (PR MERGED)"; \
-		git -C "$$wt" fetch origin develop --quiet; \
-		git -C "$$wt" checkout --detach origin/develop >/dev/null; \
-		git -C "$$wt" reset --hard origin/develop >/dev/null; \
-		git -C "$$wt" branch -D "$$current" >/dev/null 2>&1 || true; \
-		git -C "$$wt" remote prune origin >/dev/null 2>&1 || true; \
-		rm -rf "$$wt/.venv"; \
-		swept=$$((swept + 1)); \
-	done; \
-	echo "Swept $$swept pool slot(s)."
-
-## worktree-pool-disk-clean: drop pytest, mypy, ruff, coverage caches
-## from every pool slot without touching `.venv/` or git state. Useful
-## when the pre-claim free-space check refuses or `worktree-pool-status`
-## shows slots ballooning past their typical ~2 GB footprint.
-##
-## Lock-free by design: it only removes ignored cache directories, so
-## it cannot corrupt git state or interfere with concurrent claim/release.
-worktree-pool-disk-clean:
-	@set -e; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	freed_total=0; \
-	cleaned=0; \
-	i=1; \
-	while [ "$$i" -le "$(POOL_SIZE)" ]; do \
-		pool=$$(printf 'pool-%02d' "$$i"); \
-		wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.$$pool"; \
-		i=$$((i + 1)); \
-		[ -d "$$wt" ] || continue; \
-		before=$$(du -sk "$$wt" 2>/dev/null | awk '{print $$1}'); \
-		find "$$wt" -type d \( -name '__pycache__' -o -name '.pytest_cache' -o -name '.ruff_cache' -o -name '.mypy_cache' \) -prune -exec rm -rf {} + 2>/dev/null || true; \
-		find "$$wt" -maxdepth 4 -type f \( -name '.coverage' -o -name '.coverage.*' \) -exec rm -f {} + 2>/dev/null || true; \
-		[ -d "$$wt/.benchbox/cache" ] && rm -rf "$$wt/.benchbox/cache" || true; \
-		after=$$(du -sk "$$wt" 2>/dev/null | awk '{print $$1}'); \
-		delta=$$((before - after)); \
-		if [ "$$delta" -gt 0 ]; then \
-			echo "$$pool: freed $${delta}K (was $${before}K, now $${after}K)"; \
-			freed_total=$$((freed_total + delta)); \
-			cleaned=$$((cleaned + 1)); \
-		fi; \
-	done; \
-	echo "Cleaned $$cleaned slot(s); freed $${freed_total}K total."
-
-worktree-list:
-	@git worktree list
-
-
-# Remove worktrees whose branches are BOTH gone on origin AND merged into
-# origin/develop. The merged check matters: "gone on origin" alone also
-# matches never-pushed local branches, which are live work, not leftovers.
-# Legacy cleanup only. Pool worktrees are retained and released instead.
-# Guarded against running from a container vantage (see AGENTS.md
-# "Worktree safety"): inside a sandbox with this repo's .git bind-mounted,
-# every host worktree reads as prunable and pruning destroys real host
-# registrations. Locked worktrees ("agentbox mount guard") are unlocked
-# only at the moment this target has decided, by the merged check, that
-# removal is safe.
-worktree-prune:
-	@case "$$(hostname)" in agentbox-*|obento-*) \
-		echo "REFUSING: this looks like a sandbox container (hostname $$(hostname))." >&2; \
-		echo "Inside a container the shared .git records absolute host paths that are" >&2; \
-		echo "not mounted, so every host worktree reads as prunable and pruning would" >&2; \
-		echo "destroy real host registrations. Run this target on the host only." >&2; \
-		exit 1 ;; esac
-	@PRUNABLE=$$(git worktree list --porcelain | grep -c '^prunable' || true); \
-	if [ "$${PRUNABLE:-0}" -gt 3 ]; then \
-		echo "REFUSING: $$PRUNABLE worktrees read as prunable. On a healthy host that" >&2; \
-		echo "number is ~0; a large count means this vantage cannot see the worktree" >&2; \
-		echo "paths (container, moved checkout) and pruning would destroy live" >&2; \
-		echo "registrations. Investigate before overriding." >&2; \
-		exit 1; \
-	fi
-	@git fetch --prune --quiet
-	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
-	git worktree list --porcelain | awk 'function emit(){if (wt != "") print wt "|" br} /^worktree /{emit(); wt=$$2; br=""} /^branch /{br=$$2} END{emit()}' | \
-		while IFS='|' read -r wt br; do \
-			[ "$$wt" = "$$MAIN_CLONE" ] && continue; \
-			base=$$(basename "$$wt"); \
-			case "$$base" in *.pool-[0-9][0-9]) pool=$${base##*.}; echo "Skipping pool worktree $$pool (retained)"; continue ;; esac; \
-			[ -n "$$br" ] || continue; \
-			short=$${br#refs/heads/}; \
-			if git ls-remote --exit-code --heads origin "$$short" >/dev/null 2>&1; then continue; fi; \
-			if ! git merge-base --is-ancestor "$$short" origin/develop 2>/dev/null; then \
-				echo "Keeping $$wt [$$short]: gone on origin but NOT merged into origin/develop (likely never pushed)"; \
-				continue; \
-			fi; \
-			echo "Removing worktree (branch merged into origin/develop, gone on origin): $$wt [$$short]"; \
-			git worktree unlock "$$wt" 2>/dev/null || true; \
-			git worktree remove "$$wt" 2>/dev/null || git worktree remove --force "$$wt"; \
-			git branch -D "$$short" 2>/dev/null || true; \
-		done
-	@git worktree prune
-
-# Lock every linked worktree against `git worktree prune` / `git gc` run
-# from a vantage that cannot see the worktree paths (a sandbox container
-# with this repo's .git bind-mounted; see AGENTS.md "Worktree safety").
-# Locks do NOT affect claiming or normal work (status/checkout/commit all
-# work in a locked worktree); they only block worktree remove/move until
-# `git worktree unlock`, and make prune skip the entry. Re-run after
-# creating new worktrees; locking is idempotent (already-locked is OK).
-worktree-lock-all:
-	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
-	git worktree list --porcelain | awk '/^worktree /{print substr($$0,10)}' | \
-		while IFS= read -r wt; do \
-			[ "$$wt" = "$$MAIN_CLONE" ] && continue; \
-			if git worktree lock --reason "obento mount guard (formerly agentbox): .git may be bind-mounted into a container where this entry reads prunable but is live. Never prune. Unlock: git worktree unlock" "$$wt" 2>/dev/null; then \
-				echo "locked: $$wt"; \
-			else \
-				echo "already locked (or missing): $$wt"; \
-			fi; \
-		done
-	@git worktree list | grep -c 'locked' | sed 's/^/locked total: /'
-
-# Blind-spot finding triage (file-first capture; see _project/blind-spots/README.md).
-blind-spots-list:
-	@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list
-
-blind-spots-report:
-	@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py report
-
-# Alias: 'sweep' as the verb users will reach for; report is the v1 sweep view.
-blind-spots-sweep: blind-spots-report
-
-# Soundness-PR drain digest (read-only local run; the scheduled workflow
-# runs the same script with --apply). See docs/operations/soundness-drain.md.
-soundness-drain-report:
-	@uv run -- python _project/scripts/soundness_drain_report.py
-
-soundness-drain-self-test:
-	@uv run -- python _project/scripts/soundness_drain_report.py --self-test
+include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-maintenance.mk
 
 # ----------------------------------------------------------------------
 # UAT framework (tests/uat/) — see _project/specs/uat-framework.md.
@@ -2639,161 +1741,4 @@ uat-execute:
 		$(if $(DATABASES_ROOT),--databases-root "$(DATABASES_ROOT)",) \
 		$(if $(NO_CLEANUP),--no-cleanup,)
 
-# Help
-help:
-	@echo "BenchBox Makefile"
-	@echo "----------------"
-	@echo "Available commands:"
-	@echo ""
-	@echo "Core Testing:"
-	@echo "  make test            Run default test suite (fast tests)"
-	@echo "  make test-all        Run all tests"
-	@echo "  make test-unit       Run unit tests only"
-	@echo "  make test-integration Run integration tests only"
-	@echo "  make test-tpch       Run TPC-H tests only"
-	@echo "  make test-quick      Run quick tests without slow operations"
-	@echo "  make test-verbose    Run tests with verbose output"
-	@echo ""
-	@echo "Speed-Based Testing:"
-	@echo "  make test-pytest     Run all tests with pytest"
-	@echo "  make test-fast       Run fast tests (< 1 sec)"
-	@echo "  make test-medium     Run medium speed tests (1-10 sec)"
-	@echo "  make test-slow       Run slow tests (> 10 sec)"
-	@echo "  make test-dev        Fast development cycle testing"
-	@echo "  make test-smoke      Quick smoke testing"
-	@echo "  make test-correctness-gate Run bounded real-result correctness gate"
-	@echo "  make tpchavoc-equivalence-report Gate: TPC-Havoc variant vs canonical TPC-H equivalence (DuckDB)"
-	@echo "  make tpchavoc-equivalence-report-postgres Sample: TPC-Havoc variant equivalence on PostgreSQL"
-	@echo "  make tpchavoc-equivalence-report-datafusion Sample: TPC-Havoc variant equivalence on DataFusion"
-	@echo "  make tpchavoc-equivalence-report-clickhouse Sample: TPC-Havoc variant equivalence on ClickHouse"
-	@echo "  make tpchavoc-dataframe-equivalence-report Gate: TPC-Havoc DataFrame variants vs canonical TPC-H"
-	@echo "  make ssb-cross-surface-equivalence-report Gate: SSB DataFrame surface vs its own SQL surface"
-	@echo "  make amplab-cross-surface-equivalence-report Gate: AMPLab DataFrame surface vs its own SQL surface"
-	@echo "  make coffeeshop-cross-surface-equivalence-report Gate: CoffeeShop DataFrame surface vs its own SQL surface"
-	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"
-	@echo "  make test-ci         Maintained broad local CI profile"
-	@echo ""
-	@echo "Database-Specific Testing:"
-	@echo "  make test-duckdb     Run DuckDB-specific tests"
-	@echo "  make test-sqlite     Run SQLite-specific tests"
-	@echo ""
-	@echo "Benchmark-Specific Testing:"
-	@echo "  make test-read-primitives Run primitives benchmark tests"
-	@echo "  make test-benchmarks Run all benchmark tests"
-	@echo "  make test-tpcds      Run TPC-DS tests"
-	@echo ""
-	@echo "Feature-Specific Testing:"
-	@echo "  make test-olap       Run OLAP functionality tests"
-	@echo "  make test-window     Run window functions tests"
-	@echo ""
-	@echo "CI/CD Testing:"
-	@echo "  make test-ci         Run maintained broad local CI profile"
-	@echo ""
-	@echo "CI Local Equivalents (run before push):"
-	@echo "  make ci-local        Run ALL CI checks locally (lint+test+docs+package)"
-	@echo "  make ci-lint         Lint + format check + type check (matches lint.yml)"
-	@echo "  make ci-test         Fast tests with coverage (matches test.yml)"
-	@echo "  make ci-docs         Build documentation (matches docs.yml)"
-	@echo "  make ci-linux        Reproduce the Linux pr.yml gate in Apple container (Apple silicon, opt-in)"
-	@echo "  make test-integration-smoke  Integration smoke tests"
-	@echo "  make test-package    Build and test package installation"
-	@echo "  make security-audit  Run pip-audit security check"
-	@echo "  make spellcheck      Run codespell on codebase"
-	@echo "  make docstring-coverage  Check docstring coverage with interrogate"
-	@echo "  make complexity-check    Check cyclomatic complexity (fails on violations)"
-	@echo "  make complexity-report   Report cyclomatic complexity (no failure)"
-	@echo ""
-	@echo "Parallel Testing:"
-	@echo "  make test-parallel   Run tests in parallel"
-	@echo "  make test-parallel-fast Run fast tests in parallel"
-	@echo ""
-	@echo "Live Integration Testing (requires cloud credentials):"
-	@echo "  make test-live       Run all live integration tests"
-	@echo "  make test-live-databricks Run Databricks live tests"
-	@echo "  make test-live-snowflake  Run Snowflake live tests"
-	@echo "  make test-live-bigquery   Run BigQuery live tests"
-	@echo "  make test-live-all   Run all live tests (all platforms)"
-	@echo ""
-	@echo "Utility:"
-	@echo "  make run-test TEST=path Run a specific test file"
-	@echo ""
-	@echo "UAT Operations:"
-	@echo "  make uat-docker-cleanup        Report abandoned UAT Docker resources and non-UAT cleanup commands"
-	@echo "  make uat-docker-cleanup APPLY=1 Remove only UAT-owned Docker leftovers"
-	@echo "  make uat-docker-cleanup ENGINE=container [MODE=owned|images|max] Reclaim the Apple container store"
-	@echo ""
-	@echo "Coverage:"
-	@echo "  make coverage-fast   Run fast-marked tests with coverage (quick feedback)"
-	@echo "  make coverage-all    Run full test suite with coverage report"
-	@echo "  make coverage-html   Generate HTML coverage report"
-	@echo "  make coverage-report Generate comprehensive coverage reports"
-	@echo ""
-	@echo "Development:"
-	@echo "  make lint            Check code style"
-	@echo "  make lint-markers    Validate test marker annotations (catches speed-lane conflicts)"
-	@echo "  make lint-imports    Enforce import-layering contracts (utils < core < platforms < cli; experimental/mcp isolation)"
-	@echo "  make typecheck       Run type checking with ty"
-	@echo "  make typecheck-uv    Run type checking with uv (development)"
-	@echo "  make validate-imports Validate import structure and detect circular dependencies"
-	@echo "  make dependency-check Validate lock file against pyproject specs (ARGS='--matrix' to show summary)"
-	@echo "  make duplicate-check Detect duplicate code via AST structural hashing"
-	@echo "  make duplicate-check-delta  Fail if duplicated lines rose vs merge-base"
-	@echo "  make guards-fix      Regenerate every mechanical drift-guard artifact (inventory/oracle-map/parity/compat-docs/UAT-LOC/skill-sync), then print git status"
-	@echo "  make mutation-test   Run mutation testing on critical modules (mutmut)"
-	@echo "  make format          Format code with ruff"
-	@echo "  make clean           Remove build artifacts"
-	@echo "  make install         Install the package"
-	@echo "  make develop         Install the package in development mode"
-	@echo "  make dist            Create distribution packages"
-	@echo "  make compile-tpcds-binaries  Rebuild TPC-DS/TPC-H binaries from patched sources (no Docker)"
-	@echo ""
-	@echo "Documentation:"
-	@echo "  make docs-build      Build Sphinx documentation locally"
-	@echo "  make docs-serve      Build and serve docs at http://localhost:8000"
-	@echo "  make docs-clean      Clean documentation build artifacts"
-	@echo "  make docs-linkcheck  Check for broken links in documentation"
-	@echo "  make docs-validate   Validate example references, syntax, and screenshot sync"
-	@echo "  make docs-images     Refresh generated visualization screenshots and sync docs/blog copies"
-	@echo "  make docs-check      Run all documentation checks (validate, linkcheck, build)"
-	@echo ""
-	@echo "PR Workflow & Worktrees:"
-	@echo "  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden"
-	@echo "  make pr-preflight    Run lint + fast marker tests locally (coverage remains CI-only)"
-	@echo "  make pr-open [PR_BODY_FILE=path] [READY=1]  Push branch + open PR vs develop (auto-merge withheld unless READY=1)"
-	@echo "  make pr-ready        Arm squash auto-merge for the open PR on this branch (when final)"
-	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
-	@echo "  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop"
-	@echo "  make pr-refresh      Merge origin/develop into current branch and re-run pr-open (still withholds auto-merge unless READY=1)"
-	@echo "  make pr-status       List your open PRs vs develop with CI + auto-merge state"
-	@echo "  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs"
-	@echo "  make pr-review-followups             Action each comment, reply with marker, submit PR"
-	@echo "  make dev-loop-metrics  Summarize recent develop post-merge metrics (DEV_LOOP_METRICS_DAYS=$(DEV_LOOP_METRICS_DAYS))"
-	@echo "Worktree-pool lifecycle (preferred for new write sessions):"
-	@echo "  make worktree-pool-init           Bootstrap retained pool worktrees (POOL_SIZE=$(POOL_SIZE))"
-	@echo "  make worktree-claim BRANCH=name   Claim a free pool slot for a feature branch"
-	@echo "  make worktree-release             Inside a pool worktree: return to detached origin/develop after PR merges"
-	@echo "  make worktree-pool-status         Show pool slot state, venv health, and disk usage"
-	@echo "  make worktree-pool-check          Assert pool invariants (count, aborted slots) — exit non-zero on drift"
-	@echo "  make worktree-pool-sweep-stale    Auto-release pool slots whose PRs have merged"
-	@echo "  make worktree-pool-disk-clean     Drop pytest/mypy/ruff/coverage caches from pool slots (preserves .venv)"
-	@echo "  make worktree-pool-reset POOL=NN  Manual escape hatch for stuck pool slots"
-	@echo ""
-	@echo "Legacy / non-pool worktree utilities (pool path via worktree-claim is preferred):"
-	@echo "  make worktree-list             List active worktrees"
-	@echo "  make worktree-prune            Remove legacy non-pool worktrees whose branches are gone on origin"
-	@echo ""
-	@echo "Blind-Spot Findings (see _project/blind-spots/README.md):"
-	@echo "  make blind-spots-list   List open findings (one row each)"
-	@echo "  make blind-spots-report Counts by status + kind, oldest active first"
-	@echo "  make blind-spots-sweep  Alias for blind-spots-report"
-	@echo ""
-	@echo "Soundness-PR Drain Digest (see docs/operations/soundness-drain.md):"
-	@echo "  make soundness-drain-report     Read-only local digest of parked soundness-path PRs"
-	@echo "  make soundness-drain-self-test  Run the fixture-based classifier self-test (no network)"
-	@echo ""
-	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
-	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs release (re-run to resume)"
-	@echo "  make release-cut-abort VERSION=X.Y.Z  Discard an unpushed v\$$VERSION cut and return to develop"
-	@echo "  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag release, push tag"
-	@echo ""
-	@echo "  make help            Show this help message"
+include $(BENCHBOX_MAKEFILE_ROOT)make/help.mk

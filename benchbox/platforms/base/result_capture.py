@@ -37,6 +37,7 @@ import statistics
 import threading
 import time
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,11 @@ from benchbox.core.results.builder import (
 )
 from benchbox.core.results.metrics import percentile_ms, sample_stdev_ms
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT
+from benchbox.core.results.query_execution import (
+    query_duration_ms_from_legacy,
+    query_execution_from_legacy_dict,
+    query_execution_to_legacy_dict,
+)
 from benchbox.core.results.query_plan_models import (
     DEFAULT_PLAN_MAX_DEPTH,
     DEFAULT_RAW_OUTPUT_MAX_BYTES,
@@ -261,30 +267,14 @@ def _extract_result_field(result: Any, attr: str, default: Any = None) -> Any:
 
 
 def _coerce_time_seconds(result: Any) -> float | None:
-    """Best-effort conversion of execution time to seconds."""
-    time_ms = _extract_result_field(result, "execution_time_ms")
-    if time_ms is not None:
-        try:
-            return float(time_ms) / 1000.0
-        except (TypeError, ValueError):  # pragma: no cover - defensive
-            return None
+    """Convert an explicitly-unit-tagged query duration to seconds.
 
-    time_value = _extract_result_field(result, "execution_time_seconds")
-    if time_value is None:
-        time_value = _extract_result_field(result, "duration")
-
-    if time_value is None:
-        return None
-
-    try:
-        seconds = float(time_value)
-    except (TypeError, ValueError):  # pragma: no cover - defensive
-        return None
-
-    # Heuristic: treat very large numbers as milliseconds
-    if seconds > 1000:
-        seconds /= 1000.0
-    return seconds
+    Duration aliases retain the canonical adapter's validation and explicit
+    units without coupling this field-specific summary to unrelated legacy
+    fields such as ``rows_returned``.
+    """
+    duration_ms = query_duration_ms_from_legacy(result)
+    return None if duration_ms is None else duration_ms / 1000.0
 
 
 def _build_latency_stats(values: list[float]) -> dict[str, Any] | None:
@@ -541,7 +531,7 @@ class ResultCaptureMixin:
         }
 
         try:
-            import psutil  # type: ignore
+            import psutil
         except ImportError:
             snapshot["reason"] = "psutil not installed"
             return snapshot
@@ -1337,7 +1327,15 @@ class ResultCaptureMixin:
 
             result_dict["row_count_validation"] = row_count_validation
 
-        return result_dict
+        execution = query_execution_from_legacy_dict(result_dict)
+        compatibility_result = query_execution_to_legacy_dict(
+            execution,
+            include_milliseconds=False,
+            include_seconds=True,
+            error_field="error",
+        )
+        compatibility_result["first_row"] = first_row
+        return compatibility_result
 
     def _build_query_failure_result(
         self,
@@ -1368,14 +1366,24 @@ class ResultCaptureMixin:
                 exc_info=True,
             )
 
-        return {
-            "query_id": query_id,
-            "status": "FAILED",
-            "execution_time_seconds": execution_time,
-            "rows_returned": 0,
-            "error": str(exception),
-            "error_type": type(exception).__name__,
-        }
+        execution = QueryExecution(
+            query_id=query_id,
+            stream_id=None,
+            execution_order=None,
+            execution_time_seconds=execution_time,
+            status="FAILED",
+            rows_returned=0,
+            error_message=str(exception),
+            error_type=type(exception).__name__,
+            iteration=None,
+            run_type=None,
+        )
+        return query_execution_to_legacy_dict(
+            execution,
+            include_milliseconds=False,
+            include_seconds=True,
+            error_field="error",
+        )
 
     def _build_dry_run_result(self, query_id: str) -> dict[str, Any]:
         """Build standardized dry-run query result dictionary.
@@ -1389,15 +1397,24 @@ class ResultCaptureMixin:
             Dictionary with standardized dry-run result fields
         """
         self.log_very_verbose(f"Captured query {query_id} for dry-run")
-        return {
-            "query_id": query_id,
-            "status": "DRY_RUN",
-            "execution_time_seconds": 0.0,
-            "rows_returned": 0,
-            "first_row": None,
-            "error": None,
-            "dry_run": True,
-        }
+        execution = QueryExecution(
+            query_id=query_id,
+            stream_id=None,
+            execution_order=None,
+            execution_time_seconds=0.0,
+            status="DRY_RUN",
+            rows_returned=0,
+            iteration=None,
+            run_type=None,
+        )
+        compatibility_result = query_execution_to_legacy_dict(
+            execution,
+            include_milliseconds=False,
+            include_seconds=True,
+            error_field="error",
+        )
+        compatibility_result.update(first_row=None, error=None, dry_run=True)
+        return compatibility_result
 
     @staticmethod
     def _normalize_and_validate_file_paths(
@@ -1529,7 +1546,17 @@ class ResultCaptureMixin:
 
             query_executions: list[QueryExecution] = []
             for idx, query_result in enumerate(stream_result.query_results, start=1):
-                execution_order = query_result.get("position") or query_result.get("execution_order") or idx
+                # ``position`` is the stream-local slot. It is deliberately
+                # distinct from the flattened result's global execution order;
+                # preserve an explicit zero instead of using truthiness.
+                position = query_result.get("position")
+                execution_order_value = query_result.get("execution_order")
+                if position is not None:
+                    execution_order = position
+                elif execution_order_value is not None:
+                    execution_order = execution_order_value
+                else:
+                    execution_order = idx
                 execution_time_ms = int(float(query_result.get("execution_time_seconds", 0.0)) * 1000)
 
                 query_executions.append(
@@ -1625,22 +1652,19 @@ class ResultCaptureMixin:
     def _create_standard_execution_phase(
         self, query_results: list[dict[str, Any]], stream_id: str = "standard"
     ) -> list[QueryExecution]:
-        """Convert legacy query results to enhanced query executions."""
+        """Convert compatibility dictionaries to canonical query executions."""
         query_executions = []
 
         for i, result in enumerate(query_results):
-            query_executions.append(
-                QueryExecution(
-                    query_id=result.get("query_id", f"Q{i + 1}"),
-                    stream_id=stream_id,
-                    execution_order=i + 1,
-                    execution_time_ms=round(result.get("execution_time_seconds", 0) * 1000, 2),
-                    status=result.get("status", "UNKNOWN"),
-                    rows_returned=result.get("rows_returned"),
-                    error_message=result.get("error"),
-                    run_type=result.get("run_type", QUERY_RUN_TYPE_MEASUREMENT),
-                )
-            )
+            source = dict(result)
+            source.setdefault("query_id", f"Q{i + 1}")
+            source.setdefault("stream_id", stream_id)
+            source.setdefault("execution_order", i + 1)
+            source.setdefault("run_type", QUERY_RUN_TYPE_MEASUREMENT)
+            execution = query_execution_from_legacy_dict(source)
+            if execution.execution_time_ms is not None:
+                execution = replace(execution, execution_time_ms=round(execution.execution_time_ms, 2))
+            query_executions.append(execution)
 
         return query_executions
 

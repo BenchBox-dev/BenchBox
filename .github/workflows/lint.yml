@@ -55,6 +55,10 @@ jobs:
       - name: Compatibility docs drift check
         run: make compat-docs-check
 
+      - name: Platform manifest drift check
+        if: hashFiles('_project/scripts/platform_manifest.py') != ''
+        run: make platform-manifest-check
+
       - name: Dependency audit (no unused declarations)
         if: hashFiles('_project/scripts/dependency_audit/check_deps.py') != ''
         run: make audit-deps
