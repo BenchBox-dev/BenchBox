@@ -28,6 +28,7 @@ from benchbox.core.tuning.applied_ledger import (
     PHASE_SESSION,
     STATEMENT_FAILED,
     AppliedTuningLedger,
+    is_schema_tuning_statement,
     recording_connection,
 )
 
@@ -333,3 +334,34 @@ class TestRecordingConnectionHarness:
 
         assert conn.executed == ["SHOW VARIABLES LIKE 'max_threads'"]
         assert ledger.is_empty()
+
+    def test_executescript_records_tuning_ddl_but_not_baseline_schema(self) -> None:
+        import sqlite3
+
+        ledger = AppliedTuningLedger()
+        conn = sqlite3.connect(":memory:")
+        wrapped = recording_connection(
+            conn,
+            ledger,
+            PHASE_DDL,
+            statement_filter=is_schema_tuning_statement,
+        )
+
+        wrapped.executescript("CREATE TABLE baseline (id INTEGER);\nCREATE TABLE tuned (id INTEGER PRIMARY KEY);\n")
+
+        assert [statement.statement for statement in ledger.executed_statements] == [
+            "CREATE TABLE tuned (id INTEGER PRIMARY KEY);"
+        ]
+        assert is_schema_tuning_statement("CREATE TABLE baseline (id INTEGER);") is False
+        assert (
+            is_schema_tuning_statement(
+                'CREATE TABLE IF NOT EXISTS lake.main."__benchbox_run_identity" '
+                "(identity_key VARCHAR, identity_value VARCHAR)"
+            )
+            is False
+        )
+        assert is_schema_tuning_statement('DELETE FROM lake.main."__benchbox_run_identity"') is False
+        assert conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").fetchall() == [
+            ("baseline",),
+            ("tuned",),
+        ]

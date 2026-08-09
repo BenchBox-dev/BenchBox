@@ -172,13 +172,9 @@ class TestAppliedLedgerCapturesExecutedStatements:
         adapter, connection, _saved = self._run_setup_phase(effective_config, tmp_path)
 
         ledger = adapter._applied_tuning_ledger
-        # The ledger records EXACTLY the statement the connection saw -- not the
-        # requested table tunings that never executed.
-        assert [s.statement for s in ledger.executed_statements] == [
-            "CREATE TABLE schema_table (id INTEGER)",
-            "APPLY CONSTRAINTS",
-        ]
-        assert [s.statement for s in ledger.executed_statements] == connection.executed_statements
+        # The ledger records the tuning statement that reached the connection,
+        # while the ordinary baseline CREATE TABLE is intentionally filtered.
+        assert [s.statement for s in ledger.executed_statements] == ["APPLY CONSTRAINTS"]
         assert all(s.phase == PHASE_DDL and s.status == EXECUTED for s in ledger.executed_statements)
 
     def test_status_is_applied_unverified_from_the_ledger(self, tmp_path) -> None:
@@ -202,10 +198,7 @@ class TestAppliedLedgerCapturesExecutedStatements:
         assert set(tunings_applied_dict["table_tunings"]) == {"orders", "customer"}
         # ... but the ledger tells the truth about what physically ran.
         assert connection.executed_statements == ["CREATE TABLE schema_table (id INTEGER)", "APPLY CONSTRAINTS"]
-        assert [s.statement for s in adapter._applied_tuning_ledger.executed_statements] == [
-            "CREATE TABLE schema_table (id INTEGER)",
-            "APPLY CONSTRAINTS",
-        ]
+        assert [s.statement for s in adapter._applied_tuning_ledger.executed_statements] == ["APPLY CONSTRAINTS"]
 
     def test_metadata_save_does_not_drive_the_tuning_status(self, tmp_path) -> None:
         # save_tuning_metadata succeeding is orthogonal to what actually

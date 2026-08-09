@@ -10,6 +10,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
+from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 from benchbox.platforms.sqlite import SQLiteAdapter
 
 pytestmark = [
@@ -29,6 +31,38 @@ class TestSQLiteAdapter:
         assert adapter.database_path == ":memory:"
         assert adapter.timeout == 30.0
         assert adapter.check_same_thread is False
+
+    def test_tuned_schema_executescript_captures_constraint_ddl_only(self, tmp_path):
+        config = UnifiedTuningConfiguration()
+        adapter = SQLiteAdapter(
+            database_path=":memory:",
+            tuning_enabled=True,
+            unified_tuning_configuration=config,
+        )
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+        connection = adapter.create_connection()
+        benchmark = Mock()
+        benchmark.output_dir = tmp_path
+        benchmark.get_create_tables_sql.return_value = (
+            "CREATE TABLE baseline (id INTEGER);\nCREATE TABLE tuned (id INTEGER PRIMARY KEY);\n"
+        )
+        adapter.apply_unified_tuning = Mock()
+        adapter.save_tuning_metadata = Mock(return_value=True)
+        adapter.load_data = Mock(return_value=({}, 0.0, None))
+
+        adapter._setup_fresh_database_phases(benchmark, connection, config)
+
+        assert [statement.statement for statement in adapter._applied_tuning_ledger.executed_statements] == [
+            'CREATE TABLE "tuned" ("id" INTEGER PRIMARY KEY);'
+        ]
+        assert adapter._applied_tuning_ledger.applied_ledger_hash() is not None
+        assert (
+            adapter._applied_tuning_ledger.overall_status(tuning_enabled=True, has_config=True) == "applied_unverified"
+        )
+        assert connection.execute("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").fetchall() == [
+            ("baseline",),
+            ("tuned",),
+        ]
 
     def test_initialization_with_defaults(self):
         """Test initialization with default configuration."""

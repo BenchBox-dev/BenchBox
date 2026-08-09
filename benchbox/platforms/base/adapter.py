@@ -29,6 +29,7 @@ from benchbox.core.tuning.applied_ledger import (
     PHASE_SESSION,
     STATEMENT_FAILED,
     AppliedTuningLedger,
+    is_schema_tuning_statement,
     recording_connection,
 )
 from benchbox.core.tuning.introspection import Introspector, corroborate
@@ -1246,7 +1247,12 @@ class PlatformAdapter(
             for method_name in ("_record_tuned_sort_key_op", "_record_starrocks_tuning_to_ledger")
         )
         schema_connection = (
-            recording_connection(connection, getattr(self, "_applied_tuning_ledger", None), PHASE_DDL)
+            recording_connection(
+                connection,
+                getattr(self, "_applied_tuning_ledger", None),
+                PHASE_DDL,
+                statement_filter=is_schema_tuning_statement,
+            )
             if schema_records_ddl
             else connection
         )
