@@ -707,8 +707,20 @@ class TestDeploymentContractIsEnumerated:
         assert VeloxAdapter._validate_deployment(deployment) == expected
 
     def test_the_supported_set_matches_the_mcp_contract(self):
-        """The adapter and the MCP allow-list must not drift apart."""
-        from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST
-        from benchbox.platforms.velox import SUPPORTED_VELOX_DEPLOYMENTS
+        """Velox deployment is deliberately not in the MCP allow-list (security boundary)."""
+        import pytest
 
-        assert set(MCP_PLATFORM_OPTION_ALLOWLIST["velox"]["deployment"].choices) == set(SUPPORTED_VELOX_DEPLOYMENTS)
+        from benchbox.mcp.schemas import MCP_PLATFORM_OPTION_ALLOWLIST, MCPValidationError, validate_platform_options
+        from benchbox.platforms.velox import SUPPORTED_VELOX_DEPLOYMENTS, VeloxAdapter
+
+        # Direct Velox adapter deployment validation remains supported
+        assert VeloxAdapter._validate_deployment("local") == "local"
+        assert VeloxAdapter._validate_deployment("remote") == "remote"
+        assert set(SUPPORTED_VELOX_DEPLOYMENTS) == {"local", "remote"}
+
+        # MCP has no velox.deployment option (security boundary: remote would need server-owned endpoint)
+        assert "deployment" not in MCP_PLATFORM_OPTION_ALLOWLIST.get("velox", {})
+
+        # MCP fails closed for any velox.deployment value
+        with pytest.raises(MCPValidationError, match="not authorized"):
+            validate_platform_options("velox", {"deployment": "remote"})

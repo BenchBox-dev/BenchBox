@@ -1291,6 +1291,10 @@ pr-open:
 
 # Arms squash auto-merge for an already-open PR. Split out of pr-open so the
 # soundness check has exactly one implementation and both entry points get it.
+# Honours the durable `no-auto-merge` hold label: before this check, the label
+# was only durable against paths that never arm (workflow + sweep) while the
+# one live arm path ignored it — #1626 was armed 52s after being labeled. See
+# _project/decisions/auto-merge-policy-consolidation-2026-08-06.md (D3).
 pr-arm-auto-merge:
 	@URL="$(URL)"; \
 	if [ -z "$$URL" ]; then \
@@ -1298,6 +1302,11 @@ pr-arm-auto-merge:
 		URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
 	fi; \
 	if [ -z "$$URL" ]; then echo "No open PR found for this branch." >&2; exit 1; fi; \
+	LABELS=$$(gh pr view "$$URL" --json labels --jq '.labels[].name') || { echo "Cannot read PR labels — refusing to arm (fail closed)." >&2; exit 1; }; \
+	if printf '%s\n' "$$LABELS" | grep -qxF 'no-auto-merge'; then \
+		echo "PR carries the durable no-auto-merge hold label; leaving auto-merge disabled. Remove the label first if arming is intended."; \
+		exit 0; \
+	fi; \
 	git fetch origin develop --quiet; \
 	SOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \
 	if [ "$$SOUNDNESS_PATH" = "true" ]; then \
@@ -1512,10 +1521,16 @@ worktree-release-locked:
 		state=$$(gh pr view "$$branch" --json state --jq .state 2>/dev/null || true); \
 		[ "$$state" = "MERGED" ] || { echo "Refusing: PR for $$branch is not MERGED; open or close PR first, or rerun with FORCE=1."; exit 1; }; \
 	fi; \
-	git checkout --detach origin/develop; \
 	git fetch origin develop --quiet; \
+	if [ "$(FORCE)" = "1" ]; then \
+		git reset --hard HEAD; \
+		git clean -fdx -e .benchbox >/dev/null; \
+	fi; \
+	git checkout --detach origin/develop; \
 	git reset --hard origin/develop; \
-	git branch -D "$$branch"; \
+	if [ -n "$$branch" ]; then \
+		case "$$branch" in develop|main|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
+	fi; \
 	git remote prune origin; \
 	rm -rf "$$top/.venv"; \
 	echo "Released $$branch; worktree is detached at origin/develop (.venv cleared; next claim will re-sync)."
@@ -1543,9 +1558,12 @@ worktree-pool-reset-locked:
 		[ "$$answer" = "RESET" ] || { echo "Aborted."; exit 1; }; \
 	fi; \
 	git -C "$$wt" fetch origin develop --quiet; \
+	if [ "$(FORCE)" = "1" ]; then \
+		git -C "$$wt" reset --hard HEAD; \
+		git -C "$$wt" clean -fdx -e .benchbox >/dev/null; \
+	fi; \
 	git -C "$$wt" checkout --detach origin/develop; \
 	git -C "$$wt" reset --hard origin/develop; \
-	if [ "$(FORCE)" = "1" ]; then git -C "$$wt" clean -fdx -e .benchbox >/dev/null; fi; \
 	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
 		case "$$branch" in develop|main|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
 	fi; \

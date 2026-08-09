@@ -1,7 +1,8 @@
 """Pin CONTRIBUTING.md to the post-#1567/#1592 auto-merge enablement policy.
 
-``make pr-open`` withholds auto-merge; arming is explicit via ``make pr-ready``,
-``make pr-open READY=1``, or draft → ready_for_review. CONTRIBUTING used to
+``make pr-open`` withholds auto-merge; arming is explicit via ``make pr-ready``
+or ``make pr-open READY=1`` (the only arm paths — the workflow is revoke-only
+since auto-merge-policy-consolidation-2026-08-06, D2). CONTRIBUTING used to
 teach the opposite (``gh pr merge --auto --squash`` as part of pr-open). This
 module is a cheap docs contract so that drift fails in the fast unit lane.
 """
@@ -40,5 +41,5 @@ def test_contributing_documents_withhold_and_hands_free_arm_path(contributing_te
     """Finished-branch path must stay documented: pr-ready / READY=1 / withhold."""
     for required in ("withhold", "pr-ready", "READY=1"):
         assert required in contributing_text, f"CONTRIBUTING missing hands-free arm cue {required!r}"
-    # Draft → ready is the UI equivalent of pr-ready.
-    assert "ready_for_review" in contributing_text
+    # The workflow must be documented as revoke-only: no draft→ready arm path.
+    assert "revoke-only" in contributing_text

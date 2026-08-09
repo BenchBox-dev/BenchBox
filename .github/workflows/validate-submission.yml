@@ -250,6 +250,18 @@ jobs:
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
           HEAD_REF: ${{ github.head_ref }}
         run: |
+          # `pipefail` is load-bearing, not hygiene. The validator's exit code is
+          # this gate: it is piped into `tee` below, and a bash pipeline returns
+          # the status of its LAST command. GitHub's default shell is
+          # `bash -e {0}` -- `-e` but NOT `-o pipefail` -- so without this line
+          # `tee`'s zero masked a failing validator entirely. Observed on PR
+          # #1629: the validator reported "Submission Validation: FAILED" with
+          # 105/105 bundles failing, this step still exited 0, and the required
+          # check went green. It also silently disarmed the corpus-inventory step
+          # below, which is gated on `steps.validate.outcome == 'success'`.
+          # Do not remove `| tee` without keeping the exit code, and do not
+          # remove this line while the pipe exists.
+          set -euo pipefail
           REQUIRE_MANIFEST="--require-manifest"
           if [ "$IS_FORK" = "false" ]; then
             case "$HEAD_REF" in
@@ -257,7 +269,9 @@ jobs:
             esac
           fi
           # Validate and generate PR comment in a single invocation.
-          # --pr-comment writes the Markdown file; exit code reflects validation result.
+          # --pr-comment writes the Markdown file; exit code reflects validation
+          # result -- which reaches this step's outcome only because of the
+          # `set -o pipefail` above.
           xargs -d '\n' uv run -- python scripts/validate_submission.py $REQUIRE_MANIFEST --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
             | tee /tmp/validation_output.txt
 

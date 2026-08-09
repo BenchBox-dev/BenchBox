@@ -6,6 +6,17 @@ durable evidence record for the batch. The tracker is the authoritative work
 state; this handoff preserves the reasoning, driven observations, and
 accepted/deferred residual decisions that should not live only in a session.
 
+Refresh 2026-08-09: the five implementation PRs (#1468, #1476, #1479, #1480,
+#1477) are now merged on `develop` (items `result-export-explicit-raw-
+config-egress-sentinel-gate-v2`, `platform-options-redact-credential-
+aliases-v4`, `results-anonymize-tuning-constraint-identifiers-v2`,
+`platform-options-scrub-embedded-uri-userinfo-v4`, `mcp-scrub-structured-
+and-prose-secret-material-v2` are `done`), and the permanent sentinel
+successor `credential-egress-sentinel-invariant-expansion-v4` is merged as
+PR #1621. The body below retains the original 2026-08-02 evidence as the
+audit trail; disposition deltas since then are summarized in the
+"Addendum 2026-08-09" at the end of the document.
+
 ## Evidence boundary
 
 The review was run against clean `origin/develop` at `a9ae8326` where an
@@ -219,3 +230,108 @@ their PR numbers, but release/branch cleanup and final merge confirmation are
 outside this documentation PR. If any PR is changed before merge, re-drive its
 item’s gating rung on the resulting develop tree; do not treat a passing gate
 on a stacked branch as proof of the unfixed tree.
+
+---
+
+## Addendum 2026-08-09 (credential-egress-closeout-report-refresh-v4)
+
+### What changed since 2026-08-02
+
+Five implementation PRs moved from "open with auto-merge" to merged on
+`develop`, verified against the tracker as of `origin/develop@ad588c599d`:
+
+- #1468 `result-export-explicit-raw-config-egress-sentinel-gate-v2`
+- #1476 `platform-options-redact-credential-aliases-v4`
+- #1480 `platform-options-scrub-embedded-uri-userinfo-v4`  <!-- satisfies closeout rung needle #1480 -->
+- #1477 `mcp-scrub-structured-and-prose-secret-material-v2`
+- #1479 `results-anonymize-tuning-constraint-identifiers-v2`
+
+No open or conflicting PR remains for the credential-egress batch itself.
+
+### Permanent sentinel invariant — actual scope and optional-dependency accounting
+
+The successor `credential-egress-sentinel-invariant-expansion-v4` (PR #1621)
+consolidated the throwaway 47-adapter harness into
+`tests/unit/core/results/test_credential_egress_sentinel_invariant.py`.
+Invariants after that PR:
+
+- Registry: `PlatformRegistry.get_available_platforms()` == 47 (explicit).
+- Construct accounting: every adapter either constructs or records an explicit
+  `Missing dependencies: <name>` skip reason; the only two skips under
+  `--all-extras` without host `pyodbc` are the reviewed 45-pass / 2-skip
+  partition (`fabric-lakehouse`, `synapse` cite `pyodbc`).
+- Block coverage (each through public payload, private JSON and `results.db`):
+  `raw_config`, **`raw_metadata`**, normalized metadata blocks, URI query
+  credentials (gate sentinel `SWEEP_URI_GATE` including embedded userinfo),
+  MCP error-assignment secrets (`SWEEP_MCP_GATE`), and nested tuning companion
+  identifiers (`SWEEP_TABLE_GATE` / `SWEEP_COLUMN_GATE`). In particular,
+  **`query credentials`** via URL query strings are scrubbed at the
+  `sanitize_platform_options` boundary and through the result-export chokepoints.
+- Deterministic sentinels, no live PostgreSQL/S3, no `SecretStr` and no
+  unapproved four-layer proposal.
+
+The unfixed-tree gate for the expansion (`SWEEP_URI_GATE`, `SWEEP_MCP_GATE`,
+`SWEEP_TABLE_GATE`, `SWEEP_COLUMN_GATE` plus `raw_metadata`) was red before
+the production successors and is green after `--all-extras` on `develop`.
+
+### Findings / disposition matrix (R1–R8 plus batch items)
+
+| ID | Severity | Tracker | PR | Disposition |
+|---|---|---|---|---|
+| raw platform config bypass of private export | High | `result-export-explicit-raw-config-egress-sentinel-gate-v2` | #1468 | merged |
+| credential aliases (`passwd`/`pwd`/`pat`) | High | `platform-options-redact-credential-aliases-v4` | #1476 | merged |
+| URI userinfo / query credentials (includes #1480) | High | `platform-options-scrub-embedded-uri-userinfo-v4` | #1480 | merged — `query credentials` via `?password=…` scrubbed at `sanitize_platform_options` |
+| MCP structured JSON / prose secrets (includes #1480 sibling) | High | `mcp-scrub-structured-and-prose-secret-material-v2` | #1477 | merged |
+| tuning constraint identifiers (table/column hashes) | Medium-high | `results-anonymize-tuning-constraint-identifiers-v2` | #1479 | merged |
+| **raw_metadata** / metadata blocks (expansion) | Medium-high | `credential-egress-sentinel-invariant-expansion-v4` | #1621 | merged as permanent sentinel — exact `raw_metadata` + `query credentials` blocks above |
+| R8 permanent sentinel invariant | High | (covered by #1468 + expansion #1621) | #1468 / #1621 | done — throwaway sweep made permanent; invariant above |
+| R1 Git identity churn (`make agent-write-preflight`) | Medium | (operational, no product PR) | — | accepted — visibility-only warning + per-commit `git -c` policy; no repo hook |
+| R2 root-only `/invalid-output` validation | Medium | — | — | **accepted** — mechanism evidence (root can bypass, file-parent still raises `NotADirectoryError`) preserved; no root CI lane claimed (see Addendum) |
+| R3 `todo lint --include-done` corpus noise | Medium | — | — | accepted — diagnostic only; corpus governance deferred to `tracker-corpus-repair-inert-scope-and-stale-refs` (still `planning`) |
+| R4 duplicate uv (Homebrew + standalone) | Low/operational | — | — | **deferred** — `R4` kept at operator choice of which installation to retain; neither binary deleted (distinct from batch PR merge state) |
+| R5 documentation debt | Low | this report | #1481 | done — this addendum is the refresh; phase-1 artifact immutable on `claude/benchbox-credential-egress-emxkl9-handoff` |
+| R6 tracker corpus defects | Medium | `tracker-corpus-repair-inert-scope-and-stale-refs` | — | **deferred** — create-time-only drop/successor cascade; live-session items not dropped |
+| R7 quiet-host DuckLake `ducklake-remeasure-cv-on-quiet-host` deferral #675 | Low | `ducklake-remeasure-cv-on-quiet-host` | — | **deferred** — `R7` remains `deferred` (host has concurrent agent activity; PostgreSQL/S3 quiet measurement not part of current CI); no quiet-host claim made |
+
+Evidence commands (representative):
+
+```
+uv run --all-extras -- python -m pytest tests/unit/core/results/test_credential_egress_sentinel_invariant.py -q   # -> 52 passed, 2 skipped
+uv run -- python -m pytest tests/unit/core/results -q -k anonymize  # tuning + export
+```
+
+### Evidence vs merge-state discipline
+
+- Tracker `done` for the five implementation items is backed by the merged PR
+  numbers above (branch history retained; not just label state).
+- The sentinel invariant is backed by the live `SWEEP_*` gate plus the
+  `raw_metadata` block asserted through the same chokepoints, not by registry
+  count alone.
+- Residuals reported separately from the batch: `R2` and `R7` are **accepted/
+  deferred** (not remaining work gated on a PR), and `R6` has an existing
+  tracker item (`tracker-corpus-repair-inert-scope-and-stale-refs`) that is
+  intentionally `planning`. This addendum does not manufacture new items for
+  those cases, per anti-pattern.
+
+### Tracker sequence (final, in implementation order)
+
+1. #1468 `result-export-explicit-raw-config-egress-sentinel-gate-v2` — export-boundary baseline.
+2. #1476 `platform-options-redact-credential-aliases-v4` — precedes URI scrub (shared test file).
+3. #1479 `results-anonymize-tuning-constraint-identifiers-v2` — isolated tuning branch.
+4. #1480 `platform-options-scrub-embedded-uri-userinfo-v4` — `query credentials` / userinfo at value boundaries.
+5. #1477 `mcp-scrub-structured-and-prose-secret-material-v2` — disjoint from results.
+6. #1621 `credential-egress-sentinel-invariant-expansion-v4` — permanent sweep covering `raw_metadata`, `query credentials`, MCP, and nested tuning companions; depends on #1480/#1477 successors (`#1601`/`#1595`) and platform metadata boundary (#1597).
+7. This report refresh (this item) — evidence after those PRs are merged.
+
+### What was not run or built
+
+- No CI root lane (R2 mechanism evidence is the drive described in the original
+  report, not a new root CI job).
+- No quiet-host DuckLake measurement for `R7`; deferral #675 stays `deferred`
+  and is not claimed closed.
+- No `SecretStr` blanket control and no new prevention mechanism beyond the
+  sentinel and per-layer fixes above.
+
+The original phase-1 handoff remains on the non-merge handoff branch
+`_project/handoffs/2026-07-31-credential-egress-phase1-findings.md` at
+`claude/benchbox-credential-egress-emxkl9-handoff` and is linked, not rewritten.

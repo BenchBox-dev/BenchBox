@@ -104,10 +104,10 @@ def test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge() -> None:
 
     # Diff via git with --no-renames (gh pr diff --name-only drops rename sources).
     assert "git diff --name-only --no-renames" in workflow
-    # Enable is multi-line (`if: >-`); pin the soundness gate fragment rather than
-    # a single-line `if:` that no longer exists after the hold-label conjunction.
-    assert "steps.soundness.outputs.soundness_path != 'true'" in workflow
+    # Revoke-only workflow (D2): the disable step is the only consumer of the
+    # predicate output; no enable step exists to pin.
     assert "if: steps.soundness.outputs.soundness_path == 'true'" in workflow
+    assert "gh pr merge --auto" not in workflow.replace("gh pr merge --disable-auto", "")
     # A soundness-touching push must re-evaluate and clear any stale auto-merge.
     assert "synchronize" in workflow
     assert "gh pr merge --disable-auto" in workflow
@@ -120,8 +120,8 @@ def test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge() -> None:
     )
     assert "python3 /tmp/predicate_base.py --stdin --format github-output" in workflow
     # PR checkout copy is evaluated alongside base-ref (union/OR) so a gate
-    # *widened* mid-flight still revokes. Enable requires soundness_path != true
-    # (both false), so the PR copy cannot weaken the gate by narrowing rules.
+    # *widened* mid-flight still revokes, and the PR copy cannot weaken the
+    # gate by narrowing rules (union means either copy saying true wins).
     assert "python3 _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output" in workflow
     assert '[ "$base_result" = "soundness_path=true" ] || [ "$pr_result" = "soundness_path=true" ]' in workflow
 

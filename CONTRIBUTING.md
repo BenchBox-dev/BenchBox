@@ -98,7 +98,7 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → (wh
    # make pr-open READY=1
    ```
 
-   Equivalent UI path: open as draft, then mark ready for review (`ready_for_review`); the workflow arms only on that event, not on bare `opened` / `reopened` / `synchronize`. Once armed, the PR squash-merges when required checks turn green — don't poll. Soundness-critical paths stay withheld pending review (see `docs/operations/repo-admin-settings.md`).
+   `make pr-ready` (or `READY=1`) is the only arm path: `auto-merge-on-open.yml` is revoke-only and never arms — not on `opened` / `reopened` / `synchronize`, and not on draft → ready (`ready_for_review` is not even a trigger; the historical workflow arm point never fired once and was deleted). Once armed, the PR squash-merges when required checks turn green — don't poll. Soundness-critical paths and the `no-auto-merge` hold label stay withheld pending review (see `docs/operations/repo-admin-settings.md`).
 
 6. **After merge**, the remote branch auto-deletes (repo setting `delete_branch_on_merge`). Sweep any stale local branches and worktrees with:
 
