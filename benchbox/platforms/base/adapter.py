@@ -24,10 +24,12 @@ from benchbox.core.tuning.applied_ledger import (
     APPLIED_UNVERIFIED,
     APPLIED_VERIFIED,
     EXECUTED,
+    PHASE_DDL,
     PHASE_POST_LOAD,
     PHASE_SESSION,
     STATEMENT_FAILED,
     AppliedTuningLedger,
+    is_schema_tuning_statement,
     recording_connection,
 )
 from benchbox.core.tuning.introspection import Introspector, corroborate
@@ -1204,6 +1206,77 @@ class PlatformAdapter(
                 )
             except Exception as exc:  # capture must never break a run
                 self.logger.debug("applied-ledger layout fold degraded: %s", exc)
+
+    def _setup_fresh_database_phases(self, benchmark, connection: Any, effective_tuning_config) -> tuple:
+        """Run fresh-database setup while capturing schema-phase tuning DDL.
+
+        The shared result-capture mixin owns the historical setup implementation,
+        but schema creation is an adapter lifecycle seam: platform adapters render
+        tuning clauses while creating tables. Keep the wrapper limited to that
+        call so data loading and the subsequent tuning/session wrappers retain
+        their existing ledger boundaries.
+
+        ClickHouse and StarRocks already record their rendered schema clauses at
+        their platform-specific render points. Passing those adapters another
+        recording connection would append the same physical DDL twice and change
+        the order-sensitive ledger hash.
+        """
+        data_dir = Path(benchmark.output_dir) if hasattr(benchmark, "output_dir") else Path(".")
+
+        if self.table_mode == "external":
+            if not self.supports_external_tables:
+                raise RuntimeError(f"Platform '{self.platform_name}' does not support --table-mode external")
+            validate_fn = getattr(self, "validate_external_table_requirements", None)
+            if callable(validate_fn):
+                validate_fn()
+
+            schema_time = 0.0
+            schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, 0.0)
+            schema_creation_phase.status = "SKIPPED"
+
+            quiet_console.print("Creating external tables...")
+            table_stats, loading_time, per_table_timings = self.create_external_tables(benchmark, connection, data_dir)
+            _fmt_tag = f" [{self.external_format}]" if self.external_format else ""
+            quiet_console.print(f"✅ External tables created in {loading_time:.2f}s{_fmt_tag}")
+            data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+            return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
+
+        quiet_console.print("Creating database schema...")
+        schema_records_ddl = bool(self.tuning_enabled and effective_tuning_config) and not any(
+            callable(getattr(self, method_name, None))
+            for method_name in ("_record_tuned_sort_key_op", "_record_starrocks_tuning_to_ledger")
+        )
+        schema_connection = (
+            recording_connection(
+                connection,
+                getattr(self, "_applied_tuning_ledger", None),
+                PHASE_DDL,
+                statement_filter=is_schema_tuning_statement,
+            )
+            if schema_records_ddl
+            else connection
+        )
+        schema_time = self.create_schema(benchmark, schema_connection)
+        schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, schema_time)
+
+        tuning_metadata_saved = False
+        if self.tuning_enabled and effective_tuning_config:
+            quiet_console.print("Applying unified tuning configuration...")
+            self.apply_unified_tuning(effective_tuning_config, connection)
+            quiet_console.print("✅ Unified tuning configuration applied")
+
+            quiet_console.print("Saving tuning metadata...")
+            tuning_metadata_saved = self.save_tuning_metadata(connection)
+            if tuning_metadata_saved:
+                quiet_console.print("✅ Tuning metadata saved")
+            else:
+                quiet_console.print("⚠️ Failed to save tuning metadata")
+
+        quiet_console.print("Loading benchmark data...")
+        table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
+        quiet_console.print(f"✅ Data loading completed in {loading_time:.2f}s")
+        data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+        return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
 
     def run_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:
         """Run complete benchmark with enhanced phase tracking.

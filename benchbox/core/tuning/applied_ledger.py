@@ -28,6 +28,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -107,6 +109,67 @@ PHASE_SESSION = "session"
 # `PRAGMA` is deliberately absent -- DuckDB tuning uses `PRAGMA threads=4` etc.,
 # which ARE applied statements.
 _READBACK_PREFIXES = ("select", "show", "describe", "desc ", "explain", "values ")
+
+_SQL_COMMENT_RE = re.compile(r"--[^\n]*|/\*.*?\*/", re.DOTALL)
+_SQL_QUOTED_TEXT_RE = re.compile(r"'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"|`(?:``|[^`])*`")
+_SCHEMA_TUNING_STATEMENT_RE = re.compile(
+    r"^\s*(?:create\s+index|create\s+(?:or\s+replace\s+)?table|alter\s+table)\b",
+    re.IGNORECASE,
+)
+_SCHEMA_TUNING_FOOTPRINT_RE = re.compile(
+    r"\b(?:cluster\s+by|distributed\s+by|foreign\s+key|order\s+by|partition\s+by|primary\s+key|"
+    r"sortkey|unique|check)\b",
+    re.IGNORECASE,
+)
+
+
+def _sql_shape(statement: Any) -> str:
+    """Return SQL with comments and quoted text blanked for shape matching."""
+    text = str(statement)
+    text = _SQL_COMMENT_RE.sub(" ", text)
+    return _SQL_QUOTED_TEXT_RE.sub(" ", text)
+
+
+def is_schema_tuning_statement(statement: Any) -> bool:
+    """Whether a schema statement contains a recognizable tuning footprint.
+
+    Fresh-database schema creation runs through the same connection as tuning
+    DDL, but ordinary ``CREATE TABLE`` and catalog identity statements are not
+    tuning evidence. Keep only layout/index/constraint-bearing schema shapes;
+    platform-specific recorders remain responsible for dialects whose tuning
+    cannot be recognized generically.
+    """
+    shape = _sql_shape(statement)
+    if not _SCHEMA_TUNING_STATEMENT_RE.match(shape):
+        return False
+    if re.match(r"^\s*create\s+index\b", shape, re.IGNORECASE):
+        return True
+    return _SCHEMA_TUNING_FOOTPRINT_RE.search(shape) is not None
+
+
+def _split_sql_script(script: Any) -> list[str]:
+    """Split a SQLite ``executescript`` payload without changing execution."""
+    text = str(script)
+    if not text.strip():
+        return []
+
+    try:
+        import sqlite3
+
+        statements: list[str] = []
+        pending: list[str] = []
+        for line in text.splitlines(keepends=True):
+            pending.append(line)
+            candidate = "".join(pending)
+            if sqlite3.complete_statement(candidate):
+                if candidate.strip():
+                    statements.append(candidate.strip())
+                pending.clear()
+        if pending and "".join(pending).strip():
+            statements.append("".join(pending).strip())
+        return statements
+    except Exception:  # pragma: no cover - defensive fallback for non-SQLite runtimes
+        return [text]
 
 
 def _is_recordable_statement(statement: Any) -> bool:
@@ -289,35 +352,74 @@ class AppliedTuningLedger:
         return not self.statements and not self.dropped
 
 
-class RecordingConnection:
+class _RecordingProxy:
+    """Shared state and filtering for connection/cursor recording proxies."""
+
+    __slots__ = ("_ledger", "_phase", "_statement_filter")
+
+    def __init__(
+        self,
+        ledger: AppliedTuningLedger,
+        phase: str,
+        statement_filter: Callable[[Any], bool] | None = None,
+    ) -> None:
+        object.__setattr__(self, "_ledger", ledger)
+        object.__setattr__(self, "_phase", phase)
+        object.__setattr__(self, "_statement_filter", statement_filter)
+
+    def _should_record(self, statement: Any) -> bool:
+        if not _is_recordable_statement(statement):
+            return False
+        if self._statement_filter is None:
+            return True
+        try:
+            return bool(self._statement_filter(statement))
+        except Exception as exc:  # capture must never break a run
+            logger.debug("applied-ledger statement filter degraded: %s", exc)
+            return True
+
+
+class RecordingConnection(_RecordingProxy):
     """Transparent proxy that records executed statements into a ledger.
 
-    Wraps a real DB connection: ``execute`` and ``cursor().execute`` are
-    recorded (SQL text + phase + executed/failed), everything else delegates
-    unchanged. Wrapping never changes control flow -- the real result is
-    returned and exceptions re-raise after being recorded, so an adapter's own
-    try/except around a statement behaves exactly as before.
+    Wraps a real DB connection: ``execute``, ``cursor().execute``, and
+    ``executescript`` are recorded (SQL text + phase + executed/failed),
+    everything else delegates unchanged. An optional statement filter can
+    narrow capture for lifecycle seams such as schema creation, where ordinary
+    DDL shares a connection with tuning DDL.
 
     Only ever wraps the connection handed to the tuning-apply /
     session-configuration path, so it sees only tuning-relevant statements.
     """
 
-    __slots__ = ("_conn", "_ledger", "_phase")
+    __slots__ = ("_conn",)
 
-    def __init__(self, connection: Any, ledger: AppliedTuningLedger, phase: str) -> None:
+    def __init__(
+        self,
+        connection: Any,
+        ledger: AppliedTuningLedger,
+        phase: str,
+        statement_filter: Callable[[Any], bool] | None = None,
+    ) -> None:
+        super().__init__(ledger, phase, statement_filter)
         object.__setattr__(self, "_conn", connection)
-        object.__setattr__(self, "_ledger", ledger)
-        object.__setattr__(self, "_phase", phase)
 
     # -- recorded surface ---------------------------------------------------
     def execute(self, statement: Any, *args: Any, **kwargs: Any) -> Any:
         return self._run(self._conn.execute, statement, args, kwargs)
 
     def cursor(self, *args: Any, **kwargs: Any) -> Any:
-        return _RecordingCursor(self._conn.cursor(*args, **kwargs), self._ledger, self._phase)
+        return _RecordingCursor(self._conn.cursor(*args, **kwargs), self._ledger, self._phase, self._statement_filter)
+
+    def executescript(self, script: Any, *args: Any, **kwargs: Any) -> Any:
+        result = self._conn.executescript(script, *args, **kwargs)
+        for statement in _split_sql_script(script):
+            if self._should_record(statement):
+                self._ledger.record(statement, self._phase, status=EXECUTED)
+        return result
 
     def _run(self, fn: Any, statement: Any, args: tuple, kwargs: dict) -> Any:
-        record = _is_recordable_statement(statement)
+        record = self._should_record(statement)
         try:
             result = fn(statement, *args, **kwargs)
         except Exception as exc:
@@ -348,18 +450,23 @@ class RecordingConnection:
         return self._conn
 
 
-class _RecordingCursor:
+class _RecordingCursor(_RecordingProxy):
     """Cursor proxy mirroring :class:`RecordingConnection` for ``cursor.execute``."""
 
-    __slots__ = ("_cur", "_ledger", "_phase")
+    __slots__ = ("_cur",)
 
-    def __init__(self, cursor: Any, ledger: AppliedTuningLedger, phase: str) -> None:
+    def __init__(
+        self,
+        cursor: Any,
+        ledger: AppliedTuningLedger,
+        phase: str,
+        statement_filter: Callable[[Any], bool] | None = None,
+    ) -> None:
+        super().__init__(ledger, phase, statement_filter)
         object.__setattr__(self, "_cur", cursor)
-        object.__setattr__(self, "_ledger", ledger)
-        object.__setattr__(self, "_phase", phase)
 
     def execute(self, statement: Any, *args: Any, **kwargs: Any) -> Any:
-        record = _is_recordable_statement(statement)
+        record = self._should_record(statement)
         try:
             result = self._cur.execute(statement, *args, **kwargs)
         except Exception as exc:
@@ -387,7 +494,12 @@ class _RecordingCursor:
         return self._cur.__exit__(*exc_info)
 
 
-def recording_connection(connection: Any, ledger: AppliedTuningLedger | None, phase: str) -> Any:
+def recording_connection(
+    connection: Any,
+    ledger: AppliedTuningLedger | None,
+    phase: str,
+    statement_filter: Callable[[Any], bool] | None = None,
+) -> Any:
     """Wrap *connection* for capture, degrading to the raw connection on error.
 
     Returns the unwrapped connection when *ledger* is ``None`` or wrapping is
@@ -396,7 +508,7 @@ def recording_connection(connection: Any, ledger: AppliedTuningLedger | None, ph
     if ledger is None:
         return connection
     try:
-        return RecordingConnection(connection, ledger, phase)
+        return RecordingConnection(connection, ledger, phase, statement_filter)
     except Exception as exc:  # pragma: no cover - defensive
         logger.debug("applied-ledger connection wrap degraded: %s", exc)
         return connection

@@ -12,6 +12,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from benchbox.core.tuning.applied_ledger import (
@@ -214,6 +216,37 @@ class TestTunedSortKeyFold:
         original = "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER)"
         adapter._record_tuned_sort_key_op(original, original, "lineitem", tunings)
         assert adapter._applied_tuning_ledger.executed_statements == []
+
+    def test_schema_phase_tuning_exports_hash_without_duplicate_ddl(self, tmp_path):
+        adapter = self._tuned_adapter()
+        config = _sorted_tuning_config()
+        adapter.unified_tuning_configuration = config
+
+        benchmark = SimpleNamespace(
+            output_dir=tmp_path,
+            get_create_tables_sql=lambda dialect, tuning_config: (
+                "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER, l_shipdate DATE)"
+            ),
+            get_schema=lambda: {
+                "lineitem": {
+                    "columns": [
+                        {"name": "l_orderkey", "nullable": False},
+                        {"name": "l_linenumber", "nullable": False},
+                        {"name": "l_shipdate", "nullable": False},
+                    ]
+                }
+            },
+        )
+        connection = _FakeCHConnection([])
+        adapter.apply_unified_tuning = lambda _config, _connection: None
+        adapter.save_tuning_metadata = lambda _connection: True
+        adapter.load_data = lambda _benchmark, _connection, _data_dir: ({}, 0.0, None)
+
+        adapter._setup_fresh_database_phases(benchmark, connection, config)
+
+        assert len(adapter._applied_tuning_ledger.executed_statements) == 1
+        assert adapter._applied_tuning_ledger.executed_statements[0].table == "lineitem"
+        assert adapter._applied_tuning_ledger.applied_ledger_hash()
 
 
 class TestCombinedPartitionAndSortKey:
