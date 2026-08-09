@@ -79,6 +79,19 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # only the table's row content changed, not the command's surface.
     "benchbox/cli/commands/tuning_group.py",
     "benchbox/cli/commands/visualize.py",
+    # fix/one-engine-batch: execution_pipeline.py deleted (superseded by
+    # benchbox/core/run_service.py); empty deletion is not a Click surface
+    # change, only removal of dead module.
+    "benchbox/cli/execution_pipeline.py",
+    # cli-tuning-wizard-presort-hint-divergence: wizard hint now derives from
+    # registry presort_table_configs instead of hardcoded l_shipdate; prompt
+    # text only, no Click decorator or signature change.
+    "benchbox/cli/tuning.py",
+    # one-engine-sink-cli-logic: datagen/metrics/publish sink into core
+    # (QphH/admission/tuning); CLI commands remain but bodies delegate to
+    # core — internal move, surface decorators/signatures unchanged.
+    "benchbox/cli/commands/datagen.py",
+    "benchbox/cli/commands/metrics.py",
     "benchbox/cli/composite_params.py",
     "benchbox/cli/config.py",
     # cli-debug-logging-raw-options: sanitizes values attached to internal
