@@ -16,7 +16,6 @@ from rich.prompt import Confirm, IntPrompt, Prompt
 from rich.table import Table
 from rich.text import Text
 
-from benchbox.core.benchmark_registry import get_presort_table_configs
 from benchbox.core.schemas import SystemProfile
 from benchbox.core.tuning.interface import TuningType, UnifiedTuningConfiguration
 from benchbox.utils.printing import quiet_console
@@ -779,30 +778,12 @@ def _wizard_sorting_step(caps: dict, benchmark: str, platform_lower: str, SortCo
     if caps.get("sort_by"):
         console.print("\n[bold cyan]Step 1: Sorting[/bold cyan]")
         console.print("Sorted data improves compression and enables skip-scanning.")
-        presort_configs = get_presort_table_configs(benchmark)
-        if presort_configs:
-            hint_parts: list[str] = []
-            for table, cols in presort_configs.items():
-                col_names = ", ".join(
-                    c.get("name") if isinstance(c, dict) else getattr(c, "name", str(c)) for c in cols
-                )
-                hint_parts.append(f"{col_names} (for {table})")
-            hint = ", ".join(hint_parts)
-            console.print(f"[dim]Recommended for {benchmark.upper()}: {hint}[/dim]")
-            first_table = next(iter(presort_configs))
-            first_cols = presort_configs[first_table]
-            default_sort = ""
-            if first_cols:
-                first = first_cols[0]
-                default_sort = first.get("name") if isinstance(first, dict) else getattr(first, "name", "")
-        else:
-            console.print(f"[dim]Recommended for {benchmark.upper()}: sort by date column if applicable[/dim]")
-            default_sort = ""
+        console.print(f"[dim]Recommended for {benchmark.upper()}: l_shipdate, l_orderkey (for lineitem)[/dim]")
 
         if Confirm.ask("Enable sorting?", default=True):
             sort_cols_str = Prompt.ask(
                 "Enter column names to sort by (comma-separated)",
-                default=default_sort,
+                default="l_shipdate" if benchmark.lower() == "tpch" else "",
             )
             if sort_cols_str:
                 for col_name in sort_cols_str.split(","):
