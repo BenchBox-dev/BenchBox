@@ -177,7 +177,10 @@ def current_run_request(state: types.SimpleNamespace) -> RunRequest:
         compression_type=compression.type,
         compression_level=compression.level,
         iterations=getattr(state, "iterations", None),
-        concurrency=int(getattr(state, "concurrency", 1)),
+        # Click leaves the hidden --concurrency option as None when callers
+        # use the normal CLI surface; the canonical plan treats that as the
+        # single-stream default rather than passing None through int().
+        concurrency=int(getattr(state, "concurrency", None) or 1),
         non_replayable_options=_active_non_replayable_options(state),
     )
 
