@@ -127,8 +127,7 @@ def collect_system_profile_with_recommendations() -> dict[str, object]:
     recommendation is consistent with the reported ``available_gb``.
     """
     import platform as _platform
-
-    import benchbox as _benchbox
+    from importlib.metadata import PackageNotFoundError, version
 
     try:
         import psutil as _psutil
@@ -174,6 +173,11 @@ def collect_system_profile_with_recommendations() -> dict[str, object]:
         except ImportError:
             packages[_pkg] = "not installed"
 
+    try:
+        _benchbox_version = version("benchbox")
+    except PackageNotFoundError:
+        _benchbox_version = "unknown"
+
     return {
         "cpu": {
             "cores": profile.cpu_cores_physical,
@@ -190,7 +194,7 @@ def collect_system_profile_with_recommendations() -> dict[str, object]:
         "disk": disk_usage,
         "python": {"version": _platform.python_version()},
         "packages": packages,
-        "benchbox": {"version": getattr(_benchbox, "__version__", "unknown")},
+        "benchbox": {"version": _benchbox_version},
         "platform": {"system": _platform.system(), "release": _platform.release()},
         "recommendations": {
             "max_scale_factor": recommend_max_scale_factor(_available_bytes),

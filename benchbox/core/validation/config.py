@@ -70,7 +70,6 @@ def validate_benchmark_config(
 ) -> None:
     """Validate benchmark name, scale factor, and dataframe compatibility."""
     from benchbox.core.benchmark_registry import get_all_benchmarks
-    from benchbox.platforms import is_dataframe_platform
 
     all_benchmarks = get_all_benchmarks()
 
@@ -81,7 +80,7 @@ def validate_benchmark_config(
         min_scale = meta.get("min_scale", 0.01)
         if scale_factor < min_scale:
             warnings.append(f"{benchmark} requires scale factor >= {min_scale}")
-        if is_dataframe_platform(platform_lower) and not meta.get("supports_dataframe", False):
+        if platform_lower.endswith("-df") and not meta.get("supports_dataframe", False):
             errors.append(f"DataFrame mode does not support {benchmark} benchmark")
 
     if scale_factor <= 0:

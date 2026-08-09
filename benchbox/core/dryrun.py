@@ -497,24 +497,13 @@ class DryRunExecutor:
 
             if benchmark_id == "tpcds":
                 return self._execute_tpcds_test_class(
-                    benchmark,
-                    benchmark_config,
-                    test_execution_type,
-                    scale_factor,
-                    connection,
-                    platform_adapter,
+                    benchmark, benchmark_config, test_execution_type, scale_factor, connection, platform_adapter
                 )
-            elif benchmark_id == "tpch":
+            if benchmark_id == "tpch":
                 return self._execute_tpch_test_class(
-                    benchmark,
-                    benchmark_config,
-                    test_execution_type,
-                    scale_factor,
-                    connection,
-                    platform_adapter,
+                    benchmark, benchmark_config, test_execution_type, scale_factor, connection, platform_adapter
                 )
-            else:
-                return self._extract_standard_queries(benchmark)
+            return self._extract_standard_queries(benchmark)
 
         except Exception:
             return self._extract_standard_queries(benchmark)
@@ -528,30 +517,10 @@ class DryRunExecutor:
         connection,
         platform_adapter,
     ) -> dict[str, str]:
-        try:
-            # For TPC-DS tests, extract queries from the benchmark directly
-            # Test classes don't expose get_all_queries(), but benchmarks do
-            return self._extract_standard_queries(benchmark)
+        """Extract query text from the TPC-DS benchmark object."""
+        return self._extract_standard_queries(benchmark)
 
-        except Exception:
-            return {}
-
-    def _execute_tpch_test_class(
-        self,
-        benchmark,
-        benchmark_config,
-        test_execution_type: str,
-        scale_factor: float,
-        connection,
-        platform_adapter,
-    ) -> dict[str, str]:
-        try:
-            # For TPC-H tests, extract queries from the benchmark directly
-            # Test classes don't expose get_all_queries(), but benchmarks do
-            return self._extract_standard_queries(benchmark)
-
-        except Exception:
-            return {}
+    _execute_tpch_test_class = _execute_tpcds_test_class
 
     def _extract_standard_queries(self, benchmark) -> dict[str, str]:
         if hasattr(benchmark, "get_queries"):
