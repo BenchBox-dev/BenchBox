@@ -31,6 +31,10 @@ def _column_type_for_dialect(column: dict[str, Any], dialect: str) -> str:
     column_type = cast(str, column["type"])
     if column_type == "TIME" and dialect.lower() in _SPARK_FAMILY_DIALECTS:
         return "STRING"
+    if column_type == "TIME" and dialect.lower() == "clickhouse":
+        # ClickHouse TIME requires enable_time_time64_type=1 (experimental).
+        # Prefer portable remap to String ("HH:MM:SS") for bench stability.
+        return "String"
     return column_type
 
 
