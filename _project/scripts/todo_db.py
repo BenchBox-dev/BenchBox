@@ -42,6 +42,7 @@ import argparse
 import difflib
 import fnmatch
 import getpass
+import importlib.util
 import json
 import math
 import os
@@ -57,12 +58,19 @@ from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from time import sleep
 from typing import Any
 
 # Make this script's own directory importable so the findings sibling resolves
 # whether todo_db runs via `uv run ... todo_db.py` (dir already on sys.path[0])
 # or is loaded by file path in tests (spec_from_file_location adds nothing).
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _SCRIPT_DIR.parents[1]
+sys.path.insert(0, str(_SCRIPT_DIR))
+# The standalone `todo` shim uses the scripts-only uv project, not BenchBox's
+# package environment. Add the repository root so shared production helpers
+# (such as the monotonic clock) remain importable in that execution mode.
+sys.path.insert(0, str(_REPO_ROOT))
 
 # Alias THIS module as "todo_db" so the findings sibling's `import todo_db`
 # binds this exact instance instead of re-executing the file under the canonical
@@ -84,6 +92,21 @@ if _self_module is not None:
 # single instance, and todo_findings defines its schema constants before it first
 # touches todo_db. See todo_findings.py's header.
 import todo_findings  # noqa: E402
+
+try:
+    from benchbox.utils.clock import elapsed_seconds, mono_time  # noqa: E402
+except ModuleNotFoundError:
+    # The scripts-only uv environment intentionally does not install BenchBox's
+    # optional runtime dependencies. Load the same repository-owned helper
+    # directly instead of importing benchbox/__init__.py and its full surface.
+    _clock_spec = importlib.util.spec_from_file_location("_benchbox_clock", _REPO_ROOT / "benchbox/utils/clock.py")
+    if _clock_spec is None or _clock_spec.loader is None:
+        raise RuntimeError("cannot load repository clock helpers") from None
+    _clock_module = importlib.util.module_from_spec(_clock_spec)
+    sys.modules[_clock_spec.name] = _clock_module
+    _clock_spec.loader.exec_module(_clock_module)
+    elapsed_seconds = _clock_module.elapsed_seconds
+    mono_time = _clock_module.mono_time
 
 SCHEMA_VERSION = 5
 
@@ -3095,23 +3118,126 @@ def changed_files(base: str | None) -> list[str]:
     return sorted(set(files))
 
 
+@contextmanager
+def _verification_test_lock():
+    """Serialize verification commands with the repository's parallel test lane.
+
+    A lock timeout means the command was not run, so callers must not turn it
+    into a code verdict. Advisory locks are released by the kernel when their
+    owner dies; stale diagnostic text in the file therefore does not make a
+    dead holder permanent.
+    """
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        # The xdist controller already owns this lock for the whole session;
+        # a worker must not contend with its own controller through a nested
+        # verification subprocess.
+        yield True, ""
+        return
+    lock_dir = os.environ.get("BENCHBOX_TEST_LOCK_DIR")
+    base_dir = Path(lock_dir).expanduser() if lock_dir else Path.home() / ".benchbox"
+    lock_path = base_dir / "test.lock"
+    timeout_raw = os.environ.get("BENCHBOX_VERIFY_LOCK_TIMEOUT", "30")
+    try:
+        timeout = max(0.0, float(timeout_raw))
+    except ValueError:
+        timeout = 30.0
+
+    try:
+        base_dir.mkdir(parents=True, exist_ok=True)
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
+    except OSError as exc:
+        yield False, f"could not open test lock {lock_path}: {exc}"
+        return
+
+    acquired = False
+    started_at = mono_time()
+    try:
+        try:
+            import fcntl
+
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquired = True
+                    break
+                except BlockingIOError:
+                    if elapsed_seconds(started_at) >= timeout:
+                        break
+                    sleep(0.1)
+        except ImportError:  # pragma: no cover - Windows uses msvcrt below
+            import msvcrt
+
+            while True:
+                try:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                    acquired = True
+                    break
+                except OSError:
+                    if elapsed_seconds(started_at) >= timeout:
+                        break
+                    sleep(0.1)
+
+        if not acquired:
+            try:
+                holder = lock_path.read_text(encoding="utf-8").strip() or "unknown holder"
+            except OSError:
+                holder = "unknown holder"
+            yield False, f"test lock held after {timeout:g}s ({holder}); verification command was not run"
+            return
+
+        yield True, ""
+    finally:
+        if acquired:
+            try:
+                if "fcntl" in sys.modules and sys.platform != "win32":
+                    import fcntl
+
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                else:  # pragma: no cover - Windows
+                    import msvcrt
+
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
+        os.close(fd)
+
+
 def run_verification(conn: sqlite3.Connection, actor: str, item_id: str, seq: int) -> tuple[str, str]:
     row = conn.execute("SELECT * FROM verifications WHERE item_id = ? AND seq = ?", (item_id, seq)).fetchone()
     if row is None:
         raise TodoError(f"no verification seq={seq} on {item_id!r}")
     if not row["command"]:
         raise TodoError(f"verification seq={seq} on {item_id!r} has no command")
-    proc = subprocess.run(row["command"], shell=True, capture_output=True, text=True, check=False)
-    output = (proc.stdout or "") + (proc.stderr or "")
-    passed = proc.returncode == 0
-    result = "pass" if passed else "fail"
+    with _verification_test_lock() as (can_run, lock_message):
+        if can_run:
+            command_env = os.environ.copy()
+            # The wrapper owns the shared lock for the command's full
+            # duration; prevent pytest's own session hook from attempting a
+            # nested acquisition against the descriptor we already hold.
+            command_env["BENCHBOX_SKIP_TEST_LOCK"] = "1"
+            proc = subprocess.run(
+                row["command"], shell=True, capture_output=True, text=True, check=False, env=command_env
+            )
+            output = (proc.stdout or "") + (proc.stderr or "")
+            result = "pass" if proc.returncode == 0 else "fail"
+        else:
+            output = f"indeterminate: {lock_message}"
+            result = "indeterminate"
     with _write_txn(conn):
         if not _touch_lease(conn, actor, item_id):
             raise TodoError(f"{item_id!r}'s lease is expired, missing, or held by another actor; re-acquire it")
-        conn.execute(
-            "UPDATE verifications SET last_run = ?, last_result = ? WHERE item_id = ? AND seq = ?",
-            (utc_now(), result, item_id, seq),
-        )
+        # The existing schema intentionally admits only pass/fail. Keep an
+        # environmental non-verdict out of last_result and retain the durable
+        # distinction in the audit event and CLI output. The verification did
+        # not run, so its previous verdict and timestamp remain the last
+        # completed observation.
+        if result != "indeterminate":
+            conn.execute(
+                "UPDATE verifications SET last_run = ?, last_result = ? WHERE item_id = ? AND seq = ?",
+                (utc_now(), result, item_id, seq),
+            )
         log_event(conn, actor, item_id, "verify", {"seq": seq, "result": result})
     return result, output
 
