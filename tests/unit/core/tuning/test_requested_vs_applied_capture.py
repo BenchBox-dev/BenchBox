@@ -89,6 +89,7 @@ class _PartiallyApplyingStubAdapter(PlatformAdapter):
         return _RecordingConnection()
 
     def create_schema(self, benchmark, connection):
+        connection.execute("CREATE TABLE schema_table (id INTEGER)")
         return 0.0
 
     def load_data(self, benchmark, connection, data_dir):
@@ -162,9 +163,9 @@ class TestAppliedLedgerCapturesExecutedStatements:
         effective_config = _requested_config_with_table_tunings()
         _adapter, connection, _saved = self._run_setup_phase(effective_config, tmp_path)
 
-        # The stub only ever executes the constraint statement -- neither
-        # requested table tuning (orders/customer sorting) reaches the DB.
-        assert connection.executed_statements == ["APPLY CONSTRAINTS"]
+        # The stub executes one schema statement and one constraint statement;
+        # neither requested table tuning (orders/customer sorting) reaches DB.
+        assert connection.executed_statements == ["CREATE TABLE schema_table (id INTEGER)", "APPLY CONSTRAINTS"]
 
     def test_ledger_captures_exactly_what_executed(self, tmp_path) -> None:
         effective_config = _requested_config_with_table_tunings()
@@ -173,7 +174,10 @@ class TestAppliedLedgerCapturesExecutedStatements:
         ledger = adapter._applied_tuning_ledger
         # The ledger records EXACTLY the statement the connection saw -- not the
         # requested table tunings that never executed.
-        assert [s.statement for s in ledger.executed_statements] == ["APPLY CONSTRAINTS"]
+        assert [s.statement for s in ledger.executed_statements] == [
+            "CREATE TABLE schema_table (id INTEGER)",
+            "APPLY CONSTRAINTS",
+        ]
         assert [s.statement for s in ledger.executed_statements] == connection.executed_statements
         assert all(s.phase == PHASE_DDL and s.status == EXECUTED for s in ledger.executed_statements)
 
@@ -197,8 +201,11 @@ class TestAppliedLedgerCapturesExecutedStatements:
         tunings_applied_dict = effective_config.to_dict()
         assert set(tunings_applied_dict["table_tunings"]) == {"orders", "customer"}
         # ... but the ledger tells the truth about what physically ran.
-        assert connection.executed_statements == ["APPLY CONSTRAINTS"]
-        assert [s.statement for s in adapter._applied_tuning_ledger.executed_statements] == ["APPLY CONSTRAINTS"]
+        assert connection.executed_statements == ["CREATE TABLE schema_table (id INTEGER)", "APPLY CONSTRAINTS"]
+        assert [s.statement for s in adapter._applied_tuning_ledger.executed_statements] == [
+            "CREATE TABLE schema_table (id INTEGER)",
+            "APPLY CONSTRAINTS",
+        ]
 
     def test_metadata_save_does_not_drive_the_tuning_status(self, tmp_path) -> None:
         # save_tuning_metadata succeeding is orthogonal to what actually
@@ -208,5 +215,33 @@ class TestAppliedLedgerCapturesExecutedStatements:
         adapter, connection, tuning_metadata_saved = self._run_setup_phase(effective_config, tmp_path)
 
         assert tuning_metadata_saved is True
-        assert len(connection.executed_statements) == 1
+        assert len(connection.executed_statements) == 2
         assert adapter._applied_tuning_ledger.overall_status(tuning_enabled=True, has_config=True) == APPLIED_UNVERIFIED
+
+
+class _SelfRecordingSchemaAdapter(_PartiallyApplyingStubAdapter):
+    """Stub for a platform whose schema renderer owns ledger recording."""
+
+    def _record_tuned_sort_key_op(self, *args: Any, **kwargs: Any) -> None:
+        return None
+
+    def create_schema(self, benchmark, connection):
+        statement = "CREATE TABLE schema_table (id INTEGER)"
+        connection.execute(statement)
+        self._applied_tuning_ledger.record(statement, PHASE_DDL)
+        return 0.0
+
+
+def test_schema_renderer_ledger_owner_prevents_duplicate_capture(tmp_path) -> None:
+    config = _requested_config_with_table_tunings()
+    adapter = _SelfRecordingSchemaAdapter(tuning_enabled=True, unified_tuning_configuration=config)
+    adapter._applied_tuning_ledger = AppliedTuningLedger()
+    connection = adapter.create_connection()
+
+    adapter._setup_fresh_database_phases(SimpleNamespace(output_dir=tmp_path), connection, config)
+
+    assert connection.executed_statements == ["CREATE TABLE schema_table (id INTEGER)", "APPLY CONSTRAINTS"]
+    assert [statement.statement for statement in adapter._applied_tuning_ledger.executed_statements] == [
+        "CREATE TABLE schema_table (id INTEGER)",
+        "APPLY CONSTRAINTS",
+    ]
