@@ -22,9 +22,9 @@ from benchbox.cli.platform_readiness import (
     check_platform_readiness,
     has_readiness_failures,
 )
+from benchbox.core.platform_manifest import DefaultMode, get_platform_alias_modes, get_platform_aliases
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.schemas import LibraryInfo, PlatformInfo
-from benchbox.platforms.manifest import DefaultMode, get_platform_alias_modes, get_platform_aliases
 from benchbox.utils.printing import quiet_console
 
 console = quiet_console

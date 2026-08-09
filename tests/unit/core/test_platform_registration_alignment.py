@@ -10,8 +10,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import pytest
 
+from benchbox.core.platform_manifest import PLATFORM_MANIFEST, get_platform_aliases
 from benchbox.core.platform_registry import PlatformRegistry
-from benchbox.platforms.manifest import PLATFORM_MANIFEST, get_platform_aliases
 
 pytestmark = [
     pytest.mark.unit,

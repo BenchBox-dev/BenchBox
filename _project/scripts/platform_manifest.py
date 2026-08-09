@@ -7,7 +7,7 @@ import ast
 from collections.abc import Iterable
 from pathlib import Path
 
-from benchbox.platforms.manifest import (
+from benchbox.core.platform_manifest import (
     PLATFORM_MANIFEST,
     PLATFORM_MANIFEST_BY_KEY,
     get_adapter_imports,

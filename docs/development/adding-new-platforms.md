@@ -21,7 +21,7 @@ Platform adapters in BenchBox follow a consistent architecture based on the `Pla
 
 ## Platform Manifest Authority
 
-`benchbox/platforms/manifest.py` is the only static authority for platform
+`benchbox/core/platform_manifest.py` is the only static authority for platform
 identity and metadata. Each typed manifest entry owns its canonical key, every
 scoped alias and its implied execution mode, support status,
 execution/deployment capabilities, and the optional adapter module/class/order
@@ -52,6 +52,11 @@ Do not add a second canonical-key, alias, capability, support-status, or
 adapter-coordinate registry. In particular, decorator-based discovery was not
 introduced: it would require importing adapter modules to discover static
 metadata and would weaken the lazy optional-dependency boundary.
+
+`benchbox.platforms.manifest` remains a compatibility import path that only
+re-exports the core-owned authority. New internal code should import
+`benchbox.core.platform_manifest` directly so the enforced
+`utils < core < platforms < cli` dependency direction remains intact.
 
 The following inventory is generated from the manifest:
 
@@ -779,7 +784,7 @@ def run_maintenance_test(self, benchmark, **kwargs) -> Dict[str, Any]:
 Add one typed entry to the manifest source of truth:
 
 ```python
-# benchbox/platforms/manifest.py (abridged JSON-shaped entry)
+# benchbox/core/platform_manifest.py (abridged JSON-shaped entry)
 {
     "key": "newdatabase",
     "aliases": [

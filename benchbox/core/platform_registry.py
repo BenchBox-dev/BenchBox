@@ -16,9 +16,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
-from benchbox.core.schemas import LibraryInfo, PlatformInfo
-from benchbox.platforms.base import PlatformAdapter
-from benchbox.platforms.manifest import (
+from benchbox.core.platform_manifest import (
     SUPPORT_STATUS_VALUES,
     SupportStatus,
     get_adapter_imports,
@@ -28,6 +26,8 @@ from benchbox.platforms.manifest import (
     get_platform_metadata,
     is_valid_platform_key,
 )
+from benchbox.core.schemas import LibraryInfo, PlatformInfo
+from benchbox.platforms.base import PlatformAdapter
 
 CostClass = Literal["free", "paid_credits", "paid_compute"]
 OptionalAdapterImportStatus = Literal[
@@ -159,7 +159,7 @@ class PlatformCapability:
 class PlatformRegistry:
     """Registry for platform adapters with factory functionality.
 
-    Static definitions are projected from ``benchbox.platforms.manifest``.
+    Static definitions are projected from ``benchbox.core.platform_manifest``.
     This class owns runtime adapter state and factory behavior. The
     get_platform_adapter() function in benchbox/platforms/__init__.py delegates
     to this registry for adapter lookup while handling CLI-specific concerns.

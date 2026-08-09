@@ -12,13 +12,7 @@ import sys
 
 import pytest
 
-from benchbox.core.platform_registry import (
-    DeploymentCapability,
-    PlatformCapability,
-    PlatformRegistry,
-)
-from benchbox.platforms.base import PlatformAdapter
-from benchbox.platforms.manifest import (
+from benchbox.core.platform_manifest import (
     _PLATFORM_MANIFEST_JSON,
     PLATFORM_MANIFEST,
     _load_manifest,
@@ -28,6 +22,12 @@ from benchbox.platforms.manifest import (
     get_platform_aliases,
     get_platform_metadata,
 )
+from benchbox.core.platform_registry import (
+    DeploymentCapability,
+    PlatformCapability,
+    PlatformRegistry,
+)
+from benchbox.platforms.base import PlatformAdapter
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -555,6 +555,14 @@ class TestExtractRequirementPackage:
 
 
 class TestPlatformManifest:
+    def test_platforms_manifest_compatibility_facade_reexports_core_authority(self):
+        from benchbox.core import platform_manifest as core_manifest
+        from benchbox.platforms import manifest as compatibility_manifest
+
+        assert compatibility_manifest.PLATFORM_MANIFEST is core_manifest.PLATFORM_MANIFEST
+        assert compatibility_manifest.PlatformManifestEntry is core_manifest.PlatformManifestEntry
+        assert compatibility_manifest.get_adapter_imports is core_manifest.get_adapter_imports
+
     def test_registry_and_cli_are_exact_manifest_projections(self):
         from benchbox.cli.platform import PLATFORM_ALIASES
         from benchbox.core.platform_registry import _OPTIONAL_ADAPTERS
@@ -582,7 +590,7 @@ class TestPlatformManifest:
     def test_static_manifest_import_does_not_load_optional_sdks(self):
         code = """
 import sys
-from benchbox.platforms.manifest import PLATFORM_MANIFEST
+from benchbox.core.platform_manifest import PLATFORM_MANIFEST
 blocked = {'chdb', 'datafusion', 'databricks.sql', 'google.cloud.bigquery', 'polars', 'pyspark', 'snowflake'}
 loaded = sorted(name for name in blocked if name in sys.modules)
 raise SystemExit('optional SDKs loaded: ' + ', '.join(loaded) if loaded else 0)

@@ -49,7 +49,7 @@ def build_plan(name: str, kind: PlatformKind) -> ScaffoldPlan:
     cli_name = slug.replace("_", "-")
 
     common_files = (
-        "benchbox/platforms/manifest.py",
+        "benchbox/core/platform_manifest.py",
         "pyproject.toml",
         f"docs/platforms/{cli_name}.md",
         "docs/platforms/comparison-matrix.md",
