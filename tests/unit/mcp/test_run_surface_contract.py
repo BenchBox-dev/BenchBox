@@ -139,6 +139,15 @@ EXPECTED_OMISSION_TIERS = {
 def _omission_ledger(text: str) -> dict[str, dict[str, str]]:
     """Parse the scoped-surface omission ledger table from the MCP reference."""
     section = _section(text, "**Scoped-surface omission ledger**", "### Discovery Tools")
+    # The per-tool ledger was inserted before the run-surface ledger.  Isolate
+    # the run-surface ledger by its dedicated heading so the tool-mapping rows
+    # are not mixed in.
+    run_heading = "### Scoped-Surface Omission Ledger"
+    if run_heading.lower() in section.lower():
+        # Find the heading case-insensitively inside section.
+        lower = section.lower()
+        idx = lower.index(run_heading.lower())
+        section = section[idx:]
     ledger: dict[str, dict[str, str]] = {}
     for line in section.splitlines():
         if not line.startswith("| `"):
@@ -146,10 +155,105 @@ def _omission_ledger(text: str) -> dict[str, dict[str, str]]:
         columns = [column.strip() for column in line.strip("|").split("|")]
         if len(columns) < 4:
             continue
-        ledger[columns[0].strip("`")] = {
+        # Skip rows from the per-tool tables where the tier column may be
+        # absent or not one of the ratified tiers (e.g. the tool-mapping table
+        # has category/notes columns).  Only collect rows whose tier is a
+        # ratified value and whose first column looks like a CLI flag.
+        tier_candidate = columns[2].strip()
+        if tier_candidate not in RATIFIED_OMISSION_TIERS:
+            continue
+        first = columns[0].strip("`")
+        if not first.startswith("--"):
+            continue
+        ledger[first] = {
             "status": columns[1],
-            "tier": columns[2],
+            "tier": tier_candidate,
             "reason": columns[3],
+        }
+    return ledger
+
+
+# ---------------------------------------------------------------------------
+# Per-tool CLI↔MCP mapping ledger
+# ---------------------------------------------------------------------------
+
+_EXPECTED_TOOL_CLI_MAP: dict[str, str] = {
+    # tool -> representative CLI counterpart substring that must appear in the
+    # table's CLI column.  ``none`` is the literal sentinel for MCP-only tools.
+    "list_available": "benchbox platforms list",
+    "get_benchmark_info": "benchbox benchmarks list",
+    "system_profile": "benchbox profile",
+    "check_dependencies": "benchbox check-deps",
+    "run_benchmark": "benchbox run",
+    "get_query_details": "none",
+    "get_results": "benchbox results",
+    "analyze_results": "benchbox compare",
+    "get_query_plan": "benchbox show-plan",
+    "validate_results": "validate_results",
+    "suggest_charts": "benchbox visualize",
+    "generate_chart": "benchbox visualize",
+}
+
+_EXPECTED_OMITTED_CLI_FAMILIES: dict[str, str] = {
+    "benchbox auth": "security-scoped",
+    "benchbox publish": "security-scoped",
+    "benchbox submit": "security-scoped",
+    "benchbox setup": "security-scoped",
+    "benchbox shell": "interaction-scoped",
+    "benchbox datagen": "not-yet-demanded",
+    "benchbox convert": "not-yet-demanded",
+    "benchbox tuning": "not-yet-demanded",
+    "benchbox plan-history": "not-yet-demanded",
+    "benchbox download-answers": "security-scoped",
+    "benchbox metrics": "not-yet-demanded",
+}
+
+
+def _tool_mapping_ledger(text: str) -> dict[str, dict[str, str]]:
+    """Parse the ``MCP tool -> CLI mapping`` table.
+
+    Returns a mapping from MCP tool name to its row dict with keys
+    ``category``, ``cli_counterparts``, ``notes``.
+    """
+    section = _section(
+        text,
+        "### Per-Tool CLI",
+        "**CLI command families with no MCP tool**",
+    )
+    ledger: dict[str, dict[str, str]] = {}
+    for line in section.splitlines():
+        if not line.startswith("| `"):
+            continue
+        columns = [column.strip() for column in line.strip("|").split("|")]
+        if len(columns) < 4:
+            continue
+        tool = columns[0].strip("`")
+        ledger[tool] = {
+            "category": columns[1],
+            "cli_counterparts": columns[2],
+            "notes": columns[3],
+        }
+    return ledger
+
+
+def _omitted_cli_families(text: str) -> dict[str, dict[str, str]]:
+    """Parse the ``CLI command families with no MCP tool`` table."""
+    section = _section(
+        text,
+        "**CLI command families with no MCP tool**",
+        "### Scoped-Surface Omission Ledger",
+    )
+    ledger: dict[str, dict[str, str]] = {}
+    for line in section.splitlines():
+        if not line.startswith("| `"):
+            continue
+        columns = [column.strip() for column in line.strip("|").split("|")]
+        if len(columns) < 3:
+            continue
+        family = columns[0].strip("`")
+        ledger[family] = {
+            "tier": columns[1],
+            "reason": columns[2],
         }
     return ledger
 
@@ -373,6 +477,66 @@ class TestMCPDocsContract:
         documented_headings = set(re.findall(r"^#### `([^`]+)`", text, flags=re.MULTILINE))
 
         assert not (STALE_TOOL_NAMES & documented_headings)
+
+    # -- Per-tool ledger  ---------------------------------------------------
+
+    def test_per_tool_mapping_ledger_covers_all_local_tools(self):
+        text = _doc_text()
+        ledger = _tool_mapping_ledger(text)
+        live = set(_registered_tools())
+
+        assert set(ledger) == EXPECTED_TOOLS == live, f"tool-mapping ledger {sorted(ledger)} vs live {sorted(live)}"
+        # No extra rows, no missing rows, and no stale names.
+        assert not (STALE_TOOL_NAMES & set(ledger))
+
+    def test_per_tool_mapping_cli_counterparts_match_expectations(self):
+        ledger = _tool_mapping_ledger(_doc_text())
+
+        for tool, expected_cli_substr in _EXPECTED_TOOL_CLI_MAP.items():
+            cli_cell = ledger[tool]["cli_counterparts"]
+            if expected_cli_substr == "none":
+                assert cli_cell.strip("` ") == "none", f"{tool}: expected none, got {cli_cell!r}"
+            else:
+                assert expected_cli_substr in cli_cell, (
+                    f"{tool}: expected CLI counterpart {expected_cli_substr!r} in {cli_cell!r}"
+                )
+
+    def test_per_tool_mapping_none_is_only_for_mcp_only_conveniences(self):
+        ledger = _tool_mapping_ledger(_doc_text())
+
+        none_tools = {tool for tool, row in ledger.items() if row["cli_counterparts"].strip("` ") == "none"}
+        assert none_tools == {"get_query_details"}
+
+    def test_per_tool_mapping_rows_carry_category_and_notes(self):
+        ledger = _tool_mapping_ledger(_doc_text())
+
+        for tool, row in ledger.items():
+            assert row["category"], f"{tool}: empty category"
+            assert row["notes"], f"{tool}: empty notes"
+
+    def test_omitted_cli_families_carry_exactly_one_ratified_tier(self):
+        ledger = _omitted_cli_families(_doc_text())
+
+        for family, entry in sorted(ledger.items()):
+            assert entry["tier"] in RATIFIED_OMISSION_TIERS, family
+            assert entry["reason"], family
+
+    def test_omitted_cli_families_match_expected_classification(self):
+        ledger = _omitted_cli_families(_doc_text())
+
+        assert set(ledger) >= set(_EXPECTED_OMITTED_CLI_FAMILIES)
+        for family, expected_tier in _EXPECTED_OMITTED_CLI_FAMILIES.items():
+            assert ledger[family]["tier"] == expected_tier, family
+
+    def test_omitted_cli_families_are_not_registered_mcp_tools(self):
+        families = _omitted_cli_families(_doc_text())
+        live_tools = set(_registered_tools())
+
+        # CLI families use ``benchbox <name>`` spelling, not MCP tool names,
+        # so they must not collide with any registered tool name.
+        for family in families:
+            tool_like = family.replace("benchbox ", "").replace("-", "_")
+            assert tool_like not in live_tools, family
 
 
 class TestScopedSurfaceADR:

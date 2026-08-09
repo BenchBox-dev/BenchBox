@@ -331,6 +331,53 @@ one ratified tier reason, defined in
 
 An omission that is absent from this ledger is a defect, not a decision.
 
+### Per-Tool CLI↔MCP Mapping Ledger
+
+Every local MCP tool names its CLI counterpart(s) or `none`. Every CLI command
+family absent from MCP carries exactly one ratified tier tag. Together the two
+tables below cover all 12 local tools and every CLI command family with no MCP
+tool.
+
+**MCP tool → CLI mapping (12 local tools)**
+
+| MCP Tool | Category | CLI counterpart(s) | Notes |
+|---|---|---|---|
+| `list_available` | discovery | `benchbox platforms list`, `benchbox benchmarks list` | Discovery inventory. CLI lists are the authoritative registry read path; MCP exposes the same metadata via registry. |
+| `get_benchmark_info` | discovery | `benchbox benchmarks list` | Single-benchmark metadata, query counts, and scale constraints. CLI `list` is the registry read path; MCP returns enriched per-ID detail via `get_benchmark_info`. |
+| `system_profile` | discovery | `benchbox profile` | Host, CPU, memory, and package facts. |
+| `check_dependencies` | discovery | `benchbox check-deps [platform]` | Dependency availability and install guidance. |
+| `run_benchmark` | execution | `benchbox run` | Scoped subset of `benchbox run`; omission details are in the run-surface ledger below. |
+| `get_query_details` | execution aid | `none` | MCP-only convenience: CLI users read query SQL from the benchmark source tree; MCP returns it structured per platform/mode. |
+| `get_results` | results | `benchbox results`, `benchbox export` | Lists, reads, and exports result bundles; MCP inline-reads while CLI renders to stdout/files and supports cloud export. |
+| `analyze_results` | analytics | `benchbox compare`, `benchbox report`, `benchbox aggregate` | Comparison, regression, trend, and aggregation over result bundles. |
+| `get_query_plan` | analytics | `benchbox show-plan`, `benchbox compare-plans` | Reads captured plans from a result bundle; CLI also renders live plans. |
+| `validate_results` | analytics | `_project/scripts/validate_results.py` | Result JSON integrity and believability checks (`benchbox validate` checks config YAML, not result bundles). |
+| `suggest_charts` | visualization | `benchbox visualize` | Suggests semantic chart types for result files. |
+| `generate_chart` | visualization | `benchbox visualize` | Generates ASCII charts; MCP is inline-only by contract, CLI may write files. |
+
+**CLI command families with no MCP tool**
+
+| CLI command family | Tier | Reason |
+|---|---|---|
+| `benchbox auth` | security-scoped | Hosted credential provisioning and token lifecycle; MCP carries no credential-issuance surface. |
+| `benchbox publish` | security-scoped | Publication writes to an external destination and assigns trust labels; MCP requests do not carry publish authority. |
+| `benchbox submit` | security-scoped | Posts a result bundle to the hosted results platform; remote tenants must not submit on behalf of the server identity. |
+| `benchbox setup` | security-scoped | Interactive credential and connection bootstrap that writes local config and touches filesystem/cloud state. |
+| `benchbox shell` | interaction-scoped | Interactive SQL REPL; interaction has no meaning in a request/response protocol. |
+| `benchbox datagen` | not-yet-demanded | Standalone data generation without a power run; MCP expresses this as `run_benchmark` with `mode=data_only`, so a separate datagen tool is not yet demanded. |
+| `benchbox convert` | not-yet-demanded | Table-format conversion (e.g. parquet → delta); bounded enum, no MCP client has demanded it. |
+| `benchbox tuning` | not-yet-demanded | Tuning template discovery and validation; promotion would be the enum subset (`tuned`/`notuning`/`auto`), not YAML paths. |
+| `benchbox plan-history` | not-yet-demanded | Plan evolution history over multiple runs; bounded read, no client demand yet. |
+| `benchbox download-answers` | security-scoped | Fetches external TPC answer keys from a remote source; network fetch with no tenant budget. |
+| `benchbox metrics` | not-yet-demanded | QphH composite metric calculation; bounded, no MCP client has demanded it. |
+| `benchbox config` / `benchbox validate` (config file) | not-yet-demanded | Config-file syntax and completeness check; file-path input outside the MCP result-registry surface. |
+
+### Scoped-Surface Omission Ledger — `benchbox run` Flags
+
+The section below ledgers every `benchbox run` flag not exposed as an
+`run_benchmark` parameter. The tier taxonomy is shared with the per-tool ledger
+above.
+
 | CLI surface | MCP status | Tier | Reason |
 |---|---|---|---|
 | `--output` | Omitted | security-scoped | Result roots are server configuration (`--results-dir`, env vars). A request must not name a local or cloud write destination. |
