@@ -1111,18 +1111,22 @@ class DryRunExecutor:
         if test_execution_type == "power":
             if benchmark_name == "tpcds":
                 return "TPC-DS PowerTest stream permutation (99 queries in randomized order)"
-            if benchmark_name == "tpch":
+            elif benchmark_name == "tpch":
                 return "TPC-H PowerTest stream permutation (22 queries in a specific, randomized order)"
-            return "Power test execution (stream permutation)"
-        if test_execution_type == "throughput":
+            else:
+                return "Power test execution (stream permutation)"
+        elif test_execution_type == "throughput":
             if benchmark_name == "tpcds":
                 return f"TPC-DS ThroughputTest (4 concurrent streams, {query_count} queries total)"
-            return "Throughput test execution (concurrent streams)"
-        if test_execution_type == "maintenance":
+            else:
+                return "Throughput test execution (concurrent streams)"
+        elif test_execution_type == "maintenance":
             if benchmark_name == "tpcds":
                 return "TPC-DS MaintenanceTest (data operations: INSERT/UPDATE/DELETE)"
-            return "Maintenance test execution (data operations)"
-        return f"Standard sequential execution ({query_count} queries)"
+            else:
+                return "Maintenance test execution (data operations)"
+        else:
+            return f"Standard sequential execution ({query_count} queries)"
 
 
 def preview_benchmark_run(  # noqa: C901
@@ -1201,16 +1205,14 @@ def preview_benchmark_run(  # noqa: C901
                 }
             else:
                 resolved_mode = m_lower
+        elif platform_lower.endswith("-df"):
+            resolved_mode = "dataframe"
         else:
-            # Preserve the dataframe alias when no explicit mode is supplied.
-            # The registry is keyed by the base platform and therefore cannot
-            # retain the ``-df`` suffix's user-visible execution-mode meaning.
+            # Default from registry, fall back to sql.
             try:
-                resolved_mode = (
-                    "dataframe" if platform_lower.endswith("-df") else PlatformRegistry.get_default_mode(base_platform)
-                )
+                resolved_mode = PlatformRegistry.get_default_mode(base_platform)
             except Exception:
-                resolved_mode = "dataframe" if platform_lower.endswith("-df") else "sql"
+                resolved_mode = "sql"
 
         meta = all_benchmarks[benchmark_lower]
         display_name = meta.get("display_name", benchmark_lower.upper())
