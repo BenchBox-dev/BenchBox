@@ -35,10 +35,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Mirrors benchbox/mcp/schemas.py MEMORY_LIMIT_PATTERN. Duplicated rather than
-# imported to keep platforms below surfaces (core < platforms < cli); see
-# duckdb-set-statement-value-hardening.
-_MEMORY_LIMIT_PATTERN = re.compile(r"^(?:[1-9]\d{0,5}(?:\.\d{1,2})?)(?:B|KB|MB|GB|TB)$", re.IGNORECASE)
+# Adapter-level memory-size validation: broader than the MCP request contract
+# (which is intentionally narrow for remote admisson) but still bounded and
+# injection-safe. Accepts DuckDB's documented sizes such as "4GB", "2GiB",
+# "100 MB", "1.5e9", etc., with optional spaces and binary units, while
+# rejecting SQL metacharacters. See duckdb-set-statement-value-hardening.
+_MEMORY_LIMIT_PATTERN = re.compile(
+    r"^\s*[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\s*(?:B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)?\s*$",
+    re.IGNORECASE,
+)
 
 
 def _normalize_duckdb_version(raw_version: Any) -> str | None:
@@ -807,17 +812,17 @@ class DuckDBAdapter(PlatformAdapter):
         # Apply DuckDB settings
         config_applied = []
         if self.memory_limit:
-            conn.execute("SET memory_limit = ?", [self.memory_limit])
+            conn.execute(f"SET memory_limit = '{self.memory_limit}'")
             config_applied.append(f"memory_limit={self.memory_limit}")
             self.log_very_verbose(f"DuckDB memory limit set to: {self.memory_limit}")
 
         if self.max_temp_directory_size:
-            conn.execute("SET max_temp_directory_size = ?", [self.max_temp_directory_size])
+            conn.execute(f"SET max_temp_directory_size = '{self.max_temp_directory_size}'")
             config_applied.append(f"max_temp_directory_size={self.max_temp_directory_size}")
             self.log_very_verbose(f"DuckDB max temp directory size set to: {self.max_temp_directory_size}")
 
         if self.thread_limit is not None:
-            conn.execute("SET threads TO ?", [self.thread_limit])
+            conn.execute(f"SET threads TO {self.thread_limit}")
             config_applied.append(f"threads={self.thread_limit}")
             self.log_very_verbose(f"DuckDB thread limit set to: {self.thread_limit}")
 
