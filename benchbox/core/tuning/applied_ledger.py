@@ -352,7 +352,34 @@ class AppliedTuningLedger:
         return not self.statements and not self.dropped
 
 
-class RecordingConnection:
+class _RecordingProxy:
+    """Shared state and filtering for connection/cursor recording proxies."""
+
+    __slots__ = ("_ledger", "_phase", "_statement_filter")
+
+    def __init__(
+        self,
+        ledger: AppliedTuningLedger,
+        phase: str,
+        statement_filter: Callable[[Any], bool] | None = None,
+    ) -> None:
+        object.__setattr__(self, "_ledger", ledger)
+        object.__setattr__(self, "_phase", phase)
+        object.__setattr__(self, "_statement_filter", statement_filter)
+
+    def _should_record(self, statement: Any) -> bool:
+        if not _is_recordable_statement(statement):
+            return False
+        if self._statement_filter is None:
+            return True
+        try:
+            return bool(self._statement_filter(statement))
+        except Exception as exc:  # capture must never break a run
+            logger.debug("applied-ledger statement filter degraded: %s", exc)
+            return True
+
+
+class RecordingConnection(_RecordingProxy):
     """Transparent proxy that records executed statements into a ledger.
 
     Wraps a real DB connection: ``execute``, ``cursor().execute``, and
@@ -365,7 +392,7 @@ class RecordingConnection:
     session-configuration path, so it sees only tuning-relevant statements.
     """
 
-    __slots__ = ("_conn", "_ledger", "_phase", "_statement_filter")
+    __slots__ = ("_conn",)
 
     def __init__(
         self,
@@ -374,10 +401,8 @@ class RecordingConnection:
         phase: str,
         statement_filter: Callable[[Any], bool] | None = None,
     ) -> None:
+        super().__init__(ledger, phase, statement_filter)
         object.__setattr__(self, "_conn", connection)
-        object.__setattr__(self, "_ledger", ledger)
-        object.__setattr__(self, "_phase", phase)
-        object.__setattr__(self, "_statement_filter", statement_filter)
 
     # -- recorded surface ---------------------------------------------------
     def execute(self, statement: Any, *args: Any, **kwargs: Any) -> Any:
@@ -392,17 +417,6 @@ class RecordingConnection:
             if self._should_record(statement):
                 self._ledger.record(statement, self._phase, status=EXECUTED)
         return result
-
-    def _should_record(self, statement: Any) -> bool:
-        if not _is_recordable_statement(statement):
-            return False
-        if self._statement_filter is None:
-            return True
-        try:
-            return bool(self._statement_filter(statement))
-        except Exception as exc:  # capture must never break a run
-            logger.debug("applied-ledger statement filter degraded: %s", exc)
-            return True
 
     def _run(self, fn: Any, statement: Any, args: tuple, kwargs: dict) -> Any:
         record = self._should_record(statement)
@@ -436,10 +450,10 @@ class RecordingConnection:
         return self._conn
 
 
-class _RecordingCursor:
+class _RecordingCursor(_RecordingProxy):
     """Cursor proxy mirroring :class:`RecordingConnection` for ``cursor.execute``."""
 
-    __slots__ = ("_cur", "_ledger", "_phase", "_statement_filter")
+    __slots__ = ("_cur",)
 
     def __init__(
         self,
@@ -448,21 +462,8 @@ class _RecordingCursor:
         phase: str,
         statement_filter: Callable[[Any], bool] | None = None,
     ) -> None:
+        super().__init__(ledger, phase, statement_filter)
         object.__setattr__(self, "_cur", cursor)
-        object.__setattr__(self, "_ledger", ledger)
-        object.__setattr__(self, "_phase", phase)
-        object.__setattr__(self, "_statement_filter", statement_filter)
-
-    def _should_record(self, statement: Any) -> bool:
-        if not _is_recordable_statement(statement):
-            return False
-        if self._statement_filter is None:
-            return True
-        try:
-            return bool(self._statement_filter(statement))
-        except Exception as exc:  # capture must never break a run
-            logger.debug("applied-ledger cursor filter degraded: %s", exc)
-            return True
 
     def execute(self, statement: Any, *args: Any, **kwargs: Any) -> Any:
         record = self._should_record(statement)
