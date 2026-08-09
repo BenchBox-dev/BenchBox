@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.core.platform_manifest import PLATFORM_MANIFEST_BY_KEY
 from benchbox.core.platform_registry import SUPPORT_STATUS_VALUES, PlatformRegistry
 from benchbox.core.schemas import LibraryInfo
 
@@ -88,8 +89,8 @@ class TestPlatformRegistry:
         assert isinstance(duckdb_spec["libraries"], list)
         assert len(duckdb_spec["libraries"]) > 0
 
-    def test_get_all_platform_metadata_returns_copy(self):
-        """Test that get_all_platform_metadata returns a copy."""
+    def test_get_all_platform_metadata_returns_deeply_isolated_copy(self):
+        """Nested mutations must not poison registry decisions or the manifest."""
         metadata1 = PlatformRegistry.get_all_platform_metadata()
         metadata2 = PlatformRegistry.get_all_platform_metadata()
 
@@ -97,9 +98,56 @@ class TestPlatformRegistry:
         assert metadata1 == metadata2
         assert metadata1 is not metadata2
 
-        # Modifying one shouldn't affect the other
+        # Top-level and nested mutations remain isolated from both cache and manifest.
         metadata1["test"] = "modified"
+        metadata1["duckdb"]["capabilities"]["supports_sql"] = False
+        metadata1["duckdb"]["capabilities"]["default_mode"] = "dataframe"
+        metadata1["duckdb"]["requirements"].append("cache-poison-requirement")
+        metadata1["duckdb"]["libraries"][0]["name"] = "cache-poison-library"
+        metadata1["duckdb"]["supports"].append("cache-poison-feature")
+
         assert "test" not in metadata2
+        fresh = PlatformRegistry.get_all_platform_metadata()["duckdb"]
+        assert fresh["capabilities"]["supports_sql"] is True
+        assert fresh["capabilities"]["default_mode"] == "sql"
+        assert "cache-poison-requirement" not in fresh["requirements"]
+        assert fresh["libraries"][0]["name"] == "duckdb"
+        assert "cache-poison-feature" not in fresh["supports"]
+        assert PlatformRegistry.supports_mode("duckdb", "sql") is True
+        assert PlatformRegistry.get_default_mode("duckdb") == "sql"
+
+        manifest_entry = PLATFORM_MANIFEST_BY_KEY["duckdb"]
+        assert manifest_entry.capabilities["supports_sql"] is True
+        assert manifest_entry.capabilities["default_mode"] == "sql"
+        assert "cache-poison-requirement" not in manifest_entry.metadata["requirements"]
+        assert manifest_entry.metadata["libraries"][0]["name"] == "duckdb"
+
+    def test_sibling_metadata_getters_return_isolated_nested_lists(self):
+        """PlatformInfo and PlatformCapability must not leak cache-owned lists."""
+        info = PlatformRegistry.get_platform_info("duckdb")
+        capabilities = PlatformRegistry.get_platform_capabilities("duckdb")
+        assert info is not None
+        assert capabilities is not None
+
+        info.requirements.append("info-poison-requirement")
+        info.supports.append("info-poison-feature")
+        capabilities.deployment_modes["local"].dependencies.append("capability-poison-dependency")
+
+        fresh_info = PlatformRegistry.get_platform_info("duckdb")
+        fresh_capabilities = PlatformRegistry.get_platform_capabilities("duckdb")
+        assert fresh_info is not None
+        assert fresh_capabilities is not None
+        assert "info-poison-requirement" not in fresh_info.requirements
+        assert "info-poison-feature" not in fresh_info.supports
+        assert "capability-poison-dependency" not in fresh_capabilities.deployment_modes["local"].dependencies
+
+        fresh_metadata = PlatformRegistry.get_all_platform_metadata()["duckdb"]
+        assert "info-poison-requirement" not in fresh_metadata["requirements"]
+        assert "info-poison-feature" not in fresh_metadata["supports"]
+        assert (
+            "capability-poison-dependency"
+            not in fresh_metadata["capabilities"]["deployment_modes"]["local"]["dependencies"]
+        )
 
     @patch("benchbox.core.platform_registry.importlib.import_module")
     def test_detect_library_success(self, mock_import):

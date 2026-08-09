@@ -13,6 +13,7 @@ import argparse
 import importlib
 from collections import Counter
 from collections.abc import Iterable
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
@@ -475,11 +476,11 @@ class PlatformRegistry:
             libraries=libraries,
             available=available,
             enabled=available and canonical_name in cls._adapters,
-            requirements=platform_spec["requirements"],
+            requirements=deepcopy(platform_spec["requirements"]),
             installation_command=platform_spec["installation_command"],
             adoption=platform_spec.get("adoption", "niche"),
             category=platform_spec.get("category", "database"),
-            supports=platform_spec.get("supports", []),
+            supports=deepcopy(platform_spec.get("supports", [])),
             driver_package=driver_package,
         )
 
@@ -617,20 +618,25 @@ class PlatformRegistry:
         cls._availability_cache = None
 
     @classmethod
-    def get_all_platform_metadata(cls) -> dict[str, dict[str, Any]]:
-        """Get all platform metadata for CLI use.
-
-        Returns:
-            Dictionary mapping platform names to their metadata
-        """
+    def _get_cached_platform_metadata(cls) -> dict[str, dict[str, Any]]:
+        """Return the internal metadata cache for read-only registry decisions."""
         if not cls._platform_metadata:
             cls._platform_metadata = cls._build_platform_metadata()
-        return cls._platform_metadata.copy()
+        return cls._platform_metadata
+
+    @classmethod
+    def get_all_platform_metadata(cls) -> dict[str, dict[str, Any]]:
+        """Get a fully isolated mutable copy of all platform metadata.
+
+        Returns:
+            Dictionary mapping platform names to independently mutable metadata.
+        """
+        return deepcopy(cls._get_cached_platform_metadata())
 
     @classmethod
     def get_platform_support_status(cls, platform_name: str) -> Optional[SupportStatus]:
         """Return the registry support status for a platform."""
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         canonical_name = cls.resolve_platform_name(platform_name)
         platform_spec = metadata.get(canonical_name)
         if platform_spec is None:
@@ -643,13 +649,13 @@ class PlatformRegistry:
         if status not in SUPPORT_STATUS_VALUES:
             raise ValueError(f"Unknown support_status {status!r}. Expected one of: {', '.join(SUPPORT_STATUS_VALUES)}")
 
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         return sorted(name for name, spec in metadata.items() if spec["support_status"] == status)
 
     @classmethod
     def get_platform_count_summary(cls) -> dict[str, Any]:
         """Return registry-derived platform counts for docs drift checks."""
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         status_counts = Counter(spec["support_status"] for spec in metadata.values())
         category_counts = Counter(spec.get("category", "unknown") for spec in metadata.values())
         sql_capable = sum(1 for spec in metadata.values() if spec.get("capabilities", {}).get("supports_sql", False))
@@ -780,8 +786,8 @@ class PlatformRegistry:
                 default_for_platform=mode_spec.get("default_for_platform", False),
                 display_name=mode_spec.get("display_name", ""),
                 description=mode_spec.get("description", ""),
-                dependencies=mode_spec.get("dependencies", []),
-                auth_methods=mode_spec.get("auth_methods", []),
+                dependencies=deepcopy(mode_spec.get("dependencies", [])),
+                auth_methods=deepcopy(mode_spec.get("auth_methods", [])),
             )
 
         # unsupported_benchmarks is computed from registry benchmark_gate rules;
@@ -907,7 +913,7 @@ class PlatformRegistry:
     @classmethod
     def get_self_hosted_platforms(cls, *, include_deprecated: bool = False) -> list[str]:
         """Return platforms with at least one self-hosted deployment mode."""
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         out: list[str] = []
         for name, spec in metadata.items():
             if not include_deprecated and spec.get("support_status") in {"deprecated", "document_only"}:
@@ -924,7 +930,7 @@ class PlatformRegistry:
         *,
         include_deprecated: bool = False,
     ) -> list[str]:
-        metadata = cls.get_all_platform_metadata()
+        metadata = cls._get_cached_platform_metadata()
         out: list[str] = []
         for name, spec in metadata.items():
             if not include_deprecated and spec.get("support_status") in {"deprecated", "document_only"}:
