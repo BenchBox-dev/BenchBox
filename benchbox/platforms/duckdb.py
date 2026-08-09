@@ -36,12 +36,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Adapter-level memory-size validation: broader than the MCP request contract
-# (which is intentionally narrow for remote admisson) but still bounded and
-# injection-safe. Accepts DuckDB's documented sizes such as "4GB", "2GiB",
-# "100 MB", "1.5e9", etc., with optional spaces and binary units, while
-# rejecting SQL metacharacters. See duckdb-set-statement-value-hardening.
+# (which is intentionally narrow for remote admission) but still bounded and
+# injection-safe. Accepts DuckDB's supported decimal and binary spellings,
+# including long-form decimal units, optional spaces, and scientific notation,
+# while rejecting SQL metacharacters. See duckdb-set-statement-value-hardening.
+_DUCKDB_MEMORY_SIZE_PATTERN = (
+    r"\s*[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\s*"
+    r"(?:B|bytes?|K|KB|kilobytes?|M|MB|megabytes?|G|GB|gigabytes?|T|TB|terabytes?|KiB|MiB|GiB|TiB)\s*"
+)
 _MEMORY_LIMIT_PATTERN = re.compile(
-    r"^\s*[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\s*(?:B|KB|MB|GB|TB|KiB|MiB|GiB|TiB)?\s*$",
+    rf"^{_DUCKDB_MEMORY_SIZE_PATTERN}$",
+    re.IGNORECASE,
+)
+_MAX_TEMP_DIRECTORY_SIZE_PATTERN = re.compile(
+    rf"^(?:{_DUCKDB_MEMORY_SIZE_PATTERN}|90%\s+of\s+available\s+disk\s+space)$",
     re.IGNORECASE,
 )
 
@@ -680,8 +688,10 @@ class DuckDBAdapter(PlatformAdapter):
         self.memory_limit = raw_memory
         raw_temp = config.get("max_temp_directory_size")
         if raw_temp is not None:
-            if not isinstance(raw_temp, str) or not _MEMORY_LIMIT_PATTERN.fullmatch(raw_temp):
-                raise ValueError("max_temp_directory_size must use a bounded memory size (e.g., '4GB')")
+            if not isinstance(raw_temp, str) or not _MAX_TEMP_DIRECTORY_SIZE_PATTERN.fullmatch(raw_temp):
+                raise ValueError(
+                    "max_temp_directory_size must use a DuckDB size (e.g., '4GB' or '90% of available disk space')"
+                )
         self.max_temp_directory_size = raw_temp
         raw_threads = config.get("thread_limit")
         if raw_threads is not None:
@@ -810,14 +820,21 @@ class DuckDBAdapter(PlatformAdapter):
             )
 
         # Apply DuckDB settings
+        from benchbox.platforms.base.data_loading import escape_sql_string_literal
+
         config_applied = []
         if self.memory_limit:
-            conn.execute(f"SET memory_limit = '{self.memory_limit}'")
+            # DuckDB does not support parameters in SET statements. Keep the
+            # value a string literal, with the adapter-level whitelist above
+            # providing the validation boundary and escaping as defense in depth.
+            memory_limit = escape_sql_string_literal(str(self.memory_limit))
+            conn.execute(f"SET memory_limit = '{memory_limit}'")
             config_applied.append(f"memory_limit={self.memory_limit}")
             self.log_very_verbose(f"DuckDB memory limit set to: {self.memory_limit}")
 
         if self.max_temp_directory_size:
-            conn.execute(f"SET max_temp_directory_size = '{self.max_temp_directory_size}'")
+            max_temp_directory_size = escape_sql_string_literal(str(self.max_temp_directory_size))
+            conn.execute(f"SET max_temp_directory_size = '{max_temp_directory_size}'")
             config_applied.append(f"max_temp_directory_size={self.max_temp_directory_size}")
             self.log_very_verbose(f"DuckDB max temp directory size set to: {self.max_temp_directory_size}")
 
