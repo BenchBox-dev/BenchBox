@@ -15,7 +15,6 @@ For real benchmark execution, `benchbox/cli/commands/run.py` delegates to:
 1. `BenchmarkOrchestrator.execute_benchmark(...)` in `benchbox/cli/orchestrator.py`
 2. `run_benchmark_lifecycle(...)` in `benchbox/core/runner/runner.py`
 
-`benchbox/cli/execution_pipeline.py` is not the default path used by `run.py`.
 
 ## Branch Matrix (`benchbox/cli/commands/run.py`)
 
@@ -36,13 +35,12 @@ For real benchmark execution, `benchbox/cli/commands/run.py` delegates to:
 
 These blocks are the target for unification in the refactor.
 
-## Metadata Wiring Gap Identified
+## Metadata Wiring Gap — Resolved
 
-Driver/runtime metadata enrichment currently exists in `ExecutionEngine._enrich_driver_metadata(...)`
-inside `benchbox/cli/execution_pipeline.py`.
-
-Because `run.py` executes through orchestrator/lifecycle, metadata wired only in pipeline code may be
-missing from real exported CLI artifacts unless enrichment is moved to canonical post-processing.
+Driver/runtime metadata enrichment previously existed in `ExecutionEngine._enrich_driver_metadata(...)`
+and was wired only in `benchbox/cli/execution_pipeline.py`. With the pipeline module deleted
+(`benchbox/cli/execution_pipeline.py` removed, `ExecutionPipeline`/`ExecutionEngine` no longer retained),
+enrichment now runs on the canonical path via `benchbox/core/run_service.py::execute_run` → `apply_driver_metadata(...)` (see `benchbox/core/results/driver_metadata.py`), so all run modes inherit it.
 
 ## Refactor Baseline Decisions
 
@@ -74,5 +72,4 @@ missing from real exported CLI artifacts unless enrichment is moved to canonical
 - Unified non-dry-run execution through shared run-command helpers:
   - `_execute_orchestrated_run(...)`
   - `_export_orchestrated_result(...)`
-- `ExecutionPipeline` is retained as a compatibility module and test surface, not the behavior-authoritative
-  runtime path for `benchbox run`.
+- Deleted `benchbox/cli/execution_pipeline.py` (`ExecutionPipeline`/`ExecutionEngine`) — it was superseded by `benchbox/core/run_service.py::execute_run` + `run_benchmark_lifecycle(...)`; enrichment and export are now on the canonical path (see *Single-Path Architecture* above).

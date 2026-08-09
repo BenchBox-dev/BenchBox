@@ -345,7 +345,9 @@ def register_benchmark_tools(
             else:
                 _populate_sql_query_details(response, benchmark_lower, normalized_id, platform)
 
-            response["complexity_hints"] = _get_query_complexity_hints(benchmark_lower, normalized_id)
+            from benchbox.core.query_hints import get_query_complexity_hints as _core_hints
+
+            response["complexity_hints"] = _core_hints(benchmark_lower, normalized_id)
             response["benchmark_info"] = _build_query_details_benchmark_info(benchmark_lower, meta)
 
             return response
@@ -671,175 +673,48 @@ def _dry_run_impl(
     queries: str | None,
     mode: str | None,
 ) -> dict[str, Any]:
-    """Preview what a benchmark run would do without executing."""
-    from benchbox.core.dryrun import DryRunExecutor
-    from benchbox.core.platform_registry import PlatformRegistry
-    from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig
-    from benchbox.core.system import SystemProfiler
+    """Preview what a benchmark run would do without executing.
 
-    try:
+    Delegates to :func:`benchbox.core.dryrun.preview_benchmark_run` (core-owned).
+    """
+    from benchbox.core.dryrun import preview_benchmark_run
+
+    result = preview_benchmark_run(platform, benchmark, scale_factor, queries, mode)
+
+    # Preserve MCP error shape for benchmark-not-found (uses make_not_found_error).
+    if result.get("status") == "error" and "not found" in str(result.get("error", "")).lower():
         benchmark_lower = benchmark.lower()
         all_benchmarks = get_all_benchmarks()
-
         if benchmark_lower not in all_benchmarks:
             error_response = make_not_found_error("benchmark", benchmark, available=list(all_benchmarks.keys()))
             error_response["status"] = "error"
             return error_response
 
-        platform_lower = platform.lower()
-        base_platform = platform_lower.replace("-df", "")
-        platform_info = PlatformRegistry.get_platform_info(base_platform)
-
-        warnings: list[str] = []
-        if platform_info is None:
-            warnings.append(f"Unknown platform: {platform}")
-        elif not platform_info.available:
-            warnings.append(f"Platform '{platform}' dependencies not installed: {platform_info.installation_command}")
-
-        resolved_mode, mode_error = _validate_and_resolve_mode(platform, mode)
-        if mode_error:
-            mode_error["status"] = "error"
-            return mode_error
-
-        meta = all_benchmarks[benchmark_lower]
-        display_name = meta.get("display_name", benchmark_lower.upper())
-
-        benchmark_config = BenchmarkConfig(
-            name=benchmark_lower,
-            display_name=display_name,
-            scale_factor=scale_factor,
-            queries=[q.strip() for q in queries.split(",")] if queries else None,
-        )
-
-        database_config = DatabaseConfig(
-            type=platform_lower,
-            name=f"mcp_dryrun_{platform_lower}",
-            execution_mode=resolved_mode,
-        )
-
-        profiler = SystemProfiler()
-        system_profile = profiler.get_system_profile()
-
-        executor = DryRunExecutor(output_dir=None)
-        result = executor.execute_dry_run(benchmark_config, system_profile, database_config)
-
-        warnings.extend(result.warnings)
-
-        response: dict[str, Any] = {
-            "status": "dry_run",
-            "platform": platform,
-            "benchmark": benchmark,
-            "scale_factor": scale_factor,
-            "execution_mode": result.execution_mode,
-        }
-
-        if result.query_preview:
-            query_ids = result.query_preview.get("queries", [])
-            response["execution_plan"] = {
-                "phases": ["load", "power"],
-                "total_queries": result.query_preview.get("query_count", 0),
-                "query_ids": query_ids[:30],
-                "query_ids_truncated": len(query_ids) > 30,
-            }
-
-        if result.estimated_resources:
-            data_size_mb = result.estimated_resources.get("estimated_data_size_mb", 0)
-            response["resource_estimates"] = {
-                "data_size_gb": round(data_size_mb / 1024, 2),
-                "memory_recommended_gb": max(2, round(data_size_mb / 1024 * 2, 1)),
-            }
-
-        if warnings:
-            response["warnings"] = warnings
-
-        return response
-
-    except Exception as e:
-        logger.error("Dry run failed (%s)", type(e).__name__)
-        error_response = make_error(
-            ErrorCode.INTERNAL_ERROR,
-            f"Dry run failed: {e}",
-            details={"exception_type": type(e).__name__},
+    # Map VALIDATION_UNSUPPORTED_MODE from core through MCP error envelope so
+    # the error has the canonical suggestion/shape from make_unsupported_mode_error.
+    if result.get("error_code") == "VALIDATION_UNSUPPORTED_MODE":
+        details = result.get("details", {})
+        error_response = make_unsupported_mode_error(
+            details.get("platform", platform),
+            details.get("requested_mode", mode or "unknown"),
+            details.get("supported_modes", []),
         )
         error_response["status"] = "error"
         return error_response
 
+    # Map core INTERNAL_ERROR to MCP error envelope when the core fell through
+    # to a generic exception (preserves previous behaviour and error codes).
+    if result.get("status") == "error" and result.get("error_code") == "INTERNAL_ERROR":
+        if "error" in result and "not found" not in str(result["error"]).lower():
+            error_response = make_error(
+                ErrorCode.INTERNAL_ERROR,
+                result.get("error", "Dry run failed"),
+                details=result.get("details", {}),
+            )
+            error_response["status"] = "error"
+            return error_response
 
-def _validate_platform_config(
-    platform: str, platform_lower: str, base_platform: str, errors: list[str], warnings: list[str]
-) -> Any:
-    """Validate platform availability and return platform info."""
-    from benchbox.core.platform_registry import PlatformRegistry
-
-    info = PlatformRegistry.get_platform_info(base_platform)
-    if info is None:
-        errors.append(f"Unknown platform: {platform}")
-    elif not info.available:
-        errors.append(f"Platform '{platform}' dependencies not installed: {info.installation_command}")
-
-    cloud_platforms = ["snowflake", "bigquery", "databricks", "redshift"]
-    if base_platform in cloud_platforms:
-        warnings.append(f"Cloud platform '{platform}' requires credential configuration")
-
-    return info
-
-
-def _validate_mode_config(
-    mode: str | None, platform: str, base_platform: str, info: Any, errors: list[str]
-) -> str | None:
-    """Validate and resolve execution mode."""
-    from benchbox.core.platform_registry import PlatformRegistry
-
-    if mode is None:
-        return PlatformRegistry.get_default_mode(base_platform)
-
-    mode_lower = mode.lower()
-    if mode_lower in ("datagen", "generate"):
-        mode_lower = "data_only"
-
-    if mode_lower not in ("sql", "dataframe", "data_only"):
-        errors.append(f"Invalid mode: {mode}. Must be 'sql', 'dataframe', or 'data_only'")
-        return None
-
-    if mode_lower == "data_only":
-        return "data_only"
-
-    if info is not None and not PlatformRegistry.supports_mode(base_platform, mode_lower):
-        supported = [m for m in ["sql", "dataframe"] if PlatformRegistry.supports_mode(base_platform, m)]
-        supported.append("data_only")
-        errors.append(f"Platform '{platform}' doesn't support {mode_lower} mode. Supported: {', '.join(supported)}")
-        return None
-
-    return mode_lower
-
-
-def _validate_benchmark_config(
-    benchmark: str,
-    benchmark_lower: str,
-    scale_factor: float,
-    platform_lower: str,
-    errors: list[str],
-    warnings: list[str],
-) -> None:
-    """Validate benchmark name, scale factor, and dataframe compatibility."""
-    from benchbox.platforms import is_dataframe_platform
-
-    all_benchmarks = get_all_benchmarks()
-
-    if benchmark_lower not in all_benchmarks:
-        errors.append(f"Unknown benchmark: {benchmark}. Available: {', '.join(all_benchmarks.keys())}")
-    else:
-        meta = all_benchmarks[benchmark_lower]
-        min_scale = meta.get("min_scale", 0.01)
-        if scale_factor < min_scale:
-            warnings.append(f"{benchmark} requires scale factor >= {min_scale}")
-        if is_dataframe_platform(platform_lower) and not meta.get("supports_dataframe", False):
-            errors.append(f"DataFrame mode does not support {benchmark} benchmark")
-
-    if scale_factor <= 0:
-        errors.append(f"Scale factor must be positive, got: {scale_factor}")
-    elif scale_factor < 0.01:
-        warnings.append(f"Scale factor {scale_factor} is very small")
+    return result
 
 
 def _validate_config_impl(
@@ -848,28 +723,10 @@ def _validate_config_impl(
     scale_factor: float,
     mode: str | None,
 ) -> dict[str, Any]:
-    """Validate a benchmark configuration before running."""
-    errors: list[str] = []
-    warnings: list[str] = []
+    """Validate a benchmark configuration before running (core-owned)."""
+    from benchbox.core.validation.config import validate_config as _core_validate
 
-    platform_lower = platform.lower()
-    base_platform = platform_lower.replace("-df", "")
-
-    info = _validate_platform_config(platform, platform_lower, base_platform, errors, warnings)
-    resolved_mode = _validate_mode_config(mode, platform, base_platform, info, errors)
-
-    benchmark_lower = benchmark.lower()
-    _validate_benchmark_config(benchmark, benchmark_lower, scale_factor, platform_lower, errors, warnings)
-
-    return {
-        "valid": len(errors) == 0,
-        "platform": platform,
-        "benchmark": benchmark,
-        "scale_factor": scale_factor,
-        "execution_mode": resolved_mode,
-        "errors": errors,
-        "warnings": warnings,
-    }
+    return _core_validate(platform, benchmark, scale_factor, mode)
 
 
 def _resolve_query_details_mode(platform: str | None, mode: str | None) -> str:
@@ -1015,100 +872,3 @@ def _populate_sql_query_details(
         else:
             response["sql"] = query_sql
             response["sql_truncated"] = False
-
-
-def _get_query_complexity_hints(benchmark: str, query_id: str) -> dict[str, Any]:
-    """Get complexity hints for a specific query."""
-    tpch_hints: dict[str, dict[str, Any]] = {
-        "1": {"type": "aggregation", "tables": ["lineitem"], "complexity": "simple", "joins": 0},
-        "2": {
-            "type": "correlated_subquery",
-            "tables": ["part", "supplier", "partsupp", "nation", "region"],
-            "complexity": "complex",
-            "joins": 5,
-        },
-        "3": {
-            "type": "join_aggregate",
-            "tables": ["customer", "orders", "lineitem"],
-            "complexity": "medium",
-            "joins": 2,
-        },
-        "4": {"type": "exists_subquery", "tables": ["orders", "lineitem"], "complexity": "medium", "joins": 1},
-        "5": {
-            "type": "multi_join",
-            "tables": ["customer", "orders", "lineitem", "supplier", "nation", "region"],
-            "complexity": "complex",
-            "joins": 5,
-        },
-        "6": {"type": "scan_filter", "tables": ["lineitem"], "complexity": "simple", "joins": 0},
-        "7": {
-            "type": "multi_join",
-            "tables": ["supplier", "lineitem", "orders", "customer", "nation"],
-            "complexity": "complex",
-            "joins": 6,
-        },
-        "8": {
-            "type": "multi_join",
-            "tables": ["part", "supplier", "lineitem", "orders", "customer", "nation", "region"],
-            "complexity": "complex",
-            "joins": 7,
-        },
-        "9": {
-            "type": "multi_join",
-            "tables": ["part", "supplier", "lineitem", "partsupp", "orders", "nation"],
-            "complexity": "complex",
-            "joins": 5,
-        },
-        "10": {
-            "type": "join_aggregate",
-            "tables": ["customer", "orders", "lineitem", "nation"],
-            "complexity": "medium",
-            "joins": 3,
-        },
-        "11": {
-            "type": "having_subquery",
-            "tables": ["partsupp", "supplier", "nation"],
-            "complexity": "medium",
-            "joins": 2,
-        },
-        "12": {"type": "case_aggregate", "tables": ["orders", "lineitem"], "complexity": "medium", "joins": 1},
-        "13": {"type": "outer_join", "tables": ["customer", "orders"], "complexity": "medium", "joins": 1},
-        "14": {"type": "case_aggregate", "tables": ["lineitem", "part"], "complexity": "simple", "joins": 1},
-        "15": {"type": "view_with_max", "tables": ["lineitem", "supplier"], "complexity": "medium", "joins": 1},
-        "16": {
-            "type": "distinct_aggregate",
-            "tables": ["partsupp", "part", "supplier"],
-            "complexity": "medium",
-            "joins": 2,
-        },
-        "17": {"type": "correlated_subquery", "tables": ["lineitem", "part"], "complexity": "complex", "joins": 1},
-        "18": {
-            "type": "having_subquery",
-            "tables": ["customer", "orders", "lineitem"],
-            "complexity": "complex",
-            "joins": 3,
-        },
-        "19": {"type": "or_predicates", "tables": ["lineitem", "part"], "complexity": "medium", "joins": 1},
-        "20": {
-            "type": "exists_subquery",
-            "tables": ["supplier", "nation", "partsupp", "part", "lineitem"],
-            "complexity": "complex",
-            "joins": 4,
-        },
-        "21": {
-            "type": "not_exists",
-            "tables": ["supplier", "lineitem", "orders", "nation"],
-            "complexity": "complex",
-            "joins": 4,
-        },
-        "22": {"type": "not_exists", "tables": ["customer", "orders"], "complexity": "complex", "joins": 1},
-    }
-
-    if benchmark == "tpch" and query_id in tpch_hints:
-        return tpch_hints[query_id]
-
-    return {
-        "type": "unknown",
-        "complexity": "unknown",
-        "note": f"Complexity hints not available for {benchmark} query {query_id}",
-    }

@@ -62,6 +62,7 @@ COMMANDS = frozenset(
 )
 
 GLOBAL_VALUE_OPTIONS = frozenset({"--actor", "--db", "--project-id", "--repository"})
+OFFLINE_FINDING_SUBCOMMANDS = frozenset({"create", "candidates"})
 
 
 def _repo_root() -> Path:
@@ -100,6 +101,12 @@ def _has_database_environment() -> bool:
 
 def _has_config_json(root: Path) -> bool:
     return (root / ".todo-db" / "config.json").is_file()
+
+
+def _is_offline_finding_command(args: list[str], command_index: int, command: str) -> bool:
+    """Return whether a finding command only reads or writes local drafts."""
+    subcommand = args[command_index + 1] if command_index + 1 < len(args) else None
+    return command == "finding" and subcommand in OFFLINE_FINDING_SUBCOMMANDS
 
 
 def _with_identity(argv: list[str], command_index: int) -> list[str]:
@@ -339,7 +346,7 @@ def _main(argv: list[str] | None = None) -> int:
         # Refuse loudly if no DB is configured via env, --db, or config.json; honor config.json as configured.
         # w5: doctor without DB must diagnose no-backend-configured, not refuse exit-2.
         has_db = _has_database_environment() or _has_option(args, "--db") or _has_config_json(root)
-        if not has_db and command != "doctor":
+        if not has_db and command != "doctor" and not _is_offline_finding_command(args, command_index, command):
             print(
                 f"error: standalone shim cannot route '{command}' without explicit --db, TODO_DB_PATH/URL, or .todo-db/config.json; refusing to create fork DB at {root / '.todo-db' / 'todo.sqlite'}",
                 file=sys.stderr,

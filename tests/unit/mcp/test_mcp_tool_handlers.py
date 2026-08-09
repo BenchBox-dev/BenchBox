@@ -260,7 +260,7 @@ class TestFutureSupportStatusVisibilityInvariants:
     def test_dataframe_routing_uses_capability_not_support_status(self):
         """DataFrame validation must read supports_dataframe, not infer from support tier."""
         from benchbox.core import benchmark_registry
-        from benchbox.mcp.tools.benchmark import _validate_benchmark_config
+        from benchbox.core.validation.config import validate_benchmark_config as _validate_benchmark_config
 
         fixtures = {
             "x_experimental_df": _future_benchmark_meta("experimental", "public", supports_dataframe=True),

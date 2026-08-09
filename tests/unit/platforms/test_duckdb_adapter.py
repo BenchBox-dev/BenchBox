@@ -48,6 +48,28 @@ class TestDuckDBAdapter:
             assert adapter.thread_limit is None
             assert adapter.enable_progress_bar is False
 
+    @pytest.mark.parametrize("value", ["2GiB", "2 GB", "2 gigabytes", "2e3 MB", "976.5 KiB"])
+    def test_initialization_accepts_duckdb_memory_size_syntax(self, value):
+        """Direct adapter configuration must preserve DuckDB's supported spellings."""
+        with patch("benchbox.platforms.duckdb.duckdb"):
+            adapter = DuckDBAdapter(memory_limit=value, max_temp_directory_size=value)
+
+        assert adapter.memory_limit == value
+        assert adapter.max_temp_directory_size == value
+
+    def test_initialization_accepts_duckdb_default_temp_size_expression(self):
+        with patch("benchbox.platforms.duckdb.duckdb"):
+            adapter = DuckDBAdapter(max_temp_directory_size="90% of available disk space")
+
+        assert adapter.max_temp_directory_size == "90% of available disk space"
+
+    @pytest.mark.parametrize("value", ["2", "2 tebibytes", "2GB'; DROP TABLE results; --", "/tmp/secret"])
+    def test_initialization_rejects_invalid_or_unsafe_memory_size(self, value):
+        """Invalid SET values must fail before they can reach SQL construction."""
+        with patch("benchbox.platforms.duckdb.duckdb"):
+            with pytest.raises(ValueError, match="memory_limit"):
+                DuckDBAdapter(memory_limit=value)
+
     def test_create_external_tables_uses_read_parquet_views(self, tmp_path):
         """External mode should create views over read_parquet() sources."""
         with patch("benchbox.platforms.duckdb.duckdb"):
