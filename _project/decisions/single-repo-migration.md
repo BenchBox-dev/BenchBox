@@ -382,3 +382,16 @@ local fallback.
 - **`main` only** (extension to A3): `.todo-db/`.
 
 This amendment is authoritative for the release-curation guard.
+
+## Amendment 2026-08-08 — modular Make runtime on release branches
+
+The modular Make implementation lives in the top-level `make/` directory.
+`Makefile` uses mandatory includes, so this directory is required runtime on
+both `develop` and curated release branches; it is not internal `_project`
+tooling.
+
+- **`main` only** (extension to A3): `make/`.
+
+Release curation continues to remove `_project/` in full. Keeping the Make
+modules, contract inventory, historical migration proof, and inventory checker
+together under `make/` preserves a self-contained released Make interface.

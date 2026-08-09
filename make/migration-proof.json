@@ -10,6 +10,9 @@
     "added_phony_targets": [
       "makefile-inventory-check"
     ],
+    "added_release_curated_tests": [
+      "tests/unit/scripts/test_check_complexity.py"
+    ],
     "added_targets": [
       "makefile-inventory-check"
     ],
@@ -18,20 +21,20 @@
     ],
     "help_recipe_line": "\t@echo \"  make makefile-inventory-check Verify public Make contract inventory and ordering\"",
     "include_order": [
-      "_project/make/platform-tests.mk",
-      "_project/make/documentation.mk",
-      "_project/make/worktrees.mk",
-      "_project/make/worktree-pool.mk",
-      "_project/make/worktree-maintenance.mk",
-      "_project/make/help.mk"
+      "make/platform-tests.mk",
+      "make/documentation.mk",
+      "make/worktrees.mk",
+      "make/worktree-pool.mk",
+      "make/worktree-maintenance.mk",
+      "make/help.mk"
     ]
   },
   "reviewed_split": {
-    "contract_sha256": "c1be9689a64db5ff90793add95b74fd7d5cf7e1a28682480da5f6605ac885b93",
+    "contract_sha256": "e9a205513e47049054ffbc583626b567d52190e1be802e80e5e8b980928aecd7",
     "default_goal": "test",
     "normalized_semantic_sha256": "02033fa486629ed64b0a0ba9a67ca64d22daeff03097d4e067b3298d6f6dbbf9",
     "public_target_count": 196,
-    "semantic_sha256": "0fd077e47ce0d29a059b1d9aad4f8da1ad3503ce6229ed9405220071d4462ccc",
+    "semantic_sha256": "5a41de9f3c3ae72946e9043eb6247655e591d31071b814a78dac2f269a188425",
     "target_count": 199
   },
   "schema_version": 1

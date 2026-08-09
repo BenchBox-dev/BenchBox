@@ -99,11 +99,6 @@ release/archive/
 
 # Exclude everything in _project/ except TODO files and marketing/launch docs
 _project/*
-!_project/make/
-!_project/make/*.mk
-!_project/make/inventory.json
-!_project/make/migration-proof.json
-!_project/make/monolith-baseline.json
 !_project/MARKETING_*.md
 !_project/LAUNCH_*.md
 !_project/CONTENT_*.md

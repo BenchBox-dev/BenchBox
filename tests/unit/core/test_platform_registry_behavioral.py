@@ -9,6 +9,7 @@ import copy
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -30,6 +31,12 @@ from benchbox.core.platform_registry import (
 from benchbox.platforms.base import PlatformAdapter
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+PLATFORM_MANIFEST_GENERATOR = Path(__file__).resolve().parents[3] / "_project" / "scripts" / "platform_manifest.py"
+requires_dev_manifest_generator = pytest.mark.skipif(
+    not PLATFORM_MANIFEST_GENERATOR.is_file(),
+    reason="platform-manifest drift checks require development-only _project tooling",
+)
 
 EXPECTED_CLI_ALIASES = {
     "azure-synapse": "synapse",
@@ -630,15 +637,17 @@ raise SystemExit('optional SDKs loaded: ' + ', '.join(loaded) if loaded else 0)
         with pytest.raises(ValueError, match="defaults to unsupported SQL mode"):
             _load_manifest(json.dumps(payload))
 
+    @requires_dev_manifest_generator
     def test_generated_inventory_and_semantic_surfaces_are_current(self):
         result = subprocess.run(
-            [sys.executable, "_project/scripts/platform_manifest.py", "--check"],
+            [sys.executable, str(PLATFORM_MANIFEST_GENERATOR), "--check"],
             capture_output=True,
             text=True,
             check=False,
         )
         assert result.returncode == 0, result.stderr or result.stdout
 
+    @requires_dev_manifest_generator
     def test_dataframe_availability_typo_is_detected_and_restoration_passes(self, monkeypatch):
         import benchbox.platforms as platform_package
         from _project.scripts.platform_manifest import validate_platform_surfaces

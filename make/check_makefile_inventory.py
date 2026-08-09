@@ -12,21 +12,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
-MANIFEST_PATH = Path("_project/make/inventory.json")
-BASELINE_PATH = Path("_project/make/monolith-baseline.json")
-MIGRATION_PROOF_PATH = Path("_project/make/migration-proof.json")
+MANIFEST_PATH = Path("make/inventory.json")
+BASELINE_PATH = Path("make/monolith-baseline.json")
+MIGRATION_PROOF_PATH = Path("make/migration-proof.json")
 SCHEMA_VERSION = 2
 MIGRATION_PROOF_SCHEMA_VERSION = 1
 RESERVED_ROOT_VARIABLE = "BENCHBOX_MAKEFILE_ROOT"
 EXPECTED_INCLUDE_ORDER = [
-    "_project/make/platform-tests.mk",
-    "_project/make/documentation.mk",
-    "_project/make/worktrees.mk",
-    "_project/make/worktree-pool.mk",
-    "_project/make/worktree-maintenance.mk",
-    "_project/make/help.mk",
+    "make/platform-tests.mk",
+    "make/documentation.mk",
+    "make/worktrees.mk",
+    "make/worktree-pool.mk",
+    "make/worktree-maintenance.mk",
+    "make/help.mk",
 ]
 INVENTORY_TARGET = "makefile-inventory-check"
+ADDED_RELEASE_CURATED_TESTS = [
+    "tests/unit/scripts/test_check_complexity.py",
+]
 HELP_RECIPE_LINE = '\t@echo "  make makefile-inventory-check Verify public Make contract inventory and ordering"'
 INCLUDE_RE = re.compile(r"^include\s+(.+?)\s*$")
 VARIABLE_RE = re.compile(r"^(?:(override)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*([:+?]?=)(.*)$")
@@ -235,6 +238,9 @@ def _normalized_current_statements(inventory: dict[str, Any]) -> list[dict[str, 
             body = body.replace(f" {INVENTORY_TARGET}", "")
         if statement["kind"] == "rule" and statement.get("targets") == ["help"]:
             body = body.replace(f"\n{HELP_RECIPE_LINE}", "")
+        if statement["kind"] == "rule" and statement.get("targets") == ["release-cut"]:
+            for path in ADDED_RELEASE_CURATED_TESTS:
+                body = body.replace(f" {path}", "")
         statement["body"] = body
         statement["sha256"] = _digest(body.splitlines())
         normalized.append(statement)
@@ -250,6 +256,41 @@ def _normalized_help_rule(records: list[dict[str, str]]) -> list[dict[str, str]]
         record["recipe_sha256"] = _digest(recipe.splitlines())
         normalized.append(record)
     return normalized
+
+
+def _normalized_release_rule(records: list[dict[str, str]]) -> list[dict[str, str]]:
+    normalized = []
+    for raw in records:
+        record = dict(raw)
+        recipe = record["recipe"]
+        for path in ADDED_RELEASE_CURATED_TESTS:
+            recipe = recipe.replace(f" {path}", "")
+        record["recipe"] = recipe
+        record["recipe_sha256"] = _digest(recipe.splitlines())
+        normalized.append(record)
+    return normalized
+
+
+def _compare_baseline_rules(baseline: dict[str, Any], current: dict[str, Any]) -> list[str]:
+    problems: list[str] = []
+    for target, records in baseline["rules"].items():
+        current_records = current["rules"].get(target, [])
+        if target == "help":
+            current_records = _normalized_help_rule(current_records)
+        if target == "release-cut":
+            current_records = _normalized_release_rule(current_records)
+        if current_records != records:
+            problems.append(f"rule {target} changed from monolith")
+    expected_inventory_rule = [
+        {
+            "header": f"{INVENTORY_TARGET}:",
+            "recipe": "\tuv run -- python make/check_makefile_inventory.py",
+            "recipe_sha256": _digest(["\tuv run -- python make/check_makefile_inventory.py"]),
+        }
+    ]
+    if current["rules"].get(INVENTORY_TARGET) != expected_inventory_rule:
+        problems.append("inventory guard rule differs from the reviewed addition")
+    return problems
 
 
 def compare_migration(root: Path, actual: dict[str, Any] | None = None) -> list[str]:
@@ -302,20 +343,7 @@ def compare_migration(root: Path, actual: dict[str, Any] | None = None) -> list[
     if current["macros"] != baseline["macros"]:
         problems.append("define macro bodies changed from monolith")
 
-    for target, records in baseline["rules"].items():
-        current_records = current["rules"].get(target, [])
-        if target == "help":
-            current_records = _normalized_help_rule(current_records)
-        if current_records != records:
-            problems.append(f"rule {target} changed from monolith")
-    if current["rules"].get(INVENTORY_TARGET) != [
-        {
-            "header": f"{INVENTORY_TARGET}:",
-            "recipe": "\tuv run -- python _project/scripts/check_makefile_inventory.py",
-            "recipe_sha256": _digest(["\tuv run -- python _project/scripts/check_makefile_inventory.py"]),
-        }
-    ]:
-        problems.append("inventory guard rule differs from the reviewed addition")
+    problems.extend(_compare_baseline_rules(baseline, current))
 
     if _normalized_current_statements(current) != baseline["semantic_statements"]:
         problems.append("semantic statement order or content changed from monolith")
@@ -346,6 +374,7 @@ def build_migration_proof(baseline: dict[str, Any], extracted: dict[str, Any]) -
             "added_targets": [INVENTORY_TARGET],
             "added_phony_targets": [INVENTORY_TARGET],
             "added_variables": [RESERVED_ROOT_VARIABLE],
+            "added_release_curated_tests": ADDED_RELEASE_CURATED_TESTS,
             "include_order": EXPECTED_INCLUDE_ORDER,
             "help_recipe_line": HELP_RECIPE_LINE,
         },
@@ -386,6 +415,7 @@ def validate_migration_proof(root: Path) -> list[str]:
         "added_targets": [INVENTORY_TARGET],
         "added_phony_targets": [INVENTORY_TARGET],
         "added_variables": [RESERVED_ROOT_VARIABLE],
+        "added_release_curated_tests": ADDED_RELEASE_CURATED_TESTS,
         "include_order": EXPECTED_INCLUDE_ORDER,
         "help_recipe_line": HELP_RECIPE_LINE,
     }
@@ -467,7 +497,7 @@ def compare_inventory(root: Path) -> list[str]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--write", action="store_true")
     mode.add_argument("--verify-migration", action="store_true")

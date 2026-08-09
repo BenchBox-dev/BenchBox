@@ -15,7 +15,7 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SCRIPT = REPO_ROOT / "_project" / "scripts" / "check_makefile_inventory.py"
+SCRIPT = REPO_ROOT / "make" / "check_makefile_inventory.py"
 
 
 def _load_module() -> ModuleType:
@@ -29,7 +29,7 @@ def _load_module() -> ModuleType:
 
 def _copy_make_contract(destination: Path) -> None:
     shutil.copy2(REPO_ROOT / "Makefile", destination / "Makefile")
-    shutil.copytree(REPO_ROOT / "_project" / "make", destination / "_project" / "make")
+    shutil.copytree(REPO_ROOT / "make", destination / "make")
 
 
 def _run_make(root: Path, *arguments: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -75,15 +75,15 @@ def test_public_target_removal_fails_closed(tmp_path: Path) -> None:
 def test_required_include_removal_fails_closed(tmp_path: Path) -> None:
     module = _load_module()
     _copy_make_contract(tmp_path)
-    (tmp_path / "_project" / "make" / "help.mk").unlink()
+    (tmp_path / "make" / "help.mk").unlink()
 
-    assert module.compare_inventory(tmp_path) == ["required Make include is missing: _project/make/help.mk"]
+    assert module.compare_inventory(tmp_path) == ["required Make include is missing: make/help.mk"]
 
 
 def test_semantic_assignment_reorder_fails_and_changes_gnu_make_evaluation(tmp_path: Path) -> None:
     module = _load_module()
     _copy_make_contract(tmp_path)
-    platform_makefile = tmp_path / "_project" / "make" / "platform-tests.mk"
+    platform_makefile = tmp_path / "make" / "platform-tests.mk"
     original = "CONTAINER_ENGINE ?= docker\nCOMPOSE := $(CONTAINER_ENGINE) compose"
     reordered = "COMPOSE := $(CONTAINER_ENGINE) compose\nCONTAINER_ENGINE ?= docker"
     text = platform_makefile.read_text(encoding="utf-8")
@@ -107,7 +107,7 @@ def test_writer_blesses_intentional_future_target_without_rewriting_migration_pr
 ) -> None:
     module = _load_module()
     _copy_make_contract(tmp_path)
-    maintenance = tmp_path / "_project" / "make" / "worktree-maintenance.mk"
+    maintenance = tmp_path / "make" / "worktree-maintenance.mk"
     maintenance.write_text(
         maintenance.read_text(encoding="utf-8")
         + "\n.PHONY: future-contract-probe\nfuture-contract-probe:\n\t@echo future\n",

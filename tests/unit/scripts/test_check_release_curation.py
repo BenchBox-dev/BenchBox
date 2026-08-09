@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,6 +22,14 @@ spec = importlib.util.spec_from_file_location("check_release_curation", SCRIPT_P
 check_release_curation = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(check_release_curation)
+
+CURATED_PROJECT_DEPENDENT_TESTS = {
+    "tests/unit/scripts/test_check_complexity.py",
+}
+RELEASE_SAFE_PROJECT_TESTS = {
+    "tests/unit/scripts/test_check_makefile_inventory.py",
+    "tests/unit/core/test_platform_registry_behavioral.py",
+}
 
 
 def _write_makefile(tmp_path: Path, recipe_lines: list[str]) -> Path:
@@ -75,3 +86,88 @@ def test_real_makefile_curation_list_parses_to_paths_only():
     assert paths, "expected a non-empty curation list from the repo Makefile"
     flags = {p for p in paths if p.startswith("-")}
     assert not flags, f"parser leaked flags into the curation list: {sorted(flags)}"
+
+
+def test_release_make_runtime_is_main_only_not_curated() -> None:
+    main_only = check_release_curation.parse_main_only_allowlist(
+        REPO_ROOT / "_project" / "decisions" / "single-repo-migration.md"
+    )
+    curated = check_release_curation.parse_curation_list(REPO_ROOT / "Makefile")
+
+    assert "make" in main_only
+    assert "make" not in curated
+
+
+def _copy_curated_make_runtime(destination: Path) -> None:
+    shutil.copy2(REPO_ROOT / "Makefile", destination / "Makefile")
+    shutil.copytree(REPO_ROOT / "make", destination / "make")
+
+
+def test_curated_release_make_runtime_executes_help_and_inventory(tmp_path: Path) -> None:
+    _copy_curated_make_runtime(tmp_path)
+
+    help_result = subprocess.run(
+        ["make", "--no-print-directory", "help"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    inventory_result = subprocess.run(
+        ["make", "--no-print-directory", "makefile-inventory-check"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert help_result.returncode == 0, help_result.stderr
+    assert "makefile-inventory-check" in help_result.stdout
+    assert inventory_result.returncode == 0, inventory_result.stderr
+    assert "Makefile inventory OK: 199 targets, 196 public, default=test" in inventory_result.stdout
+
+
+def test_curated_release_make_runtime_fails_closed_when_module_is_omitted(tmp_path: Path) -> None:
+    _copy_curated_make_runtime(tmp_path)
+    (tmp_path / "make" / "help.mk").unlink()
+
+    result = subprocess.run(
+        ["make", "--no-print-directory", "help"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "make/help.mk" in result.stderr
+    assert "No such file or directory" in result.stderr
+
+
+def test_curated_release_removes_dangling_project_test_and_runs_retained_tests(
+    tmp_path: Path,
+) -> None:
+    curated = check_release_curation.parse_curation_list(REPO_ROOT / "Makefile")
+    assert curated >= CURATED_PROJECT_DEPENDENT_TESTS
+    assert curated.isdisjoint(RELEASE_SAFE_PROJECT_TESTS)
+
+    _copy_curated_make_runtime(tmp_path)
+    shutil.copytree(REPO_ROOT / "benchbox", tmp_path / "benchbox")
+    retained_tests = []
+    for relative in sorted(RELEASE_SAFE_PROJECT_TESTS):
+        retained_test = tmp_path / relative
+        retained_test.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / relative, retained_test)
+        retained_tests.append(str(retained_test))
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", *retained_tests],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "passed" in result.stdout
+    assert "2 skipped" in result.stdout
