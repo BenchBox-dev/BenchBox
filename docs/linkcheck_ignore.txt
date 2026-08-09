@@ -33,3 +33,10 @@ https://jfly\.uni-koeln\.de/.*
 
 # NO_COLOR spec host: unresolvable from CI runners (DNS NameResolutionError)
 https://no-color\.org/.*
+
+# AWS documentation rejects automated CI requests with HTTP 403 (Redshift and
+# S3 pages); the links remain visible in the rendered documentation.
+https://docs\.aws\.amazon\.com/(redshift|s3)/.*
+
+# H2O documentation rejects automated CI requests with HTTP 403.
+https://docs\.h2o\.ai/.*
