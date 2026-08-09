@@ -1,17 +1,48 @@
 """Deprecated run-official compatibility command."""
 
+import contextlib
+import functools
 import sys
+from collections.abc import Iterator
 
 import click
 
 from benchbox.cli.commands.run import PlatformOptionParamType, run
 from benchbox.cli.composite_params import ValidationConfig
+from benchbox.cli.orchestrator import BenchmarkOrchestrator
 from benchbox.cli.shared import console
 from benchbox.core.run_service import (
     TPC_ALLOWED_SCALE_FACTORS,
     validate_stream_count,
     validate_tpc_scale_factor,
 )
+
+
+@contextlib.contextmanager
+def _forward_requested_streams(streams: int | None) -> Iterator[None]:
+    """Temporarily forward a requested stream count through the legacy seam.
+
+    ``run-official`` now passes ``concurrency`` directly to ``run``.  Keep this
+    narrow context manager for callers and tests that used the historical
+    compatibility seam while the deprecated command is still importable.
+    """
+    if not streams:
+        yield
+        return
+
+    original = BenchmarkOrchestrator.execute_benchmark
+
+    @functools.wraps(original)
+    def _patched(self, *args, **kwargs):
+        config = args[0] if args else kwargs["config"]
+        config.concurrency = streams
+        return original(self, *args, **kwargs)
+
+    BenchmarkOrchestrator.execute_benchmark = _patched
+    try:
+        yield
+    finally:
+        BenchmarkOrchestrator.execute_benchmark = original
 
 
 @click.command("run-official", hidden=True, deprecated=True)
