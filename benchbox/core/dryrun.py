@@ -1134,6 +1134,27 @@ class DryRunExecutor:
 
         return ddl_preview, post_load_statements
 
+    def _get_execution_context(self, benchmark_config: BenchmarkConfig, query_count: int) -> str:
+        """Describe the execution context represented by a dry-run preview."""
+        test_execution_type = getattr(benchmark_config, "test_execution_type", "standard")
+        benchmark_name = getattr(benchmark_config, "name", "").lower()
+
+        if test_execution_type == "power":
+            if benchmark_name == "tpcds":
+                return "TPC-DS PowerTest stream permutation (99 queries in randomized order)"
+            if benchmark_name == "tpch":
+                return "TPC-H PowerTest stream permutation (22 queries in a specific, randomized order)"
+            return "Power test execution (stream permutation)"
+        if test_execution_type == "throughput":
+            if benchmark_name == "tpcds":
+                return f"TPC-DS ThroughputTest (4 concurrent streams, {query_count} queries total)"
+            return "Throughput test execution (concurrent streams)"
+        if test_execution_type == "maintenance":
+            if benchmark_name == "tpcds":
+                return "TPC-DS MaintenanceTest (data operations: INSERT/UPDATE/DELETE)"
+            return "Maintenance test execution (data operations)"
+        return f"Standard sequential execution ({query_count} queries)"
+
 
 def preview_benchmark_run(  # noqa: C901
     platform: str,
@@ -1212,11 +1233,15 @@ def preview_benchmark_run(  # noqa: C901
             else:
                 resolved_mode = m_lower
         else:
-            # Default from registry, fall back to sql.
+            # Preserve the dataframe alias when no explicit mode is supplied.
+            # The registry is keyed by the base platform and therefore cannot
+            # retain the ``-df`` suffix's user-visible execution-mode meaning.
             try:
-                resolved_mode = PlatformRegistry.get_default_mode(base_platform)
+                resolved_mode = (
+                    "dataframe" if platform_lower.endswith("-df") else PlatformRegistry.get_default_mode(base_platform)
+                )
             except Exception:
-                resolved_mode = "sql"
+                resolved_mode = "dataframe" if platform_lower.endswith("-df") else "sql"
 
         meta = all_benchmarks[benchmark_lower]
         display_name = meta.get("display_name", benchmark_lower.upper())
@@ -1279,27 +1304,3 @@ def preview_benchmark_run(  # noqa: C901
             "error_code": "INTERNAL_ERROR",
             "details": {"exception_type": type(e).__name__},
         }
-
-    def _get_execution_context(self, benchmark_config: BenchmarkConfig, query_count: int) -> str:
-        test_execution_type = getattr(benchmark_config, "test_execution_type", "standard")
-        benchmark_name = getattr(benchmark_config, "name", "").lower()
-
-        if test_execution_type == "power":
-            if benchmark_name == "tpcds":
-                return "TPC-DS PowerTest stream permutation (99 queries in randomized order)"
-            elif benchmark_name == "tpch":
-                return "TPC-H PowerTest stream permutation (22 queries in a specific, randomized order)"
-            else:
-                return "Power test execution (stream permutation)"
-        elif test_execution_type == "throughput":
-            if benchmark_name == "tpcds":
-                return f"TPC-DS ThroughputTest (4 concurrent streams, {query_count} queries total)"
-            else:
-                return "Throughput test execution (concurrent streams)"
-        elif test_execution_type == "maintenance":
-            if benchmark_name == "tpcds":
-                return "TPC-DS MaintenanceTest (data operations: INSERT/UPDATE/DELETE)"
-            else:
-                return "Maintenance test execution (data operations)"
-        else:
-            return f"Standard sequential execution ({query_count} queries)"
