@@ -69,21 +69,21 @@ cd <WORKTREE_PATH>
 make agent-write-preflight
 ```
 
-`worktree-claim` pins your identity to the claimed worktree via
-`git config --worktree`; that outranks the shared config, so a later write
-there cannot reauthor it.
+`worktree-claim` pins your identity via `git config --worktree`, outranking
+the shared config so a later write there cannot reauthor it.
 
-Stop if `git rev-parse --show-toplevel` is the primary clone. Emergency writes
-there require explicit user authorization and
-`BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`. Preserve unrelated dirty work. Never use
-destructive Git/filesystem commands without explicit approval. Use `rg`, and
-stage only authorized paths; never `git add -A`.
+Stop if `git rev-parse --show-toplevel` is the primary clone; emergency writes
+there need explicit user authorization plus `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`.
+Preserve unrelated dirty work; never use destructive Git/filesystem commands
+without approval. Use `rg`; stage only authorized paths; never `git add -A`.
 
-A disposable clone — a remote agent session, a CI runner — has no canonical
-clone to protect and no pool to claim from, so it declares
-`BENCHBOX_EPHEMERAL_CLONE=1` instead of the emergency override. That declaration
-is ignored wherever a pool exists, so it cannot weaken the guard on a machine
-that uses one.
+A disposable clone (remote agent session, CI runner) has no canonical clone or
+pool; it declares `BENCHBOX_EPHEMERAL_CLONE=1` instead of the emergency
+override — ignored wherever a pool exists, so it cannot weaken that guard.
+
+Never run `git worktree prune`/`gc`/`make worktree-prune` inside a container
+mounting `.git` — host registrations read prunable there and pruning destroys
+them. Worktrees stay locked; unlock only for safe removal; `make worktree-lock-all` re-locks.
 
 ## Tooling and implementation
 
