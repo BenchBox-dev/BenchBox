@@ -485,6 +485,29 @@ def test_standalone_finding_sync_still_requires_db(monkeypatch: pytest.MonkeyPat
     assert compat.main(["finding", "sync"]) == 0
 
 
+@pytest.mark.parametrize("subcommand", ["create", "candidates"])
+def test_standalone_offline_finding_commands_do_not_require_db(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, subcommand: str
+) -> None:
+    """Offline finding capture/listing must delegate without inventing a DB."""
+    calls: list[tuple[list[str], str]] = []
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        calls.append((argv, command))
+        return CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    monkeypatch.delenv("TODO_DB_URL", raising=False)
+
+    assert compat.main(["finding", subcommand]) == 0
+    assert calls[0][1] == "finding"
+    assert "--db" not in calls[0][0]
+    assert not (tmp_path / ".todo-db" / "todo.sqlite").exists()
+
+
 def test_env_passthrough_includes_finding_drafts_and_ro_token(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """w4: TODO_DB_FINDING_DRAFTS_DIR and TODO_DB_RO_AUTH_TOKEN are forwarded via _delegate env."""
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
