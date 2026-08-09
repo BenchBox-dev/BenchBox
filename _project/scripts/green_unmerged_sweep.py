@@ -114,19 +114,16 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from auto_merge_soundness_paths import any_soundness_path  # noqa: E402
+from required_lane import (  # noqa: E402
+    REQUIRED_CHECK_NAMES,
+    is_check_run_success,
+    is_required_lane_green,
+    latest_check_run,
+)
 
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "green_unmerged_fixture.json"
 
 DEFAULT_REPO = "joeharris76/BenchBox"
-# Develop ruleset `develop-squash-only` required status contexts.
-# Pin must match docs/operations/repo-admin-settings.md and the live
-# ruleset (id 15611785). Partial membership is incomplete green.
-# Prefer this constant over re-deriving from path-filters or workflow
-# names: ruleset contexts are the merge gate, not subordinate jobs.
-REQUIRED_CHECK_NAMES: tuple[str, ...] = (
-    "ci-required-result",
-    "Results Explorer browser gate",
-)
 GRACE_PERIOD_HOURS = 2.0
 API_ROOT = "https://api.github.com"
 DEVELOP_POST_MERGE_WORKFLOW = "develop-post-merge.yml"
@@ -184,43 +181,11 @@ class ClassifiedPR:
 
 
 def _parse_iso(value: str) -> dt.datetime:
-    # GitHub timestamps are RFC3339 with a trailing "Z".
-    return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    # Re-export for fixture/tests that import via the sweep module. Real logic
+    # lives in required_lane to keep timestamp handling consistent.
+    from required_lane import _parse_iso as _rl_parse_iso
 
-
-def latest_check_run(check_runs: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
-    """Return the latest check run for *name*, if present.
-
-    A re-run can leave multiple same-named runs on one SHA; pick the most
-    recently started so a stale conclusion never wins.
-    """
-    matches = [run for run in check_runs if run.get("name") == name]
-    if not matches:
-        return None
-    return max(matches, key=lambda run: run.get("started_at") or "")
-
-
-def is_check_run_success(run: dict[str, Any] | None) -> bool:
-    """True when *run* completed with conclusion ``success`` (not skipped/neutral)."""
-    if run is None:
-        return False
-    return run.get("status") == "completed" and run.get("conclusion") == "success"
-
-
-def is_required_lane_green(check_runs: list[dict[str, Any]]) -> bool:
-    """True when every develop-ruleset required context is latest-success.
-
-    Partial green (e.g. ``ci-required-result`` success but browser gate
-    missing or red) returns False. Missing runs are fail-closed not-green;
-    the browser gate always reports on develop PRs (success when the
-    explorer suite is not needed).
-    """
-    if not REQUIRED_CHECK_NAMES:
-        return False
-    for name in REQUIRED_CHECK_NAMES:
-        if not is_check_run_success(latest_check_run(check_runs, name)):
-            return False
-    return True
+    return _rl_parse_iso(value)
 
 
 def is_soundness_gated(changed_files: list[str]) -> bool:
