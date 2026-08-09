@@ -12,6 +12,7 @@ internally; no `parallel=True` knob anywhere.
 from __future__ import annotations
 
 import datetime as _dt
+import hashlib
 import json
 import signal
 import subprocess
@@ -856,6 +857,29 @@ def _accounting_for_gate_summary(report_summary: Any, execute_outcome: Any) -> g
     )
 
 
+def _artifact_digest(path: Path) -> str | None:
+    """sha256 hex of *path*'s bytes, or None when absent.
+
+    Computed at artifact-write time in the sweep process, so a later
+    tamper of the file on disk produces a different digest at gate-check
+    recomputation time. Absence is an honest value (e.g. an aborted sweep
+    before its accounting sidecar was written), not an error, so it is not
+    treated as a mismatch when recomputation also sees absence."""
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def _collect_artifact_digests(log_dir: Path) -> dict[str, str | None]:
+    """Digests for the three stage artifacts gate-check binds (w1)."""
+    return {
+        "cells_jsonl": _artifact_digest(log_dir / "cells.jsonl"),
+        "accounting_sidecar": _artifact_digest(log_dir / "cells.jsonl.accounting.json"),
+        "lifecycle_log": _artifact_digest(log_dir / "uat_lifecycle.log"),
+    }
+
+
 def _write_gate_summary_artifact(
     *,
     config: UATConfig,
@@ -894,6 +918,7 @@ def _write_gate_summary_artifact(
         cross_scale_floor=(report_summary.cross_scale_floor if report_summary is not None else None),
         cross_scale_floor_breached=(report_summary.cross_scale_floor_breached if report_summary is not None else None),
         explorer_smoke_status=explorer_smoke_status,
+        artifact_digests=_collect_artifact_digests(log_dir),
         verdict=gate_summary.derive_verdict(
             dry_run=config.dry_run,
             aborted=aborted_phase is not None,
