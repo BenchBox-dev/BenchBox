@@ -161,12 +161,15 @@ def pandas_ctx():
     pytest.importorskip("pandas")
     import pandas as pd
 
+    # Align synthetic dates with FLIGHTDATA_DEFAULT_PARAMS (2024-12-01/2025-01-01)
+    # so DataFrame queries with default window return rows. Previously 2018
+    # matched the old hardcoded default and now would be filtered out.
     flights = pd.DataFrame(
         {
             "flight_id": range(1, 11),
-            "flight_date": [date(2018, 1, i) for i in range(1, 11)],
-            "year": [2018] * 10,
-            "month": [1] * 10,
+            "flight_date": [date(2024, 12, i) for i in range(1, 11)],
+            "year": [2024] * 10,
+            "month": [12] * 10,
             "day_of_month": list(range(1, 11)),
             "day_of_week": [1, 2, 3, 4, 5, 6, 7, 1, 2, 3],
             "reporting_airline": ["AA", "AA", "DL", "DL", "UA", "UA", "WN", "WN", "B6", "B6"],
@@ -257,7 +260,7 @@ def polars_ctx():
         pl.DataFrame(
             {
                 "flight_id": range(1, 11),
-                "flight_date": [date(2018, 1, i) for i in range(1, 11)],
+                "flight_date": [date(2024, 12, i) for i in range(1, 11)],
                 "month": [1, 2, 3, 4, 5, 6, 7, 11, 12, 12],
                 "day_of_month": [1, 2, 3, 4, 26, 6, 4, 24, 24, 31],
                 "day_of_week": [1, 2, 3, 4, 1, 6, 7, 4, 1, 2],
