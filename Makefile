@@ -2073,10 +2073,16 @@ worktree-release-locked:
 		state=$$(gh pr view "$$branch" --json state --jq .state 2>/dev/null || true); \
 		[ "$$state" = "MERGED" ] || { echo "Refusing: PR for $$branch is not MERGED; open or close PR first, or rerun with FORCE=1."; exit 1; }; \
 	fi; \
-	git checkout --detach origin/develop; \
 	git fetch origin develop --quiet; \
+	if [ "$(FORCE)" = "1" ]; then \
+		git reset --hard HEAD; \
+		git clean -fdx -e .benchbox >/dev/null; \
+	fi; \
+	git checkout --detach origin/develop; \
 	git reset --hard origin/develop; \
-	git branch -D "$$branch"; \
+	if [ -n "$$branch" ]; then \
+		case "$$branch" in develop|main|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
+	fi; \
 	git remote prune origin; \
 	rm -rf "$$top/.venv"; \
 	echo "Released $$branch; worktree is detached at origin/develop (.venv cleared; next claim will re-sync)."
@@ -2274,9 +2280,12 @@ worktree-pool-reset-locked:
 		[ "$$answer" = "RESET" ] || { echo "Aborted."; exit 1; }; \
 	fi; \
 	git -C "$$wt" fetch origin develop --quiet; \
+	if [ "$(FORCE)" = "1" ]; then \
+		git -C "$$wt" reset --hard HEAD; \
+		git -C "$$wt" clean -fdx -e .benchbox >/dev/null; \
+	fi; \
 	git -C "$$wt" checkout --detach origin/develop; \
 	git -C "$$wt" reset --hard origin/develop; \
-	if [ "$(FORCE)" = "1" ]; then git -C "$$wt" clean -fdx -e .benchbox >/dev/null; fi; \
 	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
 		case "$$branch" in develop|main|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
 	fi; \

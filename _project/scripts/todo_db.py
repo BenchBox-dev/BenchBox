@@ -580,10 +580,35 @@ def _load_config_url() -> str | None:
         raise TodoError(f"todo backend config {path}: 'url' must be a non-empty string")
     url = _normalize_url(raw)
     if not _is_hosted_url(url):
-        raise TodoError(
-            f"todo backend config {path}: 'url' must be a libsql:// or https:// hosted URL, got {url!r}"
-        )
+        raise TodoError(f"todo backend config {path}: 'url' must be a libsql:// or https:// hosted URL, got {url!r}")
     return _require_secure_url(url)
+
+
+def _try_turso_token_auto_mint() -> tuple[str | None, str | None]:
+    """Mint only a token for the already-known hosted backend via turso CLI.
+
+    Used when ``.todo-db/config.json`` supplies a URL but no token is present.
+    Mirrors the error-class contract of ``_try_turso_auto_provision``.
+    """
+    if not shutil.which("turso"):
+        return None, None
+    name = _turso_db_name()
+    try:
+        tokens = subprocess.run(
+            ["turso", "db", "tokens", "create", name, "--expiration", "1d"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=15,
+        )
+        if tokens.returncode != 0:
+            return None, "token-create-failed"
+        token = tokens.stdout.strip()
+        if not token:
+            return None, "token-empty"
+        return token, None
+    except (OSError, subprocess.SubprocessError):
+        return None, "turso-error"
 
 
 def _try_turso_auto_provision() -> tuple[tuple[str, str] | None, str | None]:
@@ -676,10 +701,26 @@ def _resolve_backend(explicit: str | None) -> tuple[Path | str, bool, bool, str 
         return _normalize_url(env_url), False, False, None
     config_url = _load_config_url()
     if config_url:
-        # Selected hosted backend (same class as TODO_DB_URL). Token still
-        # comes from TODO_DB_AUTH_TOKEN; missing token surfaces through the
-        # existing connect/auth failure paths. Do not auto-mint here --
-        # full auto-provision (URL+token) only runs when no URL is known.
+        # Selected hosted backend (same class as TODO_DB_URL). If a token is
+        # already present we return immediately. If not but the maintainer's
+        # turso CLI is logged in, auto-mint a short-lived token for this
+        # config URL (env-only, never written to disk) so a configured-hosted
+        # checkout does not require a manual `turso db tokens create` every
+        # shell. This extends the sanctioned local provisioning to the
+        # "config URL but no token" case without changing the plaintext-URL
+        # refusal or the env-only token posture.
+        if _auth_token():
+            return config_url, False, False, None
+        token_only, token_failure = _try_turso_token_auto_mint()
+        if token_only:
+            os.environ["TODO_DB_AUTH_TOKEN"] = token_only
+            return config_url, False, True, None
+        # Token mint failed — fall through to the existing auth-failure path
+        # but preserve the mint failure reason so the caller can surface a
+        # sharper diagnostic if desired. Returning the config URL (not local
+        # fallback) ensures the missing-token error remains the primary signal.
+        if token_failure:
+            return config_url, False, False, token_failure
         return config_url, False, False, None
     provisioned, provision_failure = _try_turso_auto_provision()
     if provisioned:
@@ -1601,9 +1642,7 @@ def run_doctor(
     # a batch run that silently used it would write real work to a throwaway DB.
     if hosted:
         backend_detail = (
-            "hosted (auto-provisioned via turso CLI, URL withheld)"
-            if auto_provisioned
-            else "hosted (URL withheld)"
+            "hosted (auto-provisioned via turso CLI, URL withheld)" if auto_provisioned else "hosted (URL withheld)"
         )
         identity_status, identity_detail = (
             ("OK", "hosted backend auto-provisioned via turso CLI")
@@ -1742,9 +1781,7 @@ def _preconnect_command(
 
     if implicit_default_local and _command_mutates_tracker(args):
         provision_note = (
-            f" (turso auto-provision was attempted but failed: {provision_failure})"
-            if provision_failure
-            else ""
+            f" (turso auto-provision was attempted but failed: {provision_failure})" if provision_failure else ""
         )
         print(
             "error: refusing to write through the implicit local fallback"
@@ -2245,9 +2282,7 @@ def _update_metadata_fields(
     return changes
 
 
-def _update_edit_work(
-    conn: sqlite3.Connection, item_id: str, edits: dict[str, str]
-) -> dict[str, dict[str, str]]:
+def _update_edit_work(conn: sqlite3.Connection, item_id: str, edits: dict[str, str]) -> dict[str, dict[str, str]]:
     work_edited: dict[str, dict[str, str]] = {}
     for wid, summary in edits.items():
         unit = _require_unit(conn, item_id, wid)
@@ -2268,9 +2303,7 @@ def _update_edit_work(
     return work_edited
 
 
-def _update_add_work(
-    conn: sqlite3.Connection, item_id: str, adds: list[dict[str, Any]]
-) -> list[dict[str, Any]]:
+def _update_add_work(conn: sqlite3.Connection, item_id: str, adds: list[dict[str, Any]]) -> list[dict[str, Any]]:
     wid_rows = conn.execute("SELECT wid FROM work_units WHERE item_id = ?", (item_id,))
     wids = {row["wid"] for row in wid_rows}
     work_added: list[dict[str, Any]] = []
@@ -3604,6 +3637,7 @@ def lint_item(conn: sqlite3.Connection, item_id: str, *, item: dict[str, Any] | 
         findings.extend(_missing_scope_test_files(item))
     return findings
 
+
 # ---------------------------------------------------------------------------
 # Export
 
@@ -4607,13 +4641,32 @@ def _cmd_import_yaml(conn, actor, args):
 def _parse_work_flag(specs: list[str]) -> list[dict[str, Any]]:
     work = []
     for spec in specs:
-        parts = spec.split(":", 2)
-        if len(parts) < 2:
+        # Split WID from the rest on the first colon; summary may contain colons.
+        if ":" not in spec:
             raise TodoError(f"--work expects WID:SUMMARY[:needs=...], got {spec!r}")
-        needs = []
-        if len(parts) == 3 and parts[2].startswith("needs="):
-            needs = [n for n in parts[2][len("needs=") :].split(",") if n]
-        work.append({"id": parts[0], "summary": parts[1], "needs": needs})
+        wid, rest = spec.split(":", 1)
+        if not WID_RE.match(wid):
+            raise TodoError(f"invalid work-unit id {wid!r} (expect w0..w999)")
+        if not rest:
+            raise TodoError(f"--work expects WID:SUMMARY[:needs=...], got {spec!r} (empty summary)")
+        # Needs clause is a trailing ":needs=..." — split on the LAST occurrence
+        # so colons inside the summary survive (e.g. "w0:Fix foo: bar:needs=w1").
+        if ":needs=" in rest:
+            head, tail = rest.rsplit(":needs=", 1)
+            # rsplit always reconstructs, no need to re-validate.
+            summary = head
+            needs = [n for n in tail.split(",") if n]
+            if not summary:
+                raise TodoError(f"--work expects WID:SUMMARY[:needs=...], got {spec!r} (empty summary)")
+        else:
+            summary = rest
+            needs = []
+            # Old code silently truncated at the second colon and dropped the tail
+            # unless it was "needs=". That was silent data loss. Now the whole
+            # tail is preserved as summary, so "w0:a:b:c" is summary "a:b:c" — no
+            # error needed. Only an explicit ambiguous ":needs=" fragment without
+            # the colon prefix is impossible here because we already handled it.
+        work.append({"id": wid, "summary": summary, "needs": needs})
     return work
 
 
@@ -4925,6 +4978,17 @@ def _cmd_check_scope(conn, actor, args):
     # had never looked at. Say what actually happened instead.
     if not item["scope"]:
         print(f"SCOPE_UNCHECKED: no scope rules on {args.id!r}; {len(files)} changed file(s) were not checked")
+        return 1 if getattr(args, "strict", False) else 0
+
+    # Zero-file diff is not "scope OK" — it means nothing was compared. This
+    # happens when check-scope is run before committing, or when the shim
+    # resolves the wrong tree/branch (main clone vs worktree), or when --base
+    # points at the wrong ref. Report what was compared and fail under --strict.
+    if not files:
+        base_desc = args.base if args.base else "HEAD"
+        print(
+            f"SCOPE_UNCHECKED: no changed files vs {base_desc!r} ({len(files)} file(s)); diff was empty or targeted the wrong branch"
+        )
         return 1 if getattr(args, "strict", False) else 0
 
     violations = check_paths(files, item["scope"])

@@ -70,6 +70,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from auto_merge_soundness_paths import any_soundness_path  # noqa: E402
+from required_lane import (  # noqa: E402
+    REQUIRED_CHECK_NAMES,
+    _parse_iso,
+    is_check_run_success,  # noqa: F401 - re-exported for compat
+    is_required_lane_green,
+    latest_check_run,
+)
 
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "soundness_drain_fixture.json"
 
@@ -79,20 +86,6 @@ FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "soundness_drain_fixture.json"
 OWNER_LOGIN = "joeharris76"
 
 DEFAULT_REPO = "joeharris76/BenchBox"
-# Develop ruleset `develop-squash-only` required status contexts. Pin must
-# match docs/operations/repo-admin-settings.md and the live ruleset
-# (id 15611785). Partial membership is incomplete green. Prefer this constant
-# over re-deriving from path-filters or workflow names: ruleset contexts are
-# the merge gate, not subordinate jobs.
-#
-# Kept deliberately identical to green_unmerged_sweep.py's copy: both scripts
-# classify the same lane, and the two implementations converge into one shared
-# helper once PR #1633 lands (tracked separately). Changing one without the
-# other reintroduces the split this comment exists to prevent.
-REQUIRED_CHECK_NAMES: tuple[str, ...] = (
-    "ci-required-result",
-    "Results Explorer browser gate",
-)
 DRAIN_LABEL = "awaiting-owner"
 DRAIN_LABEL_COLOR = "b60205"
 DRAIN_LABEL_DESCRIPTION = "Green, gated on owner review, parked >24h (see docs/operations/soundness-drain.md)"
@@ -127,43 +120,6 @@ class ClassifiedPR:
         return asdict(self)
 
 
-def _parse_iso(value: str) -> dt.datetime:
-    # GitHub timestamps are RFC3339 with a trailing "Z".
-    return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-
-def latest_check_run(check_runs: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
-    """Return the latest check run for *name*, if present.
-
-    A re-run can leave multiple same-named runs on one SHA; pick the most
-    recently started so a stale conclusion never wins.
-    """
-    matches = [run for run in check_runs if run.get("name") == name]
-    if not matches:
-        return None
-    return max(matches, key=lambda run: run.get("started_at") or "")
-
-
-def is_check_run_success(run: dict[str, Any] | None) -> bool:
-    """True when *run* completed with conclusion ``success`` (not skipped/neutral)."""
-    if run is None:
-        return False
-    return run.get("status") == "completed" and run.get("conclusion") == "success"
-
-
-def is_required_lane_green(check_runs: list[dict[str, Any]]) -> bool:
-    """True when every develop-ruleset required context is latest-success.
-
-    Partial green (e.g. ``ci-required-result`` success but browser gate red
-    or never reported) returns False. Missing runs are fail-closed not-green;
-    the browser gate always reports on develop PRs (success when the explorer
-    suite is not needed), so silence is a real signal, not an expected gap.
-    """
-    if not REQUIRED_CHECK_NAMES:
-        return False
-    return all(is_check_run_success(latest_check_run(check_runs, name)) for name in REQUIRED_CHECK_NAMES)
-
-
 def required_lane_green_at(check_runs: list[dict[str, Any]]) -> str | None:
     """Timestamp at which the required lane went green: the LAST context to finish.
 
@@ -173,15 +129,22 @@ def required_lane_green_at(check_runs: list[dict[str, Any]]) -> str | None:
     the browser gate finishes later and trip the >24h gate early. Returns
     None when any required context lacks a completion timestamp, leaving the
     caller to fall back rather than anchor on a half-finished lane.
+    Uses datetime parsing so fractional seconds and offsets sort correctly.
     """
-    stamps: list[str] = []
+    stamps: list[dt.datetime] = []
+    raw: list[str] = []
     for name in REQUIRED_CHECK_NAMES:
         stamp = (latest_check_run(check_runs, name) or {}).get("completed_at")
         if not stamp:
             return None
-        stamps.append(stamp)
-    # RFC3339 UTC ("...Z") sorts lexicographically in chronological order.
-    return max(stamps) if stamps else None
+        raw.append(str(stamp))
+        try:
+            stamps.append(_parse_iso(str(stamp)))
+        except (ValueError, TypeError):
+            return None
+    # Return the raw string of the latest timestamp (caller parses it).
+    latest = max(zip(stamps, raw), key=lambda x: x[0])[1]
+    return latest
 
 
 def is_soundness_gated(changed_files: list[str]) -> bool:
