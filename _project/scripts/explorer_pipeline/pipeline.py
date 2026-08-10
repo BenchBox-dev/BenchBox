@@ -38,8 +38,10 @@ from _project.scripts.explorer_pipeline.models import (
 from _project.scripts.explorer_pipeline.ranking import RankedCohort, rank_platforms
 from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
+    CompanionPrivacyError,
     _applied_receipt,
     _platform_percentile_stats,
+    _public_companion_bytes,
 )
 from _project.scripts.results_explorer_snapshot_invariants import check_snapshot
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
@@ -741,37 +743,30 @@ class ExplorerPipeline:
 
                     dest_bundle.write_bytes(public_raw)
 
-                    # Publish the plans sidecar alongside the bundle when present
-                    # and set ``plans_published`` on the detail so the explorer UI
-                    # only renders a download link for plans that actually exist
-                    # at the published URL. Without this wire-up, the consumer-side
-                    # gate (results-explorer/src/components/RunReceipt.tsx) sees
-                    # ``plans_published=undefined`` and never renders a link, so
-                    # the feature stays dark even when plans are available.
-                    plans_src = bundle_path.with_name(f"{bundle_path.stem}.plans.json")
-                    if plans_src.exists():
-                        plans_dest = (out_bundles_dir / f"{result_id}.plans.json").resolve()
-                        if plans_dest.is_relative_to(out_bundles_dir.resolve()):
-                            try:
-                                plans_payload = json.loads(plans_src.read_text(encoding="utf-8"))
-                                public_plans = public_anonymizer.anonymize_result_payload(plans_payload)
-                                plans_leaks = find_public_path_leaks(public_plans)
-                                if plans_leaks:
-                                    # Escapes both this block's handler and the
-                                    # per-bundle one. A leaking companion used to
-                                    # be the quietest case of all: the bundle
-                                    # still published, only `plans_published`
-                                    # stayed false, so the corpus looked complete.
-                                    raise PrivacyRejectionError(
-                                        "public plans privacy check failed for fields: "
-                                        + ", ".join(sorted(set(plans_leaks)))
-                                    )
-                                plans_dest.write_bytes(canonical_json_bytes(public_plans))
-                                detail.plans_published = True
-                            except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
-                                logger.warning(
-                                    "Skipping plans companion %s - %s: %s", plans_src, type(exc).__name__, exc
-                                )
+                    # Publish only the validated, anonymized companions that
+                    # actually exist. Source-side ``has_tuning`` is not enough:
+                    # the browser derives the tuning URL from that flag, so it
+                    # must be set only after the public sidecar is committed.
+                    detail.has_tuning = False
+                    detail.plans_published = False
+                    for suffix in COMPANION_SUFFIXES:
+                        try:
+                            public_companion = _public_companion_bytes(bundle_path, suffix, public_anonymizer)
+                        except CompanionPrivacyError as exc:
+                            raise PrivacyRejectionError(str(exc)) from exc
+                        if public_companion is None:
+                            continue
+
+                        companion_dest = (out_bundles_dir / f"{result_id}{suffix}").resolve()
+                        if not companion_dest.is_relative_to(out_bundles_dir.resolve()):
+                            raise PrivacyRejectionError(
+                                f"published companion path escapes bundles directory: {companion_dest.name}"
+                            )
+                        companion_dest.write_bytes(public_companion)
+                        if suffix == ".plans.json":
+                            detail.plans_published = True
+                        elif suffix == ".tuning.json":
+                            detail.has_tuning = True
 
                     # Add the entry only after the public bundle has been copied
                     # successfully.  A privacy rejection must not leave a

@@ -284,6 +284,78 @@ class TestExplorerPipelineRun:
         assert all(row["plans_published"] is False for row in rows)
         assert not list((output / "bundles").glob("*.plans.json"))
 
+    def test_publishes_tuning_sidecar_and_sets_has_tuning_after_copy(self, tmp_path: Path) -> None:
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle_path = bundles_dir / "with_tuning.json"
+        bundle_path.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        bundle_path.with_name("with_tuning.tuning.json").write_text(
+            json.dumps(
+                {
+                    "version": "2.1",
+                    "run_id": "test-exec-001",
+                    "source_file": "/Users/alice/private/tuning.yaml",
+                    "requested": {"table_tunings": {"lineitem": {"table_name": "lineitem"}}},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        row = _duckdb_results(output)[0]
+        result_id = row["result_id"]
+        tuning_path = output / "bundles" / f"{result_id}.tuning.json"
+        assert row["has_tuning"] is True
+        assert tuning_path.exists()
+        published = tuning_path.read_text(encoding="utf-8")
+        assert "/Users/alice" not in published
+        assert "lineitem" not in published
+
+    def test_publishes_sanitized_applied_companion(self, tmp_path: Path) -> None:
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle_path = bundles_dir / "with_applied.json"
+        bundle_path.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        bundle_path.with_name("with_applied.applied.json").write_text(
+            json.dumps(
+                {
+                    "status": "applied_unverified",
+                    "applied_ledger_hash": "a" * 64,
+                    "statements": [{"statement": "SET warehouse=/Users/alice/private", "status": "executed"}],
+                    "dropped": [{"reason": "private adapter detail"}],
+                    "receipt": {"entries": [{"statement": "CREATE INDEX private_table", "verdict": "unknown"}]},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        row = _duckdb_results(output)[0]
+        result_id = row["result_id"]
+        applied_path = output / "bundles" / f"{result_id}.applied.json"
+        assert applied_path.exists()
+        published = applied_path.read_text(encoding="utf-8")
+        assert "/Users/alice" not in published
+        assert '"statement"' not in published
+
+    @pytest.mark.parametrize("suffix", [".tuning.json", ".applied.json"])
+    def test_malformed_companion_is_not_published_or_advertised(
+        self, data_dir: Path, tmp_path: Path, suffix: str
+    ) -> None:
+        bundle = next(data_dir.joinpath("bundles").rglob("*.json"))
+        bundle.with_name(f"{bundle.stem}{suffix}").write_text("{not json", encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(data_dir, output)
+
+        row = _duckdb_results(output)[0]
+        assert row["has_tuning"] is False
+        assert not list((output / "bundles").glob(f"*{suffix}"))
+
     def test_discovers_nested_bundle_layout(self, tmp_path: Path) -> None:
         nested_dir = tmp_path / "data" / "bundles" / "tpch" / "duckdb" / "sf0.1"
         nested_dir.mkdir(parents=True)
