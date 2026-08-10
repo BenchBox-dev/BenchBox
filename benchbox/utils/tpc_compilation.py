@@ -354,7 +354,8 @@ class TPCCompiler:
                         rpar = s.index(")", lpar)
                         eq = s.index("=", rpar)
                         filename = s[lpar + 1 : rpar].strip().lstrip("./")
-                        expected_hash = s[eq + 1 :].strip().split()[0]
+                        digest_fields = s[eq + 1 :].strip().split()
+                        expected_hash = digest_fields[0] if digest_fields else ""
                         if filename and expected_hash:
                             return expected_hash, filename
                     except ValueError:

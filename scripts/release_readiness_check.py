@@ -262,6 +262,35 @@ def evaluate_uat_gate_evidence(
         f"- uat_source_dirty: {str(source_dirty).lower()}",
         f"- uat_completed_at: {completed_raw or '(missing)'}",
     ]
+    # Artifact-digest provenance (uat-evidence-provenance-binding w3): older
+    # combined evidence has no stage_artifact_digests at all. That is an
+    # additive format change, not a crash — gate-check already reports it as
+    # HOLD with a "regenerate evidence" message, and a combined evidence that
+    # was genuinely green after this PR always carries digests. Defense in
+    # depth: if a caller somehow produces a green combined evidence without
+    # digests, treat it as HOLD here with the same clear regenerate message
+    # (no provenance to bind). Threat model: digests recomputed on the
+    # operator machine are integrity against accident/drift, not tamper-proof
+    # provenance (no signing infra) — see _project/release-evidence/README.md.
+    if payload.get("stage_artifact_digests") is None:
+        # Surface as part of the summary so the HOLD message names what to do.
+        summary.append("- uat_stage_artifact_digests: (missing)")
+        # Only HOLD when the rest of the record would have been green; if it
+        # is already red, leave the original verdict's reason as the message
+        # (it already explains why, possibly already a regenerate reason via
+        # gate-check). The "missing digests" case for a green record needs an
+        # explicit regenerate HOLD here.
+        if verdict == "green" and not source_dirty and completed_raw:
+            return ReadinessResult(
+                False,
+                (
+                    "UAT gate evidence has no artifact digests: evidence was "
+                    "produced before artifact-digest provenance was added — "
+                    "regenerate evidence with the current orchestrator and "
+                    "`make uat-gate-check`"
+                ),
+                summary,
+            )
 
     if verdict != "green":
         return ReadinessResult(False, f"UAT gate evidence verdict is {verdict!r}; release is blocked.", summary)

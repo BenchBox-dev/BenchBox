@@ -120,6 +120,18 @@ class TestVerifyChecksumBSDLabeledBinary:
         compiler = tpc_mod.TPCCompiler.__new__(tpc_mod.TPCCompiler)
         assert compiler._verify_checksum(binary) is True
 
+    def test_empty_bsd_digest_is_skipped_before_valid_entry(self, tmp_path: Path):
+        binary = tmp_path / "dbgen"
+        binary.write_bytes(b"bsd-content")
+        (tmp_path / "checksums.md5").write_text(
+            "MD5 (checksums.md5) =\nMD5 (dbgen) = " + "0" * 32 + "\n",
+            encoding="utf-8",
+        )
+        tpc_mod._checksum_cache.pop(binary, None)
+        compiler = tpc_mod.TPCCompiler.__new__(tpc_mod.TPCCompiler)
+
+        assert compiler._verify_checksum(binary) is False
+
 
 class TestBundledChecksumsMatchBinaries:
     """Every bundled checksums.md5 entry for a real binary matches its bytes.

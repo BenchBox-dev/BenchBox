@@ -138,6 +138,22 @@ class GateSummary:
     # non-aborted sweeps and on aborts from phases that do not classify
     # (validate/report).
     abort_kind: str | None = None
+    # Per-stage artifact provenance binding (uat-evidence-provenance-binding
+    # w1): sha256 digests of the stage artifacts computed at artifact-write
+    # time in tests.uat.orchestrator so gate-check can recompute and reject
+    # a mismatch. Additive and optional: older stage summaries simply lack
+    # the key (forward-compat via _dataclass_from_payload's unknown-key
+    # drop, plus build_combined_evidence's explicit "regenerate" HOLD for
+    # digests is None). Keys are fixed: cells_jsonl, accounting_sidecar,
+    # lifecycle_log. A value of None means the file was absent at capture
+    # time (e.g. an aborted sweep before its accounting sidecar was written);
+    # recomputation sees a missing file as the same "absent" digest so an
+    # honest aborted summary is not flagged as tampered.
+    artifact_digests: dict[str, str | None] | None = None
+    # Threat-model note, not signed: digests are recomputed locally, so
+    # they prove the committed summary matches the stage directories the
+    # operator pointed gate-check at — not that those directories are the
+    # "authentic" originals. See _project/release-evidence/README.md.
     version: int = GATE_SUMMARY_SCHEMA_VERSION
 
     def to_json_dict(self) -> dict:
@@ -206,6 +222,13 @@ class CombinedGateEvidence:
     stage_verdicts: dict[str, str]
     ordering_violations: tuple[str, ...]
     reasons: tuple[str, ...]
+    # Carried through from the per-stage GateSummary artifact_digests so the
+    # combined evidence — the one file that is committed and later read by
+    # scripts/release_readiness_check.py — preserves the provenance binding.
+    # None when any stage lacked digests (then build_combined_evidence already
+    # issued a "regenerate" HOLD). Additive, optional like its stage
+    # counterpart.
+    stage_artifact_digests: dict[str, dict[str, str | None]] | None = None
     version: int = COMBINED_EVIDENCE_SCHEMA_VERSION
 
     def to_json_dict(self) -> dict:
@@ -267,6 +290,23 @@ def build_combined_evidence(
             )
         if stage.validator_clean_rate_floor is None or stage.cross_scale_floor is None:
             reasons.append(f"stage {stage.config_name!r} floor gates were not configured")
+        # sha='unknown' (git failure swallowed) must not pass locally even though CI
+        # fails closed later on the ancestry check: the operator acts on the local
+        # APPROVE, so a lying local gate erodes trust in the whole chain.
+        if stage.source_commit_sha == "unknown":
+            reasons.append(
+                f"stage {stage.config_name!r} source_commit_sha is 'unknown': "
+                "git rev-parse failed to capture provenance — regenerate evidence "
+                "from a repo checkout where `git rev-parse HEAD` succeeds"
+            )
+        # Artifact digest provenance (w1/w2): older summaries lack artifact_digests
+        # entirely, so this is a HOLD with a regenerate message, not a crash.
+        if stage.artifact_digests is None:
+            reasons.append(
+                f"stage {stage.config_name!r} has no artifact digests: "
+                "evidence was produced before artifact-digest provenance was added — "
+                "regenerate evidence with the current orchestrator"
+            )
 
     if ordering_violations:
         reasons.extend(ordering_violations)
@@ -275,6 +315,17 @@ def build_combined_evidence(
     completed_at = completed_at_values[0] if completed_at_values else None
 
     verdict = VERDICT_GREEN if not reasons else VERDICT_RED
+
+    # Preserve the per-stage digests in the committed combined evidence so the
+    # file that release_readiness_check reads still carries the binding. None
+    # when any stage lacked digests (already a HOLD via the loop above), but
+    # still carried so the regenerate path can see which stages are stale.
+    stage_artifact_digests: dict[str, dict[str, str | None]] | None = None
+    if all(s.artifact_digests is not None for s in stage_summaries):
+        stage_artifact_digests = {
+            s.config_name: dict(s.artifact_digests)  # type: ignore[arg-type]
+            for s in stage_summaries
+        }
 
     return CombinedGateEvidence(
         verdict=verdict,
@@ -286,6 +337,7 @@ def build_combined_evidence(
         stage_verdicts={s.config_name: s.verdict for s in stage_summaries},
         ordering_violations=tuple(ordering_violations),
         reasons=tuple(reasons),
+        stage_artifact_digests=stage_artifact_digests,
     )
 
 

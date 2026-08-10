@@ -1635,6 +1635,11 @@ def _stage_summary(name: str, completed_at: str, **overrides):
         "cross_scale_floor": 8,
         "cross_scale_floor_breached": False,
         "explorer_smoke_status": "ran",
+        "artifact_digests": {
+            "cells_jsonl": "a" * 64,
+            "accounting_sidecar": "b" * 64,
+            "lifecycle_log": "c" * 64,
+        },
         "verdict": "green",
     }
     kwargs.update(overrides)

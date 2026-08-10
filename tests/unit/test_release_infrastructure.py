@@ -1430,6 +1430,7 @@ class TestUATGateReleaseEvidence:
                 "release-gate-02-docker-nonoltp",
                 "release-gate-03-docker-oltp",
             ],
+            "stage_artifact_digests": {"release-gate-01-native-dataframe": "abc123"},
         }
         payload.update(overrides)
         return payload
