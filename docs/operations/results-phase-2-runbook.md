@@ -4,8 +4,9 @@ Phase 2 is the PR-based community submission flow for the BenchBox public result
 corpus. The product boundary and launch rationale live in
 [`docs/development/benchbox-results-platform-strategy.md`](../development/benchbox-results-platform-strategy.md).
 This runbook documents the current operating model only: contributor PRs target
-`published-results`, CI validates them, maintainers review them, merges trigger the
-static explorer rebuild, and no hosted API is involved.
+`published-results`, CI validates them, maintainers review them, and the protected
+release workflow is the only path that can rebuild and deploy the static Explorer;
+no hosted API is involved.
 
 ## 1. Submission Lifecycle
 
@@ -159,23 +160,23 @@ reads more protection into a green badge than is there:
 
 ### 1.3 Explorer publish path
 
-The static explorer at `benchbox.dev/results/` is intended to build and
-deploy from `main` via [`docs.yml`](../../.github/workflows/docs.yml): the
-`build` job runs on pushes and PRs to `main`, and the `deploy` job (Pages)
-runs only on pushes to `main`. `published-results` is **not** the explorer's
-build source — it is the corpus-archive branch that contributor PRs target
-and that mirrors develop's `results-data/`.
+The static Explorer at `benchbox.dev/results/` is wired through
+[`docs.yml`](../../.github/workflows/docs.yml): the `build` job runs for
+documentation PRs targeting `release` or `develop` and for pushes to `release`,
+while the `deploy` job runs only for a protected push to `release`.
+`published-results` is **not** the Explorer's build source — it is the
+corpus-archive branch that contributor PRs target and that mirrors develop's
+`results-data/`.
 
 > **Current state (pre-launch):** the explorer steps in `docs.yml` are gated
 > on `hashFiles('results-explorer/package.json')`, and `release-cut`
 > (`Makefile`) currently `git rm`s `results-explorer/` and `results-data/`
-> from the release branch, so those paths are **not on `main`** and the
-> explorer build/deploy steps are a deliberate no-op there today. The site is
-> therefore not yet published from `main`. For the explorer to go live from
-> `main`, the develop → main release flow must stop curating
-> `results-explorer/`/`results-data/` out of the release branch — a maintainer
-> decision tracked separately. Until then, treat `benchbox.dev/results/` as a
-> develop-built preview, not a main-deployed site.
+> from the release branch. The release build therefore has no Explorer input
+> and the Explorer steps are a deliberate no-op; the custom-domain route is not
+> a live publication. Launch requires a maintainer decision to change the
+> release curation/deploy contract, followed by assembled-artifact and protected
+> environment acceptance. Until that decision and evidence exist, do not treat
+> a develop checkout or a manual workflow build as a deployed Explorer.
 
 ## 2. Maintainer Review Checklist
 
@@ -278,7 +279,8 @@ rebuilding the site. Note that `workflow_dispatch` runs the `build` job but
 **not** the `deploy` job — the Pages deploy is gated on
 `github.event_name == 'push' && github.ref == 'refs/heads/release'` — so a manual
 run validates the build without publishing. A publish requires a push to
-`main` (and, per §1.3, the explorer paths actually being present on `main`).
+`release` (and, per §1.3, the Explorer paths actually being present on
+`release`).
 
 ## 7. Data Locations
 
