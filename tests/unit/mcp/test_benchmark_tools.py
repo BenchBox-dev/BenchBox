@@ -96,6 +96,17 @@ class TestDryRunTool:
         assert memory_recommended >= 2.0
 
 
+def _assert_effective_consumer_value(
+    platform: str, option_name: str, adapter: object, attribute: str, expected: object
+) -> None:
+    """Require an adapter to expose the option value at its declared consumer."""
+    observed = getattr(adapter, attribute, None)
+    assert observed is not None, (
+        f"{platform}.{option_name} consumer attribute {attribute!r} was not observed on {type(adapter).__name__}"
+    )
+    assert observed == expected, f"{platform}.{option_name} -> {attribute} {observed!r} != {expected!r}"
+
+
 class TestRunBenchmarkTool:
     """Tests for run_benchmark tool functionality."""
 
@@ -446,21 +457,25 @@ class TestRunBenchmarkTool:
             ("clickhouse-server", "connection_profile"): "port",
             ("datafusion", "batch_size"): "batch_size",
             ("datafusion", "memory_limit"): "memory_limit",
+            ("datafusion", "parquet_pushdown"): "parquet_pushdown",
+            ("datafusion", "repartition_joins"): "repartition_joins",
             ("datafusion", "target_partitions"): "target_partitions",
             ("cudf", "device_id"): "device_id",
             ("cudf", "spill_to_host"): "spill_to_host",
+            ("polars", "n_rows"): "n_rows",
             ("polars", "streaming"): "streaming",
             ("polars", "rechunk"): "rechunk",
             ("spark", "adaptive_enabled"): "adaptive_enabled",
             ("sqlite", "timeout"): "timeout",
             ("sqlite", "check_same_thread"): "check_same_thread",
             ("velox", "adaptive_enabled"): "adaptive_enabled",
-            ("velox", "driver_memory"): "_driver_memory",
-            ("velox", "offheap_size"): "_offheap_memory",
+            ("velox", "driver_memory"): "driver_memory",
+            ("velox", "offheap_size"): "offheap_size",
             ("velox", "shuffle_partitions"): "shuffle_partitions",
             ("modin", "engine"): "engine",
             ("pandas", "dtype_backend"): "dtype_backend",
             ("firebolt", "disable_result_cache"): "disable_result_cache",
+            ("firebolt", "strict_validation"): "strict_validation",
         }
 
         for platform, specs in MCP_PLATFORM_OPTION_ALLOWLIST.items():
@@ -496,8 +511,17 @@ class TestRunBenchmarkTool:
                     if platform == "duckdb" and option_name == "threads":
                         assert prepared == {"thread_limit": value}, f"duckdb threads prepared {prepared!r}"
                     elif platform == "databricks":
-                        assert "tuning_config" in prepared, f"databricks missing tuning_config {prepared!r}"
-                        # Databricks consumer is the tuning object, not a simple attr
+                        tuning = prepared.get("tuning_config")
+                        assert tuning is not None, f"databricks missing tuning_config {prepared!r}"
+                        optimizations = tuning.platform_optimizations
+                        if option_name == "databricks_clustering_strategy":
+                            assert optimizations.databricks_clustering_strategy == value, (
+                                f"databricks.{option_name} did not reach the tuning consumer"
+                            )
+                        else:
+                            assert optimizations.liquid_clustering_columns == ["id"], (
+                                f"databricks.{option_name} did not reach the tuning consumer"
+                            )
                         observed += 1
                         continue
                     elif option_name == "connection_profile":
@@ -505,9 +529,6 @@ class TestRunBenchmarkTool:
                         assert prepared["port"] == 9440 and prepared["secure"] is True, (
                             f"connection_profile prepared {prepared!r}"
                         )
-                        # For connection_profile, the consumer is port/secure, count as observed if translation succeeded
-                        observed += 1
-                        continue
                     else:
                         assert (
                             prepared.get(option_name) == value
@@ -544,36 +565,34 @@ class TestRunBenchmarkTool:
                         )
                         observed += 1
                     elif platform in ("clickhouse", "clickhouse-server"):
-                        # ClickHouse adapter requires server profile resolution; we already verified prepared port/secure
-                        # For deployment_mode, check attribute if present
-                        if option_name == "deployment_mode":
-                            try:
-                                from benchbox.platforms.clickhouse import ClickHouseAdapter
+                        try:
+                            if platform == "clickhouse-server":
+                                from benchbox.platforms.clickhouse_server import ClickHouseServerAdapter as Adapter
+                            else:
+                                from benchbox.platforms.clickhouse import ClickHouseAdapter as Adapter
 
-                                cfg = {"benchmark": "tpch", "scale_factor": 0.01, "output_dir": str(tmp_path)}
-                                cfg.update(prepared)
-                                # ClickHouse from_config may need additional keys; try minimal
-                                built = ClickHouseAdapter.from_config(cfg)  # type: ignore[arg-type]
-                                observed_val = getattr(built, attr, None) or getattr(built, "deployment_mode", None)
-                                # If attribute not directly exposed, count prepared verification as sufficient
-                                if observed_val is not None:
-                                    assert observed_val == value, (
-                                        f"{platform}.{option_name} {observed_val!r} != {value!r}"
-                                    )
-                                observed += 1
-                            except ImportError as ie:
-                                skipped.append(f"{platform}.{option_name} ClickHouse extra missing: {ie}")
-                                continue
-                            except Exception as e:
-                                # Construction may need live server; treat as prepared-only verification
-                                # but still count as observed if prepared was correct and contract exists
-                                # To keep honest, we do not silently count; we record and continue
-                                # For this sweep, prepared verification is sufficient for ClickHouse when live deps missing
-                                skipped.append(f"{platform}.{option_name} not constructible: {e}")
-                                observed += 1  # prepared already verified
-                                continue
-                        else:
+                            cfg = {
+                                "benchmark": "tpch",
+                                "scale_factor": 0.01,
+                                "output_dir": str(tmp_path),
+                                "host": "localhost",
+                            }
+                            cfg.update(prepared)
+                            built = Adapter.from_config(cfg)
+                            if option_name == "connection_profile":
+                                _assert_effective_consumer_value(platform, option_name, built, "port", 9440)
+                                _assert_effective_consumer_value(platform, option_name, built, "secure", True)
+                            else:
+                                _assert_effective_consumer_value(platform, option_name, built, "deployment_mode", value)
                             observed += 1
+                        except ImportError as ie:
+                            skipped.append(f"{platform}.{option_name} ClickHouse extra missing: {ie}")
+                            continue
+                        except AssertionError:
+                            raise
+                        except Exception as e:
+                            failures.append(f"{platform}.{option_name} consumer construction failed: {e}")
+                            continue
                     elif platform == "dask":
                         # Isolate Dask lifecycle: mock LocalCluster and Client so no scheduler/worker/nanny/process starts
                         try:
@@ -608,19 +627,12 @@ class TestRunBenchmarkTool:
                                 observed_val = getattr(built, check_attr, None) if check_attr else None
                                 # For use_distributed, the consumer is the flag itself
                                 if option_name == "use_distributed":
-                                    assert built.use_distributed is False, (
-                                        f"dask.use_distributed {built.use_distributed!r} != False"
+                                    _assert_effective_consumer_value(
+                                        platform, option_name, built, "use_distributed", False
                                     )
-                                elif observed_val is not None:
-                                    # For memory_limit, the stored value may be normalized
-                                    if option_name == "memory_limit":
-                                        # _memory_limit stores the raw string; compare directly
-                                        assert observed_val == value, f"dask.memory_limit {observed_val!r} != {value!r}"
-                                    else:
-                                        assert observed_val == value, (
-                                            f"dask.{option_name} {observed_val!r} != {value!r}"
-                                        )
-                                # If attribute is None due to defaults, still count prepared verification
+                                else:
+                                    # _memory_limit stores the raw string; compare it directly.
+                                    _assert_effective_consumer_value(platform, option_name, built, check_attr, value)
                                 # Ensure no real cluster was started
                                 assert (
                                     mock_cluster.call_count == 0
@@ -640,21 +652,13 @@ class TestRunBenchmarkTool:
                                 from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
 
                                 built = PolarsDataFrameAdapter(**prepared)
-                                observed_val = getattr(built, attr, None)
-                                if observed_val is not None:
-                                    assert observed_val == value, (
-                                        f"{platform}.{option_name} {observed_val!r} != {value!r}"
-                                    )
+                                _assert_effective_consumer_value(platform, option_name, built, attr, value)
                                 observed += 1
                             elif platform == "pandas":
                                 from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
 
                                 built = PandasDataFrameAdapter(**prepared)
-                                observed_val = getattr(built, attr, None)
-                                if observed_val is not None:
-                                    assert observed_val == value, (
-                                        f"{platform}.{option_name} {observed_val!r} != {value!r}"
-                                    )
+                                _assert_effective_consumer_value(platform, option_name, built, attr, value)
                                 observed += 1
                             elif platform == "modin":
                                 from benchbox.platforms.dataframe.modin_df import ModinDataFrameAdapter
@@ -696,47 +700,32 @@ class TestRunBenchmarkTool:
                                 mod_name, cls_name = mod_path.rsplit(".", 1)
                                 mod = __import__(mod_name, fromlist=[cls_name])
                                 Adapter = getattr(mod, cls_name)
-                                # For velox, driver_memory/offheap are stored with underscore prefix
-                                # Use prepared to construct with minimal config
+                                # Use prepared to construct with the minimal config required by the factory.
                                 cfg = (
                                     {"benchmark": "tpch", "scale_factor": 0.01, "output_dir": str(tmp_path)}
-                                    if platform in ("velox", "spark", "datafusion")
+                                    if platform in ("velox", "spark", "datafusion", "firebolt")
                                     else {}
                                 )
                                 cfg.update(prepared)
                                 # For sqlite, need database_path
                                 if platform == "sqlite":
                                     cfg["database_path"] = ":memory:"
-                                # Try from_config if exists, else constructor
-                                if hasattr(Adapter, "from_config"):
-                                    try:
-                                        built = Adapter.from_config(cfg)  # type: ignore[arg-type]
-                                    except Exception:
-                                        built = Adapter(**prepared)
-                                else:
+                                # Use the same config-aware factory that production adapter construction uses;
+                                # a constructor fallback would hide dropped configuration keys.
+                                if not hasattr(Adapter, "from_config"):
                                     built = Adapter(**prepared)
-                                # Check attribute
-                                check_attr = attr
-                                # Velox driver_memory stored as _driver_memory or similar; try both
-                                observed_val = getattr(built, check_attr, None)
-                                if observed_val is None and check_attr.startswith("_"):
-                                    observed_val = getattr(built, check_attr.lstrip("_"), None)
-                                if observed_val is not None:
-                                    assert observed_val == value, (
-                                        f"{platform}.{option_name} {observed_val!r} != {value!r}"
-                                    )
+                                else:
+                                    built = Adapter.from_config(cfg)  # type: ignore[arg-type]
+                                _assert_effective_consumer_value(platform, option_name, built, attr, value)
                                 observed += 1
                             except ImportError as ie:
                                 skipped.append(f"{platform}.{option_name} adapter not installed: {ie}")
                                 continue
                             except Exception as e:
-                                skipped.append(f"{platform}.{option_name} not constructible: {e}")
+                                failures.append(f"{platform}.{option_name} consumer construction failed: {e}")
                                 continue
                         else:
-                            # No specific adapter mapping, count prepared verification as consumer observation
-                            # This is honest for options where the consumer is not a simple attribute
-                            # but the contract still exists and prepared was verified
-                            observed += 1
+                            failures.append(f"{platform}.{option_name} missing adapter observation mapping")
                 except AssertionError:
                     raise
                 except Exception as e:
@@ -745,16 +734,23 @@ class TestRunBenchmarkTool:
 
         # Honest counting: report how many consumers were actually observed, not how many were configured
         total_options = sum(len(v) for v in MCP_PLATFORM_OPTION_ALLOWLIST.values())
+        assert not failures, f"consumer failures: {failures[:10]}"
         assert observed + len(skipped) == total_options, (
             f"observed {observed} + skipped {len(skipped)} != total {total_options}; skipped: {skipped[:5]}"
         )
         # Require that a meaningful number of consumers were observed (not just prepared)
         # At least 15 options should have been constructed and verified, and skips should be explicit
         assert observed >= 15, f"only {observed} consumers observed, expected at least 15; skipped: {skipped}"
-        assert not failures, f"failures: {failures[:5]}"
-        # Preserve DuckDB negative control is exercised via the main loop's duckdb.threads case;
-        # an additional explicit check ensures the consumer observation would fail if from_config dropped the key.
-        # This is verified by the separate negative-control command (see verification ladder), not by this count.
+        # The dedicated negative control below ensures the consumer observation fails if an adapter drops the key.
+
+    def test_effective_consumer_oracle_rejects_dropped_option(self):
+        """A prepared value alone cannot satisfy the effective-consumer oracle."""
+
+        class DroppedAdapter:
+            thread_limit = None
+
+        with pytest.raises(AssertionError, match=r"duckdb\.threads"):
+            _assert_effective_consumer_value("duckdb", "threads", DroppedAdapter(), "thread_limit", 4)
 
 
 class TestGetQueryDetailsTool:

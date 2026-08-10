@@ -267,7 +267,9 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         adapter_config["memory_limit"] = config.get("memory_limit", "16G")
 
         # Parallelism (default to CPU count)
-        adapter_config["target_partitions"] = config.get("partitions") or os.cpu_count()
+        adapter_config["target_partitions"] = (
+            config.get("target_partitions") or config.get("partitions") or os.cpu_count()
+        )
 
         # Data format
         adapter_config["data_format"] = config.get("format", "parquet")
