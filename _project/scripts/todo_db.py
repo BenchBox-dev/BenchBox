@@ -159,6 +159,10 @@ TRANSITIONS = {
 UNIT_STATUSES = ("pending", "in_progress", "done")
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]*[a-z0-9]$")
 WID_RE = re.compile(r"^w[0-9]{1,3}$")
+# The legacy ``::`` separator is retained for compatibility, but it collides
+# with pytest node IDs. New specs may use this separator when the command
+# itself contains ``::``.
+VERIFY_SPEC_SEPARATOR = "|||"
 DEFAULT_LEASE_TTL_HOURS = 24
 
 _CORE_SCHEMA_SQL = """
@@ -4472,13 +4476,14 @@ def main(argv: list[str] | None = None) -> int:
         "--verify",
         action="append",
         default=[],
-        metavar="DESC[::COMMAND[::EXPECTED]]",
+        metavar="DESC[::COMMAND[::EXPECTED]]|DESC[|||COMMAND[|||EXPECTED]]",
         help=(
             "A verification rung. COMMAND is graded ONLY on its exit status, so it must be "
             "self-asserting: exit 0 if and only if the criterion holds. Assert on output by "
             "composing (`cmd | grep -q PATTERN`), and on expected failure by negating (`! cmd`). "
             "Do not grep/rg `_project/todo-db-export` for schema absence because item prose is self-matching; "
             "parse JSON keys or table membership instead. "
+            "Use `|||` separators when COMMAND contains pytest's `::` node-id separator. "
             "EXPECTED is human acceptance text and is never evaluated - it documents the rung, "
             "it does not check it."
         ),
@@ -4813,7 +4818,11 @@ def _parse_work_flag(specs: list[str]) -> list[dict[str, Any]]:
 def _parse_verify_flag(specs: list[str]) -> list[dict[str, str]]:
     verifications = []
     for spec in specs:
-        fields = spec.split("::")
+        # Keep the legacy two/three-field form byte-for-byte compatible. The
+        # explicit alternate form is unambiguous for commands such as
+        # ``pytest path.py::TestClass::test_case``.
+        separator = VERIFY_SPEC_SEPARATOR if VERIFY_SPEC_SEPARATOR in spec else "::"
+        fields = spec.split(separator, 2)
         entry = {"description": fields[0]}
         if len(fields) > 1:
             entry["command"] = fields[1]
