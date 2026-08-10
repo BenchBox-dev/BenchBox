@@ -284,6 +284,35 @@ def test_explorer_vitest_job_uses_contract_filter_and_exact_command() -> None:
     assert aggregate["env"]["EXPLORER_VITEST_RESULT"] == "${{ needs.explorer-vitest.result }}"
 
 
+@pytest.mark.parametrize(
+    "changed_path",
+    [
+        ".github/workflows/pr.yml",
+        ".github/path-filters.yml",
+        "tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml",
+        "tests/parity/fixtures/chart_ids.json",
+    ],
+)
+def test_explorer_vitest_filter_covers_each_non_local_contract_input(changed_path: str) -> None:
+    pfd = _load_path_filter_decision()
+    rules = pfd.load_rules(REPO_ROOT / ".github" / "path-filters.yml")
+
+    decision = pfd.classify_paths([changed_path], rules)
+
+    assert decision["explorer_vitest_needed"] is True
+    assert decision["explorer_vitest_paths"] == [changed_path]
+
+
+def test_explorer_vitest_filter_skips_unrelated_python_changes() -> None:
+    pfd = _load_path_filter_decision()
+    rules = pfd.load_rules(REPO_ROOT / ".github" / "path-filters.yml")
+
+    decision = pfd.classify_paths(["benchbox/cli/run.py"], rules)
+
+    assert decision["explorer_vitest_needed"] is False
+    assert decision["explorer_vitest_paths"] == []
+
+
 def test_explorer_vitest_job_declares_clean_runner_python_and_uv_setup() -> None:
     workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
     job = workflow_yaml["jobs"]["explorer-vitest"]
