@@ -878,6 +878,21 @@ class TestDataFusionAdapter:
             assert str(Path(tmpdir) / "databases") in str(adapter.working_dir)
 
     @patch("benchbox.platforms.datafusion.SessionContext")
+    def test_from_config_preserves_target_partitions_option(self, mock_session_context):
+        """The MCP-facing target_partitions key must reach the adapter consumer."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = {
+                "benchmark": "tpch",
+                "scale_factor": 0.01,
+                "output_dir": tmpdir,
+                "target_partitions": 7,
+            }
+
+            adapter = DataFusionAdapter.from_config(config)
+
+            assert adapter.target_partitions == 7
+
+    @patch("benchbox.platforms.datafusion.SessionContext")
     def test_add_cli_arguments(self, mock_session_context):
         """Test CLI argument addition."""
         import argparse
