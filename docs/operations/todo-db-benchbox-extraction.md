@@ -1,9 +1,9 @@
 # BenchBox todo-db extraction: staged integration and acceptance handoff
 
-Status: migration and compatibility evidence complete; production cutover is
-still gated by package publication and the operational acceptance TODO. The
-legacy BenchBox tracker remains the default and `_project/scripts/todo` remains
-the stable entry point.
+Status: migration and compatibility evidence complete; the canonical
+`todo-db` 0.3.1 package is released, but production cutover remains gated by
+the operational acceptance TODO. The legacy BenchBox tracker remains the
+default and `_project/scripts/todo` remains the stable entry point.
 
 ## Live evidence at this handoff
 
@@ -16,8 +16,10 @@ the stable entry point.
   tracker/meta table equal, event provenance equal, a verified
   `sha256-chain-v2` audit chain, and an exactly equal second clean export
   including all three migration records.
-- `/Users/joe/Developer/todo-db` remains physically separate and unpublished.
-  Its local suite, Ruff checks, formatting check, and wheel/sdist builds pass.
+- `todo-db` 0.3.1 is published as the GitHub release
+  [v0.3.1](https://github.com/joeharris76/todo-db/releases/tag/v0.3.1), built
+  from the merged holder-only fix. BenchBox consumers must resolve it through
+  the locked `_project/scripts` environment, never a sibling checkout.
 - No hosted write credential was used and the hosted primary was not modified.
 
 ## Compatibility boundary
@@ -74,9 +76,13 @@ uv run --project _project/scripts -- python _project/scripts/todo_db_shadow.py \
   --todo-dir _project/TODO \
   --done-dir _project/DONE \
   --db "$SHADOW_DB" \
-  --report "$REPORT" \
-  --standalone-project /Users/joe/Developer/todo-db
+  --report "$REPORT"
 ```
+
+The shadow tool invokes `todo-db` only as `uv run --project
+_project/scripts --locked -- todo-db`. The package must be present in the locked
+BenchBox scripts environment; an absent or incompatible package is an error,
+with no PATH or sibling-checkout fallback.
 
 The report compares item counts and IDs, titles, states, priorities, worktrees,
 descriptions, categories, approaches, work units, prerequisites, dependencies,
@@ -166,25 +172,25 @@ uv run --project _project/scripts -- python _project/scripts/todo_db_shadow.py \
   --hosted-url "$TODO_DB_URL" \
   --hosted-snapshot-output "$SCRATCH/legacy.json"
 
-uv run --project /Users/joe/Developer/todo-db todo-db \
+uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/restore.sqlite" $IDENTITY init
-uv run --project /Users/joe/Developer/todo-db todo-db \
+uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/restore.sqlite" $IDENTITY \
   restore-legacy --input "$SCRATCH/legacy.json" --replace
-uv run --project /Users/joe/Developer/todo-db todo-db \
+uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/restore.sqlite" $IDENTITY audit verify
-uv run --project /Users/joe/Developer/todo-db todo-db \
+uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/restore.sqlite" $IDENTITY \
   export --output "$SCRATCH/todo-db.json"
 
-uv run --project /Users/joe/Developer/todo-db todo-db \
+uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/roundtrip.sqlite" $IDENTITY init
-uv run --project /Users/joe/Developer/todo-db todo-db \
+uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
   restore --input "$SCRATCH/todo-db.json" --replace
-uv run --project /Users/joe/Developer/todo-db todo-db \
+uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/roundtrip.sqlite" $IDENTITY audit verify
-uv run --project /Users/joe/Developer/todo-db todo-db \
+uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
   export --output "$SCRATCH/roundtrip.json"
 
@@ -227,7 +233,8 @@ through the compatibility window.
 Operational defaults remain one physical database per project,
 separate read-write/read-only credentials, weekly exports, clean-DB restore
 drills, and SHA-256 chained events with optional signed export manifests. This
-work does not provision hosted infrastructure or publish a package.
+work does not provision hosted infrastructure or perform the destructive
+hosted cutover.
 
 ## Oxbow, textcharts, and future consumers
 

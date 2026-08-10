@@ -249,18 +249,35 @@ def test_validate_target_rejects_export_sidecar(tmp_path: Path) -> None:
     target = tmp_path / "shadow.sqlite"
     target.with_suffix(".export.json").write_text("keep", encoding="utf-8")
     with pytest.raises(shadow.ShadowMigrationError, match="export path"):
-        shadow.validate_target(target, benchbox_db=tmp_path / "benchbox.sqlite", standalone_db=tmp_path / "plan.sqlite")
+        shadow.validate_target(target, benchbox_db=tmp_path / "benchbox.sqlite")
 
 
-@pytest.mark.parametrize("protected_name", ["benchbox.sqlite", "plan.sqlite"])
+def test_validate_target_rejects_existing_target(tmp_path: Path) -> None:
+    target = tmp_path / "shadow.sqlite"
+    target.write_text("existing", encoding="utf-8")
+    with pytest.raises(shadow.ShadowMigrationError, match="must not already exist"):
+        shadow.validate_target(target, benchbox_db=tmp_path / "benchbox.sqlite")
+
+
+@pytest.mark.parametrize("protected_name", ["benchbox.sqlite"])
 def test_validate_target_rejects_protected_databases(tmp_path: Path, protected_name: str) -> None:
     protected = tmp_path / protected_name
     with pytest.raises(shadow.ShadowMigrationError, match="protected tracker database"):
         shadow.validate_target(
             protected,
             benchbox_db=tmp_path / "benchbox.sqlite",
-            standalone_db=tmp_path / "plan.sqlite",
         )
+
+
+def test_canonical_command_uses_only_locked_benchbox_project(tmp_path: Path) -> None:
+    scripts_project = tmp_path / "_project" / "scripts"
+    scripts_project.mkdir(parents=True)
+    (scripts_project / "pyproject.toml").write_text("[project]\nname='scripts'\n", encoding="utf-8")
+    (scripts_project / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+
+    command = shadow._canonical_todo_command(tmp_path)
+
+    assert command == ["uv", "run", "--project", str(scripts_project), "--locked", "--", "todo-db"]
 
 
 def test_run_captures_success_output() -> None:
@@ -318,7 +335,6 @@ def test_empty_source_is_rejected_before_any_target_creation(tmp_path: Path) -> 
             done_dir=done_dir,
             target=target,
             report_path=tmp_path / "report.json",
-            standalone_project=tmp_path / "standalone",
         )
     assert not target.exists()
 
@@ -341,7 +357,6 @@ def test_zero_item_import_is_rejected_instead_of_passing(tmp_path: Path, monkeyp
             done_dir=done_dir,
             target=target,
             report_path=tmp_path / "report.json",
-            standalone_project=tmp_path / "standalone",
         )
     assert not target.exists()
 
@@ -353,16 +368,16 @@ def test_failed_import_rolls_back_new_target(tmp_path: Path, monkeypatch: pytest
     done_dir.mkdir()
     (todo_dir / "item.yaml").write_text("id: item\n", encoding="utf-8")
     target = tmp_path / "shadow.sqlite"
-    standalone_project = tmp_path / "standalone"
 
     monkeypatch.setattr(
         shadow, "legacy_snapshot", lambda connection: {"items": [{"id": "item"}], "events": [], "meta": []}
     )
+    monkeypatch.setattr(shadow, "_canonical_todo_command", lambda _: ["uv", "run", "--", "todo-db"])
 
     def fake_run(command: list[str], *, cwd: Path, env: dict[str, str]) -> None:
-        if str(standalone_project) in command and "init" in command:
+        if "todo-db" in command and "init" in command:
             target.touch()
-        if str(standalone_project) in command and "import-yaml" in command:
+        if "todo-db" in command and "import-yaml" in command:
             raise shadow.ShadowMigrationError("simulated failed import")
 
     monkeypatch.setattr(shadow, "_run", fake_run)
@@ -373,6 +388,5 @@ def test_failed_import_rolls_back_new_target(tmp_path: Path, monkeypatch: pytest
             done_dir=done_dir,
             target=target,
             report_path=tmp_path / "report.json",
-            standalone_project=standalone_project,
         )
     assert not target.exists()
