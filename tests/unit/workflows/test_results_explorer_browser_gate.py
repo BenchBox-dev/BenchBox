@@ -16,6 +16,7 @@ documented agreement here and confirm the ruleset with `gh api` when triaging.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -198,3 +199,16 @@ def test_chromium_runs_the_full_suite_entrypoint(workflow: dict[str, Any]) -> No
     assert any("test:e2e:chromium" in command for command in run_commands), (
         "Chromium job no longer runs the npm test:e2e:chromium entrypoint"
     )
+
+
+def test_chromium_typechecks_e2e_harness_before_playwright(workflow: dict[str, Any]) -> None:
+    """The blocking browser lane must compile the Playwright harness first."""
+    package = json.loads((REPO_ROOT / "results-explorer/package.json").read_text(encoding="utf-8"))
+    assert package["scripts"]["typecheck:e2e"] == "tsc --project tsconfig.e2e.json --noEmit"
+    assert (REPO_ROOT / "results-explorer/tsconfig.e2e.json").is_file()
+
+    steps = workflow["jobs"][CHROMIUM_JOB]["steps"]
+    typecheck_index = next(index for index, step in enumerate(steps) if step.get("run") == "npm run typecheck:e2e")
+    playwright_index = next(index for index, step in enumerate(steps) if "playwright install" in step.get("run", ""))
+    assert typecheck_index < playwright_index
+    assert steps[typecheck_index]["working-directory"] == "results-explorer"
