@@ -1,6 +1,7 @@
 {
   "enabled": true,
   "max_fast_tests": 28050,
+  "reservation": null,
   "_ceiling_log": "see _project/config/fast_lane_ceiling_log.md",
   "forbidden_marker_expressions": [
     "resource_heavy",
