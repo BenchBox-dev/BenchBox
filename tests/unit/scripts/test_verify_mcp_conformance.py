@@ -55,6 +55,17 @@ def test_certifying_protocol_gate_rejects_incomplete_expected_baseline(monkeypat
         verify_mcp_conformance._run_protocol_gate("http://127.0.0.1:8000/mcp", CURRENT_PROTOCOL_VERSION, tmp_path)
 
 
+def test_certifying_protocol_gate_rejects_unexpected_warning(monkeypatch, tmp_path: Path) -> None:
+    expected_failures = "".join(
+        f"FAILURE [{failure.split(':', 1)[1]}]\n" for failure in verify_mcp_conformance.EXPECTED_FAILURE_IDS
+    )
+    output = expected_failures + "WARNING [sep-2575-server-sends-tools-list-changed-on-subscription]\n"
+    _stub_protocol_runner(monkeypatch, tmp_path, {"server-stateless": (1, output)})
+
+    with pytest.raises(subprocess.CalledProcessError):
+        verify_mcp_conformance._run_protocol_gate("http://127.0.0.1:8000/mcp", CURRENT_PROTOCOL_VERSION, tmp_path)
+
+
 def test_generated_evidence_does_not_certify_local_multiworker_tests(monkeypatch, tmp_path: Path) -> None:
     def fake_check_output(command: list[str], **_kwargs: object) -> str:
         if command[1] == "status":
