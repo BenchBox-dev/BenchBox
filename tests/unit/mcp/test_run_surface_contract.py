@@ -135,6 +135,79 @@ EXPECTED_OMISSION_TIERS = {
     "--validation": "not-yet-demanded",
 }
 
+_TABLE_SEPARATOR_CELL = re.compile(r"^:?-{3,}:?$")
+
+
+def _split_markdown_table_row(line: str, line_number: int) -> list[str]:
+    """Split one pipe-delimited Markdown row and require both delimiters."""
+    stripped = line.rstrip()
+    if not stripped.startswith("|") or not stripped.endswith("|"):
+        raise AssertionError(f"Markdown table row {line_number} must have leading and trailing pipes")
+
+    cells: list[str] = []
+    cell: list[str] = []
+    escaped = False
+    for character in stripped[1:-1]:
+        if character == "|" and not escaped:
+            cells.append("".join(cell).strip())
+            cell = []
+        else:
+            cell.append(character)
+        if character == "\\":
+            escaped = not escaped
+        else:
+            escaped = False
+    cells.append("".join(cell).strip())
+    return cells
+
+
+def _assert_markdown_table_topology(text: str) -> None:
+    """Require every public-contract Markdown table to have a stable topology."""
+    lines = text.splitlines()
+    in_fenced_code = False
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        if line.startswith("```"):
+            in_fenced_code = not in_fenced_code
+            index += 1
+            continue
+        if in_fenced_code or not line.strip():
+            index += 1
+            continue
+        if "|" not in line:
+            index += 1
+            continue
+
+        header = _split_markdown_table_row(line, index + 1)
+        if index + 1 >= len(lines) or not lines[index + 1].strip():
+            raise AssertionError(f"Markdown table at row {index + 1} is missing its separator row")
+        separator = _split_markdown_table_row(lines[index + 1], index + 2)
+        if len(separator) != len(header) or not all(_TABLE_SEPARATOR_CELL.fullmatch(cell) for cell in separator):
+            raise AssertionError(f"Markdown table at row {index + 1} has an invalid separator row")
+
+        expected_columns = len(header)
+        index += 2
+        while index < len(lines):
+            row = lines[index]
+            if not row.strip() or row.startswith("#"):
+                break
+            if "|" not in row:
+                next_content = index + 1
+                while next_content < len(lines) and not lines[next_content].strip():
+                    next_content += 1
+                if next_content < len(lines) and "|" in lines[next_content]:
+                    raise AssertionError(f"Non-table content at row {index + 1} interrupts a Markdown table")
+                break
+
+            cells = _split_markdown_table_row(row, index + 1)
+            if len(cells) != expected_columns:
+                raise AssertionError(
+                    f"Markdown table row {index + 1} has {len(cells)} columns; expected {expected_columns}"
+                )
+            index += 1
+
 
 def _omission_ledger(text: str) -> dict[str, dict[str, str]]:
     """Parse the scoped-surface omission ledger table from the MCP reference."""
@@ -367,6 +440,23 @@ def _schema_params(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 class TestMCPDocsContract:
+    def test_authoritative_public_contract_tables_have_valid_topology(self):
+        _assert_markdown_table_topology((REPO_ROOT / "docs/reference/public-contracts.md").read_text(encoding="utf-8"))
+
+    @pytest.mark.parametrize(
+        "malformed",
+        [
+            "Header | Value |\n|---|---|\n| good | row |",
+            "| Header | Value\n|---|---|\n| good | row |",
+            "| Header | Value |\n|---|---|\n| good |",
+            "| Header | Value |\n|---|---|\n| good | row |\nprose inserted here\n| continued | row |",
+        ],
+        ids=["missing-leading-delimiter", "missing-trailing-delimiter", "wrong-column-count", "prose-interruption"],
+    )
+    def test_public_contract_table_topology_rejects_malformed_rows(self, malformed: str):
+        with pytest.raises(AssertionError):
+            _assert_markdown_table_topology(malformed)
+
     def test_docs_identify_mcp_as_scoped_surface_over_shared_core(self):
         text = _doc_text()
         normalized = " ".join(text.split())
