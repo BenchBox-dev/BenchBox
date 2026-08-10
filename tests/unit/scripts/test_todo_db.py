@@ -407,6 +407,46 @@ class TestVerifyRun:
         assert "expected: human-readable criterion" in capsys.readouterr().out
 
 
+class TestVerifyFlagParsing:
+    def test_verify_flag_legacy_two_and_three_field_specs_remain_unchanged(self):
+        assert todo_db._parse_verify_flag(["description::true"])[0] == {
+            "description": "description",
+            "command": "true",
+        }
+        assert todo_db._parse_verify_flag(["description::true::exit 0"])[0] == {
+            "description": "description",
+            "command": "true",
+            "expected": "exit 0",
+        }
+
+    def test_verify_flag_alternate_separator_preserves_pytest_node_id(self):
+        spec = (
+            "pytest node id|||uv run -- python -m pytest "
+            "tests/unit/scripts/test_todo_db.py::TestVerifyFlagParsing::test_case -q|||exit 0"
+        )
+        assert todo_db._parse_verify_flag([spec])[0] == {
+            "description": "pytest node id",
+            "command": (
+                "uv run -- python -m pytest tests/unit/scripts/test_todo_db.py::TestVerifyFlagParsing::test_case -q"
+            ),
+            "expected": "exit 0",
+        }
+
+    def test_lex_rejects_mangled_pytest_node_id_command(self, conn):
+        _mk(
+            conn,
+            verifications=[
+                {
+                    "description": "mangled node id",
+                    "command": "uv run -- python -m pytest -n 0 'tests/unit/cli/test_cli_output.py",
+                    "expected": "fails shell parsing",
+                }
+            ],
+        )
+        findings = todo_db.lint_item(conn, "sample-item")
+        assert any("cannot execute" in finding and "shell parse" in finding for finding in findings)
+
+
 class TestExport:
     def test_export_deterministic(self, conn, tmp_path):
         _mk(conn, work=[{"id": "w1", "summary": "first unit"}])
