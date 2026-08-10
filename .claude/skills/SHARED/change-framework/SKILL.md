@@ -14,7 +14,8 @@ Use for multi-file work, features, refactors, or any change likely to exceed abo
 - Start with the simplest thing that can work; avoid premature abstractions.
 - Touch only task-required code; surface adjacent issues as "noticed but not touching."
 - Prefer vertical slices; use contract-first for parallel components and risk-first for uncertainty.
-- Each slice must implement, test, verify, and commit one logical behavior.
+- Each slice must implement, test, and verify one logical behavior. When
+  Section 3 authorizes commits, commit one slice at a time.
 - Keep the project buildable and each increment independently revertible.
 - New incomplete code stays disabled by default.
 

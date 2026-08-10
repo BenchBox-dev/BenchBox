@@ -2,22 +2,23 @@
 
 Every review evaluates five dimensions with severity classification.
 
+> **Scope:** This file is for code reviews only. Use it to check the five axes, what to delete, how to rate issues, size limits, and code-specific branches.
+>
+> It does not control permissions or workflow. `SHARED/review-protocol/SKILL.md` controls those. It covers authorization, defect handling, L1/L2/L3 steps, saving findings, and parity (`REVIEW-AUTH-001` to `REVIEW-PARITY-001`).
+>
+> `SHARED/review-protocol/SKILL.md` defines the authorization boundary. Only a later user message, in a separate turn, can authorize remediation. This file cannot authorize changes.
+
 ## Router-specific checks
 
-- Accept path, directory, staged, recent, PR, topic, or empty review scope;
-  output severity findings first: Critical, Required, Nit, Consider.
+- Accept any review scope: a file path, directory, staged changes, recent commits, a PR, a topic, or no scope. List severity findings first: Critical, Required, Nit, Consider.
 - Route L2 blind-spot audits through `SHARED/review-protocol/SKILL.md`.
 - For review-shape triggers, use the matching branch below: matrix/audit-doc,
   mixed tooling+data, repo-shape ADR, multi-W spec, defect follow-up
   artifact-freshness, or verification-only.
-- For TODOs claiming to retire a SQL-translation post-fixup from a harness
-  PASS, grep the helper call site and confirm the harness probe matches the
-  wrapper's `read=` argument. A single-dialect PASS cannot retire a helper
-  invoked with SQLGlot cross-dialect translation.
 - For multi-PR work, run `gh pr diff <N> --name-only` and classify blockers
   before content; avoid `--json body,files` unless needed.
-- `review --chain` may apply only authorized non-structural fixes; verify them,
-  then use the commit framework for commit/push/PR close-out.
+- Put project-specific checks (for example, SQLGlot dialect checks) in `code.review_checklist` (`code/skill.yaml:28`). Do not add them to this shared rubric. Use them only when `skill-sync.config.yaml` sets `code.review_checklist`.
+- `review --chain` stays read-only unless a later user message explicitly authorizes remediation in a separate turn under `SHARED/review-protocol/SKILL.md` [REVIEW-AUTH-001]. If authorized, it can fix only non-structural issues. Verify the fixes. Then use the commit framework to save, push, or open a PR.
 
 ## The Five Axes
 
@@ -27,7 +28,7 @@ Every review evaluates five dimensions with severity classification.
 - Error paths handled (not just happy path)?
 - Tests adequate and testing the right things?
 - Off-by-one, race conditions, state inconsistencies?
-- **Empirical-claim durability**: changes that update empirically-observed numbers (catalog "verified <tool>" comments, doc storage-size claims, expected-bytes bounds) need a checked-in smoke or make target that re-produces the observation, plus a consistency test that fails when doc claims drift outside catalog bounds.
+- **Empirical-claim durability**: if you change numbers that were measured (like `verified <tool>` comments, doc storage sizes, or expected-bytes limits), add two things. First, a check-in smoke or make target that reproduces the measurement. Second, a test that fails when the docs no longer match the catalog.
 
 ### 2. Readability & Simplicity
 - Names descriptive, consistent with project conventions?

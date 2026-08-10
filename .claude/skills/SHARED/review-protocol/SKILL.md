@@ -13,6 +13,11 @@ Review-shaped actions are read-only plus local capture. They may read code, run 
 
 A single request that bundles review with fixing or remediation remains review-only: the immediate action reports findings with zero tracked worktree-content changes. Do not interpret the bundle as permission to review and then edit locally in the same turn. Only a later user message, sent after the findings and explicitly authorizing implementation, permits remediation.
 
+An internal quality check inside an already-authorized write action is
+verification. It is not a review-shaped action if it stays within scope and
+adds no permissions. This rule does not apply when the user asks for a review,
+audit, or other review-shaped result.
+
 They must not, as a side effect:
 
 - Commit any file.
@@ -53,7 +58,11 @@ Layer 2 asks what class of issue the review framework failed to catch. It captur
 
 Projects provide storage locations/specs and sweep workflows. This protocol governs behavior; project docs govern storage format. Do not duplicate behavior rules in storage docs.
 
-Projects without their own binding: capture findings drafts out-of-tree to `~/.todo-db/finding-drafts/<project-id>/` as `YYYY-MM-DD-HHMMSS-<slug>.md` with the standard frontmatter (`id`, `date`, `status`, `finding_kind`, `review_context`, `related_paths`, `suggested_sweep`, `todo_id`) and record the path in chat; promote via the tracker's deferral/finding flow when available.
+For projects without their own binding:
+
+1. Save `~/.todo-db/finding-drafts/<project-id>/YYYY-MM-DD-HHMMSS-<slug>.md`.
+2. Add frontmatter: `id`, `date`, `status`, `finding_kind`, `review_context`, `related_paths`, `suggested_sweep`, and `todo_id`.
+3. Report the path. Promote through the tracker's deferral or finding flow when available.
 
 ## 6. Semantic Parity [REVIEW-PARITY-001]
 
