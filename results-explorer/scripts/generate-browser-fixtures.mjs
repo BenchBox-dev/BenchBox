@@ -564,7 +564,11 @@ const readShortIds = () => {
  */
 const writeFixtureIds = () => {
   const rows = readdirSync(join(genDataDir, "bundles"))
-    .filter((name) => name.endsWith(".json"))
+    // Companion tuning sidecars are deliberately published beside their
+    // primary result bundle, but they are not browser fixtures and have no
+    // `run.id`. Keep them available for detail-page sidecar requests while
+    // excluding them from role discovery.
+    .filter((name) => name.endsWith(".json") && !name.endsWith(".tuning.json"))
     .map((name) => name.slice(0, -".json".length));
   const runIdOf = (rid) => JSON.parse(readFileSync(join(genDataDir, "bundles", `${rid}.json`), "utf8"))?.run?.id;
   const shortIds = readShortIds();
