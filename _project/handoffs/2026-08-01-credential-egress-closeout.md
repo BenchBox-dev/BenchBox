@@ -17,6 +17,11 @@ PR #1621. The body below retains the original 2026-08-02 evidence as the
 audit trail; disposition deltas since then are summarized in the
 "Addendum 2026-08-09" at the end of the document.
 
+Current revalidation: the five successor remediations (#1597, #1601, #1595,
+#1610, #1617) are also merged and tracker-complete. The live evidence boundary
+is `origin/develop@8fdd4336de5a6f6a5e755a291f52f32fc9207a9d`; the addendum
+below records their dispositions and the remaining accepted/deferred residuals.
+
 ## Evidence boundary
 
 The review was run against clean `origin/develop` at `a9ae8326` where an
@@ -238,7 +243,8 @@ on a stacked branch as proof of the unfixed tree.
 ### What changed since 2026-08-02
 
 Five implementation PRs moved from "open with auto-merge" to merged on
-`develop`, verified against the tracker as of `origin/develop@ad588c599d`:
+`develop`, verified against the tracker as of
+`origin/develop@8fdd4336de5a6f6a5e755a291f52f32fc9207a9d`:
 
 - #1468 `result-export-explicit-raw-config-egress-sentinel-gate-v2`
 - #1476 `platform-options-redact-credential-aliases-v4`
@@ -247,6 +253,19 @@ Five implementation PRs moved from "open with auto-merge" to merged on
 - #1479 `results-anonymize-tuning-constraint-identifiers-v2`
 
 No open or conflicting PR remains for the credential-egress batch itself.
+
+The successor remediation queue is also merged and tracker-complete:
+
+- #1597 `credential-egress-platform-metadata-boundary-v3` — normalized
+  metadata/export boundaries, including `raw_metadata` coverage.
+- #1601 `platform-options-scrub-uri-credential-params-v2` — URI query and
+  fragment credential scrubbing with username precision.
+- #1595 `mcp-error-scrub-secret-vocabulary-v3` — assignment vocabulary for
+  DSNs, connection strings, private keys, SAS, and PATs.
+- #1610 `tuning-companion-constraint-shapes-v3` — nested tuning companion
+  table/column identifier anonymization.
+- #1617 `mcp-error-scrub-prose-precision-v4` — preserves benign secret-related
+  prose while scrubbing actual secret material.
 
 ### Permanent sentinel invariant — actual scope and optional-dependency accounting
 
@@ -283,7 +302,11 @@ the production successors and is green after `--all-extras` on `develop`.
 | URI userinfo / query credentials (includes #1480) | High | `platform-options-scrub-embedded-uri-userinfo-v4` | #1480 | merged — `query credentials` via `?password=…` scrubbed at `sanitize_platform_options` |
 | MCP structured JSON / prose secrets (includes #1480 sibling) | High | `mcp-scrub-structured-and-prose-secret-material-v2` | #1477 | merged |
 | tuning constraint identifiers (table/column hashes) | Medium-high | `results-anonymize-tuning-constraint-identifiers-v2` | #1479 | merged |
-| **raw_metadata** / metadata blocks (expansion) | Medium-high | `credential-egress-sentinel-invariant-expansion-v4` | #1621 | merged as permanent sentinel — exact `raw_metadata` + `query credentials` blocks above |
+| **raw_metadata** / metadata blocks (expansion) | Medium-high | `credential-egress-platform-metadata-boundary-v3`; `credential-egress-sentinel-invariant-expansion-v4` | #1597 / #1621 | merged — boundary fix plus permanent exact `raw_metadata` sentinel coverage |
+| URI query / fragment credentials | High | `platform-options-scrub-uri-credential-params-v2` | #1601 | merged — username-preserving query/fragment redaction |
+| MCP secret vocabulary | High | `mcp-error-scrub-secret-vocabulary-v3` | #1595 | merged — DSN, connection-string, private-key, SAS, and PAT assignments |
+| MCP prose precision | Medium-high | `mcp-error-scrub-prose-precision-v4` | #1617 | merged — benign diagnostics remain readable while secret values are scrubbed |
+| nested tuning companion shapes | Medium-high | `tuning-companion-constraint-shapes-v3` | #1610 | merged — table/column identifiers are anonymized in companion payloads |
 | R8 permanent sentinel invariant | High | (covered by #1468 + expansion #1621) | #1468 / #1621 | done — throwaway sweep made permanent; invariant above |
 | R1 Git identity churn (`make agent-write-preflight`) | Medium | (operational, no product PR) | — | accepted — visibility-only warning + per-commit `git -c` policy; no repo hook |
 | R2 root-only `/invalid-output` validation | Medium | — | — | **accepted** — mechanism evidence (root can bypass, file-parent still raises `NotADirectoryError`) preserved; no root CI lane claimed (see Addendum) |
@@ -320,8 +343,13 @@ uv run -- python -m pytest tests/unit/core/results -q -k anonymize  # tuning + e
 3. #1479 `results-anonymize-tuning-constraint-identifiers-v2` — isolated tuning branch.
 4. #1480 `platform-options-scrub-embedded-uri-userinfo-v4` — `query credentials` / userinfo at value boundaries.
 5. #1477 `mcp-scrub-structured-and-prose-secret-material-v2` — disjoint from results.
-6. #1621 `credential-egress-sentinel-invariant-expansion-v4` — permanent sweep covering `raw_metadata`, `query credentials`, MCP, and nested tuning companions; depends on #1480/#1477 successors (`#1601`/`#1595`) and platform metadata boundary (#1597).
-7. This report refresh (this item) — evidence after those PRs are merged.
+6. #1597 `credential-egress-platform-metadata-boundary-v3` — normalized metadata/export boundary.
+7. #1601 `platform-options-scrub-uri-credential-params-v2` — URI query/fragment credential scrubbing.
+8. #1595 `mcp-error-scrub-secret-vocabulary-v3` — structured assignment vocabulary.
+9. #1610 `tuning-companion-constraint-shapes-v3` — nested companion identifiers.
+10. #1617 `mcp-error-scrub-prose-precision-v4` — benign prose precision.
+11. #1621 `credential-egress-sentinel-invariant-expansion-v4` — permanent sweep covering `raw_metadata`, `query credentials`, MCP, and nested tuning companions.
+12. This report refresh (this item) — evidence after the successor queue and sentinel are merged.
 
 ### What was not run or built
 
