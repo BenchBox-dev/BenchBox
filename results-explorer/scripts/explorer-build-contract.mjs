@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const EXPECTED_CONTRACT_VERSION = "6";
 export const EXPECTED_READ_MODEL_VERSION = 7;
+const EXPECTED_NEWER_READ_MODEL_POLICY = "warn-and-continue";
 const REQUIRED_FLAGS = ["--data-dir", "--output", "--trust-label", "--visibility"];
 const REQUIRED_OUTPUTS = ["results.duckdb", "bundles/{result_id}.json"];
 const REMOVED_LEGACY_OUTPUTS = [
@@ -72,6 +73,20 @@ export function readExplorerBuildContract() {
     throw new Error(
       `Explorer read-model version ${EXPECTED_READ_MODEL_VERSION} expected, got ${contract.read_model_version}. ` +
         ALIGNMENT_HINT,
+    );
+  }
+
+  const compatibility = contract.read_model_compatibility ?? {};
+  if (compatibility.minimum_supported !== EXPECTED_READ_MODEL_VERSION) {
+    throw new Error(
+      `Explorer minimum supported read-model version ${EXPECTED_READ_MODEL_VERSION} expected, got ` +
+        `${compatibility.minimum_supported}. ${ALIGNMENT_HINT}`,
+    );
+  }
+  if (compatibility.newer_policy !== EXPECTED_NEWER_READ_MODEL_POLICY) {
+    throw new Error(
+      `Explorer newer read-model policy ${EXPECTED_NEWER_READ_MODEL_POLICY} expected, got ` +
+        `${compatibility.newer_policy}. ${ALIGNMENT_HINT}`,
     );
   }
 

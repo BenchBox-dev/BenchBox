@@ -29,10 +29,15 @@ EXPLORER_BUILD_CONTRACT_VERSION = "6"
 #     missing test_type as `power`. Existing snapshots must be rebuilt so their
 #     ranking and cohort tables cannot be queried under the new semantics.
 EXPLORER_READ_MODEL_VERSION = 7
+EXPLORER_READ_MODEL_COMPATIBILITY = {
+    "minimum_supported": EXPLORER_READ_MODEL_VERSION,
+    "newer_policy": "warn-and-continue",
+}
 
 EXPLORER_BUILD_CONTRACT = {
     "version": EXPLORER_BUILD_CONTRACT_VERSION,
     "read_model_version": EXPLORER_READ_MODEL_VERSION,
+    "read_model_compatibility": EXPLORER_READ_MODEL_COMPATIBILITY,
     "command": "uv run -- python _project/scripts/explorer_publish.py build",
     "flags": [
         "--data-dir",
@@ -60,5 +65,6 @@ EXPLORER_BUILD_CONTRACT = {
 __all__ = [
     "EXPLORER_BUILD_CONTRACT",
     "EXPLORER_BUILD_CONTRACT_VERSION",
+    "EXPLORER_READ_MODEL_COMPATIBILITY",
     "EXPLORER_READ_MODEL_VERSION",
 ]
