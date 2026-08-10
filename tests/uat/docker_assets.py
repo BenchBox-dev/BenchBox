@@ -288,9 +288,9 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
 # Endpoint roles are modeled explicitly: PLATFORM_SERVICE_PORT is the
 # container/service port (NOT the host port). Do not collapse the two.
 #
-# Credential and secondary-port literals (password=, http_port=, ...) are NOT
-# yet derived — that is the deferred follow-up. They live here as the single
-# connection registry so matrix.py no longer keeps a parallel copy.
+# Secondary host ports and managed credentials derive from the registered
+# Compose files below. The small role/key maps identify which Compose fact an
+# adapter option consumes; they do not duplicate the values themselves.
 # ---------------------------------------------------------------------------
 
 # Platform -> in-container service port the adapter connects to. The host
@@ -315,20 +315,26 @@ PLATFORM_SERVICE_PORT: dict[str, int] = {
     "velox": 50051,
 }
 
-# Static (non-derived) platform options, relocated from matrix.py. The
-# reachability `port=` option is injected separately from the compose-derived
-# host port (see platform_extra_opts) so an env override flows through.
 _PLATFORM_STATIC_OPTS: dict[str, list[str]] = {
-    "questdb": ["--platform-option", "http_port=19000"],
-    "starrocks": ["--platform-option", "http_port=18040"],
-    "doris": [
-        "--platform-option",
-        "http_port=18030",
-        "--platform-option",
-        "be_http_port=18040",
-    ],
-    "singlestore": ["--platform-option", "password=benchbox"],
     "velox": ["--platform-option", "deployment=remote"],
+}
+
+# Platform -> adapter option -> in-container port. The host-side value is
+# resolved from Compose, including ${VAR:-default} overrides.
+_PLATFORM_SECONDARY_PORTS: dict[str, dict[str, int]] = {
+    "questdb": {"http_port": 9000},
+    "starrocks": {"http_port": 8040},
+    "doris": {"http_port": 8030, "be_http_port": 8040},
+}
+
+# Platform -> Compose environment key whose value is the adapter password.
+_PLATFORM_PASSWORD_ENV_KEYS: dict[str, str] = {
+    "clickhouse-server": "CLICKHOUSE_PASSWORD",
+    "pg-duckdb": "POSTGRES_PASSWORD",
+    "pg-mooncake": "POSTGRES_PASSWORD",
+    "timescaledb": "POSTGRES_PASSWORD",
+    "postgresql": "POSTGRES_PASSWORD",
+    "singlestore": "ROOT_PASSWORD",
 }
 
 # Platforms that pass the resolved host reachability port to the adapter as the
@@ -352,12 +358,8 @@ _PLATFORM_INJECT_SPARK_CONNECT_ENDPOINT_OPT: frozenset[str] = frozenset({"lakesa
 # authentication fails outright. `username=benchbox` must be injected here
 # alongside `password=benchbox` for any docker-managed postgresql cell (e.g.
 # the throughput UAT cell) to connect at all.
-_PLATFORM_LOCAL_MANAGED_OPTS: dict[str, list[str]] = {
-    "clickhouse-server": ["--platform-option", "password=benchbox"],
-    "pg-duckdb": ["--platform-option", "password=benchbox"],
-    "pg-mooncake": ["--platform-option", "password=benchbox"],
-    "timescaledb": ["--platform-option", "password=benchbox"],
-    "postgresql": ["--platform-option", "username=benchbox", "--platform-option", "password=benchbox"],
+_PLATFORM_LOCAL_MANAGED_STATIC_OPTS: dict[str, list[str]] = {
+    "postgresql": ["--platform-option", "username=benchbox"],
 }
 
 # A compose `ports:` entry: "[ip:]host:container", host may be ${VAR:-default}.
@@ -409,17 +411,75 @@ def resolve_published_host_port(platform: str, *, env: dict[str, str] | None = N
     PLATFORM_SERVICE_PORT[platform], disambiguating sidecar ports (e.g. databend
     MinIO, questdb REST) from the reachability endpoint.
     """
-    env = os.environ if env is None else env
     service_port = PLATFORM_SERVICE_PORT.get(platform)
+    return resolve_published_host_port_for_container(platform, service_port, env=env)
+
+
+def resolve_published_host_port_for_container(
+    platform: str,
+    container_port: int | None,
+    *,
+    env: dict[str, str] | None = None,
+) -> int | None:
+    """Resolve one Compose container port to its published host port."""
+    env = os.environ if env is None else env
     spec = _DOCKER_PLATFORM_SPECS.get(platform)
-    if service_port is None or spec is None:
+    if container_port is None or spec is None:
         return None
     for compose_file in spec.compose_files:
-        for host_token, container in _iter_compose_port_mappings(compose_file):
-            if container == service_port:
+        for host_token, mapped_container_port in _iter_compose_port_mappings(compose_file):
+            if mapped_container_port == container_port:
                 resolved = _resolve_host_token(host_token, env)
                 if resolved is not None:
                     return resolved
+    return None
+
+
+@functools.cache
+def _compose_document(compose_file: Path) -> dict:
+    payload = yaml.safe_load(compose_file.read_text(encoding="utf-8")) or {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _compose_service_environment_value(
+    platform: str,
+    key: str,
+    *,
+    env: dict[str, str] | None = None,
+) -> str | None:
+    """Resolve a registered service's Compose environment value."""
+    process_env = os.environ if env is None else env
+    spec = _DOCKER_PLATFORM_SPECS.get(platform)
+    if spec is None:
+        return None
+    for compose_file in spec.compose_files:
+        services = _compose_document(compose_file).get("services", {})
+        if not isinstance(services, dict):
+            continue
+        for service_name in spec.services:
+            service = services.get(service_name, {})
+            if not isinstance(service, dict):
+                continue
+            raw_environment = service.get("environment", {})
+            if isinstance(raw_environment, list):
+                entries = dict(
+                    entry.split("=", 1) for entry in raw_environment if isinstance(entry, str) and "=" in entry
+                )
+            elif isinstance(raw_environment, dict):
+                entries = raw_environment
+            else:
+                continue
+            raw = entries.get(key)
+            if raw is None:
+                continue
+            text = str(raw)
+            default_match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z0-9_]*):-(.*)\}", text)
+            if default_match:
+                return process_env.get(default_match.group(1), default_match.group(2))
+            bare_match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", text)
+            if bare_match:
+                return process_env.get(bare_match.group(1))
+            return text
     return None
 
 
@@ -440,6 +500,14 @@ def platform_extra_opts(platform: str, *, env: dict[str, str] | None = None) -> 
         host_port = resolve_published_host_port(platform, env=env)
         if host_port is not None:
             opts += ["--platform-option", f"port={host_port}"]
+    for option, container_port in _PLATFORM_SECONDARY_PORTS.get(platform, {}).items():
+        host_port = resolve_published_host_port_for_container(platform, container_port, env=env)
+        if host_port is not None:
+            opts += ["--platform-option", f"{option}={host_port}"]
+    if platform == "singlestore":
+        password = _compose_service_environment_value(platform, _PLATFORM_PASSWORD_ENV_KEYS[platform], env=env)
+        if password is not None:
+            opts += ["--platform-option", f"password={password}"]
     opts += list(_PLATFORM_STATIC_OPTS.get(platform, []))
     if platform in _PLATFORM_INJECT_SPARK_CONNECT_ENDPOINT_OPT:
         host_port = resolve_published_host_port(platform, env=env)
@@ -448,9 +516,15 @@ def platform_extra_opts(platform: str, *, env: dict[str, str] | None = None) -> 
     return opts
 
 
-def local_managed_platform_extra_opts(platform: str) -> list[str]:
+def local_managed_platform_extra_opts(platform: str, *, env: dict[str, str] | None = None) -> list[str]:
     """Return managed-Docker-only `--platform-option` argv (credentials)."""
-    return list(_PLATFORM_LOCAL_MANAGED_OPTS.get(platform, []))
+    opts = list(_PLATFORM_LOCAL_MANAGED_STATIC_OPTS.get(platform, []))
+    password_key = _PLATFORM_PASSWORD_ENV_KEYS.get(platform)
+    if password_key is not None:
+        password = _compose_service_environment_value(platform, password_key, env=env)
+        if password is not None:
+            opts += ["--platform-option", f"password={password}"]
+    return opts
 
 
 # Fill each spec's display probe label from the compose-derived endpoint (default

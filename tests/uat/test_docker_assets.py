@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from pathlib import Path
 
@@ -404,6 +405,56 @@ def test_local_managed_clickhouse_compose_password_matches_uat_argv():
     assert 'CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"' in compose_text
     assert "init-default-database.sql:/docker-entrypoint-initdb.d/init-default-database.sql:ro" in compose_text
     assert "password=benchbox" in argv
+
+
+def test_secondary_ports_follow_compose_mappings(monkeypatch, tmp_path):
+    compose = tmp_path / "compose.yml"
+    compose.write_text(
+        """services:\n  doris:\n    ports:\n      - \"19031:9030\"\n      - \"28030:8030\"\n      - \"28040:8040\"\n"""
+    )
+    original = docker_assets.docker_platform_spec("doris")
+    monkeypatch.setitem(
+        docker_assets._DOCKER_PLATFORM_SPECS,
+        "doris",
+        dataclasses.replace(original, compose_files=(compose,)),
+    )
+
+    assert docker_assets.platform_extra_opts("doris") == [
+        "--platform-option",
+        "port=19031",
+        "--platform-option",
+        "http_port=28030",
+        "--platform-option",
+        "be_http_port=28040",
+    ]
+
+
+def test_password_follows_compose_environment_and_override(monkeypatch, tmp_path):
+    compose = tmp_path / "compose.yml"
+    compose.write_text(
+        """services:\n  singlestore:\n    ports:\n      - \"13306:3306\"\n    environment:\n      ROOT_PASSWORD: ${ROOT_PASSWORD:-benchbox}\n"""
+    )
+    original = docker_assets.docker_platform_spec("singlestore")
+    monkeypatch.setitem(
+        docker_assets._DOCKER_PLATFORM_SPECS,
+        "singlestore",
+        dataclasses.replace(original, compose_files=(compose,)),
+    )
+
+    assert "password=changed" in docker_assets.platform_extra_opts("singlestore", env={"ROOT_PASSWORD": "changed"})
+
+
+def test_connection_registries_do_not_duplicate_derived_values():
+    assert all(
+        not value.startswith(("password=", "http_port=", "be_http_port="))
+        for values in docker_assets._PLATFORM_STATIC_OPTS.values()
+        for value in values
+    )
+    assert all(
+        not value.startswith("password=")
+        for values in docker_assets._PLATFORM_LOCAL_MANAGED_STATIC_OPTS.values()
+        for value in values
+    )
 
 
 # --------------------------------------------------------------------------
