@@ -140,3 +140,7 @@ explorer-vitest:
   - "tests/parity/fixtures/**"
   - "tests/unit/core/tuning/fixtures/**"
   - ".github/workflows/results-explorer-browser.yml"
+  - ".github/workflows/pr.yml"
+  - ".github/path-filters.yml"
+  - "tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml"
+  - "tests/parity/fixtures/chart_ids.json"
