@@ -37,13 +37,9 @@ Every review evaluates five dimensions with severity classification.
 - Dead code removed (`_unused` vars, compat shims, stale comments)?
 
 **Deletion sub-checklist (what can be cut):**
-- What in this diff can be deleted while preserving the specification?
-- Look for: reinvented stdlib, unneeded dependencies, speculative
-  abstractions, and dead flexibility (unused options/params/branches).
-- One line per finding: location (`file:line`), what to cut, what replaces
-  it (stdlib call, existing helper, or nothing).
-- These are report-only findings: deletions are structural changes and are
-  never auto-applied by a review.
+- Check source-code diffs against `SHARED/change-framework/SKILL.md` Section 1.
+- For each finding, report `file:line`, what to cut, and its replacement.
+- Findings are report-only; never apply deletions during a review.
 
 ### 3. Architecture
 - Follows existing patterns or introduces justified new one?

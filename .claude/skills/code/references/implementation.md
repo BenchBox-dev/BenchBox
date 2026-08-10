@@ -1,5 +1,9 @@
 # Code Implementation Actions
 
+## Implement
+
+Follow configured project conventions and checks.
+
 ## Commit
 
 Discover session files, inspect `git status --porcelain` and the diff, verify,
@@ -9,9 +13,7 @@ make a conventional commit, and push through the commit framework.
 
 - Lint: use configured lint/fix commands.
 - Type: run typecheck and add annotations where needed.
-- Runtime: apply the research framework and make the smallest code change.
-- Before writing a new helper, search for an existing equivalent;
-  `make duplicate-check-verbose` names current clone groups.
+- Runtime: apply the investigation framework's Debug workflow.
 
 ## Debug
 

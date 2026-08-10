@@ -21,6 +21,6 @@ Ranking and grouping open work is a skill-only analysis. It has no CLI command. 
 
 * `todo block <id> --reason ...` — mark blocked
 * `todo unblock <id>` — clear the blocked flag
-* `todo release <id>` — release a claim
+* `todo release <id>` — release your claim. Fails with exit 2 if another actor holds it. Checking `claimed_by` with `todo show --json` can still race. You cannot release another actor's expired claim. Use `todo claim` (may take it over if expired) or `todo sweep-stale`. Does nothing if unclaimed.
 * `todo sweep-stale` — release expired claims
 * `todo drop <id> --reason ...` — drop an item
