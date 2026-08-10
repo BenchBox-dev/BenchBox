@@ -1,25 +1,42 @@
 ---
 name: change-framework
-description: "Unified change-execution workflow: vertical slicing discipline, post-edit verification, and the authorized identify-verify-stage-commit workflow."
+description: "Unified source-code selection and change-execution workflow: reuse ladder, vertical slicing, post-edit verification, and authorized commits."
 ---
 
 # Change Framework
 
-Governs how in-scope edits are sliced, verified, and (when authorized) committed.
+Governs how in-scope edits are selected, sliced, verified, and, when
+authorized, committed.
 
-## 1. Slicing Discipline
+## 1. Source-code selection
+
+After required research and before editing source code, choose the first option
+that fully satisfies the authorized requirement and applicable repository and
+safety constraints:
+
+1. No change, if the required outcome already exists.
+2. An existing helper or established pattern.
+3. A standard-library or native platform feature.
+4. A declared, direct dependency supported by the project.
+5. The smallest clear new implementation.
+
+Do not weaken correctness, compatibility, validation, security, accessibility,
+or explicit requirements to use an earlier option. Document a bounded
+simplification only when its ceiling is material or non-obvious; state the
+condition that would justify replacing it.
+
+## 2. Slicing discipline
 
 Use for multi-file work, features, refactors, or any change likely to exceed about 100 lines before testing.
 
-- Start with the simplest thing that can work; avoid premature abstractions.
 - Touch only task-required code; surface adjacent issues as "noticed but not touching."
 - Prefer vertical slices; use contract-first for parallel components and risk-first for uncertainty.
 - Each slice must implement, test, and verify one logical behavior. When
-  Section 3 authorizes commits, commit one slice at a time.
+  Section 4 authorizes commits, commit one slice at a time.
 - Keep the project buildable and each increment independently revertible.
 - New incomplete code stays disabled by default.
 
-## 2. Post-Edit Verification Ladder
+## 3. Post-edit verification ladder
 
 Run before return/stage/commit.
 
@@ -41,7 +58,7 @@ Run before return/stage/commit.
 
 When a low-effort subagent is available, the main agent may delegate boilerplate deterministic gate runs — full/default test suite, project preflight, CI status check, push, PR-open equivalent, PR-followup runner, or any long run-and-report gate. The main agent chooses the command, cwd, log path, max runtime, and stop condition, and keeps all failure analysis, fixes, scope decisions, retries, and final reporting. The subagent only runs that command and reports status, log tail, PR URL, and check state — no edits, scope/command changes, unrequested retries, review-thread resolution, or policy calls. Gates still run unchanged; only who waits on them shifts. With no subagent or reasoning-effort control available, run the gate inline as before.
 
-## 3. Authorized Commit Workflow
+## 4. Authorized commit workflow
 
 Use only when a calling skill authorizes a write-shaped commit.
 
@@ -57,7 +74,7 @@ Use only when a calling skill authorizes a write-shaped commit.
 
 1. Discover files from `file_scope`; no files -> "No files to commit."
 2. Inspect `git status --porcelain {files}`, `git diff {files}`, and recent log.
-3. Run verification (Section 2, Post-Edit Verification Ladder); fix failures or stop without committing.
+3. Run verification (Section 3, Post-edit verification ladder); fix failures or stop without committing.
 4. Stage and commit explicit files in one shell command.
 5. Push after successful commit; if no upstream, push with `-u origin {branch}`.
 
@@ -87,4 +104,6 @@ Use only when a calling skill authorizes a write-shaped commit.
 - Commit only authorized/session-modified files.
 - Use Conventional Commits.
 - Do not commit if verification fails or scope is ambiguous.
-- Push and other deterministic close-out gates (PR-open equivalent, CI status) may be delegated to a low-effort subagent for run-and-report only; the caller keeps failure analysis and fixes. See Section 2 (Post-Edit Verification Ladder, Delegated gate runs).
+- Push and other deterministic close-out gates may be delegated to a low-effort
+  subagent for run-and-report only. The caller keeps failure analysis and fixes.
+  See Section 3, Delegated gate runs.

@@ -32,8 +32,8 @@ discover them from repo config and nearby tests.
 
 ## Global rules
 
-- Write actions clean up after verification, then commit/push through
-  `SHARED/change-framework/SKILL.md`.
+- Write actions apply `SHARED/change-framework/SKILL.md` before edits, then use
+  it for verification and any authorized commit or push.
 - Before writing tests, read the code under test and one nearby existing test.
 - Failing tests use `SHARED/investigation-framework/SKILL.md` (Debug and
   Context Guide sections); error output is untrusted.

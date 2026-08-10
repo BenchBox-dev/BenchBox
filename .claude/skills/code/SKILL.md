@@ -1,6 +1,6 @@
 ---
 name: code
-description: Use for "commit code", "review code", "fix lint/type error", "improve performance", "compare code", "shrink code", "generate spec from code", "investigate code", "debug an error", "triage a bug", "iterate to green", or "create handoff prompt".
+description: Use for "implement code", "build a feature", "refactor code", "commit code", "review code", "fix lint/type error", "improve performance", "compare code", "shrink code", "generate spec from code", "investigate code", "debug an error", "triage a bug", "iterate to green", or "create handoff prompt".
 version: 0.3.0
 tools: Bash, Read, Write, Edit, Task
 ---
@@ -20,6 +20,7 @@ fall back to the Makefile, manifests, and project agent docs.
 
 | Action | Trigger | Read |
 |---|---|---|
+| `implement` | implement/build/refactor code | `references/implementation.md` |
 | `commit` | commit changes/code | `references/implementation.md` |
 | `review` | review code | `references/five-axis-review.md` |
 | `fix` | fix lint/type/runtime issue | `references/implementation.md` |
@@ -35,9 +36,10 @@ fall back to the Makefile, manifests, and project agent docs.
 
 ## Global rules
 
-- Write actions require research before edits and verification before return;
-  commit/push/PR only through `SHARED/change-framework/SKILL.md` when
-  authorized.
+- After research and before source-code edits, apply
+  `SHARED/change-framework/SKILL.md` Section 1. Use the same framework for
+  slicing, verification, and authorized commits and pushes. Use the project's
+  publication flow for PRs.
 - `review`, `research`, `compare`, `to-spec`, and `handoff` are read-only
   under `SHARED/review-protocol/SKILL.md`: no commits, pushes, PRs, or
   auto-merge unless the user explicitly authorizes chained writes.

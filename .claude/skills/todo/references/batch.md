@@ -74,7 +74,10 @@ Repeat until every item is `done` or `blocked`:
 
 1. Mark `in_progress` in the ledger.
 2. Use a fresh pool worktree off the integration branch when you can. If a dependency PR merged since you claimed the worktree, refresh onto the updated branch first.
-3. Run `todo claim <id>` and follow the work order. For each work unit: `todo start` (records worktree and branch), implement, then `todo done <id> <wid> --evidence "<command or commit or PR>"`. Defer out-of-scope work at once with `todo defer`.
+3. Run `todo claim <id>` and follow the work order. For each work unit, run
+   `todo start`, apply `SHARED/change-framework/SKILL.md` Section 1 before
+   source-code edits, implement, then record evidence with `todo done`. Defer
+   out-of-scope work with `todo defer`.
 4. Run `todo check-scope <id>` and `todo verify <id> --run`.
 5. Mark `in_review`. As internal implementation verification under
    `SHARED/review-protocol/SKILL.md` [REVIEW-AUTH-001], run the `code` skill
