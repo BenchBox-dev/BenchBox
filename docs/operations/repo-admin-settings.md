@@ -380,7 +380,7 @@ future regression (ruleset deleted, made inactive, ref narrowed, creation rule
 dropped, or bypass emptied) becomes a blocking drift finding instead of a
 warning.
 
-### `pypi` environment required-reviewers gate (configured; observed 2026-08-05)
+### `pypi` environment required-reviewers gate (configured; observed 2026-08-10)
 
 `release.yml`'s `publish` job already scopes the real-PyPI publish to the
 GitHub `environment: pypi` (and `test-pypi` for the test-PyPI path), which
@@ -388,9 +388,12 @@ is the correct native mechanism for a required-reviewers/human-approval
 gate on publish. The workflow file alone does not prove the `pypi`
 environment has `required_reviewers` configured on the repo side — only a
 live environments API read does. GitHub enforces the gate at deployment time
-when it is configured; unlike the tag-creation ruleset, there is no automated
-environment-drift canary in `release-canary.yml` / `ruleset_drift_check.py` —
-honesty of this section rests on the dated pin below and manual re-verify.
+when it is configured. `scripts/ruleset_drift_check.py` reads that API in the
+existing release-canary drift job and fails closed when the environment,
+required-reviewers rule, reviewer identity, admin-bypass posture, or
+self-review posture differs from the pin below. The check reuses
+`RULESET_DRIFT_TOKEN`, which therefore needs environment-read visibility as
+well as full ruleset visibility.
 
 Verify:
 
@@ -399,12 +402,12 @@ gh api repos/joeharris76/BenchBox/environments/pypi \
   --jq '{name, can_admins_bypass, protection_rules: [.protection_rules[] | {type, prevent_self_review, reviewers: [.reviewers[]?.reviewer.login]}]}'
 ```
 
-Live verification on 2026-08-05 (command above) shows the `pypi` environment
+Live verification on 2026-08-10 (command above) shows the `pypi` environment
 already carries a required-reviewers gate:
 
 ```text
 # pypi environment live state
-# checked: 2026-08-05  by: joeharris76 (admin)
+# checked: 2026-08-10  by: joeharris76 (admin)
 # command: gh api repos/joeharris76/BenchBox/environments/pypi --jq '{name, can_admins_bypass, protection_rules: [.protection_rules[] | {type, prevent_self_review, reviewers: [.reviewers[]?.reviewer.login]}]}'
 # observed: {"name":"pypi","can_admins_bypass":true,"protection_rules":[{"reviewers":["joeharris76"],"type":"required_reviewers","prevent_self_review":false}]}
 # type: required_reviewers  reviewer login(s): joeharris76  (User id 57046)
@@ -415,9 +418,10 @@ No admin mutation required for this gate — it is already configured. The
 `can_admins_bypass: true` + `prevent_self_review: false` pair is the accepted
 single-admin / self-review posture for this repo (one maintainer is both the
 required reviewer and an admin who can still approve or bypass their own
-deployment). Detect drift manually: re-run the verify command above and
-compare to this dated record (rule removed, reviewers emptied, environment
-deleted, or bypass/self-review flags flipped).
+deployment). The release canary continuously detects a removed rule, emptied
+or replaced reviewer set, deleted environment, or changed bypass/self-review
+flag. Re-run the verify command above for operator diagnosis when the canary
+reports drift.
 
 `test-pypi` intentionally has no protection rules (lower friction for dry-run
 publish paths). Observed on 2026-08-05:

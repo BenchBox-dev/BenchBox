@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts import ruleset_drift_check
-from scripts.ruleset_drift_check import compare_ruleset, parse_expected_rulesets
+from scripts.ruleset_drift_check import compare_ruleset, environment_protection_findings, parse_expected_rulesets
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -101,6 +101,66 @@ def test_bypass_actor_visibility_can_be_required() -> None:
     findings = compare_ruleset(expected, live, require_bypass_actor_visibility=True)
 
     assert any("bypass actors are not visible" in finding for finding in findings)
+
+
+def _pypi_environment() -> dict:
+    return {
+        "name": "pypi",
+        "can_admins_bypass": True,
+        "protection_rules": [
+            {
+                "type": "required_reviewers",
+                "prevent_self_review": False,
+                "reviewers": [{"type": "User", "reviewer": {"id": 57046, "login": "joeharris76"}}],
+            }
+        ],
+    }
+
+
+def test_matching_pypi_environment_has_no_drift_findings() -> None:
+    assert environment_protection_findings(_pypi_environment()) == []
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected"),
+    [
+        (lambda payload: payload.update(can_admins_bypass=False), "can_admins_bypass"),
+        (lambda payload: payload.update(protection_rules=[]), "required_reviewers"),
+        (lambda payload: payload["protection_rules"][0].update(prevent_self_review=True), "prevent_self_review"),
+        (
+            lambda payload: payload["protection_rules"][0]["reviewers"][0]["reviewer"].update(id=999),
+            "required reviewers",
+        ),
+        (
+            lambda payload: payload["protection_rules"][0]["reviewers"].append(
+                {"type": "User", "reviewer": {"id": None, "login": None}}
+            ),
+            "required reviewers",
+        ),
+        (lambda payload: payload.update(protection_rules=None), "protection_rules"),
+        (lambda payload: payload["protection_rules"][0].update(reviewers=None), "reviewers"),
+    ],
+)
+def test_pypi_environment_policy_drift_is_reported(mutate, expected: str) -> None:
+    payload = _pypi_environment()
+    mutate(payload)
+
+    findings = environment_protection_findings(payload)
+
+    assert any(expected in finding for finding in findings)
+
+
+def test_fetch_environment_uses_pypi_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[tuple[str, str]] = []
+
+    def fake_api_json(url: str, token: str) -> dict:
+        seen.append((url, token))
+        return _pypi_environment()
+
+    monkeypatch.setattr(ruleset_drift_check, "_api_json", fake_api_json)
+
+    assert ruleset_drift_check._fetch_environment("owner/repo", "secret") == _pypi_environment()
+    assert seen == [("https://api.github.com/repos/owner/repo/environments/pypi", "secret")]
 
 
 def test_github_api_failure_is_reported_without_traceback(

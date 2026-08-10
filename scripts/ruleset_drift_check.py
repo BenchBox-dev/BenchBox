@@ -40,6 +40,11 @@ WARNING_PREFIX = "WARNING (non-blocking): "
 # parameter override remains available for migration fixtures.
 DEVELOP_REVIEW_RULE_ENFORCED = True
 
+PYPI_ENVIRONMENT = "pypi"
+PYPI_REQUIRED_REVIEWERS = (("User", 57046, "joeharris76"),)
+PYPI_CAN_ADMINS_BYPASS = True
+PYPI_PREVENT_SELF_REVIEW = False
+
 
 @dataclass(frozen=True)
 class ExpectedRuleset:
@@ -51,6 +56,52 @@ class ExpectedRuleset:
     non_fast_forward: bool
     deletion: bool
     bypass_actors_none: bool
+
+
+def environment_protection_findings(live: dict[str, Any]) -> list[str]:
+    """Return blocking drift findings for the real-PyPI environment gate."""
+    findings: list[str] = []
+    if live.get("name") != PYPI_ENVIRONMENT:
+        findings.append(f"pypi environment: name is {live.get('name')!r}, expected {PYPI_ENVIRONMENT!r}")
+    if live.get("can_admins_bypass") is not PYPI_CAN_ADMINS_BYPASS:
+        findings.append(
+            "pypi environment: can_admins_bypass is "
+            f"{live.get('can_admins_bypass')!r}, expected {PYPI_CAN_ADMINS_BYPASS!r}"
+        )
+
+    protection_rules = live.get("protection_rules")
+    if not isinstance(protection_rules, list):
+        findings.append("pypi environment: protection_rules is missing or malformed")
+        return findings
+    reviewer_rules = [
+        rule for rule in protection_rules if isinstance(rule, dict) and rule.get("type") == "required_reviewers"
+    ]
+    if len(reviewer_rules) != 1:
+        findings.append(f"pypi environment: found {len(reviewer_rules)} required_reviewers rules, expected exactly one")
+        return findings
+
+    rule = reviewer_rules[0]
+    if rule.get("prevent_self_review") is not PYPI_PREVENT_SELF_REVIEW:
+        findings.append(
+            "pypi environment: prevent_self_review is "
+            f"{rule.get('prevent_self_review')!r}, expected {PYPI_PREVENT_SELF_REVIEW!r}"
+        )
+    raw_reviewers = rule.get("reviewers")
+    if not isinstance(raw_reviewers, list):
+        findings.append("pypi environment: reviewers is missing or malformed")
+        return findings
+    reviewers: list[tuple[Any, Any, Any]] = []
+    for reviewer in raw_reviewers:
+        if not isinstance(reviewer, dict):
+            reviewers.append((None, None, None))
+            continue
+        principal = reviewer.get("reviewer")
+        if not isinstance(principal, dict):
+            principal = {}
+        reviewers.append((reviewer.get("type"), principal.get("id"), principal.get("login")))
+    if tuple(reviewers) != PYPI_REQUIRED_REVIEWERS:
+        findings.append(f"pypi environment: required reviewers are {reviewers!r}, expected {PYPI_REQUIRED_REVIEWERS!r}")
+    return findings
 
 
 def _api_json(url: str, token: str) -> Any:
@@ -276,6 +327,10 @@ def _fetch_live_rulesets(repo: str, token: str) -> dict[str, dict[str, Any]]:
     return by_name
 
 
+def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> dict[str, Any]:
+    return _api_json(f"https://api.github.com/repos/{repo}/environments/{name}", token)
+
+
 def blocking_findings(findings: list[str]) -> list[str]:
     """Findings that should fail the check (excludes WARNING_PREFIX entries)."""
     return [finding for finding in findings if not finding.startswith(WARNING_PREFIX)]
@@ -290,6 +345,7 @@ def render_summary(findings: list[str], expected: dict[str, ExpectedRuleset]) ->
         lines = ["# Ruleset Drift - OK", ""]
         for ruleset in expected.values():
             lines.append(f"- {ruleset.name}: required checks {', '.join(ruleset.required_checks)}")
+        lines.append("- pypi environment: required reviewer joeharris76 (User id 57046)")
     if warnings:
         lines += ["", "## Non-blocking warnings", "", *[f"- {finding}" for finding in warnings]]
     return "\n".join(lines) + "\n"
@@ -326,13 +382,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         live_by_name = _fetch_live_rulesets(args.repo, args.token)
+        live_pypi_environment = _fetch_environment(args.repo, args.token)
     except Exception as exc:
         if args.output:
             args.output.write_text(
                 json.dumps({"status": "error", "error": str(exc)}, indent=2) + "\n",
                 encoding="utf-8",
             )
-        print(f"ERROR: ruleset drift check failed while querying GitHub: {exc}", file=sys.stderr)
+        print(f"ERROR: governance drift check failed while querying GitHub: {exc}", file=sys.stderr)
         return 1
 
     findings: list[str] = []
@@ -349,6 +406,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     findings.extend(tag_creation_findings(list(live_by_name.values())))
+    findings.extend(environment_protection_findings(live_pypi_environment))
 
     blocking = blocking_findings(findings)
     summary = render_summary(findings, expected)
