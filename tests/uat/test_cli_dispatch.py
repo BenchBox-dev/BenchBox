@@ -853,6 +853,7 @@ def test_gate_check_rejects_old_evidence_without_digests(tmp_path: Path, capsys)
     assert any("regenerate evidence" in reason.lower() for reason in payload["reasons"])
 
 
+@pytest.mark.slow
 def test_completeness_gate_digest_provenance(tmp_path: Path):
     """End-to-end: a real sweep-produced GateSummary carries cell/sidecar/lifecycle digests."""
     from tests.uat import orchestrator
