@@ -135,6 +135,122 @@ EXPECTED_OMISSION_TIERS = {
     "--validation": "not-yet-demanded",
 }
 
+_TABLE_SEPARATOR_CELL = re.compile(r"^:?-{3,}:?$")
+_FENCE_LINE = re.compile(r"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
+
+
+def _fence_marker(line: str) -> str | None:
+    """Return a Markdown fence marker, if *line* opens or closes one."""
+    match = _FENCE_LINE.fullmatch(line)
+    if match is None:
+        return None
+    marker = match.group("marker")
+    info = match.group("info")
+    if marker[0] == "`" and "`" in info:
+        return None
+    return marker
+
+
+def _is_fence_closer(line: str, opening_marker: str) -> bool:
+    """Return whether *line* closes a fence opened with *opening_marker*."""
+    match = _FENCE_LINE.fullmatch(line)
+    if match is None or match.group("info").strip():
+        return False
+    marker = match.group("marker")
+    return marker[0] == opening_marker[0] and len(marker) >= len(opening_marker)
+
+
+def _is_indented_code(line: str) -> bool:
+    """Return whether *line* starts a Markdown indented code block."""
+    return line.startswith("    ") or line.startswith("\t")
+
+
+def _looks_like_table_separator(line: str) -> bool:
+    """Identify a separator-row candidate without parsing its delimiters."""
+    return "|" in line and re.search(r"-{3,}", line) is not None
+
+
+def _split_markdown_table_row(line: str, line_number: int) -> list[str]:
+    """Split one pipe-delimited Markdown row and require both delimiters."""
+    stripped = line.rstrip()
+    if not stripped.startswith("|") or not stripped.endswith("|"):
+        raise AssertionError(f"Markdown table row {line_number} must have leading and trailing pipes")
+
+    cells: list[str] = []
+    cell: list[str] = []
+    escaped = False
+    for character in stripped[1:-1]:
+        if character == "|" and not escaped:
+            cells.append("".join(cell).strip())
+            cell = []
+        else:
+            cell.append(character)
+        if character == "\\":
+            escaped = not escaped
+        else:
+            escaped = False
+    cells.append("".join(cell).strip())
+    return cells
+
+
+def _assert_markdown_table_topology(text: str) -> None:
+    """Require every public-contract Markdown table to have a stable topology."""
+    lines = text.splitlines()
+    opening_fence: str | None = None
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        if opening_fence is not None:
+            if _is_fence_closer(line, opening_fence):
+                opening_fence = None
+            index += 1
+            continue
+        fence_marker = _fence_marker(line)
+        if fence_marker is not None:
+            opening_fence = fence_marker
+            index += 1
+            continue
+        if _is_indented_code(line) or not line.strip():
+            index += 1
+            continue
+        if "|" not in line:
+            index += 1
+            continue
+        if index + 1 >= len(lines) or not _looks_like_table_separator(lines[index + 1]):
+            index += 1
+            continue
+
+        header = _split_markdown_table_row(line, index + 1)
+        if not lines[index + 1].strip():
+            raise AssertionError(f"Markdown table at row {index + 1} is missing its separator row")
+        separator = _split_markdown_table_row(lines[index + 1], index + 2)
+        if len(separator) != len(header) or not all(_TABLE_SEPARATOR_CELL.fullmatch(cell) for cell in separator):
+            raise AssertionError(f"Markdown table at row {index + 1} has an invalid separator row")
+
+        expected_columns = len(header)
+        index += 2
+        while index < len(lines):
+            row = lines[index]
+            if not row.strip() or row.startswith("#"):
+                break
+            if _fence_marker(row) is not None or _is_indented_code(row):
+                break
+            if "|" not in row:
+                next_content = index + 1
+                while next_content < len(lines) and not lines[next_content].strip():
+                    next_content += 1
+                if next_content < len(lines) and "|" in lines[next_content]:
+                    raise AssertionError(f"Non-table content at row {index + 1} interrupts a Markdown table")
+                break
+
+            cells = _split_markdown_table_row(row, index + 1)
+            if len(cells) != expected_columns:
+                raise AssertionError(
+                    f"Markdown table row {index + 1} has {len(cells)} columns; expected {expected_columns}"
+                )
+            index += 1
+
 
 def _omission_ledger(text: str) -> dict[str, dict[str, str]]:
     """Parse the scoped-surface omission ledger table from the MCP reference."""
@@ -367,6 +483,43 @@ def _schema_params(schema: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 class TestMCPDocsContract:
+    def test_authoritative_public_contract_tables_have_valid_topology(self):
+        _assert_markdown_table_topology((REPO_ROOT / "docs/reference/public-contracts.md").read_text(encoding="utf-8"))
+
+    @pytest.mark.parametrize(
+        "malformed",
+        [
+            "Header | Value |\n|---|---|\n| good | row |",
+            "| Header | Value\n|---|---|\n| good | row |",
+            "| Header | Value |\n|---|---|\n| good |",
+            "| Header | Value |\n|---|not-a-separator|\n| good | row |",
+            "| Header | Value |\n|---|---|\n| good | row |\nprose inserted here\n| continued | row |",
+        ],
+        ids=[
+            "missing-leading-delimiter",
+            "missing-trailing-delimiter",
+            "wrong-column-count",
+            "invalid-separator",
+            "prose-interruption",
+        ],
+    )
+    def test_public_contract_table_topology_rejects_malformed_rows(self, malformed: str):
+        with pytest.raises(AssertionError):
+            _assert_markdown_table_topology(malformed)
+
+    @pytest.mark.parametrize(
+        "non_table_markdown",
+        [
+            "The value is `alpha | beta`.\n",
+            "```text\nvalue = alpha | beta\n```\n",
+            "   ~~~text\nvalue = alpha | beta\n   ~~~\n",
+            "    value = alpha | beta\n",
+        ],
+        ids=["prose", "backtick-fence", "tilde-fence", "indented-code"],
+    )
+    def test_public_contract_table_topology_ignores_non_table_pipes(self, non_table_markdown: str):
+        _assert_markdown_table_topology(non_table_markdown)
+
     def test_docs_identify_mcp_as_scoped_surface_over_shared_core(self):
         text = _doc_text()
         normalized = " ".join(text.split())
