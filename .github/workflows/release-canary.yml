@@ -147,7 +147,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
-      - name: Check ruleset drift
+      - name: Check ruleset and environment-protection drift
         id: drift
         shell: bash
         env:
@@ -176,7 +176,7 @@ jobs:
       - name: Fail if ruleset drift was detected
         if: steps.drift.outputs.drift_exit_code != '0'
         run: |
-          echo "::error::Ruleset drift check failed."
+          echo "::error::Ruleset or environment-protection drift check failed."
           exit 1
 
   pypi-latest-installability:
