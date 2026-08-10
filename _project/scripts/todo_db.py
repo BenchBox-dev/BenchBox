@@ -163,6 +163,8 @@ WID_RE = re.compile(r"^w[0-9]{1,3}$")
 # with pytest node IDs. New specs may use this separator when the command
 # itself contains ``::``.
 VERIFY_SPEC_SEPARATOR = "|||"
+VERIFY_SPEC_METAVAR = "DESC[::COMMAND[::EXPECTED]]|DESC[|||COMMAND[|||EXPECTED]]"
+VERIFY_SPEC_HELP = "Use ||| separators when COMMAND contains pytest's :: node-id separator."
 DEFAULT_LEASE_TTL_HOURS = 24
 
 _CORE_SCHEMA_SQL = """
@@ -4476,7 +4478,7 @@ def main(argv: list[str] | None = None) -> int:
         "--verify",
         action="append",
         default=[],
-        metavar="DESC[::COMMAND[::EXPECTED]]|DESC[|||COMMAND[|||EXPECTED]]",
+        metavar=VERIFY_SPEC_METAVAR,
         help=(
             "A verification rung. COMMAND is graded ONLY on its exit status, so it must be "
             "self-asserting: exit 0 if and only if the criterion holds. Assert on output by "
@@ -4513,7 +4515,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--worktree")
     p.add_argument("--add-work", action="append", default=[], metavar="WID:SUMMARY[:needs=w1,w2]")
     p.add_argument("--edit-work", action="append", default=[], metavar="WID:NEW-SUMMARY")
-    p.add_argument("--add-verify", action="append", default=[], metavar="DESC[::COMMAND[::EXPECTED]]")
+    p.add_argument(
+        "--add-verify",
+        action="append",
+        default=[],
+        metavar=VERIFY_SPEC_METAVAR,
+        help=VERIFY_SPEC_HELP,
+    )
     p.add_argument("--drop-verify", action="append", default=[], type=int, metavar="SEQ")
     p.add_argument(
         "--reason",
@@ -4557,7 +4565,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--only-modify", action="append", default=[], metavar="GLOB")
     p.add_argument("--do-not-modify", action="append", default=[], metavar="GLOB")
     p.add_argument("--preserve", action="append", default=[], metavar="BEHAVIOR")
-    p.add_argument("--verify", action="append", default=[], metavar="DESC[::COMMAND[::EXPECTED]]")
+    p.add_argument("--verify", action="append", default=[], metavar=VERIFY_SPEC_METAVAR, help=VERIFY_SPEC_HELP)
     p.add_argument("--work", action="append", default=[], metavar="WID:SUMMARY[:needs=w1,w2]")
 
     p = sub.add_parser("dismiss", help="dismiss a deferral with a reason")
@@ -4815,14 +4823,54 @@ def _parse_work_flag(specs: list[str]) -> list[dict[str, Any]]:
     return work
 
 
+def _split_unquoted(text: str, separator: str, maxsplit: int = 2) -> list[str]:
+    """Split on unquoted separators while preserving shell command text verbatim."""
+    fields: list[str] = []
+    start = 0
+    quote: str | None = None
+    escaped = False
+    index = 0
+    splits = 0
+    while index < len(text):
+        char = text[index]
+        if escaped:
+            escaped = False
+            index += 1
+            continue
+        if char == "\\" and quote != "'":
+            escaped = True
+            index += 1
+            continue
+        if quote is not None:
+            if char == quote:
+                quote = None
+            index += 1
+            continue
+        if char in "'\"":
+            quote = char
+            index += 1
+            continue
+        if splits < maxsplit and text.startswith(separator, index):
+            fields.append(text[start:index])
+            start = index + len(separator)
+            index = start
+            splits += 1
+            continue
+        index += 1
+    fields.append(text[start:])
+    return fields
+
+
 def _parse_verify_flag(specs: list[str]) -> list[dict[str, str]]:
     verifications = []
     for spec in specs:
         # Keep the legacy two/three-field form byte-for-byte compatible. The
         # explicit alternate form is unambiguous for commands such as
         # ``pytest path.py::TestClass::test_case``.
-        separator = VERIFY_SPEC_SEPARATOR if VERIFY_SPEC_SEPARATOR in spec else "::"
-        fields = spec.split(separator, 2)
+        if len(_split_unquoted(spec, VERIFY_SPEC_SEPARATOR, 1)) > 1:
+            fields = _split_unquoted(spec, VERIFY_SPEC_SEPARATOR)
+        else:
+            fields = spec.split("::", 2)
         entry = {"description": fields[0]}
         if len(fields) > 1:
             entry["command"] = fields[1]

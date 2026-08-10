@@ -432,6 +432,21 @@ class TestVerifyFlagParsing:
             "expected": "exit 0",
         }
 
+    def test_verify_flag_legacy_separator_ignores_quoted_alternate_separator(self):
+        spec = "quoted alternate token::python -c 'print(\"|||\")'::exit 0"
+        assert todo_db._parse_verify_flag([spec])[0] == {
+            "description": "quoted alternate token",
+            "command": "python -c 'print(\"|||\")'",
+            "expected": "exit 0",
+        }
+
+    @pytest.mark.parametrize("command", ["create", "update", "promote"])
+    def test_verify_help_documents_alternate_separator(self, command, capsys):
+        with pytest.raises(SystemExit) as exc_info:
+            todo_db.main([command, "--help"])
+        assert exc_info.value.code == 0
+        assert "DESC[|||COMMAND[|||EXPECTED]]" in capsys.readouterr().out
+
     def test_lex_rejects_mangled_pytest_node_id_command(self, conn):
         _mk(
             conn,
