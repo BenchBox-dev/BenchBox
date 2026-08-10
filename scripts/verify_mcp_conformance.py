@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -35,20 +36,34 @@ SCENARIOS = (
     "server-sse-multiple-streams",
     "server-stateless",
 )
-# This is an exact, revision-bound fixture baseline.  Keep every entry
+# This is an exact, revision-bound fixture baseline. Keep every entry
 # individually named: the conformance runner must fail closed for any result
 # not listed here, and a baseline entry never waives a real BenchBox defect.
 EXPECTED_FAILURE_IDS = (
     "server-stateless:sep-2575-server-rejects-undeclared-capability",
     "server-stateless:sep-2575-missing-capability-http-400",
-    "server-stateless:sep-2575-server-sends-prompts-list-changed-on-subscription",
-    "server-stateless:sep-2575-server-sends-tools-list-changed-on-subscription",
 )
-EXPECTED_FAILURES = "server:\n" + "".join(f"  - {failure}\n" for failure in EXPECTED_FAILURE_IDS)
+# Static registries must not emit list-change warnings; any warning is a gate failure.
+EXPECTED_WARNING_IDS: tuple[str, ...] = ()
 
 
 def _run(command: list[str], *, cwd: Path | None = None, timeout: int = 600) -> None:
     subprocess.run(command, cwd=cwd, check=True, timeout=timeout)  # noqa: S603
+
+
+def _parse_result_ids(output: str, status: str) -> list[str]:
+    """Extract conformance result IDs for one exact status label."""
+    result_ids: list[str] = []
+    for line in output.splitlines():
+        if status not in line:
+            continue
+        match = re.search(r"\[(sep-[^\]]+)\]", line)
+        result_ids.append(match.group(1).strip() if match else line.strip())
+    return result_ids
+
+
+def _qualify_result_ids(result_ids: list[str], scenario: str) -> list[str]:
+    return [result_id if ":" in result_id else f"{scenario}:{result_id}" for result_id in result_ids]
 
 
 def _free_port() -> int:
@@ -101,44 +116,29 @@ def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None
         output = (result.stdout or "") + (result.stderr or "")
         # Parse all FAILURE lines regardless of exit code so we can validate
         # the exact baseline and also detect unparseable nonzero exits.
-        failed_ids: list[str] = []
-        for line in output.splitlines():
-            if "FAILURE" in line:
-                import re
+        qualified_failed = _qualify_result_ids(_parse_result_ids(output, "FAILURE"), scenario)
+        qualified_warnings = _qualify_result_ids(_parse_result_ids(output, "WARNING"), scenario)
 
-                m = re.search(r"\[(sep-[^\]]+)\]", line)
-                if m:
-                    failed_ids.append(m.group(1).strip())
-                else:
-                    failed_ids.append(line.strip())
-        qualified_failed: list[str] = []
-        for fid in failed_ids:
-            if ":" not in fid:
-                qualified_failed.append(f"{scenario}:{fid}")
-            else:
-                qualified_failed.append(fid)
-
-        expected_for_scenario = [fid for fid in EXPECTED_FAILURE_IDS if fid.startswith(f"{scenario}:")]
+        expected_failures = [fid for fid in EXPECTED_FAILURE_IDS if fid.startswith(f"{scenario}:")]
+        expected_warnings = [wid for wid in EXPECTED_WARNING_IDS if wid.startswith(f"{scenario}:")]
         # P1: nonzero exit with no parseable FAILURE is an unparseable transport/startup error
         if result.returncode != 0 and not qualified_failed:
             sys.stdout.write(output)
             sys.stderr.write(result.stderr or "")
             raise subprocess.CalledProcessError(result.returncode, command, output=result.stdout, stderr=result.stderr)
-        # P2: require exact baseline match, not just subset, for every scenario
-        if set(qualified_failed) != set(expected_for_scenario):
-            # Covers both unexpected and missing (stale) IDs
-            unexpected = [fid for fid in qualified_failed if fid not in EXPECTED_FAILURE_IDS]
-            missing = [fid for fid in expected_for_scenario if fid not in qualified_failed]
-            if unexpected or missing:
-                sys.stdout.write(output)
-                sys.stderr.write(result.stderr or "")
-                raise subprocess.CalledProcessError(
-                    result.returncode, command, output=result.stdout, stderr=result.stderr
-                )
-        # For the expected non-zero case (server-stateless with 4 baseline failures),
+        # P2: require exact failure and warning sets, not just a known-failure subset.
+        unexpected_failures = [fid for fid in qualified_failed if fid not in expected_failures]
+        missing_failures = [fid for fid in expected_failures if fid not in qualified_failed]
+        unexpected_warnings = [wid for wid in qualified_warnings if wid not in expected_warnings]
+        missing_warnings = [wid for wid in expected_warnings if wid not in qualified_warnings]
+        if unexpected_failures or missing_failures or unexpected_warnings or missing_warnings:
+            sys.stdout.write(output)
+            sys.stderr.write(result.stderr or "")
+            raise subprocess.CalledProcessError(result.returncode, command, output=result.stdout, stderr=result.stderr)
+        # For the expected non-zero case (server-stateless with fixture failures),
         # also ensure the exit code is non-zero; a zero exit with the baseline
         # would indicate the baseline is no longer exercised.
-        if expected_for_scenario and result.returncode == 0:
+        if expected_failures and result.returncode == 0:
             # Baseline expected failures but tool exited 0 -> stale baseline
             sys.stdout.write(output)
             sys.stderr.write(result.stderr or "")

@@ -16,10 +16,13 @@ import sys
 from collections.abc import Mapping
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from mcp.server.caching import CacheHint
+from mcp.server.context import ServerRequestContext
+from mcp.server.lowlevel.server import RequestHandler
 from mcp.server.mcpserver import MCPServer
+from mcp.types import DiscoverResult, RequestParams
 
 from benchbox.core.runtime_paths import resolve_runtime_paths
 from benchbox.mcp.prompts import register_all_prompts
@@ -50,6 +53,34 @@ MCP_CACHE_HINTS = {
     # Resource bodies include tenant result metadata and system profiles.
     "resources/read": CacheHint(ttl_ms=0, scope="private"),
 }
+
+
+def _install_static_registry_capability_policy(mcp: MCPServer) -> None:
+    """Advertise that BenchBox registries do not change at runtime.
+
+    The SDK derives modern ``listChanged`` flags from the presence of the
+    ``subscriptions/listen`` transport, but BenchBox has no supported runtime
+    tool, prompt, or resource-list mutation path. Keep the subscription
+    transport for protocol compatibility while making the public capability
+    contract match the static registries.
+    """
+    low_level_server = mcp._lowlevel_server  # type: ignore[attr-defined]
+    discover_entry = low_level_server.get_request_handler("server/discover")
+    if discover_entry is None:  # pragma: no cover - an SDK contract failure
+        raise RuntimeError("MCP SDK did not register the server/discover handler")
+
+    original_handler = cast(RequestHandler[Any, RequestParams], discover_entry.handler)
+
+    async def static_registry_discover(
+        context: ServerRequestContext[Any, Any], params: RequestParams
+    ) -> DiscoverResult:
+        result = cast(DiscoverResult, await original_handler(context, params))
+        for capability in (result.capabilities.prompts, result.capabilities.resources, result.capabilities.tools):
+            if capability is not None:
+                capability.list_changed = False
+        return result
+
+    low_level_server.add_request_handler("server/discover", discover_entry.params_type, static_registry_discover)
 
 
 def _resolve_log_level(
@@ -215,6 +246,7 @@ Then inspect plans: get_query_plan(result_file="...", query_id="19")
 
     logger.info("Registering prompts...")
     register_all_prompts(mcp)
+    _install_static_registry_capability_policy(mcp)
 
     # Path options are threaded through here and consumed by MCP modules.
     # They are logged for startup visibility.
