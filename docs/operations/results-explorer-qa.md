@@ -30,6 +30,24 @@ cd results-explorer
 npm run test:e2e:fixtures
 ```
 
+### Pages-shaped assembled-artifact acceptance
+
+After downloading the exact `site/` directory produced by the protected docs
+workflow, run the direct-route acceptance against that artifact rather than
+against `vite dev` or the Explorer-only test server:
+
+```bash
+cd results-explorer
+E2E_SITE_DIR=/absolute/path/to/site \\
+E2E_PAGES_SHAPED=1 npx playwright test --project=chromium --workers=1 e2e/routes/direct-route.spec.ts
+```
+
+The server returns the assembled root `404.html` with HTTP 404 for missing
+Pages routes, so the test proves the browser redirect/route restoration and a
+native `/docs/` navigation. The test also checks that the snapshot is served
+from the artifact itself. This command is an acceptance check only; it does
+not upload or deploy the artifact.
+
 ## Audit develop SHA contract
 
 Every Markdown report under `_project/audits/*.md` must begin with YAML
