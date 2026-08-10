@@ -6,6 +6,7 @@ ManifestEntry and DetailResult shapes consumed by the explorer frontend.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -26,12 +27,141 @@ from _project.scripts.explorer_pipeline.models import (
 )
 from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata, NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
+from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
+from benchbox.core.results.canonical_json import canonical_json_bytes
 from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY
 from benchbox.core.results.status import bundle_failed_query_count, bundle_non_clean_reason, normalize_validation_status
 from benchbox.core.tuning.modes import is_canonical_mode
-from benchbox.validation.bundle import APPLIED_COMPANION_MAX_BYTES, APPLIED_RECEIPT_MAX_ENTRIES
+from benchbox.validation.bundle import APPLIED_COMPANION_MAX_BYTES, APPLIED_RECEIPT_MAX_ENTRIES, COMPANION_SUFFIXES
 
 logger = logging.getLogger(__name__)
+
+
+class CompanionPrivacyError(Exception):
+    """A companion remained private after the public anonymization boundary."""
+
+
+def _companion_path(bundle_path: Path, suffix: str) -> Path:
+    """Return the exact same-stem companion path for a primary bundle."""
+    return bundle_path.with_name(f"{bundle_path.stem}{suffix}")
+
+
+def _redact_applied_dropped(payload: dict[str, Any], key: str = "dropped") -> None:
+    dropped = payload.get(key)
+    if dropped:
+        count = len(dropped) if isinstance(dropped, list) else 1
+        payload[key] = [{"redacted": True} for _ in range(count)]
+
+
+def _sanitize_applied_drift_check(drift_check: Any) -> None:
+    if not isinstance(drift_check, dict):
+        return
+    removed = False
+    for key in ("errors", "warnings", "configuration_mismatches", "missing_tables", "extra_tables"):
+        if key in drift_check:
+            drift_check.pop(key, None)
+            removed = True
+    if removed:
+        drift_check["drift_redacted"] = True
+
+
+def _sanitize_applied_receipt(receipt: Any) -> None:
+    if not isinstance(receipt, dict):
+        return
+    if "error" in receipt:
+        receipt.pop("error", None)
+        receipt["error_redacted"] = True
+    for entry in receipt.get("entries") or []:
+        if not isinstance(entry, dict):
+            continue
+        for key in ("statement", "diff", "detail", "evidence", "table", "name", "expected_columns", "observed_columns"):
+            entry.pop(key, None)
+        if "reason" in entry:
+            entry.pop("reason", None)
+            entry["reason_redacted"] = True
+        entry["statement_redacted"] = True
+    for observed in receipt.get("observed") or []:
+        if isinstance(observed, dict):
+            for key in ("table", "name", "columns", "evidence"):
+                observed.pop(key, None)
+            observed["redacted"] = True
+    _redact_applied_dropped(receipt)
+
+
+def _sanitize_applied_companion(payload: dict[str, Any]) -> dict[str, Any]:
+    """Remove free-text and user identifiers from an applied-ledger payload.
+
+    Applied statements, dropped-intent reasons, and introspection evidence are
+    execution-path text and may contain paths, DSNs, or user-chosen catalog
+    names. Preserve only the structural/status evidence needed by the public
+    companion; this mirrors the exporter boundary for already-exported inputs.
+    """
+    sanitized = copy.deepcopy(payload)
+    statements = sanitized.get("statements")
+    if isinstance(statements, list):
+        for entry in statements:
+            if not isinstance(entry, dict):
+                continue
+            entry.pop("statement", None)
+            entry.pop("error", None)
+            entry.pop("table", None)
+            entry["statement_redacted"] = True
+    _redact_applied_dropped(sanitized)
+    _sanitize_applied_drift_check(sanitized.get("drift_check"))
+    _sanitize_applied_receipt(sanitized.get("receipt"))
+    return sanitized
+
+
+def _public_companion_bytes(
+    bundle_path: Path,
+    suffix: str,
+    anonymizer: AnonymizationManager,
+) -> bytes | None:
+    """Load, validate, anonymize, and canonicalize one optional companion.
+
+    Missing, malformed, oversized, or non-regular companions are ignored so a
+    bad sidecar cannot be advertised or copied. A companion that still contains
+    a private path after anonymization is different: that is a publication
+    boundary violation and must fail the build rather than silently publish a
+    partial public artifact.
+    """
+    if suffix not in COMPANION_SUFFIXES:
+        raise ValueError(f"unsupported explorer companion suffix: {suffix}")
+
+    source = _companion_path(bundle_path, suffix)
+    if not source.exists():
+        return None
+    if source.is_symlink() or not source.is_file():
+        logger.warning("Skipping non-regular companion %s", source)
+        return None
+    try:
+        if suffix == ".applied.json" and source.stat().st_size > APPLIED_COMPANION_MAX_BYTES:
+            logger.warning("Skipping oversized applied companion %s", source)
+            return None
+        payload = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        logger.warning("Skipping malformed companion %s - %s: %s", source, type(exc).__name__, exc)
+        return None
+
+    if not isinstance(payload, dict):
+        logger.warning("Skipping non-object companion %s", source)
+        return None
+
+    if suffix == ".tuning.json":
+        public_payload = anonymizer.anonymize_tuning_payload(payload)
+    elif suffix == ".applied.json":
+        public_payload = _sanitize_applied_companion(anonymizer.anonymize_result_payload(payload))
+    else:
+        public_payload = anonymizer.anonymize_result_payload(payload)
+
+    leaks = find_public_path_leaks(public_payload)
+    if leaks:
+        raise CompanionPrivacyError(
+            f"public {suffix.removesuffix('.json').lstrip('.')} privacy check failed for fields: "
+            + ", ".join(sorted(set(leaks)))
+        )
+    return canonical_json_bytes(public_payload)
+
 
 # Status values that are considered passing for the query timing status field.
 _PASS_STATUSES = {"SUCCESS", "PASS", "pass", "success"}
