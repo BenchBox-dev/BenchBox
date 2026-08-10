@@ -82,6 +82,17 @@ docstring documents for its own stranded-PR sweep), so a ceiling bump stays
 a deliberate human/agent-authored PR -- this signal only means nobody has
 to notice the ceiling is close by accident.
 
+When a ceiling bump explicitly reserves runway for a named program, set
+`reservation` in `fast_test_lane_policy.json` to an object with `program`
+and `headroom_floor` (normally `500`, one quantum). The nightly ratchet uses
+the larger of that floor and the ordinary 100-test warning threshold. If
+other merges consume the reservation, the existing issue fires early and
+names the program; the absolute ceiling and PR delta guard do not change.
+Clear the object back to `null` only after the named program has landed or a
+maintainer explicitly abandons the reservation. The completed one-engine
+tail is intentionally not activated retroactively, so the shipped policy
+starts with `reservation: null`.
+
 **4. Union-merge log.** `_project/config/fast_lane_ceiling_log.md` replaced
 the old `_ceiling_note` JSON field. It is append-only, and
 `.gitattributes` marks it `merge=union` -- two branches that each append a

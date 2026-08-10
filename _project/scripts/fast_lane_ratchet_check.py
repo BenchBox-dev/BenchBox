@@ -17,13 +17,14 @@ read that script first if extending this one.
 What it checks: collects the fast lane (`pytest -m fast --collect-only`,
 same mechanism `timing_policy_check.py` uses) and compares it against the
 current `max_fast_tests` ceiling in `_project/config/fast_test_lane_policy.json`.
-If headroom (ceiling - collected) drops below `WARN_THRESHOLD` (100, the same
-threshold `timing_policy_check.py`'s FAST_LANE_WARNING uses), the issue is
-created/refreshed with the current numbers and the exact edit to make. When
-headroom recovers (a bump landed, or the lane contracted), the issue is
-patched to the clear state exactly once, then left alone -- never repeatedly
-updated for a state that hasn't changed (same "silent when clear" contract
-as green_unmerged_sweep.py).
+An optional named `reservation` in that policy raises the nightly action
+threshold above `WARN_THRESHOLD` (100), so consuming reserved headroom files
+the same actionable issue before the absolute ceiling is close. The hard
+ceiling and PR-time warning remain unchanged. When headroom recovers (a bump
+landed, the lane contracted, or a completed reservation is explicitly
+cleared), the issue is patched to the clear state exactly once, then left
+alone -- never repeatedly updated for a state that hasn't changed (same
+"silent when clear" contract as green_unmerged_sweep.py).
 
 Auth: GITHUB_TOKEN or GH_TOKEN from the environment (used directly over the
 REST API). If neither is set but the `gh` CLI is on PATH, its token
@@ -95,6 +96,23 @@ def load_ceiling(policy_path: Path = POLICY_PATH) -> int:
     return int(data["max_fast_tests"])
 
 
+def load_reservation(policy_path: Path = POLICY_PATH) -> tuple[str, int] | None:
+    """Return an active ``(program, headroom_floor)`` reservation, if any."""
+    data = json.loads(policy_path.read_text(encoding="utf-8"))
+    reservation = data.get("reservation")
+    if reservation is None:
+        return None
+    if not isinstance(reservation, dict):
+        raise ValueError("fast-lane reservation must be an object or null")
+    program = reservation.get("program")
+    headroom_floor = reservation.get("headroom_floor")
+    if not isinstance(program, str) or not program.strip():
+        raise ValueError("fast-lane reservation program must be a non-empty string")
+    if not isinstance(headroom_floor, int) or isinstance(headroom_floor, bool) or headroom_floor < WARN_THRESHOLD:
+        raise ValueError(f"fast-lane reservation headroom_floor must be an integer >= {WARN_THRESHOLD}")
+    return program.strip(), headroom_floor
+
+
 def headroom_status(collected: int, ceiling: int, warn_threshold: int = WARN_THRESHOLD) -> tuple[int, bool]:
     """Return (headroom, needs_ratchet). headroom can be negative (over ceiling)."""
     headroom = ceiling - collected
@@ -124,9 +142,18 @@ def _fmt_stamp(now: dt.datetime) -> str:
     return now.strftime("%Y-%m-%d %H:%M UTC")
 
 
-def build_digest(*, collected: int, ceiling: int, headroom: int, repo: str, now: dt.datetime) -> str:
+def build_digest(
+    *,
+    collected: int,
+    ceiling: int,
+    headroom: int,
+    repo: str,
+    now: dt.datetime,
+    reservation: tuple[str, int] | None = None,
+) -> str:
     """Digest for the non-empty (needs-ratchet) state."""
-    next_ceiling = suggested_next_ceiling(collected, ceiling)
+    target_headroom = max(MIN_HEADROOM_AFTER_BUMP, reservation[1] if reservation else 0)
+    next_ceiling = suggested_next_ceiling(collected, ceiling, min_headroom=target_headroom)
     bump = next_ceiling - ceiling
     new_headroom = next_ceiling - collected
     stamp = _fmt_stamp(now)
@@ -135,7 +162,8 @@ def build_digest(*, collected: int, ceiling: int, headroom: int, repo: str, now:
         f"Fast-lane ceiling ratchet signal -- nightly check (last updated {stamp})",
         "",
         f"Fast lane collected **{collected}** tests against a ceiling of **{ceiling}** "
-        f"(headroom {headroom}, below the {WARN_THRESHOLD} warning threshold).",
+        f"(headroom {headroom}, below the "
+        f"{reservation[1] if reservation else WARN_THRESHOLD} action threshold).",
         "",
         "## The exact edit",
         "",
@@ -155,6 +183,13 @@ def build_digest(*, collected: int, ceiling: int, headroom: int, repo: str, now:
         "docs/operations/fast-lane-budget.md.",
         f"(repo: {repo})",
     ]
+    if reservation:
+        lines[5:5] = [
+            f"Active reservation: **{reservation[0]}** retains at least **{reservation[1]}** tests of headroom.",
+            "Current growth has consumed that floor; either restore it with the quantum bump or explicitly clear",
+            "the reservation after the named program lands.",
+            "",
+        ]
     return "\n".join(lines)
 
 
@@ -399,8 +434,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     ceiling = load_ceiling()
+    reservation = load_reservation()
     collected = collect_fast_count(REPO_ROOT)
-    headroom, needs_ratchet = headroom_status(collected, ceiling)
+    action_threshold = max(WARN_THRESHOLD, reservation[1] if reservation else WARN_THRESHOLD)
+    headroom, needs_ratchet = headroom_status(collected, ceiling, action_threshold)
     now = dt.datetime.now(dt.timezone.utc)
 
     if args.json:
@@ -412,13 +449,26 @@ def main(argv: list[str] | None = None) -> int:
                     "collected": collected,
                     "ceiling": ceiling,
                     "headroom": headroom,
+                    "action_threshold": action_threshold,
+                    "reservation": (
+                        {"program": reservation[0], "headroom_floor": reservation[1]} if reservation else None
+                    ),
                     "needs_ratchet": needs_ratchet,
                 },
                 indent=2,
             )
         )
     elif needs_ratchet:
-        print(build_digest(collected=collected, ceiling=ceiling, headroom=headroom, repo=args.repo, now=now))
+        print(
+            build_digest(
+                collected=collected,
+                ceiling=ceiling,
+                headroom=headroom,
+                repo=args.repo,
+                now=now,
+                reservation=reservation,
+            )
+        )
     else:
         print(f"Fast lane headroom OK: {headroom} (collected {collected} / ceiling {ceiling}).")
 
@@ -432,7 +482,14 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         client = GitHubClient(token)
         if needs_ratchet:
-            body = build_digest(collected=collected, ceiling=ceiling, headroom=headroom, repo=args.repo, now=now)
+            body = build_digest(
+                collected=collected,
+                ceiling=ceiling,
+                headroom=headroom,
+                repo=args.repo,
+                now=now,
+                reservation=reservation,
+            )
             outcome = upsert_pinned_issue(client, owner, repo, body)
             print(f"ratchet issue: {outcome}", file=sys.stderr)
         else:

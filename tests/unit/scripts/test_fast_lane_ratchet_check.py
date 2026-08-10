@@ -84,6 +84,33 @@ def test_suggested_next_ceiling_multiple_quanta_when_far_over() -> None:
     assert (next_ceiling - 26050) % 500 == 0
 
 
+def test_load_reservation_accepts_named_headroom_floor(tmp_path: Path) -> None:
+    policy = tmp_path / "policy.json"
+    policy.write_text(
+        json.dumps({"max_fast_tests": 28050, "reservation": {"program": "one-engine", "headroom_floor": 500}})
+    )
+
+    assert mod.load_reservation(policy) == ("one-engine", 500)
+
+
+@pytest.mark.parametrize(
+    "reservation",
+    [
+        "one-engine",
+        {},
+        {"program": "", "headroom_floor": 500},
+        {"program": "one-engine", "headroom_floor": 99},
+        {"program": "one-engine", "headroom_floor": True},
+    ],
+)
+def test_load_reservation_rejects_malformed_policy(tmp_path: Path, reservation) -> None:
+    policy = tmp_path / "policy.json"
+    policy.write_text(json.dumps({"max_fast_tests": 28050, "reservation": reservation}))
+
+    with pytest.raises(ValueError, match="reservation"):
+        mod.load_reservation(policy)
+
+
 # ------------------------------------------------------------------ #
 # Digest formatting                                                    #
 # ------------------------------------------------------------------ #
@@ -96,6 +123,26 @@ def test_build_digest_contains_marker_and_exact_edit() -> None:
     assert "26550" in digest
     assert "fast_lane_ceiling_log.md" in digest
     assert "never opens or pushes a PR itself" in digest
+
+
+def test_build_digest_names_eroded_reservation() -> None:
+    import datetime as dt
+
+    now = dt.datetime(2026, 8, 10, 6, 0, tzinfo=dt.timezone.utc)
+    digest = mod.build_digest(
+        collected=27772,
+        ceiling=28050,
+        headroom=278,
+        repo="joeharris76/BenchBox",
+        now=now,
+        reservation=("one-engine", 500),
+    )
+
+    assert "Active reservation: **one-engine**" in digest
+    assert "at least **500** tests of headroom" in digest
+    assert "explicitly clear" in digest
+    assert '"max_fast_tests": 28550' in digest
+    assert "+500 from the current ceiling" in digest
 
 
 def test_build_clear_digest_contains_marker_and_clear_line() -> None:
