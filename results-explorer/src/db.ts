@@ -59,7 +59,8 @@ type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
 // Keep this value aligned with
 // `_project/scripts/explorer_pipeline/contract.py::EXPLORER_READ_MODEL_VERSION`.
 // `results-explorer/src/lib/__tests__/db-remediation-pin.test.ts` pins the
-// browser constant against the live Python contract.
+// browser constant against an independently reviewed contract value and
+// exercises the older/equal/newer compatibility policy below.
 const EXPECTED_READ_MODEL_VERSION = 7;
 
 // Required scans must be queryable AND non-empty for the snapshot to be
