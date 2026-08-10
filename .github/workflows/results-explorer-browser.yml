@@ -108,6 +108,10 @@ jobs:
         run: npm ci
         working-directory: results-explorer
 
+      - name: Typecheck explorer e2e harness
+        run: npm run typecheck:e2e
+        working-directory: results-explorer
+
       - name: Audit frontend dependencies
         run: npm run audit:high
         working-directory: results-explorer
