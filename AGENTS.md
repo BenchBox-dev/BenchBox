@@ -167,4 +167,4 @@ lock-verify step.
   `uat-framework.md`, `release-guide.md`, `agent-instruction-evaluation.md`
 - Development: `docs/development/` — `run-lifecycle-map.md`,
   `result-integrity-validation.md`, `adding-new-platforms.md`, `pr-base-branch-policy.md`
-- SQL compatibility: `benchbox/sql_compat/README.md`; tests: `tests/README.md`
+- SQL compatibility: `benchbox/sql_compat/README.md`; tests: `tests/README.md`; Dev-loop status (as of 2026-08-10): REASSESS — P95 PR-to-merged 22.6 hours; post-merge red rate 8.21% aggregate, but not sustained above 5% of days.
