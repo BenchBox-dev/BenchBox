@@ -26,6 +26,8 @@ const { values } = parseArgs({
     host: { type: "string", default: process.env.E2E_HOST ?? "127.0.0.1" },
     "dist-dir": { type: "string" },
     "fixture-dir": { type: "string" },
+    "site-dir": { type: "string", default: process.env.E2E_SITE_DIR },
+    "pages-shaped": { type: "boolean", default: Boolean(process.env.E2E_PAGES_SHAPED) },
   },
 });
 
@@ -37,15 +39,21 @@ const fixtureDir = resolve(
     process.env.E2E_FIXTURE_DIR ??
     join(projectRoot, "test-fixtures", ".generated", "data"),
 );
+const siteDir = values["site-dir"] ? resolve(values["site-dir"]) : null;
+const pagesShaped = values["pages-shaped"];
 
-if (!existsSync(distDir)) {
+if (pagesShaped && !siteDir) {
+  console.error("[serve-browser-tests] --pages-shaped requires --site-dir or E2E_SITE_DIR.");
+  process.exit(2);
+}
+if (!pagesShaped && !existsSync(distDir)) {
   console.error(
     `[serve-browser-tests] dist dir not found: ${distDir}\n` +
       `Run \`npm run build\` inside results-explorer/ before starting the e2e server.`,
   );
   process.exit(2);
 }
-if (!existsSync(fixtureDir)) {
+if (!pagesShaped && !existsSync(fixtureDir)) {
   console.error(
     `[serve-browser-tests] fixture dir not found: ${fixtureDir}\n` +
       `Run \`npm run test:e2e:fixtures\` inside results-explorer/ to generate the corpus.`,
@@ -81,7 +89,7 @@ const writeNotFound = (res, reason) => {
   res.end(`not found: ${reason}\n`);
 };
 
-const sendFile = (req, res, absPath, logPath) => {
+const sendFile = (req, res, absPath, logPath, statusCode = 200) => {
   let stat;
   try {
     stat = statSync(absPath);
@@ -91,7 +99,7 @@ const sendFile = (req, res, absPath, logPath) => {
   }
   if (stat.isDirectory()) {
     const indexPath = join(absPath, "index.html");
-    if (existsSync(indexPath)) return sendFile(req, res, indexPath, logPath);
+    if (existsSync(indexPath)) return sendFile(req, res, indexPath, logPath, statusCode);
     writeNotFound(res, absPath);
     return;
   }
@@ -145,7 +153,7 @@ const sendFile = (req, res, absPath, logPath) => {
     }
   }
 
-  res.writeHead(200, { ...headers, "Content-Length": String(stat.size) });
+  res.writeHead(statusCode, { ...headers, "Content-Length": String(stat.size) });
   if (logPath) {
     transferLog.push({
       path: logPath,
@@ -160,6 +168,16 @@ const sendFile = (req, res, absPath, logPath) => {
   } else {
     createReadStream(absPath).pipe(res);
   }
+};
+
+const servePagesArtifact = (req, res, pathname) => {
+  const rel = pathname.replace(/^\/+/, "") || "index.html";
+  const abs = safeJoin(siteDir, rel);
+  if (abs && existsSync(abs)) return sendFile(req, res, abs);
+
+  const fallback = safeJoin(siteDir, "404.html");
+  if (fallback && existsSync(fallback)) return sendFile(req, res, fallback, undefined, 404);
+  return writeNotFound(res, pathname);
 };
 
 // Any path whose extension *isn't* a known static asset is treated as an
@@ -178,6 +196,8 @@ const handler = (req, res) => {
   // Strip query string but keep the pathname for routing.
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const pathname = decodeURIComponent(url.pathname);
+
+  if (pagesShaped) return servePagesArtifact(req, res, pathname);
 
   // Test-only transfer-log endpoints. Not exposed in production builds -
   // this server is only used by the e2e harness.
