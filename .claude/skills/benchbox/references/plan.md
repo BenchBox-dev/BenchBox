@@ -6,7 +6,8 @@ Use for benchmark/platform features that need research, implementation, and veri
 
 1. Research current benchmark/platform patterns, tests, docs, and TODOs.
 2. State goal, scope, constraints, public interfaces, and success criteria.
-3. Slice vertically: implement one working path, test, verify, commit, repeat.
+3. Slice vertically: implement one working path, test, and verify. Use
+   `SHARED/change-framework/SKILL.md` for any authorized commit.
 4. Preserve phase propagation, validation, timing policy, artifact paths, and lazy optional deps.
 5. Update docs/tests only where the behavior changes.
 
