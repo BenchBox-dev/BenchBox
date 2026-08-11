@@ -16,10 +16,9 @@ default and `_project/scripts/todo` remains the stable entry point.
   tracker/meta table equal, event provenance equal, a verified
   `sha256-chain-v2` audit chain, and an exactly equal second clean export
   including all three migration records.
-- `todo-db` 0.3.1 is published as the GitHub release
-  [v0.3.1](https://github.com/joeharris76/todo-db/releases/tag/v0.3.1), built
-  from the merged holder-only fix. BenchBox consumers must resolve it through
-  the locked `_project/scripts` environment, never a sibling checkout.
+- `todo-db` 0.3.1 is published as the private GitHub release tag `v0.3.1`,
+  built from the merged holder-only fix. BenchBox consumers must resolve it
+  through the locked `_project/scripts` environment, never a sibling checkout.
 - No hosted write credential was used and the hosted primary was not modified.
 
 ## Compatibility boundary
