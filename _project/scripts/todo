@@ -13,10 +13,40 @@ ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 export BENCHBOX_TODO_DB_STANDALONE=1
 export BENCHBOX_TODO_DB_EXPECTED_VERSION=0.3.1
 
+is_offline_finding_command() {
+    local -a args=("$@")
+    local index=0
+    local value
+    while [[ "$index" -lt "${#args[@]}" ]]; do
+        value="${args[$index]}"
+        case "$value" in
+            --actor|--db|--project-id|--replica|--repository)
+                index=$((index + 2))
+                continue
+                ;;
+            --actor=*|--db=*|--project-id=*|--replica=*|--repository=*)
+                index=$((index + 1))
+                continue
+                ;;
+            finding)
+                [[ "${args[$((index + 1))]:-}" == "create" || "${args[$((index + 1))]:-}" == "candidates" ]]
+                return
+                ;;
+        esac
+        index=$((index + 1))
+    done
+    return 1
+}
+
+OFFLINE_FINDING=0
+if is_offline_finding_command "$@"; then
+    OFFLINE_FINDING=1
+fi
+
 # BenchBox's committed connection file predates todo-db's config schema and
 # stores the hosted target as `url` rather than `db`. Preserve that public
 # contract and translate it only at the wrapper boundary.
-if [[ -z "${TODO_DB_PATH:-}" && -z "${TODO_DB_URL:-}" && -f "$ROOT/.todo-db/config.json" ]]; then
+if [[ "$OFFLINE_FINDING" -eq 0 && -z "${TODO_DB_PATH:-}" && -z "${TODO_DB_URL:-}" && -f "$ROOT/.todo-db/config.json" ]]; then
     TODO_DB_URL="$(jq -er '.url | select(type == "string" and length > 0)' "$ROOT/.todo-db/config.json")"
     export TODO_DB_URL
 fi
@@ -24,7 +54,7 @@ fi
 # Preserve the existing local-auth convenience without writing credentials to
 # disk or command output. Explicit caller credentials always win, including a
 # read-only token used by export and audit jobs.
-if [[ -n "${TODO_DB_URL:-}" ]]; then
+if [[ "$OFFLINE_FINDING" -eq 0 && -n "${TODO_DB_URL:-}" ]]; then
     if [[ -z "${TODO_DB_AUTH_TOKEN:-}" && -z "${TODO_DB_RO_AUTH_TOKEN:-}" ]]; then
         TODO_DB_AUTH_TOKEN="$(turso db tokens create "${TODO_DB_TURSO_DB:-benchbox-todo}" --expiration 1d)"
         export TODO_DB_AUTH_TOKEN

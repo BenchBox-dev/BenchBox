@@ -32,4 +32,4 @@ dependencies = [
 managed = true
 
 [tool.uv.sources]
-todo-db = { git = "https://github.com/joeharris76/todo-db.git", rev = "75cf990094dea33a151d99192ffc57df0dba7682" }
+todo-db = { path = "vendor/todo_db-0.3.1-py3-none-any.whl" }

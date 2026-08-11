@@ -22,9 +22,9 @@ closed before it can report a successful migration.
 
 The released holder-only package is `todo-db` 0.3.1, published from merged
 commit `75cf990094dea33a151d99192ffc57df0dba7682` as GitHub release `v0.3.1`.
-The release artifacts and their SHA-256 hashes are recorded in the tracker
-release TODO and must be pinned by the subsequent BenchBox package-cutover
-TODO before this command is used by CI or a clean clone.
+BenchBox vendors the release wheel in `_project/scripts/vendor/` and pins its
+published SHA-256 in the wrapper contract tests. The scripts lock resolves that
+local artifact, so CI and clean clones need no cross-repository credentials.
 
 ## Sources of truth
 

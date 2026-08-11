@@ -17,8 +17,9 @@ default and `_project/scripts/todo` remains the stable entry point.
   `sha256-chain-v2` audit chain, and an exactly equal second clean export
   including all three migration records.
 - `todo-db` 0.3.1 is published as the private GitHub release tag `v0.3.1`,
-  built from the merged holder-only fix. BenchBox consumers must resolve it
-  through the locked `_project/scripts` environment, never a sibling checkout.
+  built from the merged holder-only fix. BenchBox vendors the verified wheel
+  under `_project/scripts/vendor/`; consumers resolve that artifact through the
+  locked scripts environment, never a sibling checkout or private Git fetch.
 - No hosted write credential was used and the hosted primary was not modified.
 
 ## Compatibility boundary

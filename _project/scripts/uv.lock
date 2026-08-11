@@ -21,7 +21,7 @@ requires-dist = [
     { name = "libsql", specifier = ">=0.1.11" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "sqlglot", specifier = ">=25.6.0,<31.0.0" },
-    { name = "todo-db", extras = ["hosted"], git = "https://github.com/joeharris76/todo-db.git?rev=75cf990094dea33a151d99192ffc57df0dba7682" },
+    { name = "todo-db", extras = ["hosted"], path = "vendor/todo_db-0.3.1-py3-none-any.whl" },
     { name = "zstandard", specifier = ">=0.20.0" },
 ]
 
@@ -170,12 +170,24 @@ wheels = [
 [[package]]
 name = "todo-db"
 version = "0.3.1"
-source = { git = "https://github.com/joeharris76/todo-db.git?rev=75cf990094dea33a151d99192ffc57df0dba7682#75cf990094dea33a151d99192ffc57df0dba7682" }
+source = { path = "vendor/todo_db-0.3.1-py3-none-any.whl" }
+wheels = [
+    { filename = "todo_db-0.3.1-py3-none-any.whl", hash = "sha256:785879ee2380fb1ff337a766b3d331e6e3337add001f8a91d4bd645e64332e0d" },
+]
 
 [package.optional-dependencies]
 hosted = [
     { name = "libsql" },
 ]
+
+[package.metadata]
+requires-dist = [
+    { name = "cryptography", marker = "extra == 'audit'", specifier = ">=42" },
+    { name = "libsql", marker = "extra == 'hosted'", specifier = ">=0.1.11" },
+    { name = "pyyaml", marker = "extra == 'findings'", specifier = ">=6" },
+    { name = "pyyaml", marker = "extra == 'legacy'", specifier = ">=6" },
+]
+provides-extras = ["audit", "findings", "hosted", "legacy"]
 
 [[package]]
 name = "zstandard"
