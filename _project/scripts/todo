@@ -43,6 +43,14 @@ if is_offline_finding_command "$@"; then
     OFFLINE_FINDING=1
 fi
 
+HELP_ONLY=0
+for arg in "$@"; do
+    if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+        HELP_ONLY=1
+        break
+    fi
+done
+
 # BenchBox's committed connection file predates todo-db's config schema and
 # stores the hosted target as `url` rather than `db`. Preserve that public
 # contract and translate it only at the wrapper boundary.
@@ -54,7 +62,7 @@ fi
 # Preserve the existing local-auth convenience without writing credentials to
 # disk or command output. Explicit caller credentials always win, including a
 # read-only token used by export and audit jobs.
-if [[ "$OFFLINE_FINDING" -eq 0 && -n "${TODO_DB_URL:-}" ]]; then
+if [[ "$OFFLINE_FINDING" -eq 0 && "$HELP_ONLY" -eq 0 && -n "${TODO_DB_URL:-}" ]]; then
     if [[ -z "${TODO_DB_AUTH_TOKEN:-}" && -z "${TODO_DB_RO_AUTH_TOKEN:-}" ]]; then
         TODO_DB_AUTH_TOKEN="$(turso db tokens create "${TODO_DB_TURSO_DB:-benchbox-todo}" --expiration 1d)"
         export TODO_DB_AUTH_TOKEN
