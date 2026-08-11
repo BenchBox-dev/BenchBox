@@ -252,8 +252,13 @@ def run_cell(
             scale=scale,
         )
     else:
-        result_path_str = last_nonempty_output_line(stdout_text) if timeout_result.exit_code == 0 else None
+        # A failed query can still export a result bundle before the CLI exits
+        # nonzero. Preserve that path so reporting/classification can explain
+        # the query failure instead of misclassifying it as missing JSON.
+        result_path_str = last_nonempty_output_line(stdout_text)
         result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
+        if result_path is not None and (result_path.suffix.lower() != ".json" or not result_path.exists()):
+            result_path = None
     status = _classify(timeout_result)
     submit_state = classify_for_submit(result_path) if result_path is not None else SubmitTerminalState.missing_manifest
     exit_code = timeout_result.exit_code
