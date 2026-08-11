@@ -44,17 +44,43 @@ if is_offline_finding_command "$@"; then
 fi
 
 HELP_ONLY=0
+VERSION_ONLY=0
 for arg in "$@"; do
     if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
         HELP_ONLY=1
+    elif [[ "$arg" == "--version" ]]; then
+        VERSION_ONLY=1
+    fi
+done
+
+EXPLICIT_DB_SET=0
+EXPLICIT_DB_VALUE=""
+args=("$@")
+index=0
+while [[ "$index" -lt "${#args[@]}" ]]; do
+    arg="${args[$index]}"
+    if [[ "$arg" == "--db" ]]; then
+        EXPLICIT_DB_SET=1
+        EXPLICIT_DB_VALUE="${args[$((index + 1))]:-}"
+        break
+    elif [[ "$arg" == --db=* ]]; then
+        EXPLICIT_DB_SET=1
+        EXPLICIT_DB_VALUE="${arg#--db=}"
         break
     fi
+    index=$((index + 1))
 done
 
 # BenchBox's committed connection file predates todo-db's config schema and
 # stores the hosted target as `url` rather than `db`. Preserve that public
 # contract and translate it only at the wrapper boundary.
-if [[ "$OFFLINE_FINDING" -eq 0 && -z "${TODO_DB_PATH:-}" && -z "${TODO_DB_URL:-}" && -f "$ROOT/.todo-db/config.json" ]]; then
+if [[ "$OFFLINE_FINDING" -eq 0 \
+    && "$HELP_ONLY" -eq 0 \
+    && "$VERSION_ONLY" -eq 0 \
+    && "$EXPLICIT_DB_SET" -eq 0 \
+    && -z "${TODO_DB_PATH:-}" \
+    && -z "${TODO_DB_URL:-}" \
+    && -f "$ROOT/.todo-db/config.json" ]]; then
     TODO_DB_URL="$(jq -er '.url | select(type == "string" and length > 0)' "$ROOT/.todo-db/config.json")"
     export TODO_DB_URL
 fi
@@ -62,7 +88,11 @@ fi
 # Preserve the existing local-auth convenience without writing credentials to
 # disk or command output. Explicit caller credentials always win, including a
 # read-only token used by export and audit jobs.
-if [[ "$OFFLINE_FINDING" -eq 0 && "$HELP_ONLY" -eq 0 && -n "${TODO_DB_URL:-}" ]]; then
+HOSTED_TARGET="${TODO_DB_URL:-}"
+if [[ "$EXPLICIT_DB_VALUE" == *://* ]]; then
+    HOSTED_TARGET="$EXPLICIT_DB_VALUE"
+fi
+if [[ "$OFFLINE_FINDING" -eq 0 && "$HELP_ONLY" -eq 0 && "$VERSION_ONLY" -eq 0 && -n "$HOSTED_TARGET" ]]; then
     if [[ -z "${TODO_DB_AUTH_TOKEN:-}" && -z "${TODO_DB_RO_AUTH_TOKEN:-}" ]]; then
         TODO_DB_AUTH_TOKEN="$(turso db tokens create "${TODO_DB_TURSO_DB:-benchbox-todo}" --expiration 1d)"
         export TODO_DB_AUTH_TOKEN

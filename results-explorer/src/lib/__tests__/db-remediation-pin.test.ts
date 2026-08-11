@@ -25,7 +25,7 @@ describe("db remediation command pin", () => {
   it("matches the live explorer build contract", () => {
     const result = spawnSync(
       "uv",
-      ["run", "--", "python", "_project/scripts/explorer_publish.py", "build-contract"],
+      ["run", "--no-sync", "--", "python", "_project/scripts/explorer_publish.py", "build-contract"],
       {
         cwd: repoRoot,
         encoding: "utf8",
