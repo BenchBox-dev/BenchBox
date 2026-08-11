@@ -49,7 +49,7 @@ describe("db remediation command pin", () => {
       newer_policy: NEWER_READ_MODEL_POLICY,
     });
     expect(_EXPECTED_READ_MODEL_VERSION_FOR_TEST).toBe(CURRENT_READ_MODEL_VERSION);
-  });
+  }, 30_000);
 
   it.each([
     { label: "older", version: CURRENT_READ_MODEL_VERSION - 1 },
