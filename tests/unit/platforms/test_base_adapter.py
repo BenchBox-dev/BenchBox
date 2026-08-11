@@ -1549,6 +1549,45 @@ class TestThroughputPhaseCreation:
 
         assert result.streams[0].query_executions[0].execution_order == 0
 
+    @pytest.mark.parametrize(
+        ("query_result", "expected_duration_ms"),
+        [
+            ({"query_id": "Q1", "execution_time_seconds": 0.0009, "success": True}, 0.9),
+            ({"query_id": "Q1", "execution_time_seconds": 0.0, "success": True}, 0.0),
+            ({"query_id": "Q1", "success": True}, None),
+        ],
+    )
+    def test_create_throughput_phase_preserves_duration_precision_and_missing_values(
+        self, query_result, expected_duration_ms
+    ):
+        """Throughput capture must not manufacture or truncate query durations."""
+        adapter = MockPlatformAdapter()
+        stream = Mock()
+        stream.stream_id = 0
+        stream.start_time = "2025-01-01T10:00:00"
+        stream.end_time = "2025-01-01T10:01:00"
+        stream.duration = 60.0
+        stream.query_results = [query_result]
+        stream.queries_executed = 1
+        stream.success = True
+        stream.error = None
+
+        throughput_result = Mock()
+        throughput_result.stream_results = [stream]
+        throughput_result.total_time = 60.0
+        throughput_result.start_time = stream.start_time
+        throughput_result.end_time = stream.end_time
+        throughput_result.config = Mock(num_streams=1)
+        throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 1
+        throughput_result.errors = []
+
+        result = adapter._create_throughput_phase(throughput_result)
+
+        assert result is not None
+        assert result.streams[0].query_executions[0].execution_time_ms == expected_duration_ms
+
 
 class TestGetExistingTables:
     """Tests for getting existing tables from database."""
