@@ -233,6 +233,21 @@ def test_run_cell_marks_failure(tmp_path: Path):
     assert result.result_path is None
 
 
+def test_run_cell_preserves_result_path_when_failed_child_exports_json(tmp_path: Path):
+    """A nonzero query run with a result bundle remains classifiable as a query failure."""
+    result_path = tmp_path / "benchmark_runs" / "results" / "failed-query.json"
+    _write_result_json(result_path, failed=1)
+    fake_argv = [sys.executable, "-c", f"print({str(result_path)!r}); raise SystemExit(2)"]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell("clickhouse-server", "read_primitives", 0.01, timeout_s=10, log_dir=tmp_path)
+
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert result.result_path == result_path
+    assert result.submit_terminal_state == "query_failure"
+
+
 def test_run_cell_diagnostic_rerun_fires_for_empty_stdout_failure(tmp_path: Path):
     captured_quiet = []
 
