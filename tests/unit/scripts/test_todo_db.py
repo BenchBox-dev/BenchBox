@@ -440,6 +440,20 @@ class TestVerifyFlagParsing:
             "expected": "exit 0",
         }
 
+    def test_verify_flag_alternate_separator_survives_apostrophe_in_description(self):
+        """A prose contraction must not be read as an opening shell quote.
+
+        Quote-aware scanning from position 0 let the apostrophe in "don't" open
+        a quote that swallowed both `|||`, silently demoting the spec to the
+        `::` form and storing pieces of the pytest node id as command/expected.
+        """
+        spec = "don't regress|||pytest tests/x.py::T::test_x|||exit 0"
+        assert todo_db._parse_verify_flag([spec])[0] == {
+            "description": "don't regress",
+            "command": "pytest tests/x.py::T::test_x",
+            "expected": "exit 0",
+        }
+
     @pytest.mark.parametrize("command", ["create", "update", "promote"])
     def test_verify_help_documents_alternate_separator(self, command, capsys):
         with pytest.raises(SystemExit) as exc_info:

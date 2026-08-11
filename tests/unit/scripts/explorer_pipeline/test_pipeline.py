@@ -246,6 +246,27 @@ class TestExplorerPipelineRun:
         assert row["applied_receipt"] is not None
         assert "/Users/alice" not in row["applied_receipt"]
 
+    def test_unexpected_applied_receipt_shape_is_redacted_from_read_model(self, tmp_path: Path) -> None:
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        source = bundles_dir / "with_unexpected_receipt.json"
+        source.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
+        source.with_name("with_unexpected_receipt.applied.json").write_text(
+            json.dumps({"receipt": "private_customer_catalog"}),
+            encoding="utf-8",
+        )
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        expected = {"reason": "unexpected_shape", "redacted": True}
+        row = _duckdb_results(output)[0]
+        assert json.loads(row["applied_receipt"]) == expected
+        with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
+            projected = con.execute("SELECT applied_receipt FROM result_detail_metrics").fetchone()
+        assert projected is not None
+        assert json.loads(projected[0]) == expected
+
     def test_publishes_plans_sidecar_when_present(self, tmp_path: Path) -> None:
         """w1 wire-up: when a ``*.plans.json`` sidecar exists alongside a
         bundle, the pipeline must copy it to ``out/bundles/<result_id>.plans.json``
@@ -619,7 +640,7 @@ class TestExplorerPipelineRun:
         assert len(_duckdb_results(output)) == 1
 
     def test_applied_receipt_reaches_results_table_and_detail_view(self, tmp_path: Path) -> None:
-        """End-to-end: the companion's receipt lands in DuckDB verbatim.
+        """End-to-end: the companion's sanitized receipt lands in DuckDB.
 
         Pins the DDL / positional-INSERT / ``result_detail_metrics`` projection
         alignment for the ``applied_receipt`` column -- a mismatch there would
@@ -643,11 +664,16 @@ class TestExplorerPipelineRun:
 
         rows = _duckdb_results(output)
         assert len(rows) == 1
-        assert json.loads(rows[0]["applied_receipt"]) == receipt
+        expected = {
+            "platform": "duckdb",
+            "corroborated": True,
+            "entries": [{"statement_redacted": True, "verdict": "corroborated"}],
+        }
+        assert json.loads(rows[0]["applied_receipt"]) == expected
 
         with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
             projected = con.execute("SELECT applied_receipt FROM result_detail_metrics").fetchall()
-        assert json.loads(projected[0][0]) == receipt
+        assert json.loads(projected[0][0]) == expected
 
     def test_applied_receipt_null_when_no_companion(self, tmp_path: Path) -> None:
         """A run with no receipt stores SQL NULL, not an empty string."""

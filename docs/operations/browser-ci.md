@@ -243,7 +243,11 @@ the host first — fixture generation shells out to `uv`/Python, which the
 Playwright image does not carry:
 
 ```bash
-cd results-explorer && npm run test:e2e:fixtures && npm run build
+# Build in a subshell so the rsync source below still resolves from the
+# repository root, and create the mount point first - rsync will not create
+# multiple missing destination components on a machine with no leftover state.
+(cd results-explorer && npm run test:e2e:fixtures && npm run build)
+mkdir -p /tmp/linux-wk
 rsync -a --exclude node_modules --exclude playwright-report \
   --exclude test-results results-explorer/ /tmp/linux-wk/results-explorer/
 mocker run -d -m 8g --cpus 4 -v /tmp/linux-wk:/work \

@@ -153,8 +153,11 @@ def test_auto_merge_partial_stack_backstop_runs_at_least_daily() -> None:
     crons = [entry["cron"] for entry in schedule]
     assert crons, "detector has no scheduled backstop"
     for cron in crons:
-        day_of_week = cron.split()[4]
-        day_of_month = cron.split()[2]
-        assert day_of_week == "*" and day_of_month == "*", (
-            f"backstop cron {cron!r} runs less often than daily; a stale-branch orphan stays invisible until it fires"
+        day_of_month, month, day_of_week = (cron.split()[2], cron.split()[3], cron.split()[4])
+        # The month field counts too: `0 7 * 1 *` is daily *within January* and
+        # silent for the other eleven months, which day-of-month and day-of-week
+        # checks alone accept as an at-least-daily backstop.
+        assert day_of_week == "*" and day_of_month == "*" and month == "*", (
+            f"backstop cron {cron!r} runs less often than daily year-round; "
+            "a stale-branch orphan stays invisible until it fires"
         )

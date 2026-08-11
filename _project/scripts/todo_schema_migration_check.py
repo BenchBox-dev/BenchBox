@@ -183,7 +183,12 @@ def validate_contract(*, tracker: Path, wrapper: Path, inventory: Path) -> None:
             entry,
             revision=revision,
             expected_count=expected_count,
-            is_empty=revision in empty_revisions or expected_count == 0,
+            # Emptiness comes solely from the parsed MIGRATIONS literal. Falling
+            # back to `expected_count == 0` let a fence whose entry gained a DDL
+            # statement still report empty while its count stayed 0, so the drift
+            # guard accepted the inconsistency that `_check_fence_declaration`
+            # exists to reject.
+            is_empty=revision in empty_revisions,
             inventory=inventory,
         )
     current = entries[-1]

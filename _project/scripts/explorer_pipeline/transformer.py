@@ -65,27 +65,70 @@ def _sanitize_applied_drift_check(drift_check: Any) -> None:
         drift_check["drift_redacted"] = True
 
 
-def _sanitize_applied_receipt(receipt: Any) -> None:
+# Stand-in for a receipt container whose shape none of the redaction rules
+# below can reach. Publishing such a value verbatim is the failure this marker
+# exists to prevent, so it carries no payload from the source document.
+_REDACTED_APPLIED_SHAPE: dict[str, Any] = {"redacted": True, "reason": "unexpected_shape"}
+
+
+def _sanitize_applied_entry(entry: dict[str, Any]) -> None:
+    for key in ("statement", "diff", "detail", "evidence", "table", "name", "expected_columns", "observed_columns"):
+        entry.pop(key, None)
+    if "reason" in entry:
+        entry.pop("reason", None)
+        entry["reason_redacted"] = True
+    entry["statement_redacted"] = True
+
+
+def _sanitize_applied_observed(observed: dict[str, Any]) -> None:
+    for key in ("table", "name", "columns", "evidence"):
+        observed.pop(key, None)
+    observed["redacted"] = True
+
+
+def _sanitized_applied_container(value: Any, sanitize_item: Any) -> Any:
+    """Sanitize a receipt sub-list, failing closed on an unexpected shape.
+
+    A non-list here (or a non-object inside it) is free text no redaction rule
+    matches. Iterating it would silently pass the original through - a string
+    yields characters, none of which are dicts - so replace it with a marker.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        return dict(_REDACTED_APPLIED_SHAPE)
+    sanitized: list[Any] = []
+    for item in value:
+        if not isinstance(item, dict):
+            sanitized.append(dict(_REDACTED_APPLIED_SHAPE))
+            continue
+        sanitize_item(item)
+        sanitized.append(item)
+    return sanitized
+
+
+def _sanitize_applied_receipt(receipt: Any) -> Any:
+    """Sanitize the introspection receipt, redacting shapes it cannot inspect.
+
+    Returning an unexpected shape untouched published it verbatim: a companion
+    such as ``{"receipt": "private_customer_catalog"}`` parses, survives the
+    generic anonymizer, and carries no absolute path for the leak detector to
+    catch, so the free text reached the public sidecar intact.
+    """
+    if receipt is None:
+        return None
     if not isinstance(receipt, dict):
-        return
+        return dict(_REDACTED_APPLIED_SHAPE)
     if "error" in receipt:
         receipt.pop("error", None)
         receipt["error_redacted"] = True
-    for entry in receipt.get("entries") or []:
-        if not isinstance(entry, dict):
-            continue
-        for key in ("statement", "diff", "detail", "evidence", "table", "name", "expected_columns", "observed_columns"):
-            entry.pop(key, None)
-        if "reason" in entry:
-            entry.pop("reason", None)
-            entry["reason_redacted"] = True
-        entry["statement_redacted"] = True
-    for observed in receipt.get("observed") or []:
-        if isinstance(observed, dict):
-            for key in ("table", "name", "columns", "evidence"):
-                observed.pop(key, None)
-            observed["redacted"] = True
+    # Keyed on presence, not truthiness, so an absent key is never introduced.
+    if "entries" in receipt:
+        receipt["entries"] = _sanitized_applied_container(receipt["entries"], _sanitize_applied_entry)
+    if "observed" in receipt:
+        receipt["observed"] = _sanitized_applied_container(receipt["observed"], _sanitize_applied_observed)
     _redact_applied_dropped(receipt)
+    return receipt
 
 
 def _sanitize_applied_companion(payload: dict[str, Any]) -> dict[str, Any]:
@@ -108,7 +151,8 @@ def _sanitize_applied_companion(payload: dict[str, Any]) -> dict[str, Any]:
             entry["statement_redacted"] = True
     _redact_applied_dropped(sanitized)
     _sanitize_applied_drift_check(sanitized.get("drift_check"))
-    _sanitize_applied_receipt(sanitized.get("receipt"))
+    if "receipt" in sanitized:
+        sanitized["receipt"] = _sanitize_applied_receipt(sanitized["receipt"])
     return sanitized
 
 

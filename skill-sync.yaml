@@ -35,6 +35,15 @@ config:
     fast_test: "uv run -- python -m pytest -m fast -q"
     verify: "uv run ruff check . && uv run ty check && uv run -- python -m pytest -m fast -q"
     line_length: 120
+    # Project-specific review checks. The shared five-axis rubric deliberately
+    # carries no BenchBox-specific items and only applies these when this key is
+    # set, so a check dropped from the rubric without landing here is simply lost.
+    review_checklist:
+      - >-
+        For TODOs claiming to retire a SQL-translation post-fixup from a harness
+        PASS, grep the helper call site and confirm the harness probe matches the
+        wrapper's `read=` argument. A single-dialect PASS cannot retire a helper
+        invoked with SQLGlot cross-dialect translation.
   test:
     runner: pytest
     coverage: "uv run -- python -m pytest --cov=benchbox --cov-report=term-missing"

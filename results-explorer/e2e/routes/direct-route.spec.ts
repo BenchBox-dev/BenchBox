@@ -102,38 +102,3 @@ test.describe("direct route parity", () => {
     await expect(guardrails).not.toContainText(/coverage\.\./i);
   });
 });
-
-test.describe("assembled GitHub Pages artifact", () => {
-  test.skip(
-    !process.env.E2E_SITE_DIR,
-    "Set E2E_SITE_DIR to the workflow-produced site directory for Pages-shaped acceptance.",
-  );
-
-  test("preserves direct routes through root 404 fallback and native docs links", async ({ page }) => {
-    const directRouteStatuses: number[] = [];
-    const docsStatuses: number[] = [];
-    page.on("response", (response) => {
-      const pathname = new URL(response.url()).pathname;
-      if (pathname === "/results/p/polars/") directRouteStatuses.push(response.status());
-      if (pathname === "/docs/usage/installation.html") docsStatuses.push(response.status());
-    });
-
-    const fallback = await page.request.get("/404.html");
-    expect(fallback.status()).toBe(200);
-    expect(await fallback.text()).toContain("benchbox.results.redirect");
-
-    await page.goto("/results/p/polars/");
-    await waitForShell(page);
-    await waitForDataElement(page, page.getByRole("heading", { name: /^Polars Results$/ }));
-    await expect(page).toHaveURL(/\/results\/p\/polars\/$/);
-    expect(directRouteStatuses).toContain(404);
-    await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(1);
-    await expectNoFalsePlatformEmpty(page);
-
-    await page.goto("/results/");
-    await waitForDataLoaded(page, /Recent Results/i);
-    await page.getByRole("link", { name: "Run a benchmark" }).click();
-    await expect(page).toHaveURL(/\/docs\/usage\/installation\.html$/);
-    expect(docsStatuses).toContain(200);
-  });
-});

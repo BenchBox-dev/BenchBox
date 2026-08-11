@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from _project.scripts.explorer_pipeline.pipeline import ExplorerPipeline
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
 from benchbox.core.results.anonymization import AnonymizationManager
 from benchbox.core.results.canonical_json import canonical_json_bytes
@@ -74,3 +75,28 @@ def test_pipeline_derives_the_id_after_anonymizing() -> None:
     derivation = source[id_assign : id_assign + 220]
     assert "raw=public_raw" in derivation, "result_id is no longer derived from the published bytes"
     assert "raw=bundle_raw" not in derivation, "result_id reverted to hashing raw source bytes"
+
+
+def test_published_artifact_bytes_recompute_the_result_id(data_dir: Path, tmp_path: Path) -> None:
+    """Recompute the ID from the emitted artifact, not from in-memory bytes.
+
+    The two tests above pass even if the publisher stops writing the bytes it
+    hashed - one feeds the same `public_bytes` to the transformer twice, the
+    other only inspects the derivation call. The advertised contract is that
+    anyone holding `bundles/{result_id}.json` can recompute its name, so run
+    the pipeline and check the artifact it actually wrote.
+    """
+    output = tmp_path / "out"
+    ExplorerPipeline().run(data_dir, output)
+
+    published = sorted((output / "bundles").glob("*.json"))
+    assert published, "pipeline published no bundle"
+
+    transformer = BundleTransformer()
+    for artifact in published:
+        emitted = artifact.read_bytes()
+        recomputed = transformer.result_id_from_bundle(artifact, data=json.loads(emitted), raw=emitted)
+        assert recomputed == artifact.stem, (
+            f"{artifact.name}: filename does not match the ID recomputed from its own bytes; "
+            "the publisher is writing bytes other than the ones it hashed"
+        )
