@@ -491,43 +491,39 @@ Manage anonymization of benchmark results for privacy-preserving sharing.
        print(f"Anonymous ID: {machine_id}")
        # Output: machine_a1b2c3d4e5f6g7h8
 
-.. method:: anonymize_system_profile() -> dict[str, Any]
+.. method:: anonymize_result_payload(payload) -> dict[str, Any]
 
-   Generate anonymized system profile information.
-
-   **Returns**: dict - Anonymized system information (OS, architecture, CPU, memory)
-
-   **Example**:
-
-   .. code-block:: python
-
-       profile = manager.anonymize_system_profile()
-       print(f"OS: {profile['os_type']} {profile['os_release']}")
-       print(f"Architecture: {profile['architecture']}")
-       print(f"CPU count: {profile['cpu_count']}")
-       print(f"Memory: {profile['memory_gb']} GB")
-       print(f"Hostname: {profile['hostname']}")  # Anonymized: host_abc123de
-       print(f"Username: {profile['username']}")  # Anonymized: user_def456gh
-
-.. method:: sanitize_path(path) -> str
-
-   Sanitize file paths by removing or anonymizing sensitive components.
+   Anonymize a whole result bundle payload. This is the entry point that
+   replaced the former per-field helpers: path sanitizing, system-profile
+   scrubbing, and query-metadata anonymization now happen inside this single
+   pass rather than through separate public methods.
 
    **Parameters**:
 
-   - **path** (str): File path to sanitize
+   - **payload** (dict): Result bundle payload to anonymize
 
-   **Returns**: str - Sanitized path
+   **Returns**: dict - Anonymized payload, safe for publication
 
    **Example**:
 
    .. code-block:: python
 
-       # Sensitive path
-       original = "/home/john.doe/projects/benchbox/data/customer_data.csv"
-       sanitized = manager.sanitize_path(original)
-       print(sanitized)
-       # Output: /home/dir_a1b2c3d4/projects/benchbox/data/dir_e5f6g7h8.csv
+       from benchbox.core.results.anonymization import AnonymizationManager
+
+       manager = AnonymizationManager()
+       public_payload = manager.anonymize_result_payload(raw_payload)
+
+.. method:: anonymize_tuning_payload(payload) -> dict[str, Any]
+
+   Anonymize a tuning companion payload using the same pseudonym domain as
+   :meth:`anonymize_result_payload`, so a bundle and its sidecars stay
+   mutually consistent.
+
+   **Parameters**:
+
+   - **payload** (dict): Tuning companion payload
+
+   **Returns**: dict - Anonymized payload
 
 .. method:: remove_pii(text) -> str
 
@@ -548,38 +544,16 @@ Manage anonymization of benchmark results for privacy-preserving sharing.
        print(cleaned)
        # Output: "Contact [REDACTED] or call [REDACTED]"
 
-.. method:: anonymize_query_metadata(query_metadata) -> dict[str, Any]
+.. note::
 
-   Anonymize query execution metadata.
-
-   **Parameters**:
-
-   - **query_metadata** (dict): Original query metadata
-
-   **Returns**: dict - Anonymized metadata
-
-.. method:: validate_anonymization(original_data, anonymized_data) -> dict[str, Any]
-
-   Validate that anonymization was successful.
-
-   **Parameters**:
-
-   - **original_data** (dict): Original data before anonymization
-   - **anonymized_data** (dict): Data after anonymization
-
-   **Returns**: dict - Validation results with warnings and errors
-
-   **Example**:
-
-   .. code-block:: python
-
-       validation = manager.validate_anonymization(original, anonymized)
-       if validation['is_valid']:
-           print("✅ Anonymization successful")
-       else:
-           print("❌ Anonymization issues:")
-           for error in validation['errors']:
-               print(f"  - {error}")
+   **Migrating from the pre-consolidation API.** ``anonymize_system_profile()``,
+   ``sanitize_path()``, ``anonymize_query_metadata()``, and
+   ``validate_anonymization()`` were removed. Call
+   :meth:`anonymize_result_payload` on the whole payload instead - it applies
+   all of those transforms in one pass. To confirm a payload is publishable,
+   use :func:`benchbox.core.results.anonymization.find_public_path_leaks`,
+   which returns the offending field paths and replaces the old
+   ``validate_anonymization`` check.
 
 Anonymization Config
 ~~~~~~~~~~~~~~~~~~~~
@@ -591,15 +565,20 @@ Configuration for result anonymization.
 
 **Attributes**:
 
-- **include_machine_id** (bool): Include anonymous machine identifier (default: True)
-- **machine_id_salt** (str | None): Custom salt for machine ID generation
-- **anonymize_paths** (bool): Sanitize file paths (default: True)
-- **allowed_path_prefixes** (list[str]): Paths to keep unchanged (default: ["/tmp", "/var/tmp"])
-- **include_system_profile** (bool): Include system information (default: True)
-- **anonymize_hostnames** (bool): Anonymize machine hostnames (default: True)
-- **anonymize_usernames** (bool): Anonymize usernames (default: True)
-- **pii_patterns** (list[str]): Regex patterns for PII detection
-- **custom_sanitizers** (dict[str, str]): Custom regex replacements
+- **machine_id_salt** (str | None): Salt for machine-ID pseudonyms (default: ``None``).
+  With the default, pseudonyms are deterministic across installations - set a
+  salt when you need cross-installation correlation resistance.
+- **pii_patterns** (list[str]): Regex patterns for PII detection (defaults cover
+  IPv4 addresses, email addresses, and US SSN-shaped strings)
+- **custom_sanitizers** (dict[str, str]): Custom regex replacements (default: ``{}``)
+
+.. note::
+
+   ``include_machine_id``, ``anonymize_paths``, ``allowed_path_prefixes``,
+   ``include_system_profile``, ``anonymize_hostnames``, and
+   ``anonymize_usernames`` were removed. Path, hostname, and username handling
+   is no longer optional - it always applies - so passing any of these now
+   raises ``TypeError``. Drop them from existing configs.
 
 **Example**:
 
@@ -612,10 +591,7 @@ Configuration for result anonymization.
 
     # Custom configuration
     config = AnonymizationConfig(
-        anonymize_hostnames=True,
-        anonymize_usernames=True,
-        anonymize_paths=True,
-        allowed_path_prefixes=["/tmp", "/var/tmp", "/opt/benchbox"],
+        machine_id_salt="your-org-salt",
         custom_sanitizers={
             r"customer_\d+": "customer_[REDACTED]",
             r"project_[a-z]+": "project_[REDACTED]"

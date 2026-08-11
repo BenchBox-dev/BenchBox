@@ -39,8 +39,13 @@ against `vite dev` or the Explorer-only test server:
 ```bash
 cd results-explorer
 E2E_SITE_DIR=/absolute/path/to/site \\
-E2E_PAGES_SHAPED=1 npx playwright test --project=chromium --workers=1 e2e/routes/direct-route.spec.ts
+E2E_PAGES_SHAPED=1 npx playwright test --project=chromium --workers=1 e2e/routes/pages-artifact.spec.ts
 ```
+
+This spec is deliberately fixture-free, so it needs no `npm run test:e2e:fixtures`
+first and asserts nothing about corpus row counts. Do not point this command at
+`direct-route.spec.ts`: that file pins generated fixture ids and exact row
+counts, which fail against a production artifact.
 
 The server returns the assembled root `404.html` with HTTP 404 for missing
 Pages routes, so the test proves the browser redirect/route restoration and a

@@ -285,6 +285,13 @@ class TestClaimRenewal:
             work=[{"id": "w1", "summary": "a unit of work"}],
         )
         todo_db.claim_item(conn, "agent-a", "long-work")
+
+        # A third party cannot release a live claim: doing so handed another
+        # worker's in-flight item back to the ready queue and reported success.
+        with pytest.raises(todo_db.TodoError, match="only 'agent-a' can release it"):
+            todo_db.release_item(conn, "agent-b", "long-work")
+        assert conn.execute("SELECT claimed_by FROM items WHERE id = 'long-work'").fetchone()[0] == "agent-a"
+
         todo_db.release_item(conn, "agent-a", "long-work")
 
         with pytest.raises(todo_db.TodoError, match="lease"):

@@ -59,17 +59,39 @@ const FIXTURE_IDS_PATH = join(
   "fixture-ids.json",
 );
 
-export const fixtureIds: FixtureIds = (() => {
-  try {
-    return JSON.parse(readFileSync(FIXTURE_IDS_PATH, "utf8")) as FixtureIds;
-  } catch (cause) {
-    throw new Error(
-      `Could not read ${FIXTURE_IDS_PATH}. Run \`npm run test:e2e:fixtures\` first - ` +
-        "the browser suite needs the generated fixture corpus.",
-      { cause },
-    );
+let loadedFixtureIds: FixtureIds | null = null;
+
+function loadFixtureIds(): FixtureIds {
+  if (loadedFixtureIds === null) {
+    try {
+      loadedFixtureIds = JSON.parse(readFileSync(FIXTURE_IDS_PATH, "utf8")) as FixtureIds;
+    } catch (cause) {
+      throw new Error(
+        `Could not read ${FIXTURE_IDS_PATH}. Run \`npm run test:e2e:fixtures\` first - ` +
+          "the browser suite needs the generated fixture corpus.",
+        { cause },
+      );
+    }
   }
-})();
+  return loadedFixtureIds;
+}
+
+/**
+ * Generated fixture identifiers, resolved on first property access.
+ *
+ * Deliberately lazy: this module also exports the `waitFor*` helpers, and an
+ * eager read made *importing* it fail whenever the generated corpus was absent.
+ * That broke Playwright discovery - not just execution - for fixture-free specs
+ * such as the assembled-artifact acceptance, which runs against a downloaded
+ * `site/` directory and never needs a fixture id.
+ */
+export const fixtureIds: FixtureIds = new Proxy({} as FixtureIds, {
+  get: (_target, property) => Reflect.get(loadFixtureIds(), property),
+  has: (_target, property) => Reflect.has(loadFixtureIds(), property),
+  ownKeys: () => Reflect.ownKeys(loadFixtureIds()),
+  getOwnPropertyDescriptor: (_target, property) =>
+    Reflect.getOwnPropertyDescriptor(loadFixtureIds(), property),
+});
 
 /**
  * Wait until the explorer's initial Preact bundle has mounted. We pick

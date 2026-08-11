@@ -42,6 +42,7 @@ from _project.scripts.explorer_pipeline.transformer import (
     _applied_receipt,
     _platform_percentile_stats,
     _public_companion_bytes,
+    _sanitize_applied_receipt,
 )
 from _project.scripts.results_explorer_snapshot_invariants import check_snapshot
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
@@ -229,13 +230,13 @@ def _public_applied_receipt(bundle_path: Path, anonymizer: AnonymizationManager)
     if receipt_json is None:
         return None
     try:
-        public_receipt = anonymizer.anonymize_result_payload(json.loads(receipt_json))
+        public_receipt = _sanitize_applied_receipt(anonymizer.anonymize_result_payload(json.loads(receipt_json)))
     except (TypeError, ValueError, json.JSONDecodeError) as exc:
         raise ValueError(f"could not sanitize applied receipt {bundle_path.name}: {exc}") from exc
     leaks = find_public_path_leaks(public_receipt)
     if leaks:
         raise PrivacyRejectionError(
-            "public applied receipt privacy check failed for fields: " + ", ".join(sorted(set(leaks)))
+            f"{bundle_path}: public applied receipt privacy check failed for fields: " + ", ".join(sorted(set(leaks)))
         )
     return canonical_json_bytes(public_receipt).decode("utf-8")
 
@@ -249,8 +250,12 @@ def _public_bundle_data(
     public_bundle = anonymizer.anonymize_result_payload(bundle_data)
     public_leaks = find_public_path_leaks(public_bundle)
     if public_leaks:
+        # The path is part of the message, not just the log line: this exception
+        # aborts the whole build, and `explorer_publish.py` prints only
+        # `str(exc)`. Without it a multi-bundle corpus reports which *fields*
+        # leaked but not which file to fix, forcing a binary search of the corpus.
         raise PrivacyRejectionError(
-            "public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks)))
+            f"{bundle_path}: public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks)))
         )
     return public_bundle, _public_applied_receipt(bundle_path, anonymizer)
 
@@ -753,7 +758,7 @@ class ExplorerPipeline:
                         try:
                             public_companion = _public_companion_bytes(bundle_path, suffix, public_anonymizer)
                         except CompanionPrivacyError as exc:
-                            raise PrivacyRejectionError(str(exc)) from exc
+                            raise PrivacyRejectionError(f"{bundle_path} ({suffix} companion): {exc}") from exc
                         if public_companion is None:
                             continue
 

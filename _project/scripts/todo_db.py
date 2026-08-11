@@ -2530,13 +2530,28 @@ def claim_item(
     return order
 
 
-def release_item(conn: sqlite3.Connection, actor: str, item_id: str) -> None:
+def release_item(
+    conn: sqlite3.Connection,
+    actor: str,
+    item_id: str,
+    ttl_hours: float = DEFAULT_LEASE_TTL_HOURS,
+) -> None:
     with _write_txn(conn):
         item = _require_item(conn, item_id)
-        if item["claimed_by"] is None:
+        holder = item["claimed_by"]
+        if holder is None:
             return
+        # Mirror `claim_item`'s takeover rule: the holder may always release,
+        # and a third party only once the lease has expired. Without this the
+        # command cleared any live claim and returned success, handing another
+        # worker's in-flight item back to the ready queue.
+        if holder != actor and not _lease_expired(item["claimed_at"], ttl_hours):
+            raise TodoError(
+                f"{item_id!r} is claimed by {holder!r} since {item['claimed_at']};"
+                f" only {holder!r} can release it, or wait for the lease to expire"
+            )
         conn.execute("UPDATE items SET claimed_by = NULL, claimed_at = NULL WHERE id = ?", (item_id,))
-        log_event(conn, actor, item_id, "release", {"holder": item["claimed_by"]})
+        log_event(conn, actor, item_id, "release", {"holder": holder})
 
 
 def _touch_lease(
@@ -4867,8 +4882,21 @@ def _parse_verify_flag(specs: list[str]) -> list[dict[str, str]]:
         # Keep the legacy two/three-field form byte-for-byte compatible. The
         # explicit alternate form is unambiguous for commands such as
         # ``pytest path.py::TestClass::test_case``.
-        if len(_split_unquoted(spec, VERIFY_SPEC_SEPARATOR, 1)) > 1:
-            fields = _split_unquoted(spec, VERIFY_SPEC_SEPARATOR)
+        # Pick the form by whichever delimiter appears FIRST, positionally and
+        # without any quote state. Whatever precedes that first delimiter is the
+        # description, so a delimiter cannot hide inside it and prose needs no
+        # escaping. Quote-aware scanning from position 0 used to decide this,
+        # which let an ordinary apostrophe ("don't regress") open a shell quote
+        # that swallowed every following `|||`; the spec then silently fell back
+        # to `::` and stored fragments of a pytest node id as the command.
+        # Shell quoting is already resolved by argv before it reaches here.
+        alternate_at = spec.find(VERIFY_SPEC_SEPARATOR)
+        legacy_at = spec.find("::")
+        if alternate_at != -1 and (legacy_at == -1 or alternate_at < legacy_at):
+            description, _, remainder = spec.partition(VERIFY_SPEC_SEPARATOR)
+            # Past the description the text is a shell command, where a *quoted*
+            # `|||` is literal payload rather than a field separator.
+            fields = [description, *_split_unquoted(remainder, VERIFY_SPEC_SEPARATOR, 1)]
         else:
             fields = spec.split("::", 2)
         entry = {"description": fields[0]}
