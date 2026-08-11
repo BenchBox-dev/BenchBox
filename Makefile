@@ -708,7 +708,7 @@ ci-lint:
 	fi; \
 	uv run -- python _project/scripts/timing_policy_check.py --strict; \
 	[ $$? -eq 0 ] || failed="$$failed timing-policy"; \
-	uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check; \
+	uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \
 	[ $$? -eq 0 ] || failed="$$failed uat-loc-table"; \
 	$(MAKE) compat-docs-check; \
 	[ $$? -eq 0 ] || failed="$$failed compat-docs-check"; \

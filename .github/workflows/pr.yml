@@ -372,7 +372,7 @@ jobs:
         # hook alone.
         id: guard-uat-loc-table
         continue-on-error: true
-        run: uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check
+        run: uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check
 
       - name: Compatibility governance drift check
         id: guard-compat-docs
