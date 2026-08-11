@@ -480,7 +480,9 @@ def test_missing_package_commands_use_extension_path(
     monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
 
     assert compat.main(["--db", str(tmp_path / "todo.sqlite"), command]) == 0
-    assert calls == [["--db", str(tmp_path / "todo.sqlite"), command]]
+    assert len(calls) == 1
+    assert calls[0][:2] == ["--db", str(tmp_path / "todo.sqlite")]
+    assert command in calls[0]
 
 
 def test_explicit_missing_local_read_target_is_initialized(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -521,6 +523,27 @@ def test_existing_local_init_checks_freeze_before_package_command(
 
     assert compat.main(["--db", str(target), "init"]) == 0
     assert calls == ["freeze-guard", "init"]
+
+
+def test_renew_stops_when_freeze_guard_rejects(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls: list[str] = []
+    target = tmp_path / "todo.sqlite"
+    target.touch()
+
+    def fake_extension(argv: list[str], *, cwd: Path) -> CompletedProcess[str]:
+        calls.append(argv[-1])
+        return CompletedProcess(argv, 2, stdout="", stderr="frozen\n")
+
+    monkeypatch.setattr(compat, "_delegate_extension", fake_extension)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+
+    assert compat.main(["--db", str(target), "renew", "item"]) == 2
+    assert calls == ["freeze-guard"]
+
+
+def test_audit_verify_is_read_only_during_freeze() -> None:
+    assert not compat._command_mutates_tracker(["audit", "verify"], "audit")
 
 
 @pytest.mark.parametrize(

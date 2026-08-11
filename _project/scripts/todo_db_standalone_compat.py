@@ -66,7 +66,7 @@ GLOBAL_VALUE_OPTIONS = frozenset({"--actor", "--db", "--project-id", "--replica"
 OFFLINE_FINDING_SUBCOMMANDS = frozenset({"create", "candidates"})
 PACKAGE_COMMAND_TRANSLATIONS = {"scope-update": "update"}
 EXTENSION_COMMANDS = frozenset({"renew", "freeze"})
-READ_ONLY_COMMANDS = frozenset({"show", "deps", "list", "ready", "stats", "check-scope", "lint", "doctor"})
+READ_ONLY_COMMANDS = frozenset({"show", "deps", "list", "ready", "stats", "check-scope", "lint", "audit", "doctor"})
 _READY_BANNER_RE = re.compile(
     r"^(?P<open>\d+) open finding\(s\), (?P<drafts>\d+) unsynced draft\(s\) -- todo-db finding candidates$"
 )
@@ -359,7 +359,7 @@ def _delegate_compat_command(argv: list[str], *, command: str, cwd: Path) -> sub
         guard = _delegate_extension(argv[: located[0]] + ["freeze-guard"], cwd=cwd)
         if guard.returncode:
             return guard
-    result = _delegate(argv, command=command, cwd=cwd)
+    result = _delegate_extension(argv, cwd=cwd) if command == "renew" else _delegate(argv, command=command, cwd=cwd)
     if command == "claim" and result.returncode == 0:
         _append_claim_context(result, argv, cwd=cwd)
     if command == "defer" and result.returncode == 2 and " is terminal;" in result.stderr:
@@ -540,7 +540,7 @@ def _main(argv: list[str] | None = None) -> int:
     if command in PACKAGE_COMMAND_TRANSLATIONS:
         command = PACKAGE_COMMAND_TRANSLATIONS[command]
         args[command_index] = command
-    if command in EXTENSION_COMMANDS:
+    if command == "freeze":
         return _forward_result(_delegate_extension(args, cwd=root))
     if command == "export":
         return _export(args, root)
