@@ -61,7 +61,7 @@ COMMANDS = frozenset(
     }
 )
 
-GLOBAL_VALUE_OPTIONS = frozenset({"--actor", "--db", "--project-id", "--repository"})
+GLOBAL_VALUE_OPTIONS = frozenset({"--actor", "--db", "--project-id", "--replica", "--repository"})
 OFFLINE_FINDING_SUBCOMMANDS = frozenset({"create", "candidates"})
 
 
@@ -182,6 +182,64 @@ def _delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True)
         text=True,
         check=False,
     )
+
+
+def _initialize_missing_local_read_target(
+    argv: list[str], *, command: str, cwd: Path
+) -> subprocess.CompletedProcess[str] | None:
+    """Preserve the legacy wrapper's create-on-first-local-read behavior."""
+    target = os.environ.get("TODO_DB_PATH", "")
+    if command not in {"list", "ready", "stats"} or not target or "://" in target or Path(target).exists():
+        return None
+    located = _command_index(argv)
+    assert located is not None
+    return _delegate(argv[: located[0]] + ["init"], command="init", cwd=cwd)
+
+
+def _append_claim_context(result: subprocess.CompletedProcess[str], argv: list[str], *, cwd: Path) -> None:
+    """Restore preservation and verification sections omitted by todo-db 0.3.1."""
+    located = _command_index(argv)
+    assert located is not None
+    item_index = located[0] + 1
+    if item_index >= len(argv):
+        return
+    detail = _delegate(argv[: located[0]] + ["show", argv[item_index], "--json"], command="show", cwd=cwd)
+    if detail.returncode:
+        return
+    try:
+        item = json.loads(detail.stdout)
+    except json.JSONDecodeError:
+        return
+    lines: list[str] = []
+    if item.get("preserves"):
+        lines.append("-- must preserve")
+        lines.extend(f"   {behavior}" for behavior in item["preserves"])
+    if item.get("anti_patterns"):
+        lines.append("-- anti-patterns")
+        lines.extend(
+            f"   DO NOT {entry['dont']} — {entry['why']} — instead: {entry['instead']}"
+            for entry in item["anti_patterns"]
+        )
+    if item.get("verifications"):
+        lines.append("-- verification ladder (narrowest first)")
+        for entry in item["verifications"]:
+            command = f" :: {entry['command']}" if entry.get("command") else ""
+            expected = f" — expected: {entry['expected']}" if entry.get("expected") else ""
+            lines.append(f"   {entry['seq']}. {entry['description']}{command}{expected}")
+    if lines:
+        result.stdout = result.stdout.rstrip("\n") + "\n" + "\n".join(lines) + "\n"
+
+
+def _delegate_compat_command(argv: list[str], *, command: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+    initialized = _initialize_missing_local_read_target(argv, command=command, cwd=cwd)
+    if initialized is not None and initialized.returncode:
+        return initialized
+    result = _delegate(argv, command=command, cwd=cwd)
+    if command == "claim" and result.returncode == 0:
+        _append_claim_context(result, argv, cwd=cwd)
+    if command == "defer" and result.returncode == 2 and " is terminal;" in result.stderr:
+        result.stderr += "error: terminal items cannot accept deferrals\n"
+    return result
 
 
 def _item_rows(envelope: dict[str, Any]) -> list[dict[str, Any]]:
@@ -374,7 +432,7 @@ def _main(argv: list[str] | None = None) -> int:
     if finding_drafts_env_was_missing:
         os.environ["TODO_DB_FINDING_DRAFTS_DIR"] = str(Path.home() / ".benchbox" / "finding-drafts")
     try:
-        result = _delegate(delegated, command=command, cwd=root)
+        result = _delegate_compat_command(delegated, command=command, cwd=root)
     finally:
         if finding_drafts_env_was_missing:
             os.environ.pop("TODO_DB_FINDING_DRAFTS_DIR", None)

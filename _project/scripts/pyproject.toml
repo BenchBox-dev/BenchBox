@@ -22,6 +22,7 @@ dependencies = [
     "libsql>=0.1.11", # todo_db.py: hosted backend (Turso embedded replica)
     "pyyaml>=6.0.0", # todo_db.py import-yaml + other _project/scripts tools
     "sqlglot>=25.6.0,<31.0.0",
+    "todo-db[hosted]",
     "zstandard>=0.20.0",
 ]
 
@@ -29,3 +30,6 @@ dependencies = [
 # Prevent uv from resolving workspace members from the repo root when
 # invoked as `uv run --project _project/scripts`.
 managed = true
+
+[tool.uv.sources]
+todo-db = { git = "https://github.com/joeharris76/todo-db.git", rev = "75cf990094dea33a151d99192ffc57df0dba7682" }

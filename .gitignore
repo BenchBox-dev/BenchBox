@@ -198,6 +198,7 @@ _project/DONE/_indexes/
 .todo-db/*.sqlite
 .todo-db/*.sqlite-*
 .todo-db/replica*
+.todo-db/standalone-replica*
 .todo-db/export/
 .todo-db/archive/
 _project/blind-spots/_indexes/
@@ -216,10 +217,9 @@ _project/verification-logs/*/
 _project/verification-logs/*.log
 _project/verification-logs/*.out
 
-# uv lockfile for the _project/scripts tooling project. Generated on first
-# `uv run --project _project/scripts ...` and was repeatedly leaving fresh
-# pool worktrees "dirty", blocking `make worktree-release`.
-_project/scripts/uv.lock
+# The _project/scripts environment now contains the released todo-db runtime.
+# Its lockfile is tracked so cutover, clean-clone, and CI commands resolve the
+# same immutable package instead of relying on a developer checkout or PATH.
 
 # Firebolt data and core data directories
 /firebolt-data
