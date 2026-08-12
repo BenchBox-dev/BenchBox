@@ -278,6 +278,31 @@ def _normalize_findings_banner(result: subprocess.CompletedProcess[str], *, comm
         result.stderr = result.stderr.rstrip("\n") + ("\n" if result.stderr else "") + banner + "\n"
 
 
+def _preserve_stats_activity(
+    result: subprocess.CompletedProcess[str], argv: list[str], *, cwd: Path
+) -> subprocess.CompletedProcess[str]:
+    """Restore BenchBox's activity fingerprint on standalone stats output."""
+    if result.returncode:
+        return result
+    located = _command_index(argv)
+    assert located is not None
+    activity = _delegate_extension(argv[: located[0]] + ["activity"], cwd=cwd)
+    if activity.returncode:
+        return activity
+    try:
+        stats = json.loads(result.stdout)
+        stats.update(json.loads(activity.stdout))
+    except (AttributeError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return subprocess.CompletedProcess(
+            argv,
+            2,
+            stdout="",
+            stderr=f"error: standalone stats activity payload is invalid: {exc}\n",
+        )
+    result.stdout = _canonical_json(stats)
+    return result
+
+
 def _command_mutates_tracker(argv: list[str], command: str) -> bool:
     if any(value in {"-h", "--help", "--version"} for value in argv):
         return False
@@ -360,6 +385,8 @@ def _delegate_compat_command(argv: list[str], *, command: str, cwd: Path) -> sub
         if guard.returncode:
             return guard
     result = _delegate_extension(argv, cwd=cwd) if command == "renew" else _delegate(argv, command=command, cwd=cwd)
+    if command == "stats" and os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1":
+        result = _preserve_stats_activity(result, argv, cwd=cwd)
     if command == "claim" and result.returncode == 0:
         _append_claim_context(result, argv, cwd=cwd)
     if command == "defer" and result.returncode == 2 and " is terminal;" in result.stderr:

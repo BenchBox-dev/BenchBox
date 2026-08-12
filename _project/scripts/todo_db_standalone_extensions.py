@@ -51,6 +51,7 @@ def _parser() -> argparse.ArgumentParser:
     freeze.add_argument("--ttl", type=float, default=legacy.DEFAULT_FREEZE_TTL_HOURS)
     freeze.add_argument("--force", action="store_true")
     sub.add_parser("freeze-guard")
+    sub.add_parser("activity")
     return parser
 
 
@@ -142,9 +143,20 @@ def _clear_freeze(tracker: TodoTracker, *, force: bool) -> bool:
 
 def _run(args: argparse.Namespace) -> int:
     actor = args.actor or legacy.default_actor()
-    mode = CredentialMode.READ_ONLY if args.command == "freeze-guard" else CredentialMode.READ_WRITE
+    mode = CredentialMode.READ_ONLY if args.command in {"freeze-guard", "activity"} else CredentialMode.READ_WRITE
     with _open_database(args, mode) as database:
         tracker = TodoTracker(database, actor=actor)
+        if args.command == "activity":
+            print(
+                legacy.json.dumps(
+                    {
+                        "events": legacy.write_activity(tracker.connection),
+                        "stale": bool(getattr(tracker.connection, "stale", False)),
+                    },
+                    sort_keys=True,
+                )
+            )
+            return 0
         if args.command == "freeze-guard":
             live = legacy.get_freeze(tracker.connection)
             if live and live["holder"] != tracker.actor:
