@@ -90,6 +90,23 @@ VENDOR_VISIBILITY = "public-vendor-reported"
 VENDOR_SUBTREE_COMPONENT = "vendor"
 
 
+def _remove_published_wal(output_dir: Path) -> None:
+    """Remove the exact published DB WAL sibling after DB promotion.
+
+    The candidate has already passed ``check_snapshot`` before promotion. A
+    stale WAL beside the active DB is nevertheless part of the published
+    output and can change how another DuckDB reader opens that DB, so cleanup
+    must be visible if the exact path cannot be removed.
+    """
+    wal_path = output_dir / "results.duckdb.wal"
+    try:
+        wal_path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise OSError(f"could not remove stale published WAL {wal_path}: {exc}") from exc
+
+
 def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
     """Publish validated bundles then atomically replace the browser DB.
 
@@ -129,7 +146,10 @@ def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
     os.replace(candidate_db, output_dir / "results.duckdb")
 
     # Stale generated artifacts cannot affect the now-active DB, so cleanup is
-    # intentionally after the atomic DB promotion and is best effort.
+    # intentionally after the atomic DB promotion. The exact WAL cleanup is
+    # fail-visible because a leftover sidecar makes the published DB
+    # non-self-contained; unrelated legacy cleanup remains best effort.
+    _remove_published_wal(output_dir)
     for child in list(target_bundles.iterdir()):
         if child.is_file() and child.name.endswith(".json") and child.name not in candidate_names:
             try:

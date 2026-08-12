@@ -18,6 +18,7 @@ from _project.scripts.explorer_pipeline.pipeline import (
     _build_short_ids,
 )
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
+from _project.scripts.results_explorer_snapshot_invariants import check_snapshot
 from benchbox.core.results.anonymization import AnonymizationManager
 from benchbox.core.results.canonical_json import canonical_json_bytes
 from benchbox.validation.bundle import COMPANION_SUFFIXES
@@ -919,6 +920,41 @@ class TestExplorerPipelineRun:
 
 
 class TestStagedOutputGuards:
+    def test_promoted_db_removes_exact_stale_wal_sibling(self, data_dir: Path, tmp_path: Path) -> None:
+        output = tmp_path / "out"
+        output.mkdir()
+        stale_wal = output / "results.duckdb.wal"
+        stale_wal.write_bytes(b"stale sidecar")
+
+        ExplorerPipeline().run(data_dir, output)
+
+        assert not stale_wal.exists()
+        assert check_snapshot(output / "results.duckdb") == []
+        with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
+            assert con.execute("SELECT COUNT(*) FROM results").fetchone()[0] == 1
+
+    def test_wal_cleanup_failure_is_visible_after_db_promotion(
+        self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        output = tmp_path / "out"
+        output.mkdir()
+        stale_wal = output / "results.duckdb.wal"
+        stale_wal.write_bytes(b"stale sidecar")
+        real_unlink = Path.unlink
+
+        def deny_published_wal(path: Path, *, missing_ok: bool = False) -> None:
+            if path == stale_wal:
+                raise PermissionError("WAL is locked")
+            real_unlink(path, missing_ok=missing_ok)
+
+        monkeypatch.setattr(Path, "unlink", deny_published_wal)
+
+        with pytest.raises(OSError, match="could not remove stale published WAL"):
+            ExplorerPipeline().run(data_dir, output)
+
+        assert (output / "results.duckdb").is_file(), "DB promotion must happen before WAL cleanup"
+        assert stale_wal.is_file(), "Cleanup failure must leave the cause visible"
+
     def test_symlinked_bundles_destination_is_rejected(self, data_dir: Path, tmp_path: Path) -> None:
         """A symlinked `bundles/` must not be published into.
 
