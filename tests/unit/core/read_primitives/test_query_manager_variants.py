@@ -219,6 +219,35 @@ class TestQueryManagerVariantIntegration:
             with pytest.raises(ValueError, match="not supported on dialect"):
                 manager.get_query(query_id, dialect="datafusion")
 
+    def test_actual_catalog_clickhouse_uses_lowercase_window_functions(self):
+        """ClickHouse receives its case-sensitive LAG/LEAD spelling."""
+        manager = ReadPrimitivesQueryManager()
+
+        query = manager.get_query("window_lead_lag_same_frame", dialect="clickhouse")
+
+        assert "lag(o_totalprice, 1)" in query
+        assert "lead(o_totalprice, 1)" in query
+        assert "LAG(o_totalprice, 1)" not in query
+        assert "LEAD(o_totalprice, 1)" not in query
+        assert "toDate('1995-01-01')" in query
+
+    def test_actual_catalog_clickhouse_lowercases_timeseries_lag(self):
+        """ClickHouse receives lowercase LAG in the time-series variant."""
+        manager = ReadPrimitivesQueryManager()
+
+        query = manager.get_query("timeseries_trend_analysis", dialect="clickhouse")
+
+        assert "lag(monthly_revenue, 1)" in query
+        assert "LAG(monthly_revenue, 1)" not in query
+
+    def test_actual_catalog_clickhouse_skips_missing_cume_dist(self):
+        """Unsupported ClickHouse cume_dist cells are explicit skips."""
+        manager = ReadPrimitivesQueryManager()
+
+        for query_id in ("window_multiple_orderings", "qualify_cume_dist"):
+            with pytest.raises(QuerySkippedError, match="not supported on dialect"):
+                manager.get_query(query_id, dialect="clickhouse")
+
     def test_query_manager_initialized_successfully(self):
         """Test query manager initializes with actual catalog."""
         manager = ReadPrimitivesQueryManager()

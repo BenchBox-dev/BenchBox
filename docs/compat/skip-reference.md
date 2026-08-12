@@ -4,7 +4,7 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 334
+**Total rules:** 349
 
 **Platforms with rules:** 21
 
@@ -18,6 +18,7 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.10_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-cloud.tpchavoc.11_v4` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=12_v7 | execution_filter | ClickHouse rejects DuckDB FILTER clauses on COUNT aggregates (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-cloud.tpchavoc.12_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=13_v8 | execution_filter | ClickHouse cannot lower this variant's correlated subquery (CommonSubplan plan step, Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.13_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=14_v8 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.14_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=16_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.16_v1` |
@@ -25,6 +26,7 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v10 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.17_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v7 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.17_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v10 | execution_filter | ClickHouse rejects a GROUP BY whose key is a CASE aliased to the same name as a column it references (alias shadowing, Code 215 NOT_AN_AGGREGATE). | `execution_filter.clickhouse-cloud.tpchavoc.1_v10` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v6 | execution_filter | ClickHouse rejects the DuckDB FILTER clause on aggregate functions (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-cloud.tpchavoc.1_v6` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | ClickHouse has no DuckDB `LIST` aggregate / `list_transform`/`list_zip` lambda forms this variant uses (`Syntax error` at the `->` lambda). | `execution_filter.clickhouse-cloud.tpchavoc.1_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.3_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v10 | execution_filter | ClickHouse cannot SUM a `Variant(Decimal, Float64)` column produced by this variant's mixed-type CASE (Code 43 ILLEGAL_TYPE_OF_ARGUMENT). | `execution_filter.clickhouse-cloud.tpchavoc.3_v10` |
@@ -34,6 +36,9 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-cloud.tpchavoc.5_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v10 | execution_filter | ClickHouse cannot SUM a `Variant(Decimal, Float64)` column produced by this variant's mixed-type CASE (Code 43 ILLEGAL_TYPE_OF_ARGUMENT). | `execution_filter.clickhouse-cloud.tpchavoc.5_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-cloud.tpchavoc.5_v4` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=7_v1 | execution_filter | ClickHouse cannot execute this correlated revenue subquery (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-cloud.tpchavoc.7_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=8_v1 | execution_filter | ClickHouse cannot execute the two correlated market-share subqueries (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-cloud.tpchavoc.8_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=9_v1 | execution_filter | ClickHouse cannot execute this correlated profit subquery (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-cloud.tpchavoc.9_v1` |
 
 ### clickhouse-local
 
@@ -41,6 +46,7 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.10_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-local.tpchavoc.11_v4` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=12_v7 | execution_filter | ClickHouse rejects DuckDB FILTER clauses on COUNT aggregates (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-local.tpchavoc.12_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=13_v8 | execution_filter | ClickHouse cannot lower this variant's correlated subquery (CommonSubplan plan step, Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.13_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=14_v8 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.14_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=16_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.16_v1` |
@@ -48,6 +54,7 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v10 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.17_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v7 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.17_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v10 | execution_filter | ClickHouse rejects a GROUP BY whose key is a CASE aliased to the same name as a column it references (alias shadowing, Code 215 NOT_AN_AGGREGATE). | `execution_filter.clickhouse-local.tpchavoc.1_v10` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v6 | execution_filter | ClickHouse rejects the DuckDB FILTER clause on aggregate functions (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-local.tpchavoc.1_v6` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | ClickHouse has no DuckDB `LIST` aggregate / `list_transform`/`list_zip` lambda forms this variant uses (`Syntax error` at the `->` lambda). | `execution_filter.clickhouse-local.tpchavoc.1_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.3_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v10 | execution_filter | ClickHouse cannot SUM a `Variant(Decimal, Float64)` column produced by this variant's mixed-type CASE (Code 43 ILLEGAL_TYPE_OF_ARGUMENT). | `execution_filter.clickhouse-local.tpchavoc.3_v10` |
@@ -57,6 +64,9 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-local.tpchavoc.5_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v10 | execution_filter | ClickHouse cannot SUM a `Variant(Decimal, Float64)` column produced by this variant's mixed-type CASE (Code 43 ILLEGAL_TYPE_OF_ARGUMENT). | `execution_filter.clickhouse-local.tpchavoc.5_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-local.tpchavoc.5_v4` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=7_v1 | execution_filter | ClickHouse cannot execute this correlated revenue subquery (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-local.tpchavoc.7_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=8_v1 | execution_filter | ClickHouse cannot execute the two correlated market-share subqueries (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-local.tpchavoc.8_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=9_v1 | execution_filter | ClickHouse cannot execute this correlated profit subquery (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-local.tpchavoc.9_v1` |
 
 ### clickhouse-server
 
@@ -64,6 +74,7 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=tpchavoc, query=10_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.10_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=11_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-server.tpchavoc.11_v4` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=12_v7 | execution_filter | ClickHouse rejects DuckDB FILTER clauses on COUNT aggregates (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-server.tpchavoc.12_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=13_v8 | execution_filter | ClickHouse cannot lower this variant's correlated subquery (CommonSubplan plan step, Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.13_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=14_v8 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.14_v8` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=16_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.16_v1` |
@@ -71,6 +82,7 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v10 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.17_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=17_v7 | execution_filter | ClickHouse does not support correlated subqueries in an aggregate-function argument (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.17_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v10 | execution_filter | ClickHouse rejects a GROUP BY whose key is a CASE aliased to the same name as a column it references (alias shadowing, Code 215 NOT_AN_AGGREGATE). | `execution_filter.clickhouse-server.tpchavoc.1_v10` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v6 | execution_filter | ClickHouse rejects the DuckDB FILTER clause on aggregate functions (Code 42, COUNT requires zero or one argument). | `execution_filter.clickhouse-server.tpchavoc.1_v6` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | ClickHouse has no DuckDB `LIST` aggregate / `list_transform`/`list_zip` lambda forms this variant uses (`Syntax error` at the `->` lambda). | `execution_filter.clickhouse-server.tpchavoc.1_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.3_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=3_v10 | execution_filter | ClickHouse cannot SUM a `Variant(Decimal, Float64)` column produced by this variant's mixed-type CASE (Code 43 ILLEGAL_TYPE_OF_ARGUMENT). | `execution_filter.clickhouse-server.tpchavoc.3_v10` |
@@ -80,6 +92,9 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v1 | execution_filter | ClickHouse does not support correlated subqueries in ORDER BY (Code 48 NOT_IMPLEMENTED). | `execution_filter.clickhouse-server.tpchavoc.5_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v10 | execution_filter | ClickHouse cannot SUM a `Variant(Decimal, Float64)` column produced by this variant's mixed-type CASE (Code 43 ILLEGAL_TYPE_OF_ARGUMENT). | `execution_filter.clickhouse-server.tpchavoc.5_v10` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=5_v4 | execution_filter | ClickHouse rejects an aggregate over a select-list-alias aggregate (nested aggregate, Code 184 ILLEGAL_AGGREGATION). | `execution_filter.clickhouse-server.tpchavoc.5_v4` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=7_v1 | execution_filter | ClickHouse cannot execute this correlated revenue subquery (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-server.tpchavoc.7_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=8_v1 | execution_filter | ClickHouse cannot execute the two correlated market-share subqueries (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-server.tpchavoc.8_v1` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=9_v1 | execution_filter | ClickHouse cannot execute this correlated profit subquery (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-server.tpchavoc.9_v1` |
 
 ### datafusion
 
