@@ -1557,7 +1557,8 @@ class ResultCaptureMixin:
                     execution_order = execution_order_value
                 else:
                     execution_order = idx
-                execution_time_ms = int(float(query_result.get("execution_time_seconds", 0.0)) * 1000)
+                execution_time_seconds = query_result.get("execution_time_seconds")
+                execution_time_ms = None if execution_time_seconds is None else float(execution_time_seconds) * 1000
 
                 query_executions.append(
                     QueryExecution(
