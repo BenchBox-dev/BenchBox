@@ -123,6 +123,22 @@ def test_unrelated_python_change_skips_explorer_paths(rules: dict[str, list[str]
     assert decision["explorer_paths"] == []
 
 
+def test_public_site_theme_inputs_trigger_their_dedicated_gate(rules: dict[str, list[str]]) -> None:
+    paths = [
+        "landing/shared/header.html",
+        "landing/style.css",
+        "docs/_static/custom.css",
+        "docs/_templates/page.html",
+        "results-explorer/index.html",
+    ]
+
+    decision = classify_paths(paths, rules)
+
+    assert decision["site_theme_needed"] is True
+    assert decision["site_theme_paths"] == paths
+    assert decision["explorer_paths_needed"] is False
+
+
 def test_github_output_exposes_explorer_paths_alias(rules: dict[str, list[str]], tmp_path: Path) -> None:
     decision = classify_paths(["results-explorer/src/pages/Home.tsx"], rules)
     output = tmp_path / "github-output.txt"
