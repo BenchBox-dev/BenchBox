@@ -284,37 +284,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Aggregate browser gate result
         env:
           CHANGES_RESULT: ${{ needs.explorer-changes.result }}
           CHROMIUM_RESULT: ${{ needs.chromium.result }}
           NEEDED: ${{ needs.explorer-changes.outputs.needed }}
         run: |
-          set -euo pipefail
-          echo "explorer-changes: ${CHANGES_RESULT} (needed=${NEEDED:-unset})"
-          echo "chromium:         ${CHROMIUM_RESULT}"
-
-          # Fail closed. If change detection itself broke we cannot know
-          # whether the suite was needed, so do not wave the PR through.
-          if [ "${CHANGES_RESULT}" != "success" ]; then
-            echo "::error::explorer-changes did not succeed (${CHANGES_RESULT}); refusing to pass the gate."
-            exit 1
-          fi
-
-          case "${CHROMIUM_RESULT}" in
-            success)
-              echo "Chromium suite passed."
-              ;;
-            skipped)
-              # Only legitimate when detection said the suite was not needed.
-              if [ "${NEEDED}" = "true" ]; then
-                echo "::error::Chromium was skipped even though explorer files changed."
-                exit 1
-              fi
-              echo "No explorer-relevant changes; Chromium suite not required."
-              ;;
-            *)
-              echo "::error::Chromium suite result was '${CHROMIUM_RESULT}'."
-              exit 1
-              ;;
-          esac
+          python _project/scripts/browser_gate_aggregate.py
