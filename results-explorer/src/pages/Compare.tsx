@@ -399,8 +399,12 @@ export function Compare({ url }: CompareProps) {
   const comparabilityWarnings = comparabilityWarningFields(comparabilityFields);
   const comparabilityWarningCount = comparabilityWarnings.length;
   const comparabilityWarningLabels = comparabilityWarnings.map((field) => field.label);
-  const mixedBenchmark = new Set(results.map((result) => result.benchmark)).size > 1;
-  const benchmarkLabel = mixedBenchmark ? "Mixed Benchmark" : humanizeBenchmark(benchmark);
+  // Compare identity is canonicalized at the cohort boundary. Raw slugs such
+  // as `star_schema` remain valid in result data and route links, but aliases
+  // must not turn one SSB family into a false mixed-benchmark heading.
+  const canonicalBenchmark = canonicalBenchmarkSlug(benchmark);
+  const mixedBenchmark = new Set(results.map((result) => canonicalBenchmarkSlug(result.benchmark))).size > 1;
+  const benchmarkLabel = mixedBenchmark ? "Mixed Benchmark" : formatBenchmarkLabel(canonicalBenchmark);
   const scaleFactorLabel = new Set(results.map((result) => result.scale_factor)).size > 1
     ? "Mixed scale factors"
     : `SF ${scaleFactor}`;
