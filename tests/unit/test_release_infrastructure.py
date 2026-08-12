@@ -358,16 +358,21 @@ class TestReleaseInfrastructure:
 
         jobs = workflow["jobs"]
         assert set(jobs) == {
+            "collect-credential-free-non-fast",
             "credential-free-non-fast",
             "ruleset-drift",
             "pypi-latest-installability",
             "release-canary-result",
         }
-        assert jobs["credential-free-non-fast"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
+        collection_job = jobs["collect-credential-free-non-fast"]
+        assert collection_job["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
         assert jobs["ruleset-drift"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
-        # The non-fast lane is deliberately single-threaded; keep a bounded
-        # amount of headroom for hosted-runner variance.
-        assert jobs["credential-free-non-fast"]["timeout-minutes"] == 120
+        # Each shard is deliberately single-threaded; process-level sharding
+        # keeps the timeout bounded without enabling unsafe xdist concurrency.
+        non_fast_job = jobs["credential-free-non-fast"]
+        assert non_fast_job["timeout-minutes"] == 45
+        assert non_fast_job["strategy"]["fail-fast"] is False
+        assert len(non_fast_job["strategy"]["matrix"]["include"]) == 4
 
         # pypi-latest-installability must not gate on (or be gated by) the
         # other canary jobs, and must not check out the repo (it installs
@@ -380,16 +385,22 @@ class TestReleaseInfrastructure:
         assert "importlib.util.find_spec('pandas') is None" in pypi_latest_text
         assert "mktemp -d" in pypi_latest_text
 
+        collection_text = _workflow_job_run_text("release-canary.yml", "collect-credential-free-non-fast")
+        assert RELEASE_CANARY_NON_FAST_EXPRESSION in collection_text
+        assert "--collect-only" in collection_text
+        assert "release-canary-artifacts/non-fast-collection-summary.json" in collection_text
+        assert "--checked-ref develop" in collection_text
+        assert "--checked-sha" in collection_text
+        assert "raw" not in collection_text.lower()
+        assert "set +e" not in collection_text
+
         non_fast_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
         assert RELEASE_CANARY_NON_FAST_EXPRESSION in non_fast_text
-        assert "--collect-only" in non_fast_text
-        assert "release-canary-artifacts/non-fast-summary.json" in non_fast_text
-        assert '"checked_ref": "develop"' in non_fast_text
-        assert '"commit_sha": os.environ["CHECKED_SHA"]' in non_fast_text
-        assert "raw" not in non_fast_text.lower()
-        # Exit code must propagate via rc= variable, not be swallowed by set+e/exit 0.
-        assert "set +e" not in non_fast_text
-        assert "exit 0" not in non_fast_text
+        assert "release-canary-artifacts/shard-${SHARD_INDEX}-summary.json" in non_fast_text
+        assert "actions/download-artifact@v4" not in non_fast_text
+        assert "mapfile -t node_ids" in non_fast_text
+        assert "-n 0" in non_fast_text
+        assert 'exit "$rc"' in non_fast_text
 
         ruleset_text = _workflow_job_run_text("release-canary.yml", "ruleset-drift")
         assert "scripts/ruleset_drift_check.py" in ruleset_text
@@ -402,6 +413,7 @@ class TestReleaseInfrastructure:
         result_job = jobs["release-canary-result"]
         assert result_job["name"] == "release-canary-result"
         assert set(result_job["needs"]) == {
+            "collect-credential-free-non-fast",
             "credential-free-non-fast",
             "ruleset-drift",
             "pypi-latest-installability",
@@ -409,12 +421,13 @@ class TestReleaseInfrastructure:
         result_text = _workflow_job_run_text("release-canary.yml", "release-canary-result")
         assert '"checked_ref": "develop"' in result_text
         assert '"commit_sha": "${CHECKED_SHA}"' in result_text
+        assert '"collection_result": "${COLLECTION_RESULT}"' in result_text
         assert '"freshness_contract_hours": 48' in result_text
         assert "Release canary passed." in result_text
 
     def test_canary_collect_count_regex_matches_pytest_deselect_format(self):
         """The canary collect-step grep regex must match the actual pytest --collect-only output format."""
-        collect_text = _workflow_job_run_text("release-canary.yml", "credential-free-non-fast")
+        collect_text = _workflow_job_run_text("release-canary.yml", "collect-credential-free-non-fast")
         assert "'^[0-9]+/[0-9]+ tests collected'" in collect_text
 
         # Verify the regex semantics using Python re (same logic as the grep ERE pattern).
