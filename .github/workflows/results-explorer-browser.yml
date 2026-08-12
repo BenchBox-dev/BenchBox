@@ -284,6 +284,8 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Aggregate browser gate result
         env:
           CHANGES_RESULT: ${{ needs.explorer-changes.result }}
