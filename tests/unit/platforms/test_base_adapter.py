@@ -498,6 +498,39 @@ class TestPlatformAdapter:
         assert isinstance(results, list)
         assert all(r.get("run_type") == "measurement" for r in results)
 
+    def test_execute_single_query_applies_benchmark_materialized_result_oracle(self):
+        class MaterializedAdapter(MockPlatformAdapter):
+            def execute_query(self, connection, query, query_id, **kwargs):
+                rows = [(1, 0.8), (2, 0.9)]
+                return self._build_query_result_with_validation(
+                    query_id=query_id,
+                    execution_time=0.125,
+                    actual_row_count=len(rows),
+                    first_row=rows[0],
+                    materialized_rows=rows,
+                )
+
+        class Benchmark:
+            scale_factor = 0.01
+
+            @staticmethod
+            def validate_query_result(query_id, rows):
+                from benchbox.core.vector_search.metrics import validate_search_result
+
+                validate_search_result(query_id, rows)
+
+        result = MaterializedAdapter()._execute_single_query(
+            Benchmark(),
+            connection=object(),
+            query_id="q1",
+            query_sql="SELECT 1",
+            benchmark_type="vector_search",
+        )
+
+        assert result["status"] == "FAILED"
+        assert result["execution_time_seconds"] == 0.125
+        assert "not descending" in result["error"]
+
     def test_execute_all_queries_benchmark_no_dialect_parameter(self):
         """Test _execute_all_queries when benchmark doesn't support dialect parameter."""
         adapter = MockPlatformAdapterWithDialect()

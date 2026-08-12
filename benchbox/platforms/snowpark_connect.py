@@ -429,6 +429,7 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                 execution_time=elapsed,
                 actual_row_count=len(rows),
                 first_row=rows[0] if rows else None,
+                materialized_rows=result,
             )
             result_dict["stream_id"] = stream_id
             result_dict["results"] = rows

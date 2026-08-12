@@ -1053,6 +1053,20 @@ class TestDriversMixin:
             return self._execute_operation_query(benchmark, connection, query_id)
 
         scale_factor = getattr(benchmark, "scale_factor", None)
+        validator = getattr(benchmark, "validate_query_result", None)
+        if callable(validator):
+            from benchbox.platforms.base.result_capture import materialized_result_validation
+
+            with materialized_result_validation(validator):
+                return self.execute_query(
+                    connection,
+                    query_sql,
+                    query_id,
+                    benchmark_type=benchmark_type,
+                    scale_factor=scale_factor,
+                    validate_row_count=self.enable_validation,
+                )
+
         return self.execute_query(
             connection,
             query_sql,

@@ -1621,6 +1621,16 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=first_row,
                 validation_result=validation_result,
+                materialized_rows=lambda: [
+                    tuple(
+                        batch.column(column_index)[row_index].as_py()
+                        if hasattr(batch.column(column_index)[row_index], "as_py")
+                        else batch.column(column_index)[row_index]
+                        for column_index in range(batch.num_columns)
+                    )
+                    for batch in result_batches
+                    for row_index in range(batch.num_rows)
+                ],
             )
 
             # Display plan in console when --show-query-plans is active.

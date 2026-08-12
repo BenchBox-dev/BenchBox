@@ -36,7 +36,9 @@ import re
 import statistics
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -71,6 +73,58 @@ from benchbox.platforms.base.utils import is_non_interactive
 from benchbox.utils.clock import elapsed_seconds
 from benchbox.utils.printing import quiet_console
 from benchbox.utils.timeout_manager import run_with_timeout
+
+MaterializedRows = Sequence[Sequence[object]]
+MaterializedRowsSource = MaterializedRows | Callable[[], MaterializedRows]
+MaterializedResultValidator = Callable[[str, MaterializedRows], None]
+
+_MATERIALIZED_RESULT_VALIDATOR: ContextVar[MaterializedResultValidator | None] = ContextVar(
+    "benchbox_materialized_result_validator",
+    default=None,
+)
+
+
+@contextmanager
+def materialized_result_validation(validator: MaterializedResultValidator) -> Iterator[None]:
+    """Apply a benchmark-local full-result oracle to one adapter execution.
+
+    A context variable keeps concurrent throughput streams isolated while
+    avoiding a public ``execute_query`` signature change across every adapter.
+    Platform implementations pass their already-materialized rows to the
+    shared result builder; the oracle runs after the adapter has captured the
+    measured execution duration.
+    """
+    token = _MATERIALIZED_RESULT_VALIDATOR.set(validator)
+    try:
+        yield
+    finally:
+        _MATERIALIZED_RESULT_VALIDATOR.reset(token)
+
+
+def materialized_result_validation_active() -> bool:
+    """Return whether the current adapter execution needs its full result rows."""
+    return _MATERIALIZED_RESULT_VALIDATOR.get() is not None
+
+
+def apply_materialized_result_validation(
+    result: dict[str, Any],
+    query_id: str,
+    materialized_rows: MaterializedRowsSource | None,
+) -> None:
+    """Apply the active benchmark-local oracle to a successful result in place."""
+    materialized_validator = _MATERIALIZED_RESULT_VALIDATOR.get()
+    if materialized_validator is None or result["status"] != "SUCCESS":
+        return
+
+    try:
+        if materialized_rows is None:
+            raise RuntimeError("platform adapter did not expose materialized rows for structural validation")
+        rows = materialized_rows if isinstance(materialized_rows, Sequence) else materialized_rows()
+        materialized_validator(str(query_id), rows)
+    except Exception as exc:
+        result["status"] = "FAILED"
+        result["error"] = str(exc) or type(exc).__name__
+
 
 try:
     from benchbox.core.results.models import ExecutionPhases, QueryDefinition
@@ -1265,6 +1319,7 @@ class ResultCaptureMixin:
         validation_result: Any = None,
         error: str | None = None,
         result_digest: str | None = None,
+        materialized_rows: MaterializedRowsSource | None = None,
     ) -> dict[str, Any]:
         """Build query result dictionary with consistent validation field mapping.
 
@@ -1281,6 +1336,8 @@ class ResultCaptureMixin:
             result_digest: Gate-only full-result value digest (optional). Present
                 only when BENCHBOX_EMIT_RESULT_DIGEST armed the value oracle; absent
                 on a normal run so the payload shape is unchanged.
+            materialized_rows: Full rows, or a lazy row supplier, for an active
+                benchmark-local structural oracle. Ignored when no oracle is active.
 
         Returns:
             Dictionary with standardized query result fields
@@ -1326,6 +1383,8 @@ class ResultCaptureMixin:
                 result_dict["error"] = validation_result.error_message
 
             result_dict["row_count_validation"] = row_count_validation
+
+        apply_materialized_result_validation(result_dict, query_id, materialized_rows)
 
         execution = query_execution_from_legacy_dict(result_dict)
         compatibility_result = query_execution_to_legacy_dict(

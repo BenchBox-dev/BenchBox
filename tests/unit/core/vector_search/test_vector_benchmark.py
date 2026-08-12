@@ -450,6 +450,29 @@ class TestVectorSearchSchema:
 class TestVectorSearchMetrics:
     """Tests for recall@k, latency percentiles, and QPS utilities."""
 
+    def test_search_result_oracle_accepts_ordered_rows(self):
+        from benchbox.core.vector_search.metrics import validate_search_result
+
+        validate_search_result("Q1", [(1, 0.9), (2, 0.8)])
+        validate_search_result("q1", [(1, 0.9), (2, 0.8)])
+        validate_search_result(" q2 ", [(1, 0.1), (2, 0.2)])
+
+    def test_search_result_oracle_rejects_planted_ordering_defect(self):
+        from benchbox.core.vector_search.metrics import validate_search_result
+
+        with pytest.raises(ValueError, match="similarity results are not descending"):
+            validate_search_result("Q1", [(1, 0.8), (2, 0.9)])
+
+    def test_search_result_oracle_rejects_duplicate_ids_and_excess_rows(self):
+        from benchbox.core.vector_search.metrics import validate_search_result
+
+        with pytest.raises(ValueError, match="duplicate id"):
+            validate_search_result("Q2", [(1, 0.1), (1, 0.2)])
+        with pytest.raises(ValueError, match="at most 10"):
+            validate_search_result("Q2", [(index, float(index)) for index in range(11)])
+        with pytest.raises(ValueError, match="exactly id and metric columns"):
+            validate_search_result("Q1", [(1, 0.9, "extra")])
+
     def test_perfect_recall(self):
         from benchbox.core.vector_search.metrics import recall_at_k
 
@@ -624,6 +647,55 @@ class TestVectorSearchBenchmark:
         assert results["queries"]["Q2"]["status"] == "SKIPPED"
         assert "l2_distance requires StarRocks" in results["queries"]["Q2"]["skip_reason"]
 
+    def test_run_benchmark_applies_structural_result_oracle(self, tmp_path):
+        from benchbox.core.vector_search import VectorSearchBenchmark
+
+        class Cursor:
+            def fetchall(self):
+                return [(1, 0.8), (2, 0.9)]
+
+        class Connection:
+            def execute(self, _sql):
+                return Cursor()
+
+        benchmark = VectorSearchBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        results = benchmark.run_benchmark(connection=Connection(), queries=["Q1"])
+
+        iteration = results["queries"]["Q1"]["iterations"][0]
+        assert iteration["success"] is False
+        assert "similarity results are not descending" in iteration["error"]
+
+    def test_run_benchmark_excludes_structural_validation_from_latency(self, tmp_path, monkeypatch):
+        from benchbox.core.vector_search import VectorSearchBenchmark, benchmark as benchmark_module
+
+        events: list[str] = []
+
+        class Cursor:
+            def fetchall(self):
+                return [(1, 0.9), (2, 0.8)]
+
+        class Connection:
+            def execute(self, _sql):
+                return Cursor()
+
+        benchmark = VectorSearchBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        monkeypatch.setattr(benchmark_module, "mono_time", lambda: 10.0)
+        monkeypatch.setattr(
+            benchmark_module,
+            "elapsed_seconds",
+            lambda _start: events.append("elapsed") or 0.25,
+        )
+        monkeypatch.setattr(
+            benchmark,
+            "validate_query_result",
+            lambda _query_id, _rows: events.append("validate"),
+        )
+
+        results = benchmark.run_benchmark(connection=Connection(), queries=["q1"])
+
+        assert events == ["elapsed", "validate"]
+        assert results["queries"]["q1"]["iterations"][0]["time"] == 0.25
+
     def test_get_create_tables_sql_duckdb(self, tmp_path):
         from benchbox.core.vector_search import VectorSearchBenchmark
 
@@ -678,6 +750,13 @@ class TestVectorSearchWrapper:
 
         b = VectorSearch(scale_factor=0.01, output_dir=tmp_path)
         assert len(b.get_all_queries()) == 6
+
+    def test_wrapper_exposes_structural_result_oracle(self, tmp_path):
+        from benchbox.vector_search import VectorSearch
+
+        benchmark = VectorSearch(scale_factor=0.01, output_dir=tmp_path)
+        with pytest.raises(ValueError, match="not descending"):
+            benchmark.validate_query_result("q1", [(1, 0.8), (2, 0.9)])
 
 
 # ---------------------------------------------------------------------------

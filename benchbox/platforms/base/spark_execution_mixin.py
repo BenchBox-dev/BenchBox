@@ -564,6 +564,7 @@ class SparkQueryExecutionMixin:
                 actual_row_count=actual_row_count,
                 first_row=tuple(result[0]) if result else None,
                 validation_result=validation_result,
+                materialized_rows=result,
             )
 
             result_dict["query_statistics"] = query_stats
