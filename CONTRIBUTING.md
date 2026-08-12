@@ -50,17 +50,14 @@ Required CI on `develop` reports through `ci-required-result`. The umbrella uses
 
 The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready` (or open already-final work with `make pr-open READY=1`); then walk away — don't poll.
 
-1. **Create a feature branch off `develop`.** For parallel work, prefer a worktree so the main clone keeps `develop` checked out:
+1. **Create a feature worktree off `develop`.** Agents must keep the main clone read-only:
 
    ```bash
-   # Single-branch (simplest):
-   git checkout develop && git pull
-   git checkout -b feat/your-thing
-
-   # Or, parallel-friendly — claim a retained pool worktree off develop
-   # (run `make worktree-pool-init` once first):
-   WORKTREE_PATH=$(make -s worktree-claim BRANCH=feat/your-thing | sed -n 's/^WORKTREE_PATH=//p')
-   cd "$WORKTREE_PATH" && uv sync --group dev
+   WORKTREE_PATH=../BenchBox.wt-feat-your-thing
+   make worktree-create BRANCH=feat/your-thing WORKTREE_PATH="$WORKTREE_PATH"
+   cd "$WORKTREE_PATH"
+   make agent-write-preflight
+   uv sync --group dev
    ```
 
 2. **Make your changes.** Iterate with the fast lane:
@@ -100,10 +97,10 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → (wh
 
    `make pr-ready` (or `READY=1`) is the only arm path: `auto-merge-on-open.yml` is revoke-only and never arms — not on `opened` / `reopened` / `synchronize`, and not on draft → ready (`ready_for_review` is not even a trigger; the historical workflow arm point never fired once and was deleted). Once armed, the PR squash-merges when required checks turn green — don't poll. Soundness-critical paths and the `no-auto-merge` hold label stay withheld pending review (see `docs/operations/repo-admin-settings.md`).
 
-6. **After merge**, the remote branch auto-deletes (repo setting `delete_branch_on_merge`). Sweep any stale local branches and worktrees with:
+6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; clean local branches separately:
 
    ```bash
-   make worktree-prune    # removes worktrees whose branches are gone on origin
+   make worktree-remove WORKTREE_PATH="$WORKTREE_PATH"
    ```
 
    Inspect open PRs at any time with `make pr-status`.

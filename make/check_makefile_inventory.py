@@ -22,6 +22,13 @@ EXPECTED_INCLUDE_ORDER = [
     "make/platform-tests.mk",
     "make/documentation.mk",
     "make/worktrees.mk",
+    "make/worktree-maintenance.mk",
+    "make/help.mk",
+]
+HISTORICAL_INCLUDE_ORDER = [
+    "make/platform-tests.mk",
+    "make/documentation.mk",
+    "make/worktrees.mk",
     "make/worktree-pool.mk",
     "make/worktree-maintenance.mk",
     "make/help.mk",
@@ -375,7 +382,7 @@ def build_migration_proof(baseline: dict[str, Any], extracted: dict[str, Any]) -
             "added_phony_targets": [INVENTORY_TARGET],
             "added_variables": [RESERVED_ROOT_VARIABLE],
             "added_release_curated_tests": ADDED_RELEASE_CURATED_TESTS,
-            "include_order": EXPECTED_INCLUDE_ORDER,
+            "include_order": HISTORICAL_INCLUDE_ORDER,
             "help_recipe_line": HELP_RECIPE_LINE,
         },
     }
@@ -416,7 +423,7 @@ def validate_migration_proof(root: Path) -> list[str]:
         "added_phony_targets": [INVENTORY_TARGET],
         "added_variables": [RESERVED_ROOT_VARIABLE],
         "added_release_curated_tests": ADDED_RELEASE_CURATED_TESTS,
-        "include_order": EXPECTED_INCLUDE_ORDER,
+        "include_order": HISTORICAL_INCLUDE_ORDER,
         "help_recipe_line": HELP_RECIPE_LINE,
     }
     reviewed_split = proof.get("reviewed_split", {})

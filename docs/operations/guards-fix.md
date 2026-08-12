@@ -22,7 +22,7 @@ make guards-fix
 | Benchmark correctness-oracle coverage map | `make oracle-coverage-map-check` | `make oracle-coverage-map` (`_project/scripts/generate_oracle_coverage_map.py`) |
 | Visualization parity fixtures | `make parity-check` | `make parity-fixtures` (`tests/parity/generate_visualization_fixtures.py`) |
 | sql_compat capability matrix / skip-reference docs | `make compat-docs-check` | `make compat-docs` (`scripts/generate_compat_docs.py`) |
-| skill-sync tracked snapshot | `make skill-sync-check` | `make skill-sync` (no-op with a notice if the skill-sync CLI isn't installed locally — see its section in `dev-loop-worktree-pool.md`/the Makefile comments) |
+| skill-sync tracked snapshot | `make skill-sync-check` | `make skill-sync` (no-op with a notice if the skill-sync CLI isn't installed locally — see the Makefile comments) |
 
 **Not in this table: the UAT production-LOC ceiling gate.**
 `uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check`

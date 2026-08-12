@@ -815,11 +815,16 @@ class TestReleaseInfrastructure:
         recipe = _make_target_recipe("pr-refresh")
         assert 'develop|main|release|"") echo "Refusing to refresh $$CURRENT' in recipe
 
-        recipe = _make_target_recipe("worktree-release-locked")
-        assert 'develop|main|release) echo "Refusing to release protected branch' in recipe
-
         makefile_content = _makefile_text()
-        assert 'develop|main|release) ;; *) git branch -D "$$branch"' in makefile_content
+        assert "worktree-release-locked" not in makefile_content
+
+        worktree_recipe = (REPO_ROOT / "make" / "worktrees.mk").read_text(encoding="utf-8")
+        worktree_helper = (REPO_ROOT / "scripts" / "worktree_lifecycle.sh").read_text(encoding="utf-8")
+        assert "worktree-remove:" in worktree_recipe
+        assert "worktree_lifecycle.sh remove" in worktree_recipe
+        assert "worktree is locked" in worktree_helper
+        assert "worktree remove" in worktree_helper
+        assert "git branch -D" not in worktree_recipe
 
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""

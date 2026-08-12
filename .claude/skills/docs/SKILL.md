@@ -1,7 +1,7 @@
 ---
 name: docs
 description: Use when the user asks to "create documentation", "build docs", "review docs", "compare documents", "compress docs", "adversarial review docs", or "commit docs".
-version: 0.2.0
+version: 0.3.0
 tools: Bash, Read, Write, Edit, Task
 ---
 

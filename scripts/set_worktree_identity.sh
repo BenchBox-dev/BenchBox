@@ -5,19 +5,19 @@ set -eu
 #
 # `make agent-write-preflight` detects a contaminated identity, and
 # `agent_instruction_audit.py` warns about one. Both act after the fact. This
-# acts before: it pins the human identity to the claimed worktree so a later
+# acts before: it pins the human identity to the new linked worktree so a later
 # write to the shared config cannot reauthor work done here.
 #
 # Why worktree scope is the fix. Linked worktrees share the primary clone's
 # config, and from inside one of them `git config user.email X` (no --global)
 # writes to that COMMON config -- which is exactly the defect this repairs: one
-# such write reauthors the primary clone and every pool worktree at once.
+# such write reauthors the primary clone and every linked worktree at once.
 # Git's precedence is worktree > local > global, so a value written with
 # `--worktree` keeps resolving here no matter what later lands in the common
 # config. Measured: with a worktree override in place, re-contaminating the
 # common config leaves this worktree resolving the human identity, while a
 # sibling worktree without the override goes agent. That is why this must run
-# per worktree, at claim time.
+# per worktree, at creation time.
 #
 # This never writes user.* to the common config. `extensions.worktreeConfig` is
 # the one common-config key it sets, because `--worktree` is inert without it;
@@ -74,7 +74,7 @@ agent/service identity.
 Pinning it into worktree scope would make the misattribution durable and
 survive repair of the shared config -- the opposite of this guard's purpose.
 Restore the human global identity, then re-run:
-  make worktree-claim BRANCH=fix/descriptive-slug
+  make worktree-create BRANCH=fix/descriptive-slug WORKTREE_PATH=../BenchBox.wt-fix-descriptive-slug
 
 For a single commit that an authorized task explicitly wants attributed
 elsewhere, pass the identity per command instead:

@@ -30,8 +30,8 @@ then applies that value to the primary clone *and every worktree it owns*, at
 once.
 
 So a single obedient session reauthors every other session's work. That is what
-happened here: one observed write in a pool worktree is enough to explain
-agent-authored stashes across four different pool worktrees. The blast radius
+happened here: one observed write in a linked worktree is enough to explain
+agent-authored stashes across four different linked worktrees. The blast radius
 is the reason this is treated as a defect rather than a preference.
 
 ## The signature trade-off, stated plainly
@@ -57,8 +57,8 @@ attribution over a green badge, and keeps signatures where it can have both.
 - Per commit, when a task explicitly authorized a different identity:
   `git -c user.name=... -c user.email=... commit`. It applies to that command
   only and never becomes standing policy.
-- Per worktree, to make a claimed worktree immune to a later contaminating
-  write: `git config --worktree user.email ...`, which `make worktree-claim`
+- Per worktree, to make a linked worktree immune to a later contaminating
+  write: `git config --worktree user.email ...`, which `make worktree-create`
   now does automatically. Worktree scope outranks local scope, so the identity
   survives contamination of the common config.
 - Never write `user.*` to the shared common config to normalize identity. That
@@ -68,8 +68,8 @@ attribution over a green badge, and keeps signatures where it can have both.
 
 | Point | Guard | Kind |
 |---|---|---|
-| Claim time | `make worktree-claim` pins worktree-scoped identity | prevention |
-| Claim time | `make agent-write-preflight` refuses an agent author | detection |
+| Creation time | `make worktree-create` pins worktree-scoped identity | prevention |
+| Preflight time | `make agent-write-preflight` refuses an agent author | detection |
 | Any audit | `make agent-identity-check` warns on identity that displaces the global one | detection |
 | Commit time | `pre-commit` / `commit-msg` hooks | detection |
 | Merge time | `guard-agent-commit-range` reads the commits themselves | detection |

@@ -22,14 +22,14 @@ PR with one command and walk away - auto-merge handles the rest.
 Execute the following in order, stopping on the first failure:
 
 1. **Run `make agent-write-preflight`.** If it refuses because this is the
-   BenchBox primary clone, stop and tell the user to claim a pool worktree with
-   `make worktree-claim BRANCH=<name>`. Do not commit, push, or open a PR from
+   BenchBox primary clone, stop and tell the user to create a disposable
+   worktree with `make worktree-create BRANCH=<name> WORKTREE_PATH=<path>`. Do not commit, push, or open a PR from
    the primary clone unless the user explicitly set
    `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`.
 
 2. **Refuse if on `develop` or `main`.** If `git branch --show-current` returns
-   one of those, stop and tell the user to switch to a feature branch (offer
-   `make worktree-claim BRANCH=<name>`).
+   one of those, stop and tell the user to switch to a feature branch worktree
+   (offer `make worktree-create BRANCH=<name> WORKTREE_PATH=<path>`).
 
 3. **If there are authorized uncommitted changes**, inspect the diff and refuse
    to sweep unrelated or ambiguous files into the commit. Stage each authorized
