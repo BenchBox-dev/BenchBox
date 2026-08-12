@@ -470,6 +470,8 @@ class TestVectorSearchMetrics:
             validate_search_result("Q2", [(1, 0.1), (1, 0.2)])
         with pytest.raises(ValueError, match="at most 10"):
             validate_search_result("Q2", [(index, float(index)) for index in range(11)])
+        with pytest.raises(ValueError, match="exactly id and metric columns"):
+            validate_search_result("Q1", [(1, 0.9, "extra")])
 
     def test_perfect_recall(self):
         from benchbox.core.vector_search.metrics import recall_at_k

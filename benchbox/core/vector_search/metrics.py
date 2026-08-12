@@ -46,8 +46,8 @@ def validate_search_result(query_id: str, rows: Sequence[Sequence[object]]) -> N
     seen_ids: set[object] = set()
     metrics: list[float] = []
     for index, row in enumerate(rows):
-        if len(row) < 2:
-            raise ValueError(f"{normalized_query_id} row {index} has no metric column")
+        if len(row) != 2:
+            raise ValueError(f"{normalized_query_id} row {index} must contain exactly id and metric columns")
         row_id = row[0]
         if row_id in seen_ids:
             raise ValueError(f"{normalized_query_id} returned duplicate id {row_id!r}")
