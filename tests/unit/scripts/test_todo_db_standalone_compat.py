@@ -493,12 +493,44 @@ def test_explicit_missing_local_read_target_is_initialized(monkeypatch: pytest.M
         return CompletedProcess(argv, 0, stdout="{}\n" if command == "stats" else "", stderr="")
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setattr(
+        compat,
+        "_delegate_extension",
+        lambda argv, *, cwd: CompletedProcess(argv, 0, stdout='{"events": {}, "stale": false}\n', stderr=""),
+    )
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
     monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     target = tmp_path / "missing.sqlite"
 
     assert compat.main(["--db", str(target), "stats"]) == 0
     assert calls == ["init", "stats"]
+
+
+@pytest.mark.parametrize(
+    ("argv", "stdout"), [(["stats", "--help"], "stats help\n"), (["--version", "stats"], "todo-db 0.3.1\n")]
+)
+def test_stats_metadata_skips_activity_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+    stdout: str,
+) -> None:
+    monkeypatch.setattr(
+        compat,
+        "_delegate",
+        lambda argv, *, command, cwd, capture=True: CompletedProcess(argv, 0, stdout=stdout, stderr=""),
+    )
+    monkeypatch.setattr(
+        compat,
+        "_delegate_extension",
+        lambda *args, **kwargs: pytest.fail("metadata-only stats must not open the database"),
+    )
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+
+    assert compat.main(argv) == 0
+    assert capsys.readouterr().out == stdout
 
 
 def test_existing_local_init_checks_freeze_before_package_command(
@@ -581,10 +613,34 @@ def test_ready_and_stats_findings_banners_are_stderr_only(
         "_delegate",
         lambda argv, *, command, cwd, capture=True: CompletedProcess(argv, 0, stdout=stdout, stderr=""),
     )
+    monkeypatch.setattr(
+        compat,
+        "_delegate_extension",
+        lambda argv, *, cwd: CompletedProcess(
+            argv,
+            0,
+            stdout=(
+                '{"events": {"count": 1, "last_seq": 1, "latest": "2026-08-11T00:00:00Z", '
+                '"findings": {"count": 2, "last_seq": 2, "latest": "2026-08-11T00:00:01Z"}}, '
+                '"stale": false}\n'
+            ),
+            stderr="",
+        ),
+    )
 
     assert compat.main(["--db", str(tmp_path / "todo.sqlite"), command]) == 0
     captured = capsys.readouterr()
-    assert captured.out == expected_stdout
+    if command == "stats":
+        stats = json.loads(captured.out)
+        assert stats["events"] == {
+            "count": 1,
+            "last_seq": 1,
+            "latest": "2026-08-11T00:00:00Z",
+            "findings": {"count": 2, "last_seq": 2, "latest": "2026-08-11T00:00:01Z"},
+        }
+        assert stats["stale"] is False
+    else:
+        assert captured.out == expected_stdout
     assert captured.err == expected_banner
 
 
