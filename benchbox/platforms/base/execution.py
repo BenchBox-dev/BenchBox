@@ -1053,7 +1053,21 @@ class TestDriversMixin:
             return self._execute_operation_query(benchmark, connection, query_id)
 
         scale_factor = getattr(benchmark, "scale_factor", None)
-        result = self.execute_query(
+        validator = getattr(benchmark, "validate_query_result", None)
+        if callable(validator):
+            from benchbox.platforms.base.result_capture import materialized_result_validation
+
+            with materialized_result_validation(validator):
+                return self.execute_query(
+                    connection,
+                    query_sql,
+                    query_id,
+                    benchmark_type=benchmark_type,
+                    scale_factor=scale_factor,
+                    validate_row_count=self.enable_validation,
+                )
+
+        return self.execute_query(
             connection,
             query_sql,
             query_id,
@@ -1061,72 +1075,6 @@ class TestDriversMixin:
             scale_factor=scale_factor,
             validate_row_count=self.enable_validation,
         )
-        return self._apply_benchmark_result_validation(benchmark, connection, query_id, query_sql, result)
-
-    @staticmethod
-    def _materialize_query_rows_for_validation(connection: Any, query_sql: str) -> Any:
-        """Materialize rows for an opt-in post-execution benchmark oracle.
-
-        Platform ``execute_query`` implementations intentionally return compact
-        result dictionaries, so the generic driver cannot inspect the full row
-        set from the timed call. An opt-in benchmark hook therefore gets a
-        second, untimed read of the same rendered SQL. This keeps oracle work
-        out of ``execution_time_seconds`` while preserving the adapter's normal
-        execution and result-building path for every benchmark without a hook.
-        """
-        execute = getattr(connection, "execute", None)
-        if callable(execute):
-            cursor = execute(query_sql)
-            fetchall = getattr(cursor, "fetchall", None)
-            if callable(fetchall):
-                return fetchall()
-            if cursor is not None and not hasattr(cursor, "fetchall"):
-                return cursor
-            connection_fetchall = getattr(connection, "fetchall", None)
-            if callable(connection_fetchall):
-                return connection_fetchall()
-
-        cursor_factory = getattr(connection, "cursor", None)
-        if not callable(cursor_factory):
-            raise TypeError(f"Connection cannot materialize validation rows: {type(connection)!r}")
-        cursor = cursor_factory()
-        try:
-            cursor.execute(query_sql)
-            return cursor.fetchall()
-        finally:
-            close = getattr(cursor, "close", None)
-            if callable(close):
-                close()
-
-    def _apply_benchmark_result_validation(
-        self,
-        benchmark: Any,
-        connection: Any,
-        query_id: str,
-        query_sql: str,
-        result: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Apply an opt-in benchmark oracle and route failures as query failures."""
-        # Inspect the class as well as the instance so test doubles and other
-        # dynamic objects that fabricate arbitrary attributes do not opt into a
-        # second query execution accidentally.
-        validator = getattr(benchmark, "validate_query_result", None)
-        if getattr(type(benchmark), "validate_query_result", None) is None:
-            validator = None
-        if not callable(validator) or result.get("status") != "SUCCESS":
-            return result
-
-        try:
-            rows = self._materialize_query_rows_for_validation(connection, query_sql)
-            validator(query_id, rows)
-        except Exception as exc:
-            failed_result = dict(result)
-            failed_result["status"] = "FAILED"
-            failed_result["validation_passed"] = False
-            failed_result["error"] = f"result validation failed: {exc}"
-            return failed_result
-
-        return result
 
     def _execute_operation_query(self, benchmark, connection: Any, query_id: str) -> dict[str, Any]:
         """Execute a benchmark operation (INSERT/UPDATE/DELETE) and return result dict."""

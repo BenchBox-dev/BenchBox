@@ -1163,6 +1163,7 @@ class DuckDBAdapter(PlatformAdapter):
                 first_row=rows[0] if rows else None,
                 validation_result=validation_result,
                 result_digest=result_digest,
+                materialized_rows=rows,
             )
 
             # Capture and merge structured query plan (SUCCESS-guarded in the helper)

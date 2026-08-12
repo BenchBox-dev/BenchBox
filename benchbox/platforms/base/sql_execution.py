@@ -100,6 +100,7 @@ def execute_sql_query(
             first_row=results[0] if results else None,
             validation_result=validation_result,
             result_digest=result_digest,
+            materialized_rows=results,
         )
 
     except Exception as exc:

@@ -837,17 +837,18 @@ class ClickHouseWorkloadMixin:
                         "translated_query": None,
                     }
 
-            # Build successful result
+            # Preserve ClickHouse's historical row-count metadata semantics: a
+            # warning can accompany a successful validation result without the
+            # expected-results ValidationMode enum used by the shared builder.
             result_dict = {
                 "query_id": query_id,
                 "status": "SUCCESS",
                 "execution_time_seconds": execution_time,
                 "rows_returned": actual_row_count,
                 "first_row": result[0] if result else None,
-                "translated_query": None,  # Translation handled by base adapter
+                "translated_query": None,
             }
 
-            # Include validation metadata if validation was performed
             if validation_result:
                 row_count_validation = {
                     "expected": validation_result.expected_row_count,
@@ -857,6 +858,10 @@ class ClickHouseWorkloadMixin:
                 if validation_result.warning_message:
                     row_count_validation["warning"] = validation_result.warning_message
                 result_dict["row_count_validation"] = row_count_validation
+
+            from benchbox.platforms.base.result_capture import apply_materialized_result_validation
+
+            apply_materialized_result_validation(result_dict, query_id, result)
 
         except Exception as e:
             execution_time = elapsed_seconds(start_time)

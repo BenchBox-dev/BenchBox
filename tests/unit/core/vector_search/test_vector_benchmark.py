@@ -665,34 +665,36 @@ class TestVectorSearchBenchmark:
         assert iteration["success"] is False
         assert "similarity results are not descending" in iteration["error"]
 
-    def test_run_benchmark_times_query_before_structural_oracle(self, tmp_path, monkeypatch):
-        from benchbox.core.vector_search import benchmark as vector_benchmark_module
+    def test_run_benchmark_excludes_structural_validation_from_latency(self, tmp_path, monkeypatch):
+        from benchbox.core.vector_search import VectorSearchBenchmark, benchmark as benchmark_module
 
         events: list[str] = []
 
         class Cursor:
             def fetchall(self):
-                return [(1, 0.9)]
+                return [(1, 0.9), (2, 0.8)]
 
         class Connection:
             def execute(self, _sql):
                 return Cursor()
 
+        benchmark = VectorSearchBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        monkeypatch.setattr(benchmark_module, "mono_time", lambda: 10.0)
         monkeypatch.setattr(
-            vector_benchmark_module,
+            benchmark_module,
             "elapsed_seconds",
-            lambda _start: events.append("duration") or 0.25,
+            lambda _start: events.append("elapsed") or 0.25,
         )
         monkeypatch.setattr(
-            vector_benchmark_module,
-            "validate_search_result",
-            lambda _query_id, _rows: events.append("oracle"),
+            benchmark,
+            "validate_query_result",
+            lambda _query_id, _rows: events.append("validate"),
         )
 
-        benchmark = vector_benchmark_module.VectorSearchBenchmark(scale_factor=0.01, output_dir=tmp_path)
-        benchmark.run_benchmark(connection=Connection(), queries=["Q1"])
+        results = benchmark.run_benchmark(connection=Connection(), queries=["q1"])
 
-        assert events == ["duration", "oracle"]
+        assert events == ["elapsed", "validate"]
+        assert results["queries"]["q1"]["iterations"][0]["time"] == 0.25
 
     def test_get_create_tables_sql_duckdb(self, tmp_path):
         from benchbox.core.vector_search import VectorSearchBenchmark
@@ -748,6 +750,13 @@ class TestVectorSearchWrapper:
 
         b = VectorSearch(scale_factor=0.01, output_dir=tmp_path)
         assert len(b.get_all_queries()) == 6
+
+    def test_wrapper_exposes_structural_result_oracle(self, tmp_path):
+        from benchbox.vector_search import VectorSearch
+
+        benchmark = VectorSearch(scale_factor=0.01, output_dir=tmp_path)
+        with pytest.raises(ValueError, match="not descending"):
+            benchmark.validate_query_result("q1", [(1, 0.8), (2, 0.9)])
 
 
 # ---------------------------------------------------------------------------

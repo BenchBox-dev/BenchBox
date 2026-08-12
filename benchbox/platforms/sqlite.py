@@ -567,6 +567,7 @@ class SQLiteAdapter(PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=results[0] if results else None,
                 validation_result=validation_result,
+                materialized_rows=results,
             )
             # Include full results for SQLite compatibility
             result["results"] = results

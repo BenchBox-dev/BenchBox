@@ -18,6 +18,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
@@ -194,7 +195,7 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
     # Query execution
     # ------------------------------------------------------------------
 
-    def validate_query_result(self, query_id: Union[int, str], rows: Any) -> None:
+    def validate_query_result(self, query_id: Union[int, str], rows: Sequence[Sequence[object]]) -> None:
         """Validate materialized rows returned by a platform adapter.
 
         The generic adapter execution path does not call this benchmark's

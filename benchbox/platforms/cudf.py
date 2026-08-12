@@ -544,6 +544,12 @@ class CuDFAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             actual_row_count = result.rowcount
             # Get first row efficiently (only transfers one row)
             first_row = result.fetchone()
+            materialized_rows = None
+            from benchbox.platforms.base.result_capture import materialized_result_validation_active
+
+            if materialized_result_validation_active():
+                materialized_rows = ([first_row] if first_row is not None else []) + list(result.fetchall())
+                actual_row_count = len(materialized_rows)
 
             logger.debug(f"Query {query_id} completed in {execution_time:.3f}s, returned {actual_row_count} rows")
 
@@ -579,6 +585,7 @@ class CuDFAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 actual_row_count=actual_row_count,
                 first_row=first_row,
                 validation_result=validation_result,
+                materialized_rows=materialized_rows,
             )
 
             # Add GPU-specific metrics
