@@ -20,10 +20,6 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import get_all_benchmarks
-from benchbox.core.platform_config import get_platform_config
-from benchbox.core.run_service import SilentVerbosity, execute_run
-from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, ExecutionContext
-from benchbox.core.system import SystemProfiler
 from benchbox.mcp.schemas import MCPValidationError, validate_phases, validate_platform_options
 from benchbox.mcp.security import (
     AUTHORIZATION_ERROR,
@@ -33,11 +29,11 @@ from benchbox.mcp.security import (
     authenticated_principal,
 )
 from benchbox.mcp.tools.benchmark import (
-    _attach_summary_charts,
-    _export_and_build_payload,
+    _execute_mcp_run_via_core,
     _generate_data_impl,
+    _resolve_mcp_mode_with_registry,
 )
-from benchbox.utils.clock import elapsed_seconds, mono_time, utc_now
+from benchbox.utils.clock import mono_time, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -643,43 +639,7 @@ class DurableJobWorker:
         # ``mcp_metadata + data_generation`` shape expected by durable callers.
         # The core ``execute_run`` data_only path produces ``BenchmarkResults``,
         # not this shape, so we keep the surface-owned helper until w3 cleans it.
-        from benchbox.core.platform_registry import PlatformRegistry
-
-        _mode_input = mode
-        if _mode_input is not None:
-            _mode_input = _mode_input.lower()
-            if _mode_input in ("datagen", "generate"):
-                _mode_input = "data_only"
-        if _mode_input == "data_only":
-            resolved_mode, mode_error = "data_only", None
-        else:
-            _pl = platform.lower()
-            _base = _pl.replace("-df", "")
-            _caps = PlatformRegistry.get_platform_capabilities(_base)
-            if _caps is None:
-                resolved_mode, mode_error = _mode_input or "sql", None
-            else:
-                _sup = []
-                if _caps.supports_sql:
-                    _sup.append("sql")
-                if _caps.supports_dataframe:
-                    _sup.append("dataframe")
-                _sup.append("data_only")
-                if _mode_input is not None:
-                    if not PlatformRegistry.supports_mode(_base, _mode_input):
-                        from benchbox.mcp.errors import make_unsupported_mode_error
-
-                        resolved_mode, mode_error = (
-                            _mode_input,
-                            make_unsupported_mode_error(platform, _mode_input, _sup),
-                        )
-                    else:
-                        resolved_mode, mode_error = _mode_input, None
-                else:
-                    if _pl.endswith("-df"):
-                        resolved_mode, mode_error = "dataframe", None
-                    else:
-                        resolved_mode, mode_error = _caps.default_mode, None
+        resolved_mode, mode_error = _resolve_mcp_mode_with_registry(platform, mode)
         if mode_error:
             mode_error["execution_id"] = execution_id
             mode_error["status"] = "failed"
@@ -713,185 +673,46 @@ class DurableJobWorker:
                 bm_lower, bm_class, scale_factor, execution_id, start_time, results_dir=results_dir
             )
 
-        # Normal path: build core configs and delegate to execute_run
-        from benchbox.core.benchmark_registry import get_all_benchmarks, get_public_benchmark_class
+        from benchbox.core.benchmark_registry import get_public_benchmark_class
 
         all_benchmarks = get_all_benchmarks()
-        bm_lower = benchmark.lower()
-        if bm_lower not in all_benchmarks:
+        benchmark_lower = benchmark.lower()
+        if benchmark_lower not in all_benchmarks:
             from benchbox.mcp.errors import make_not_found_error
 
-            resp = make_not_found_error("benchmark", benchmark, available=list(all_benchmarks.keys()))
-            resp["execution_id"] = execution_id
-            resp["status"] = "failed"
-            return resp
-        bm_class = get_public_benchmark_class(bm_lower)
-        if bm_class is None:
+            response = make_not_found_error("benchmark", benchmark, available=list(all_benchmarks.keys()))
+            response["execution_id"] = execution_id
+            response["status"] = "failed"
+            return response
+        benchmark_class = get_public_benchmark_class(benchmark_lower)
+        if benchmark_class is None:
             from benchbox.mcp.errors import ErrorCode, make_error
 
-            resp = make_error(
+            response = make_error(
                 ErrorCode.DEPENDENCY_MISSING,
                 f"Benchmark '{benchmark}' requires additional dependencies",
                 details={"benchmark": benchmark},
             )
-            resp["execution_id"] = execution_id
-            resp["status"] = "failed"
-            return resp
-        benchmark_instance = bm_class(scale_factor=scale_factor)
+            response["execution_id"] = execution_id
+            response["status"] = "failed"
+            return response
 
-        # Translate platform_options for adapter (reuse core helper + clickhouse profile)
-        from benchbox.core.run_service import _translate_platform_options_for_adapter
-
-        try:
-            adapter_options = _translate_platform_options_for_adapter(platform, dict(normalized_platform_options))
-            # ClickHouse profile needs server config; handle here as surface-owned
-            _pname = platform.lower().removesuffix("-df")
-            if _pname in {"clickhouse", "clickhouse-server"} and "connection_profile" in normalized_platform_options:
-                from benchbox.mcp.schemas import resolve_clickhouse_connection_profile
-
-                _prof = resolve_clickhouse_connection_profile(
-                    str(normalized_platform_options.get("connection_profile"))
-                )
-                adapter_options["port"] = _prof["port"]
-                adapter_options["secure"] = _prof["secure"]
-                adapter_options.pop("connection_profile", None)
-        except Exception as exc:
-            from benchbox.mcp.errors import ErrorCode, make_error
-
-            resp = make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform})
-            resp["execution_id"] = execution_id
-            resp["status"] = "failed"
-            return resp
-
-        query_subset = [q.strip() for q in queries.split(",")] if queries else None
-        phases_list = [p.strip() for p in (phases or "load,power").split(",")]
-        execution_context = ExecutionContext(
-            entry_point="mcp",
+        phases_list = [phase.strip() for phase in (phases or "load,power").split(",")]
+        return _execute_mcp_run_via_core(
+            platform=platform,
+            benchmark=benchmark_lower,
+            benchmark_class=benchmark_class,
+            scale_factor=scale_factor,
+            queries=queries,
             phases=phases_list,
-            query_subset=query_subset,
-            mode=resolved_mode if resolved_mode in ("sql", "dataframe") else "sql",
-        )
-
-        # Build core configs
-
-        # BenchmarkConfig
-        meta = all_benchmarks[bm_lower]
-        display_name = meta.get("display_name", bm_lower.upper())
-        # Use query_subset already parsed
-        benchmark_config = BenchmarkConfig(
-            name=bm_lower,
-            display_name=display_name,
-            scale_factor=scale_factor,
-            queries=query_subset,
+            resolved_mode=resolved_mode,
             capture_plans=capture_plans,
+            normalized_platform_options=normalized_platform_options,
+            results_dir=results_dir,
+            execution_id=execution_id,
+            start_time=start_time,
+            anonymize=anonymize,
         )
-        # Map phases to test_execution_type for BenchmarkConfig (kept for harness routing)
-        from benchbox.core.run_service import _map_phases_to_execution_type
-
-        benchmark_config.test_execution_type = _map_phases_to_execution_type(phases_list)
-        if "statistics" in phases_list:
-            benchmark_config.options = dict(benchmark_config.options or {})
-            benchmark_config.options["gather_statistics"] = True
-            benchmark_config.options["statistics_benchmark_name"] = bm_lower
-
-        # DatabaseConfig
-        platform_lower = platform.lower()
-        database_config = DatabaseConfig(
-            type=platform_lower,
-            name=f"mcp_job_{platform_lower}",
-            execution_mode=resolved_mode,
-            options=dict(adapter_options),
-        )
-
-        # SystemProfile
-        profiler = SystemProfiler()
-        system_profile = profiler.get_system_profile()
-
-        # Platform config
-        platform_cfg = get_platform_config(
-            database_config,
-            system_profile,
-            benchmark_name=bm_lower,
-            scale_factor=scale_factor,
-            tuning_config=benchmark_config.options.get("unified_tuning_configuration")
-            if benchmark_config.options
-            else None,
-        )
-
-        # Output root
-        output_root = staging
-
-        # Adapter factory (surface-owned)
-        def _factory(*, execution_mode, output_root, phases):
-            # phases is LifecyclePhases, not used for adapter creation beyond dataframe check
-            if database_config is None or not (phases.load or phases.execute):
-                return None
-            if execution_mode == "dataframe":
-                from benchbox.core.platform_registry import PlatformRegistry as PR
-
-                registered = PR.list_option_specs(database_config.type) if hasattr(PR, "list_option_specs") else []
-                # Fallback: use adapter_options directly filtered
-                df_opts = (
-                    {k: v for k, v in (database_config.options or {}).items() if k in registered}
-                    if registered
-                    else dict(database_config.options or {})
-                )
-                from benchbox.platforms import get_dataframe_adapter
-
-                return get_dataframe_adapter(
-                    database_config.type,
-                    mode="dataframe",
-                    working_dir=output_root,
-                    verbose=False,
-                    very_verbose=False,
-                    tuning_config=benchmark_config.options.get("df_tuning_config"),
-                    **df_opts,
-                )
-            from benchbox.platforms import get_platform_adapter
-
-            adapter = get_platform_adapter(database_config.type, **(platform_cfg or {}))
-            if adapter and benchmark_instance:
-                adapter.benchmark_instance = benchmark_instance
-                adapter.scale_factor = scale_factor
-            return adapter
-
-        # Execute via core
-        result = execute_run(
-            config=benchmark_config,
-            benchmark_instance=benchmark_instance,
-            database_config=database_config,
-            system_profile=system_profile,
-            platform_config=platform_cfg,
-            output_root=output_root,
-            phases_to_run=phases_list,
-            adapter_factory=_factory,
-            verbosity=SilentVerbosity(),
-            monitor=None,
-            execution_context=execution_context,
-        )
-
-        if result is not None:
-            result.execution_context = execution_context.model_dump()
-
-        execution_time = elapsed_seconds(start_time)
-        result_file_path, result_payload = (
-            _export_and_build_payload(result, execution_id, results_dir, anonymize=anonymize)
-            if result
-            else (None, None)
-        )
-        response: dict[str, Any] = result_payload or {}
-        response["mcp_metadata"] = {
-            "execution_id": execution_id,
-            "status": "completed" if result else "no_results",
-            "platform_requested": platform,
-            "benchmark_requested": benchmark,
-            "scale_factor_requested": scale_factor,
-            "execution_mode": resolved_mode,
-            "execution_time_seconds": round(execution_time, 2),
-            "result_file": result_file_path,
-        }
-        _attach_summary_charts(response, result)
-        return response
 
     async def run(self) -> None:
         """Continuously recover and execute shared queued work."""

@@ -26,10 +26,10 @@ from benchbox.core.benchmark_registry import (
     get_benchmark_surface,
     get_public_benchmark_class,
 )
-from benchbox.core.constants import QUERY_PHASES, VALID_PHASES
+from benchbox.core.constants import VALID_PHASES
+from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.schema import build_result_payload
-from benchbox.core.schemas import ExecutionContext
 from benchbox.mcp.errors import (
     ErrorCode,
     make_error,
@@ -39,7 +39,6 @@ from benchbox.mcp.errors import (
 )
 from benchbox.mcp.schemas import (
     MCPValidationError,
-    build_databricks_clustering_intent,
     resolve_clickhouse_connection_profile,
     validate_phases,
     validate_platform_options,
@@ -93,103 +92,6 @@ def _get_platform_adapter(platform: str, mode: str | None = None, **config):
         return get_dataframe_adapter(platform_lower, **df_config)
     else:
         return get_platform_adapter(platform_lower, **config)
-
-
-def _prepare_adapter_platform_options(platform: str, options: Mapping[str, object]) -> dict[str, object]:
-    """Translate MCP option names to the adapter and tuning contracts."""
-    normalized = dict(options)
-    from benchbox.mcp.schemas import resolve_platform_policy_key
-
-    platform_name = resolve_platform_policy_key(platform)
-
-    if platform_name in {"clickhouse", "clickhouse-server"} and "connection_profile" in normalized:
-        # The request carries only a profile name.  Port and TLS policy are read
-        # from server configuration here, at execution time, so a durable retry
-        # re-resolves against current policy instead of replaying a persisted
-        # destination.
-        profile = resolve_clickhouse_connection_profile(str(normalized.pop("connection_profile")))
-        normalized["port"] = profile["port"]
-        normalized["secure"] = profile["secure"]
-
-    if platform_name == "duckdb" and "threads" in normalized:
-        normalized["thread_limit"] = normalized.pop("threads")
-
-    if platform_name == "databricks":
-        # Same translation the admission gate ran, so the object the resolver
-        # consumes is the one that was validated.  `tuning_config` is what
-        # PlatformAdapter turns into `unified_tuning_configuration`, which
-        # `get_effective_tuning_configuration()` returns to the clustering
-        # resolver -- the raw option names would be dropped by `from_config`.
-        tuning_config = build_databricks_clustering_intent(normalized)
-        if tuning_config is not None:
-            normalized.pop("databricks_clustering_strategy", None)
-            normalized.pop("liquid_clustering_columns", None)
-            normalized["tuning_config"] = tuning_config
-            normalized["tuning_enabled"] = True
-
-    return normalized
-
-
-def _validate_and_resolve_mode(platform: str, mode: str | None) -> tuple[str, dict | None]:
-    """Validate mode against platform capabilities, resolve default if not specified."""
-    from benchbox.core.platform_registry import PlatformRegistry
-
-    if mode is not None:
-        mode = mode.lower()
-        if mode in ("datagen", "generate"):
-            mode = "data_only"
-
-    if mode == "data_only":
-        return "data_only", None
-
-    platform_lower = platform.lower()
-    base_platform = platform_lower.replace("-df", "")
-
-    caps = PlatformRegistry.get_platform_capabilities(base_platform)
-    if caps is None:
-        return mode or "sql", None
-
-    supported = []
-    if caps.supports_sql:
-        supported.append("sql")
-    if caps.supports_dataframe:
-        supported.append("dataframe")
-    supported.append("data_only")
-
-    if mode is not None:
-        if not PlatformRegistry.supports_mode(base_platform, mode):
-            return mode, make_unsupported_mode_error(platform, mode, supported)
-        return mode, None
-
-    from benchbox.mcp.schemas import is_dataframe_alias
-
-    if is_dataframe_alias(platform_lower):
-        return "dataframe", None
-    return caps.default_mode, None
-
-
-def _map_phases_to_test_execution_type(phases: list[str]) -> str:
-    """Map benchmark phases to test execution type."""
-    phases_set = set(phases)
-    query_phases = set(QUERY_PHASES)
-
-    if phases_set & query_phases:
-        if "power" in phases_set and "throughput" in phases_set and "maintenance" in phases_set:
-            return "combined"
-        elif "power" in phases_set:
-            return "power"
-        elif "throughput" in phases_set:
-            return "throughput"
-        elif "maintenance" in phases_set:
-            return "maintenance"
-        else:
-            return "standard"
-    elif phases == ["load"] or ("load" in phases_set and not phases_set & query_phases):
-        return "load_only"
-    elif phases == ["generate"] or ("generate" in phases_set and not phases_set & ({"load"} | query_phases)):
-        return "data_only"
-    else:
-        return "standard"
 
 
 def register_benchmark_tools(
@@ -367,6 +269,16 @@ def _make_failed_response(error_response: dict[str, Any], execution_id: str) -> 
     return error_response
 
 
+def _resolve_mcp_mode_with_registry(platform: str, mode: str | None):
+    """Resolve a mode through core and adapt unsupported-mode errors for MCP."""
+    from benchbox.core.run_service import _resolve_mode_with_registry
+
+    resolved_mode, mode_error = _resolve_mode_with_registry(platform, mode)
+    if mode_error is None:
+        return resolved_mode, None
+    return resolved_mode, make_unsupported_mode_error(platform, mode_error.mode, list(mode_error.supported))
+
+
 def _export_and_build_payload(
     result: Any,
     execution_id: str,
@@ -427,6 +339,165 @@ def _attach_summary_charts(response: dict[str, Any], result: Any) -> None:
         logger.debug("Failed to generate post-run summary charts", exc_info=True)
 
 
+def _execute_mcp_run_via_core(
+    *,
+    platform: str,
+    benchmark: str,
+    benchmark_class: Any,
+    scale_factor: float,
+    queries: str | None,
+    phases: list[str],
+    resolved_mode: str,
+    capture_plans: bool,
+    normalized_platform_options: Mapping[str, object],
+    results_dir: Path,
+    execution_id: str,
+    start_time: float,
+    anonymize: bool,
+) -> dict[str, Any]:
+    """Execute a validated MCP run through the shared core run service."""
+    from benchbox.core.run_service import (
+        SilentVerbosity,
+        _map_phases_to_execution_type,
+        _translate_platform_options_for_adapter,
+        execute_run,
+    )
+    from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, ExecutionContext
+    from benchbox.core.system import SystemProfiler
+
+    benchmark_instance = benchmark_class(scale_factor=scale_factor)
+
+    try:
+        adapter_input = dict(normalized_platform_options)
+        platform_name = platform.lower().removesuffix("-df")
+        if platform_name in {"clickhouse", "clickhouse-server"} and "connection_profile" in normalized_platform_options:
+            profile = resolve_clickhouse_connection_profile(str(normalized_platform_options["connection_profile"]))
+            adapter_input["port"] = profile["port"]
+            adapter_input["secure"] = profile["secure"]
+            adapter_input.pop("connection_profile", None)
+        adapter_options = _translate_platform_options_for_adapter(platform, adapter_input)
+    except MCPValidationError as exc:
+        return _make_failed_response(
+            make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform}),
+            execution_id,
+        )
+
+    query_subset = [query.strip() for query in queries.split(",")] if queries else None
+    execution_context = ExecutionContext(
+        entry_point="mcp",
+        phases=phases,
+        query_subset=query_subset,
+        mode=resolved_mode if resolved_mode in ("sql", "dataframe") else "sql",
+    )
+    all_benchmarks = get_all_benchmarks()
+    metadata = all_benchmarks[benchmark]
+    benchmark_config = BenchmarkConfig(
+        name=benchmark,
+        display_name=metadata.get("display_name", benchmark.upper()),
+        scale_factor=scale_factor,
+        queries=query_subset,
+        capture_plans=capture_plans,
+    )
+    benchmark_config.test_execution_type = _map_phases_to_execution_type(phases)
+    if "statistics" in phases:
+        benchmark_config.options = dict(benchmark_config.options or {})
+        benchmark_config.options["gather_statistics"] = True
+        benchmark_config.options["statistics_benchmark_name"] = benchmark
+
+    database_config = DatabaseConfig(
+        type=platform.lower(),
+        name=f"mcp_{platform.lower()}",
+        execution_mode=resolved_mode,
+        options=dict(adapter_options),
+    )
+    profiler = SystemProfiler()
+    system_profile = profiler.get_system_profile()
+    from benchbox.core.platform_config import get_platform_config
+
+    platform_config = get_platform_config(
+        database_config,
+        system_profile,
+        benchmark_name=benchmark,
+        scale_factor=scale_factor,
+        tuning_config=benchmark_config.options.get("unified_tuning_configuration")
+        if benchmark_config.options
+        else None,
+    )
+
+    def adapter_factory(*, execution_mode, output_root, phases):
+        if not (phases.load or phases.execute):
+            return None
+        if execution_mode == "dataframe":
+            registered = PlatformHookRegistry.list_option_specs(database_config.type)
+            dataframe_options = (
+                {key: value for key, value in database_config.options.items() if key in registered}
+                if registered
+                else dict(database_config.options)
+            )
+            from benchbox.platforms import get_adapter
+
+            return get_adapter(
+                database_config.type,
+                mode="dataframe",
+                working_dir=output_root,
+                verbose=False,
+                very_verbose=False,
+                tuning_config=benchmark_config.options.get("df_tuning_config") if benchmark_config.options else None,
+                **dataframe_options,
+            )
+
+        adapter_kwargs = dict(platform_config or {})
+        adapter_kwargs.update(adapter_options)
+        adapter_kwargs.pop("benchmark", None)
+        adapter_kwargs.pop("scale_factor", None)
+        adapter = _get_platform_adapter(
+            database_config.type,
+            mode=execution_mode,
+            benchmark=benchmark,
+            scale_factor=scale_factor,
+            **adapter_kwargs,
+        )
+        if adapter is not None:
+            adapter.benchmark_instance = benchmark_instance
+            adapter.scale_factor = scale_factor
+        return adapter
+
+    with silence_output(enabled=True):
+        result = execute_run(
+            config=benchmark_config,
+            benchmark_instance=benchmark_instance,
+            database_config=database_config,
+            system_profile=system_profile,
+            platform_config=platform_config,
+            output_root=results_dir,
+            phases_to_run=phases,
+            adapter_factory=adapter_factory,
+            verbosity=SilentVerbosity(),
+            monitor=None,
+            execution_context=execution_context,
+        )
+    if result is not None:
+        result.execution_context = execution_context.model_dump()
+
+    execution_time = elapsed_seconds(start_time)
+    result_file_path, result_payload = (
+        _export_and_build_payload(result, execution_id, results_dir, anonymize=anonymize) if result else (None, None)
+    )
+    response: dict[str, Any] = result_payload or {}
+    response["mcp_metadata"] = {
+        "execution_id": execution_id,
+        "status": "completed" if result else "no_results",
+        "platform_requested": platform,
+        "benchmark_requested": benchmark,
+        "scale_factor_requested": scale_factor,
+        "execution_mode": resolved_mode,
+        "execution_time_seconds": round(execution_time, 2),
+        "result_file": result_file_path,
+    }
+    _attach_summary_charts(response, result)
+    return response
+
+
 def _run_benchmark_impl(
     platform: str,
     benchmark: str,
@@ -481,7 +552,7 @@ def _run_benchmark_impl(
                 execution_id,
             )
 
-        resolved_mode, mode_error = _validate_and_resolve_mode(platform, mode)
+        resolved_mode, mode_error = _resolve_mcp_mode_with_registry(platform, mode)
         if mode_error:
             return _make_failed_response(mode_error, execution_id)
 
@@ -495,102 +566,22 @@ def _run_benchmark_impl(
                 results_dir=results_dir,
             )
 
-        benchmark_instance = benchmark_class(scale_factor=scale_factor)
-
-        # Resolved separately from adapter construction so a policy rejection is
-        # reported as a validation error rather than an unsupported platform.
-        try:
-            adapter_options = _prepare_adapter_platform_options(platform, normalized_platform_options)
-        except MCPValidationError as exc:
-            return _make_failed_response(
-                make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform}),
-                execution_id,
-            )
-
-        try:
-            adapter = _get_platform_adapter(
-                platform,
-                mode=resolved_mode,
-                benchmark=benchmark_lower,
-                scale_factor=scale_factor,
-                **adapter_options,
-            )
-        except (ValueError, ImportError) as e:
-            return _make_failed_response(
-                make_error(ErrorCode.VALIDATION_UNSUPPORTED_PLATFORM, str(e), details={"platform": platform}),
-                execution_id,
-            )
-
-        query_subset = [q.strip() for q in queries.split(",")] if queries else None
         phases_list = [p.strip() for p in (phases or "load,power").split(",")]
-        execution_context = ExecutionContext(
-            entry_point="mcp",
+        return _execute_mcp_run_via_core(
+            platform=platform,
+            benchmark=benchmark_lower,
+            benchmark_class=benchmark_class,
+            scale_factor=scale_factor,
+            queries=queries,
             phases=phases_list,
-            query_subset=query_subset,
-            mode=resolved_mode if resolved_mode in ("sql", "dataframe") else "sql",
+            resolved_mode=resolved_mode,
+            capture_plans=capture_plans,
+            normalized_platform_options=normalized_platform_options,
+            results_dir=results_dir,
+            execution_id=execution_id,
+            start_time=start_time,
+            anonymize=anonymize,
         )
-
-        test_execution_type = _map_phases_to_test_execution_type(phases_list)
-
-        # Opt-in statistics phase (`statistics` in `phases`): threaded independently
-        # of `_map_phases_to_test_execution_type`, which intentionally ignores the
-        # token for execution-type derivation. The base-adapter's
-        # `run_statistics_phase` needs a benchmark slug to resolve the per-benchmark
-        # `supports_statistics_phase` registry gate; omitting it would make the gate
-        # look up an empty slug and always skip.
-        #
-        # Deliberately NOT `benchmark_name`: that run_config key also feeds
-        # `_resolve_benchmark_slug`, which the power/throughput/maintenance/combined
-        # dispatchers use to route TPC benchmarks to specialized harnesses instead of
-        # the generic handler (and, in `run_enhanced_benchmark`, query dialect-family
-        # selection and the row-count-validation `benchmark_type` gate). Setting it
-        # only when `statistics` is requested would make requesting the phase also
-        # change which harness/dialect/validation path runs, so a stats-opt-in MCP
-        # run would no longer be comparable to the same run without it.
-        # `statistics_benchmark_name` is a dedicated key `run_enhanced_benchmark`
-        # reads only for the statistics gate, leaving `benchmark_name` unset (and
-        # routing/dialect/validation behavior identical) whether or not `statistics`
-        # is requested.
-        statistics_run_config: dict[str, Any] = {}
-        if "statistics" in phases_list:
-            statistics_run_config["gather_statistics"] = True
-            statistics_run_config["statistics_benchmark_name"] = benchmark_lower
-
-        with silence_output(enabled=True):
-            result = benchmark_instance.run_with_platform(
-                adapter,
-                query_subset=query_subset,
-                test_execution_type=test_execution_type,
-                capture_plans=capture_plans,
-                **statistics_run_config,
-            )
-
-        if result is not None:
-            result.execution_context = execution_context.model_dump()
-
-        execution_time = elapsed_seconds(start_time)
-
-        result_file_path, result_payload = (
-            _export_and_build_payload(result, execution_id, results_dir, anonymize=anonymize)
-            if result
-            else (None, None)
-        )
-
-        response: dict[str, Any] = result_payload or {}
-        response["mcp_metadata"] = {
-            "execution_id": execution_id,
-            "status": "completed" if result else "no_results",
-            "platform_requested": platform,
-            "benchmark_requested": benchmark,
-            "scale_factor_requested": scale_factor,
-            "execution_mode": resolved_mode,
-            "execution_time_seconds": round(execution_time, 2),
-            "result_file": result_file_path,
-        }
-
-        _attach_summary_charts(response, result)
-
-        return response
 
     except Exception as e:
         logger.error("Benchmark execution failed (%s)", type(e).__name__)

@@ -172,31 +172,18 @@ class TestRemoteModeAnonymization:
             completed_at=None,
         )
 
-        # New one-engine path delegates to core execute_run and exports with anonymize=True.
-        mock_result = MagicMock()
-        mock_result.query_results = []
+        # New one-engine path delegates to the shared MCP/core execution helper.
         with (
-            patch("benchbox.mcp.jobs.execute_run", return_value=mock_result) as exec_mock,
-            patch("benchbox.mcp.jobs._export_and_build_payload", return_value=(None, {})) as export_mock,
-            patch("benchbox.mcp.jobs.get_public_benchmark_class", return_value=MagicMock(return_value=MagicMock())),
-            patch("benchbox.mcp.jobs.get_all_benchmarks", return_value={"tpch": {"display_name": "TPC-H"}}),
+            patch("benchbox.mcp.jobs._execute_mcp_run_via_core", return_value={}) as run_core,
             patch(
-                "benchbox.mcp.jobs.SystemProfiler",
-                return_value=MagicMock(get_system_profile=MagicMock(return_value=MagicMock())),
+                "benchbox.core.benchmark_registry.get_public_benchmark_class",
+                return_value=MagicMock,
             ),
-            patch("benchbox.mcp.jobs.get_platform_config", return_value={}),
+            patch("benchbox.mcp.jobs.get_all_benchmarks", return_value={"tpch": {"display_name": "TPC-H"}}),
         ):
             DurableJobWorker._execute_benchmark(record, tmp_path)
 
-        # Either the old helper (for data_only) or the new export path must anonymize
-        if export_mock.called:
-            assert (
-                export_mock.call_args.kwargs.get("anonymize") is True
-                or export_mock.call_args[1].get("anonymize") is True
-            )
-        else:
-            # Fallback: old path still used for data_only
-            assert True
+        assert run_core.call_args.kwargs["anonymize"] is True
 
     def test_compare_results_threads_the_anonymization_decision(self, tmp_path: Path):
         from benchbox.mcp.tools import analytics as analytics_module

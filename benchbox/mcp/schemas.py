@@ -597,39 +597,15 @@ def build_databricks_clustering_intent(normalized: Mapping[str, object]):
     Raises:
         MCPValidationError: If the requested layout fields contradict each other.
     """
-    strategy = normalized.get("databricks_clustering_strategy")
-    columns = normalized.get("liquid_clustering_columns")
-    if strategy is None and columns is None:
-        return None
-
-    from benchbox.core.tuning.interface import UnifiedTuningConfiguration
-
-    tuning_config = UnifiedTuningConfiguration()
-    platform_optimizations = tuning_config.platform_optimizations
-
-    if strategy is not None:
-        strategy = str(strategy).lower()
-        platform_optimizations.databricks_clustering_strategy = strategy
-        platform_optimizations.liquid_clustering_enabled = strategy in {
-            "liquid_clustering",
-            "liquid_clustering_auto",
-        }
-        platform_optimizations.physical_rendering_id = None
-    if columns is not None:
-        parsed_columns = [column.strip() for column in str(columns).split(",") if column.strip()]
-        platform_optimizations.liquid_clustering_columns = parsed_columns
-        platform_optimizations.liquid_clustering_enabled = bool(parsed_columns)
-        if parsed_columns and strategy is None:
-            platform_optimizations.databricks_clustering_strategy = "liquid_clustering"
+    from benchbox.core.run_service import build_databricks_clustering_intent as build_core_intent
 
     try:
-        platform_optimizations.__post_init__()
+        return build_core_intent(dict(normalized))
     except ValueError as exc:
         # Surface layout conflicts as a structured validation error at admission
         # instead of an execution failure discovered by a worker.  The message
         # is generated from allow-listed option names, not from caller text.
         raise MCPValidationError(f"Databricks clustering options conflict: {exc}") from exc
-    return tuning_config
 
 
 def validate_query_id(query_id: str) -> str:

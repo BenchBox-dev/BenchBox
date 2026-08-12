@@ -1,25 +1,13 @@
 """Characterization of run orchestration, ahead of the core run service.
 
-`one-engine-core-run-service` extracts run orchestration into
-`benchbox.core` below both surfaces. Its first work unit is characterization,
-and its anti-patterns require that extractions move code verbatim and that any
-behavior delta be listed explicitly rather than discovered later.
+`one-engine-core-run-service` extracts run orchestration into `benchbox.core`
+below both surfaces. This module pins the shared execution-type behavior so
+both surfaces remain reviewable and cannot silently diverge again.
 
-This module pins what the two surfaces do TODAY, so the extraction can be proven
-behavior-preserving -- or its deltas named. It deliberately does not fix
-anything: the divergence recorded in TestExecutionTypeDivergence is a defect the
-run service is expected to resolve, and pinning it first is what makes that
-resolution reviewable instead of invisible.
-
-Two independent implementations derive a benchmark's execution type from its
-requested phases:
-
-- `benchbox/cli/commands/run.py::_derive_execution_type`
-- `benchbox/mcp/tools/benchmark.py::_map_phases_to_test_execution_type`
-
-They agree on every single-query-phase request and every three-query-phase
-request. They disagree on all 48 combinations that select exactly TWO of the
-three query phases.
+The CLI wrapper and MCP execution both derive a benchmark's execution type from
+`benchbox/core/run_service.py::_map_phases_to_execution_type`. Mixed
+query-phase requests use `combined`, ensuring the runner executes every
+requested query phase.
 """
 
 from __future__ import annotations
@@ -43,9 +31,9 @@ def _cli_derive(phases: list[str]) -> str:
 
 
 def _mcp_derive(phases: list[str]) -> str:
-    from benchbox.mcp.tools.benchmark import _map_phases_to_test_execution_type
+    from benchbox.core.run_service import _map_phases_to_execution_type
 
-    return _map_phases_to_test_execution_type(phases)
+    return _map_phases_to_execution_type(phases)
 
 
 def _all_phase_subsets() -> list[list[str]]:
@@ -95,21 +83,8 @@ class TestExecutionTypeAgreement:
         assert _cli_derive(phases) == _mcp_derive(phases) == "combined"
 
 
-class TestExecutionTypeDivergence:
-    """KNOWN DEFECT, pinned so the run service must resolve it deliberately.
-
-    Selecting exactly two of the three query phases gives different execution
-    types on the two surfaces. The CLI returns `combined`, which its own comment
-    explains is required so the adapter runs exactly the requested subset. MCP
-    returns whichever single phase its if-chain tests first, so the other
-    requested phase is silently dropped: `phases="power,throughput"` over MCP
-    runs the power phase only.
-
-    These tests assert the CURRENT behavior of both surfaces. When the core run
-    service unifies them, these expectations must be updated in the same change,
-    which is the point -- the delta becomes a reviewed edit rather than a silent
-    one.
-    """
+class TestExecutionTypeParity:
+    """Mixed query-phase requests remain combined on both surfaces."""
 
     TWO_QUERY_PHASE_SUBSETS = [list(combo) for combo in itertools.combinations(QUERY_PHASES, 2)]
 
@@ -117,37 +92,21 @@ class TestExecutionTypeDivergence:
     def test_cli_treats_two_query_phases_as_combined(self, phases: list[str]):
         assert _cli_derive(phases) == "combined"
 
-    @pytest.mark.parametrize(
-        ("phases", "mcp_result", "dropped"),
-        [
-            (["power", "throughput"], "power", "throughput"),
-            (["power", "maintenance"], "power", "maintenance"),
-            (["throughput", "maintenance"], "throughput", "maintenance"),
-        ],
-    )
-    def test_mcp_silently_drops_the_second_query_phase(self, phases: list[str], mcp_result: str, dropped: str):
-        derived = _mcp_derive(phases)
+    @pytest.mark.parametrize("phases", TWO_QUERY_PHASE_SUBSETS)
+    def test_mcp_treats_two_query_phases_as_combined(self, phases: list[str]):
+        assert _mcp_derive(phases) == "combined"
 
-        assert derived == mcp_result
-        assert dropped in phases
-        assert derived != "combined", "MCP would have to return combined to honour both phases"
-
-    def test_the_divergence_is_exactly_the_two_query_phase_case(self):
-        """Bounds the defect: 48 of 127 subsets, all of them two-query-phase."""
+    def test_no_phase_subset_diverges(self):
+        """All phase subsets agree across CLI and MCP."""
         diverging = [phases for phases in ALL_SUBSETS if _cli_derive(phases) != _mcp_derive(phases)]
 
         assert len(ALL_SUBSETS) == 127
-        assert len(diverging) == 48
-        for phases in diverging:
-            assert len(set(phases) & set(QUERY_PHASES)) == 2, phases
+        assert diverging == []
 
-    def test_no_agreeing_subset_involves_two_query_phases(self):
-        """The converse, so the bound cannot rot in one direction only."""
+    def test_every_subset_including_two_query_phases_agrees(self):
         agreeing = [phases for phases in ALL_SUBSETS if _cli_derive(phases) == _mcp_derive(phases)]
 
-        assert len(agreeing) == 79
-        for phases in agreeing:
-            assert len(set(phases) & set(QUERY_PHASES)) != 2, phases
+        assert len(agreeing) == len(ALL_SUBSETS)
 
 
 class TestPhaseParsingCharacterization:

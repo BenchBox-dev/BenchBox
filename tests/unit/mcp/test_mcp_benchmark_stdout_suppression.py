@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -21,22 +21,14 @@ def test_run_benchmark_impl_suppresses_transitive_stdout() -> None:
     """_run_benchmark_impl should suppress print() leakage from benchmark execution."""
     from benchbox.mcp.tools.benchmark import _run_benchmark_impl
 
-    class DummyBenchmark:
-        def __init__(self, scale_factor: float) -> None:
-            self.scale_factor = scale_factor
-
-        def run_with_platform(self, *_args, **_kwargs):
-            print("LEAK: benchmark run output")
-            return None
-
     captured = io.StringIO()
     original_stdout = sys.stdout
     try:
         sys.stdout = captured
         with (
             patch("benchbox.mcp.tools.benchmark.get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
-            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=DummyBenchmark),
-            patch("benchbox.mcp.tools.benchmark._get_platform_adapter", return_value=object()),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=MagicMock),
+            patch("benchbox.core.run_service.execute_run", side_effect=lambda **_: print("LEAK: benchmark run output")),
         ):
             response = _run_benchmark_impl(
                 "duckdb",

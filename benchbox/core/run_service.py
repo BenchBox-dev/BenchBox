@@ -155,6 +155,15 @@ class RunPlan:
     resolved_mode: str | None = None
 
 
+@dataclass(frozen=True)
+class UnsupportedExecutionMode:
+    """Surface-neutral description of an unsupported platform mode."""
+
+    platform: str
+    mode: str
+    supported: tuple[str, ...]
+
+
 def resolve_run_config(
     config: BenchmarkConfig,
     *,
@@ -351,30 +360,14 @@ def execute_run(
 
 
 def _translate_platform_options_for_adapter(platform: str, options: dict) -> dict:
-    """Translate validated MCP-style options to adapter kwargs (duckdb/databricks).
+    """Translate validated platform options to adapter kwargs.
 
-    This is the non-MCP-specific part of the former
-    ``_prepare_adapter_platform_options``. ClickHouse profile resolution stays
-    surface-owned (it needs server config) and is handled by the MCP adapter
-    factory closure; this function handles the generic duckdb/databricks
-    rewrites that are the same regardless of surface.
+    ClickHouse profile resolution stays surface-owned because it needs server
+    configuration. This function handles generic DuckDB and Databricks
+    rewrites that are independent of the calling surface.
     """
-    from benchbox.mcp.schemas import build_databricks_clustering_intent
-
-    # ClickHouse profile is surface-owned but we handle it here for
-    # backwards compatibility with tests that call the core helper directly.
-    # Lazy import avoids hard layering violation at import time.
     normalized = dict(options)
     platform_name = platform.lower().removesuffix("-df")
-    if platform_name in {"clickhouse", "clickhouse-server"} and "connection_profile" in normalized:
-        try:
-            from benchbox.mcp.schemas import resolve_clickhouse_connection_profile
-
-            _profile = resolve_clickhouse_connection_profile(str(normalized.pop("connection_profile")))
-            normalized["port"] = _profile["port"]
-            normalized["secure"] = _profile["secure"]
-        except Exception:
-            pass
     if platform_name == "duckdb" and "threads" in normalized:
         normalized["thread_limit"] = normalized.pop("threads")
     if platform_name == "databricks":
@@ -387,10 +380,38 @@ def _translate_platform_options_for_adapter(platform: str, options: dict) -> dic
     return normalized
 
 
-def _resolve_mode_with_registry(platform: str, mode: str | None):
-    """Validate mode against PlatformRegistry, mirroring former MCP helper."""
-    from benchbox.mcp.errors import make_unsupported_mode_error
+def build_databricks_clustering_intent(options: dict[str, object]):
+    """Build a validated Databricks layout intent without surface coupling."""
+    strategy = options.get("databricks_clustering_strategy")
+    columns = options.get("liquid_clustering_columns")
+    if strategy is None and columns is None:
+        return None
 
+    from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+
+    tuning_config = UnifiedTuningConfiguration()
+    platform_optimizations = tuning_config.platform_optimizations
+    if strategy is not None:
+        strategy = str(strategy).lower()
+        platform_optimizations.databricks_clustering_strategy = strategy
+        platform_optimizations.liquid_clustering_enabled = strategy in {
+            "liquid_clustering",
+            "liquid_clustering_auto",
+        }
+        platform_optimizations.physical_rendering_id = None
+    if columns is not None:
+        parsed_columns = [column.strip() for column in str(columns).split(",") if column.strip()]
+        platform_optimizations.liquid_clustering_columns = parsed_columns
+        platform_optimizations.liquid_clustering_enabled = bool(parsed_columns)
+        if parsed_columns and strategy is None:
+            platform_optimizations.databricks_clustering_strategy = "liquid_clustering"
+
+    platform_optimizations.__post_init__()
+    return tuning_config
+
+
+def _resolve_mode_with_registry(platform: str, mode: str | None):
+    """Resolve a requested mode against the shared platform registry."""
     if mode is not None:
         mode = mode.lower()
         if mode in ("datagen", "generate"):
@@ -410,7 +431,7 @@ def _resolve_mode_with_registry(platform: str, mode: str | None):
     supported.append("data_only")
     if mode is not None:
         if not PlatformRegistry.supports_mode(base_platform, mode):
-            return mode, make_unsupported_mode_error(platform, mode, supported)
+            return mode, UnsupportedExecutionMode(platform, mode, tuple(supported))
         return mode, None
     if platform_lower.endswith("-df"):
         return "dataframe", None
@@ -418,22 +439,23 @@ def _resolve_mode_with_registry(platform: str, mode: str | None):
 
 
 def _map_phases_to_execution_type(phases: list[str]) -> str:
-    """Map phases to test_execution_type (former MCP helper, now core-owned)."""
-    from benchbox.core.constants import QUERY_PHASES
-
+    """Map the requested phases to the shared benchmark execution type."""
     phases_set = set(phases)
     query_phases = set(QUERY_PHASES)
-    if phases_set & query_phases:
-        if "power" in phases_set and "throughput" in phases_set and "maintenance" in phases_set:
+    selected_query_phases = phases_set & query_phases
+    if selected_query_phases:
+        # Any mixed query-phase request must use combined mode so the runner
+        # executes exactly the requested subset instead of silently selecting
+        # the first phase in a priority chain.
+        if len(selected_query_phases) > 1:
             return "combined"
-        elif "power" in phases_set:
+        if "power" in selected_query_phases:
             return "power"
-        elif "throughput" in phases_set:
+        if "throughput" in selected_query_phases:
             return "throughput"
-        elif "maintenance" in phases_set:
+        if "maintenance" in selected_query_phases:
             return "maintenance"
-        else:
-            return "standard"
+        return "standard"
     elif phases == ["load"] or ("load" in phases_set and not phases_set & query_phases):
         return "load_only"
     elif phases == ["generate"] or ("generate" in phases_set and not phases_set & ({"load"} | query_phases)):
@@ -455,6 +477,8 @@ __all__ = [
     "resolve_validation_options",
     "stamp_requested_phases",
     "_translate_platform_options_for_adapter",
+    "build_databricks_clustering_intent",
     "_resolve_mode_with_registry",
+    "UnsupportedExecutionMode",
     "_map_phases_to_execution_type",
 ]

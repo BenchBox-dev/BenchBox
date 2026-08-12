@@ -153,18 +153,14 @@ class TestRunBenchmarkTool:
     def test_platform_options_are_forwarded_only_after_validation(self, tmp_path: Path):
         from benchbox.mcp.tools import benchmark as benchmark_tools
 
-        class DummyBenchmark:
-            def __init__(self, scale_factor: float) -> None:
-                self.scale_factor = scale_factor
-
-            def run_with_platform(self, *_args, **_kwargs):
-                return None
-
-        adapter = Mock()
         with (
             patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
-            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=DummyBenchmark),
-            patch.object(benchmark_tools, "_get_platform_adapter", return_value=adapter) as get_adapter,
+            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=Mock),
+            patch.object(
+                benchmark_tools,
+                "_execute_mcp_run_via_core",
+                return_value={"mcp_metadata": {"status": "no_results"}},
+            ) as run_core,
         ):
             response = benchmark_tools._run_benchmark_impl(
                 "duckdb",
@@ -179,7 +175,7 @@ class TestRunBenchmarkTool:
             )
 
         assert response["mcp_metadata"]["status"] == "no_results"
-        assert get_adapter.call_args.kwargs["thread_limit"] == 4
+        assert run_core.call_args.kwargs["normalized_platform_options"] == {"threads": 4}
 
     def test_modin_engine_reaches_the_effective_backend(self, tmp_path: Path):
         """Forwarding can succeed while the effective backend is unchanged."""
@@ -262,7 +258,7 @@ class TestRunBenchmarkTool:
 
         with (
             patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
-            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=DummyBenchmark),
+            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=Mock),
             patch.object(dask_df, "LocalCluster") as local_cluster,
             patch.object(dask_df, "Client"),
         ):
@@ -284,17 +280,14 @@ class TestRunBenchmarkTool:
         """The envelope is a ceiling, not a ban on tuning."""
         from benchbox.mcp.tools import benchmark as benchmark_tools
 
-        class DummyBenchmark:
-            def __init__(self, scale_factor: float) -> None:
-                self.scale_factor = scale_factor
-
-            def run_with_platform(self, *_args, **_kwargs):
-                return None
-
         with (
             patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
-            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=DummyBenchmark),
-            patch.object(benchmark_tools, "_get_platform_adapter", return_value=Mock()) as get_adapter,
+            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=Mock),
+            patch.object(
+                benchmark_tools,
+                "_execute_mcp_run_via_core",
+                return_value={"mcp_metadata": {"status": "no_results"}},
+            ) as run_core,
         ):
             benchmark_tools._run_benchmark_impl(
                 "dask-df",
@@ -308,10 +301,11 @@ class TestRunBenchmarkTool:
                 anonymize=False,
             )
 
-        kwargs = get_adapter.call_args.kwargs
-        assert kwargs["n_workers"] == 4
-        assert kwargs["threads_per_worker"] == 4
-        assert kwargs["memory_limit"] == "4GB"
+        assert run_core.call_args.kwargs["normalized_platform_options"] == {
+            "n_workers": 4,
+            "threads_per_worker": 4,
+            "memory_limit": "4GB",
+        }
 
     @pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-server"])
     def test_clickhouse_port_override_is_refused_before_any_adapter_is_built(self, platform, tmp_path: Path):
@@ -343,17 +337,14 @@ class TestRunBenchmarkTool:
 
         monkeypatch.setenv(MCP_CLICKHOUSE_PROFILE_ENV, json.dumps({"reviewed": {"port": 9440, "secure": True}}))
 
-        class DummyBenchmark:
-            def __init__(self, scale_factor: float) -> None:
-                self.scale_factor = scale_factor
-
-            def run_with_platform(self, *_args, **_kwargs):
-                return None
-
         with (
             patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"name": "tpch"}}),
-            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=DummyBenchmark),
-            patch.object(benchmark_tools, "_get_platform_adapter", return_value=Mock()) as get_adapter,
+            patch.object(benchmark_tools, "get_public_benchmark_class", return_value=Mock),
+            patch.object(
+                benchmark_tools,
+                "_execute_mcp_run_via_core",
+                return_value={"mcp_metadata": {"status": "no_results"}},
+            ) as run_core,
         ):
             benchmark_tools._run_benchmark_impl(
                 "clickhouse-server",
@@ -367,10 +358,7 @@ class TestRunBenchmarkTool:
                 anonymize=False,
             )
 
-        kwargs = get_adapter.call_args.kwargs
-        assert kwargs["port"] == 9440
-        assert kwargs["secure"] is True
-        assert "connection_profile" not in kwargs
+        assert run_core.call_args.kwargs["normalized_platform_options"] == {"connection_profile": "reviewed"}
 
     def test_clickhouse_profile_withdrawn_by_the_operator_fails_closed(self, monkeypatch, tmp_path: Path):
         """A replayed request cannot outlive the profile that authorized it."""
@@ -436,6 +424,7 @@ class TestRunBenchmarkTool:
             MCP_CLICKHOUSE_PROFILE_ENV,
             MCP_PLATFORM_OPTION_ALLOWLIST,
             MCP_PLATFORM_OPTION_CONTRACT,
+            resolve_clickhouse_connection_profile,
             validate_platform_options,
         )
 
@@ -507,6 +496,11 @@ class TestRunBenchmarkTool:
 
                 try:
                     normalized = validate_platform_options(platform, request)
+                    if option_name == "connection_profile":
+                        profile = resolve_clickhouse_connection_profile("reviewed")
+                        normalized = {
+                            key: item for key, item in normalized.items() if key != "connection_profile"
+                        } | profile
                     prepared = _prepare_adapter_platform_options(platform, normalized)
                 except Exception as e:
                     failures.append(f"{platform}.{option_name} prepare failed: {e}")

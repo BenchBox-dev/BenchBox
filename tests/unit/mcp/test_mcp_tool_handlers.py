@@ -505,28 +505,16 @@ class TestRunBenchmarkToolSuccess:
         assert result["mcp_metadata"]["result_file"] == str(result_path)
 
     def test_query_subset_forwarded(self, tool_functions):
-        """Query subset string is parsed and forwarded."""
+        """Query subset string reaches the shared core run service."""
         fn = tool_functions["run_benchmark"]
 
-        mock_result = MagicMock()
-        mock_result.total_queries = 3
-        mock_result.successful_queries = 3
-        mock_result.failed_queries = 0
-        mock_result.total_execution_time = 1.0
-        mock_result.query_results = []
-
-        mock_instance = MagicMock()
-        mock_instance.run_with_platform.return_value = mock_result
-        mock_bm_class = MagicMock(return_value=mock_instance)
-
-        with (
-            patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
-        ):
+        with patch(
+            "benchbox.mcp.tools.benchmark._execute_mcp_run_via_core",
+            return_value={"mcp_metadata": {"status": "completed"}},
+        ) as run_core:
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, queries="1,6,17")
 
-            call_kwargs = mock_instance.run_with_platform.call_args[1]
-            assert call_kwargs["query_subset"] == ["1", "6", "17"]
+        assert run_core.call_args.kwargs["queries"] == "1,6,17"
 
     def test_result_exported_with_execution_id(self, tool_functions):
         """Execution ID is set on result before export."""
@@ -539,18 +527,14 @@ class TestRunBenchmarkToolSuccess:
         mock_result.total_execution_time = 1.0
         mock_result.query_results = []
 
-        mock_instance = MagicMock()
-        mock_instance.run_with_platform.return_value = mock_result
-
-        mock_bm_class = MagicMock(return_value=mock_instance)
-
         mock_exporter = MagicMock()
         mock_exporter.export_result.return_value = {"json": Path("/tmp/result.json")}
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=MagicMock),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
+            patch("benchbox.core.run_service.execute_run", return_value=mock_result),
         ):
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
 
@@ -638,6 +622,7 @@ class TestRunBenchmarkToolSuccess:
     def test_dataframe_platform_uses_dataframe_runner(self, tool_functions, tmp_path):
         """DataFrame platforms use the dedicated dataframe runner."""
         fn = tool_functions["run_benchmark"]
+        from benchbox.core.runner.runner import LifecyclePhases
 
         mock_df_result = MagicMock()
         mock_df_result.query_results = [
@@ -659,22 +644,23 @@ class TestRunBenchmarkToolSuccess:
         mock_exporter = MagicMock()
         mock_exporter.export_result.return_value = {"json": result_path}
 
-        # Create mock benchmark instance that returns our mock result
-        mock_benchmark_instance = MagicMock()
-        mock_benchmark_instance.run_with_platform.return_value = mock_df_result
-
-        mock_benchmark_class = MagicMock(return_value=mock_benchmark_instance)
+        def execute_run(**kwargs):
+            kwargs["adapter_factory"](
+                execution_mode="dataframe",
+                output_root=tmp_path,
+                phases=LifecyclePhases(load=True, execute=True),
+            )
+            return mock_df_result
 
         with (
-            patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.platforms.is_dataframe_platform", return_value=True),
-            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_benchmark_class),
+            patch("benchbox.platforms.get_adapter", return_value=MagicMock()) as get_adapter,
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=MagicMock),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
+            patch("benchbox.core.run_service.execute_run", side_effect=execute_run),
         ):
             result = fn(platform="polars-df", benchmark="tpch", scale_factor=0.01)
 
-        # Verify unified run_with_platform was called (DataFrame adapters now use same path)
-        mock_benchmark_instance.run_with_platform.assert_called_once()
+        assert get_adapter.call_args.kwargs["mode"] == "dataframe"
 
         assert result["mcp_metadata"]["status"] == "completed"
         assert result["platform"]["name"] == "polars-df"
@@ -1052,11 +1038,6 @@ class TestPhasesMapping:
         mock_result = MagicMock()
         mock_result.query_results = []
 
-        mock_instance = MagicMock()
-        mock_instance.run_with_platform.return_value = mock_result
-
-        mock_bm_class = MagicMock(return_value=mock_instance)
-
         result_path = tmp_path / "result.json"
         write_v2_result_file(result_path, execution_id="test", timestamp="2026-01-01T00:00:00")
 
@@ -1065,27 +1046,21 @@ class TestPhasesMapping:
 
         with (
             patch("benchbox.mcp.tools.benchmark._get_platform_adapter"),
-            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=MagicMock),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
+            patch("benchbox.core.run_service.execute_run", return_value=mock_result) as execute_run,
         ):
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, phases="power")
 
-        # Verify run_with_platform was called with test_execution_type="power"
-        mock_instance.run_with_platform.assert_called_once()
-        call_kwargs = mock_instance.run_with_platform.call_args[1]
-        assert call_kwargs.get("test_execution_type") == "power"
+        assert execute_run.call_args.kwargs["config"].test_execution_type == "power"
 
     def test_run_benchmark_passes_mode_to_adapter(self, tool_functions, tmp_path):
-        """run_benchmark should pass mode to _get_platform_adapter for correct adapter selection."""
+        """run_benchmark should pass mode to the unified adapter factory."""
         fn = tool_functions["run_benchmark"]
+        from benchbox.core.runner.runner import LifecyclePhases
 
         mock_result = MagicMock()
         mock_result.query_results = []
-
-        mock_instance = MagicMock()
-        mock_instance.run_with_platform.return_value = mock_result
-
-        mock_bm_class = MagicMock(return_value=mock_instance)
 
         result_path = tmp_path / "result.json"
         write_v2_result_file(
@@ -1100,14 +1075,23 @@ class TestPhasesMapping:
 
         mock_get_adapter = MagicMock()
 
+        def execute_run(**kwargs):
+            kwargs["adapter_factory"](
+                execution_mode="dataframe",
+                output_root=tmp_path,
+                phases=LifecyclePhases(load=True, execute=True),
+            )
+            return mock_result
+
         with (
-            patch("benchbox.mcp.tools.benchmark._get_platform_adapter", mock_get_adapter),
-            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.platforms.get_adapter", mock_get_adapter),
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=MagicMock),
             patch("benchbox.mcp.tools.benchmark.ResultExporter", return_value=mock_exporter),
+            patch("benchbox.core.run_service.execute_run", side_effect=execute_run),
         ):
             fn(platform="datafusion", benchmark="tpch", scale_factor=0.01, mode="dataframe")
 
-        # Verify _get_platform_adapter was called with mode="dataframe"
+        # Verify the unified adapter factory was called with mode="dataframe"
         mock_get_adapter.assert_called_once()
         call_kwargs = mock_get_adapter.call_args[1]
         assert call_kwargs.get("mode") == "dataframe"
