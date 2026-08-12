@@ -920,6 +920,11 @@ class TestExplorerPipelineRun:
 
 
 class TestStagedOutputGuards:
+    @staticmethod
+    def _assert_no_staging_leftovers(output: Path) -> None:
+        leftovers = [p.name for p in output.parent.iterdir() if p.name.startswith(f".{output.name}.")]
+        assert leftovers == [], f"Staging directory leaked after a failed build: {leftovers}"
+
     def test_promoted_db_removes_exact_stale_wal_sibling(self, data_dir: Path, tmp_path: Path) -> None:
         output = tmp_path / "out"
         output.mkdir()
@@ -991,3 +996,71 @@ class TestStagedOutputGuards:
 
         leftovers = [p.name for p in output.parent.iterdir() if p.name.startswith(f".{output.name}.")]
         assert leftovers == [], f"Staging directory leaked after a pre-build failure: {leftovers}"
+
+    def test_staging_dir_is_removed_when_staged_bundle_copy_fails(
+        self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A failure while copying a validated bundle does not strand staging."""
+        output = tmp_path / "out"
+        real_write_bytes = Path.write_bytes
+
+        def _copy_boom(path: Path, data: bytes) -> int:
+            if path.parent.name == "bundles" and path.parent.parent.name.startswith(f".{output.name}."):
+                raise OSError("staged bundle copy failed")
+            return real_write_bytes(path, data)
+
+        monkeypatch.setattr(Path, "write_bytes", _copy_boom)
+
+        with pytest.raises(OSError, match="staged bundle copy failed"):
+            ExplorerPipeline().run(data_dir, output)
+
+        self._assert_no_staging_leftovers(output)
+
+    def test_staging_dir_is_removed_when_bundle_transform_fails(
+        self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An uncaught transformer error preserves its message and cleans staging."""
+        output = tmp_path / "out"
+        transformer = BundleTransformer()
+
+        def _transform_boom(*_args: object, **_kwargs: object) -> tuple:
+            raise OSError("bundle transform failed")
+
+        monkeypatch.setattr(transformer, "load_bundle_full", _transform_boom)
+
+        with pytest.raises(OSError, match="bundle transform failed"):
+            ExplorerPipeline(transformer=transformer).run(data_dir, output)
+
+        self._assert_no_staging_leftovers(output)
+
+    def test_staging_dir_is_removed_when_summary_build_fails(
+        self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A summary-construction error does not strand the partially built candidate."""
+        output = tmp_path / "out"
+
+        def _summary_boom(*_args: object, **_kwargs: object) -> list:
+            raise OSError("summary build failed")
+
+        monkeypatch.setattr(pipeline_module, "_build_benchmark_summaries", _summary_boom)
+
+        with pytest.raises(OSError, match="summary build failed"):
+            ExplorerPipeline().run(data_dir, output)
+
+        self._assert_no_staging_leftovers(output)
+
+    def test_staging_dir_is_removed_when_promotion_fails(
+        self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A failed atomic promotion cleans the candidate but leaves no retry debris."""
+        output = tmp_path / "out"
+
+        def _promotion_boom(*_args: object, **_kwargs: object) -> None:
+            raise OSError("snapshot promotion failed")
+
+        monkeypatch.setattr(pipeline_module, "_promote_staged_output", _promotion_boom)
+
+        with pytest.raises(OSError, match="snapshot promotion failed"):
+            ExplorerPipeline().run(data_dir, output)
+
+        self._assert_no_staging_leftovers(output)
