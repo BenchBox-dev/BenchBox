@@ -12,6 +12,7 @@ from path_filter_decision import (
     git_changed_paths,
     load_rules,
     pattern_matches,
+    write_github_output,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -97,6 +98,55 @@ def test_unrelated_python_change_skips_explorer_vitest(rules: dict[str, list[str
     decision = classify_paths(["benchbox/cli/run.py"], rules)
     assert decision["explorer_vitest_needed"] is False
     assert decision["explorer_vitest_paths"] == []
+
+
+def test_explorer_paths_only_match_results_explorer_source(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths(
+        [
+            "results-explorer/src/pages/Home.tsx",
+            "results-explorer/e2e/home.spec.ts",
+            "_project/scripts/explorer_pipeline/contract.py",
+        ],
+        rules,
+    )
+
+    assert decision["explorer_paths_needed"] is True
+    assert decision["explorer_paths"] == ["results-explorer/src/pages/Home.tsx"]
+    assert decision["explorer_tokens_needed"] is True
+    assert decision["explorer_tokens_paths"] == ["results-explorer/src/pages/Home.tsx"]
+
+
+def test_unrelated_python_change_skips_explorer_paths(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths(["benchbox/cli/run.py"], rules)
+
+    assert decision["explorer_paths_needed"] is False
+    assert decision["explorer_paths"] == []
+
+
+def test_public_site_theme_inputs_trigger_their_dedicated_gate(rules: dict[str, list[str]]) -> None:
+    paths = [
+        "landing/shared/header.html",
+        "landing/style.css",
+        "docs/_static/custom.css",
+        "docs/_templates/page.html",
+        "results-explorer/index.html",
+    ]
+
+    decision = classify_paths(paths, rules)
+
+    assert decision["site_theme_needed"] is True
+    assert decision["site_theme_paths"] == paths
+    assert decision["explorer_paths_needed"] is False
+
+
+def test_github_output_exposes_explorer_paths_alias(rules: dict[str, list[str]], tmp_path: Path) -> None:
+    decision = classify_paths(["results-explorer/src/pages/Home.tsx"], rules)
+    output = tmp_path / "github-output.txt"
+
+    write_github_output(output, decision)
+
+    text = output.read_text(encoding="utf-8")
+    assert "explorer-paths-needed=true\n" in text
 
 
 # F2 regression: docs/** glob originally treated all of docs/ as safe-content,

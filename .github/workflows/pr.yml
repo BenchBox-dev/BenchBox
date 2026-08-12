@@ -27,6 +27,9 @@ jobs:
       packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
       viz-needed: ${{ steps.classify.outputs.viz-needed }}
       explorer-vitest-needed: ${{ steps.classify.outputs.explorer-vitest-needed }}
+      explorer-paths-needed: ${{ steps.classify.outputs.explorer-paths-needed }}
+      explorer-tokens-needed: ${{ steps.classify.outputs.explorer-tokens-needed }}
+      site-theme-needed: ${{ steps.classify.outputs.site-theme-needed }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -926,7 +929,7 @@ jobs:
   explorer-tokens:
     name: explorer-tokens
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    if: ${{ needs.ci-paths.outputs.explorer-paths-needed == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -937,23 +940,24 @@ jobs:
       - name: Fetch base branch
         run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
 
-      - name: Detect results-explorer/src changes
-        id: scope
-        shell: bash
-        run: |
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
-              | grep -qE '^results-explorer/src/'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "No results-explorer/src paths changed; skipping token scan."
-          fi
-
       - name: Run explorer token scan
-        if: ${{ steps.scope.outputs.run == 'true' }}
         # Bare python is intentional: the scan is stdlib-only so this gate
         # does not pay a dependency-sync cost before deciding.
         run: make lint-explorer-tokens
+
+  site-theme-tokens:
+    name: site-theme-tokens
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-theme-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
 
       - name: Run public site theme token scan
         # Bare python is intentional: the scan is stdlib-only so this gate
@@ -1162,7 +1166,7 @@ jobs:
 
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check]
+    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -1176,6 +1180,7 @@ jobs:
           PLAN_CAPTURE_RESULT: ${{ needs.plan-capture-gate.result }}
           MEDIUM_TEST_RESULT: ${{ needs.medium-test.result }}
           EXPLORER_TOKENS_RESULT: ${{ needs.explorer-tokens.result }}
+          SITE_THEME_TOKENS_RESULT: ${{ needs.site-theme-tokens.result }}
           EXPLORER_VITEST_RESULT: ${{ needs.explorer-vitest.result }}
           AUDIT_SHA_RESULT: ${{ needs.audit-sha.result }}
           PACKAGE_SMOKE_RESULT: ${{ needs.package-smoke.result }}
@@ -1239,12 +1244,22 @@ jobs:
             exit 0
           fi
 
-          # explorer-tokens is gated on needs-code-ci; when it runs it must
-          # pass. A "skipped" result (no results-explorer/src changes within
-          # the code-CI tier) counts as success here.
+          # explorer-tokens is gated on explorer-paths-needed; when it runs it
+          # must pass. A "skipped" result is still accepted defensively for a
+          # path-filtered job that did not need to run.
           if [ "$EXPLORER_TOKENS_RESULT" != "success" ] \
               && [ "$EXPLORER_TOKENS_RESULT" != "skipped" ]; then
             echo "explorer-tokens=$EXPLORER_TOKENS_RESULT"
+            exit 1
+          fi
+
+          # The public site theme scan has its own path group because its
+          # inputs are broader than results-explorer/src/**. A matched group
+          # must produce a real successful result before the required context
+          # can pass.
+          if [ "$SITE_THEME_TOKENS_RESULT" != "success" ] \
+              && [ "$SITE_THEME_TOKENS_RESULT" != "skipped" ]; then
+            echo "site-theme-tokens=$SITE_THEME_TOKENS_RESULT"
             exit 1
           fi
 

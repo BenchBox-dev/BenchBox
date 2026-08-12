@@ -17,6 +17,10 @@ DEFAULT_RULES = Path(".github/path-filters.yml")
 # and automatically grows a `<group>-needed` / `<group>-paths` output pair —
 # add a new gated job by adding a YAML key, not by touching this script.
 CORE_RULE_KEYS = {"safe-content", "content-guard", "code-ci"}
+# The workflow uses a semantic output name for the source-path gate while the
+# rules file keeps the job-oriented `explorer-tokens` key. Treat the alias as
+# a first-class extra group so output declarations stay in lockstep.
+GROUP_ALIASES = {"explorer-paths": "explorer-tokens"}
 LIST_NAMES = {
     "changed": "changed_paths",
     "content": "content_guard_paths",
@@ -86,9 +90,12 @@ def extra_group_keys(rules: dict[str, list[str]]) -> list[str]:
     Each name becomes a `<name>_paths` / `<name>_needed` decision key, a
     `<name>-needed` GitHub Actions output, and a `<name>.txt` helper list —
     all derived generically so a new gated job (e.g. `packaging`, `viz`)
-    only requires a new key in path-filters.yml, not a script change.
+    only requires a new key in path-filters.yml, not a script change. The
+    small alias map above lets a job use a clearer output name when its rule
+    key is intentionally job-oriented.
     """
-    return [key for key in rules if key not in CORE_RULE_KEYS]
+    groups = [key for key in rules if key not in CORE_RULE_KEYS]
+    return [*groups, *(alias for alias, source in GROUP_ALIASES.items() if source in rules)]
 
 
 def git_changed_paths(base_ref: str) -> list[str]:
@@ -165,9 +172,14 @@ def classify_paths(changed_paths: list[str], rules: dict[str, list[str]]) -> dic
     group_keys = extra_group_keys(rules)
     for group in group_keys:
         group_id = group.replace("-", "_")
-        matched = [path for path in changed_paths if matches_any(path, rules[group])]
+        source_group = GROUP_ALIASES.get(group, group)
+        matched = [path for path in changed_paths if matches_any(path, rules[source_group])]
         decision[f"{group_id}_paths"] = matched
         decision[f"{group_id}_needed"] = bool(matched)
+    # `explorer-paths` is an output alias, not a nested `explorer/paths`
+    # namespace. Normalize its generic path key to the public JSON/list name.
+    if "explorer_paths_paths" in decision:
+        decision["explorer_paths"] = decision.pop("explorer_paths_paths")
     # Record which extra groups exist so downstream writers (GitHub output,
     # helper lists) can loop over them without re-deriving from raw rules.
     decision["extra_group_ids"] = [group.replace("-", "_") for group in group_keys]
@@ -232,7 +244,7 @@ def write_lists(directory: Path, decision: dict[str, object]) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     list_names = dict(LIST_NAMES)
     for group_id in cast(list[str], decision.get("extra_group_ids", [])):
-        list_names[group_id] = f"{group_id}_paths"
+        list_names[group_id] = group_id if group_id.endswith("_paths") else f"{group_id}_paths"
     for filename, decision_key in list_names.items():
         with (directory / f"{filename}.txt").open("w", encoding="utf-8") as list_file:
             for path in path_list(decision, decision_key):

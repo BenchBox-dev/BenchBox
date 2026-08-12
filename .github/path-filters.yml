@@ -144,3 +144,18 @@ explorer-vitest:
   - ".github/path-filters.yml"
   - "tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml"
   - "tests/parity/fixtures/chart_ids.json"
+
+# Results Explorer source-only token contract. This intentionally stays
+# narrower than explorer-vitest: the token scan is about the public source
+# surface, not e2e fixtures, read-model inputs, or publication scripts.
+explorer-tokens:
+  - "results-explorer/src/**"
+
+# Public site theme token contract. The scan reads these files directly, so it
+# must run when any of them changes even if no Explorer source file changed.
+site-theme:
+  - "landing/shared/**"
+  - "landing/style.css"
+  - "docs/_static/custom.css"
+  - "docs/_templates/page.html"
+  - "results-explorer/index.html"

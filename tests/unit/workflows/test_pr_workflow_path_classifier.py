@@ -72,6 +72,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "PLAN_CAPTURE_RESULT": "skipped",
         "MEDIUM_TEST_RESULT": "skipped",
         "EXPLORER_TOKENS_RESULT": "skipped",
+        "SITE_THEME_TOKENS_RESULT": "skipped",
         "AUDIT_SHA_RESULT": "skipped",
         "PACKAGE_SMOKE_RESULT": "skipped",
         "DEPENDENCY_AUDIT_RESULT": "skipped",
@@ -100,9 +101,10 @@ def test_pr_path_classifier_fetches_base_history_for_merge_base() -> None:
     # Three consumers of the full base history today:
     #   - ci-paths (path classifier)
     #   - content-guard (recreates path lists for content validators)
-    #   - explorer-tokens (greps the diff for results-explorer/src changes)
+    #   - explorer-tokens and site-theme-tokens (each greps the diff for its
+    #     own source changes)
     assert '--depth=1 origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"' not in workflow
-    assert workflow.count(base_fetch) == 3
+    assert workflow.count(base_fetch) == 4
 
 
 def test_ci_required_result_preserves_content_guard_failure() -> None:
