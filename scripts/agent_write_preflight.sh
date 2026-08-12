@@ -6,6 +6,7 @@ set -eu
 
 top=$(git rev-parse --show-toplevel)
 common_dir=$(git rev-parse --git-common-dir)
+git_dir_abs=$(git rev-parse --absolute-git-dir)
 
 case "$common_dir" in
   /*) common_abs=$(realpath "$common_dir") ;;
@@ -21,18 +22,12 @@ allow_main=${BENCHBOX_ALLOW_MAIN_CLONE_WRITE:-${ALLOW_MAIN_CLONE_WRITE:-}}
 # A disposable clone -- a remote agent session, a CI runner -- is structurally
 # identical to the maintainer's primary clone: both are plain clones, neither is
 # a linked worktree. Nothing in the filesystem distinguishes them, so the
-# session has to say so. What keeps that declaration from becoming another
-# blanket override is that it is honored ONLY where the worktree pool this
-# guard exists to protect is absent. On a machine running the pool,
-# BENCHBOX_EPHEMERAL_CLONE cannot switch the guard off, so a session that
-# declares it wrongly there still refuses.
-pool_worktrees=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
-pool_siblings=$(find "$(dirname "$top_abs")" -maxdepth 1 -name '*.pool-*' 2>/dev/null | wc -l | tr -d ' ')
+# session has to say so. Keep that declaration explicit and reserve it for
+# disposable remote/CI clones; normal local agents use linked worktrees.
+registered_worktrees=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
 
 ephemeral=no
-if [ "${BENCHBOX_EPHEMERAL_CLONE:-}" = "1" ] &&
-  [ "$pool_worktrees" -eq 1 ] &&
-  [ "$pool_siblings" -eq 0 ]; then
+if [ "${BENCHBOX_EPHEMERAL_CLONE:-}" = "1" ] && [ "$registered_worktrees" -eq 1 ]; then
   ephemeral=yes
 fi
 
@@ -41,15 +36,14 @@ if [ "$top_abs" -ef "$primary_abs" ] && [ "$allow_main" != "1" ] && [ "$ephemera
 Refusing BenchBox write preflight in the primary clone:
   $top_abs
 
-Claim a pool worktree before write work:
-  make worktree-claim BRANCH=fix/descriptive-slug
+Create a disposable worktree before write work:
+  make worktree-create BRANCH=fix/descriptive-slug WORKTREE_PATH=../BenchBox.wt-fix-descriptive-slug
   cd <WORKTREE_PATH>
 
 If this is instead a disposable, ephemeral clone with no canonical clone to
 protect -- a remote agent session or a CI runner -- declare that:
   BENCHBOX_EPHEMERAL_CLONE=1 make agent-write-preflight
-It is ignored wherever a worktree pool is present, so it cannot disable this
-guard on a machine that uses one.
+Normal local agent sessions must use a linked worktree.
 
 Read-only review/research may stay in the primary clone. Emergency main-clone
 hotfix work requires explicit user authorization and:
@@ -58,11 +52,23 @@ EOF
   exit 1
 fi
 
+if [ "$allow_main" != "1" ] && [ "$ephemeral" != "yes" ] && [ "$git_dir_abs" -ef "$common_abs" ]; then
+  cat >&2 <<EOF
+Refusing BenchBox write preflight: this is a plain clone, not a registered
+linked worktree.
+
+Create a disposable worktree before write work:
+  make worktree-create BRANCH=fix/descriptive-slug WORKTREE_PATH=../BenchBox.wt-fix-descriptive-slug
+  cd <WORKTREE_PATH>
+EOF
+  exit 1
+fi
+
 # [COMMIT-IDENTITY-001] Claim-time identity assertion.
 #
 # Linked worktrees share the primary clone's config, so a single stray [user]
-# block there silently reauthors every pool worktree at once. Catching it at
-# claim time -- the moment a session acquires write rights -- is the only point
+# block there silently reauthors every linked worktree at once. Catching it at
+# preflight time -- before a session acquires write rights -- is the only point
 # where one check covers every worktree before any commit exists. Keep the agent
 # name/address lists in sync with AGENT_NAMES / AGENT_EMAILS and
 # SIGNING_SERVICE_EMAILS in _project/scripts/agent_instruction_audit.py.
@@ -101,9 +107,8 @@ EOF
   fi
 fi
 
-# An ephemeral clone never runs worktree-claim, which is where pool worktrees
-# get their hooks, so the repo's commit-time gates would silently never fire
-# here. Installing is best-effort: CI re-runs the same guards, so a failure to
+# An ephemeral clone has no linked-worktree setup, so commit-time hooks may not
+# be installed. Installing is best-effort: CI re-runs the same guards, so a failure to
 # install is a warning rather than a refusal.
 if [ "$ephemeral" = "yes" ] && [ ! -e "$common_abs/hooks/pre-commit" ]; then
   if (cd "$top_abs" && uv run -- pre-commit install --hook-type pre-commit --hook-type commit-msg >/dev/null 2>&1); then
@@ -114,7 +119,7 @@ if [ "$ephemeral" = "yes" ] && [ ! -e "$common_abs/hooks/pre-commit" ]; then
 fi
 
 if [ "$ephemeral" = "yes" ]; then
-  printf 'BenchBox write preflight OK (ephemeral clone, no worktree pool present): %s\n' "$top_abs"
+  printf 'BenchBox write preflight OK (ephemeral clone): %s\n' "$top_abs"
 else
   printf 'BenchBox write preflight OK: %s\n' "$top_abs"
 fi

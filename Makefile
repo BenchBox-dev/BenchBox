@@ -11,39 +11,17 @@ PR_REVIEW_PR_LIMIT ?= 1000
 PR_REVIEW_MAX_COMMENTS ?= 0
 PR_REVIEW_EXECUTOR_SANDBOX ?= workspace-write
 PR_REVIEW_EXECUTOR_APPROVAL ?= never
-POOL_SIZE ?= 10
-WORKTREE_POOL_PARENT ?= ..
 DEV_LOOP_METRICS_DAYS ?= 30
 DEV_LOOP_METRICS_LIMIT ?= 100
 AUDIT_SHA_TARGET_REF ?= origin/develop
 AUDIT_SHA_REQUIRE_CURRENT ?=
-# Minimum free disk space (in 1K-blocks) required on the pool parent
-# directory before `make worktree-claim` will allocate a slot. Default
-# 5 GB. Override to 0 to bypass the check (e.g. during low-space CI).
-POOL_MIN_FREE_KB ?= 5000000
 JOINORDER_BUILD_DIR ?= $(HOME)/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1
 JOINORDER_POSTGRES_DB ?= imdb
 JOINORDER_POSTGRES_USER ?= postgres
 JOINORDER_QUERIES ?= _project/joinorder/build-inputs/queries
 JOINORDER_REFERENCE ?= _project/joinorder/reference_cardinalities.json
 
-# Age threshold (in seconds) before a `.benchbox/claim_in_progress` marker
-# is treated as evidence of an aborted claim by `worktree-pool-check`.
-# Fresh markers indicate an in-flight `worktree-claim` and must not be
-# reported as aborted: `worktree-pool-check` is documented as safe for
-# periodic / cron use, and `worktree-claim` writes the marker at the
-# start of a normal claim and only removes it at the end. Default 600s
-# (10 min); concurrent claim runs typically finish in seconds.
-POOL_CLAIM_MARKER_STALE_SECONDS ?= 600
-
-# Shell command snippet that resolves the main clone's directory name
-# (e.g. "BenchBox"). Pool worktree paths derive from it as
-# $(WORKTREE_POOL_PARENT)/$(POOL_REPO_CMD).pool-NN. Inlined as a Make
-# variable so the four pool-management targets share a single source of
-# truth instead of repeating the four-deep nested expansion.
-POOL_REPO_CMD = basename "$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")")"
-
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-pool-reset worktree-pool-sweep-stale worktree-pool-disk-clean worktree-list worktree-prune
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -588,7 +566,7 @@ mutation-test:
 .PHONY: guards-fix
 guards-fix:
 	@echo "== guards-fix: regenerating every mechanically-regenerable drift-guard artifact =="
-	@# Enforce the pool-worktree write rule BEFORE the first regen rewrites a
+	@# Enforce the linked-worktree write rule BEFORE the first regen rewrites a
 	@# checked-in artifact. skill-sync runs this guard too, but only after
 	@# several earlier write steps -- and not at all when the skill-sync CLI is
 	@# absent, which would leave this whole write target unguarded.
@@ -774,7 +752,7 @@ security-audit:
 # way; do NOT skip a directory that holds tracked content.
 # Spellcheck scans the TRACKED file list rather than walking the working tree, so
 # a gitignored directory can never be scanned. Walking the tree made the gate
-# environment-dependent: it stayed green in CI and in fresh pool worktrees, but
+# environment-dependent: it stayed green in CI and in fresh linked worktrees, but
 # failed in the maintainer's primary clone on gitignored paths that only exist
 # there. Deriving the file list from git fixes the class.
 #
@@ -1182,7 +1160,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-pool-init worktree-pool-status worktree-pool-check worktree-claim worktree-claim-locked worktree-claim-attempt worktree-release worktree-release-locked worktree-pool-reset worktree-pool-reset-locked worktree-pool-sweep-stale worktree-pool-sweep-stale-locked worktree-pool-disk-clean worktree-list worktree-prune blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1504,70 +1482,6 @@ dev-loop-metrics:
 	test -f _project/scripts/dev_loop_pr_metrics.py && uv run -- python _project/scripts/dev_loop_pr_metrics.py --days "$(DEV_LOOP_METRICS_DAYS)" || true
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktrees.mk
-
-worktree-release-locked:
-	@set -e; \
-	top=$$(git rev-parse --show-toplevel); \
-	branch=$$(git branch --show-current); \
-	test -n "$$branch" || { echo "Refusing: this pool worktree is already detached/free."; exit 1; }; \
-	case "$$branch" in develop|main|release) echo "Refusing to release protected branch $$branch."; exit 1 ;; esac; \
-	dirty=$$(git status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
-		echo "Refusing to release dirty pool worktree $$top. Review changes or rerun with FORCE=1."; \
-		echo "$$dirty"; \
-		exit 1; \
-	fi; \
-	if [ "$(FORCE)" != "1" ]; then \
-		state=$$(gh pr view "$$branch" --json state --jq .state 2>/dev/null || true); \
-		[ "$$state" = "MERGED" ] || { echo "Refusing: PR for $$branch is not MERGED; open or close PR first, or rerun with FORCE=1."; exit 1; }; \
-	fi; \
-	git fetch origin develop --quiet; \
-	if [ "$(FORCE)" = "1" ]; then \
-		git reset --hard HEAD; \
-		git clean -fdx -e .benchbox >/dev/null; \
-	fi; \
-	git checkout --detach origin/develop; \
-	git reset --hard origin/develop; \
-	if [ -n "$$branch" ]; then \
-		case "$$branch" in develop|main|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
-	fi; \
-	git remote prune origin; \
-	rm -rf "$$top/.venv"; \
-	echo "Released $$branch; worktree is detached at origin/develop (.venv cleared; next claim will re-sync)."
-
-include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-pool.mk
-
-worktree-pool-reset-locked:
-	@set -e; \
-	POOL_REPO=$$($(POOL_REPO_CMD)); \
-	wt="$(WORKTREE_POOL_PARENT)/$$POOL_REPO.pool-$(POOL)"; \
-	git -C "$$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "No pool worktree found: $$wt"; exit 1; }; \
-	branch=$$(git -C "$$wt" branch --show-current 2>/dev/null || true); \
-	dirty=$$(git -C "$$wt" status --porcelain --untracked-files=normal | grep -vE '^\?\? \.benchbox(/|$$)' || true); \
-	if [ -n "$$dirty" ] && [ "$(FORCE)" != "1" ]; then \
-		echo "Refusing to reset dirty pool worktree $$wt. Review changes or rerun with FORCE=1."; \
-		echo "$$dirty"; \
-		exit 1; \
-	fi; \
-	if [ "$(FORCE)" = "1" ]; then \
-		echo "About to reset $$wt to origin/develop."; \
-		if [ -n "$$branch" ]; then echo "Current branch: $$branch"; else echo "Current branch: (detached)"; fi; \
-		if [ -n "$$dirty" ]; then echo "Uncommitted changes to discard:"; echo "$$dirty"; fi; \
-		printf 'Type RESET to continue: '; \
-		read answer; \
-		[ "$$answer" = "RESET" ] || { echo "Aborted."; exit 1; }; \
-	fi; \
-	git -C "$$wt" fetch origin develop --quiet; \
-	if [ "$(FORCE)" = "1" ]; then \
-		git -C "$$wt" reset --hard HEAD; \
-		git -C "$$wt" clean -fdx -e .benchbox >/dev/null; \
-	fi; \
-	git -C "$$wt" checkout --detach origin/develop; \
-	git -C "$$wt" reset --hard origin/develop; \
-	if [ "$(FORCE)" = "1" ] && [ -n "$$branch" ]; then \
-		case "$$branch" in develop|main|release) ;; *) git branch -D "$$branch" >/dev/null 2>&1 || true ;; esac; \
-	fi; \
-	echo "Reset pool-$(POOL): $$wt"
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-maintenance.mk
 

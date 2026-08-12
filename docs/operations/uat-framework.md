@@ -31,7 +31,7 @@ developer guide for hacking on the framework itself is
 By default every BenchBox runtime artefact lands under the shared
 `benchmark_runs/` root alongside the checkout — `~/Developer/benchmark_runs/`
 for a clone at `~/Developer/BenchBox`, and the same root for every sibling
-pool worktree:
+linked worktree:
 
 ```
 ~/Developer/benchmark_runs/
@@ -44,8 +44,8 @@ pool worktree:
 
 The UAT runner passes this root to every `benchbox run` subprocess as
 `BENCHBOX_OUTPUT_DIR`, so datagen, loaded databases, and result JSONs
-stay outside the worktree even when the sweep is launched from a pool
-worktree.
+stay outside the worktree even when the sweep is launched from a disposable
+linked worktree.
 
 Two ways to change the root, in precedence order: an explicit
 `output.benchmark_runs_dir_template` (and/or `output.logs_dir_template`,
@@ -62,7 +62,7 @@ path — no silent root switching for a configured sweep.
 **Invariant:** whenever the resolved output root lies outside the worktree, the
 worktree-local `benchmark_runs/` must **not** grow. Datagen, databases, and
 result JSONs all belong under that root. This guards the 2026-06-01 incident,
-where a corpus sweep launched from a pool worktree with
+where a corpus sweep launched from a linked worktree with
 `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` still accumulated ~4.2 GB
 under the worktree-local `benchmark_runs/datagen/`.
 
@@ -800,7 +800,7 @@ otherwise-healthy host merely because the measurement failed (fail-closed).
 | Cleanup command failed | UAT-owned `docker compose down ...` returned non-zero | inspect `uat_lifecycle.log`, then run the logged command manually if safe |
 | Fixed `container_name` collision | a compose file declares a global container name already in use | stop the conflicting developer stack or keep that platform external-only until the compose file is fixed |
 | Validator clean rate breaches floor | bundle quality regression | run `make uat-validate` standalone; it validates via `benchbox.validation.bundle` and writes the rollup TSV |
-| Make target missing | new release not synced | `make worktree-pool-status` to check pool freshness |
+| Make target missing | new release not synced | `make help` to check the available Make targets |
 
 ## Release-gate re-run
 

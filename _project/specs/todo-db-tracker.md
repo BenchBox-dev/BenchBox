@@ -669,8 +669,8 @@ configured** — NOT the default project-wide TODO process.
   `_replica_setup_lock()` advisory flock serializes replica open+sync across
   processes but is released while the connection stays open, so it does not
   make two processes *sharing one replica file* provably safe. The supported
-  operating model is therefore **one active process per worktree** — already
-  enforced by the `worktree-claim` workflow (one agent per worktree). The
+  operating model is therefore **one active process per linked worktree** —
+  each agent task uses its own disposable worktree. The
   design also already supports **per-process replica isolation** via
   `TODO_DB_REPLICA` (the live acceptance test drives two concurrent actors
   with distinct replica paths); any concurrent-same-worktree use should give

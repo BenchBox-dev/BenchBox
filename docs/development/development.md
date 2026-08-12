@@ -103,12 +103,11 @@ We welcome contributions! Please see the `CONTRIBUTING.md` file in the root of t
 
 ## Maintainer Dev Loop
 
-Maintainers (and AI agents working in this repo) use a retained pool
-of 10 git worktrees for parallel branch work. New work claims a free
-slot, runs there until merge, then releases it back. See
-[the worktree-pool guide](../operations/dev-loop-worktree-pool.md) for
-common commands, slot states, and recovery scenarios. External
-contributors working from a fork do not need the pool.
+Maintainers and AI agents use one disposable linked worktree per task. Create
+it for the branch, work there until the PR merges, then remove that exact
+clean registration. See [the disposable worktree guide](../operations/dev-loop-worktrees.md)
+for common commands and recovery scenarios. External contributors working
+from a fork can use the same lifecycle.
 
 ## Release Preparation Workflow
 

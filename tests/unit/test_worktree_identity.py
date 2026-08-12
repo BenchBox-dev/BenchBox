@@ -1,4 +1,4 @@
-"""Tests for claim-time worktree-scoped Git identity.
+"""Tests for creation-time worktree-scoped Git identity.
 
 The defect under repair: from inside a linked worktree, `git config user.email X`
 (no `--global`) writes to the *common* config, so one write reauthors the primary
@@ -87,7 +87,7 @@ def test_pinned_identity_survives_a_contaminated_common_config(fixture_repo) -> 
 
 
 def test_sibling_worktree_without_the_override_is_contaminated(fixture_repo) -> None:
-    """Negative control: the protection is per worktree, which is why claim time.
+    """Negative control: the protection is per worktree, which is why creation time.
 
     Without this, the previous test could pass for the wrong reason.
     """
@@ -130,7 +130,7 @@ def test_refuses_when_no_global_identity_exists(fixture_repo) -> None:
 
 
 def test_is_idempotent(fixture_repo) -> None:
-    """worktree-claim may run more than once against the same worktree."""
+    """worktree identity setup may run more than once against one worktree."""
     primary, linked, home = fixture_repo
     first = _run_helper(linked, home)
     second = _run_helper(linked, home)

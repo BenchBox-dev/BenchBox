@@ -3989,10 +3989,10 @@ def build_snapshot(conn: sqlite3.Connection) -> dict[str, list[dict[str, Any]]]:
 def _enclosing_work_tree(path: Path) -> Path | None:
     """The Git work tree containing ``path``, if any.
 
-    Deliberately NOT ``git_main_root()``: agents work in pool worktrees
-    (BenchBox.pool-NN), which are separate roots, so a main-root check passes a
-    destination straight into a checkout. Walk instead, and accept ``.git`` as
-    either a directory (clone) or a file (linked worktree).
+    Deliberately NOT ``git_main_root()``: agents work in separate linked
+    worktrees, so a main-root check passes a destination straight into a
+    checkout. Walk instead, and accept ``.git`` as either a directory (clone)
+    or a file (linked worktree).
     """
     probe = path if path.is_dir() else path.parent
     while True:

@@ -257,7 +257,7 @@ class TestMigrationSnapshotStaysOutOfGit:
             todo_db.write_snapshot(conn, nested / "snapshot.json")
 
     def test_refuses_inside_a_linked_worktree_where_dot_git_is_a_file(self, conn, tmp_path):
-        # Pool worktrees (BenchBox.pool-NN) carry a `.git` FILE, not a directory,
+        # Linked worktrees carry a `.git` FILE, not a directory,
         # and are separate roots from the main clone -- a main-root check lets
         # them through, which is exactly where agents do their work.
         work_tree = tmp_path / "pool-01"

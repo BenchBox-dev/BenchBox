@@ -59,7 +59,7 @@ force-push after every parent merge anyway. Preferred workflow:
 1. Open each PR against `develop` (or the appropriate integration base).
 2. If work depends on an unmerged parent, wait or fold into the parent PR.
 3. After the parent squash-merges, rebase the child onto the updated base and
-   force-push with `--force-with-lease` on the feature/pool branch only.
+   force-push with `--force-with-lease` on the feature branch only.
 
 ## "No checks" is not one failure mode
 

@@ -58,7 +58,10 @@ def test_preflight_rejects_primary_clone_without_override() -> None:
 
     assert result.returncode == 1
     assert "Refusing BenchBox write preflight in the primary clone" in result.stderr
-    assert "make worktree-claim BRANCH=fix/descriptive-slug" in result.stderr
+    assert (
+        "make worktree-create BRANCH=fix/descriptive-slug WORKTREE_PATH=../BenchBox.wt-fix-descriptive-slug"
+        in result.stderr
+    )
 
 
 def test_preflight_allows_explicit_primary_clone_override() -> None:
@@ -68,8 +71,32 @@ def test_preflight_allows_explicit_primary_clone_override() -> None:
     assert "BenchBox write preflight OK" in result.stdout
 
 
-def test_preflight_allows_non_primary_worktree() -> None:
-    result = _run_preflight(primary_clone=Path.cwd().parent)
+def test_preflight_allows_non_primary_worktree(tmp_path: Path) -> None:
+    primary = _init_clone(tmp_path / "BenchBox primary")
+    linked = primary.parent / ".tmp-preflight-linked"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "fix/preflight-fixture", str(linked), "HEAD"],
+        cwd=primary,
+        check=True,
+    )
+
+    try:
+        result = subprocess.run(
+            ["sh", str(SCRIPT.resolve())],
+            cwd=linked,
+            env={
+                **os.environ,
+                **HUMAN_IDENTITY,
+                "BENCHBOX_AGENT_PRIMARY_CLONE": str(primary),
+                "GIT_CONFIG_NOSYSTEM": "1",
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        subprocess.run(["git", "worktree", "remove", "--force", str(linked)], cwd=primary, check=True)
+        subprocess.run(["git", "branch", "-D", "fix/preflight-fixture"], cwd=primary, check=True)
 
     assert result.returncode == 0
     assert "BenchBox write preflight OK" in result.stdout
@@ -79,7 +106,7 @@ def test_claude_pr_command_runs_write_preflight_before_pr_workflow() -> None:
     command = Path(".claude/commands/pr.md").read_text(encoding="utf-8")
 
     assert "make agent-write-preflight" in command
-    assert "make worktree-claim BRANCH=<name>" in command
+    assert "make worktree-create BRANCH=<name> WORKTREE_PATH=<path>" in command
     assert "make worktree-add" not in command
 
 
@@ -95,6 +122,11 @@ def _init_clone(path: Path) -> Path:
     session or CI runner actually looks like on disk."""
     path.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.name", "BenchBox Test"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True)
+    (path / "README.md").write_text("fixture\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=path, check=True)
+    subprocess.run(["git", "commit", "-qm", "initial"], cwd=path, check=True)
     return path
 
 
@@ -169,24 +201,23 @@ def test_preflight_allows_a_declared_ephemeral_clone(tmp_path: Path) -> None:
     assert "ephemeral clone" in result.stdout
 
 
-def test_ephemeral_declaration_is_ignored_when_a_worktree_pool_is_present(tmp_path: Path) -> None:
-    """The load-bearing safety property: on a machine running the pool this
-    guard protects, declaring the clone ephemeral must NOT switch it off."""
+def test_ephemeral_declaration_is_not_sibling_path_dependent(tmp_path: Path) -> None:
+    """The explicit disposable-clone exception does not inspect sibling paths."""
     repo = _init_clone(tmp_path / "BenchBox")
-    (tmp_path / "BenchBox.pool-01").mkdir()
+    (tmp_path / "BenchBox.sibling-worktree").mkdir()
 
     result = _run_in_clone(repo, ephemeral=True)
 
-    assert result.returncode == 1
-    assert "Refusing BenchBox write preflight in the primary clone" in result.stderr
+    assert result.returncode == 0
+    assert "ephemeral clone" in result.stdout
 
 
 def test_preflight_refuses_an_agent_author_identity(tmp_path: Path) -> None:
-    """[COMMIT-IDENTITY-001] at claim time.
+    """[COMMIT-IDENTITY-001] before linked-worktree writes.
 
     Linked worktrees share the primary clone's config, so one stray [user]
-    block reauthors every pool worktree at once. The claim is the only point
-    where a single check covers them all before any commit exists.
+    block can reauthor every linked worktree at once. Preflight catches this
+    before any commit exists.
     """
     result = _run_in_clone(_init_clone(tmp_path / "BenchBox"), ephemeral=True, extra_env=AGENT_IDENTITY)
 
@@ -229,4 +260,4 @@ def test_refusal_names_the_ephemeral_escape_not_only_the_broad_override(tmp_path
 
     assert "BENCHBOX_EPHEMERAL_CLONE=1" in result.stderr
     assert "ephemeral" in result.stderr
-    assert "make worktree-claim" in result.stderr
+    assert "make worktree-create" in result.stderr

@@ -441,7 +441,7 @@ class TestWorkTreeAnchoredDefault:
     """The default benchmark_runs root is a sibling of the enclosing work tree.
 
     A cwd-anchored default put multi-gigabyte datagen artifacts *inside* the
-    checkout and gave every pool worktree its own copy. Anchoring to the work
+    checkout and gave every linked worktree its own copy. Anchoring to the work
     tree's parent yields one shared ``../benchmark_runs`` for the clone and
     every linked worktree.
     """
@@ -508,17 +508,17 @@ class TestWorkTreeAnchoredDefault:
         assert from_root == from_nested == tmp_path / "benchmark_runs"
 
     def test_sibling_worktrees_share_one_root(self, tmp_path, monkeypatch):
-        """A clone and its pool worktrees resolve to the SAME shared root."""
+        """A clone and its linked worktrees resolve to the SAME shared root."""
         clone = self._make_work_tree(tmp_path / "BenchBox", linked=False)
-        pool = self._make_work_tree(tmp_path / "BenchBox.pool-01", linked=True)
+        linked = self._make_work_tree(tmp_path / "BenchBox.wt-linked", linked=True)
         monkeypatch.delenv("BENCHBOX_OUTPUT_DIR", raising=False)
 
         monkeypatch.chdir(clone)
         from_clone = resolve_benchmark_runs_dir()
-        monkeypatch.chdir(pool)
-        from_pool = resolve_benchmark_runs_dir()
+        monkeypatch.chdir(linked)
+        from_linked = resolve_benchmark_runs_dir()
 
-        assert from_clone == from_pool == tmp_path / "benchmark_runs"
+        assert from_clone == from_linked == tmp_path / "benchmark_runs"
 
     def test_directory_name_is_still_benchmark_runs(self, tmp_path, monkeypatch):
         """The name is unchanged, so the existing corpus keeps working."""

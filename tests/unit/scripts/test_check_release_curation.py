@@ -124,7 +124,7 @@ def test_curated_release_make_runtime_executes_help_and_inventory(tmp_path: Path
     assert help_result.returncode == 0, help_result.stderr
     assert "makefile-inventory-check" in help_result.stdout
     assert inventory_result.returncode == 0, inventory_result.stderr
-    assert "Makefile inventory OK: 199 targets, 196 public, default=test" in inventory_result.stdout
+    assert "Makefile inventory OK: 187 targets, 184 public, default=test" in inventory_result.stdout
 
 
 def test_curated_release_make_runtime_fails_closed_when_module_is_omitted(tmp_path: Path) -> None:
