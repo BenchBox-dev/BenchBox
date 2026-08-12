@@ -1049,6 +1049,7 @@ describe("Compare", () => {
       expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
     });
 
+    expect(screen.getByRole("heading", { name: "Mixed Benchmark Comparison" })).toBeTruthy();
     expect(screen.queryByText(/Cannot compare results from different benchmarks/)).toBeNull();
     const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
     const receipt = screen.getByRole("region", { name: "Comparability receipt" });
@@ -1067,6 +1068,42 @@ describe("Compare", () => {
     expect(queryDiff).toHaveTextContent(
       "Winner claims are suppressed because benchmarks differ and scale factors differ",
     );
+  });
+
+  it("uses canonical SSB identity for the heading while keeping aliases comparable", async () => {
+    const canonicalSsb = makeResult({
+      result_id: "r1",
+      benchmark: "ssb",
+      platform: "DuckDB",
+      platform_id: "duckdb",
+    });
+    const legacySsb = makeResult({
+      result_id: "r2",
+      benchmark: "star_schema",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      power_score: 300,
+      display_geomean_ms: 100,
+      display_timings: SQLITE.display_timings,
+    });
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1" ? Promise.resolve(canonicalSsb) : Promise.resolve(legacySsb),
+    );
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Decision Summary" })).toBeTruthy();
+    });
+
+    expect(screen.getByRole("heading", { name: "SSB Comparison" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Mixed Benchmark Comparison" })).toBeNull();
+
+    const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
+    const summary = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    expect(guardrails).toHaveTextContent("Selected runs share the same benchmark, scale, and phase for winner claims.");
+    expect(guardrails).toHaveTextContent("Comparable");
+    expect(summary).not.toHaveTextContent("Claims suppressed");
+    expect(summary).toHaveTextContent("DuckDB leads by");
   });
 
   it("suppresses winner claims for direct compare URLs with mixed phases", async () => {
