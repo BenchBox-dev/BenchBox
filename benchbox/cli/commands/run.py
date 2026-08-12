@@ -77,7 +77,7 @@ from benchbox.core.benchmark_registry import (
     presort_capable_benchmarks,
 )
 from benchbox.core.config import DatabaseConfig
-from benchbox.core.constants import QUERY_PHASES, RUN_MODES, VALID_PHASES
+from benchbox.core.constants import RUN_MODES, VALID_PHASES
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.provenance import FUNDING_SOURCES, RESULT_SOURCES
 from benchbox.core.results.status import result_cli_failure_reason, result_non_clean_reason
@@ -511,26 +511,10 @@ class BenchmarkOptionParamType(click.ParamType):
 
 
 def _derive_execution_type(phases: list[str]) -> str:
-    """Derive benchmark execution type from the requested phase list."""
-    query_phases = set(QUERY_PHASES)
-    selected_query_phases = set(phases) & query_phases
-    if selected_query_phases:
-        # Any mixed query-phase request should use combined mode so the adapter
-        # can execute exactly the requested subset of query phases.
-        if len(selected_query_phases) > 1:
-            return "combined"
-        if "power" in selected_query_phases:
-            return "power"
-        if "throughput" in selected_query_phases:
-            return "throughput"
-        if "maintenance" in selected_query_phases:
-            return "maintenance"
-        return "standard"
-    if phases == ["load"] or ("load" in phases and not (set(phases) & query_phases)):
-        return "load_only"
-    if phases == ["generate"] or ("generate" in phases and not (set(phases) & ({"load"} | query_phases))):
-        return "data_only"
-    return "standard"
+    """Derive benchmark execution type through the shared core service."""
+    from benchbox.core.run_service import _map_phases_to_execution_type
+
+    return _map_phases_to_execution_type(phases)
 
 
 def _describe_platform_options(platform_names: Iterable[str]) -> None:

@@ -149,6 +149,8 @@ class TestRemoteModeAnonymization:
 
     def test_durable_job_execution_anonymizes(self, tmp_path: Path):
         """Durable jobs exist only under a remote policy, so the worker is remote."""
+        from unittest.mock import MagicMock
+
         from benchbox.mcp.jobs import DurableJobWorker, JobRecord
 
         record = JobRecord(
@@ -170,10 +172,18 @@ class TestRemoteModeAnonymization:
             completed_at=None,
         )
 
-        with patch("benchbox.mcp.jobs._run_benchmark_impl", return_value={}) as run_impl:
+        # New one-engine path delegates to the shared MCP/core execution helper.
+        with (
+            patch("benchbox.mcp.jobs._execute_mcp_run_via_core", return_value={}) as run_core,
+            patch(
+                "benchbox.core.benchmark_registry.get_public_benchmark_class",
+                return_value=MagicMock,
+            ),
+            patch("benchbox.mcp.jobs.get_all_benchmarks", return_value={"tpch": {"display_name": "TPC-H"}}),
+        ):
             DurableJobWorker._execute_benchmark(record, tmp_path)
 
-        assert run_impl.call_args.kwargs["anonymize"] is True
+        assert run_core.call_args.kwargs["anonymize"] is True
 
     def test_compare_results_threads_the_anonymization_decision(self, tmp_path: Path):
         from benchbox.mcp.tools import analytics as analytics_module

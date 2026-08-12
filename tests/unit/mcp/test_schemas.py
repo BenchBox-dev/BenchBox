@@ -288,6 +288,9 @@ class TestPlatformOptionAdmission:
 
     def test_df_suffixed_allowlist_key_resolves_to_itself(self, monkeypatch):
         """A -df-suffixed allow-list key must resolve to itself on both sides."""
+        from benchbox.core.run_service import (
+            _translate_platform_options_for_adapter as _prepare_adapter_platform_options,
+        )
         from benchbox.mcp.schemas import (
             MCP_PLATFORM_OPTION_ALLOWLIST,
             MCP_PLATFORM_OPTION_CONTRACT,
@@ -296,7 +299,6 @@ class TestPlatformOptionAdmission:
             resolve_platform_policy_key,
             validate_platform_options,
         )
-        from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
 
         # Inject a synthetic -df allow-list entry that would be shadowed by the base name
         # if the resolver were unconditional.

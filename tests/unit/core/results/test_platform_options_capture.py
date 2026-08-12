@@ -431,6 +431,27 @@ def test_lifecycle_run_config_persists_sanitized_platform_options_with_provenanc
     }
 
 
+def test_lifecycle_run_config_preserves_requested_phases() -> None:
+    benchmark_config = BenchmarkConfig(
+        name="tpch",
+        display_name="TPC-H",
+        options={"requested_phases": ["power", "throughput"]},
+    )
+
+    run_config = _build_run_config_from_options(
+        benchmark_config=benchmark_config,
+        options=benchmark_config.options,
+        platform_config={},
+        database_config=None,
+        validation_opts=ValidationOptions(),
+        verbosity_settings=VerbositySettings.default(),
+        test_type="combined",
+        table_format=None,
+    )
+
+    assert run_config.options == {"requested_phases": ["power", "throughput"]}
+
+
 def test_sanitize_excludes_internal_keys_when_requested() -> None:
     """w1: exported paths must drop internal bookkeeping keys, matching
     ``_iter_public_options`` semantics, instead of publishing them."""

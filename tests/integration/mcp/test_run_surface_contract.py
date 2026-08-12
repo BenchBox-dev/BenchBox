@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from benchbox.core.run_service import _translate_platform_options_for_adapter as _prepare_adapter_platform_options
 from benchbox.mcp.schemas import MCPValidationError, validate_platform_options
-from benchbox.mcp.tools.benchmark import _prepare_adapter_platform_options
 
 pytestmark = [pytest.mark.integration, pytest.mark.fast]
 

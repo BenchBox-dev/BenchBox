@@ -19,6 +19,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp.shared.exceptions import MCPError
 from mcp.types import ToolAnnotations
 
+from benchbox.core.benchmark_registry import get_all_benchmarks
 from benchbox.mcp.schemas import MCPValidationError, validate_phases, validate_platform_options
 from benchbox.mcp.security import (
     AUTHORIZATION_ERROR,
@@ -27,7 +28,11 @@ from benchbox.mcp.security import (
     TenantWorkspaceProvider,
     authenticated_principal,
 )
-from benchbox.mcp.tools.benchmark import _run_benchmark_impl
+from benchbox.mcp.tools.benchmark import (
+    _execute_mcp_run_via_core,
+    _generate_data_impl,
+    _resolve_mcp_mode_with_registry,
+)
 from benchbox.utils.clock import mono_time, utc_now
 
 logger = logging.getLogger(__name__)
@@ -575,21 +580,138 @@ class DurableJobWorker:
 
     @staticmethod
     def _execute_benchmark(job: JobRecord, staging: Path) -> dict[str, Any]:
+        """Execute a durable job via the shared core run service.
+
+        This is the one-engine adoption for the worker path: instead of
+        calling the MCP-private ``_run_benchmark_impl`` helper chain, the
+        worker builds surface-neutral configs and delegates to
+        ``benchbox.core.run_service.execute_run`` with a surface-injected
+        ``AdapterFactory`` and ``SilentVerbosity``. Lease/fencing,
+        idempotency and ``staging→os.replace`` publication remain in
+        ``DurableJobWorker._run_job`` and are untouched.
+        """
+        from benchbox.mcp.errors import ErrorCode, make_error, make_not_found_error
+
         request = job.request
-        return _run_benchmark_impl(
-            str(request["platform"]),
-            str(request["benchmark"]),
-            float(request.get("scale_factor", 0.01)),
-            request.get("queries"),
-            request.get("phases"),
-            request.get("mode"),
-            bool(request.get("capture_plans", False)),
-            platform_options=request.get("platform_options"),
-            results_dir=staging,
-            execution_id=job.execution_id,
-            # Durable jobs only exist under a remote security policy, so the
-            # consumer is always a remote tenant.
-            anonymize=True,
+        platform = str(request["platform"])
+        benchmark = str(request["benchmark"])
+        scale_factor = float(request.get("scale_factor", 0.01))
+        queries = request.get("queries")
+        phases = request.get("phases")
+        mode = request.get("mode")
+        capture_plans = bool(request.get("capture_plans", False))
+        platform_options = request.get("platform_options")
+        results_dir = staging
+        execution_id = job.execution_id
+        anonymize = True
+        start_time = __import__("benchbox.utils.clock", fromlist=["mono_time"]).mono_time()
+
+        # Re-admission: durable store is re-read, so validate again.
+        try:
+            from benchbox.mcp.schemas import validate_platform_options
+
+            normalized_platform_options = validate_platform_options(platform, platform_options)
+        except Exception as exc:
+            from benchbox.mcp.errors import ErrorCode, make_error
+
+            resp = make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform})
+            resp["execution_id"] = execution_id
+            resp["status"] = "failed"
+            return resp
+
+        try:
+            from benchbox.mcp.schemas import validate_phases
+
+            phases = validate_phases(phases)
+        except Exception as exc:
+            from benchbox.core.constants import VALID_PHASES
+            from benchbox.mcp.errors import ErrorCode, make_error
+
+            resp = make_error(
+                ErrorCode.VALIDATION_INVALID_PHASE, str(exc), details={"valid_phases": list(VALID_PHASES)}
+            )
+            resp["execution_id"] = execution_id
+            resp["status"] = "failed"
+            return resp
+
+        # For data_only, delegate to the existing data-gen impl which already
+        # writes to ``results_dir / "datagen"`` and returns the
+        # ``mcp_metadata + data_generation`` shape expected by durable callers.
+        # The core ``execute_run`` data_only path produces ``BenchmarkResults``,
+        # not this shape, so we keep the surface-owned helper until w3 cleans it.
+        resolved_mode, mode_error = _resolve_mcp_mode_with_registry(platform, mode)
+        if mode_error:
+            mode_error["execution_id"] = execution_id
+            mode_error["status"] = "failed"
+            return mode_error
+        if resolved_mode == "data_only":
+            # Use surface helper for data_only shape preservation
+            from benchbox.core.benchmark_registry import get_public_benchmark_class
+
+            all_bms = get_all_benchmarks()
+            bm_lower = benchmark.lower()
+            if bm_lower not in all_bms:
+                from benchbox.mcp.errors import make_not_found_error
+
+                resp = make_not_found_error("benchmark", benchmark, available=list(all_bms.keys()))
+                resp["execution_id"] = execution_id
+                resp["status"] = "failed"
+                return resp
+            bm_class = get_public_benchmark_class(bm_lower)
+            if bm_class is None:
+                from benchbox.mcp.errors import ErrorCode, make_error
+
+                resp = make_error(
+                    ErrorCode.DEPENDENCY_MISSING,
+                    f"Benchmark '{benchmark}' requires additional dependencies",
+                    details={"benchmark": benchmark},
+                )
+                resp["execution_id"] = execution_id
+                resp["status"] = "failed"
+                return resp
+            return _generate_data_impl(
+                bm_lower, bm_class, scale_factor, execution_id, start_time, results_dir=results_dir
+            )
+
+        from benchbox.core.benchmark_registry import get_public_benchmark_class
+
+        all_benchmarks = get_all_benchmarks()
+        benchmark_lower = benchmark.lower()
+        if benchmark_lower not in all_benchmarks:
+            from benchbox.mcp.errors import make_not_found_error
+
+            response = make_not_found_error("benchmark", benchmark, available=list(all_benchmarks.keys()))
+            response["execution_id"] = execution_id
+            response["status"] = "failed"
+            return response
+        benchmark_class = get_public_benchmark_class(benchmark_lower)
+        if benchmark_class is None:
+            from benchbox.mcp.errors import ErrorCode, make_error
+
+            response = make_error(
+                ErrorCode.DEPENDENCY_MISSING,
+                f"Benchmark '{benchmark}' requires additional dependencies",
+                details={"benchmark": benchmark},
+            )
+            response["execution_id"] = execution_id
+            response["status"] = "failed"
+            return response
+
+        phases_list = [phase.strip() for phase in (phases or "load,power").split(",")]
+        return _execute_mcp_run_via_core(
+            platform=platform,
+            benchmark=benchmark_lower,
+            benchmark_class=benchmark_class,
+            scale_factor=scale_factor,
+            queries=queries,
+            phases=phases_list,
+            resolved_mode=resolved_mode,
+            capture_plans=capture_plans,
+            normalized_platform_options=normalized_platform_options,
+            results_dir=results_dir,
+            execution_id=execution_id,
+            start_time=start_time,
+            anonymize=anonymize,
         )
 
     async def run(self) -> None:
