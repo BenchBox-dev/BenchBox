@@ -153,6 +153,15 @@ class TestMetadataPrimitivesQueryManager:
         with pytest.raises(ValueError, match="not supported on dialect"):
             manager.get_query("schema_list_views", dialect="clickhouse")
 
+    def test_clickhouse_role_membership_uses_native_admin_option_name(self):
+        """ClickHouse exposes role delegation as ``with_admin_option``."""
+        manager = MetadataPrimitivesQueryManager()
+
+        query = manager.get_query("acl_role_membership", dialect="clickhouse")
+
+        assert "with_admin_option AS admin_option" in query
+        assert "\n    admin_option\n" not in query
+
     def test_get_query_entry(self):
         """Test getting full query entry."""
         manager = MetadataPrimitivesQueryManager()
