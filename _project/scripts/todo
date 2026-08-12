@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Thin entry point for the DB-backed TODO tracker
-# (_project/specs/todo-db-tracker.md). All TODO state changes go through this
-# command; the CLI and database enforce the lifecycle rules.
+# Thin entry point for the released todo-db tracker. BenchBox's compatibility
+# adapter preserves the project wrapper contract while lifecycle, identity,
+# audit, export, and restore semantics come from the locked package.
 set -euo pipefail
 # Keep this declaration synchronized with todo_db.SCHEMA_VERSION. The required
 # schema-migration inventory gate rejects a wrapper/CLI mismatch before merge.
@@ -10,4 +10,102 @@ TODO_SCHEMA_VERSION=5
 # path to another clone's shim must still run that clone's todo_db.py.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-exec uv run --project "$ROOT/_project/scripts" -- python "$ROOT/_project/scripts/todo_db.py" "$@"
+export BENCHBOX_TODO_DB_STANDALONE=1
+export BENCHBOX_TODO_DB_EXPECTED_VERSION=0.3.1
+
+is_offline_finding_command() {
+    local -a args=("$@")
+    local index=0
+    local value
+    while [[ "$index" -lt "${#args[@]}" ]]; do
+        value="${args[$index]}"
+        case "$value" in
+            --actor|--db|--project-id|--replica|--repository)
+                index=$((index + 2))
+                continue
+                ;;
+            --actor=*|--db=*|--project-id=*|--replica=*|--repository=*)
+                index=$((index + 1))
+                continue
+                ;;
+            finding)
+                [[ "${args[$((index + 1))]:-}" == "create" || "${args[$((index + 1))]:-}" == "candidates" ]]
+                return
+                ;;
+        esac
+        index=$((index + 1))
+    done
+    return 1
+}
+
+OFFLINE_FINDING=0
+if is_offline_finding_command "$@"; then
+    OFFLINE_FINDING=1
+fi
+
+HELP_ONLY=0
+VERSION_ONLY=0
+for arg in "$@"; do
+    if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+        HELP_ONLY=1
+    elif [[ "$arg" == "--version" ]]; then
+        VERSION_ONLY=1
+    fi
+done
+
+EXPLICIT_DB_SET=0
+EXPLICIT_DB_VALUE=""
+args=("$@")
+index=0
+while [[ "$index" -lt "${#args[@]}" ]]; do
+    arg="${args[$index]}"
+    if [[ "$arg" == "--db" ]]; then
+        EXPLICIT_DB_SET=1
+        EXPLICIT_DB_VALUE="${args[$((index + 1))]:-}"
+        break
+    elif [[ "$arg" == --db=* ]]; then
+        EXPLICIT_DB_SET=1
+        EXPLICIT_DB_VALUE="${arg#--db=}"
+        break
+    fi
+    index=$((index + 1))
+done
+
+# BenchBox's committed connection file predates todo-db's config schema and
+# stores the hosted target as `url` rather than `db`. Preserve that public
+# contract and translate it only at the wrapper boundary.
+if [[ "$OFFLINE_FINDING" -eq 0 \
+    && "$HELP_ONLY" -eq 0 \
+    && "$VERSION_ONLY" -eq 0 \
+    && "$EXPLICIT_DB_SET" -eq 0 \
+    && -z "${TODO_DB_PATH:-}" \
+    && -z "${TODO_DB_URL:-}" \
+    && -f "$ROOT/.todo-db/config.json" ]]; then
+    TODO_DB_URL="$(jq -er '.url | select(type == "string" and length > 0)' "$ROOT/.todo-db/config.json")"
+    export TODO_DB_URL
+fi
+
+# Preserve the existing local-auth convenience without writing credentials to
+# disk or command output. Explicit caller credentials always win, including a
+# read-only token used by export and audit jobs.
+HOSTED_TARGET="${TODO_DB_URL:-}"
+if [[ "$EXPLICIT_DB_VALUE" == *://* ]]; then
+    HOSTED_TARGET="$EXPLICIT_DB_VALUE"
+fi
+if [[ "$OFFLINE_FINDING" -eq 0 && "$HELP_ONLY" -eq 0 && "$VERSION_ONLY" -eq 0 && -n "$HOSTED_TARGET" ]]; then
+    if [[ -z "${TODO_DB_AUTH_TOKEN:-}" && -z "${TODO_DB_RO_AUTH_TOKEN:-}" ]]; then
+        TODO_DB_AUTH_TOKEN="$(turso db tokens create "${TODO_DB_TURSO_DB:-benchbox-todo}" --expiration 1d)"
+        export TODO_DB_AUTH_TOKEN
+    fi
+    # todo-db uses its remote-only connection for read commands. A caller's RW
+    # token or the freshly minted short-lived token is valid on that path; an
+    # explicit RO token remains authoritative and is never promoted to RW.
+    if [[ -z "${TODO_DB_RO_AUTH_TOKEN:-}" && -n "${TODO_DB_AUTH_TOKEN:-}" ]]; then
+        TODO_DB_RO_AUTH_TOKEN="$TODO_DB_AUTH_TOKEN"
+        export TODO_DB_RO_AUTH_TOKEN
+    fi
+fi
+
+exec uv run --project "$ROOT/_project/scripts" --locked -- \
+    python "$ROOT/_project/scripts/todo_db.py" \
+    --replica "$ROOT/.todo-db/standalone-replica.db" "$@"

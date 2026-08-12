@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -61,8 +62,14 @@ COMMANDS = frozenset(
     }
 )
 
-GLOBAL_VALUE_OPTIONS = frozenset({"--actor", "--db", "--project-id", "--repository"})
+GLOBAL_VALUE_OPTIONS = frozenset({"--actor", "--db", "--project-id", "--replica", "--repository"})
 OFFLINE_FINDING_SUBCOMMANDS = frozenset({"create", "candidates"})
+PACKAGE_COMMAND_TRANSLATIONS = {"scope-update": "update"}
+EXTENSION_COMMANDS = frozenset({"renew", "freeze"})
+READ_ONLY_COMMANDS = frozenset({"show", "deps", "list", "ready", "stats", "check-scope", "lint", "audit", "doctor"})
+_READY_BANNER_RE = re.compile(
+    r"^(?P<open>\d+) open finding\(s\), (?P<drafts>\d+) unsynced draft\(s\) -- todo-db finding candidates$"
+)
 
 
 def _repo_root() -> Path:
@@ -107,6 +114,14 @@ def _is_offline_finding_command(args: list[str], command_index: int, command: st
     """Return whether a finding command only reads or writes local drafts."""
     subcommand = args[command_index + 1] if command_index + 1 < len(args) else None
     return command == "finding" and subcommand in OFFLINE_FINDING_SUBCOMMANDS
+
+
+def _can_run_without_database(args: list[str], command_index: int, command: str) -> bool:
+    return (
+        any(value in {"-h", "--help", "--version"} for value in args)
+        or command == "doctor"
+        or _is_offline_finding_command(args, command_index, command)
+    )
 
 
 def _with_identity(argv: list[str], command_index: int) -> list[str]:
@@ -155,6 +170,15 @@ def _redact(text: str, secrets: Iterable[str]) -> str:
     return result
 
 
+def _forward_result(result: subprocess.CompletedProcess[str]) -> int:
+    secrets = (os.environ.get("TODO_DB_AUTH_TOKEN", ""), os.environ.get("TODO_DB_RO_AUTH_TOKEN", ""))
+    if result.stdout:
+        sys.stdout.write(_redact(result.stdout, secrets))
+    if result.stderr:
+        sys.stderr.write(_redact(result.stderr, secrets))
+    return result.returncode
+
+
 def _delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> subprocess.CompletedProcess[str]:
     executable = shlex.split(os.environ.get("BENCHBOX_TODO_DB_COMMAND", "todo-db"))
     if not executable:
@@ -182,6 +206,167 @@ def _delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True)
         text=True,
         check=False,
     )
+
+
+def _delegate_extension(argv: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
+    """Run a BenchBox compatibility verb against the package-opened database."""
+    environment = os.environ.copy()
+    module_root = str(Path(__file__).resolve().parents[2])
+    environment["PYTHONPATH"] = os.pathsep.join(
+        value for value in (module_root, environment.get("PYTHONPATH", "")) if value
+    )
+    return subprocess.run(
+        [sys.executable, "-m", "_project.scripts.todo_db_standalone_extensions", *argv],
+        cwd=cwd,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _initialize_missing_local_read_target(
+    argv: list[str], *, command: str, cwd: Path
+) -> subprocess.CompletedProcess[str] | None:
+    """Preserve the legacy wrapper's create-on-first-local-read behavior."""
+    explicit_target, _ = _option_value(argv, "--db")
+    target = explicit_target or os.environ.get("TODO_DB_PATH", "")
+    candidate = Path(target).expanduser()
+    if not candidate.is_absolute():
+        candidate = cwd / candidate
+    if command not in {"list", "ready", "stats"} or not target or "://" in target or candidate.exists():
+        return None
+    located = _command_index(argv)
+    assert located is not None
+    return _delegate(argv[: located[0]] + ["init"], command="init", cwd=cwd)
+
+
+def _findings_banner(open_count: int, draft_count: int) -> str | None:
+    if not open_count and not draft_count:
+        return None
+    parts: list[str] = []
+    destinations: list[str] = []
+    if open_count:
+        parts.append(f"{open_count} open finding(s)")
+        destinations.append("todo finding list --disposition open")
+    if draft_count:
+        parts.append(f"{draft_count} unsynced draft(s)")
+        destinations.append("todo finding candidates")
+    return f"→ {', '.join(parts)} awaiting triage — see: {'; '.join(destinations)}"
+
+
+def _normalize_findings_banner(result: subprocess.CompletedProcess[str], *, command: str) -> None:
+    """Restore BenchBox's stderr-only ready/stats findings warning."""
+    if result.returncode:
+        return
+    banner: str | None = None
+    if command == "ready":
+        lines = result.stdout.splitlines()
+        if lines and (match := _READY_BANNER_RE.fullmatch(lines[-1])):
+            banner = _findings_banner(int(match["open"]), int(match["drafts"]))
+            result.stdout = "\n".join(lines[:-1]) + ("\n" if len(lines) > 1 else "")
+    elif command == "stats":
+        try:
+            stats = json.loads(result.stdout)
+            banner = _findings_banner(
+                int((stats.get("findings_by_disposition") or {}).get("open", 0)),
+                int(stats.get("unsynced_drafts", 0)),
+            )
+        except (AttributeError, TypeError, ValueError, json.JSONDecodeError):
+            return
+    if banner:
+        result.stderr = result.stderr.rstrip("\n") + ("\n" if result.stderr else "") + banner + "\n"
+
+
+def _command_mutates_tracker(argv: list[str], command: str) -> bool:
+    if any(value in {"-h", "--help", "--version"} for value in argv):
+        return False
+    if command in READ_ONLY_COMMANDS:
+        return False
+    if command == "import-yaml":
+        return not _has_option(argv, "--dry-run")
+    if command == "verify":
+        return _has_option(argv, "--run")
+    located = _command_index(argv)
+    if located is None:
+        return True
+    trailing = argv[located[0] + 1 :]
+    if command == "config":
+        return len([value for value in trailing if not value.startswith("--")]) >= 2
+    if command == "finding":
+        return bool(trailing) and trailing[0] not in {"create", "candidates", "list", "show"}
+    return True
+
+
+def _database_can_have_freeze(argv: list[str], cwd: Path) -> bool:
+    explicit_target, _ = _option_value(argv, "--db")
+    target = explicit_target or os.environ.get("TODO_DB_PATH") or os.environ.get("TODO_DB_URL")
+    if target:
+        if "://" in target:
+            return True
+        candidate = Path(target).expanduser()
+        if not candidate.is_absolute():
+            candidate = cwd / candidate
+        return candidate.exists()
+    return _has_config_json(cwd)
+
+
+def _append_claim_context(result: subprocess.CompletedProcess[str], argv: list[str], *, cwd: Path) -> None:
+    """Restore preservation and verification sections omitted by todo-db 0.3.1."""
+    located = _command_index(argv)
+    assert located is not None
+    item_index = located[0] + 1
+    if item_index >= len(argv):
+        return
+    detail = _delegate(argv[: located[0]] + ["show", argv[item_index], "--json"], command="show", cwd=cwd)
+    if detail.returncode:
+        return
+    try:
+        item = json.loads(detail.stdout)
+    except json.JSONDecodeError:
+        return
+    lines: list[str] = []
+    if item.get("preserves"):
+        lines.append("-- must preserve")
+        lines.extend(f"   {behavior}" for behavior in item["preserves"])
+    if item.get("anti_patterns"):
+        lines.append("-- anti-patterns")
+        lines.extend(
+            f"   DO NOT {entry['dont']} — {entry['why']} — instead: {entry['instead']}"
+            for entry in item["anti_patterns"]
+        )
+    if item.get("verifications"):
+        lines.append("-- verification ladder (narrowest first)")
+        for entry in item["verifications"]:
+            command = f" :: {entry['command']}" if entry.get("command") else ""
+            expected = f" — expected: {entry['expected']}" if entry.get("expected") else ""
+            lines.append(f"   {entry['seq']}. {entry['description']}{command}{expected}")
+    if lines:
+        result.stdout = result.stdout.rstrip("\n") + "\n" + "\n".join(lines) + "\n"
+
+
+def _delegate_compat_command(argv: list[str], *, command: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+    initialized = _initialize_missing_local_read_target(argv, command=command, cwd=cwd)
+    if initialized is not None and initialized.returncode:
+        return initialized
+    if (
+        os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1"
+        and _command_mutates_tracker(argv, command)
+        and _database_can_have_freeze(argv, cwd)
+    ):
+        located = _command_index(argv)
+        assert located is not None
+        guard = _delegate_extension(argv[: located[0]] + ["freeze-guard"], cwd=cwd)
+        if guard.returncode:
+            return guard
+    result = _delegate_extension(argv, cwd=cwd) if command == "renew" else _delegate(argv, command=command, cwd=cwd)
+    if command == "claim" and result.returncode == 0:
+        _append_claim_context(result, argv, cwd=cwd)
+    if command == "defer" and result.returncode == 2 and " is terminal;" in result.stderr:
+        result.stderr += "error: terminal items cannot accept deferrals\n"
+    if command in {"ready", "stats"}:
+        _normalize_findings_banner(result, command=command)
+    return result
 
 
 def _item_rows(envelope: dict[str, Any]) -> list[dict[str, Any]]:
@@ -330,13 +515,7 @@ def _main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     located = _command_index(args)
     if located is None:
-        result = _delegate(args, command="", cwd=_repo_root())
-        secrets = (os.environ.get("TODO_DB_AUTH_TOKEN", ""), os.environ.get("TODO_DB_RO_AUTH_TOKEN", ""))
-        if result.stdout:
-            sys.stdout.write(_redact(result.stdout, secrets))
-        if result.stderr:
-            sys.stderr.write(_redact(result.stderr, secrets))
-        return result.returncode
+        return _forward_result(_delegate(args, command="", cwd=_repo_root()))
     command_index, command = located
     root = _repo_root()
     # w2/w3: Map RO/RW tokens + drafts dir; refuse unroutable verbs loudly; never create a fork DB.
@@ -346,7 +525,7 @@ def _main(argv: list[str] | None = None) -> int:
         # Refuse loudly if no DB is configured via env, --db, or config.json; honor config.json as configured.
         # w5: doctor without DB must diagnose no-backend-configured, not refuse exit-2.
         has_db = _has_database_environment() or _has_option(args, "--db") or _has_config_json(root)
-        if not has_db and command != "doctor" and not _is_offline_finding_command(args, command_index, command):
+        if not has_db and not _can_run_without_database(args, command_index, command):
             print(
                 f"error: standalone shim cannot route '{command}' without explicit --db, TODO_DB_PATH/URL, or .todo-db/config.json; refusing to create fork DB at {root / '.todo-db' / 'todo.sqlite'}",
                 file=sys.stderr,
@@ -358,6 +537,11 @@ def _main(argv: list[str] | None = None) -> int:
         if not _has_option(args, "--db") and not _has_database_environment():
             args[command_index:command_index] = ["--db", str(root / ".todo-db" / "todo.sqlite")]
             command_index += 2
+    if command in PACKAGE_COMMAND_TRANSLATIONS:
+        command = PACKAGE_COMMAND_TRANSLATIONS[command]
+        args[command_index] = command
+    if command == "freeze":
+        return _forward_result(_delegate_extension(args, cwd=root))
     if command == "export":
         return _export(args, root)
     delegated = _with_identity(args, command_index)
@@ -374,16 +558,11 @@ def _main(argv: list[str] | None = None) -> int:
     if finding_drafts_env_was_missing:
         os.environ["TODO_DB_FINDING_DRAFTS_DIR"] = str(Path.home() / ".benchbox" / "finding-drafts")
     try:
-        result = _delegate(delegated, command=command, cwd=root)
+        result = _delegate_compat_command(delegated, command=command, cwd=root)
     finally:
         if finding_drafts_env_was_missing:
             os.environ.pop("TODO_DB_FINDING_DRAFTS_DIR", None)
-    secrets = (os.environ.get("TODO_DB_AUTH_TOKEN", ""), os.environ.get("TODO_DB_RO_AUTH_TOKEN", ""))
-    if result.stdout:
-        sys.stdout.write(_redact(result.stdout, secrets))
-    if result.stderr:
-        sys.stderr.write(_redact(result.stderr, secrets))
-    return result.returncode
+    return _forward_result(result)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -55,10 +55,9 @@ def yaml_paths(todo_dir: Path, done_dir: Path | None) -> list[tuple[Path, str]]:
     return paths
 
 
-def validate_target(target: Path, *, benchbox_db: Path, standalone_db: Path) -> None:
+def validate_target(target: Path, *, benchbox_db: Path) -> None:
     resolved = target.resolve()
-    forbidden = {benchbox_db.resolve(), standalone_db.resolve()}
-    if resolved in forbidden:
+    if resolved == benchbox_db.resolve():
         raise ShadowMigrationError(f"refusing protected tracker database: {resolved}")
     if target.exists() or target.is_symlink():
         raise ShadowMigrationError(f"shadow target must not already exist: {target}")
@@ -395,6 +394,22 @@ def _run(command: list[str], *, cwd: Path, env: dict[str, str]) -> dict[str, Any
     return {"stdout": stdout, "stderr": stderr, "returncode": result.returncode}
 
 
+def _canonical_todo_command(repo_root: Path) -> list[str]:
+    """Return the only supported canonical CLI route for this repository.
+
+    The package is resolved by BenchBox's isolated ``uv`` project and its lock
+    state.  There is deliberately no PATH fallback, sibling checkout, or
+    developer-machine path: an absent or incompatible package must fail closed.
+    """
+
+    scripts_project = repo_root / "_project" / "scripts"
+    if not (scripts_project / "pyproject.toml").is_file():
+        raise ShadowMigrationError(f"BenchBox scripts project is missing: {scripts_project}")
+    if not (scripts_project / "uv.lock").is_file():
+        raise ShadowMigrationError(f"BenchBox scripts lockfile is missing: {scripts_project / 'uv.lock'}")
+    return ["uv", "run", "--project", str(scripts_project), "--locked", "--", "todo-db"]
+
+
 def run_shadow(
     *,
     repo_root: Path,
@@ -402,8 +417,6 @@ def run_shadow(
     done_dir: Path,
     target: Path,
     report_path: Path,
-    standalone_project: Path,
-    standalone_command: str = "todo-db",
 ) -> dict[str, Any]:
     sources = yaml_paths(todo_dir, done_dir)
     if not sources:
@@ -413,12 +426,11 @@ def run_shadow(
     validate_target(
         target,
         benchbox_db=repo_root / ".todo-db" / "todo.sqlite",
-        standalone_db=Path("/Users/joe/Developer/todo-db/.todo-db/todo.sqlite"),
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     environment = os.environ.copy()
-    environment.setdefault("TODO_DB_PROJECT_ID", "benchbox")
-    environment.setdefault("TODO_DB_REPOSITORY", "https://github.com/joeharris76/BenchBox")
+    environment["TODO_DB_PROJECT_ID"] = "benchbox"
+    environment["TODO_DB_REPOSITORY"] = "https://github.com/joeharris76/BenchBox"
     created_target = False
     export_path: Path | None = None
     legacy_temporary = tempfile.TemporaryDirectory(prefix="benchbox-legacy-shadow-")
@@ -470,16 +482,11 @@ def run_shadow(
             legacy = legacy_snapshot(connection)
         _require_imported_items(legacy, source_count=len(sources), importer="legacy")
         created_target = True
+        canonical_command = _canonical_todo_command(repo_root)
         command_reports.append(
             _run(
                 [
-                    "uv",
-                    "run",
-                    "--project",
-                    str(standalone_project),
-                    "--extra",
-                    "legacy",
-                    standalone_command,
+                    *canonical_command,
                     "--db",
                     str(target),
                     "init",
@@ -495,13 +502,7 @@ def run_shadow(
         command_reports.append(
             _run(
                 [
-                    "uv",
-                    "run",
-                    "--project",
-                    str(standalone_project),
-                    "--extra",
-                    "legacy",
-                    standalone_command,
+                    *canonical_command,
                     "--db",
                     str(target),
                     "import-yaml",
@@ -522,13 +523,7 @@ def run_shadow(
         command_reports.append(
             _run(
                 [
-                    "uv",
-                    "run",
-                    "--project",
-                    str(standalone_project),
-                    "--extra",
-                    "legacy",
-                    standalone_command,
+                    *canonical_command,
                     "--db",
                     str(target),
                     "export",
@@ -575,7 +570,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", type=Path, help="new dedicated shadow target; must not exist")
     parser.add_argument("--report", type=Path)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--standalone-project", type=Path, default=Path("/Users/joe/Developer/todo-db"))
     parser.add_argument("--hosted-url", help="legacy hosted source URL; never written to output")
     parser.add_argument("--hosted-snapshot-output", type=Path)
     args = parser.parse_args(argv)
@@ -598,7 +592,6 @@ def main(argv: list[str] | None = None) -> int:
             done_dir=args.done_dir.resolve(),
             target=args.db,
             report_path=args.report,
-            standalone_project=args.standalone_project.resolve(),
         )
     except (OSError, ShadowMigrationError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)

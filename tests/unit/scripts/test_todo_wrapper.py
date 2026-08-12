@@ -14,6 +14,7 @@ budget-gated.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -33,6 +34,7 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SHIM_PATH = REPO_ROOT / "_project" / "scripts" / "todo"
 SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "todo" / "SKILL.md"
+VENDORED_WHEEL = REPO_ROOT / "_project" / "scripts" / "vendor" / "todo_db-0.3.1-py3-none-any.whl"
 
 
 def _read_skill_package() -> str:
@@ -104,11 +106,143 @@ class TestShim:
         assert "todo_db.py" in text
         assert "uv run --project" in text
 
+    def test_scripts_project_uses_verified_vendored_todo_db_release(self):
+        assert VENDORED_WHEEL.is_file()
+        assert hashlib.sha256(VENDORED_WHEEL.read_bytes()).hexdigest() == (
+            "785879ee2380fb1ff337a766b3d331e6e3337add001f8a91d4bd645e64332e0d"
+        )
+        project = (REPO_ROOT / "_project" / "scripts" / "pyproject.toml").read_text(encoding="utf-8")
+        assert 'todo-db = { path = "vendor/todo_db-0.3.1-py3-none-any.whl" }' in project
+        assert "github.com/joeharris76/todo-db" not in project
+
+    @pytest.mark.parametrize("subcommand", ["create", "candidates"])
+    def test_offline_finding_commands_do_not_mint_hosted_credentials(self, tmp_path: Path, subcommand: str):
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        (fake_bin / "uv").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        (fake_bin / "turso").write_text("#!/bin/sh\nexit 91\n", encoding="utf-8")
+        (fake_bin / "uv").chmod(0o755)
+        (fake_bin / "turso").chmod(0o755)
+
+        result = subprocess.run(
+            [str(SHIM_PATH), "--actor", "reviewer", "finding", subcommand],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            env={"PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}", "HOME": str(Path.home())},
+            check=False,
+            timeout=30,
+        )
+
+        assert result.returncode == 0, result.stderr
+
+    @pytest.mark.parametrize(
+        "args",
+        [
+            ["--help"],
+            ["--version"],
+            ["--db", "local.sqlite", "stats"],
+            ["--db=local.sqlite", "stats"],
+        ],
+    )
+    def test_metadata_and_explicit_local_paths_do_not_mint_hosted_credentials(
+        self, tmp_path: Path, args: list[str]
+    ) -> None:
+        fake_bin = tmp_path / "bin"
+        fake_bin.mkdir()
+        marker = tmp_path / "turso-called"
+        (fake_bin / "uv").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        (fake_bin / "turso").write_text(f"#!/bin/sh\ntouch {marker}\nexit 91\n", encoding="utf-8")
+        (fake_bin / "uv").chmod(0o755)
+        (fake_bin / "turso").chmod(0o755)
+
+        result = subprocess.run(
+            [str(SHIM_PATH), *args],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            env={"PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}", "HOME": str(Path.home())},
+            check=False,
+            timeout=30,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert not marker.exists()
+
     def test_shim_runs_stats_from_repo_subdir(self, tmp_path):
         result = _run_shim(["stats"], tmp_path / "wrapper.sqlite", cwd=REPO_ROOT / "tests")
         assert result.returncode == 0, result.stderr
         stats = json.loads(result.stdout)
         assert stats["items_by_state"] == {}
+
+    def test_explicit_local_read_initializes_missing_database(self, tmp_path: Path) -> None:
+        db = tmp_path / "explicit.sqlite"
+        result = subprocess.run(
+            [str(SHIM_PATH), "--db", str(db), "stats"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            env={"PATH": os.environ["PATH"], "HOME": str(Path.home())},
+            check=False,
+            timeout=120,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert db.is_file()
+        assert json.loads(result.stdout)["items_by_state"] == {}
+
+    def test_legacy_compatibility_commands_remain_available(self, tmp_path: Path) -> None:
+        db = tmp_path / "legacy-commands.sqlite"
+        create = _run_shim(
+            [
+                "create",
+                "compat-item",
+                "--title",
+                "Compatibility command item",
+                "--worktree",
+                "compat",
+                "--priority",
+                "low",
+                "--description",
+                "Exercise the retained compatibility commands.",
+            ],
+            db,
+        )
+        assert create.returncode == 0, create.stderr
+
+        scope = _run_shim(
+            ["scope-update", "compat-item", "--add-only-modify", "tests/**", "--reason", "test boundary"], db
+        )
+        assert scope.returncode == 0, scope.stderr
+        assert _run_shim(["claim", "compat-item"], db).returncode == 0
+        renewed = _run_shim(["renew", "compat-item"], db)
+        assert renewed.returncode == 0, renewed.stderr
+        status = _run_shim(["freeze", "--status"], db)
+        assert status.returncode == 0, status.stderr
+        assert status.stdout.strip() == "no live freeze"
+        frozen = _run_shim(["--actor", "alice", "freeze", "--reason", "compatibility test"], db)
+        assert frozen.returncode == 0, frozen.stderr
+        blocked = _run_shim(
+            [
+                "--actor",
+                "bob",
+                "create",
+                "blocked-item",
+                "--title",
+                "Blocked during freeze",
+                "--worktree",
+                "compat",
+                "--priority",
+                "low",
+                "--description",
+                "This write must not pass a foreign freeze.",
+            ],
+            db,
+        )
+        assert blocked.returncode == 2
+        assert "tracker is frozen for maintenance by alice" in blocked.stderr
+        released = _run_shim(["--actor", "alice", "freeze", "--release"], db)
+        assert released.returncode == 0, released.stderr
 
     def test_shim_resolves_code_from_own_location_not_cwd_git_root(self, tmp_path):
         # Absolute path to THIS tree's shim must win even when cwd is another

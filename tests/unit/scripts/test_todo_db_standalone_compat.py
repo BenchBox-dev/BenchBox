@@ -131,7 +131,9 @@ def test_required_legacy_commands_are_routable(monkeypatch: pytest.MonkeyPatch, 
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), command]) == 0
+    target = tmp_path / "todo.sqlite"
+    target.touch()
+    assert compat.main(["--db", str(target), command]) == 0
     assert calls == [command]
 
 
@@ -413,8 +415,6 @@ def test_legacy_entrypoint_only_routes_when_explicitly_enabled(monkeypatch: pyte
     "command",
     [
         "update",
-        "scope-update",
-        "freeze",
         "finding",
         "sweep-stale",
         "migrate",
@@ -441,6 +441,151 @@ def test_standalone_030_verbs_are_routable_through_shim(
         assert calls == [command]
     else:
         assert calls == [""]
+
+
+def test_scope_update_translates_to_package_update(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls: list[tuple[list[str], str]] = []
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        calls.append((argv, command))
+        return CompletedProcess(argv, 0, stdout="updated\n", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "scope-update", "item", "--reason", "boundary"]) == 0
+    assert calls[-1][1] == "update"
+    assert "scope-update" not in calls[-1][0]
+    assert "update" in calls[-1][0]
+
+
+@pytest.mark.parametrize("command", sorted(compat.EXTENSION_COMMANDS))
+def test_missing_package_commands_use_extension_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, command: str
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_extension(argv: list[str], *, cwd: Path) -> CompletedProcess[str]:
+        calls.append(argv)
+        return CompletedProcess(argv, 0, stdout=f"{command} ok\n", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate_extension", fake_extension)
+    monkeypatch.setattr(
+        compat,
+        "_delegate",
+        lambda *args, **kwargs: pytest.fail("package CLI must not receive a command it does not expose"),
+    )
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), command]) == 0
+    assert len(calls) == 1
+    assert calls[0][:2] == ["--db", str(tmp_path / "todo.sqlite")]
+    assert command in calls[0]
+
+
+def test_explicit_missing_local_read_target_is_initialized(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        calls.append(command)
+        return CompletedProcess(argv, 0, stdout="{}\n" if command == "stats" else "", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+    target = tmp_path / "missing.sqlite"
+
+    assert compat.main(["--db", str(target), "stats"]) == 0
+    assert calls == ["init", "stats"]
+
+
+def test_existing_local_init_checks_freeze_before_package_command(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[str] = []
+    target = tmp_path / "todo.sqlite"
+    target.touch()
+
+    def fake_extension(argv: list[str], *, cwd: Path) -> CompletedProcess[str]:
+        calls.append("freeze-guard")
+        return CompletedProcess(argv, 0, stdout="", stderr="")
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        calls.append(command)
+        return CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate_extension", fake_extension)
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+
+    assert compat.main(["--db", str(target), "init"]) == 0
+    assert calls == ["freeze-guard", "init"]
+
+
+def test_renew_stops_when_freeze_guard_rejects(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls: list[str] = []
+    target = tmp_path / "todo.sqlite"
+    target.touch()
+
+    def fake_extension(argv: list[str], *, cwd: Path) -> CompletedProcess[str]:
+        calls.append(argv[-1])
+        return CompletedProcess(argv, 2, stdout="", stderr="frozen\n")
+
+    monkeypatch.setattr(compat, "_delegate_extension", fake_extension)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+
+    assert compat.main(["--db", str(target), "renew", "item"]) == 2
+    assert calls == ["freeze-guard"]
+
+
+def test_audit_verify_is_read_only_during_freeze() -> None:
+    assert not compat._command_mutates_tracker(["audit", "verify"], "audit")
+
+
+@pytest.mark.parametrize(
+    ("command", "stdout", "expected_stdout", "expected_banner"),
+    [
+        (
+            "ready",
+            "item high worktree\n2 open finding(s), 3 unsynced draft(s) -- todo-db finding candidates\n",
+            "item high worktree\n",
+            "→ 2 open finding(s), 3 unsynced draft(s) awaiting triage — see: "
+            "todo finding list --disposition open; todo finding candidates\n",
+        ),
+        (
+            "stats",
+            '{"findings_by_disposition": {"open": 2}, "unsynced_drafts": 3}\n',
+            '{"findings_by_disposition": {"open": 2}, "unsynced_drafts": 3}\n',
+            "→ 2 open finding(s), 3 unsynced draft(s) awaiting triage — see: "
+            "todo finding list --disposition open; todo finding candidates\n",
+        ),
+    ],
+)
+def test_ready_and_stats_findings_banners_are_stderr_only(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    command: str,
+    stdout: str,
+    expected_stdout: str,
+    expected_banner: str,
+) -> None:
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+    monkeypatch.setattr(
+        compat,
+        "_delegate",
+        lambda argv, *, command, cwd, capture=True: CompletedProcess(argv, 0, stdout=stdout, stderr=""),
+    )
+
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), command]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == expected_stdout
+    assert captured.err == expected_banner
 
 
 @pytest.mark.parametrize("subcommand", ["create", "candidates"])
@@ -483,30 +628,12 @@ def test_standalone_finding_sync_still_requires_db(monkeypatch: pytest.MonkeyPat
         return CompletedProcess(argv, 0, stdout="", stderr="")
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setattr(
+        compat,
+        "_delegate_extension",
+        lambda argv, *, cwd: CompletedProcess(argv, 0, stdout="", stderr=""),
+    )
     assert compat.main(["finding", "sync"]) == 0
-
-
-@pytest.mark.parametrize("subcommand", ["create", "candidates"])
-def test_standalone_offline_finding_commands_do_not_require_db(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, subcommand: str
-) -> None:
-    """Offline finding capture/listing must delegate without inventing a DB."""
-    calls: list[tuple[list[str], str]] = []
-
-    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
-        calls.append((argv, command))
-        return CompletedProcess(argv, 0, stdout="", stderr="")
-
-    monkeypatch.setattr(compat, "_delegate", fake_delegate)
-    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
-    monkeypatch.delenv("TODO_DB_PATH", raising=False)
-    monkeypatch.delenv("TODO_DB_URL", raising=False)
-
-    assert compat.main(["finding", subcommand]) == 0
-    assert calls[0][1] == "finding"
-    assert "--db" not in calls[0][0]
-    assert not (tmp_path / ".todo-db" / "todo.sqlite").exists()
 
 
 def test_env_passthrough_includes_finding_drafts_and_ro_token(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

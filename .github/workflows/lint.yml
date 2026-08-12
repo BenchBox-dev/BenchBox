@@ -50,7 +50,7 @@ jobs:
 
       - name: UAT spec LOC table drift check
         if: hashFiles('_project/scripts/uat_loc_table.py') != ''
-        run: uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check
+        run: uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check
 
       - name: Compatibility docs drift check
         run: make compat-docs-check
