@@ -10,10 +10,60 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import math
 import statistics
 from typing import Sequence
 
 from benchbox.core.results.metrics import percentile_ms
+
+_QUERY_LIMITS = {"Q1": 10, "Q2": 10, "Q3": 10, "Q4": 100, "Q5": 10, "Q6": 20}
+_DISTANCE_QUERY = "Q2"
+
+
+def validate_search_result(query_id: str, rows: Sequence[Sequence[object]]) -> None:
+    """Validate the engine-independent shape and ordering contract of a search result.
+
+    This is a structural oracle for the vector-search benchmark.  It does not
+    assert engine-specific nearest-neighbour IDs; it catches result-shape,
+    duplicate-ID, non-finite-metric, and ordering regressions that a timing-only
+    benchmark would otherwise report as successful.
+
+    Args:
+        query_id: One of Q1-Q6.
+        rows: Rows returned by the query, with ``(id, metric)`` in that order.
+
+    Raises:
+        ValueError: If the result violates the query's published contract.
+    """
+    if query_id not in _QUERY_LIMITS:
+        raise ValueError(f"Unknown vector-search query: {query_id}")
+
+    limit = _QUERY_LIMITS[query_id]
+    if len(rows) > limit:
+        raise ValueError(f"{query_id} returned {len(rows)} rows; expected at most {limit}")
+
+    seen_ids: set[object] = set()
+    metrics: list[float] = []
+    for index, row in enumerate(rows):
+        if len(row) < 2:
+            raise ValueError(f"{query_id} row {index} has no metric column")
+        row_id = row[0]
+        if row_id in seen_ids:
+            raise ValueError(f"{query_id} returned duplicate id {row_id!r}")
+        seen_ids.add(row_id)
+        try:
+            metric = float(row[1])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{query_id} row {index} has a non-numeric metric") from exc
+        if not math.isfinite(metric):
+            raise ValueError(f"{query_id} row {index} has a non-finite metric")
+        metrics.append(metric)
+
+    for previous, current in zip(metrics, metrics[1:]):
+        if query_id == _DISTANCE_QUERY and previous > current:
+            raise ValueError(f"{query_id} distance results are not ascending")
+        if query_id != _DISTANCE_QUERY and previous < current:
+            raise ValueError(f"{query_id} similarity results are not descending")
 
 
 def recall_at_k(ground_truth: Sequence[int], approximate: Sequence[int], k: int) -> float:

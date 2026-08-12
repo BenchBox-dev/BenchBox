@@ -26,6 +26,7 @@ from benchbox.core.benchmark_mixins import DataGenerationMixin
 from benchbox.core.query_catalog_base import QuerySkippedError, TranslatableQueryMixin
 from benchbox.core.utils.tuning import extract_constraint_flags
 from benchbox.core.vector_search.generator import VectorSearchDataGenerator
+from benchbox.core.vector_search.metrics import validate_search_result
 from benchbox.core.vector_search.queries import VectorSearchQueryManager
 from benchbox.core.vector_search.schema import TABLES, get_all_create_table_sql
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -308,6 +309,7 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
                         dialect=dialect,
                         platform_version=platform_version,
                     )
+                    validate_search_result(query_id, result)
                     duration = elapsed_seconds(start)
                     query_results["iterations"].append(
                         {
