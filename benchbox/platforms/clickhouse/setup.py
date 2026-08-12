@@ -33,6 +33,13 @@ class ClickHouseSetupMixin:
         self.max_memory_usage = config.get("max_memory_usage", "8GB")  # Sufficient with uncompressed cache disabled
         self.max_execution_time = config.get("max_execution_time", 300)
         self.max_threads = config.get("max_threads", 8)
+        insert_block_size = config.get("insert_block_size", 65536)
+        if isinstance(insert_block_size, bool) or not isinstance(insert_block_size, int):
+            raise ValueError("insert_block_size must be an integer")
+        if insert_block_size <= 0 or insert_block_size == 1000:
+            raise ValueError("insert_block_size must be a positive integer other than 1000")
+        self.insert_block_size = insert_block_size
+        self.send_receive_timeout = config.get("send_receive_timeout", 300)
 
         # Orphaned: max_server_memory_usage_ratio has no live ClickHouse consumer
         # since the session-setting cleanup. Keep as None for backwards compat;
@@ -182,8 +189,8 @@ class ClickHouseSetupMixin:
         return ClickHouseClient(
             **params,
             connect_timeout=30,
-            send_receive_timeout=300,
-            sync_request_timeout=300,
+            send_receive_timeout=self.send_receive_timeout,
+            sync_request_timeout=self.send_receive_timeout,
         )
 
     def _quote_database_identifier(self, database: str) -> str:
@@ -226,8 +233,8 @@ class ClickHouseSetupMixin:
                 database=database,
                 # Connection settings
                 connect_timeout=30,
-                send_receive_timeout=300,
-                sync_request_timeout=300,
+                send_receive_timeout=self.send_receive_timeout,
+                sync_request_timeout=self.send_receive_timeout,
             )
 
             # Test connection

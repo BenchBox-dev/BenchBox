@@ -24,6 +24,8 @@ import pytest
 from benchbox.platforms.base.data_loading import (
     BenchmarkImplTablesSource,
     BenchmarkTablesSource,
+    ClickHouseServerLoadError,
+    DataLoader,
     DataLoadingError,
     DataSource,
     DataSourceResolver,
@@ -39,6 +41,42 @@ from benchbox.platforms.base.data_loading import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+
+class TestDataLoaderClickHouseFailurePropagation:
+    """Server-mode loader failures must not be swallowed as zero-row success."""
+
+    @staticmethod
+    def _loader(tmp_path: Path, handler: object) -> DataLoader:
+        data_file = tmp_path / "events.tbl"
+        data_file.write_text("1|alpha\n", encoding="utf-8")
+        loader = DataLoader.__new__(DataLoader)
+        loader.handler_factory = lambda file_path, adapter, benchmark, table_name=None, data_source=None: handler
+        loader.connection = MagicMock()
+        loader.benchmark = MagicMock()
+        loader.adapter = MagicMock()
+        loader.adapter.logger = MagicMock()
+        return loader
+
+    def test_sharded_load_rethrows_typed_server_failure(self, tmp_path):
+        failure = ClickHouseServerLoadError("events", [], 0, RuntimeError("timeout"))
+        loader = self._loader(tmp_path, MagicMock(load_table_bulk=MagicMock(side_effect=failure)))
+        data_file = tmp_path / "events.tbl"
+
+        with pytest.raises(ClickHouseServerLoadError) as exc_info:
+            loader._load_sharded_table("events", [data_file])
+
+        assert exc_info.value is failure
+
+    def test_single_file_load_rethrows_typed_server_failure(self, tmp_path):
+        failure = ClickHouseServerLoadError("events", [], 0, RuntimeError("timeout"))
+        loader = self._loader(tmp_path, MagicMock(load_table=MagicMock(side_effect=failure)))
+        data_file = tmp_path / "events.tbl"
+
+        with pytest.raises(ClickHouseServerLoadError) as exc_info:
+            loader._load_single_file("events", data_file)
+
+        assert exc_info.value is failure
 
 
 # ---------------------------------------------------------------------------

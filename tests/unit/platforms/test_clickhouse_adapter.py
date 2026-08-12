@@ -5,9 +5,10 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import gzip
 import logging
 from pathlib import Path
-from types import SimpleNamespace
+from types import GeneratorType, SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -56,6 +57,15 @@ class TestClickHouseAdapter:
             assert adapter.host == "localhost"
             assert adapter.port == 9000
             assert adapter.deployment_mode == "server"
+            assert adapter.insert_block_size == 65536
+
+    def test_server_insert_block_size_rejects_legacy_batch_size(self):
+        """The server path cannot be configured back to the 1,000-row fallback."""
+        with (
+            patch("benchbox.platforms.clickhouse.setup.ClickHouseClient"),
+            pytest.raises(ValueError, match="other than 1000"),
+        ):
+            ClickHouseAdapter(deployment_mode="server", insert_block_size=1000)
 
     def test_initialization_missing_driver(self):
         """Test initialization when ClickHouse driver dependencies are missing (server mode)."""
@@ -90,6 +100,20 @@ class TestClickHouseAdapter:
         assert mock_client_class.call_count == 3
         # Should execute SHOW DATABASES, CREATE DATABASE, and SELECT 1
         assert mock_client.execute.call_count == 3
+        assert mock_client_class.call_args_list[2].kwargs["send_receive_timeout"] == 300
+        assert mock_client_class.call_args_list[2].kwargs["sync_request_timeout"] == 300
+
+    @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
+    def test_create_connection_uses_configured_server_timeout(self, mock_client_class):
+        """The configured driver timeout is applied to the scoped server client."""
+        mock_client_class.return_value = Mock()
+        mock_client_class.return_value.execute.side_effect = [[], None, None]
+
+        adapter = ClickHouseAdapter(deployment_mode="server", send_receive_timeout=900)
+        adapter.create_connection()
+
+        assert mock_client_class.call_args_list[2].kwargs["send_receive_timeout"] == 900
+        assert mock_client_class.call_args_list[2].kwargs["sync_request_timeout"] == 900
 
     @patch("benchbox.platforms.clickhouse.setup.ClickHouseClient")
     def test_create_connection_bootstraps_database_before_scoped_client(self, mock_client_class):
@@ -195,10 +219,16 @@ class TestClickHouseAdapter:
         mock_client_class.return_value = mock_client
         # Mock database check to return empty list (database doesn't exist)
         # Mock database creation and SELECT 1 to return None for connection setup
-        # Mock COUNT(*) query to return the row count
-        # Mock: database check, database create, connection test,
-        # COUNT(*) before, INSERT statement, COUNT(*) after
-        mock_client.execute.side_effect = [[], None, None, [[0]], None, [[100]]]
+        # Mock database setup and consume the generator as the real driver does.
+        execute_results = iter([[], None, None])
+
+        def execute(*args, **kwargs):
+            if len(args) > 1 and isinstance(args[1], GeneratorType):
+                list(args[1])
+                return None
+            return next(execute_results)
+
+        mock_client.execute.side_effect = execute
 
         # Create temporary test file first
         import tempfile
@@ -1114,12 +1144,15 @@ class TestClickHouseNativeHandlerBulk:
         handler.adapter.capture_sql.assert_called_once()
 
     def test_server_mode_loads_host_files_with_client_batches(self, tmp_path):
-        """ClickHouse server mode cannot use file() for host-local Docker paths."""
+        """ClickHouse server mode streams host-local Docker files through one insert."""
         shard = tmp_path / "region.tbl"
         shard.write_text("1|AFRICA\n2|AMERICA\n", encoding="utf-8")
 
         handler = self._make_handler(server_mode=True)
         connection = Mock()
+        connection.execute.side_effect = (
+            lambda query, params=None, **kwargs: list(params) if params is not None else None
+        )
         benchmark = Mock()
         benchmark.get_schema.return_value = {
             "region": {
@@ -1130,14 +1163,143 @@ class TestClickHouseNativeHandlerBulk:
             }
         }
 
-        result = handler.load_table_bulk("region", [shard], connection, benchmark, Mock())
+        with patch("benchbox.platforms.base.data_loading.RowBatchProcessor") as batch_processor:
+            result = handler.load_table_bulk("region", [shard], connection, benchmark, Mock())
 
         assert result == 2
-        connection.execute.assert_called_once_with(
-            "INSERT INTO region VALUES",
-            [(1, "AFRICA"), (2, "AMERICA")],
-        )
+        batch_processor.assert_not_called()
+        query, params = connection.execute.call_args.args[:2]
+        assert query == "INSERT INTO region VALUES"
+        assert isinstance(params, GeneratorType)
+        assert connection.execute.call_args.kwargs["settings"]["insert_block_size"] > 1000
         assert "file(" not in connection.execute.call_args[0][0]
+
+    def test_server_mode_uses_one_generator_across_shards(self, tmp_path):
+        """All shards for one table share one bounded native-driver generator."""
+        shards = [tmp_path / "region.tbl.1", tmp_path / "region.tbl.2"]
+        shards[0].write_text("1|AFRICA\n", encoding="utf-8")
+        shards[1].write_text("2|AMERICA\n", encoding="utf-8")
+
+        handler = self._make_handler(server_mode=True)
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {
+            "region": {
+                "columns": [
+                    {"name": "r_regionkey", "type": "INTEGER"},
+                    {"name": "r_name", "type": "CHAR(25)"},
+                ]
+            }
+        }
+        connection = Mock()
+        seen: dict[str, object] = {}
+
+        def execute(query, params=None, **kwargs):
+            seen["query"] = query
+            seen["params_type"] = type(params)
+            seen["generator"] = params
+            seen["rows"] = list(params)
+            seen["settings"] = kwargs["settings"]
+
+        connection.execute.side_effect = execute
+
+        result = handler.load_table_bulk("region", shards, connection, benchmark, Mock())
+
+        assert result == 2
+        assert seen["query"] == "INSERT INTO region VALUES"
+        assert seen["params_type"] is GeneratorType
+        assert seen["rows"] == [(1, "AFRICA"), (2, "AMERICA")]
+        assert seen["settings"] == {"insert_block_size": 65536}
+        assert seen["generator"].gi_frame is None
+
+    def test_server_mode_dry_run_is_explicit_and_not_a_batch_placeholder(self, tmp_path):
+        """Server dry-run records the insert without pretending 1,000 rows were loaded."""
+        shard = tmp_path / "region.tbl"
+        shard.write_text("1|AFRICA\n", encoding="utf-8")
+        handler = self._make_handler(dry_run=True, server_mode=True)
+        connection = Mock()
+
+        result = handler.load_table_bulk("region", [shard], connection, Mock(), Mock())
+
+        assert result == 0
+        assert not connection.execute.called
+        handler.adapter.capture_sql.assert_called_once()
+        assert "INSERT INTO region VALUES" in handler.adapter.capture_sql.call_args.args[0]
+
+    def test_server_mode_preserves_header_blank_and_width_normalization(self, tmp_path):
+        """Streaming parser keeps the established header/blank/pad/truncate contract."""
+        shard = tmp_path / "events.csv.gz"
+        with gzip.open(shard, "wt", encoding="utf-8") as file_handle:
+            file_handle.write("id,name\n\n1,alpha,ignored\n2\n")
+
+        handler = self._make_handler(server_mode=True)
+        handler.delimiter_char = ","
+        handler.has_header = True
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {"events": {"columns": [{"type": "INTEGER"}, {"type": "STRING"}]}}
+        connection = Mock()
+        seen_rows: list[tuple[object, ...]] = []
+
+        def execute(query, params=None, **kwargs):
+            assert isinstance(params, GeneratorType)
+            seen_rows.extend(params)
+
+        connection.execute.side_effect = execute
+
+        result = handler.load_table_bulk("events", [shard], connection, benchmark, Mock())
+
+        assert result == 2
+        assert seen_rows == [(1, "alpha"), (2, "")]
+
+    def test_server_mode_parquet_is_bounded_and_not_materialized(self, tmp_path):
+        """Parquet uses iter_batches and sends a real generator to the driver."""
+        pa = pytest.importorskip("pyarrow")
+        import pyarrow.parquet as pq
+
+        shard = tmp_path / "events.parquet"
+        pq.write_table(pa.table({"id": [1, 2], "name": ["alpha", "beta"]}), shard)
+        handler = self._make_handler(server_mode=True)
+        connection = Mock()
+        seen: dict[str, object] = {}
+
+        def execute(query, params=None, **kwargs):
+            seen["type"] = type(params)
+            seen["rows"] = list(params)
+            seen["settings"] = kwargs["settings"]
+
+        connection.execute.side_effect = execute
+
+        result = handler.load_table_bulk("events", [shard], connection, Mock(), Mock())
+
+        assert result == 2
+        assert seen == {
+            "type": GeneratorType,
+            "rows": [(1, "alpha"), (2, "beta")],
+            "settings": {"insert_block_size": 65536},
+        }
+
+    def test_server_mode_failure_is_typed_and_terminal(self, tmp_path):
+        """A driver failure is surfaced with table/source/partial-row context."""
+        from benchbox.platforms.base.data_loading import ClickHouseServerLoadError
+
+        shard = tmp_path / "events.tbl"
+        shard.write_text("1|alpha\n2|beta\n", encoding="utf-8")
+        handler = self._make_handler(server_mode=True)
+        connection = Mock()
+
+        def execute(query, params=None, **kwargs):
+            list(params)
+            raise RuntimeError("server timed out")
+
+        connection.execute.side_effect = execute
+
+        with pytest.raises(ClickHouseServerLoadError) as exc_info:
+            handler.load_table_bulk("events", [shard], connection, Mock(), Mock())
+
+        error = exc_info.value
+        assert error.table_name == "events"
+        assert error.source_files == (shard,)
+        assert error.rows_attempted == 2
+        assert "server timed out" in str(error)
 
 
 # ===================================================================
