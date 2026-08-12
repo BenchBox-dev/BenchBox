@@ -506,6 +506,33 @@ def test_explicit_missing_local_read_target_is_initialized(monkeypatch: pytest.M
     assert calls == ["init", "stats"]
 
 
+@pytest.mark.parametrize(
+    ("argv", "stdout"), [(["stats", "--help"], "stats help\n"), (["--version", "stats"], "todo-db 0.3.1\n")]
+)
+def test_stats_metadata_skips_activity_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+    stdout: str,
+) -> None:
+    monkeypatch.setattr(
+        compat,
+        "_delegate",
+        lambda argv, *, command, cwd, capture=True: CompletedProcess(argv, 0, stdout=stdout, stderr=""),
+    )
+    monkeypatch.setattr(
+        compat,
+        "_delegate_extension",
+        lambda *args, **kwargs: pytest.fail("metadata-only stats must not open the database"),
+    )
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
+
+    assert compat.main(argv) == 0
+    assert capsys.readouterr().out == stdout
+
+
 def test_existing_local_init_checks_freeze_before_package_command(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

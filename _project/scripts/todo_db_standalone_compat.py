@@ -385,7 +385,11 @@ def _delegate_compat_command(argv: list[str], *, command: str, cwd: Path) -> sub
         if guard.returncode:
             return guard
     result = _delegate_extension(argv, cwd=cwd) if command == "renew" else _delegate(argv, command=command, cwd=cwd)
-    if command == "stats" and os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1":
+    if (
+        command == "stats"
+        and os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1"
+        and not any(value in {"-h", "--help", "--version"} for value in argv)
+    ):
         result = _preserve_stats_activity(result, argv, cwd=cwd)
     if command == "claim" and result.returncode == 0:
         _append_claim_context(result, argv, cwd=cwd)
