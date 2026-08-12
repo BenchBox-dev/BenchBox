@@ -1,7 +1,7 @@
 ---
 name: todo
-description: Use when the user asks to "ideate on an idea", "refine an idea", "brainstorm", "write a spec", "create a specification", "create a TODO", "show TODO items", "manage TODOs", "prioritize TODOs", "top N most important todos", "rank the backlog", "what should we work on", "implement a TODO", "implement a batch of TODOs", "complete a TODO", "cleanup TODOs", "review TODO quality", "claim a TODO", "what's ready" / "ready queue", "defer this work", "promote a deferral", "dismiss a deferral", "block"/"unblock a TODO", "create TODOs from a spec", or "todo stats". Covers the lifecycle from idea to specification, implementation, and completion.
-version: 0.8.0
+description: Use when the user asks to "ideate on an idea", "refine an idea", "brainstorm", "write a spec", "create a specification", "create a TODO", "show TODO items", "manage TODOs", "prioritize TODOs", "top N most important todos", "rank the backlog", "what should we work on", "implement a TODO", "implement a batch of TODOs", "complete a TODO", "cleanup TODOs", "review TODO quality", "claim a TODO", "what's ready" / "ready queue", "defer this work", "promote a deferral", "dismiss a deferral", "block"/"unblock a TODO", "create TODOs from a spec", "create a batch handoff", "close out a reviewed batch", or "todo stats". Covers the lifecycle from idea to specification, implementation, and completion.
+version: 0.9.0
 tools: Bash, Read, Edit, Write, Task
 ---
 
@@ -21,6 +21,10 @@ Use `_project/scripts/todo`. Check that the wrapper supports the command you nee
 * If the subcommand is missing, report the gap and stop.
 
 `prioritize` has no CLI command. It is a skill-only analysis. Follow `references/prioritize.md` and use only the inspect commands it lists.
+
+If one request combines review or validation with close-out, perform the
+read-only review and stop at findings under `SHARED/review-protocol/SKILL.md`.
+A later user message may authorize `closeout`.
 
 Put global flags before the subcommand: `todo --db <path> --actor <name> <command>`.
 
@@ -51,6 +55,8 @@ The `--help` output for the command you chose is the full contract.
 | `lint` | You review an item | `references/review.md` |
 | `finding candidates`, `finding triage`, `finding import`, `finding sync`, `finding promote` | You triage findings | `references/implement.md` |
 | `batch` — a set of related TODOs | You implement several TODOs in order | `references/batch.md` |
+| `handoff` — skill-only, no CLI command | You create a self-contained batch handoff | `references/handoff.md` |
+| `closeout` — skill-only, no CLI command | You remediate a separately reviewed batch and close its items | `references/closeout.md` |
 | `help` | You need the action list | This table |
 
 `todo ready` and `todo stats` may print a one-line warning on stderr when there are untriaged findings (open findings or unsynced drafts). The warning does not affect stdout. When you see it, run `todo finding candidates` to triage. The warning is silent when there are no findings.

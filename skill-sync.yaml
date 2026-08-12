@@ -3,7 +3,12 @@ sources:
   - name: canonical
     type: git
     url: https://github.com/joeharris76/skill-sync-skills.git
-    ref: 3e337743078a1c766842a9ff0be9bfab100ea535
+    ref: 8c21132f08805cbaea14398d5d842880c4b93d81
+    subdir: skills
+  - name: product
+    type: git
+    url: https://github.com/joeharris76/skill-sync.git
+    ref: 6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa
     subdir: skills
 skills:
   - blog
@@ -26,6 +31,9 @@ targets:
   gemini: .gemini/skills
   antigravity: .antigravity/skills
 install_mode: mirror
+overrides:
+  skill-sync:
+    source_name: product
 config:
   code:
     lint: "uv run ruff check ."

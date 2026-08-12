@@ -1,34 +1,34 @@
 ---
 name: skill-sync
-description: Use when the user asks to "sync skills", "set up skill-sync", "check skill status", "validate skills", "preview skill changes", "diagnose skills", "verify skills", "pin a skill", "unpin a skill", "prune skills", "promote skill changes", or "configure skill settings".
-version: 0.2.0
-tools: Bash, Read, Write, Edit
+description: Use when the user asks to sync, set up, inspect, validate, verify, pin, prune, promote, or configure skills managed by skill-sync.
 ---
 
 # Skill Sync
 
-Read `skill-sync.yaml` at the project root first. It defines sources, skills, targets, and pins. Route to the operation guide below and read the file in the Read column before acting.
+Read the project-root `skill-sync.yaml`, then read
+`references/operations.md` before acting.
+
+## Critical rules
+
+- Resolve the authoritative source before any write: use `source_name` when set;
+  otherwise use the first configured source containing the skill.
+- Never edit a generated target as the source of truth.
+- The `skill-sync` product repository owns its bundled `skills/skill-sync`
+  operator skill. Installed and catalog copies are generated consumers.
+- Stop before sync when managed tracked files are dirty. Review and commit
+  produced tracked changes before unrelated work.
 
 ## Actions
 
 | Action | Read |
 |---|---|
-| `setup` | `references/operations.md` |
-| `sync` | `references/operations.md` |
-| `status` | `references/operations.md` |
-| `validate` | `references/operations.md` |
-| `verify` | `references/operations.md` |
-| `diff` | `references/operations.md` |
-| `doctor` | `references/operations.md` |
-| `pin` | `references/operations.md` |
-| `unpin` | `references/operations.md` |
-| `prune` | `references/operations.md` |
-| `promote` | `references/operations.md` |
-| `settings` | `references/operations.md` |
+| `setup`, `sync`, `status`, `validate`, `verify`, `diff`, `doctor` | `references/operations.md` |
+| `pin`, `unpin`, `prune`, `promote`, `settings` | `references/operations.md` |
 | `help` | this table |
 
-## Rules
+## Flags
 
-- Stop before sync if managed tracked files are dirty. Review and commit produced tracked changes before unrelated work.
-- Never edit generated/materialized copies as the source of truth unless the config says they are authoritative.
-- Global flags: `--json`/`-j`, `--project`/`-p`, `--help`/`-h`. Per-command flags: `--dry-run`/`-n` and `--force`/`-f` for sync, `--exit-code` for validate, `--agent` for settings, `--dry-run` for prune. Use `--force` only when source/destination ownership is known.
+- Global: `--json`/`-j`, `--project`/`-p`, `--help`/`-h`.
+- Sync: `--dry-run`/`-n`, `--force`/`-f`.
+- Validate: `--exit-code`. Settings: `--agent`. Prune: `--dry-run`.
+- Use `--force` only when source and target ownership is known.

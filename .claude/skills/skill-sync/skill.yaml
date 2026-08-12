@@ -4,6 +4,9 @@ tags:
 category: infrastructure
 depends: []
 config_inputs: []
+compatibility:
+  skill-sync:
+    min_version: 0.1.0
 targets:
   claude: true
   codex: true

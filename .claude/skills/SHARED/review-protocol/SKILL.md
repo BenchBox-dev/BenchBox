@@ -7,6 +7,10 @@ description: Shared protocol for review-shaped actions, authorization scope, def
 
 Governs code reviews, audits, research, compare, to-spec, security reviews, and L1/L2/L3 planning-depth layers (including blind-spot audits). If a wrapper conflicts with this file, this file wins.
 
+For an adversarial review, also read
+`references/adversarial-review.md`. The selected domain wrapper supplies its
+own rubric.
+
 ## 1. Scope [REVIEW-AUTH-001]
 
 Review-shaped actions are read-only plus local capture. They may read code, run analyses, produce findings, and write capture files to designated TODO/blind-spot/audit/decision/handoff locations.

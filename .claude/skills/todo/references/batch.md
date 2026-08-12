@@ -73,7 +73,7 @@ Repeat until every item is `done` or `blocked`:
 ## For each ready TODO
 
 1. Mark `in_progress` in the ledger.
-2. Use a fresh pool worktree off the integration branch when you can. If a dependency PR merged since you claimed the worktree, refresh onto the updated branch first.
+2. For implementation work, create and use a fresh linked worktree off the integration branch before editing. Keep the work isolated there, and after the PR or PRs merge, verify the tree is clean and remove that exact linked worktree according to repository policy. Do not assume a retained slot or worktree pool. If a dependency PR merged since you created the worktree, refresh onto the updated branch first.
 3. Run `todo claim <id>` and follow the work order. For each work unit, run
    `todo start`, apply `SHARED/change-framework/SKILL.md` Section 1 before
    source-code edits, implement, then record evidence with `todo done`. Defer
