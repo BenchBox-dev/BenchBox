@@ -51,6 +51,11 @@ def _declared_standalone_only() -> set[str]:
     return set(declared)
 
 
+def _documented_skill_only_actions(text: str) -> set[str]:
+    """Actions routed by the skill rather than either TODO CLI surface."""
+    return set(re.findall(r"\| `([a-z][a-z-]*)` — skill-only", text))
+
+
 def _unknown_commands(text: str, declared: set[str]) -> set[str]:
     """Referenced `todo <cmd>` forms that are neither wrapper handlers nor declared."""
     referenced = set(re.findall(r"`todo ([a-z][a-z-]*)", text))
@@ -349,6 +354,18 @@ class TestSkillThinness:
         # in either direction; the sets must stay disjoint.
         overlap = _declared_standalone_only() & set(todo_db._HANDLERS)
         assert not overlap, f"standalone_only_commands overlaps wrapper handlers: {sorted(overlap)}"
+
+    def test_skill_only_actions_are_not_cli_commands(self):
+        text = _read_skill_package()
+        skill_only = _documented_skill_only_actions(text)
+        expected = {"prioritize", "batch", "handoff", "closeout"}
+        assert expected <= skill_only
+        assert not (_declared_standalone_only() & skill_only)
+        for action in sorted(skill_only):
+            assert not re.search(rf"_project/scripts/todo\s+{action}\b", text), (
+                f"skill-only `{action}` shown as a project-wrapper invocation"
+            )
+            assert not re.search(rf"`todo {action}\b", text), f"skill-only `{action}` shown as a TODO CLI invocation"
 
     def test_undeclared_unsupported_command_is_flagged(self):
         # Without a declaration the boundary must trip — the declaration is the

@@ -9,6 +9,4 @@ category: workflow
 targets:
   claude: true
   codex: true
-standalone_only_commands:
-  batch: 0.9.0
-  closeout: 0.9.0
+standalone_only_commands: {}
