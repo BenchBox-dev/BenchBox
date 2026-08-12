@@ -81,12 +81,43 @@ rollback_started_creation() {
   fi
 }
 
+release_creation_lock() {
+  [ "${creation_lock_owned:-no}" = yes ] || return 0
+
+  if [ ! -e "$creation_lock_dir/pid" ] || [ "$(cat "$creation_lock_dir/pid")" = "$$" ]; then
+    rm -f "$creation_lock_dir/pid"
+    rmdir "$creation_lock_dir" 2>/dev/null ||
+      echo "Rollback warning: could not release worktree-create lock: $creation_lock_dir" >&2
+  fi
+  creation_lock_owned=no
+}
+
+acquire_creation_lock() {
+  if mkdir "$creation_lock_dir" 2>/dev/null; then
+    # mkdir is the ownership handoff. Set the flag before writing the PID so a
+    # signal in this narrow window can still release this process's lock.
+    creation_lock_owned=yes
+    if ! printf '%s\n' "$$" > "$creation_lock_dir/pid"; then
+      release_creation_lock
+      die "Could not record worktree-create lock owner: $creation_lock_dir"
+    fi
+    return 0
+  fi
+
+  lock_pid=$(cat "$creation_lock_dir/pid" 2>/dev/null || true)
+  if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+    die "Refusing: another worktree-create is in progress (pid $lock_pid)"
+  fi
+  die "Refusing: worktree-create lock exists without a live owner; confirm no worktree-create is active, then remove it separately: $creation_lock_dir"
+}
+
 on_exit() {
   status=$?
   trap - EXIT HUP INT TERM
   if [ "$status" -ne 0 ]; then
     rollback_started_creation
   fi
+  release_creation_lock
   exit "$status"
 }
 
@@ -94,6 +125,7 @@ on_signal() {
   status=$1
   trap - EXIT HUP INT TERM
   rollback_started_creation
+  release_creation_lock
   exit "$status"
 }
 
@@ -110,8 +142,17 @@ create_worktree() {
   esac
   git check-ref-format --branch "$branch" >/dev/null || die "Invalid git branch name: $branch"
 
-  primary_clone=$(dirname "$(git_common_dir)")
+  common_dir=$(git_common_dir)
+  primary_clone=$(dirname "$common_dir")
   worktree_path=$(canonical_path "$worktree_input")
+  creation_lock_dir=$common_dir/worktree-create.lock
+  # Serialize the collision checks and git worktree add. This is a short-lived
+  # create transaction lock, not a retained worktree pool or slot reservation.
+  trap on_exit EXIT
+  trap 'on_signal 129' HUP
+  trap 'on_signal 130' INT
+  trap 'on_signal 143' TERM
+  acquire_creation_lock
 
   if git show-ref --verify --quiet "refs/heads/$branch"; then
     die "Local branch already exists: $branch"
@@ -122,13 +163,10 @@ create_worktree() {
 
   git fetch origin develop --quiet
   creation_started=yes
-  trap on_exit EXIT
-  trap 'on_signal 129' HUP
-  trap 'on_signal 130' INT
-  trap 'on_signal 143' TERM
   git worktree add -b "$branch" "$worktree_path" origin/develop
   "$script_dir/set_worktree_identity.sh" "$worktree_path"
   creation_started=no
+  release_creation_lock
   trap - EXIT HUP INT TERM
   printf 'WORKTREE_PATH=%s\n' "$(cd "$worktree_path" && pwd -P)"
 }

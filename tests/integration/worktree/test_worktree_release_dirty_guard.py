@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -182,6 +183,79 @@ exec "{real_git}" "$@"
     assert not linked.exists()
     assert run(["git", "branch", "--list", branch], repo).stdout.strip() == ""
     assert str(linked) not in run(["git", "worktree", "list", "--porcelain"], repo).stdout
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX process and executable shell-wrapper regression test")
+def test_concurrent_worktree_create_cannot_rollback_the_winner(tmp_path: Path) -> None:
+    real_git = shutil.which("git")
+    assert real_git is not None
+    repo = init_repo_with_origin(tmp_path / "BenchBox repo")
+    home = tmp_path / "home"
+    env = make_test_env(home)
+    branch = f"fix/test-worktree-create-race-{tmp_path.name}"
+    linked = tmp_path / "BenchBox race wt"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    add_started = tmp_path / "worktree-add-started"
+    git_wrapper = bin_dir / "git"
+    git_wrapper.write_text(
+        f"""#!/bin/sh
+if [ "${{1:-}}" = worktree ] && [ "${{2:-}}" = add ]; then
+  "{real_git}" "$@"
+  touch "{add_started}"
+  sleep 2
+  exit 0
+fi
+exec "{real_git}" "$@"
+""",
+        encoding="utf-8",
+    )
+    git_wrapper.chmod(0o755)
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
+
+    command = [
+        "make",
+        "-f",
+        str(REPO_ROOT / "Makefile"),
+        "-s",
+        "worktree-create",
+        f"BRANCH={branch}",
+        f"WORKTREE_PATH={linked}",
+    ]
+    winner = subprocess.Popen(command, cwd=repo, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        for _ in range(40):
+            if add_started.exists():
+                break
+            winner.poll()
+            assert winner.returncode is None, winner.communicate()[1]
+            time.sleep(0.05)
+        assert add_started.exists(), "winner did not reach git worktree add"
+
+        loser = subprocess.run(command, cwd=repo, env=env, text=True, capture_output=True, check=False)
+        winner_stdout, winner_stderr = winner.communicate(timeout=10)
+    finally:
+        if winner.poll() is None:
+            winner.kill()
+            winner.communicate()
+
+    assert loser.returncode != 0
+    assert "another worktree-create is in progress" in loser.stderr
+    assert winner.returncode == 0, winner_stderr
+    assert "WORKTREE_PATH=" in winner_stdout
+    assert linked.is_dir()
+    assert run(["git", "symbolic-ref", "--short", "HEAD"], linked).stdout.strip() == branch
+    assert run(["git", "branch", "--list", branch], repo).stdout.strip().lstrip("+ ") == branch
+
+    cleanup = subprocess.run(
+        ["git", "worktree", "remove", "--force", str(linked)],
+        cwd=repo,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert cleanup.returncode == 0, cleanup.stderr
+    subprocess.run(["git", "branch", "-D", branch], cwd=repo, text=True, capture_output=True, check=False)
 
 
 def test_worktree_create_refuses_protected_branch_before_remote_access(tmp_path: Path) -> None:
