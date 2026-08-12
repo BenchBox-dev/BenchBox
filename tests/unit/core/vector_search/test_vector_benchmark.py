@@ -454,6 +454,8 @@ class TestVectorSearchMetrics:
         from benchbox.core.vector_search.metrics import validate_search_result
 
         validate_search_result("Q1", [(1, 0.9), (2, 0.8)])
+        validate_search_result("q1", [(1, 0.9), (2, 0.8)])
+        validate_search_result(" q2 ", [(1, 0.1), (2, 0.2)])
 
     def test_search_result_oracle_rejects_planted_ordering_defect(self):
         from benchbox.core.vector_search.metrics import validate_search_result
@@ -660,6 +662,35 @@ class TestVectorSearchBenchmark:
         iteration = results["queries"]["Q1"]["iterations"][0]
         assert iteration["success"] is False
         assert "similarity results are not descending" in iteration["error"]
+
+    def test_run_benchmark_times_query_before_structural_oracle(self, tmp_path, monkeypatch):
+        from benchbox.core.vector_search import benchmark as vector_benchmark_module
+
+        events: list[str] = []
+
+        class Cursor:
+            def fetchall(self):
+                return [(1, 0.9)]
+
+        class Connection:
+            def execute(self, _sql):
+                return Cursor()
+
+        monkeypatch.setattr(
+            vector_benchmark_module,
+            "elapsed_seconds",
+            lambda _start: events.append("duration") or 0.25,
+        )
+        monkeypatch.setattr(
+            vector_benchmark_module,
+            "validate_search_result",
+            lambda _query_id, _rows: events.append("oracle"),
+        )
+
+        benchmark = vector_benchmark_module.VectorSearchBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        benchmark.run_benchmark(connection=Connection(), queries=["Q1"])
+
+        assert events == ["duration", "oracle"]
 
     def test_get_create_tables_sql_duckdb(self, tmp_path):
         from benchbox.core.vector_search import VectorSearchBenchmark

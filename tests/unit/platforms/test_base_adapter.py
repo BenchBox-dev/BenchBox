@@ -364,6 +364,47 @@ class TestPlatformAdapter:
         assert adapter.connection_pool is None
         assert adapter.dialect is None
 
+    def test_execute_single_query_applies_benchmark_result_oracle(self):
+        """The production adapter path must route opt-in benchmark oracles."""
+
+        class Cursor:
+            def fetchall(self):
+                return [(1, 0.8), (2, 0.9)]
+
+        class Connection:
+            def __init__(self):
+                self.executed_sql: list[str] = []
+
+            def execute(self, sql):
+                self.executed_sql.append(sql)
+                return Cursor()
+
+        class Benchmark:
+            scale_factor = 0.01
+
+            def validate_query_result(self, query_id, rows):
+                assert query_id == "Q1"
+                assert rows == [(1, 0.8), (2, 0.9)]
+                raise ValueError("similarity results are not descending")
+
+        adapter = MockPlatformAdapter()
+        adapter.execute_query = Mock(
+            return_value={
+                "query_id": "Q1",
+                "status": "SUCCESS",
+                "execution_time_seconds": 0.1,
+                "rows_returned": 2,
+            }
+        )
+        connection = Connection()
+
+        result = adapter._execute_single_query(Benchmark(), connection, "Q1", "SELECT ...")
+
+        assert result["status"] == "FAILED"
+        assert result["validation_passed"] is False
+        assert "similarity results are not descending" in result["error"]
+        assert connection.executed_sql == ["SELECT ..."]
+
     def test_external_table_capability_defaults_disabled(self):
         """Base adapter defaults to native tables unless subclasses opt in."""
         adapter = MockPlatformAdapter()

@@ -112,6 +112,10 @@ class VectorSearch(BaseBenchmark):
         """Return all queries in the default (DuckDB) dialect."""
         return self._impl.get_all_queries()
 
+    def validate_query_result(self, query_id: Union[int, str], rows: Any) -> None:
+        """Validate materialized rows returned by a platform adapter."""
+        self._impl.validate_query_result(query_id, rows)
+
     def get_schema(self, dialect: str = "duckdb") -> dict[str, dict]:
         """Return the schema table definitions."""
         return self._impl.get_schema(dialect)

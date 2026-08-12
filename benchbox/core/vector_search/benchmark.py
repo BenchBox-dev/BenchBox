@@ -194,6 +194,16 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
     # Query execution
     # ------------------------------------------------------------------
 
+    def validate_query_result(self, query_id: Union[int, str], rows: Any) -> None:
+        """Validate materialized rows returned by a platform adapter.
+
+        The generic adapter execution path does not call this benchmark's
+        ``run_benchmark`` method. Adapters use this opt-in hook after their
+        timed query execution to apply the same structural oracle to the
+        production CLI/MCP path.
+        """
+        validate_search_result(str(query_id), rows)
+
     def execute_query(
         self,
         query_id: Union[int, str],
@@ -309,8 +319,8 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
                         dialect=dialect,
                         platform_version=platform_version,
                     )
-                    validate_search_result(query_id, result)
                     duration = elapsed_seconds(start)
+                    self.validate_query_result(query_id, result)
                     query_results["iterations"].append(
                         {
                             "iteration": i + 1,

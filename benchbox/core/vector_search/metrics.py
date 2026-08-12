@@ -35,35 +35,36 @@ def validate_search_result(query_id: str, rows: Sequence[Sequence[object]]) -> N
     Raises:
         ValueError: If the result violates the query's published contract.
     """
-    if query_id not in _QUERY_LIMITS:
+    normalized_query_id = str(query_id).strip().upper()
+    if normalized_query_id not in _QUERY_LIMITS:
         raise ValueError(f"Unknown vector-search query: {query_id}")
 
-    limit = _QUERY_LIMITS[query_id]
+    limit = _QUERY_LIMITS[normalized_query_id]
     if len(rows) > limit:
-        raise ValueError(f"{query_id} returned {len(rows)} rows; expected at most {limit}")
+        raise ValueError(f"{normalized_query_id} returned {len(rows)} rows; expected at most {limit}")
 
     seen_ids: set[object] = set()
     metrics: list[float] = []
     for index, row in enumerate(rows):
         if len(row) < 2:
-            raise ValueError(f"{query_id} row {index} has no metric column")
+            raise ValueError(f"{normalized_query_id} row {index} has no metric column")
         row_id = row[0]
         if row_id in seen_ids:
-            raise ValueError(f"{query_id} returned duplicate id {row_id!r}")
+            raise ValueError(f"{normalized_query_id} returned duplicate id {row_id!r}")
         seen_ids.add(row_id)
         try:
             metric = float(row[1])
         except (TypeError, ValueError) as exc:
-            raise ValueError(f"{query_id} row {index} has a non-numeric metric") from exc
+            raise ValueError(f"{normalized_query_id} row {index} has a non-numeric metric") from exc
         if not math.isfinite(metric):
-            raise ValueError(f"{query_id} row {index} has a non-finite metric")
+            raise ValueError(f"{normalized_query_id} row {index} has a non-finite metric")
         metrics.append(metric)
 
     for previous, current in zip(metrics, metrics[1:]):
-        if query_id == _DISTANCE_QUERY and previous > current:
-            raise ValueError(f"{query_id} distance results are not ascending")
-        if query_id != _DISTANCE_QUERY and previous < current:
-            raise ValueError(f"{query_id} similarity results are not descending")
+        if normalized_query_id == _DISTANCE_QUERY and previous > current:
+            raise ValueError(f"{normalized_query_id} distance results are not ascending")
+        if normalized_query_id != _DISTANCE_QUERY and previous < current:
+            raise ValueError(f"{normalized_query_id} similarity results are not descending")
 
 
 def recall_at_k(ground_truth: Sequence[int], approximate: Sequence[int], k: int) -> float:
