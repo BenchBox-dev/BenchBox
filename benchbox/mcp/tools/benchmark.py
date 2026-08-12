@@ -469,7 +469,7 @@ def _execute_mcp_run_via_core(
             database_config=database_config,
             system_profile=system_profile,
             platform_config=platform_config,
-            output_root=results_dir,
+            output_root=benchmark_instance.output_dir,
             phases_to_run=phases,
             adapter_factory=adapter_factory,
             verbosity=SilentVerbosity(),

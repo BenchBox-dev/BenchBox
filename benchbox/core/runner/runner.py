@@ -733,6 +733,10 @@ def _build_run_config_from_options(
         requested_sources=options.get("platform_option_sources"),
         database_options=_database_platform_options(database_config),
     )
+    run_options: dict[str, Any] = {}
+    requested_phases = options.get("requested_phases")
+    if requested_phases:
+        run_options["requested_phases"] = list(requested_phases)
     return RunConfig(
         benchmark=benchmark_config.name,
         query_subset=benchmark_config.queries,
@@ -742,6 +746,7 @@ def _build_run_config_from_options(
         seed=(int(seed_raw) if seed_raw is not None else None),
         platform_options=platform_options or None,
         platform_option_sources=platform_option_sources or None,
+        options=run_options,
         connection={
             "database_path": (platform_config or {}).get("database_path"),
         },

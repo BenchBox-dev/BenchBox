@@ -1019,6 +1019,46 @@ class TestPopulateSqlQueryDetails:
             assert response.get("sql_truncated") is False
 
 
+class TestMcpCoreRunOutputRoots:
+    """MCP data generation and result publication use separate roots."""
+
+    def test_core_run_preserves_constructed_datagen_root(self, tmp_path: Path):
+        from benchbox.mcp.tools import benchmark as benchmark_tools
+
+        datagen_root = tmp_path / "benchmark_runs" / "datagen" / "tpch_sf001"
+        results_root = tmp_path / "benchmark_runs" / "results"
+        benchmark_instance = SimpleNamespace(output_dir=datagen_root)
+        result = SimpleNamespace()
+
+        with (
+            patch.object(benchmark_tools, "get_all_benchmarks", return_value={"tpch": {"display_name": "TPC-H"}}),
+            patch("benchbox.core.system.SystemProfiler") as profiler_cls,
+            patch.object(benchmark_tools, "_export_and_build_payload", return_value=("result.json", {})) as export,
+            patch.object(benchmark_tools, "_attach_summary_charts"),
+            patch("benchbox.core.platform_config.get_platform_config", return_value={}),
+            patch("benchbox.core.run_service.execute_run", return_value=result) as execute,
+        ):
+            profiler_cls.return_value.get_system_profile.return_value = None
+            benchmark_tools._execute_mcp_run_via_core(
+                platform="duckdb",
+                benchmark="tpch",
+                benchmark_class=Mock(return_value=benchmark_instance),
+                scale_factor=0.01,
+                queries=None,
+                phases=["load", "power"],
+                resolved_mode="sql",
+                capture_plans=False,
+                normalized_platform_options={},
+                results_dir=results_root,
+                execution_id="exec-1",
+                start_time=100.0,
+                anonymize=False,
+            )
+
+        assert execute.call_args.kwargs["output_root"] == datagen_root
+        assert export.call_args.args[2] == results_root
+
+
 class TestBenchmarkTiming:
     """Tests for monotonic execution timing in benchmark MCP helpers."""
 
