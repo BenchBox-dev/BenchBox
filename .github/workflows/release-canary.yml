@@ -21,7 +21,9 @@ jobs:
   credential-free-non-fast:
     name: credential-free non-fast canary
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # This suite is intentionally single-threaded. Leave headroom for hosted
+    # runner variance without changing the canary's test coverage.
+    timeout-minutes: 120
     outputs:
       checked_sha: ${{ steps.checked-ref.outputs.checked_sha }}
       collected_count: ${{ steps.collect.outputs.collected_count }}

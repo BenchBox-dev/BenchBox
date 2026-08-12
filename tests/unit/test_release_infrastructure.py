@@ -365,6 +365,9 @@ class TestReleaseInfrastructure:
         }
         assert jobs["credential-free-non-fast"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
         assert jobs["ruleset-drift"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
+        # The non-fast lane is deliberately single-threaded; keep a bounded
+        # amount of headroom for hosted-runner variance.
+        assert jobs["credential-free-non-fast"]["timeout-minutes"] == 120
 
         # pypi-latest-installability must not gate on (or be gated by) the
         # other canary jobs, and must not check out the repo (it installs
