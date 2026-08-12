@@ -6,8 +6,8 @@ reviewed batch. Assume the next session knows only what the prompt states.
 Include these sections in order:
 
 1. **Objective and item set** — batch label, every TODO id, and whether the
-   next action is the standalone skill action `todo batch` or the standalone
-   skill action `todo closeout`; neither is a project-wrapper command.
+   next action is the Todo skill's `batch` action or `closeout` action; neither
+   is a CLI command.
 2. **Tracker preflight** — how to reach the tracker and confirm the intended
    backend before any write.
 3. **Current state** — live PR states, branch names, required checks, and the

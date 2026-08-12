@@ -6,7 +6,7 @@ a command contract. These tests pin that contract:
 
 - the `todo` shim is the single entry point and works from any cwd;
 - the root skill is genuinely thin (line budget) and carries no schema prose;
-- the skill package covers the mandatory workflow verbs and mentions only real commands.
+- the skill package separates wrapper commands, standalone CLI commands, and skill-only actions.
 
 Marked medium (not fast) deliberately: subprocess-driven and the fast lane is
 budget-gated.
@@ -43,7 +43,7 @@ def _read_skill_package() -> str:
     return "\n".join(path.read_text(encoding="utf-8") for path in (SKILL_PATH, *reference_paths))
 
 
-def _declared_standalone_only() -> set[str]:
+def _declared_standalone_cli_commands() -> set[str]:
     """Commands the skill declares as standalone `todo` CLI only (never wrapper)."""
     meta = yaml.safe_load((SKILL_PATH.parent / "skill.yaml").read_text(encoding="utf-8")) or {}
     declared = meta.get("standalone_only_commands") or {}
@@ -51,15 +51,29 @@ def _declared_standalone_only() -> set[str]:
     return set(declared)
 
 
-def _unknown_commands(text: str, declared: set[str]) -> set[str]:
-    """Referenced `todo <cmd>` forms that are neither wrapper handlers nor declared."""
+def _declared_skill_only_actions() -> set[str]:
+    """Skill orchestration actions explicitly marked as having no CLI command."""
+    text = SKILL_PATH.read_text(encoding="utf-8")
+    return set(re.findall(r"\| `([a-z][a-z-]*)` — skill-only, no CLI command \|", text))
+
+
+def _critical_rule_skill_only_actions() -> set[str]:
+    """Skill-only actions exempted from the wrapper-help requirement."""
+    text = SKILL_PATH.read_text(encoding="utf-8")
+    match = re.search(r"Skill-only actions: ([^;]+);", text)
+    assert match, "skill package must exempt skill-only actions from the wrapper-help rule"
+    return set(re.findall(r"`([a-z][a-z-]*)`", match.group(1)))
+
+
+def _unknown_cli_commands(text: str, standalone: set[str]) -> set[str]:
+    """Referenced `todo <cmd>` forms that are neither wrapper nor standalone CLI commands."""
     referenced = set(re.findall(r"`todo ([a-z][a-z-]*)", text))
     # `finding` is dispatched by name (not via _HANDLERS) so todo_db never
     # references a todo_findings symbol at load time. `doctor` is also outside
     # _HANDLERS: main routes it before open/dispatch so it can diagnose an
     # unreachable backend. Both are real CLI verbs consumers may document.
     real = set(todo_db._HANDLERS) | {"finding", "doctor"}
-    return referenced - real - declared
+    return referenced - real - standalone
 
 
 def _load_script():
@@ -334,35 +348,45 @@ class TestSkillThinness:
             "rules belong in the CLI/DB, not the skill"
         )
 
-    def test_skill_references_only_real_or_declared_commands(self):
+    def test_skill_references_only_real_or_declared_cli_commands(self):
         text = _read_skill_package()
         referenced = set(re.findall(r"`todo ([a-z][a-z-]*)", text))
         assert referenced, "skill package must reference `todo <command>` forms"
-        unknown = _unknown_commands(text, _declared_standalone_only())
+        unknown = _unknown_cli_commands(text, _declared_standalone_cli_commands())
         assert not unknown, (
-            "skill package references commands that are neither wrapper handlers "
-            f"nor declared standalone-only: {sorted(unknown)}"
+            "skill package presents actions as CLI commands that are neither wrapper handlers "
+            f"nor declared standalone CLI commands: {sorted(unknown)}"
         )
 
-    def test_declared_standalone_commands_are_not_wrapper_handlers(self):
-        # Declaring a wrapper-supported verb standalone-only would mask drift
-        # in either direction; the sets must stay disjoint.
-        overlap = _declared_standalone_only() & set(todo_db._HANDLERS)
-        assert not overlap, f"standalone_only_commands overlaps wrapper handlers: {sorted(overlap)}"
+    def test_action_capability_classes_are_disjoint(self):
+        wrapper_commands = set(todo_db._HANDLERS) | {"finding", "doctor"}
+        standalone_commands = _declared_standalone_cli_commands()
+        skill_actions = _declared_skill_only_actions()
+        assert skill_actions, "skill package must declare its skill-only actions"
+        assert not (wrapper_commands & standalone_commands), "standalone CLI commands overlap wrapper handlers"
+        assert not (wrapper_commands & skill_actions), "skill-only actions overlap wrapper handlers"
+        assert not (standalone_commands & skill_actions), "skill-only actions overlap standalone CLI commands"
+
+    def test_skill_only_actions_are_exempted_from_wrapper_help(self):
+        assert _critical_rule_skill_only_actions() == _declared_skill_only_actions()
 
     def test_undeclared_unsupported_command_is_flagged(self):
         # Without a declaration the boundary must trip — the declaration is the
-        # only sanctioned way to document a wrapper-unsupported verb.
-        assert _unknown_commands("run `todo frobnicate` then stop", set()) == {"frobnicate"}
+        # only sanctioned way to document a wrapper-unsupported CLI verb.
+        assert _unknown_cli_commands("run `todo frobnicate` then stop", set()) == {"frobnicate"}
         # update is a real wrapper handler; it must not be flagged as unknown
         # when the declared standalone set is empty.
-        assert _unknown_commands("`todo update <id>` corrects items", set()) == set()
+        assert _unknown_cli_commands("`todo update <id>` corrects items", set()) == set()
 
-    def test_standalone_only_commands_never_presented_as_wrapper_invocations(self):
+    def test_skill_only_action_presented_as_cli_command_is_flagged(self):
+        assert "batch" in _declared_skill_only_actions()
+        assert _unknown_cli_commands("run `todo batch`", set()) == {"batch"}
+
+    def test_standalone_cli_commands_never_presented_as_wrapper_invocations(self):
         # A declared verb must never appear as a project-wrapper invocation and
         # every documented use must carry standalone gating language nearby.
         text = _read_skill_package()
-        for command in sorted(_declared_standalone_only()):
+        for command in sorted(_declared_standalone_cli_commands()):
             assert not re.search(rf"_project/scripts/todo\s+{command}\b", text), (
                 f"standalone-only `{command}` shown as a project-wrapper invocation"
             )
@@ -374,6 +398,13 @@ class TestSkillThinness:
                 assert "standalone" in window, (
                     f"`todo {command}` reference at package line {index + 1} lacks standalone gating language"
                 )
+
+    def test_skill_only_actions_never_presented_as_cli_commands(self):
+        text = _read_skill_package()
+        for action in sorted(_declared_skill_only_actions()):
+            assert not re.search(rf"\btodo\s+{action}\b", text), (
+                f"skill-only action `{action}` is presented as a CLI command"
+            )
 
     def test_skill_covers_required_workflow(self):
         text = _read_skill_package()
