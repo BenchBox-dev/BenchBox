@@ -17,6 +17,10 @@
 services:
   clickhouse:
     image: clickhouse/clickhouse-server:25.8
+    # The calibration-selected envelope is supplied by the caller. Do not
+    # add a default here: an unset or malformed request must fail admission
+    # instead of silently recreating the old 1 GiB engine fallback.
+    mem_limit: ${CLICKHOUSE_MEMORY_LIMIT}
     environment:
       CLICKHOUSE_DB: default
       CLICKHOUSE_PASSWORD: benchbox

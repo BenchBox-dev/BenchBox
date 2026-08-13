@@ -109,6 +109,12 @@ class PreflightConfig:
     # `.available` reading captured during a real memory-starved incident,
     # and record any change against a measured `.available` figure.
     free_memory_min_gib: float = 2.0
+    # Calibrated ClickHouse server compose request. This is resolved into
+    # CLICKHOUSE_MEMORY_LIMIT for managed starts; it is not a 1 GiB fallback.
+    # Operators may override it explicitly for a separately measured rung.
+    clickhouse_memory_limit: str = "4g"
+    # Host memory kept available in addition to requested VM/container bytes.
+    docker_memory_reserve_gib: float = 2.0
 
 
 @dataclass(frozen=True)
@@ -358,6 +364,13 @@ def _require_bool(payload: dict[str, Any], key: str, *, default: bool, section: 
     return value
 
 
+def _require_nonempty_string(payload: dict[str, Any], key: str, *, default: str, section: str) -> str:
+    value = payload.get(key, default)
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"`{section}.{key}` must be a non-empty string")
+    return value.strip()
+
+
 def _as_string_tuple(value: Any, *, section: str, key: str) -> tuple[str, ...]:
     if value is None:
         return ()
@@ -579,6 +592,8 @@ def _validate_preflight(payload: dict[str, Any] | None) -> PreflightConfig:
                 "noisy_neighbor_warn_load",
                 "local_platforms_check",
                 "free_memory_min_gib",
+                "clickhouse_memory_limit",
+                "docker_memory_reserve_gib",
             }
         ),
         "preflight",
@@ -605,6 +620,18 @@ def _validate_preflight(payload: dict[str, Any] | None) -> PreflightConfig:
         free_memory_min_gib=_require_nonnegative_float(
             payload,
             "free_memory_min_gib",
+            default=2.0,
+            section="preflight",
+        ),
+        clickhouse_memory_limit=_require_nonempty_string(
+            payload,
+            "clickhouse_memory_limit",
+            default="4g",
+            section="preflight",
+        ),
+        docker_memory_reserve_gib=_require_nonnegative_float(
+            payload,
+            "docker_memory_reserve_gib",
             default=2.0,
             section="preflight",
         ),

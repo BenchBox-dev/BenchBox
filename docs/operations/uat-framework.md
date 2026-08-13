@@ -843,6 +843,40 @@ calibration step. The subsequent compose-admission TODO consumes a selected
 rung only after this trace review and separately verifies the runtime limit and
 host reserve.
 
+### ClickHouse managed-stack admission
+
+ClickHouse is the exception to the generic "declared limit or engine default"
+diagnostic above. Its managed UAT compose file requires the caller to resolve
+`preflight.clickhouse_memory_limit` (default `4g`, the calibration-selected
+SF1 rung) into `CLICKHOUSE_MEMORY_LIMIT`; the compose file has no `:-1g` or
+other fallback. A missing, empty, or malformed request is an admission error
+before `compose up`, never a reason to recreate the historical 1 GiB batch.
+An operator override is allowed only when it names a separately measured
+calibration rung and is recorded with the run evidence.
+
+The host reserve is configured independently as
+`preflight.docker_memory_reserve_gib` (default `2.0`). For ClickHouse the
+pre-start requirement is the selected request plus that reserve, compared
+with the same `virtual_memory().available` metric used by the generic gate.
+After startup UAT also runs a no-stream runtime-stats query, requires an
+explicit container memory limit, and requires it to equal the selected
+request exactly. It then repeats the host-available check. Unknown runtime
+limits or unavailable post-start host memory fail the ClickHouse platform
+closed; UAT does not infer a limit from total RAM, engine defaults, or a
+driver batch size. The existing `free_memory_min_gib: 0` setting remains an
+explicit, supervised opt-out of the pre-start floor, but it does not permit
+an unverified ClickHouse runtime limit or post-start reserve shortfall.
+
+For a direct operator compose check, export the selected rung explicitly:
+
+```bash
+CLICKHOUSE_MEMORY_LIMIT=4g docker compose -f docker/clickhouse/docker-compose.yml config
+```
+
+The UAT harness passes the same environment to `up`, readiness, runtime
+stats, and teardown, so every lifecycle action is tied to one request and
+cannot silently fall back to a 1 GiB setting.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |

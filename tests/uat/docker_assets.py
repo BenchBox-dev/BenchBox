@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import json
 import os
 import re
 import shlex
@@ -69,6 +70,125 @@ CONTAINER_CLI_ENV_VAR = "BENCHBOX_CONTAINER_CLI"
 
 class DockerAssetError(ValueError):
     """Raised when a UAT Docker lifecycle request is unsafe or unsupported."""
+
+
+CLICKHOUSE_MEMORY_LIMIT_ENV_VAR = "CLICKHOUSE_MEMORY_LIMIT"
+_MEMORY_VALUE_RE = re.compile(r"^\s*(?P<value>[0-9]+(?:\.[0-9]+)?)\s*(?P<unit>[KMGTPE]?i?B?)\s*$", re.IGNORECASE)
+_MEMORY_UNITS = {
+    "": 1,
+    "b": 1,
+    "k": 1000,
+    "kb": 1000,
+    "ki": 1024,
+    "kib": 1024,
+    "m": 1000**2,
+    "mb": 1000**2,
+    "mi": 1024**2,
+    "mib": 1024**2,
+    "g": 1000**3,
+    "gb": 1000**3,
+    "gi": 1024**3,
+    "gib": 1024**3,
+    "t": 1000**4,
+    "tb": 1000**4,
+    "ti": 1024**4,
+    "tib": 1024**4,
+}
+
+
+def parse_memory_bytes(value: str) -> int:
+    """Parse a positive Docker memory value without inventing a default."""
+    if not isinstance(value, str):
+        raise DockerAssetError(f"memory limit must be a string, got {type(value).__name__}")
+    match = _MEMORY_VALUE_RE.fullmatch(value)
+    if match is None:
+        raise DockerAssetError(f"invalid memory limit {value!r}; use a positive value such as 4g or 4096MiB")
+    try:
+        amount = float(match.group("value"))
+    except (OverflowError, ValueError) as exc:
+        raise DockerAssetError(f"invalid memory limit {value!r}; use a positive value such as 4g or 4096MiB") from exc
+    unit = match.group("unit").lower()
+    multiplier = _MEMORY_UNITS.get(unit)
+    if multiplier is None or amount <= 0:
+        raise DockerAssetError(f"invalid memory limit {value!r}; use a positive value such as 4g or 4096MiB")
+    try:
+        size = int(amount * multiplier)
+    except (OverflowError, ValueError) as exc:
+        raise DockerAssetError(f"invalid memory limit {value!r}; use a positive value such as 4g or 4096MiB") from exc
+    if size <= 0:
+        raise DockerAssetError(f"invalid memory limit {value!r}; use a positive value such as 4g or 4096MiB")
+    return size
+
+
+def resolve_clickhouse_memory_limit(
+    configured: str | None = None, *, env: dict[str, str] | None = None
+) -> tuple[str, int]:
+    """Resolve and validate the calibrated ClickHouse memory request.
+
+    Environment wins over config; missing or malformed input fails before compose, with no 1 GiB fallback.
+    """
+    environment = os.environ if env is None else env
+    value = (
+        environment[CLICKHOUSE_MEMORY_LIMIT_ENV_VAR] if CLICKHOUSE_MEMORY_LIMIT_ENV_VAR in environment else configured
+    )
+    if value is None or not str(value).strip():
+        raise DockerAssetError(
+            f"{CLICKHOUSE_MEMORY_LIMIT_ENV_VAR} is required for ClickHouse server UAT; "
+            "set the measured calibration rung explicitly"
+        )
+    if not isinstance(value, str):
+        raise DockerAssetError(f"memory limit must be a string, got {type(value).__name__}")
+    normalized = value.strip()
+    return normalized, parse_memory_bytes(normalized)
+
+
+def compose_stats_command(spec: DockerPlatformSpec, project_name: str) -> list[str]:
+    """Build a portable no-stream stats command for the first compose service."""
+    if not spec.services:
+        raise DockerAssetError(f"Platform {spec.platform!r} has no compose services to inspect")
+    return [
+        resolve_container_cli(),
+        "stats",
+        "--no-stream",
+        "--format",
+        "{{json .}}",
+        f"{project_name}-{spec.services[0]}-1",
+    ]
+
+
+def parse_runtime_memory_limit(text: str) -> int | None:
+    """Extract the runtime memory limit from Docker or Mocker stats output."""
+    usage: str | None = None
+    limit: str | None = None
+    for line in text.splitlines():
+        candidate = line.strip()
+        if not candidate:
+            continue
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, list):
+            payload = payload[0] if payload else None
+        if isinstance(payload, dict):
+            usage = payload.get("MemUsage") or payload.get("MemUsageBytes") or payload.get("memory_usage")
+            limit = payload.get("MemLimit") or payload.get("MemLimitBytes") or payload.get("memory_limit")
+            if limit is None and isinstance(usage, str) and "/" in usage:
+                _, limit = usage.split("/", 1)
+            if limit is not None:
+                try:
+                    return parse_memory_bytes(str(limit).strip())
+                except DockerAssetError:
+                    return None
+        if candidate.upper().startswith(("CONTAINER ID", "NAME")):
+            continue
+        table_match = re.search(r"(?P<usage>\S+\s*/\s*(?P<limit>\S+))", candidate)
+        if table_match:
+            try:
+                return parse_memory_bytes(table_match.group("limit"))
+            except DockerAssetError:
+                return None
+    return None
 
 
 def _which_container_cli(cli: str) -> str | None:
@@ -747,18 +867,24 @@ def compose_ps_unhealthy_services(ps_stdout: str) -> tuple[str, ...]:
     return tuple(unhealthy)
 
 
-def compose_declared_memory_limits(spec: DockerPlatformSpec) -> dict[str, str]:
+def _resolve_compose_memory_value(value: object, *, env: dict[str, str] | None) -> str:
+    raw = str(value).strip()
+    match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", raw)
+    if match is None:
+        return raw
+    environment = os.environ if env is None else env
+    resolved = environment.get(match.group(1))
+    if not resolved:
+        raise DockerAssetError(f"compose memory variable {match.group(1)!r} is not set")
+    return resolved.strip()
+
+
+def compose_declared_memory_limits(spec: DockerPlatformSpec, *, env: dict[str, str] | None = None) -> dict[str, str]:
     """Return {service: declared-memory-limit} for services with an explicit compose memory cap.
 
-    Reads `mem_limit` or `deploy.resources.limits.memory` straight from the
-    compose YAML -- static configuration, not a live container inspect (mocker
-    and docker do not expose a portable "runtime cgroup limit" query). Most
-    UAT compose files declare no limit at all (e.g.
-    docker/cedardb/docker-compose.yml): the 2026-08-04 postmortem's "Running
-    under cgroup memory limit: 1024 MB" for CedarDB was the CONTAINER ENGINE's
-    own default sizing, not anything this repo's compose files requested --
-    logged as "no declared memory limit (engine default)" by callers in that
-    case (see execute.py's per-platform-boundary memory gate logging, w3).
+    Reads `mem_limit` or `deploy.resources.limits.memory` from the compose
+    YAML. Missing declarations remain distinct from runtime engine defaults;
+    callers log that distinction rather than inferring a cgroup limit.
     """
     limits: dict[str, str] = {}
     for compose_file in spec.compose_files:
@@ -774,7 +900,7 @@ def compose_declared_memory_limits(spec: DockerPlatformSpec) -> dict[str, str]:
                 continue
             mem_limit = service.get("mem_limit")
             if mem_limit:
-                limits[str(name)] = str(mem_limit)
+                limits[str(name)] = _resolve_compose_memory_value(mem_limit, env=env)
                 continue
             deploy = service.get("deploy")
             resources = deploy.get("resources") if isinstance(deploy, dict) else None
@@ -791,7 +917,7 @@ def compose_declared_memory_limits(spec: DockerPlatformSpec) -> dict[str, str]:
             limits_block = resources.get("limits") if isinstance(resources, dict) else None
             declared = limits_block.get("memory") if isinstance(limits_block, dict) else None
             if declared:
-                limits[str(name)] = str(declared)
+                limits[str(name)] = _resolve_compose_memory_value(declared, env=env)
     return limits
 
 
@@ -865,6 +991,7 @@ def compose_environment(
     spec: DockerPlatformSpec,
     *,
     benchmark_runs_dir: Path | str | None = None,
+    memory_limit: str | None = None,
 ) -> dict[str, str]:
     """Return environment overrides needed by a compose spec.
 
@@ -893,8 +1020,12 @@ def compose_environment(
     should catch DockerAssetError and substitute a throwaway absolute value
     rather than skip this validation.
     """
+    environment: dict[str, str] = {}
+    if spec.platform == "clickhouse-server":
+        resolved, _ = resolve_clickhouse_memory_limit(memory_limit)
+        environment[CLICKHOUSE_MEMORY_LIMIT_ENV_VAR] = resolved
     if spec.platform not in {"lakesail", "velox"}:
-        return {}
+        return environment
     if benchmark_runs_dir is None:
         raise DockerAssetError(
             f"benchmark_runs_dir is required for platform {spec.platform!r} -- its compose "
@@ -912,7 +1043,8 @@ def compose_environment(
             "at the SAME absolute path inside the container as on the host, so a relative "
             "value can never match. Pass an absolute benchmark_runs_dir / --benchmark-runs-dir."
         )
-    return {"BENCHBOX_DATA_DIR": str(data_dir)}
+    environment["BENCHBOX_DATA_DIR"] = str(data_dir)
+    return environment
 
 
 _FORBIDDEN_PRUNE_VERBS: frozenset[tuple[str, str]] = frozenset(
