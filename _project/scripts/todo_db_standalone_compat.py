@@ -453,6 +453,11 @@ def _canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True) + "\n"
 
 
+def _canonical_lossless_json(value: Any) -> str:
+    """Match the locked package's lossless export serialization exactly."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+
+
 def _atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
@@ -491,7 +496,7 @@ def _write_legacy_export(
     events_path = output_dir / "events.jsonl"
     index_path = output_dir / "index.md"
     items = _item_rows(envelope)
-    _atomic_write(lossless_path, _canonical_json(envelope))
+    _atomic_write(lossless_path, _canonical_lossless_json(envelope))
     _atomic_write(items_path, "".join(_canonical_json(item) for item in items))
     events = sorted((dict(row) for row in envelope.get("events") or []), key=lambda row: row["seq"])
     _atomic_write(events_path, "".join(_canonical_json(event) for event in events))
@@ -503,8 +508,26 @@ def _write_legacy_export(
 
 
 def _export(argv: list[str], cwd: Path) -> int:
-    if any(value in {"-h", "--help", "--version"} for value in argv):
+    if any(value in {"-h", "--help"} for value in argv):
+        print(
+            "usage: todo export [-h] [--out DIRECTORY] [--lossless-out DIRECTORY]\n\n"
+            "Write deterministic compatibility views and a separate lossless recovery envelope.\n\n"
+            "options:\n"
+            "  -h, --help            show this help message and exit\n"
+            "  --out DIRECTORY       compatibility-view directory (default: .todo-db/export)\n"
+            "  --lossless-out DIRECTORY\n"
+            "                        lossless recovery-envelope directory"
+        )
+        return 0
+    if "--version" in argv:
         return _forward_result(_delegate(argv, command="export", cwd=cwd))
+    if _has_option(argv, "--output"):
+        print(
+            "error: BenchBox compatibility export uses --out DIRECTORY; "
+            "use --lossless-out DIRECTORY to place the recovery envelope",
+            file=sys.stderr,
+        )
+        return 2
     out_dir, without_out = _option_value(argv, "--out")
     # The lossless envelope is written outside --out (the committed snapshot);
     # --lossless-out relocates it, e.g. to a CI artifact staging directory.

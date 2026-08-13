@@ -275,8 +275,10 @@ def test_export_writes_lossless_envelope_and_legacy_views(monkeypatch: pytest.Mo
 
     # The lossless envelope is the recovery artifact -- complete, and OUTSIDE the
     # committed snapshot directory.
-    lossless = json.loads((lossless_dir / "todo-db.json").read_text(encoding="utf-8"))
+    lossless_text = (lossless_dir / "todo-db.json").read_text(encoding="utf-8")
+    lossless = json.loads(lossless_text)
     assert lossless == envelope
+    assert lossless_text == json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
     assert not (output_dir / "todo-db.json").exists()
     item = json.loads((output_dir / "items.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert item["work"][0]["wid"] == "w0"
@@ -285,6 +287,36 @@ def test_export_writes_lossless_envelope_and_legacy_views(monkeypatch: pytest.Mo
     # leftover from a separate main-path export.
     events = [json.loads(line) for line in (output_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()]
     assert events == envelope["events"]
+
+
+def test_export_help_describes_the_compatibility_contract(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setattr(
+        compat,
+        "_delegate",
+        lambda *args, **kwargs: pytest.fail("export help must not delegate to the package contract"),
+    )
+
+    assert compat.main(["export", "--help"]) == 0
+
+    captured = capsys.readouterr()
+    assert "--out DIRECTORY" in captured.out
+    assert "--lossless-out DIRECTORY" in captured.out
+    assert "--output" not in captured.out
+
+
+def test_export_rejects_the_package_output_option_with_compatibility_guidance(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "export", "--output", "snapshot.json"]) == 2
+
+    captured = capsys.readouterr()
+    assert "uses --out DIRECTORY" in captured.err
+    assert "--lossless-out DIRECTORY" in captured.err
 
 
 def test_export_lossless_envelope_defaults_outside_the_committed_snapshot(
