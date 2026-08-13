@@ -1,8 +1,7 @@
-"""Contract tests for the opt-in BenchBox to standalone CLI adapter."""
+"""Contract tests for the package-only BenchBox CLI adapter."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import sys
@@ -127,9 +126,14 @@ def test_required_legacy_commands_are_routable(monkeypatch: pytest.MonkeyPatch, 
 
     def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
         calls.append(command)
-        return CompletedProcess(argv, 0, stdout="", stderr="")
+        return CompletedProcess(argv, 0, stdout="{}\n" if command == "stats" else "", stderr="")
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setattr(
+        compat,
+        "_delegate_extension",
+        lambda argv, *, cwd: CompletedProcess(argv, 0, stdout='{"events": {}, "stale": false}\n', stderr=""),
+    )
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
     target = tmp_path / "todo.sqlite"
     target.touch()
@@ -158,7 +162,9 @@ def test_destructive_standalone_only_commands_are_not_routable() -> None:
     assert compat._command_index(["audit", "verify"]) == (0, "audit")
 
 
-def test_missing_db_is_pinned_to_benchbox_database(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_missing_db_refuses_implicit_fork_database(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     calls: list[list[str]] = []
 
     def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
@@ -169,8 +175,9 @@ def test_missing_db_is_pinned_to_benchbox_database(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
     monkeypatch.delenv("TODO_DB_PATH", raising=False)
     monkeypatch.delenv("TODO_DB_URL", raising=False)
-    assert compat.main(["show", "item"]) == 0
-    assert calls[0][:2] == ["--db", str(tmp_path / ".todo-db" / "todo.sqlite")]
+    assert compat.main(["show", "item"]) == 2
+    assert calls == []
+    assert "refusing to create fork DB" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
@@ -197,7 +204,7 @@ def test_database_environment_is_left_for_standalone_cli(
 def test_missing_binary_fails_cleanly(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys) -> None:
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
     monkeypatch.setenv("BENCHBOX_TODO_DB_COMMAND", "definitely-not-a-real-todo-db-command")
-    assert compat.main(["show", "item"]) == 2
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "show", "item"]) == 2
     assert "standalone todo-db command not found" in capsys.readouterr().err
 
 
@@ -217,7 +224,7 @@ def test_broken_pipe_is_a_clean_exit(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
     monkeypatch.setattr(compat, "_delegate", lambda *args, **kwargs: CompletedProcess([], 0, stdout="ok", stderr=""))
     monkeypatch.setattr(compat.sys.stdout, "write", lambda value: (_ for _ in ()).throw(BrokenPipeError()))
-    assert compat.main(["show", "item"]) == 0
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "show", "item"]) == 0
 
 
 def test_no_command_output_redacts_both_token_names(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys) -> None:
@@ -396,21 +403,6 @@ def test_yaml_import_defaults_are_explicit_benchbox_paths(monkeypatch: pytest.Mo
     assert argv[argv.index("--done-dir") + 1] == str(tmp_path / "_project" / "DONE")
 
 
-def test_legacy_entrypoint_only_routes_when_explicitly_enabled(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    path = Path(__file__).resolve().parents[3] / "_project" / "scripts" / "todo_db.py"
-    spec = importlib.util.spec_from_file_location("benchbox_todo_db_entrypoint_test", path)
-    assert spec is not None and spec.loader is not None
-    entrypoint = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(entrypoint)
-    calls: list[list[str] | None] = []
-
-    monkeypatch.setattr(compat, "main", lambda argv=None: calls.append(argv) or 17)
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
-
-    assert entrypoint.main(["--db", str(tmp_path / "todo.sqlite"), "stats"]) == 17
-    assert calls == [["--db", str(tmp_path / "todo.sqlite"), "stats"]]
-
-
 @pytest.mark.parametrize(
     "command",
     [
@@ -433,14 +425,9 @@ def test_standalone_030_verbs_are_routable_through_shim(
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     # Provide explicit DB so shim does not refuse fork-DB path
     assert compat.main(["--db", str(tmp_path / "todo.sqlite"), command]) == 0
-    # finding/doctor are not in COMMANDS — they route via command="" delegation path
-    if command in compat.COMMANDS:
-        assert calls == [command]
-    else:
-        assert calls == [""]
+    assert calls == [command]
 
 
 def test_scope_update_translates_to_package_update(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -452,7 +439,6 @@ def test_scope_update_translates_to_package_update(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
 
     assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "scope-update", "item", "--reason", "boundary"]) == 0
     assert calls[-1][1] == "update"
@@ -477,7 +463,6 @@ def test_missing_package_commands_use_extension_path(
         lambda *args, **kwargs: pytest.fail("package CLI must not receive a command it does not expose"),
     )
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
 
     assert compat.main(["--db", str(tmp_path / "todo.sqlite"), command]) == 0
     assert len(calls) == 1
@@ -499,7 +484,6 @@ def test_explicit_missing_local_read_target_is_initialized(monkeypatch: pytest.M
         lambda argv, *, cwd: CompletedProcess(argv, 0, stdout='{"events": {}, "stale": false}\n', stderr=""),
     )
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     target = tmp_path / "missing.sqlite"
 
     assert compat.main(["--db", str(target), "stats"]) == 0
@@ -507,7 +491,7 @@ def test_explicit_missing_local_read_target_is_initialized(monkeypatch: pytest.M
 
 
 @pytest.mark.parametrize(
-    ("argv", "stdout"), [(["stats", "--help"], "stats help\n"), (["--version", "stats"], "todo-db 0.3.1\n")]
+    ("argv", "stdout"), [(["stats", "--help"], "stats help\n"), (["--version", "stats"], "todo-db 0.3.2\n")]
 )
 def test_stats_metadata_skips_activity_lookup(
     monkeypatch: pytest.MonkeyPatch,
@@ -527,7 +511,6 @@ def test_stats_metadata_skips_activity_lookup(
         lambda *args, **kwargs: pytest.fail("metadata-only stats must not open the database"),
     )
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
 
     assert compat.main(argv) == 0
     assert capsys.readouterr().out == stdout
@@ -551,7 +534,6 @@ def test_existing_local_init_checks_freeze_before_package_command(
     monkeypatch.setattr(compat, "_delegate_extension", fake_extension)
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
 
     assert compat.main(["--db", str(target), "init"]) == 0
     assert calls == ["freeze-guard", "init"]
@@ -568,7 +550,6 @@ def test_renew_stops_when_freeze_guard_rejects(monkeypatch: pytest.MonkeyPatch, 
 
     monkeypatch.setattr(compat, "_delegate_extension", fake_extension)
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
 
     assert compat.main(["--db", str(target), "renew", "item"]) == 2
     assert calls == ["freeze-guard"]
@@ -607,7 +588,6 @@ def test_ready_and_stats_findings_banners_are_stderr_only(
     expected_banner: str,
 ) -> None:
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     monkeypatch.setattr(
         compat,
         "_delegate",
@@ -657,7 +637,6 @@ def test_standalone_offline_finding_commands_do_not_require_db(
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     monkeypatch.delenv("TODO_DB_PATH", raising=False)
     monkeypatch.delenv("TODO_DB_URL", raising=False)
 
@@ -670,7 +649,6 @@ def test_standalone_offline_finding_commands_do_not_require_db(
 def test_standalone_finding_sync_still_requires_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Database-backed finding sync must remain fail-closed without a backend."""
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     monkeypatch.delenv("TODO_DB_PATH", raising=False)
     monkeypatch.delenv("TODO_DB_URL", raising=False)
     assert compat.main(["finding", "sync"]) == 2
@@ -695,7 +673,6 @@ def test_standalone_finding_sync_still_requires_db(monkeypatch: pytest.MonkeyPat
 def test_env_passthrough_includes_finding_drafts_and_ro_token(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """w4: TODO_DB_FINDING_DRAFTS_DIR and TODO_DB_RO_AUTH_TOKEN are forwarded via _delegate env."""
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     monkeypatch.setenv("TODO_DB_FINDING_DRAFTS_DIR", "/tmp/drafts")
     monkeypatch.setenv("TODO_DB_RO_AUTH_TOKEN", "ro-secret-xyz")
 
@@ -710,7 +687,7 @@ def test_env_passthrough_includes_finding_drafts_and_ro_token(monkeypatch: pytes
             }
         )
         if "--version" in cmd:
-            return CompletedProcess(cmd, 0, stdout="todo-db 1.0.0\n", stderr="")
+            return CompletedProcess(cmd, 0, stdout="todo-db 0.3.2\n", stderr="")
         return CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(compat.subprocess, "run", fake_run)
@@ -723,7 +700,6 @@ def test_env_passthrough_includes_finding_drafts_and_ro_token(monkeypatch: pytes
 def test_finding_sync_defaults_to_benchbox_drafts_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Standalone finding sync must read the same drafts directory as BenchBox."""
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     monkeypatch.setenv("TODO_DB_COMMAND", "todo-db")
     monkeypatch.setenv("TODO_DB_PATH", str(tmp_path / "todo.sqlite"))
     monkeypatch.delenv("TODO_DB_FINDING_DRAFTS_DIR", raising=False)
@@ -733,7 +709,7 @@ def test_finding_sync_defaults_to_benchbox_drafts_dir(monkeypatch: pytest.Monkey
     def fake_run(cmd, *, cwd, env, capture_output, text, check):
         captured.update({"TODO_DB_FINDING_DRAFTS_DIR": env["TODO_DB_FINDING_DRAFTS_DIR"]})
         if "--version" in cmd:
-            return CompletedProcess(cmd, 0, stdout="todo-db 1.0.0\n", stderr="")
+            return CompletedProcess(cmd, 0, stdout="todo-db 0.3.2\n", stderr="")
         return CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(compat.subprocess, "run", fake_run)
@@ -744,9 +720,8 @@ def test_finding_sync_defaults_to_benchbox_drafts_dir(monkeypatch: pytest.Monkey
 
 
 def test_standalone_doctor_without_db_diagnoses_not_refuse(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """w5: standalone doctor without DB diagnoses, not exit-2 refusal; legacy doctor works."""
+    """Doctor without DB diagnoses rather than taking the package-only refusal path."""
     monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
-    monkeypatch.setenv("BENCHBOX_TODO_DB_STANDALONE", "1")
     monkeypatch.delenv("TODO_DB_PATH", raising=False)
     monkeypatch.delenv("TODO_DB_URL", raising=False)
     # Remove config.json if present
@@ -759,16 +734,4 @@ def test_standalone_doctor_without_db_diagnoses_not_refuse(monkeypatch: pytest.M
         return CompletedProcess(argv, 0, stdout="doctor OK no-backend-configured\n", stderr="")
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
-    assert compat.main(["doctor"]) == 0
-
-    # legacy (no standalone) should still route doctor via --db pin, not refuse
-    monkeypatch.delenv("BENCHBOX_TODO_DB_STANDALONE", raising=False)
-
-    def fake_delegate_legacy(
-        argv: list[str], *, command: str, cwd: Path, capture: bool = True
-    ) -> CompletedProcess[str]:
-        assert "--db" in argv
-        return CompletedProcess(argv, 0, stdout="legacy doctor\n", stderr="")
-
-    monkeypatch.setattr(compat, "_delegate", fake_delegate_legacy)
     assert compat.main(["doctor"]) == 0

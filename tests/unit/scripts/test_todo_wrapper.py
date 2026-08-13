@@ -1,4 +1,4 @@
-"""Contract tests for the thin TODO wrapper (shim + skill) around todo_db.py.
+"""Contract tests for the thin TODO wrapper and locked package boundary.
 
 The wrapper thesis (see _project/specs/todo-db-tracker.md): every rule the old
 skill carried as prose must live in the CLI or the DB, so the skill shrinks to
@@ -15,7 +15,6 @@ budget-gated.
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -34,7 +33,12 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SHIM_PATH = REPO_ROOT / "_project" / "scripts" / "todo"
 SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "todo" / "SKILL.md"
-VENDORED_WHEEL = REPO_ROOT / "_project" / "scripts" / "vendor" / "todo_db-0.3.1-py3-none-any.whl"
+VENDORED_WHEEL = REPO_ROOT / "_project" / "scripts" / "vendor" / "todo_db-0.3.2-py3-none-any.whl"
+
+sys_path = str(REPO_ROOT / "_project" / "scripts")
+if sys_path not in sys.path:
+    sys.path.insert(0, sys_path)
+import todo_db_standalone_compat as compat  # noqa: E402
 
 
 def _read_skill_package() -> str:
@@ -68,27 +72,8 @@ def _critical_rule_skill_only_actions() -> set[str]:
 def _unknown_cli_commands(text: str, standalone: set[str]) -> set[str]:
     """Referenced `todo <cmd>` forms that are neither wrapper nor standalone CLI commands."""
     referenced = set(re.findall(r"`todo ([a-z][a-z-]*)", text))
-    # `finding` is dispatched by name (not via _HANDLERS) so todo_db never
-    # references a todo_findings symbol at load time. `doctor` is also outside
-    # _HANDLERS: main routes it before open/dispatch so it can diagnose an
-    # unreachable backend. Both are real CLI verbs consumers may document.
-    real = set(todo_db._HANDLERS) | {"finding", "doctor"}
+    real = set(compat.COMMANDS)
     return referenced - real - standalone
-
-
-def _load_script():
-    name = "todo_db"
-    path = REPO_ROOT / "_project" / "scripts" / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-todo_db = _load_script()
 
 
 def _run_shim(args: list[str], db_path: Path, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -115,18 +100,19 @@ class TestShim:
         first_line = SHIM_PATH.read_text(encoding="utf-8").splitlines()[0]
         assert first_line.startswith("#!"), "shim needs a shebang"
 
-    def test_shim_execs_todo_db_via_uv(self):
+    def test_shim_execs_locked_package_adapter_via_uv(self):
         text = SHIM_PATH.read_text(encoding="utf-8")
-        assert "todo_db.py" in text
+        assert "todo_db_standalone_compat.py" in text
+        assert "todo_db.py" not in text
         assert "uv run --project" in text
 
     def test_scripts_project_uses_verified_vendored_todo_db_release(self):
         assert VENDORED_WHEEL.is_file()
         assert hashlib.sha256(VENDORED_WHEEL.read_bytes()).hexdigest() == (
-            "785879ee2380fb1ff337a766b3d331e6e3337add001f8a91d4bd645e64332e0d"
+            "ddc8c56a8b9f11c550d8f3b81df568c6d111cc79c076cbc4bf7c03fd68a95fa4"
         )
         project = (REPO_ROOT / "_project" / "scripts" / "pyproject.toml").read_text(encoding="utf-8")
-        assert 'todo-db = { path = "vendor/todo_db-0.3.1-py3-none-any.whl" }' in project
+        assert 'todo-db = { path = "vendor/todo_db-0.3.2-py3-none-any.whl" }' in project
         assert "github.com/joeharris76/todo-db" not in project
 
     @pytest.mark.parametrize("subcommand", ["create", "candidates"])
@@ -260,7 +246,7 @@ class TestShim:
 
     def test_shim_resolves_code_from_own_location_not_cwd_git_root(self, tmp_path):
         # Absolute path to THIS tree's shim must win even when cwd is another
-        # git root with a decoy _project/scripts/todo_db.py (the lagging-primary
+        # git root with a decoy package adapter (the lagging-primary
         # / wrong-clone failure mode).
         assert SHIM_PATH.is_absolute()
         decoy = tmp_path / "other-clone"
@@ -268,7 +254,7 @@ class TestShim:
         scripts.mkdir(parents=True)
         (decoy / ".git").mkdir()
         decoy_marker = "DECOY_TODO_DB_MARKER_NOT_FROM_REAL_TREE"
-        (scripts / "todo_db.py").write_text(
+        (scripts / "todo_db_standalone_compat.py").write_text(
             f"import sys\nprint({decoy_marker!r})\nsys.exit(97)\n",
             encoding="utf-8",
         )
@@ -359,7 +345,7 @@ class TestSkillThinness:
         )
 
     def test_action_capability_classes_are_disjoint(self):
-        wrapper_commands = set(todo_db._HANDLERS) | {"finding", "doctor"}
+        wrapper_commands = set(compat.COMMANDS)
         standalone_commands = _declared_standalone_cli_commands()
         skill_actions = _declared_skill_only_actions()
         assert skill_actions, "skill package must declare its skill-only actions"
@@ -430,11 +416,17 @@ class TestSkillThinness:
             )
 
     def test_every_cli_subcommand_has_help(self, capsys):
-        for command in todo_db._HANDLERS:
-            with pytest.raises(SystemExit) as excinfo:
-                todo_db.main([command, "--help"])
-            assert excinfo.value.code == 0, f"{command} --help failed"
-            capsys.readouterr()
+        del capsys
+        for command in sorted(compat.COMMANDS):
+            result = subprocess.run(
+                [str(SHIM_PATH), command, "--help"],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=120,
+            )
+            assert result.returncode == 0, f"{command} --help failed: {result.stderr}"
 
 
 class TestWrapperUatLifecycle:

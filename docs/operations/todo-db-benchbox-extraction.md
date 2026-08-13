@@ -1,9 +1,8 @@
 # BenchBox todo-db extraction: staged integration and acceptance handoff
 
-Status: migration and compatibility evidence complete; the canonical
-`todo-db` 0.3.1 package is released, but production cutover remains gated by
-the operational acceptance TODO. The legacy BenchBox tracker remains the
-default and `_project/scripts/todo` remains the stable entry point.
+Status: migration and compatibility evidence complete. BenchBox now uses the
+locked `todo-db` 0.3.2 package exclusively, while `_project/scripts/todo`
+remains the stable repository entry point.
 
 ## Live evidence at this handoff
 
@@ -16,22 +15,19 @@ default and `_project/scripts/todo` remains the stable entry point.
   tracker/meta table equal, event provenance equal, a verified
   `sha256-chain-v2` audit chain, and an exactly equal second clean export
   including all three migration records.
-- `todo-db` 0.3.1 is published as the private GitHub release tag `v0.3.1`,
-  built from the merged holder-only fix. BenchBox vendors the verified wheel
+- `todo-db` 0.3.2 is published as the private GitHub release tag `v0.3.2`,
+  built from merged commit `389a3592cb92a8afde47d6d3b807ba3930f98316`. BenchBox vendors the verified wheel
   under `_project/scripts/vendor/`; consumers resolve that artifact through the
   locked scripts environment, never a sibling checkout or private Git fetch.
 - No hosted write credential was used and the hosted primary was not modified.
 
 ## Compatibility boundary
 
-`_project/scripts/todo` remains the stable entry point. The new adapter is
-selected only with `BENCHBOX_TODO_DB_STANDALONE=1`, so a normal checkout cannot
-silently switch databases:
+`_project/scripts/todo` remains the stable entry point and always runs the
+package-backed BenchBox adapter:
 
 ```sh
-BENCHBOX_TODO_DB_STANDALONE=1 \
-  uv run --project _project/scripts -- \
-  python _project/scripts/todo_db.py --db PATH_OR_URL <command>
+_project/scripts/todo --db PATH_OR_URL <command>
 ```
 
 The adapter passes an argv list to the canonical `todo-db` executable, verifies
@@ -45,7 +41,7 @@ schema migrations, and hash-chained events.
 
 | Command family | Generic operation | BenchBox adapter responsibility |
 |---|---|---|
-| `init`, `migrate`, `config` | schema, migration, and database settings | add BenchBox identity; retain explicit opt-in routing |
+| `init`, `migrate`, `config` | schema, migration, and database settings | add BenchBox identity; require an explicit configured database |
 | `create`, `show`, `claim`, `release`, `deps`, `unblock` | item and lease lifecycle | preserve actor and work-order invocation |
 | `start`, `done` | work-unit lifecycle | delegate worktree/branch capture from the BenchBox cwd |
 | `defer`, `promote`, `dismiss` | deferral lifecycle | preserve legacy arguments and output |
@@ -59,13 +55,13 @@ terminal deferrals, metadata, and ordered event provenance. Legacy events are
 re-hashed under the standalone audit contract during restore; the original
 timestamp, actor, action, item identity, and detail remain unchanged.
 
-## Shadow migration and comparison
+## Package-only shadow import and export check
 
 The repeatable path is `_project/scripts/todo_db_shadow.py`. It requires a new
 explicit target and refuses protected databases, existing targets, and an empty
-YAML source. It creates a temporary legacy import for comparison, imports into a
-separate standalone target, exports the lossless envelope, and writes one
-canonical JSON report:
+YAML source. It imports into the locked package's scratch target, reads the raw
+package tables, exports the lossless envelope, and writes one canonical JSON
+report that proves the export preserves the imported database:
 
 ```sh
 SHADOW_DB="${TMPDIR:-/tmp}/benchbox-todo-shadow.sqlite"
@@ -84,126 +80,94 @@ _project/scripts --locked -- todo-db`. The package must be present in the locked
 BenchBox scripts environment; an absent or incompatible package is an error,
 with no PATH or sibling-checkout fallback.
 
-The report compares item counts and IDs, titles, states, priorities, worktrees,
-descriptions, categories, approaches, work units, prerequisites, dependencies,
-scope rules, verification rows, preserves, anti-patterns, prior art, deferrals,
-metadata, and normalized audit event provenance. Ordering is canonical. On any
-failed import after the dedicated target is created, the tool removes only that
-new target and its adjacent export file; it never deletes a protected or
-pre-existing database. For historical parity, extract `_project/TODO` and
-`_project/DONE` from `6fde4cd36^` into scratch rather than checking out or
-modifying a live clone.
+The report compares raw database and exported item counts and IDs, titles,
+states, priorities, worktrees, descriptions, categories, approaches, work
+units, prerequisites, dependencies, scope rules, verification rows, preserves,
+anti-patterns, prior art, deferrals, metadata, and audit event provenance.
+Ordering is canonical. On any failed import after the dedicated target is
+created, the tool removes only that new target and its adjacent export file; it
+never deletes a protected or pre-existing database. The legacy-to-package
+parity gate was completed before the embedded runtime was removed. To repeat
+that historical evidence, extract `_project/TODO`, `_project/DONE`, and the
+embedded importer from `6fde4cd36^` into an isolated scratch checkout; do not
+modify a live clone.
 
-Rollback is therefore: keep the existing BenchBox DB/YAML workflow active,
-discard the isolated target/report, and unset `BENCHBOX_TODO_DB_STANDALONE`.
-There is no production cutover or destructive replacement step in this branch.
+Failure recovery is to discard only the isolated target/report and diagnose the
+locked package. BenchBox has no embedded-runtime feature flag or fallback after
+the package-only cutover.
 
 ## Export workflow and restore validation
 
-`.github/workflows/todo-db-export.yml` always runs the legacy exporter when the
-two database secrets are available:
+`.github/workflows/todo-db-export.yml` syncs the locked scripts project and runs
+the package-only wrapper when the two database secrets are available:
 
 - `TODO_DB_URL` repository secret for the dedicated BenchBox Turso/libSQL DB.
-- `TODO_DB_RO_AUTH_TOKEN` repository secret, passed to the legacy export step
-  under its expected variable name but still carrying read-only authority.
+- `TODO_DB_RO_AUTH_TOKEN` repository secret carrying read-only authority.
 
 ### Local auth provisioning
 
-CI supplies `TODO_DB_URL`/`TODO_DB_AUTH_TOKEN` as secrets, but a local checkout
-normally has neither set. `_project/scripts/todo_db.py` handles that case
-itself: when `--db`, `TODO_DB_PATH`, and `TODO_DB_URL` are all unset, it shells
-out to the maintainer's already-logged-in `turso` CLI (`turso db show <name>
---url` + `turso db tokens create <name> --expiration 1d` (day
-granularity; sub-day values like `30m` are rejected by the Turso CLI),
-db name from
-`TODO_DB_TURSO_DB`, default `benchbox-todo`) and uses the resulting hosted
-backend transparently for that invocation, without ever printing or logging
-the minted URL or token. If `turso` is missing, not logged in, or the mint
-fails for any reason, the CLI falls back to the existing local implicit
-database and its write-refusal error now names all three remediations:
-`turso auth login`, exporting `TODO_DB_URL`/`TODO_DB_AUTH_TOKEN` directly, or
-selecting a backend with `--db`/`TODO_DB_PATH`. Explicit configuration always
-takes precedence over auto-provisioning, and `todo doctor` reports the
-`hosted (auto-provisioned via turso CLI, URL withheld)` backend detail when it
-was used.
+CI supplies `TODO_DB_URL` and `TODO_DB_RO_AUTH_TOKEN` as secrets. Local commands
+must select a database with `--db`, `TODO_DB_PATH`, `TODO_DB_URL`, or
+`.todo-db/config.json`; the wrapper refuses to create an implicit fork database.
+For a selected hosted database with no supplied token, the wrapper preserves
+the maintainer convenience path: it asks the logged-in `turso` CLI for a
+one-day token without printing or persisting it. It does not fall back to a
+sibling checkout, embedded runtime, or local database. The sole database-free
+exceptions are `doctor`, help/version output, and finding commands that operate
+only on local drafts.
 
-`TODO_DB_PACKAGE_VERSION` is an optional repository variable naming an exact,
-approved release. Enabling it also requires `TODO_DB_PACKAGE_URL`, an immutable
-HTTPS wheel URL, and `TODO_DB_PACKAGE_SHA256`, the wheel's lowercase SHA-256
-digest. The workflow downloads that artifact once, verifies it, and reuses the
-same local wheel for every command. The URL must not target public PyPI until
-the project owns the `todo-db` name. When the version is unset, the additive
-standalone export and restore validation are skipped while the legacy
-provenance snapshot still runs. When set, the version is also enforced by the
-adapter handshake.
+The verified wheel is committed under `_project/scripts/vendor/` and resolved
+by `_project/scripts/uv.lock`. The wrapper enforces version 0.3.2. The workflow
+does not download or select a runtime through repository variables.
 
 The job remains weekly, deterministic, path-scoped, and outage-alerting. Each
 successful run uploads a uniquely named recovery artifact with 90-day automatic
 retention in addition to the versioned snapshot PR. GitHub owns expiry; the
 workflow owner responds to the existing incident issue and performs a clean-DB
-restore before any recovery is accepted. With an approved package configured,
-it uses the adapter to add the lossless envelope and refresh compatibility
-views, then restores the envelope into a clean SQLite database, verifies the
-audit chain, and compares the complete restored envelope, including
-`schema_migrations` and `audit_head`, before opening the snapshot PR. Missing
-database secrets, an unavailable configured package, an unreachable database,
-or a schema mismatch open/reuse the incident issue; they do not claim
-production readiness.
+restore before any recovery is accepted. It refreshes compatibility views from
+one lossless package envelope, restores that envelope into a clean SQLite
+database, verifies the audit chain, and compares the complete restored
+envelope, including `schema_migrations` and `audit_head`, before opening the
+snapshot PR. Missing database secrets, an unavailable locked package, an
+unreachable database, or a schema mismatch open or reuse the incident issue;
+they do not claim production readiness.
 
-The live BenchBox database uses the legacy schema; do not point standalone
-`export` directly at it. Capture the legacy tables in bulk with the BenchBox
-shadow tool, restore that snapshot locally, and only then produce the canonical
-standalone envelope. `TODO_DB_AUTH_TOKEN` below aliases the read-only token
-because the legacy adapter retains that historical variable name; it does not
-gain write authority.
-
-Runnable live read-only migration and restore drill:
+The live BenchBox database uses the package schema. Export it through the stable
+wrapper with explicit read-only credentials, then prove the lossless envelope
+on a new local database:
 
 ```sh
 set -eu
 test -n "$TODO_DB_URL"
 test -n "$TODO_DB_RO_AUTH_TOKEN"
-export TODO_DB_AUTH_TOKEN="$TODO_DB_RO_AUTH_TOKEN"
 
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/todo-db-live-restore.XXXXXX")"
 IDENTITY="--project-id benchbox --repository https://github.com/joeharris76/BenchBox"
 
-uv run --project _project/scripts -- python _project/scripts/todo_db_shadow.py \
-  --hosted-url "$TODO_DB_URL" \
-  --hosted-snapshot-output "$SCRATCH/legacy.json"
-
-uv run --project _project/scripts --locked -- todo-db \
-  --db "$SCRATCH/restore.sqlite" $IDENTITY init
-uv run --project _project/scripts --locked -- todo-db \
-  --db "$SCRATCH/restore.sqlite" $IDENTITY \
-  restore-legacy --input "$SCRATCH/legacy.json" --replace
-uv run --project _project/scripts --locked -- todo-db \
-  --db "$SCRATCH/restore.sqlite" $IDENTITY audit verify
-uv run --project _project/scripts --locked -- todo-db \
-  --db "$SCRATCH/restore.sqlite" $IDENTITY \
-  export --output "$SCRATCH/todo-db.json"
+_project/scripts/todo export --out "$SCRATCH/views" \
+  --lossless-out "$SCRATCH/lossless"
 
 uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/roundtrip.sqlite" $IDENTITY init
 uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
-  restore --input "$SCRATCH/todo-db.json" --replace
+  restore --input "$SCRATCH/lossless/todo-db.json" --replace
 uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/roundtrip.sqlite" $IDENTITY audit verify
 uv run --project _project/scripts --locked -- todo-db \
   --db "$SCRATCH/roundtrip.sqlite" $IDENTITY \
   export --output "$SCRATCH/roundtrip.json"
 
-cmp "$SCRATCH/todo-db.json" "$SCRATCH/roundtrip.json"
+cmp "$SCRATCH/lossless/todo-db.json" "$SCRATCH/roundtrip.json"
 ```
 
 ## Testing, CI, release, and operations gate
 
-The BenchBox-side tests cover adapter argument/identity forwarding, database
-and version pinning, exit fidelity, deterministic lossless/legacy export views, explicit YAML path
-defaults, empty-source rejection, semantic loss reporting, and failed-import
-rollback. Existing BenchBox tracker tests remain the regression suite for the
-default path. The standalone baseline covers local lifecycle, identity,
+The BenchBox-side tests cover adapter argument and identity forwarding,
+database and version pinning, exit fidelity, deterministic lossless and
+compatibility export views, explicit YAML paths, empty-source rejection,
+export-fidelity reporting, freeze and renew extensions, and failed-import
+rollback. The released package suite covers local lifecycle, identity,
 migrations/checksums, audit/export/restore, concurrency/claim contention,
 secure hosted transport, token redaction, and credential-gated live coverage.
 
@@ -222,7 +186,7 @@ without those credentials the live lane skips cleanly.
 | 7 | Migration checksum rollback guard | A tampered recorded migration is rejected before use. |
 | 8 | Prior-package/schema rollback guard | The current package refuses a database containing an unknown future migration. |
 | 9 | Lossless clean restore | Restore, audit verification, and a second export require exact full-envelope equality, including migrations and audit head. |
-| 10 | Package supply chain | The workflow downloads one immutable HTTPS wheel, verifies its configured SHA-256 digest, and reuses that artifact for all commands. |
+| 10 | Package supply chain | BenchBox vendors the wheel downloaded from the immutable v0.3.2 release, pins it in `uv.lock`, and verifies its published SHA-256 digest in wrapper tests. |
 | 11 | Versioned recovery and rotation | Weekly snapshot PRs are supplemented by run/attempt-versioned artifacts retained for 90 days; failures reuse the operational incident. |
 
 Before any package release, require a changelog entry describing public CLI/API
@@ -233,8 +197,8 @@ through the compatibility window.
 Operational defaults remain one physical database per project,
 separate read-write/read-only credentials, weekly exports, clean-DB restore
 drills, and SHA-256 chained events with optional signed export manifests. This
-work does not provision hosted infrastructure or perform the destructive
-hosted cutover.
+work does not provision hosted infrastructure; the package-only cutover reuses
+the existing hosted database and credentials.
 
 ## Oxbow, textcharts, and future consumers
 
