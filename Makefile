@@ -23,8 +23,10 @@ JOINORDER_REFERENCE ?= _project/joinorder/reference_cardinalities.json
 
 # These targets are deliberately retained in the release Make runtime so the
 # public target inventory stays stable, but their implementation or evidence
-# lives under the develop-only `_project/` tree. Fail with one explicit policy
-# message on a curated release instead of leaking file-not-found errors.
+# lives under the development-only portion of `_project/`. The curated release
+# retains only the small Explorer publication helper set. Fail with one
+# explicit policy message on a curated release instead of leaking file-not-found
+# errors from a partially retained `_project/` tree.
 DEVELOPMENT_TREE_ONLY_TARGETS := \
 	correctness-gate-digests-regen cross-surface-baseline-autodetect \
 	oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \
@@ -47,8 +49,8 @@ $(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required
 
 .PHONY: .development-tree-required
 .development-tree-required:
-	@if [ ! -d "$(BENCHBOX_MAKEFILE_ROOT)_project" ]; then \
-		echo "Error: this target requires the BenchBox development tree; _project/ is intentionally absent from curated releases." >&2; \
+	@if [ ! -d "$(BENCHBOX_MAKEFILE_ROOT)_project/decisions" ]; then \
+		echo "Error: this target requires the BenchBox development tree (full development tree required); curated releases retain only the Results Explorer publication helpers under _project/scripts/." >&2; \
 		exit 2; \
 	fi
 
@@ -945,11 +947,13 @@ run-test:
 # Do NOT invoke from the legacy private clone — it has no `origin` remote.
 #
 # Flow: develop -> v$(VERSION) -> (squash) release -> tag release -> release.yml publishes
-#   develop is intentionally NOT modified post-release. dev-only paths and
-#   deferred release surfaces (_project/, _blog/, results explorer, AGENTS.md,
-#   etc.) live on develop and are removed from the release branch by
-#   release-cut's curation step. landing/ and docs/blog/ stay in the release
-#   tree.
+#   develop is intentionally NOT modified post-release. Dev-only paths and
+#   deferred release surfaces (_project/ except the Explorer publication
+#   helpers, _blog/, agent configs, etc.) live on develop and are removed from
+#   the release branch by release-cut's curation step. The curated preview's
+#   results-data/, results-explorer/, and the three required publication
+#   helpers remain in the release tree. landing/ and docs/blog/ stay in the
+#   release tree.
 #
 # See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md.
 
@@ -1032,13 +1036,15 @@ release-cut:
 	@# Curation FIRST so dev-only paths are never staged. Order matters: git rm
 	@# before git add ensures untracked files inside _project/ etc. don't end up
 	@# staged-for-add by a later git add.
-	@# Curation list: A3 of _project/decisions/single-repo-migration.md.
+	@# Curation list: A3 of _project/decisions/single-repo-migration.md. The
+	@# Explorer is an intentional curated-preview exception: keep its corpus,
+	@# application, and only the three build-time helpers required by docs.yml.
 	@# --ignore-unmatch: git rm aborts the ENTIRE command when any one pathspec
 	@# is untracked, and a leading `-` would hide that, silently skipping all
 	@# curation on that line (v0.3.1 shipped uncurated because of this). With
 	@# --ignore-unmatch, unmatched paths are a no-op and any remaining failure
 	@# is real, so no `-` prefix: real failures must abort the cut.
-	git rm -rf --ignore-unmatch _project _blog results-data results-explorer .claude .codex .gemini
+	git rm -rf --ignore-unmatch _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini
 	git rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
 	git rm -f --ignore-unmatch .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
 	@# Tests that import _project/dev-only tooling or test curated-out surfaces
@@ -1046,12 +1052,19 @@ release-cut:
 	git rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer
 	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
 	@# Post-curation guard: every curated path must be gone from the index.
-	@LEFTOVER=$$(git ls-files _project _blog results-data results-explorer .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
+	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
 	if [ -n "$$LEFTOVER" ]; then \
-		echo "ERROR: release curation incomplete; dev-only paths still tracked:" >&2; \
+		echo "ERROR: release curation incomplete; development-only paths still tracked:" >&2; \
 		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \
 		exit 1; \
 	fi
+	@for required_dir in results-data results-explorer _project/scripts/explorer_pipeline; do \
+		test -d "$$required_dir" || { echo "ERROR: curated Explorer publication directory is missing: $$required_dir" >&2; exit 1; }; \
+		git ls-files "$$required_dir" | grep -q . || { echo "ERROR: curated Explorer publication directory is not tracked: $$required_dir" >&2; exit 1; }; \
+	done
+	@for required_file in _project/scripts/explorer_publish.py _project/scripts/results_explorer_snapshot_invariants.py; do \
+		test -f "$$required_file" && git ls-files --error-unmatch "$$required_file" >/dev/null || { echo "ERROR: curated Explorer publication helper is missing: $$required_file" >&2; exit 1; }; \
+	done
 	@# Stage only the files update_version.py + generate_changelog_entry.py +
 	@# uv lock write. Explicit list (not `git add -A`) to avoid staging
 	@# build/cache artifacts.

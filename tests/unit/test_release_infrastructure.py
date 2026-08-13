@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import itertools
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -658,11 +659,16 @@ class TestReleaseInfrastructure:
         for line in recipe.splitlines():
             rm_match = re.search(r"git rm (?:-rf|-f) --ignore-unmatch (.+?)$", line.strip())
             if rm_match:
-                rm_paths.update(rm_match.group(1).split())
+                rm_paths.update(shlex.split(rm_match.group(1)))
         assert rm_paths, "expected git rm curation paths in release-cut"
-        guard_match = re.search(r"git ls-files (.+?)\)", recipe)
-        assert guard_match, "expected a `git ls-files <curated paths>` post-curation guard in release-cut"
-        guard_paths = set(guard_match.group(1).split())
+        guard_line = next(
+            (line.strip() for line in recipe.splitlines() if "git ls-files _project" in line),
+            None,
+        )
+        assert guard_line, "expected a `git ls-files <curated paths>` post-curation guard in release-cut"
+        guard_match = re.search(r"git ls-files (.+?)\);", guard_line)
+        assert guard_match, "expected a semicolon-terminated curation guard command"
+        guard_paths = set(shlex.split(guard_match.group(1)))
         assert rm_paths == guard_paths, (
             f"post-curation guard out of sync with git rm lines; "
             f"missing from guard: {sorted(rm_paths - guard_paths)}, "

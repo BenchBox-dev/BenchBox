@@ -98,6 +98,17 @@ def test_release_make_runtime_is_main_only_not_curated() -> None:
     assert "make" not in curated
 
 
+def test_curated_preview_release_paths_are_shipped_and_deferred_workflows_are_curated() -> None:
+    main_only = check_release_curation.parse_main_only_allowlist(
+        REPO_ROOT / "_project" / "decisions" / "single-repo-migration.md"
+    )
+    curated = check_release_curation.parse_curation_list(REPO_ROOT / "Makefile")
+
+    assert main_only >= check_release_curation.REQUIRED_RELEASE_PATHS
+    assert check_release_curation.REQUIRED_RELEASE_PATHS.isdisjoint(curated)
+    assert curated >= check_release_curation.REQUIRED_CURATED_PATHS
+
+
 def _copy_curated_make_runtime(destination: Path) -> None:
     shutil.copy2(REPO_ROOT / "Makefile", destination / "Makefile")
     shutil.copytree(REPO_ROOT / "make", destination / "make")

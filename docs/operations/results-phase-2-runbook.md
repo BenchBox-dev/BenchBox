@@ -168,15 +168,21 @@ while the `deploy` job runs only for a protected push to `release`.
 corpus-archive branch that contributor PRs target and that mirrors develop's
 `results-data/`.
 
-> **Current state (pre-launch):** the explorer steps in `docs.yml` are gated
-> on `hashFiles('results-explorer/package.json')`, and `release-cut`
-> (`Makefile`) currently `git rm`s `results-explorer/` and `results-data/`
-> from the release branch. The release build therefore has no Explorer input
-> and the Explorer steps are a deliberate no-op; the custom-domain route is not
-> a live publication. Launch requires a maintainer decision to change the
-> release curation/deploy contract, followed by assembled-artifact and protected
-> environment acceptance. Until that decision and evidence exist, do not treat
-> a develop checkout or a manual workflow build as a deployed Explorer.
+> **Curated-preview state:** `release-cut` retains `results-explorer/`,
+> `results-data/`, and the three publication helpers under
+> `_project/scripts/`; all other `_project/` content remains development-only.
+> The `docs.yml` build still gates Explorer steps on
+> `hashFiles('results-explorer/package.json')`, but a release that includes the
+> application now fails closed when the corpus, helper set, or generated
+> snapshot is missing. The deploy job runs only after a protected push to
+> `release`, and the `github-pages` environment must permit `release`.
+>
+> This is a curated preview, not a broad leaderboard or full-cohort claim.
+> Completion evidence must pin the release SHA, artifact digest, deployment
+> ID, prior rollback target, environment approval, route/header checks, range
+> reads, bundle privacy scan, and live custom-domain behavior. A develop
+> checkout, manual workflow build, or local static server is not deployed-site
+> evidence.
 
 ## 2. Maintainer Review Checklist
 

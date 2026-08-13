@@ -105,7 +105,7 @@ uv run -- python scripts/generate_corpus_inventory.py --write
 
 ### 5. Review and merge
 
-A maintainer reviews the submission for quality and environment consistency. Once approved and merged into `published-results`, the bundle enters the public corpus. The Results Explorer is not built directly from `published-results`; the documented `docs.yml` workflow builds on the release path and deploys only after a protected push to `release`. **Pre-launch caveat:** `release-cut` currently strips `results-explorer/` and `results-data/` from the release branch, so the Explorer steps are a deliberate no-op and `benchbox.dev/results/` is not a live publication guarantee. See [`docs/operations/results-phase-2-runbook.md`](operations/results-phase-2-runbook.md#13-explorer-publish-path) for the current path and launch prerequisites.
+A maintainer reviews the submission for quality and environment consistency. Once approved and merged into `published-results`, the bundle enters the public corpus. The Results Explorer is not built directly from `published-results`; the documented `docs.yml` workflow builds on the curated release path and deploys only after a protected push to `release`. The Explorer is a curated preview, not a broad leaderboard claim. See [`docs/operations/results-phase-2-runbook.md`](operations/results-phase-2-runbook.md#13-explorer-publish-path) for the publication path and launch evidence.
 
 ## What Makes a Good Submission
 
