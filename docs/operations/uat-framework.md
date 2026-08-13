@@ -784,6 +784,65 @@ reading is unavailable and does **not** gate — it never silently treats an
 unmeasurable host as having headroom (fail-open), and never hard-fails an
 otherwise-healthy host merely because the measurement failed (fail-closed).
 
+## ClickHouse streaming-memory calibration
+
+The ClickHouse server loader is a bounded native-driver stream. It must not
+fall back to the generic 1,000-row application batch helper. Calibration is a
+measurement exercise, not permission to publish a new compose limit from total
+RAM, `free`, or an unrelated host snapshot. The trace records `available` and
+`free` separately, swap pressure, engine/container memory usage and limit,
+ClickHouse `MemoryTracking`/resident metrics, cumulative `InsertedRows` and
+`InsertedBytes`, driver responsiveness, the requested driver timeout, and the
+loader contract.
+
+The only supported rung order is:
+
+| rung | requested memory | load memory | driver timeout | decision |
+|---|---:|---:|---:|---|
+| `baseline-1g` | 1 GiB | 1 GiB | 300 s | run first; existing baseline, not a new published limit |
+| `candidate-4g` | 4 GiB | 4 GiB | 300 s | run only after the baseline fails or cannot complete |
+| `candidate-8g` | 8 GiB | 8 GiB | 300 s | run only when the 4 GiB trace justifies escalation |
+| `candidate-12g` | 12 GiB | 12 GiB | 300 s | last resort; requires a trace-backed reason |
+
+Wrap the real ClickHouse server UAT command so sampling covers the whole load
+and query path (the wrapper writes an atomic JSON artifact even when the child
+fails):
+
+```bash
+uv run -- python -m tests.uat.clickhouse_memory \
+  --output "$BENCHBOX_OUTPUT_DIR/clickhouse-memory-baseline-1g.json" \
+  --rung baseline-1g \
+  --engine mocker \
+  --project-name <managed-compose-project> \
+  --compose-file docker/clickhouse/docker-compose.yml \
+  -- -- uv run -- benchbox run --platform clickhouse-server \
+       --benchmark tpch --scale 0.01 --phases load
+```
+
+Run a small smoke cell first. Only if that trace is responsive and free of
+OOM/cgroup-kill/timeout evidence should the same rung be tried at SF1. Advance
+to the next rung only when the smallest failing or incomplete run has a trace
+that explains why. A passing trace is admissible only when it has a successful
+responsiveness sample, `native_streaming=true`, and
+`application_batch_rows=null`, plus the measured ClickHouse driver timeout and
+all required `MemoryTracking`, `MemoryResident`, `InsertedRows`, and
+`InsertedBytes` values. Missing, non-finite, or contradictory host, engine,
+container-state, or ClickHouse telemetry invalidates the trace. The
+current server setup default is 300 seconds and the wrapper records that source
+directly from `ClickHouseSetupMixin`; an explicitly configured timeout is also
+recorded when the command supports that option. All memory rungs keep the same
+timeout so a larger timeout cannot turn a timeout defect into a false memory
+success. A trace that reports `1000` rows or cannot establish its timeout is
+rejected, even if the command exits zero.
+`select_lowest_successful_rung()` chooses the lowest valid passing rung and
+fails closed when no such trace exists.
+
+Keep each trace with the UAT evidence. Do not add `mem_limit`,
+`CLICKHOUSE_MEMORY_LIMIT`, or a 1 GiB fallback to the compose file from this
+calibration step. The subsequent compose-admission TODO consumes a selected
+rung only after this trace review and separately verifies the runtime limit and
+host reserve.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
