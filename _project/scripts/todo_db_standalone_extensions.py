@@ -10,6 +10,9 @@ window. Remove it when the released package exposes the same verbs.
 from __future__ import annotations
 
 import argparse
+import json
+import math
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -23,12 +26,14 @@ from todo_db.backends import CredentialMode
 from todo_db.cli import _config, _discover_repo_config, _resolve_db, _resolve_identity
 from todo_db.database import TodoDatabase
 from todo_db.errors import TodoDBError, TodoError
-from todo_db.tracker import DEFAULT_LEASE_TTL_HOURS, TodoTracker, _lease_expired, utc_now
+from todo_db.tracker import DEFAULT_LEASE_TTL_HOURS, TodoTracker, _lease_expired, default_actor, utc_now
 
-if str(SCRIPTS_DIR) not in sys.path:
-    sys.path.append(str(SCRIPTS_DIR))
-
-from _project.scripts import todo_db as legacy  # noqa: E402
+FREEZE_HOLDER_KEY = "maintenance.frozen_by"
+FREEZE_AT_KEY = "maintenance.frozen_at"
+FREEZE_REASON_KEY = "maintenance.freeze_reason"
+FREEZE_TTL_KEY = "maintenance.freeze_ttl_hours"
+DEFAULT_FREEZE_TTL_HOURS = 2.0
+MAX_FREEZE_TTL_HOURS = 168.0
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -48,7 +53,7 @@ def _parser() -> argparse.ArgumentParser:
     group.add_argument("--status", action="store_true")
     group.add_argument("--release", action="store_true")
     freeze.add_argument("--reason", default="")
-    freeze.add_argument("--ttl", type=float, default=legacy.DEFAULT_FREEZE_TTL_HOURS)
+    freeze.add_argument("--ttl", type=float, default=DEFAULT_FREEZE_TTL_HOURS)
     freeze.add_argument("--force", action="store_true")
     sub.add_parser("freeze-guard")
     sub.add_parser("activity")
@@ -88,26 +93,86 @@ def _renew(tracker: TodoTracker, item_id: str) -> str:
     return stamp
 
 
+def _meta_value(tracker: TodoTracker, key: str) -> str | None:
+    row = tracker.connection.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else None
+
+
+def _freeze_ttl(raw: str | None) -> float:
+    try:
+        ttl = float(raw) if raw is not None else DEFAULT_FREEZE_TTL_HOURS
+    except (TypeError, ValueError):
+        return DEFAULT_FREEZE_TTL_HOURS
+    if not math.isfinite(ttl) or ttl <= 0:
+        return DEFAULT_FREEZE_TTL_HOURS
+    return min(ttl, MAX_FREEZE_TTL_HOURS)
+
+
+def _freeze(tracker: TodoTracker) -> dict[str, object] | None:
+    holder = _meta_value(tracker, FREEZE_HOLDER_KEY)
+    if not holder:
+        return None
+    started = _meta_value(tracker, FREEZE_AT_KEY)
+    ttl = _freeze_ttl(_meta_value(tracker, FREEZE_TTL_KEY))
+    if started:
+        try:
+            if _lease_expired(started, ttl):
+                return None
+        except (ValueError, OverflowError):
+            pass
+    return {
+        "holder": holder,
+        "since": started or "unknown",
+        "reason": _meta_value(tracker, FREEZE_REASON_KEY) or "",
+        "ttl_hours": ttl,
+    }
+
+
+def _freeze_refusal(live: dict[str, object]) -> str:
+    head = (
+        f"error: tracker is frozen for maintenance by {live['holder']} since {live['since']}"
+        f"{': ' + str(live['reason']) if live['reason'] else ''}. "
+    )
+    lapse = f"the holder runs `todo freeze --release` or the {live['ttl_hours']}h lease lapses"
+    return head + f"Reads still work; writes resume when {lapse}."
+
+
+def _write_activity(tracker: TodoTracker) -> dict[str, object]:
+    def fingerprint(table: str) -> dict[str, object]:
+        row = tracker.connection.execute(
+            f"SELECT count(*) AS n, max(seq) AS last_seq, max(at) AS last_at FROM {table}"
+        ).fetchone()
+        return {"count": row["n"] or 0, "last_seq": row["last_seq"], "latest": row["last_at"]}
+
+    activity: dict[str, object] = fingerprint("events")
+    activity["findings"] = fingerprint("finding_events")
+    return activity
+
+
 def _set_freeze(tracker: TodoTracker, reason: str, ttl_hours: float) -> dict[str, object]:
-    ttl = legacy._coerce_freeze_ttl(ttl_hours)
-    if ttl is None or ttl <= 0:
+    if not math.isfinite(ttl_hours) or ttl_hours <= 0:
         raise TodoError(
             "freeze --ttl must be positive and finite; an unbounded freeze is exactly the stuck lock this avoids"
         )
-    if ttl > legacy.MAX_FREEZE_TTL_HOURS:
+    if ttl_hours > MAX_FREEZE_TTL_HOURS:
         raise TodoError(
-            f"freeze --ttl must not exceed {legacy.MAX_FREEZE_TTL_HOURS:g}h; use a renewable bounded lease instead"
+            f"freeze --ttl must not exceed {MAX_FREEZE_TTL_HOURS:g}h; "
+            "a longer maintenance window should be re-taken, not held open"
         )
+    ttl = ttl_hours
     with tracker.database.transaction():
-        live = legacy.get_freeze(tracker.connection)
+        live = _freeze(tracker)
         if live and live["holder"] != tracker.actor:
-            raise TodoError(f"freeze is already held by {live['holder']} since {live['since']}")
+            raise TodoError(
+                f"tracker already frozen by {live['holder']} since {live['since']} "
+                f"({live['reason'] or 'no reason given'}); it lapses after {live['ttl_hours']}h"
+            )
         stamp = utc_now()
         values = {
-            legacy.FREEZE_HOLDER_KEY: tracker.actor,
-            legacy.FREEZE_AT_KEY: stamp,
-            legacy.FREEZE_REASON_KEY: reason,
-            legacy.FREEZE_TTL_KEY: str(ttl),
+            FREEZE_HOLDER_KEY: tracker.actor,
+            FREEZE_AT_KEY: stamp,
+            FREEZE_REASON_KEY: reason,
+            FREEZE_TTL_KEY: str(ttl),
         }
         for key, value in values.items():
             tracker.connection.execute(
@@ -120,37 +185,35 @@ def _set_freeze(tracker: TodoTracker, reason: str, ttl_hours: float) -> dict[str
 
 def _clear_freeze(tracker: TodoTracker, *, force: bool) -> bool:
     with tracker.database.transaction():
-        live = legacy.get_freeze(tracker.connection)
+        live = _freeze(tracker)
         if live and live["holder"] != tracker.actor and not force:
             raise TodoError(
                 f"freeze is held by {live['holder']}, not {tracker.actor}; "
                 "wait for its lease to lapse or override with `todo freeze --release --force`"
             )
-        had_rows = tracker.connection.execute(
-            "SELECT 1 FROM meta WHERE key = ?", (legacy.FREEZE_HOLDER_KEY,)
-        ).fetchone()
+        had_rows = tracker.connection.execute("SELECT 1 FROM meta WHERE key = ?", (FREEZE_HOLDER_KEY,)).fetchone()
         for key in (
-            legacy.FREEZE_HOLDER_KEY,
-            legacy.FREEZE_AT_KEY,
-            legacy.FREEZE_REASON_KEY,
-            legacy.FREEZE_TTL_KEY,
+            FREEZE_HOLDER_KEY,
+            FREEZE_AT_KEY,
+            FREEZE_REASON_KEY,
+            FREEZE_TTL_KEY,
         ):
             tracker.connection.execute("DELETE FROM meta WHERE key = ?", (key,))
         if had_rows:
             tracker._event("unfreeze", None, {"released_holder": live["holder"] if live else None})
-    return had_rows is not None
+    return live is not None
 
 
 def _run(args: argparse.Namespace) -> int:
-    actor = args.actor or legacy.default_actor()
+    actor = args.actor or default_actor()
     mode = CredentialMode.READ_ONLY if args.command in {"freeze-guard", "activity"} else CredentialMode.READ_WRITE
     with _open_database(args, mode) as database:
         tracker = TodoTracker(database, actor=actor)
         if args.command == "activity":
             print(
-                legacy.json.dumps(
+                json.dumps(
                     {
-                        "events": legacy.write_activity(tracker.connection),
+                        "events": _write_activity(tracker),
                         "stale": bool(getattr(tracker.connection, "stale", False)),
                     },
                     sort_keys=True,
@@ -158,9 +221,9 @@ def _run(args: argparse.Namespace) -> int:
             )
             return 0
         if args.command == "freeze-guard":
-            live = legacy.get_freeze(tracker.connection)
+            live = _freeze(tracker)
             if live and live["holder"] != tracker.actor:
-                print(legacy._freeze_refusal_message(live), file=sys.stderr)
+                print(_freeze_refusal(live), file=sys.stderr)
                 return 2
             return 0
         if args.command == "renew":
@@ -168,8 +231,8 @@ def _run(args: argparse.Namespace) -> int:
             print(f"renewed {args.id}; lease now runs from {renewed}")
             return 0
         if args.status:
-            live = legacy.get_freeze(tracker.connection)
-            print(legacy.json.dumps(live, indent=2, sort_keys=True) if live else "no live freeze")
+            live = _freeze(tracker)
+            print(json.dumps(live, indent=2, sort_keys=True) if live else "no live freeze")
             return 0
         if args.release:
             print("freeze lifted" if _clear_freeze(tracker, force=args.force) else "no live freeze to lift")
@@ -186,7 +249,7 @@ def _run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     try:
         return _run(_parser().parse_args(argv))
-    except (TodoDBError, TodoError, OSError, ValueError, legacy.sqlite3.Error) as exc:
+    except (TodoDBError, TodoError, OSError, ValueError, sqlite3.Error) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

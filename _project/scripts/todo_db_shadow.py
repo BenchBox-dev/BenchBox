@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Non-destructive BenchBox YAML shadow-import and semantic comparison.
+"""Non-destructive BenchBox YAML shadow-import and export-fidelity check.
 
 The command deliberately requires a fresh, explicit target database.  It will
 not use either BenchBox's live database or the standalone project's planning
@@ -10,13 +10,11 @@ be reported as a successful zero-item migration.
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import os
 import sqlite3
 import subprocess
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -74,6 +72,7 @@ def _rows(connection: sqlite3.Connection, table: str) -> list[dict[str, Any]]:
     order_by = {
         "events": "seq",
         "meta": "key",
+        "metadata": "key",
         "work_units": "item_id, wid",
         "work_needs": "item_id, wid, needs_wid",
         "item_deps": "item_id, needs_item",
@@ -104,25 +103,22 @@ def write_hosted_legacy_snapshot(connection: Any, output: Path) -> dict[str, int
 def capture_hosted_legacy_snapshot(*, repo_root: Path, url: str, output: Path) -> dict[str, int]:
     """Connect to the legacy hosted primary in read-only mode and capture it."""
 
-    if not os.environ.get("TODO_DB_AUTH_TOKEN"):
-        raise ShadowMigrationError("hosted snapshot requires TODO_DB_AUTH_TOKEN carrying read-only authority")
-    module_path = repo_root / "_project" / "scripts" / "todo_db.py"
-    spec = importlib.util.spec_from_file_location("benchbox_legacy_todo_db_for_snapshot", module_path)
-    if spec is None or spec.loader is None:
-        raise ShadowMigrationError(f"cannot load legacy tracker module: {module_path}")
-    legacy = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(legacy)
-    token = os.environ.get("TODO_DB_AUTH_TOKEN", "")
+    from todo_db.backends import connect
+    from todo_db.models import CredentialMode, DatabaseConfig
+
+    del repo_root  # Retained for CLI compatibility with the pre-cutover command.
+    token = os.environ.get("TODO_DB_RO_AUTH_TOKEN", "")
+    if not token:
+        raise ShadowMigrationError("hosted snapshot requires TODO_DB_RO_AUTH_TOKEN carrying read-only authority")
     try:
-        connection = legacy.connect_backend(url, read_only=True)
+        connection = connect(DatabaseConfig(path=url, credential_mode=CredentialMode.READ_ONLY, auth_token=token))
     except Exception as exc:
         message = str(exc).replace(url, "[REDACTED]")
         if token:
             message = message.replace(token, "[REDACTED]")
         raise ShadowMigrationError(f"hosted snapshot connection failed: {message}") from exc
     try:
-        with legacy._read_txn(connection):
-            return write_hosted_legacy_snapshot(connection, output)
+        return write_hosted_legacy_snapshot(connection, output)
     except Exception as exc:
         message = str(exc).replace(url, "[REDACTED]")
         if token:
@@ -132,8 +128,8 @@ def capture_hosted_legacy_snapshot(*, repo_root: Path, url: str, output: Path) -
         connection.close()
 
 
-def legacy_snapshot(connection: sqlite3.Connection) -> dict[str, Any]:
-    """Read a legacy DB into the same nested item shape as ``export_all``."""
+def database_snapshot(connection: sqlite3.Connection) -> dict[str, Any]:
+    """Read the package database into the same nested item shape as its export."""
 
     connection.row_factory = sqlite3.Row
     items = []
@@ -184,7 +180,7 @@ def legacy_snapshot(connection: sqlite3.Connection) -> dict[str, Any]:
         ]
         items.append(item)
     snapshot = {table: _rows(connection, table) for table in TABLE_NAMES if table != "items"}
-    snapshot.update({"items": items, "events": _rows(connection, "events"), "meta": _rows(connection, "meta")})
+    snapshot.update({"items": items, "events": _rows(connection, "events"), "meta": _rows(connection, "metadata")})
     return snapshot
 
 
@@ -296,6 +292,7 @@ def compare_snapshots(
     standalone: dict[str, Any],
     *,
     import_window: tuple[datetime, datetime] | None = None,
+    source_is_package: bool = False,
 ) -> dict[str, Any]:
     legacy_items = {item["id"]: item for item in legacy.get("items", [])}
     standalone_items = {item["id"]: item for item in _standalone_items(standalone)}
@@ -307,19 +304,26 @@ def compare_snapshots(
         if _json(_semantic_item(legacy_items[item_id], peer=standalone_items[item_id], import_window=import_window))
         != _json(_semantic_item(standalone_items[item_id], peer=legacy_items[item_id], import_window=import_window))
     }
-    legacy_events = sorted((_event_signature(event, legacy=True) for event in legacy.get("events", [])), key=_json)
+    legacy_events = sorted(
+        (_event_signature(event, legacy=not source_is_package) for event in legacy.get("events", [])), key=_json
+    )
     all_standalone_events = sorted(
         (_event_signature(event, legacy=False) for event in (standalone.get("events") or [])), key=_json
     )
-    standalone_events = [event for event in all_standalone_events if event[0] != "dependency"]
-    dependency_events = [event for event in all_standalone_events if event[0] == "dependency"]
-    expected_dependency_events = sorted(
-        [
-            ("dependency", row["item_id"], {"needs_item": row["needs_item"]})
-            for row in (standalone.get("tables") or {}).get("item_deps") or []
-        ],
-        key=_json,
-    )
+    if source_is_package:
+        standalone_events = all_standalone_events
+        dependency_events: list[tuple[Any, ...]] = []
+        expected_dependency_events: list[tuple[Any, ...]] = []
+    else:
+        standalone_events = [event for event in all_standalone_events if event[0] != "dependency"]
+        dependency_events = [event for event in all_standalone_events if event[0] == "dependency"]
+        expected_dependency_events = sorted(
+            [
+                ("dependency", row["item_id"], {"needs_item": row["needs_item"]})
+                for row in (standalone.get("tables") or {}).get("item_deps") or []
+            ],
+            key=_json,
+        )
     supplemental_actions = {
         "dependency": len(dependency_events),
     }
@@ -369,7 +373,9 @@ def compare_snapshots(
 
 def _require_imported_items(snapshot: dict[str, Any], *, source_count: int, importer: str) -> None:
     """Reject a silent all-records import failure before comparison can pass."""
-    item_count = len(snapshot.get("items", [])) if importer == "legacy" else len(_standalone_items(snapshot))
+    item_count = (
+        len(snapshot.get("items", [])) if importer in {"legacy", "database"} else len(_standalone_items(snapshot))
+    )
     if source_count and item_count == 0:
         raise ShadowMigrationError(
             f"{importer} import produced zero items for {source_count} YAML records; "
@@ -433,55 +439,9 @@ def run_shadow(
     environment["TODO_DB_REPOSITORY"] = "https://github.com/joeharris76/BenchBox"
     created_target = False
     export_path: Path | None = None
-    legacy_temporary = tempfile.TemporaryDirectory(prefix="benchbox-legacy-shadow-")
     command_reports: list[dict[str, Any]] = []
     import_started_at = datetime.now(timezone.utc)
     try:
-        legacy_db = Path(legacy_temporary.name) / "legacy.sqlite"
-        command_reports.append(
-            _run(
-                [
-                    "uv",
-                    "run",
-                    "--project",
-                    str(repo_root / "_project" / "scripts"),
-                    "--",
-                    "python",
-                    str(repo_root / "_project" / "scripts" / "todo_db.py"),
-                    "--db",
-                    str(legacy_db),
-                    "init",
-                ],
-                cwd=repo_root,
-                env=environment,
-            )
-        )
-        command_reports.append(
-            _run(
-                [
-                    "uv",
-                    "run",
-                    "--project",
-                    str(repo_root / "_project" / "scripts"),
-                    "--",
-                    "python",
-                    str(repo_root / "_project" / "scripts" / "todo_db.py"),
-                    "--db",
-                    str(legacy_db),
-                    "import-yaml",
-                    "--todo-dir",
-                    str(todo_dir),
-                    "--done-dir",
-                    str(done_dir),
-                ],
-                cwd=repo_root,
-                env=environment,
-            )
-        )
-        with sqlite3.connect(legacy_db) as connection:
-            legacy = legacy_snapshot(connection)
-        _require_imported_items(legacy, source_count=len(sources), importer="legacy")
-        created_target = True
         canonical_command = _canonical_todo_command(repo_root)
         command_reports.append(
             _run(
@@ -499,6 +459,7 @@ def run_shadow(
                 env=environment,
             )
         )
+        created_target = True
         command_reports.append(
             _run(
                 [
@@ -519,6 +480,9 @@ def run_shadow(
                 env=environment,
             )
         )
+        with sqlite3.connect(target) as connection:
+            raw_database = database_snapshot(connection)
+        _require_imported_items(raw_database, source_count=len(sources), importer="database")
         export_path = target.with_suffix(".export.json")
         command_reports.append(
             _run(
@@ -545,9 +509,10 @@ def run_shadow(
             "source": {"todo_dir": str(todo_dir), "done_dir": str(done_dir), "yaml_records": len(sources)},
             "commands": command_reports,
             "comparison": compare_snapshots(
-                legacy,
+                raw_database,
                 standalone,
                 import_window=(import_started_at, import_finished_at),
+                source_is_package=True,
             ),
         }
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -559,8 +524,6 @@ def run_shadow(
         if export_path is not None and export_path.is_file():
             export_path.unlink()
         raise
-    finally:
-        legacy_temporary.cleanup()
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Opt-in BenchBox compatibility adapter for the standalone ``todo-db`` CLI.
+"""BenchBox compatibility adapter for the locked ``todo-db`` CLI.
 
-The existing ``_project/scripts/todo`` entry point is deliberately unchanged.
-The legacy Python tracker remains the default until a released standalone
-package is selected explicitly with ``BENCHBOX_TODO_DB_STANDALONE=1``.  This
-module owns BenchBox-only routing and presentation policy; lifecycle state,
+The stable ``_project/scripts/todo`` entry point always routes here. This module
+owns BenchBox-only routing and presentation policy; lifecycle state,
 identity checks, migrations, and audit writes are delegated to ``todo-db``.
 
 This adapter uses an argv list and never a shell.  That matters for hosted DSNs
@@ -337,7 +335,7 @@ def _database_can_have_freeze(argv: list[str], cwd: Path) -> bool:
 
 
 def _append_claim_context(result: subprocess.CompletedProcess[str], argv: list[str], *, cwd: Path) -> None:
-    """Restore preservation and verification sections omitted by todo-db 0.3.1."""
+    """Render BenchBox's full binding work order after a package claim."""
     located = _command_index(argv)
     assert located is not None
     item_index = located[0] + 1
@@ -374,22 +372,14 @@ def _delegate_compat_command(argv: list[str], *, command: str, cwd: Path) -> sub
     initialized = _initialize_missing_local_read_target(argv, command=command, cwd=cwd)
     if initialized is not None and initialized.returncode:
         return initialized
-    if (
-        os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1"
-        and _command_mutates_tracker(argv, command)
-        and _database_can_have_freeze(argv, cwd)
-    ):
+    if _command_mutates_tracker(argv, command) and _database_can_have_freeze(argv, cwd):
         located = _command_index(argv)
         assert located is not None
         guard = _delegate_extension(argv[: located[0]] + ["freeze-guard"], cwd=cwd)
         if guard.returncode:
             return guard
     result = _delegate_extension(argv, cwd=cwd) if command == "renew" else _delegate(argv, command=command, cwd=cwd)
-    if (
-        command == "stats"
-        and os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1"
-        and not any(value in {"-h", "--help", "--version"} for value in argv)
-    ):
+    if command == "stats" and not any(value in {"-h", "--help", "--version"} for value in argv):
         result = _preserve_stats_activity(result, argv, cwd=cwd)
     if command == "claim" and result.returncode == 0:
         _append_claim_context(result, argv, cwd=cwd)
@@ -513,6 +503,8 @@ def _write_legacy_export(
 
 
 def _export(argv: list[str], cwd: Path) -> int:
+    if any(value in {"-h", "--help", "--version"} for value in argv):
+        return _forward_result(_delegate(argv, command="export", cwd=cwd))
     out_dir, without_out = _option_value(argv, "--out")
     # The lossless envelope is written outside --out (the committed snapshot);
     # --lossless-out relocates it, e.g. to a CI artifact staging directory.
@@ -549,25 +541,16 @@ def _main(argv: list[str] | None = None) -> int:
         return _forward_result(_delegate(args, command="", cwd=_repo_root()))
     command_index, command = located
     root = _repo_root()
-    # w2/w3: Map RO/RW tokens + drafts dir; refuse unroutable verbs loudly; never create a fork DB.
-    # Legacy default path (no BENCHBOX_TODO_DB_STANDALONE) is byte-identical — only standalone mode changes.
-    is_standalone = os.environ.get("BENCHBOX_TODO_DB_STANDALONE") == "1"
-    if is_standalone:
-        # Refuse loudly if no DB is configured via env, --db, or config.json; honor config.json as configured.
-        # w5: doctor without DB must diagnose no-backend-configured, not refuse exit-2.
-        has_db = _has_database_environment() or _has_option(args, "--db") or _has_config_json(root)
-        if not has_db and not _can_run_without_database(args, command_index, command):
-            print(
-                f"error: standalone shim cannot route '{command}' without explicit --db, TODO_DB_PATH/URL, or .todo-db/config.json; refusing to create fork DB at {root / '.todo-db' / 'todo.sqlite'}",
-                file=sys.stderr,
-            )
-            return 2
-        # RO/RW token mapping and drafts dir are via env passthrough in _delegate (os.environ.copy) —
-        # standalone reads TODO_DB_AUTH_TOKEN / TODO_DB_RO_AUTH_TOKEN / TODO_DB_FINDING_DRAFTS_DIR directly.
-    else:
-        if not _has_option(args, "--db") and not _has_database_environment():
-            args[command_index:command_index] = ["--db", str(root / ".todo-db" / "todo.sqlite")]
-            command_index += 2
+    # Refuse loudly if no DB is configured via env, --db, or config.json; honor
+    # config.json as configured. Doctor and local-draft finding commands remain
+    # intentionally database-free.
+    has_db = _has_database_environment() or _has_option(args, "--db") or _has_config_json(root)
+    if not has_db and not _can_run_without_database(args, command_index, command):
+        print(
+            f"error: package-only shim cannot route '{command}' without explicit --db, TODO_DB_PATH/URL, or .todo-db/config.json; refusing to create fork DB at {root / '.todo-db' / 'todo.sqlite'}",
+            file=sys.stderr,
+        )
+        return 2
     if command in PACKAGE_COMMAND_TRANSLATIONS:
         command = PACKAGE_COMMAND_TRANSLATIONS[command]
         args[command_index] = command

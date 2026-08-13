@@ -4,8 +4,8 @@
 # dependency surface cannot leak into the public install.
 #
 # Usage:
-#   uv run --project _project/scripts -- python _project/scripts/todo_db.py <args>
-#   _project/scripts/todo <args>   # thin shim over todo_db.py
+#   uv run --project _project/scripts -- todo-db <args>
+#   _project/scripts/todo <args>   # BenchBox policy adapter over todo-db
 #
 # See CLAUDE.md and AGENTS.md for the canonical pre-approved command forms.
 
@@ -19,8 +19,8 @@ dependencies = [
     # the default v1.0.0 on-disk format, attachable by @duckdb/duckdb-wasm
     # regardless of writer version (kept in sync with the root manifest).
     "duckdb>=1.0.0,<2.0.0",
-    "libsql>=0.1.11", # todo_db.py: hosted backend (Turso embedded replica)
-    "pyyaml>=6.0.0", # todo_db.py import-yaml + other _project/scripts tools
+    "libsql>=0.1.11", # todo-db hosted backend (Turso embedded replica)
+    "pyyaml>=6.0.0", # todo-db import-yaml + other _project/scripts tools
     "sqlglot>=25.6.0,<31.0.0",
     "todo-db[hosted]",
     "zstandard>=0.20.0",
@@ -32,4 +32,4 @@ dependencies = [
 managed = true
 
 [tool.uv.sources]
-todo-db = { path = "vendor/todo_db-0.3.1-py3-none-any.whl" }
+todo-db = { path = "vendor/todo_db-0.3.2-py3-none-any.whl" }
