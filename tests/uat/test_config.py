@@ -45,6 +45,8 @@ def test_validate_config_minimal():
     assert cfg.output.benchmark_runs_dir_template == "~/Developer/benchmark_runs"
     assert cfg.preflight.free_space_min_gib == 5.0
     assert cfg.preflight.free_memory_min_gib == 2.0
+    assert cfg.preflight.clickhouse_memory_limit == "8g"
+    assert cfg.preflight.docker_memory_reserve_gib == 2.0
     assert cfg.memory_gate_enabled is True
     assert cfg.cleanup.docker_manage_platforms is False
     assert cfg.cleanup.docker_platform_switch == "off"
@@ -194,6 +196,28 @@ def test_validate_config_memory_gate_disabled_warning_is_none_when_enabled():
 def test_validate_config_rejects_negative_free_memory_min_gib():
     with pytest.raises(config.ConfigError, match="free_memory_min_gib"):
         config.validate_config({"name": "smoke", "preflight": {"free_memory_min_gib": -1}})
+
+
+def test_validate_config_accepts_clickhouse_memory_admission_settings():
+    cfg = config.validate_config(
+        {
+            "name": "smoke",
+            "preflight": {"clickhouse_memory_limit": "8g", "docker_memory_reserve_gib": 3.5},
+        }
+    )
+    assert cfg.preflight.clickhouse_memory_limit == "8g"
+    assert cfg.preflight.docker_memory_reserve_gib == 3.5
+
+
+@pytest.mark.parametrize("value", ["", None, 4])
+def test_validate_config_rejects_invalid_clickhouse_memory_limit(value):
+    with pytest.raises(config.ConfigError, match="clickhouse_memory_limit"):
+        config.validate_config({"name": "smoke", "preflight": {"clickhouse_memory_limit": value}})
+
+
+def test_validate_config_rejects_negative_docker_memory_reserve():
+    with pytest.raises(config.ConfigError, match="docker_memory_reserve_gib"):
+        config.validate_config({"name": "smoke", "preflight": {"docker_memory_reserve_gib": -0.1}})
 
 
 @pytest.mark.parametrize(

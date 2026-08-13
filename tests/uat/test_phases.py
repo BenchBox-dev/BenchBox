@@ -471,6 +471,8 @@ def test_execute_skips_unreachable_platform(tmp_path):
 
 
 def _docker_platform_from_argv(argv: list[str]) -> str:
+    if "stats" in argv:
+        return "clickhouse-server"
     compose_file = argv[argv.index("-f") + 1]
     if compose_path_ends_with(compose_file, "docker", "clickhouse", "docker-compose.yml"):
         return "clickhouse-server"
@@ -484,6 +486,16 @@ def _docker_platform_from_argv(argv: list[str]) -> str:
 def _healthy_ps_result(argv: list[str]) -> docker_assets.DockerCommandResult:
     """A `compose ps -a` result whose single service is Up -- readiness passes."""
     return docker_assets.DockerCommandResult(tuple(argv), 0, healthy_ps_stdout(), "")
+
+
+def _healthy_stats_result(argv: list[str], *, limit: str = "8GB") -> docker_assets.DockerCommandResult:
+    """A Docker-compatible stats row exposing the calibrated ClickHouse cap."""
+    return docker_assets.DockerCommandResult(
+        tuple(argv),
+        0,
+        json.dumps({"Name": "clickhouse", "MemUsage": f"512MB / {limit}"}),
+        "",
+    )
 
 
 def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path):
@@ -503,6 +515,8 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
         sequence.append(("docker", action, _docker_platform_from_argv(argv)))
         if action == "ps":
             return _healthy_ps_result(argv)
+        if action == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def recording_runner(platform, benchmark, scale, **kwargs):
@@ -534,6 +548,7 @@ def test_execute_managed_docker_tears_down_platform_before_next_starts(tmp_path)
     assert sequence == [
         ("docker", "up", "clickhouse-server"),
         ("docker", "ps", "clickhouse-server"),
+        ("docker", "stats", "clickhouse-server"),
         ("cell", "run", "clickhouse-server"),
         ("docker", "down", "clickhouse-server"),
         ("docker", "up", "postgresql"),
@@ -683,6 +698,8 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
             return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose down failed")
         if action == "ps":
             return _healthy_ps_result(argv)
+        if action == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     with platform_reachability(True):
@@ -698,7 +715,12 @@ def test_execute_docker_teardown_failure_aborts_before_next_platform(tmp_path):
 
     assert outcome.aborted is True
     assert "Docker cleanup failed" in (outcome.abort_reason or "")
-    assert commands == ["up:clickhouse-server", "ps:clickhouse-server", "down:clickhouse-server"]
+    assert commands == [
+        "up:clickhouse-server",
+        "ps:clickhouse-server",
+        "stats:clickhouse-server",
+        "down:clickhouse-server",
+    ]
 
 
 def test_execute_aborts_before_compose_up_when_benchmark_runs_dir_is_relative_for_path_mirroring_platform(tmp_path):
@@ -826,6 +848,8 @@ def test_execute_docker_startup_failure_records_and_advances_to_next_platform(tm
             )
         if action == "ps":
             return _healthy_ps_result(argv)
+        if action == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def recording_runner(platform, benchmark, scale, **kwargs):
@@ -916,6 +940,8 @@ def test_execute_readiness_settle_reprobes_compose_ps_after_up_wait_reports_succ
             )
         if action == "ps":
             return _healthy_ps_result(argv)
+        if action == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def recording_runner(platform, benchmark, scale, **kwargs):
@@ -982,6 +1008,8 @@ def test_execute_readiness_check_fails_when_platform_unreachable_after_settle(tm
         action = _docker_verb(argv)
         if action == "ps":
             return _healthy_ps_result(argv)
+        if action == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def fail_runner(platform, benchmark, scale, **kwargs):  # pragma: no cover - assertion helper
@@ -1025,6 +1053,8 @@ def test_execute_readiness_settle_uses_configured_docker_settle_s(tmp_path):
         action = _docker_verb(argv)
         if action == "ps":
             return _healthy_ps_result(argv)
+        if action == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     with platform_reachability(True):
@@ -1094,8 +1124,11 @@ def _managed_docker_cfg(name, **overrides):
 
 
 def _healthy_fake_docker(argv, **kwargs):
-    if _docker_verb(argv) == "ps":
+    action = _docker_verb(argv)
+    if action == "ps":
         return _healthy_ps_result(argv)
+    if action == "stats":
+        return _healthy_stats_result(argv)
     return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
 
@@ -1154,8 +1187,10 @@ def test_execute_memory_floor_abort_reason_carries_the_shipped_failure_message(t
 
     reason = outcome.abort_reason
     assert reason is not None
+    selected_bytes = docker_assets.parse_memory_bytes(cfg.preflight.clickhouse_memory_limit)
+    required_gib = selected_bytes / (1024**3) + cfg.preflight.docker_memory_reserve_gib
     expected_core = format_memory_headroom_failure(
-        check_memory_headroom(MemorySnapshot(free_gib=0.07, swap_used_percent=88.0), min_free_gib=2.0)
+        check_memory_headroom(MemorySnapshot(free_gib=0.07, swap_used_percent=88.0), min_free_gib=required_gib)
     )
     assert reason.startswith(expected_core)
     assert "before starting platform clickhouse-server" in reason
@@ -1166,7 +1201,7 @@ def test_execute_memory_floor_abort_reason_carries_the_shipped_failure_message(t
     # And the same reading is on the lifecycle log for the operator.
     lifecycle = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
     assert "[free-memory]" in lifecycle
-    assert "0.07 GiB free" in lifecycle
+    assert "0.07 GiB available" in lifecycle
 
 
 def test_execute_memory_floor_passes_when_host_has_headroom(tmp_path):
@@ -1179,7 +1214,7 @@ def test_execute_memory_floor_passes_when_host_has_headroom(tmp_path):
             databases_root=tmp_path / "databases",
             runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
             docker_runner=_healthy_fake_docker,
-            memory_reader=_memory_reader(8.0),
+            memory_reader=_memory_reader(16.0),
             sleep_fn=lambda _s: None,
         )
 
@@ -1205,16 +1240,16 @@ def test_execute_memory_floor_disabled_by_zero_never_aborts(tmp_path):
         )
 
     assert outcome.aborted is False
-    assert any(r.status == "passed" for r in outcome.results)
-    # Gate off means no reading is logged either -- nothing was measured.
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
+    # The pre-start floor is off, but ClickHouse still requires a valid
+    # post-start runtime limit and request-plus-reserve reading.
     lifecycle_path = tmp_path / "uat_lifecycle.log"
     lifecycle = lifecycle_path.read_text(encoding="utf-8") if lifecycle_path.exists() else ""
     assert "[free-memory]" not in lifecycle
 
 
-def test_execute_memory_floor_unmeasurable_host_does_not_gate(tmp_path):
-    """A host where free memory cannot be read must neither abort nor pass
-    silently: it logs "could not be measured" and lets the sweep proceed."""
+def test_execute_memory_floor_unmeasurable_clickhouse_host_fails_closed(tmp_path):
+    """ClickHouse admission must not proceed without pre-start headroom evidence."""
     cfg = _managed_docker_cfg("memory unmeasurable")
 
     with platform_reachability(True):
@@ -1228,9 +1263,29 @@ def test_execute_memory_floor_unmeasurable_host_does_not_gate(tmp_path):
             sleep_fn=lambda _s: None,
         )
 
-    assert outcome.aborted is False
+    assert outcome.aborted is True
+    assert outcome.abort_kind == "memory_floor"
     lifecycle = (tmp_path / "uat_lifecycle.log").read_text(encoding="utf-8")
     assert "could not be measured" in lifecycle
+
+
+def test_execute_clickhouse_runtime_memory_rejects_host_below_request_plus_reserve(tmp_path):
+    cfg = _managed_docker_cfg("runtime memory shortfall")
+    readings = iter([16.0, 5.0])
+    with platform_reachability(True):
+        outcome = exec_phase.run_execute(
+            cfg,
+            log_dir=tmp_path,
+            databases_root=tmp_path / "databases",
+            runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
+            docker_runner=_healthy_fake_docker,
+            memory_reader=lambda: MemorySnapshot(free_gib=next(readings), swap_used_percent=0.0),
+            sleep_fn=lambda _s: None,
+        )
+    assert outcome.aborted is False
+    assert any(cell.platform == "clickhouse-server" for cell in outcome.startup_failed)
+    assert any(event.action == "memory-admission" and event.status == "ok" for event in outcome.docker_events)
+    assert "required" in (next(event.message for event in outcome.docker_events if event.action == "readiness"))
 
 
 def test_execute_memory_floor_ignores_non_docker_platforms(tmp_path):
@@ -1394,6 +1449,8 @@ def test_execute_healthy_stack_teardown_failure_still_aborts_after_startup_faile
             return docker_assets.DockerCommandResult(tuple(argv), 1, "", "compose down failed")
         if action == "ps":
             return _healthy_ps_result(argv)
+        if action == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     with platform_reachability(True):
@@ -1607,6 +1664,8 @@ def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
         actions.append(action)
         if action == "ps":
             return _healthy_ps_result(argv)
+        if action == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     def raising_runner(platform, benchmark, scale, **kwargs):
@@ -1626,7 +1685,7 @@ def test_execute_runner_exception_still_tears_down_managed_docker(tmp_path):
             sleep_fn=lambda _s: None,
         )
 
-    assert actions == ["up", "ps", "down"]
+    assert actions == ["up", "ps", "stats", "down"]
 
 
 def test_execute_fixed_container_name_platform_aborts_before_docker_command(tmp_path, monkeypatch):
@@ -1682,6 +1741,8 @@ def test_execute_free_space_abort_reports_context_after_docker_teardown(tmp_path
     readings = iter([10.0, 1.0])
 
     def fake_docker(argv, **kwargs):
+        if _docker_verb(argv) == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     with platform_reachability(True):
@@ -2494,6 +2555,8 @@ def test_execute_readiness_check_requests_ps_all(tmp_path):
         if _docker_verb(argv) == "ps":
             ps_argvs.append(tuple(argv))
             return _healthy_ps_result(argv)
+        if _docker_verb(argv) == "stats":
+            return _healthy_stats_result(argv)
         return docker_assets.DockerCommandResult(tuple(argv), 0, "", "")
 
     with platform_reachability(True):
