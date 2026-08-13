@@ -53,6 +53,28 @@ _MEMORY_UNITS = {
     "gib": 1024**3,
     "tib": 1024**4,
 }
+# ``MemoryRung.requested_memory_gib`` is a nominal envelope.  Compose and
+# Docker accept both decimal ``4g`` and binary ``4GiB`` spellings, so a
+# measured runtime cap is admissible only inside that exact unit-equivalence
+# window -- decimal gigabytes through binary gibibytes.  This is deliberately
+# not an arbitrary percentage tolerance: a materially smaller or larger cap
+# cannot be relabelled as the requested rung.
+_DECIMAL_GIB_EQUIVALENCE = 1000**3
+
+# These are the counters the calibration trace claims to capture.  A partial
+# ClickHouse response is not evidence: query/metric failures must invalidate
+# the rung instead of silently producing a plausible-looking artifact.
+_REQUIRED_CLICKHOUSE_METRICS = frozenset(
+    {
+        "metric.MemoryTracking",
+        "async.MemoryResident",
+        "async.MemoryVirtual",
+        "async.OSMemoryAvailable",
+        "async.OSMemoryFree",
+        "event.InsertedRows",
+        "event.InsertedBytes",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -146,9 +168,22 @@ class ClickHouseMemoryTrace:
             return False
         if any(sample.responsiveness_ms is None for sample in self.samples):
             return False
-        if any(sample.engine.limit_bytes is None for sample in self.samples):
-            return False
+        lower_limit = int(self.rung.requested_memory_gib * _DECIMAL_GIB_EQUIVALENCE)
+        upper_limit = int(self.rung.requested_memory_gib * GIB)
         engine_samples = [sample.engine for sample in self.samples]
+        for sample in self.samples:
+            if sample.host.available_gib is None:
+                return False
+            if sample.server_reachable is not True:
+                return False
+            if not _REQUIRED_CLICKHOUSE_METRICS.issubset(sample.clickhouse_metrics):
+                return False
+            if sample.engine.usage_bytes is None or sample.engine.limit_bytes is None:
+                return False
+            if sample.engine.oom_killed is None or sample.engine.running is None:
+                return False
+            if not lower_limit <= sample.engine.limit_bytes <= upper_limit:
+                return False
         if any(sample.oom_killed is True for sample in engine_samples):
             return False
         if any(
@@ -210,7 +245,7 @@ class ClickHouseMemoryTrace:
                 "peak_engine_usage_bytes": self.peak_engine_usage_bytes,
                 "runtime_memory_limit_bytes": self.runtime_memory_limit_bytes,
                 "driver_timeout_source": self.driver_timeout_source,
-                "oom_killed": any(sample.engine.oom_killed is True for sample in self.samples),
+                "oom_killed": self._oom_killed_summary(),
                 "memory_limit_exceeded": any(
                     sample.engine.usage_bytes is not None
                     and sample.engine.limit_bytes is not None
@@ -222,6 +257,13 @@ class ClickHouseMemoryTrace:
             },
             "samples": [asdict(sample) for sample in self.samples],
         }
+
+    def _oom_killed_summary(self) -> bool | None:
+        """Summarize OOM state without converting unknown telemetry to False."""
+        values = [sample.engine.oom_killed for sample in self.samples]
+        if not values or any(value is None for value in values):
+            return None
+        return any(values)
 
 
 def utc_now() -> str:
@@ -727,6 +769,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         trace.finish(outcome="aborted", failure_reason=loader_reason)
         write_trace(args.output, trace)
         return 2
+    # Replace any prior passing artifact before launching the child.  If the
+    # operator interrupts or the process is terminated before ``stop`` can
+    # publish a final trace, the path still says ``outcome=running`` rather
+    # than leaving stale evidence that belongs to an older invocation.
+    write_trace(args.output, trace)
     collector = MemoryTraceCollector(
         trace=trace,
         output_path=args.output,

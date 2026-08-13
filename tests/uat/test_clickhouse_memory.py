@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -13,11 +15,15 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def _trace(
-    *, outcome: str = "passed", application_batch_rows: int | None = None
+    *,
+    outcome: str = "passed",
+    application_batch_rows: int | None = None,
+    rung: clickhouse_memory.MemoryRung | None = None,
 ) -> clickhouse_memory.ClickHouseMemoryTrace:
+    selected_rung = rung or clickhouse_memory.DEFAULT_MEMORY_RUNGS[0]
     trace = clickhouse_memory.ClickHouseMemoryTrace(
         platform="clickhouse-server",
-        rung=clickhouse_memory.DEFAULT_MEMORY_RUNGS[0],
+        rung=selected_rung,
         started_at_utc=clickhouse_memory.utc_now(),
         driver_timeout_s=300,
         driver_timeout_source="test fixture",
@@ -29,9 +35,14 @@ def _trace(
             elapsed_s=0.1,
             host=clickhouse_memory.HostMemorySample(available_gib=4.0, free_gib=1.0, swap_used_percent=0.0),
             engine=clickhouse_memory.EngineMemorySample(
-                "mocker", "clickhouse", 512 * 1024**2, 1 * clickhouse_memory.GIB
+                "mocker",
+                "clickhouse",
+                512 * 1024**2,
+                int(selected_rung.requested_memory_gib * clickhouse_memory.GIB),
+                oom_killed=False,
+                running=True,
             ),
-            clickhouse_metrics={"event.InsertedRows": 100.0},
+            clickhouse_metrics=dict.fromkeys(clickhouse_memory._REQUIRED_CLICKHOUSE_METRICS, 1.0),
             responsiveness_ms=2.0,
             server_reachable=True,
         )
@@ -119,7 +130,12 @@ def test_trace_rejects_runtime_usage_above_declared_limit():
         elapsed_s=trace.samples[0].elapsed_s,
         host=trace.samples[0].host,
         engine=clickhouse_memory.EngineMemorySample(
-            "mocker", "clickhouse", 2 * clickhouse_memory.GIB, 1 * clickhouse_memory.GIB
+            "mocker",
+            "clickhouse",
+            2 * clickhouse_memory.GIB,
+            1 * clickhouse_memory.GIB,
+            oom_killed=False,
+            running=True,
         ),
         clickhouse_metrics=trace.samples[0].clickhouse_metrics,
         responsiveness_ms=trace.samples[0].responsiveness_ms,
@@ -127,6 +143,52 @@ def test_trace_rejects_runtime_usage_above_declared_limit():
     )
     assert trace.valid_for_calibration is False
     assert trace.to_dict()["summary"]["memory_limit_exceeded"] is True
+
+
+def test_trace_rejects_runtime_limit_outside_named_rung_unit_window():
+    trace = _trace()
+    sample = trace.samples[0]
+    trace.samples[0] = replace(
+        sample,
+        engine=replace(sample.engine, limit_bytes=2 * clickhouse_memory.GIB),
+    )
+    assert trace.valid_for_calibration is False
+
+
+def test_trace_accepts_decimal_runtime_spelling_for_named_gib_rung():
+    trace = _trace()
+    sample = trace.samples[0]
+    trace.samples[0] = replace(
+        sample,
+        engine=replace(sample.engine, limit_bytes=1_000_000_000),
+    )
+    assert trace.valid_for_calibration is True
+
+
+@pytest.mark.parametrize("missing", ["usage", "oom", "host", "metrics"])
+def test_trace_fails_closed_on_required_telemetry_gaps(missing):
+    trace = _trace()
+    sample = trace.samples[0]
+    engine = sample.engine
+    host = sample.host
+    metrics = sample.clickhouse_metrics
+    if missing == "usage":
+        engine = replace(engine, usage_bytes=None)
+    elif missing == "oom":
+        engine = replace(engine, oom_killed=None)
+    elif missing == "host":
+        host = replace(host, available_gib=None)
+    else:
+        metrics = {}
+    trace.samples[0] = replace(sample, engine=engine, host=host, clickhouse_metrics=metrics)
+    assert trace.valid_for_calibration is False
+
+
+def test_trace_summary_preserves_unknown_oom_state():
+    trace = _trace()
+    sample = trace.samples[0]
+    trace.samples[0] = replace(sample, engine=replace(sample.engine, oom_killed=None))
+    assert trace.to_dict()["summary"]["oom_killed"] is None
 
 
 def test_trace_rejects_missing_engine_limit_sample():
@@ -137,7 +199,9 @@ def test_trace_rejects_missing_engine_limit_sample():
             observed_at_utc=sample.observed_at_utc,
             elapsed_s=sample.elapsed_s + 1,
             host=sample.host,
-            engine=clickhouse_memory.EngineMemorySample("mocker", "clickhouse", 512, None),
+            engine=clickhouse_memory.EngineMemorySample(
+                "mocker", "clickhouse", 512, None, oom_killed=False, running=True
+            ),
             clickhouse_metrics=sample.clickhouse_metrics,
             responsiveness_ms=sample.responsiveness_ms,
             server_reachable=True,
@@ -148,8 +212,7 @@ def test_trace_rejects_missing_engine_limit_sample():
 
 def test_select_lowest_successful_rung_does_not_choose_failed_or_unmeasured():
     low = _trace()
-    high = _trace()
-    high.rung = clickhouse_memory.DEFAULT_MEMORY_RUNGS[1]
+    high = _trace(rung=clickhouse_memory.DEFAULT_MEMORY_RUNGS[1])
     failed_low = _trace(outcome="failed")
     failed_low.rung = clickhouse_memory.DEFAULT_MEMORY_RUNGS[0]
     assert clickhouse_memory.select_lowest_successful_rung([failed_low, high]) == high.rung
@@ -217,6 +280,37 @@ def test_collector_records_injected_engine_stats_without_live_daemon(monkeypatch
     assert trace.samples[0].engine.usage_bytes == clickhouse_memory.GIB
     assert trace.samples[0].responsiveness_ms == 3.5
     assert seen_argv[0][-1] == "benchbox-uat-test-clickhouse-1"
+
+
+def test_main_replaces_stale_artifact_before_child_start(monkeypatch, tmp_path: Path):
+    output = tmp_path / "trace.json"
+    output.write_text('{"outcome":"passed"}\n', encoding="utf-8")
+    started_payloads = []
+
+    class FakeCollector:
+        def __init__(self, *, trace, output_path, **kwargs):
+            self.trace = trace
+            self.output_path = output_path
+
+        def start(self):
+            started_payloads.append(json.loads(self.output_path.read_text(encoding="utf-8")))
+
+        def stop(self, *, outcome, failure_reason=None):
+            self.trace.finish(outcome=outcome, failure_reason=failure_reason)
+            clickhouse_memory.write_trace(self.output_path, self.trace)
+
+    monkeypatch.setattr(clickhouse_memory, "verify_native_streaming_loader", lambda: (True, "ok"))
+    monkeypatch.setattr(clickhouse_memory, "resolve_driver_timeout", lambda command: (300, "test"))
+    monkeypatch.setattr(clickhouse_memory, "MemoryTraceCollector", FakeCollector)
+    monkeypatch.setattr(
+        clickhouse_memory.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, stdout="", stderr=""),
+    )
+
+    assert clickhouse_memory.main(["--output", str(output), "--rung", "baseline-1g", "--", "true"]) == 0
+    assert started_payloads and started_payloads[0]["outcome"] == "running"
+    assert started_payloads[0]["trace_schema_version"] == clickhouse_memory.TRACE_SCHEMA_VERSION
 
 
 def test_rung_matrix_excludes_1000_row_language():
