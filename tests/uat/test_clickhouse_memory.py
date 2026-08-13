@@ -324,6 +324,38 @@ def test_main_replaces_stale_artifact_before_child_start(monkeypatch, tmp_path: 
     assert started_payloads[0]["trace_schema_version"] == clickhouse_memory.TRACE_SCHEMA_VERSION
 
 
+def test_main_leaves_running_artifact_when_child_is_interrupted(monkeypatch, tmp_path: Path):
+    output = tmp_path / "trace.json"
+    output.write_text('{"outcome":"passed"}\n', encoding="utf-8")
+
+    class FakeCollector:
+        def __init__(self, *, trace, output_path, **kwargs):
+            self.trace = trace
+            self.output_path = output_path
+
+        def start(self):
+            pass
+
+        def stop(self, *, outcome, failure_reason=None):
+            raise AssertionError("interrupted child must not publish a passing/final trace")
+
+    monkeypatch.setattr(clickhouse_memory, "verify_native_streaming_loader", lambda: (True, "ok"))
+    monkeypatch.setattr(clickhouse_memory, "resolve_driver_timeout", lambda command: (300, "test"))
+    monkeypatch.setattr(clickhouse_memory, "MemoryTraceCollector", FakeCollector)
+
+    def interrupt_child(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(clickhouse_memory.subprocess, "run", interrupt_child)
+
+    with pytest.raises(KeyboardInterrupt):
+        clickhouse_memory.main(["--output", str(output), "--rung", "baseline-1g", "--", "true"])
+
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["outcome"] == "running"
+    assert payload["summary"]["valid_for_calibration"] is False
+
+
 def test_rung_matrix_excludes_1000_row_language():
     rendered = clickhouse_memory.rung_matrix_text()
     assert "baseline-1g" in rendered
