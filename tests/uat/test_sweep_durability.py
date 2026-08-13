@@ -38,6 +38,7 @@ from tests.uat import (
 from tests.uat.config import validate_config
 from tests.uat.conftest import docker_verb, healthy_ps_stdout, platform_reachability
 from tests.uat.phases import execute as exec_phase
+from tests.uat.preflight_budget import MemorySnapshot
 from tests.uat.runner import CellResult
 
 pytestmark = pytest.mark.fast
@@ -307,7 +308,13 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
     def fake_docker(argv, **_kwargs):
         action = docker_verb(argv)
         sequence.append(action)
-        stdout = healthy_ps_stdout() if action == "ps" else ""
+        stdout = (
+            healthy_ps_stdout()
+            if action == "ps"
+            else json.dumps({"Name": "clickhouse", "MemUsage": "512MB / 4GB"})
+            if action == "stats"
+            else ""
+        )
         return docker_assets.DockerCommandResult(tuple(argv), 0, stdout, "")
 
     def interrupting_runner(platform, benchmark, scale, **_kwargs):
@@ -323,6 +330,12 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
                 runner=interrupting_runner,
                 docker_runner=fake_docker,
                 free_space_checks_enabled=False,
+                # Keep this signal/teardown test independent of the host's
+                # current memory pressure. ClickHouse admission now requires
+                # the selected request plus reserve before the cell starts;
+                # this test is about propagating KeyboardInterrupt through the
+                # lifecycle, not about exercising that host gate.
+                memory_reader=lambda: MemorySnapshot(free_gib=8.0, swap_used_percent=0.0),
                 # Without this the post-start readiness check runs a REAL
                 # time.sleep(cleanup.docker_settle_s) -- 10s, which made this
                 # the slowest test in the package by 8x.
