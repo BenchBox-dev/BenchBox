@@ -142,8 +142,11 @@ jobs:
             todo-db --db "${restore_dir}/restore.sqlite" \
             --project-id "${TODO_DB_PROJECT_ID}" --repository "${TODO_DB_REPOSITORY}" \
             export --output "${restore_dir}/restored.json"
-          uv run --project _project/scripts --locked -- \
-            python -c 'import json, pathlib; source=json.loads(pathlib.Path("'"${LOSSLESS_DIR}"'/todo-db.json").read_text()); restored=json.loads(pathlib.Path("'"${restore_dir}"'/restored.json").read_text()); assert source == restored'
+          cmp -s "${LOSSLESS_DIR}/todo-db.json" "${restore_dir}/restored.json" || {
+            echo "Restored export is not byte-identical to the source recovery artifact" >&2
+            sha256sum "${LOSSLESS_DIR}/todo-db.json" "${restore_dir}/restored.json" >&2
+            exit 1
+          }
 
       - name: Write directory README
         run: |
