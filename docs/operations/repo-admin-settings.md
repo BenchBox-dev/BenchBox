@@ -82,13 +82,19 @@ top-level paths) routes through `code-lint` + `code-test`.
 Other ruleset properties to preserve:
 
 ```text
-strict_required_status_checks_policy: false
+strict_required_status_checks_policy: true
 required_linear_history: true
 non_fast_forward: true
 required_pull_request_reviews:    squash-only PRs
 deletion: blocked
 bypass_actors: (none)
 ```
+
+Current-base checks are required because instruction budgets and other
+repository-wide invariants are not additive per PR. Without the strict policy,
+two PRs can each pass against the same older base and exceed an invariant when
+merged in sequence. The tradeoff is deliberate: when `develop` advances, an
+otherwise-green PR must refresh its required checks before it can merge.
 
 Verify:
 

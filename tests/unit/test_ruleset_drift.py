@@ -44,6 +44,7 @@ def test_parse_expected_rulesets_from_admin_runbook() -> None:
         "ci-required-result",
         "Results Explorer browser gate",
     )
+    assert expected["develop-squash-only"].strict_required_status_checks_policy is True
     assert expected["release-only"].ref == "refs/heads/release"
     assert expected["release-only"].required_checks == ("validate-base", "release-required-result")
     assert expected["release-only"].strict_required_status_checks_policy is False
