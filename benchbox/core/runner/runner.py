@@ -14,6 +14,7 @@ import time
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from benchbox.core.benchmark_loader import (
@@ -35,6 +36,8 @@ from benchbox.core.contracts import (
 from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.results.models import (
     BenchmarkResults,
+    ExecutionPhases,
+    SetupPhase,
 )
 from benchbox.core.results.platform_options import build_platform_options_capture
 from benchbox.core.runner.conversion import FormatConversionOrchestrator
@@ -895,6 +898,105 @@ def _build_data_only_result(
     return result_obj
 
 
+def _clickhouse_load_failure_details(
+    exc: BaseException,
+    *,
+    adapter: Any,
+    platform_config: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Return a durable, credential-free payload for a ClickHouse load failure.
+
+    ClickHouse server streaming deliberately raises a typed
+    ``ClickHouseServerLoadError``.  Keep the structured fields at this
+    orchestration boundary instead of forcing UAT to reverse-engineer a
+    human-readable log line.  The payload reports rows handed to the driver as
+    ``rows_attempted``; the driver does not expose a commit count when an
+    INSERT fails, so claiming those rows were committed would be incorrect.
+    """
+
+    # Keep the core -> platform dependency one-way.  The platform loader's
+    # typed exception is intentionally recognized by its stable boundary
+    # contract rather than importing ``benchbox.platforms`` from core (the
+    # architecture lint forbids that reverse dependency).
+    if type(exc).__name__ != "ClickHouseServerLoadError" or not all(
+        hasattr(exc, attribute) for attribute in ("table_name", "source_files", "rows_attempted", "cause")
+    ):
+        return None
+
+    resolved_config = dict(platform_config or {})
+    memory_keys = (
+        "max_memory_usage",
+        "max_threads",
+        "max_execution_time",
+        "insert_block_size",
+    )
+    memory_settings: dict[str, Any] = {}
+    for key in memory_keys:
+        value = resolved_config.get(key, getattr(adapter, key, None))
+        if value is not None:
+            memory_settings[key] = value
+
+    driver_timeout = resolved_config.get("send_receive_timeout", getattr(adapter, "send_receive_timeout", None))
+    cause = exc.cause
+    return {
+        "table": exc.table_name,
+        "source_files": [str(path) for path in exc.source_files],
+        "rows_attempted": int(exc.rows_attempted),
+        "memory_settings": memory_settings,
+        "driver_timeout_s": driver_timeout,
+        "exception": {
+            "type": type(cause).__name__,
+            "message": str(cause),
+        },
+        # A load failure is not a result bundle.  This is intentionally null so
+        # consumers cannot mistake a failed/partial load for query evidence.
+        "result_json": None,
+    }
+
+
+def _build_clickhouse_load_failure_result(
+    *,
+    benchmark: Any,
+    benchmark_config: BenchmarkConfig,
+    database_config: DatabaseConfig | None,
+    adapter: Any,
+    platform_config: Mapping[str, Any] | None,
+    exc: BaseException,
+    execution_context: ExecutionContext | None,
+) -> BenchmarkResults:
+    """Build a failed sentinel while retaining typed ClickHouse load diagnostics."""
+
+    details = _clickhouse_load_failure_details(exc, adapter=adapter, platform_config=platform_config)
+    if details is None:
+        raise TypeError("_build_clickhouse_load_failure_result requires ClickHouseServerLoadError")
+
+    result = BenchmarkResults(
+        benchmark_name=getattr(benchmark_config, "display_name", benchmark_config.name.upper()),
+        platform=getattr(adapter, "platform_name", getattr(database_config, "type", "unknown")),
+        scale_factor=benchmark_config.scale_factor,
+        execution_id=uuid.uuid4().hex[:8],
+        timestamp=datetime.now(),
+        duration_seconds=0.0,
+        total_queries=0,
+        successful_queries=0,
+        failed_queries=0,
+        query_results=[],
+        query_definitions={},
+        execution_phases=ExecutionPhases(setup=SetupPhase()),
+        validation_status="FAILED",
+        validation_details={"error": str(exc), "load_failure": details},
+        data_loading_time=0.0,
+        schema_creation_time=0.0,
+        total_rows_loaded=0,
+        data_size_mb=0.0,
+        table_statistics={},
+        execution_metadata={"mode": "load_failure"},
+    )
+    if execution_context is not None:
+        result.execution_context = execution_context.model_dump()
+    return result
+
+
 def _build_setup_only_result(
     benchmark: Any,
     adapter: Any,
@@ -1210,23 +1312,36 @@ def run_benchmark_lifecycle(
     should_run_load_only = test_type == "load_only" or (phases.load and not phases.execute and adapter is not None)
 
     if should_run_load_only:
-        with sql_translation_context(strict=strict_translation) as translation_outcomes:
-            result_obj = _run_load_only_mode(
-                benchmark=benchmark,
-                benchmark_config=benchmark_config,
-                system_profile=system_profile,
-                adapter=adapter,
-                platform_config=platform_config,
-                validation_opts=validation_opts,
-                table_mode=table_mode,
-                options=options,
-                verbosity_settings=verbosity_settings,
-                monitor=monitor,
-                output_root=output_root,
-                is_dataframe_adapter=is_dataframe_adapter,
-                validation_records=validation_records,
-                gather_statistics=phases.statistics,
-            )
+        try:
+            with sql_translation_context(strict=strict_translation) as translation_outcomes:
+                result_obj = _run_load_only_mode(
+                    benchmark=benchmark,
+                    benchmark_config=benchmark_config,
+                    system_profile=system_profile,
+                    adapter=adapter,
+                    platform_config=platform_config,
+                    validation_opts=validation_opts,
+                    table_mode=table_mode,
+                    options=options,
+                    verbosity_settings=verbosity_settings,
+                    monitor=monitor,
+                    output_root=output_root,
+                    is_dataframe_adapter=is_dataframe_adapter,
+                    validation_records=validation_records,
+                    gather_statistics=phases.statistics,
+                )
+        except Exception as exc:
+            if _clickhouse_load_failure_details(exc, adapter=adapter, platform_config=platform_config) is not None:
+                return _build_clickhouse_load_failure_result(
+                    benchmark=benchmark,
+                    benchmark_config=benchmark_config,
+                    database_config=database_config,
+                    adapter=adapter,
+                    platform_config=platform_config,
+                    exc=exc,
+                    execution_context=execution_context,
+                )
+            raise
         result_obj = _finalize_validation_metadata(result_obj, validation_records)
         result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=adapter, database_config=database_config)
         result_obj = _enrich_normalized_runtime_metadata(
@@ -1263,20 +1378,33 @@ def run_benchmark_lifecycle(
         gather_statistics=phases.statistics,
     )
 
-    with sql_translation_context(strict=strict_translation) as translation_outcomes:
-        result_obj = _execute_via_adapter(
-            adapter=adapter,
-            benchmark=benchmark,
-            benchmark_config=benchmark_config,
-            system_profile=system_profile,
-            run_config=run_config,
-            options=options,
-            phases=phases,
-            verbosity_settings=verbosity_settings,
-            monitor=monitor,
-            output_root=output_root,
-            is_dataframe_adapter=is_dataframe_adapter,
-        )
+    try:
+        with sql_translation_context(strict=strict_translation) as translation_outcomes:
+            result_obj = _execute_via_adapter(
+                adapter=adapter,
+                benchmark=benchmark,
+                benchmark_config=benchmark_config,
+                system_profile=system_profile,
+                run_config=run_config,
+                options=options,
+                phases=phases,
+                verbosity_settings=verbosity_settings,
+                monitor=monitor,
+                output_root=output_root,
+                is_dataframe_adapter=is_dataframe_adapter,
+            )
+    except Exception as exc:
+        if _clickhouse_load_failure_details(exc, adapter=adapter, platform_config=platform_config) is not None:
+            return _build_clickhouse_load_failure_result(
+                benchmark=benchmark,
+                benchmark_config=benchmark_config,
+                database_config=database_config,
+                adapter=adapter,
+                platform_config=platform_config,
+                exc=exc,
+                execution_context=execution_context,
+            )
+        raise
 
     if validation_opts.enable_postload_validation and not is_dataframe_adapter:
         postload_result = _run_postload_validation(adapter, benchmark_config, platform_config)

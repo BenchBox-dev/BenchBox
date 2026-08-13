@@ -113,6 +113,7 @@ def _render_cell_row(cell: CellResult, *, source_info: SourceInfo) -> str:
                 "elapsed_s": cell.elapsed_s,
                 "log_path": str(cell.log_path),
                 "result_path": (str(cell.result_path) if cell.result_path else None),
+                "load_failure_path": (str(cell.load_failure_path) if cell.load_failure_path else None),
                 "throughput_check": cell.throughput_check,
                 "failure_tail": failure_tail,
                 "source_commit_sha": source_info.commit_sha,
@@ -345,6 +346,9 @@ def read_cells_jsonl(path: Path) -> list[CellResult]:
                     result_path=(Path(payload["result_path"]) if payload.get("result_path") else None),
                     submit_terminal_state=payload.get("submit_terminal_state", "submittable"),
                     throughput_check=payload.get("throughput_check"),
+                    load_failure_path=(
+                        Path(payload["load_failure_path"]) if payload.get("load_failure_path") else None
+                    ),
                 )
             )
     return cells
