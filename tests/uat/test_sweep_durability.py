@@ -311,7 +311,7 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
         stdout = (
             healthy_ps_stdout()
             if action == "ps"
-            else json.dumps({"Name": "clickhouse", "MemUsage": "512MB / 4GB"})
+            else json.dumps({"Name": "clickhouse", "MemUsage": "512MB / 8GB"})
             if action == "stats"
             else ""
         )
@@ -335,7 +335,7 @@ def test_interrupt_mid_cell_still_tears_down_docker_stack(tmp_path: Path):
                 # the selected request plus reserve before the cell starts;
                 # this test is about propagating KeyboardInterrupt through the
                 # lifecycle, not about exercising that host gate.
-                memory_reader=lambda: MemorySnapshot(free_gib=8.0, swap_used_percent=0.0),
+                memory_reader=lambda: MemorySnapshot(free_gib=16.0, swap_used_percent=0.0),
                 # Without this the post-start readiness check runs a REAL
                 # time.sleep(cleanup.docker_settle_s) -- 10s, which made this
                 # the slowest test in the package by 8x.

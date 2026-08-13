@@ -488,7 +488,7 @@ def _healthy_ps_result(argv: list[str]) -> docker_assets.DockerCommandResult:
     return docker_assets.DockerCommandResult(tuple(argv), 0, healthy_ps_stdout(), "")
 
 
-def _healthy_stats_result(argv: list[str], *, limit: str = "4GB") -> docker_assets.DockerCommandResult:
+def _healthy_stats_result(argv: list[str], *, limit: str = "8GB") -> docker_assets.DockerCommandResult:
     """A Docker-compatible stats row exposing the calibrated ClickHouse cap."""
     return docker_assets.DockerCommandResult(
         tuple(argv),
@@ -1214,7 +1214,7 @@ def test_execute_memory_floor_passes_when_host_has_headroom(tmp_path):
             databases_root=tmp_path / "databases",
             runner=_stub_runner_factory({0.01: 1.0}, {0.01: True}),
             docker_runner=_healthy_fake_docker,
-            memory_reader=_memory_reader(8.0),
+            memory_reader=_memory_reader(16.0),
             sleep_fn=lambda _s: None,
         )
 
@@ -1271,7 +1271,7 @@ def test_execute_memory_floor_unmeasurable_clickhouse_host_fails_closed(tmp_path
 
 def test_execute_clickhouse_runtime_memory_rejects_host_below_request_plus_reserve(tmp_path):
     cfg = _managed_docker_cfg("runtime memory shortfall")
-    readings = iter([8.0, 5.0])
+    readings = iter([16.0, 5.0])
     with platform_reachability(True):
         outcome = exec_phase.run_execute(
             cfg,

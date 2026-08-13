@@ -847,7 +847,7 @@ host reserve.
 
 ClickHouse is the exception to the generic "declared limit or engine default"
 diagnostic above. Its managed UAT compose file requires the caller to resolve
-`preflight.clickhouse_memory_limit` (default `4g`, the calibration-selected
+`preflight.clickhouse_memory_limit` (default `8g`, the calibration-selected
 SF1 rung) into `CLICKHOUSE_MEMORY_LIMIT`; the compose file has no `:-1g` or
 other fallback. A missing, empty, or malformed request is an admission error
 before `compose up`, never a reason to recreate the historical 1 GiB batch.
@@ -870,7 +870,7 @@ an unverified ClickHouse runtime limit or post-start reserve shortfall.
 For a direct operator compose check, export the selected rung explicitly:
 
 ```bash
-CLICKHOUSE_MEMORY_LIMIT=4g docker compose -f docker/clickhouse/docker-compose.yml config
+CLICKHOUSE_MEMORY_LIMIT=8g docker compose -f docker/clickhouse/docker-compose.yml config
 ```
 
 The UAT harness passes the same environment to `up`, readiness, runtime
