@@ -30,6 +30,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DECISION_DOC = REPO_ROOT / "_project" / "decisions" / "single-repo-migration.md"
 MAKEFILE = REPO_ROOT / "Makefile"
+DEVELOPMENT_TREE_TARGETS_VARIABLE = "DEVELOPMENT_TREE_ONLY_TARGETS"
 REQUIRED_CURATED_PATHS = frozenset(
     {
         "results-data",
@@ -88,6 +89,58 @@ def parse_curation_list(makefile: Path) -> set[str]:
         # Skip option tokens such as --ignore-unmatch; only pathspecs count.
         paths.update(p for p in rm_match.group(1).split() if not p.startswith("-"))
     return paths
+
+
+def parse_development_tree_targets(makefile: Path) -> set[str]:
+    """Read the Make targets declared unavailable on a curated release."""
+    lines = makefile.read_text(encoding="utf-8").splitlines()
+    values: list[str] = []
+    collecting = False
+    for line in lines:
+        if not collecting:
+            prefix = f"{DEVELOPMENT_TREE_TARGETS_VARIABLE} :="
+            if not line.startswith(prefix):
+                continue
+            line = line[len(prefix) :].strip()
+            collecting = True
+        continued = line.endswith("\\")
+        values.extend(line.removesuffix("\\").split())
+        if not continued:
+            break
+    return set(values)
+
+
+def project_dependent_make_targets(root: Path) -> set[str]:
+    """Return targets whose recipes execute or manipulate an `_project/` path."""
+    targets: set[str] = set()
+    for path in [root / "Makefile", *sorted((root / "make").glob("*.mk"))]:
+        target: str | None = None
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if (
+                line
+                and not line[0].isspace()
+                and ":" in line
+                and ":=" not in line
+                and not line.startswith(("#", "define", "endef"))
+            ):
+                target = line.split(":", 1)[0].strip()
+            recipe = line.lstrip("\t")
+            if not line.startswith("\t") or not target or "_project/" not in recipe:
+                continue
+            if recipe.lstrip("@").startswith(("#", "echo ")):
+                continue
+            targets.add(target)
+    return targets
+
+
+def development_tree_target_findings(root: Path) -> list[str]:
+    """Find retained Make recipes that would fail opaquely after curation."""
+    declared = parse_development_tree_targets(root / "Makefile")
+    required = project_dependent_make_targets(root)
+    return [
+        f"Make target {target!r} references _project/ but is not declared development-only"
+        for target in sorted(required - declared)
+    ]
 
 
 def list_tracked_top_level() -> set[str]:

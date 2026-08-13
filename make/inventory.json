@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "c5d2efbd0a9793ce87eb46e4cf177a316872fbf0e16976dd98fddea8d962ccc8",
+  "contract_sha256": "2bb508f752d89949fb87a39932c259475406b53284a85a60a8f9e448e2fc1024",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -17,6 +17,7 @@
     ]
   },
   "phony_targets": [
+    ".development-tree-required",
     "agent-commit-range-check",
     "agent-identity-check",
     "agent-instructions-check",
@@ -348,7 +349,19 @@
     "worktree-remove"
   ],
   "rules": {
+    ".development-tree-required": [
+      {
+        "header": ".development-tree-required:",
+        "recipe": "\t@if [ ! -d \"$(BENCHBOX_MAKEFILE_ROOT)_project\" ]; then \\\n\t\techo \"Error: this target requires the BenchBox development tree; _project/ is intentionally absent from curated releases.\" >&2; \\\n\t\texit 2; \\\n\tfi",
+        "recipe_sha256": "41433c52ebf513d2159c47c7f15541a9efbb86b92cd5c16754d23f6b10d59565"
+      }
+    ],
     "agent-commit-range-check": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "agent-commit-range-check:",
         "recipe": "\t@git fetch origin $(patsubst origin/%,%,$(AGENT_IDENTITY_BASE_REF)) --quiet 2>/dev/null || true\n\tuv run -- python _project/scripts/agent_instruction_audit.py --check-commit-range $(AGENT_IDENTITY_BASE_REF)",
@@ -357,12 +370,22 @@
     ],
     "agent-identity-check": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "agent-identity-check:",
         "recipe": "\tuv run -- python _project/scripts/agent_instruction_audit.py --check-git-identity",
         "recipe_sha256": "b209a334b23c84b141dce0fda8b61eb0f5a2a58e7109fd1b6e9680d2e3a389ff"
       }
     ],
     "agent-instructions-check": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "agent-instructions-check:",
         "recipe": "\tuv run -- python _project/scripts/agent_instruction_audit.py",
@@ -385,12 +408,22 @@
     ],
     "artifact-hygiene": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "artifact-hygiene:",
         "recipe": "\tuv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked",
         "recipe_sha256": "1513741af63667301b9ee7819d735291f0720844f221d22d255f47c880bc51d5"
       }
     ],
     "audit-deps": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "audit-deps:",
         "recipe": "\tuv run -- python _project/scripts/dependency_audit/check_deps.py",
@@ -399,12 +432,22 @@
     ],
     "audit-raw": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "audit-raw:",
         "recipe": "\tuv run -- python _project/scripts/dependency_audit/parse_deps.py",
         "recipe_sha256": "0f3eaa5fa66eebbe2095d3c6f61cbdd0f706f9bc2ace5c1961a18936e3c24867"
       }
     ],
     "audit-raw-check": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "audit-raw-check:",
         "recipe": "\tuv run -- python _project/scripts/dependency_audit/parse_deps.py --check",
@@ -413,6 +456,11 @@
     ],
     "audit-sha-check": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "audit-sha-check:",
         "recipe": "\t@test -n \"$(FILE)\" || { echo \"Usage: make audit-sha-check FILE=<audit.md>\"; exit 1; }\n\tuv run --no-project -- python _project/scripts/audit_sha_check.py \\\n\t\t--target-ref \"$(AUDIT_SHA_TARGET_REF)\" \\\n\t\t$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \\\n\t\t\"$(FILE)\"",
         "recipe_sha256": "a56d25d7a388170eb7c4f9866515d85eb5b44aadb1ff672f404963d87f2026fc"
@@ -420,12 +468,22 @@
     ],
     "blind-spots-list": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "blind-spots-list:",
         "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py list",
         "recipe_sha256": "85a94270b6f9ca48a84a5f8b0ae26908d9bb3c3d94eec81709118d6b40bae652"
       }
     ],
     "blind-spots-report": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "blind-spots-report:",
         "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py report",
@@ -461,6 +519,11 @@
       }
     ],
     "ci-lint": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "ci-lint:",
         "recipe": "\t@echo \"Running CI lint checks...\"\n\t@case \" $(MAKEFLAGS) \" in *\" n \"*|*\" -n \"*|*\" --just-print \"*) echo \"Dry-run: ci-lint guards suppressed\"; exit 0;; esac; \\\n\tset +e; failed=\"\"; \\\n\tuv run ruff check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-check\"; \\\n\tuv run ruff format --check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-format\"; \\\n\tuv run ty check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ty-check\"; \\\n\t$(MAKE) quality-governance-typecheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed quality-governance-typecheck\"; \\\n\t$(MAKE) uv-lock-revision-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uv-lock-revision\"; \\\n\t$(MAKE) lint-markers; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-markers\"; \\\n\t$(MAKE) lint-imports; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-imports\"; \\\n\t$(MAKE) windows-antipatterns-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed windows-antipatterns\"; \\\n\t$(MAKE) lint-explorer-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-explorer-tokens\"; \\\n\t$(MAKE) lint-site-theme-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-site-theme-tokens\"; \\\n\t$(MAKE) artifact-hygiene; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed artifact-hygiene\"; \\\n\t$(MAKE) agent-instructions-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-instructions\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) agent-identity-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed agent-identity\"; \\\n\tfi; \\\n\t$(MAKE) agent-commit-range-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-commit-range\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) skill-sync-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed skill-sync-check\"; \\\n\tfi; \\\n\tuv run -- python _project/scripts/timing_policy_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed timing-policy\"; \\\n\tuv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uat-loc-table\"; \\\n\t$(MAKE) compat-docs-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed compat-docs-check\"; \\\n\t$(MAKE) platform-manifest-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed platform-manifest-check\"; \\\n\t$(MAKE) oracle-coverage-map-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed oracle-coverage-map-check\"; \\\n\tuv run -- python scripts/check_public_contract_drift.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed public-contract-drift\"; \\\n\t$(MAKE) audit-deps; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-deps\"; \\\n\t$(MAKE) audit-raw-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-raw-check\"; \\\n\tuv run -- python scripts/check_release_curation.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed release-curation\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed skill-mirror-drift\"; \\\n\t$(MAKE) duplicate-check-delta; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed duplicate-delta\"; \\\n\t$(MAKE) complexity-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed complexity-check\"; \\\n\t$(MAKE) spellcheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed spellcheck\"; \\\n\tif [ -n \"$$failed\" ]; then \\\n\t\techo \"\"; \\\n\t\techo \"\u274c FAILED guards:$$failed\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"\u2705 CI lint checks passed\"",
@@ -532,6 +595,11 @@
     ],
     "complexity-check": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "complexity-check:",
         "recipe": "\tuv run -- python _project/scripts/check_complexity.py",
         "recipe_sha256": "01d13c69eaf5f7b095164da72231195845ed0fc00727bd59176541e4f3ca6b31"
@@ -539,12 +607,22 @@
     ],
     "complexity-report": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "complexity-report:",
         "recipe": "\tuv run -- python _project/scripts/check_complexity.py --no-fail --top 30",
         "recipe_sha256": "468275ee8cdffd22852a59dcae27ed35a69e4ad3e4b9c00073d0671955e399e1"
       }
     ],
     "correctness-gate-digests-regen": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "correctness-gate-digests-regen:",
         "recipe": "\tBENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python _project/scripts/regenerate_correctness_gate_digests.py",
@@ -588,12 +666,22 @@
     ],
     "cross-surface-applicability-report": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "cross-surface-applicability-report:",
         "recipe": "\tuv run -- python _project/scripts/cross_surface_applicability_sweep.py",
         "recipe_sha256": "74d9721deec4b38039072b07e7fdfc6d15fdd3c512c4bb1d26f1dc46974bccfb"
       }
     ],
     "cross-surface-baseline-autodetect": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "cross-surface-baseline-autodetect:",
         "recipe": "\tuv run -- python _project/scripts/cross_surface_baseline_autodetect.py \\\n\t\t--json-out _project/cross-surface-baseline-autodetect/summary.json",
@@ -615,6 +703,11 @@
       }
     ],
     "dev-loop-metrics": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "dev-loop-metrics:",
         "recipe": "\t@set -e; \\\n\tTMP=$$(mktemp -d); \\\n\ttrap 'rm -rf \"$$TMP\"' EXIT; \\\n\tSINCE=$$(uv run -- python -c 'from datetime import datetime, timedelta, timezone; print((datetime.now(timezone.utc) - timedelta(days=int(\"$(DEV_LOOP_METRICS_DAYS)\"))).date().isoformat())'); \\\n\techo \"Fetching develop-post-merge metrics since $$SINCE (limit $(DEV_LOOP_METRICS_LIMIT))...\"; \\\n\tRUN_IDS=$$(gh run list --workflow develop-post-merge.yml --branch develop --event push --created \">=$$SINCE\" --limit \"$(DEV_LOOP_METRICS_LIMIT)\" --json databaseId --jq '.[].databaseId' 2>/dev/null || true); \\\n\tfor id in $$RUN_IDS; do \\\n\t\tgh run download \"$$id\" -n metrics -D \"$$TMP/$$id\" >/dev/null 2>&1 || true; \\\n\tdone; \\\n\tFILES=$$(find \"$$TMP\" -type f -name '*.json' | sort); \\\n\tif [ -z \"$$FILES\" ]; then \\\n\t\techo \"Metrics artifacts: 0\"; \\\n\t\techo \"PR-to-merged P50: n/a\"; \\\n\t\techo \"PR-to-merged P95: n/a\"; \\\n\t\techo \"Post-merge red rate: n/a (0/0)\"; \\\n\t\techo \"Conflict rate: n/a (0/0)\"; \\\n\t\techo \"runner minutes total: 0\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tjq -r -s ' \\\n\t\tdef nums($$k): [.[].[$$k] | select(type == \"number\")]; \\\n\t\tdef ceil_num: if . == floor then . else floor + 1 end; \\\n\t\tdef pct($$a; $$p): \\\n\t\t\tif ($$a | length) == 0 then null \\\n\t\t\telse ($$a | sort) as $$s | (((($$s | length) * $$p / 100) | ceil_num) - 1) as $$idx | $$s[$$idx] end; \\\n\t\tdef fmt: if . == null then \"n/a\" else tostring end; \\\n\t\tdef rate($$n; $$d): if $$d == 0 then \"n/a\" else (((100 * $$n / $$d) | tostring) + \"%\") end; \\\n\t\t. as $$rows | \\\n\t\t($$rows | length) as $$total | \\\n\t\t(nums(\"pr_open_to_merged_seconds\")) as $$merge_seconds | \\\n\t\t([$$rows[] | select(.post_merge_red == true)] | length) as $$red | \\\n\t\t([$$rows[] | select(.conflict_on_merge == true)] | length) as $$conflicts | \\\n\t\t((nums(\"ci_runner_minutes\") | add) // 0) as $$runner | \\\n\t\t[ \\\n\t\t\t\"Metrics artifacts: \\($$total)\", \\\n\t\t\t\"PR-to-merged P50: \\(pct($$merge_seconds; 50) | fmt) seconds\", \\\n\t\t\t\"PR-to-merged P95: \\(pct($$merge_seconds; 95) | fmt) seconds\", \\\n\t\t\t\"Post-merge red rate: \\(rate($$red; $$total)) (\\($$red)/\\($$total))\", \\\n\t\t\t\"Conflict rate: \\(rate($$conflicts; $$total)) (\\($$conflicts)/\\($$total))\", \\\n\t\t\t\"runner minutes total: \\($$runner)\" \\\n\t\t] | .[]' $$FILES\n\t@echo \"---\"; \\\n\techo \"Dev-loop PR metrics (CI-failure baseline, see dev-loop-metrics-ci-failure-baseline-2):\"; \\\n\ttest -f _project/scripts/dev_loop_pr_metrics.py && uv run -- python _project/scripts/dev_loop_pr_metrics.py --days \"$(DEV_LOOP_METRICS_DAYS)\" || true",
@@ -721,6 +814,11 @@
     ],
     "explorer-snapshot-check": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "explorer-snapshot-check:",
         "recipe": "\tuv run -- python _project/scripts/results_explorer_snapshot_invariants.py \"$(SNAPSHOT)\"",
         "recipe_sha256": "736f31629196498104d62fc37000c055257f7515f139ed5fb71bbb25229e5d11"
@@ -770,6 +868,11 @@
     ],
     "joinorder-verify-reference-results": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "joinorder-verify-reference-results:",
         "recipe": "\t@[ -n \"$(JOINORDER_POSTGRES_CONTAINER)\" ] || { echo \"JOINORDER_POSTGRES_CONTAINER is required\"; exit 2; }\n\tuv run -- python _project/scripts/build_joinorder_data.py verify-reference-results \\\n\t\t--work-dir \"$(JOINORDER_BUILD_DIR)\" \\\n\t\t--container-name \"$(JOINORDER_POSTGRES_CONTAINER)\" \\\n\t\t--database \"$(JOINORDER_POSTGRES_DB)\" \\\n\t\t--user \"$(JOINORDER_POSTGRES_USER)\" \\\n\t\t--queries \"$(JOINORDER_QUERIES)\" \\\n\t\t--reference \"$(JOINORDER_REFERENCE)\"",
         "recipe_sha256": "87bbf7c5de6e22f6788e843d2951693a8111ccd18a251f10bfe869c3e0b74697"
@@ -784,12 +887,22 @@
     ],
     "lint-explorer-stale-theme": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "lint-explorer-stale-theme:",
         "recipe": "\tpython3 _project/scripts/scan_explorer_stale_theme.py",
         "recipe_sha256": "8adfeb876277d84584d61275508781a48d0ffc828b7193ad2d3e5f647e076deb"
       }
     ],
     "lint-explorer-tokens": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "lint-explorer-tokens:",
         "recipe": "\tpython3 _project/scripts/scan_explorer_tokens.py",
@@ -812,6 +925,11 @@
     ],
     "lint-site-theme-tokens": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "lint-site-theme-tokens:",
         "recipe": "\tpython3 _project/scripts/scan_explorer_tokens.py landing/shared landing/index.html landing/style.css landing/prompts/index.html landing/prompts/prompts.css docs/_templates/page.html docs/_static/custom.css results-explorer/index.html results-explorer/src/components/Layout.tsx",
         "recipe_sha256": "76732d26e86e9e3bcad25148b1d28c6545c07a4b57b5c41550018f477ea97811"
@@ -833,12 +951,22 @@
     ],
     "oracle-coverage-map": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "oracle-coverage-map:",
         "recipe": "\tuv run -- python _project/scripts/generate_oracle_coverage_map.py",
         "recipe_sha256": "e90edf5f4a56e999f1c89f1e69a994f20cf8da91846f72e17f4b4ef2931e1bc7"
       }
     ],
     "oracle-coverage-map-check": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "oracle-coverage-map-check:",
         "recipe": "\tuv run -- python _project/scripts/generate_oracle_coverage_map.py --check",
@@ -868,6 +996,11 @@
     ],
     "platform-manifest": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "platform-manifest:",
         "recipe": "\tuv run -- python _project/scripts/platform_manifest.py",
         "recipe_sha256": "be63dd2deb27f9488e2361e8fb1c374690f5d96f28d2aad9924f88e1dbb234ab"
@@ -875,12 +1008,22 @@
     ],
     "platform-manifest-check": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "platform-manifest-check:",
         "recipe": "\tuv run -- python _project/scripts/platform_manifest.py --check",
         "recipe_sha256": "4c240335f0cdd1e3a17ff7017aa5b092b2f5c0a1105d25ef9431c0737064ed24"
       }
     ],
     "pr-arm-auto-merge": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "pr-arm-auto-merge:",
         "recipe": "\t@URL=\"$(URL)\"; \\\n\tif [ -z \"$$URL\" ]; then \\\n\t\tCURRENT=$$(git branch --show-current); \\\n\t\tURL=$$(gh pr list --base develop --head \"$$CURRENT\" --state open --json url --jq '.[0].url' 2>/dev/null); \\\n\tfi; \\\n\tif [ -z \"$$URL\" ]; then echo \"No open PR found for this branch.\" >&2; exit 1; fi; \\\n\tLABELS=$$(gh pr view \"$$URL\" --json labels --jq '.labels[].name') || { echo \"Cannot read PR labels \u2014 refusing to arm (fail closed).\" >&2; exit 1; }; \\\n\tif printf '%s\\n' \"$$LABELS\" | grep -qxF 'no-auto-merge'; then \\\n\t\techo \"PR carries the durable no-auto-merge hold label; leaving auto-merge disabled. Remove the label first if arming is intended.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tgit fetch origin develop --quiet; \\\n\tSOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \\\n\tif [ \"$$SOUNDNESS_PATH\" = \"true\" ]; then \\\n\t\techo \"Soundness-critical paths changed; leaving auto-merge disabled pending review.\"; \\\n\telse \\\n\t\tgh pr merge --auto --squash \"$$URL\"; \\\n\tfi",
@@ -945,12 +1088,22 @@
     ],
     "pr-review-followups": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "pr-review-followups:",
         "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py run \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t--executor-sandbox \"$(PR_REVIEW_EXECUTOR_SANDBOX)\" \\\n\t\t--executor-approval \"$(PR_REVIEW_EXECUTOR_APPROVAL)\" \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\") \\\n\t\t$(if $(PR_REVIEW_EXECUTOR_MODEL),--executor-model \"$(PR_REVIEW_EXECUTOR_MODEL)\") \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_REPLY)),--no-reply) \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_SUBMIT)),--no-submit) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_RESUME)),--resume)",
         "recipe_sha256": "c8851c8e77365d6cc387449a3ecf939c549f3cb87c13993caa633ab4a2986615"
       }
     ],
     "pr-review-followups-list": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "pr-review-followups-list:",
         "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
@@ -980,6 +1133,11 @@
     ],
     "quality-governance-typecheck": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "quality-governance-typecheck:",
         "recipe": "\tuv run ty check --error all _project/scripts/check_complexity.py",
         "recipe_sha256": "9fd2ca88508859aa29f452c7ac3c9a60edd6101a4f81e1576cbf54a8ea7decc7"
@@ -993,6 +1151,11 @@
       }
     ],
     "release-cut": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "release-cut:",
         "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-cut VERSION=X.Y.Z\" && exit 1)\n\t@# Resume guard. --first-parent matters: the `-s ours` alignment merge below\n\t@# puts origin/release's whole release ledger -- which contains commits literally\n\t@# titled \"Release vX.Y.Z\" -- on the merge's second parent. Walking first-parent\n\t@# only sees this branch's own commits, so the guard fires for both post-commit\n\t@# states: release commit at HEAD, and release commit beneath the alignment merge.\n\t@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \\\n\tif [ \"$$BRANCH\" = \"v$(VERSION)\" ]; then \\\n\t\tif git log --first-parent --format=%s develop..HEAD 2>/dev/null | grep -Fxq \"Release v$(VERSION)\"; then \\\n\t\t\techo \"Error: v$(VERSION) already carries its release commit; nothing left to resume.\" >&2; \\\n\t\t\techo \"       Finish it by hand (git push -u origin v$(VERSION) && gh pr create --base release ...),\" >&2; \\\n\t\t\techo \"       remembering the -s ours alignment merge if it has not run yet, or start over:\" >&2; \\\n\t\t\techo \"         make release-cut-abort VERSION=$(VERSION)\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\techo \"==> Resuming interrupted cut on v$(VERSION)\"; \\\n\telif [ \"$$BRANCH\" = \"develop\" ]; then \\\n\t\t[ -z \"$$(git status --porcelain)\" ] || { echo \"Error: working tree must be clean\" >&2; exit 1; }; \\\n\t\tif git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null; then \\\n\t\t\techo \"Error: branch v$(VERSION) already exists but HEAD is develop.\" >&2; \\\n\t\t\techo \"       Resume it (git checkout v$(VERSION) && make release-cut VERSION=$(VERSION))\" >&2; \\\n\t\t\techo \"       or discard it (make release-cut-abort VERSION=$(VERSION)).\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\telse \\\n\t\techo \"Error: must be on develop (new cut) or v$(VERSION) (resume), not $$BRANCH\" >&2; exit 1; \\\n\tfi\n\tgit fetch origin\n\t@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \\\n\t\t&& git checkout v$(VERSION) \\\n\t\t|| git checkout -b v$(VERSION) develop\n\tuv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject\n\t@# Refresh uv.lock now that pyproject.toml carries the new version, so the\n\t@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1\n\t@# aborted because the tracked lock was stale and the hook rewrote it).\n\tuv lock\n\tuv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release\n\t@# The generated section is raw commit subjects across the whole\n\t@# origin/release..HEAD delta (release lags develop by many releases), so it always\n\t@# needs hand-curation. Open $$EDITOR when there is a terminal to open it in;\n\t@# either way the --check-curation gate below decides, on the section's own\n\t@# text, whether curation actually happened. The old gate tested only whether\n\t@# EDITOR was set and stdin was a TTY, which `EDITOR=true` defeated.\n\t@if [ -n \"$$EDITOR\" ] && [ -t 0 ]; then \\\n\t\techo \"==> Opening CHANGELOG.md in $$EDITOR for hand-curation\"; \\\n\t\t$$EDITOR CHANGELOG.md; \\\n\telse \\\n\t\techo \"==> Non-interactive: CHANGELOG.md holds the raw generated draft.\"; \\\n\t\techo \"    Hand-curate the [$(VERSION)] section, then re-run: make release-cut VERSION=$(VERSION)\"; \\\n\tfi\n\tuv run -- python scripts/generate_changelog_entry.py --check-curation --version $(VERSION)\n\t@# Curation FIRST so dev-only paths are never staged. Order matters: git rm\n\t@# before git add ensures untracked files inside _project/ etc. don't end up\n\t@# staged-for-add by a later git add.\n\t@# Curation list: A3 of _project/decisions/single-repo-migration.md.\n\t@# --ignore-unmatch: git rm aborts the ENTIRE command when any one pathspec\n\t@# is untracked, and a leading `-` would hide that, silently skipping all\n\t@# curation on that line (v0.3.1 shipped uncurated because of this). With\n\t@# --ignore-unmatch, unmatched paths are a no-op and any remaining failure\n\t@# is real, so no `-` prefix: real failures must abort the cut.\n\tgit rm -rf --ignore-unmatch _project _blog results-data results-explorer .claude .codex .gemini\n\tgit rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md\n\tgit rm -f --ignore-unmatch .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml\n\t@# Tests that import _project/dev-only tooling or test curated-out surfaces\n\t@# cannot collect on the release tree (found by the v0.3.1 release PR CI).\n\tgit rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer\n\tgit rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py\n\t@# Post-curation guard: every curated path must be gone from the index.\n\t@LEFTOVER=$$(git ls-files _project _blog results-data results-explorer .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \\\n\tif [ -n \"$$LEFTOVER\" ]; then \\\n\t\techo \"ERROR: release curation incomplete; dev-only paths still tracked:\" >&2; \\\n\t\techo \"$$LEFTOVER\" | sed 's/^/  /' >&2; \\\n\t\texit 1; \\\n\tfi\n\t@# Stage only the files update_version.py + generate_changelog_entry.py +\n\t@# uv lock write. Explicit list (not `git add -A`) to avoid staging\n\t@# build/cache artifacts.\n\tgit add pyproject.toml uv.lock benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md\n\t@# --no-verify: the curation above (git rm) already deleted\n\t@# .pre-commit-config.yaml and _project/scripts/ (the repo:local hook\n\t@# entrypoints) from this working tree. The pre-commit git hook is still\n\t@# installed locally and would otherwise run against a config/entrypoints\n\t@# that no longer exist, aborting this commit with a false failure on\n\t@# every release cut. Nothing is skipped that matters: develop's PRs\n\t@# already ran these hooks before this content was curated.\n\tgit commit --no-verify -m \"Release v$(VERSION)\"\n\t@# Align release histories. release and develop have unrelated roots (Phase 4\n\t@# filter-merge) and diverge permanently: release carries one squash commit per\n\t@# release that develop never sees, and A4 step 6 (rebase develop onto release)\n\t@# was removed by the 2026-04-27 amendment. So a branch cut cleanly from\n\t@# develop is NOT mergeable into release \u2014 GitHub cannot compute a merge ref, the\n\t@# PR sits at CONFLICTING, and *no CI runs at all*: neither validate-base nor\n\t@# release-required-result ever trigger. Every cut before v0.3.1 (#711, #712,\n\t@# #1029, #1043, #1072) fixed this by hand.\n\t@#\n\t@# `-s ours` records origin/release as a second parent while keeping the curated\n\t@# release tree byte-for-byte; release-finalize's squash-merge then collapses\n\t@# the branch to one commit, so this merge never reaches the release branch's\n\t@# release-only ledger. Run AFTER the changelog step: --since-ref origin/release\n\t@# computes the patch delta against a release branch that is not yet an ancestor\n\t@# of this branch.\n\t@#\n\t@# --no-verify: merge fires pre-merge-commit (not pre-commit). That hook is not\n\t@# in default_install_hook_types today, so this is defensive \u2014 but curation has\n\t@# already deleted .pre-commit-config.yaml and the repo:local hook entrypoints,\n\t@# so adding pre-merge-commit later would otherwise break every cut here.\n\t@echo \"==> Aligning release histories: merging origin/release into v$(VERSION) (strategy: ours)\"\n\t@RELEASE_TREE=$$(git rev-parse 'HEAD^{tree}') && \\\n\tgit merge -s ours --no-verify --allow-unrelated-histories origin/release \\\n\t\t-m \"Merge release into v$(VERSION) (strategy: ours) to align release histories\" && \\\n\tMERGED_TREE=$$(git rev-parse 'HEAD^{tree}') && \\\n\tif [ \"$$RELEASE_TREE\" != \"$$MERGED_TREE\" ]; then \\\n\t\techo \"ERROR: alignment merge changed the curated release tree ($$RELEASE_TREE -> $$MERGED_TREE)\" >&2; \\\n\t\texit 1; \\\n\tfi\n\tgit push -u origin v$(VERSION)\n\tgh pr create --base release --head v$(VERSION) --title \"Release v$(VERSION)\" --body-file .github/RELEASE_PR_TEMPLATE.md\n\t@# Option-c lifecycle: delete any prior release branches on origin (loop sweeps stale entries).\n\t@# ls-remote patterns match the LAST path component, so 'v*' alone also matches\n\t@# e.g. fix/validate-submission-... (bit the 2026-07-08 v0.3.1 re-cut). Filter full\n\t@# refs against the release-branch shape, mirroring _RELEASE_BRANCH_RE in\n\t@# scripts/generate_changelog_entry.py.\n\t@# Use grep -Fxv (literal, full-line match) so version strings with `.` aren't treated as regex.\n\t@for br in $$(git ls-remote --heads origin 'v*' | awk '$$2 ~ /^refs\\/heads\\/v[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.+-]+)?$$/ {print $$2}' | sed 's|refs/heads/||' | grep -Fxv \"v$(VERSION)\"); do \\\n\t\techo \"==> Deleting prior release branch on origin: $$br\"; \\\n\t\tgit push origin --delete \"$$br\" || true; \\\n\tdone\n\t@echo\n\t@echo \"Release PR opened. Next steps:\"\n\t@echo \"  1. Review the PR diff; confirm CHANGELOG and curation are correct.\"\n\t@echo \"  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS).\"\n\t@echo \"  3. make release-finalize VERSION=$(VERSION)\"",
@@ -1022,12 +1185,22 @@
     ],
     "security-audit": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "security-audit:",
         "recipe": "\t@echo \"Running security audit...\"\n\t@if [ -n \"$(PIP_AUDIT_IGNORE_VULNS)\" ]; then \\\n\t\tIGNORE_ARGS=$$(printf '%s' \"$(PIP_AUDIT_IGNORE_VULNS)\" | tr ',' '\\n' | sed '/^$$/d;s/^/--ignore-vuln /' | tr '\\n' ' '); \\\n\t\tuvx pip-audit $$IGNORE_ARGS; \\\n\telse \\\n\t\tuvx pip-audit; \\\n\tfi\n\t@echo \"\u2705 Security audit passed\"",
         "recipe_sha256": "30fce5fff1971f001ccb6b428db4b25805c4606e3cf9a4ba48b6cbc37bb75465"
       }
     ],
     "shrink-rollup": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "shrink-rollup:",
         "recipe": "\t@git fetch origin develop --quiet\n\t@uv run --project _project/scripts -- python _project/scripts/shrink_rollup.py",
@@ -1050,12 +1223,22 @@
     ],
     "soundness-drain-report": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "soundness-drain-report:",
         "recipe": "\t@uv run -- python _project/scripts/soundness_drain_report.py",
         "recipe_sha256": "c87a7fecbbd38df5415992612f2778877c3bdfbc3366815b0d24f7c590d9a25a"
       }
     ],
     "soundness-drain-self-test": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "soundness-drain-self-test:",
         "recipe": "\t@uv run -- python _project/scripts/soundness_drain_report.py --self-test",
@@ -1161,6 +1344,11 @@
       }
     ],
     "test-docker-parity": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
       {
         "header": "test-docker-parity:",
         "recipe": "\t@bash _project/scripts/mocker_compose_parity.sh $(CONTAINER_ENGINE) $(PARITY_PLATFORMS)",
@@ -1617,6 +1805,11 @@
     ],
     "uv-lock-revision-check": [
       {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "uv-lock-revision-check:",
         "recipe": "\tuv run -- python _project/scripts/check_uv_lock_revision.py $(if $(BASE_REF),--baseline-ref \"$(BASE_REF)\",)",
         "recipe_sha256": "73aca8ac381ee0004bbb526247320f0f196a09e8dde1045e4c71dc34f79b12e4"
@@ -1674,7 +1867,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "d6245c2585c84a14f05229af7a1244da581a9c25cb6580be2b5ab89a6861dba0",
+  "semantic_sha256": "f6257e2c3c3fe08d4e4f2844e5cd38cc1a9f7e362c47abb2187359f16cab2b0b",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -1773,6 +1966,12 @@
       "sha256": "293dcd6f40e208240417878919e8f488ea36aec45931f510d57ae17e5e6dba92"
     },
     {
+      "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check ci-lint release-cut pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test",
+      "kind": "variable",
+      "name": "DEVELOPMENT_TREE_ONLY_TARGETS",
+      "sha256": "c3da9c2db28f31886b25a30913703e48dbb6623242d8e6ef9be8e4d64f9823b2"
+    },
+    {
       "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list",
       "kind": "rule",
       "sha256": "ee86422139ca425702a55120a4e17ec86fddd7855e7e19a57f58b05f5f172cb7",
@@ -1786,6 +1985,66 @@
       "sha256": "e145d9bff7b518955883f97c50ea480448575349d0701b67f974ab7747241a33",
       "targets": [
         "test"
+      ]
+    },
+    {
+      "body": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+      "kind": "rule",
+      "sha256": "1d8c28d090b9abb65d2493f2569641dcd5d7df31ec6152e25ae3d63f4257cda8",
+      "targets": [
+        "correctness-gate-digests-regen",
+        "cross-surface-baseline-autodetect",
+        "oracle-coverage-map",
+        "oracle-coverage-map-check",
+        "cross-surface-applicability-report",
+        "joinorder-verify-reference-results",
+        "complexity-check",
+        "complexity-report",
+        "quality-governance-typecheck",
+        "uv-lock-revision-check",
+        "audit-deps",
+        "audit-raw",
+        "audit-raw-check",
+        "audit-sha-check",
+        "lint-explorer-tokens",
+        "lint-site-theme-tokens",
+        "lint-explorer-stale-theme",
+        "explorer-snapshot-check",
+        "artifact-hygiene",
+        "agent-instructions-check",
+        "agent-identity-check",
+        "security-audit",
+        "agent-commit-range-check",
+        "ci-lint",
+        "release-cut",
+        "pr-arm-auto-merge",
+        "shrink-rollup",
+        "pr-review-followups-list",
+        "pr-review-followups",
+        "dev-loop-metrics",
+        "platform-manifest",
+        "platform-manifest-check",
+        "test-docker-parity",
+        "blind-spots-list",
+        "blind-spots-report",
+        "soundness-drain-report",
+        "soundness-drain-self-test"
+      ]
+    },
+    {
+      "body": ".PHONY: .development-tree-required",
+      "kind": "rule",
+      "sha256": "e291622180a86af0bfeda4da9053e4d4124347c1184f7a067b994071da2f2d8b",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
+      "body": ".development-tree-required:\n\t@if [ ! -d \"$(BENCHBOX_MAKEFILE_ROOT)_project\" ]; then \\\n\t\techo \"Error: this target requires the BenchBox development tree; _project/ is intentionally absent from curated releases.\" >&2; \\\n\t\texit 2; \\\n\tfi",
+      "kind": "rule",
+      "sha256": "d3785f9611301bf47b87f8bf2b2fe9e1025892599e2e9f743767d22027fa401b",
+      "targets": [
+        ".development-tree-required"
       ]
     },
     {
@@ -3487,8 +3746,9 @@
       ]
     }
   ],
-  "target_count": 187,
+  "target_count": 188,
   "targets": [
+    ".development-tree-required",
     "agent-commit-range-check",
     "agent-identity-check",
     "agent-instructions-check",
@@ -3744,6 +4004,13 @@
     "CORRECTNESS_GATE_QUERY_IDS": [
       {
         "body": "CORRECTNESS_GATE_QUERY_IDS := 1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22",
+        "directive": "",
+        "operator": ":="
+      }
+    ],
+    "DEVELOPMENT_TREE_ONLY_TARGETS": [
+      {
+        "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check ci-lint release-cut pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test",
         "directive": "",
         "operator": ":="
       }
