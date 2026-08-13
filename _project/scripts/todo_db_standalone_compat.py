@@ -60,6 +60,8 @@ COMMANDS = frozenset(
     }
 )
 
+STANDALONE_ONLY_COMMANDS = frozenset({"init-project", "restore", "restore-legacy"})
+
 GLOBAL_VALUE_OPTIONS = frozenset({"--actor", "--db", "--project-id", "--replica", "--repository"})
 OFFLINE_FINDING_SUBCOMMANDS = frozenset({"create", "candidates"})
 PACKAGE_COMMAND_TRANSLATIONS = {"scope-update": "update"}
@@ -81,6 +83,10 @@ def _repo_root() -> Path:
 
 
 def _command_index(argv: list[str]) -> tuple[int, str] | None:
+    return _command_index_from(argv, COMMANDS)
+
+
+def _command_index_from(argv: list[str], commands: frozenset[str]) -> tuple[int, str] | None:
     index = 0
     while index < len(argv):
         value = argv[index]
@@ -90,10 +96,39 @@ def _command_index(argv: list[str]) -> tuple[int, str] | None:
         if any(value.startswith(f"{option}=") for option in GLOBAL_VALUE_OPTIONS):
             index += 1
             continue
-        if value in COMMANDS:
+        if value in commands:
             return index, value
         index += 1
     return None
+
+
+def _is_root_help(argv: list[str]) -> bool:
+    saw_help = False
+    index = 0
+    while index < len(argv):
+        value = argv[index]
+        if value in GLOBAL_VALUE_OPTIONS:
+            index += 2
+            continue
+        if any(value.startswith(f"{option}=") for option in GLOBAL_VALUE_OPTIONS):
+            index += 1
+            continue
+        if value in {"-h", "--help"}:
+            saw_help = True
+            index += 1
+            continue
+        return False
+    return saw_help
+
+
+def _print_root_help() -> None:
+    commands = ",".join(sorted(COMMANDS))
+    print(
+        f"usage: todo [GLOBAL OPTIONS] {{{commands}}} ...\n\n"
+        "BenchBox compatibility wrapper for the locked todo-db package.\n"
+        "Run 'todo <command> --help' for command-specific options.\n\n"
+        "Standalone recovery commands are intentionally unavailable through this wrapper."
+    )
 
 
 def _has_option(argv: Iterable[str], name: str) -> bool:
@@ -453,11 +488,6 @@ def _canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True) + "\n"
 
 
-def _canonical_lossless_json(value: Any) -> str:
-    """Match the locked package's lossless export serialization exactly."""
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
-
-
 def _atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
@@ -466,8 +496,16 @@ def _atomic_write(path: Path, content: str) -> None:
     temporary.replace(path)
 
 
+def _atomic_write_bytes(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("wb", dir=path.parent, delete=False) as handle:
+        handle.write(content)
+        temporary = Path(handle.name)
+    temporary.replace(path)
+
+
 def _write_legacy_export(
-    output_dir: Path, envelope: dict[str, Any], lossless_dir: Path | None = None
+    output_dir: Path, envelope: dict[str, Any], lossless_content: bytes, lossless_dir: Path | None = None
 ) -> tuple[Path, Path, Path, Path]:
     """Write the committed items-domain views, plus the lossless envelope.
 
@@ -496,7 +534,7 @@ def _write_legacy_export(
     events_path = output_dir / "events.jsonl"
     index_path = output_dir / "index.md"
     items = _item_rows(envelope)
-    _atomic_write(lossless_path, _canonical_lossless_json(envelope))
+    _atomic_write_bytes(lossless_path, lossless_content)
     _atomic_write(items_path, "".join(_canonical_json(item) for item in items))
     events = sorted((dict(row) for row in envelope.get("events") or []), key=lambda row: row["seq"])
     _atomic_write(events_path, "".join(_canonical_json(event) for event in events))
@@ -551,8 +589,9 @@ def _export(argv: list[str], cwd: Path) -> int:
             sys.stderr.write(_redact(result.stderr, secrets))
         if result.returncode:
             return result.returncode
-        envelope = json.loads(standalone_output.read_text(encoding="utf-8"))
-        lossless, items, events, index = _write_legacy_export(output_dir, envelope, lossless_dir)
+        lossless_content = standalone_output.read_bytes()
+        envelope = json.loads(lossless_content)
+        lossless, items, events, index = _write_legacy_export(output_dir, envelope, lossless_content, lossless_dir)
         print(f"wrote {items}, {events} and {index} (lossless envelope: {lossless})")
         return 0
 
@@ -561,6 +600,17 @@ def _main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     located = _command_index(args)
     if located is None:
+        standalone_only = _command_index_from(args, STANDALONE_ONLY_COMMANDS)
+        if standalone_only is not None:
+            print(
+                f"error: BenchBox compatibility wrapper does not expose standalone-only "
+                f"'{standalone_only[1]}'; use the locked todo-db package directly in an approved recovery workflow",
+                file=sys.stderr,
+            )
+            return 2
+        if not args or _is_root_help(args):
+            _print_root_help()
+            return 0
         return _forward_result(_delegate(args, command="", cwd=_repo_root()))
     command_index, command = located
     root = _repo_root()
