@@ -57,12 +57,18 @@ implementations/consumers rather than from comments alone:
 
 Only `make complexity-check`, `make complexity-report`, and their shared
 implementation `_project/scripts/check_complexity.py` are authoritative for
-the current complexity policy. `scripts/check_complexity.py` and
-`quality/complexity/classification-matrix.yaml` are historical, non-gating
-artifacts retained outside this TODO's modification scope. Do not invoke the
-old script as a second policy or update the historical matrix as though its
-entries were active exceptions. New CI and operational documentation must use
-the Make targets.
+the current complexity policy. The former `scripts/check_complexity.py`
+duplicate was removed because it parsed retired configuration and created a
+second policy authority. `quality/complexity/classification-matrix.yaml`
+remains a historical, non-gating artifact; do not update it as though its
+entries were active exceptions.
+
+The complexity targets and every other retained Make recipe whose executable
+path depends on `_project/` are development-tree-only. A curated release keeps
+their names for Make contract stability, but fails them with one explicit
+development-tree message. Relocating the checkers into the release was rejected:
+they validate development governance and would enlarge the shipped tooling
+surface without adding a package-runtime capability.
 
 ## Ruff scope: configured discovery versus explicit paths
 

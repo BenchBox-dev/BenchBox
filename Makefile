@@ -21,11 +21,36 @@ JOINORDER_POSTGRES_USER ?= postgres
 JOINORDER_QUERIES ?= _project/joinorder/build-inputs/queries
 JOINORDER_REFERENCE ?= _project/joinorder/reference_cardinalities.json
 
+# These targets are deliberately retained in the release Make runtime so the
+# public target inventory stays stable, but their implementation or evidence
+# lives under the develop-only `_project/` tree. Fail with one explicit policy
+# message on a curated release instead of leaking file-not-found errors.
+DEVELOPMENT_TREE_ONLY_TARGETS := \
+	correctness-gate-digests-regen cross-surface-baseline-autodetect \
+	oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \
+	joinorder-verify-reference-results complexity-check complexity-report \
+	quality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \
+	audit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \
+	explorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \
+	agent-commit-range-check ci-lint release-cut pr-arm-auto-merge shrink-rollup \
+	pr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \
+	platform-manifest-check test-docker-parity blind-spots-list blind-spots-report \
+	soundness-drain-report soundness-drain-self-test
+
 .PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list
 
 # Primary test commands using pytest marker system
 test: test-fast
 	@echo "Default test run completed. Use 'make help' to see all test options."
+
+$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required
+
+.PHONY: .development-tree-required
+.development-tree-required:
+	@if [ ! -d "$(BENCHBOX_MAKEFILE_ROOT)_project" ]; then \
+		echo "Error: this target requires the BenchBox development tree; _project/ is intentionally absent from curated releases." >&2; \
+		exit 2; \
+	fi
 
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
