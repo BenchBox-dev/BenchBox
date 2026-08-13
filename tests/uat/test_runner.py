@@ -248,6 +248,43 @@ def test_run_cell_preserves_result_path_when_failed_child_exports_json(tmp_path:
     assert result.submit_terminal_state == "query_failure"
 
 
+def test_run_cell_writes_clickhouse_load_failure_sidecar(tmp_path: Path):
+    payload = {
+        "table": "lineitem",
+        "source_files": ["/tmp/lineitem.tbl"],
+        "rows_attempted": 65536,
+        "memory_settings": {"max_memory_usage": "8GB", "insert_block_size": 65536},
+        "driver_timeout_s": 300,
+        "exception": {"type": "RuntimeError", "message": "memory limit exceeded"},
+        "result_json": None,
+    }
+    fake_argv = [
+        sys.executable,
+        "-c",
+        f"print({(runner.LOAD_FAILURE_MARKER + json.dumps(payload, separators=(',', ':')))!r}); raise SystemExit(1)",
+    ]
+
+    with patch.object(runner, "benchbox_run_argv", return_value=fake_argv):
+        result = runner.run_cell(
+            "clickhouse-server",
+            "tpch",
+            1.0,
+            timeout_s=10,
+            log_dir=tmp_path,
+            now=_dt.datetime(2026, 8, 12, 12, 0, 0),
+        )
+
+    assert result.status == "failed"
+    assert result.result_path is None
+    assert result.load_failure_path is not None
+    assert result.load_failure_path == result.log_path.with_suffix(".load_failure.json")
+    artifact = json.loads(result.load_failure_path.read_text(encoding="utf-8"))
+    assert artifact["table"] == "lineitem"
+    assert artifact["rows_attempted"] == 65536
+    assert artifact["result_json"] is None
+    assert artifact["log_path"] == str(result.log_path)
+
+
 def test_run_cell_diagnostic_rerun_fires_for_empty_stdout_failure(tmp_path: Path):
     captured_quiet = []
 

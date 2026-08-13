@@ -37,10 +37,13 @@ from tests.uat.timeouts import TimeoutResult, run_with_timeout
 # benchbox.core.results.submit_classification, shared with `benchbox submit`.
 __all__ = [
     "CellResult",
+    "LOAD_FAILURE_MARKER",
     "SubmitTerminalState",
     "classify_for_submit",
     "submit_state_is_cell_failure",
 ]
+
+LOAD_FAILURE_MARKER = "BENCHBOX_LOAD_FAILURE_JSON="
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,8 @@ class CellResult:
     # "ok" on a clean pass, else the validation failure reason. None for
     # every other (non-throughput) cell.
     throughput_check: str | None = None
+    # Durable ClickHouse load-failure sidecar written beside the cell log.
+    load_failure_path: Path | None = None
 
 
 def last_nonempty_output_line(log_text: str) -> str | None:
@@ -127,6 +132,90 @@ def _append_diagnostic_rerun(log_fh, argv: list[str], *, timeout_s: int, env: di
         log_fh.write(f"[uat] diagnostic re-run exit_code={rerun.exit_code} timed_out={rerun.timed_out}\n")
     except Exception as exc:  # noqa: BLE001 - diagnostics must never mask the original failure
         log_fh.write(f"[uat] diagnostic re-run error {type(exc).__name__}: {exc}\n")
+
+
+def _extract_load_failure(log_text: str) -> dict[str, object] | None:
+    """Extract the canonical structured load-failure marker from a cell log."""
+
+    for line in log_text.splitlines():
+        if not line.startswith(LOAD_FAILURE_MARKER):
+            continue
+        raw_payload = line[len(LOAD_FAILURE_MARKER) :].strip()
+        try:
+            payload = json.loads(raw_payload)
+        except (TypeError, ValueError):
+            return None
+        return payload if isinstance(payload, dict) else None
+    return None
+
+
+def _write_load_failure_sidecar(
+    *,
+    log_path: Path,
+    platform: str,
+    benchmark: str,
+    scale: float,
+    payload: dict[str, object],
+) -> Path:
+    """Atomically persist the structured load failure next to its cell log."""
+
+    sidecar = log_path.with_suffix(".load_failure.json")
+    artifact = dict(payload)
+    artifact.update(
+        {
+            "platform": platform,
+            "benchmark": benchmark,
+            "scale": scale,
+            "log_path": str(log_path),
+        }
+    )
+    temp_path = sidecar.with_name(sidecar.name + ".tmp")
+    try:
+        with temp_path.open("w", encoding="utf-8") as fh:
+            json.dump(artifact, fh, indent=2, sort_keys=True)
+            fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(temp_path, sidecar)
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
+    return sidecar
+
+
+def _materialize_load_failure_sidecar(
+    *,
+    log_path: Path,
+    platform: str,
+    benchmark: str,
+    scale: float,
+    runs_dir: Path,
+    result_path: Path | None,
+) -> tuple[Path | None, Path | None]:
+    """Persist a marker payload and return its optional result and sidecar paths."""
+
+    payload = _extract_load_failure(log_path.read_text(encoding="utf-8"))
+    if payload is None:
+        return result_path, None
+
+    marker_result = payload.get("result_json")
+    if marker_result:
+        candidate = _resolve_result_path(str(marker_result), runs_dir)
+        if candidate.suffix.lower() == ".json" and candidate.exists():
+            result_path = candidate
+            payload["result_json"] = str(candidate)
+        else:
+            payload["result_json"] = None
+    else:
+        payload["result_json"] = str(result_path) if result_path is not None else None
+    sidecar = _write_load_failure_sidecar(
+        log_path=log_path,
+        platform=platform,
+        benchmark=benchmark,
+        scale=scale,
+        payload=payload,
+    )
+    return result_path, sidecar
 
 
 def run_cell(
@@ -259,6 +348,15 @@ def run_cell(
         result_path = _resolve_result_path(result_path_str, runs_dir) if result_path_str else None
         if result_path is not None and (result_path.suffix.lower() != ".json" or not result_path.exists()):
             result_path = None
+
+    result_path, load_failure_path = _materialize_load_failure_sidecar(
+        log_path=log_path,
+        platform=platform,
+        benchmark=benchmark,
+        scale=scale,
+        runs_dir=runs_dir,
+        result_path=result_path,
+    )
     status = _classify(timeout_result)
     submit_state = classify_for_submit(result_path) if result_path is not None else SubmitTerminalState.missing_manifest
     exit_code = timeout_result.exit_code
@@ -303,6 +401,7 @@ def run_cell(
         result_path=result_path,
         submit_terminal_state=submit_state.value,
         throughput_check=throughput_check,
+        load_failure_path=load_failure_path,
     )
 
 

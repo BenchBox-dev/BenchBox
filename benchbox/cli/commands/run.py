@@ -437,6 +437,19 @@ def _execute_orchestrated_run(
         )
 
 
+LOAD_FAILURE_MARKER = "BENCHBOX_LOAD_FAILURE_JSON="
+
+
+def _emit_load_failure_marker(result: Any) -> None:
+    """Emit one machine-readable line for UAT's durable load-failure sidecar."""
+
+    details = getattr(result, "validation_details", None)
+    payload = details.get("load_failure") if isinstance(details, dict) else None
+    if not isinstance(payload, dict):
+        return
+    click.echo(f"{LOAD_FAILURE_MARKER}{json.dumps(payload, sort_keys=True, separators=(',', ':'))}")
+
+
 def _export_orchestrated_result(
     *,
     orchestrator: BenchmarkOrchestrator,
@@ -1716,6 +1729,7 @@ def _direct_handle_result(
         if result_cli_failure_reason(result):  # narrower than non_clean_reason; see status.py
             s.ctx.exit(1)
     else:
+        _emit_load_failure_marker(result)
         console.print(f"\n[red]❌ Benchmark failed: {result.validation_status}[/red]")
         s.ctx.exit(1)
 
@@ -1911,6 +1925,7 @@ def _data_or_load_handle_result(
             additional_options={"table_mode": s.table_mode},
         )
     else:
+        _emit_load_failure_marker(result)
         console.print(
             f"\n[red]❌ {'Data generation' if s.execution_mode == 'data_only' else 'Data loading'} failed: {result.validation_status}[/red]"
         )
@@ -2704,6 +2719,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
             additional_options={"table_mode": s.table_mode},
         )
     else:
+        _emit_load_failure_marker(result)
         console.print(f"\n[red]❌ Benchmark failed with status: {result.validation_status}[/red]")
         ctx.exit(1)
 
