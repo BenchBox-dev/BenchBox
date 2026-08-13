@@ -120,6 +120,17 @@ repos:
         stages: [pre-commit]
         files: ^(AGENTS\.md|CLAUDE\.md|GEMINI\.md|ANTIGRAVITY\.md|\.claude/(commands/|settings\.json)|\.claude/skills/|docs/(development/agent-|operations/agent-instruction)|_project/(evals/agent-instructions/|scripts/agent_instruction_audit\.py)|skill-sync\.(yaml|lock))
 
+      # Enforce the linked-worktree boundary at the last safe point before Git
+      # creates a commit object. The same declarations accepted by the session
+      # preflight cover authorized primary-clone and disposable-clone commits.
+      - id: agent-write-preflight
+        name: agent write location and identity preflight
+        entry: sh scripts/agent_write_preflight.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
       # Runs the whole instruction audit, not only the identity check, so the
       # name cannot claim one check. The script prints `FAIL (<checks>)` naming
       # what actually failed - a byte-budget failure used to surface here as a
