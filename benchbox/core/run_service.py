@@ -11,14 +11,14 @@ interactive prompt -- arrives as a resolved input or an injected factory. That
 is why :func:`resolve_run_config` takes an already-computed ``database_path``
 instead of a ``DirectoryManager``: the manager is CLI-layer, the path is data.
 
-This module covers request/plan types, configuration resolution, and execution
-orchestration. Everything that needs a console, an interactive prompt, or a
-concrete adapter class stays in the surface layer.
+This module covers configuration resolution and execution orchestration.
+Everything that needs a console, an interactive prompt, or a concrete adapter
+class stays in the surface layer.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -122,37 +122,6 @@ class SilentVerbosity:
     verbose_enabled: bool = False
     very_verbose: bool = False
     quiet: bool = True
-
-
-@dataclass(frozen=True)
-class RunRequest:
-    """A fully-resolved, surface-neutral description of a benchmark run.
-
-    "Fully resolved" is the contract: every interactive decision, credential
-    prompt, and default has already been settled by the surface. The service
-    never asks a question.
-    """
-
-    platform: str
-    benchmark: str
-    scale_factor: float
-    queries: list[str] | None = None
-    phases: list[str] | None = None
-    mode: str | None = None
-    capture_plans: bool = False
-    platform_options: Mapping[str, object] = field(default_factory=dict)
-    options: Mapping[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class RunPlan:
-    """The resolved plan for one run: what will execute, and how."""
-
-    request: RunRequest
-    benchmark_config: BenchmarkConfig
-    run_config: RunConfig
-    execution_type: str
-    resolved_mode: str | None = None
 
 
 @dataclass(frozen=True)
@@ -466,8 +435,6 @@ def _map_phases_to_execution_type(phases: list[str]) -> str:
 
 __all__ = [
     "AdapterFactory",
-    "RunPlan",
-    "RunRequest",
     "SilentVerbosity",
     "VerbosityLike",
     "execute_run",
