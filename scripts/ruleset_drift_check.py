@@ -35,9 +35,9 @@ from ruleset_review_enforcement import (  # noqa: E402
 # `tag_creation_findings`).
 WARNING_PREFIX = "WARNING (non-blocking): "
 
-# The live develop-squash-only ruleset (id 15611785) carries
-# require_code_owner_review: true. A regression is blocking; the explicit
-# parameter override remains available for migration fixtures.
+# The develop-squash-only ruleset (id 15611785) requires current-base status
+# checks and code-owner review. The runbook parser and comparison below enforce
+# both policies; the explicit review override remains available for fixtures.
 DEVELOP_REVIEW_RULE_ENFORCED = True
 
 PYPI_ENVIRONMENT = "pypi"

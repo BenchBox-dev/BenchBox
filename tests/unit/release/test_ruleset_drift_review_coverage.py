@@ -75,7 +75,7 @@ def _live_develop_ruleset(*, review_count: int = 0, code_owner_review: bool = Tr
             {
                 "type": "required_status_checks",
                 "parameters": {
-                    "strict_required_status_checks_policy": False,
+                    "strict_required_status_checks_policy": True,
                     # Must mirror the develop-squash-only check list in
                     # docs/operations/repo-admin-settings.md, otherwise these
                     # fixtures report check drift and mask the review-rule
