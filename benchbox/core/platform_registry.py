@@ -634,6 +634,11 @@ class PlatformRegistry:
         return deepcopy(cls._get_cached_platform_metadata())
 
     @classmethod
+    def get_platform_names(cls) -> list[str]:
+        """Get platform names without copying nested metadata values."""
+        return list(cls._get_cached_platform_metadata())
+
+    @classmethod
     def get_platform_support_status(cls, platform_name: str) -> Optional[SupportStatus]:
         """Return the registry support status for a platform."""
         metadata = cls._get_cached_platform_metadata()
