@@ -46,6 +46,7 @@ def _trace(
                 "metric.MemoryTracking": 1.0,
                 "async.MemoryResident": 1.0,
                 "event.InsertedRows": 1.0,
+                "event.InsertedBytes": 1.0,
             },
             responsiveness_ms=2.0,
             server_reachable=True,
@@ -176,7 +177,7 @@ def test_trace_accepts_decimal_runtime_spelling_for_named_gib_rung():
     assert trace.valid_for_calibration is True
 
 
-@pytest.mark.parametrize("missing", ["usage", "oom", "host", "metrics"])
+@pytest.mark.parametrize("missing", ["usage", "oom", "running", "host", "metrics"])
 def test_trace_fails_closed_on_required_telemetry_gaps(missing):
     trace = _trace()
     sample = trace.samples[0]
@@ -187,11 +188,48 @@ def test_trace_fails_closed_on_required_telemetry_gaps(missing):
         engine = replace(engine, usage_bytes=None)
     elif missing == "oom":
         engine = replace(engine, oom_killed=None)
+    elif missing == "running":
+        engine = replace(engine, running=False)
     elif missing == "host":
         host = replace(host, available_gib=None)
     else:
         metrics = {}
     trace.samples[0] = replace(sample, engine=engine, host=host, clickhouse_metrics=metrics)
+    assert trace.valid_for_calibration is False
+
+
+@pytest.mark.parametrize(
+    ("metric_name", "replacement"),
+    [
+        ("metric.MemoryTracking", "metric.NotMemoryTracking"),
+        ("async.MemoryResident", "async.NotMemoryResident"),
+        ("event.InsertedRows", "event.NotInsertedRows"),
+        ("event.InsertedBytes", "event.NotInsertedBytes"),
+    ],
+)
+def test_trace_requires_each_named_clickhouse_metric(metric_name, replacement):
+    trace = _trace()
+    sample = trace.samples[0]
+    metrics = dict(sample.clickhouse_metrics)
+    metrics[replacement] = metrics.pop(metric_name)
+    trace.samples[0] = replace(sample, clickhouse_metrics=metrics)
+    assert trace.valid_for_calibration is False
+
+
+def test_trace_rejects_non_finite_required_telemetry():
+    trace = _trace()
+    sample = trace.samples[0]
+    trace.samples[0] = replace(
+        sample,
+        host=replace(sample.host, available_gib=float("nan")),
+    )
+    assert trace.valid_for_calibration is False
+
+    trace = _trace()
+    sample = trace.samples[0]
+    metrics = dict(sample.clickhouse_metrics)
+    metrics["event.InsertedBytes"] = float("inf")
+    trace.samples[0] = replace(sample, clickhouse_metrics=metrics)
     assert trace.valid_for_calibration is False
 
 

@@ -824,7 +824,10 @@ OOM/cgroup-kill/timeout evidence should the same rung be tried at SF1. Advance
 to the next rung only when the smallest failing or incomplete run has a trace
 that explains why. A passing trace is admissible only when it has a successful
 responsiveness sample, `native_streaming=true`, and
-`application_batch_rows=null`, plus the measured ClickHouse driver timeout. The
+`application_batch_rows=null`, plus the measured ClickHouse driver timeout and
+all required `MemoryTracking`, `MemoryResident`, `InsertedRows`, and
+`InsertedBytes` values. Missing, non-finite, or contradictory host, engine,
+container-state, or ClickHouse telemetry invalidates the trace. The
 current server setup default is 300 seconds and the wrapper records that source
 directly from `ClickHouseSetupMixin`; an explicitly configured timeout is also
 recorded when the command supports that option. All memory rungs keep the same

@@ -24,6 +24,7 @@ import base64
 import datetime as _dt
 import inspect
 import json
+import math
 import os
 import re
 import subprocess
@@ -61,11 +62,18 @@ _MEMORY_UNITS = {
 # cannot be relabelled as the requested rung.
 _DECIMAL_GIB_EQUIVALENCE = 1000**3
 
-# Each query family must return at least one metric in every sample. Some
-# ClickHouse builds omit optional asynchronous metrics such as OSMemoryFree,
-# so exact metric names would reject a real successful query. An empty family
-# is still a collection failure and invalidates the rung.
-_REQUIRED_CLICKHOUSE_METRIC_PREFIXES = frozenset({"metric", "async", "event"})
+# These are the metrics that make a trace evidence rather than a host/engine
+# health sample. Optional asynchronous metrics such as OSMemoryFree are not
+# required, but a response from the wrong metric or a partially failed query
+# must not be enough to admit a rung.
+_REQUIRED_CLICKHOUSE_METRICS = frozenset(
+    {
+        "metric.MemoryTracking",
+        "async.MemoryResident",
+        "event.InsertedRows",
+        "event.InsertedBytes",
+    }
+)
 _MEMORY_FAILURE_MARKERS = (
     "memory limit exceeded",
     "out of memory",
@@ -163,22 +171,29 @@ class ClickHouseMemoryTrace:
             return False
         if not self.driver_timeout_source or self.driver_timeout_s != self.rung.driver_timeout_s:
             return False
-        if any(sample.responsiveness_ms is None for sample in self.samples):
+        if any(
+            sample.responsiveness_ms is None or not math.isfinite(sample.responsiveness_ms) for sample in self.samples
+        ):
             return False
         lower_limit = int(self.rung.requested_memory_gib * _DECIMAL_GIB_EQUIVALENCE)
         upper_limit = int(self.rung.requested_memory_gib * GIB)
         engine_samples = [sample.engine for sample in self.samples]
         for sample in self.samples:
-            if sample.host.available_gib is None:
+            if (
+                sample.host.available_gib is None
+                or not math.isfinite(sample.host.available_gib)
+                or sample.host.available_gib < 0
+            ):
                 return False
             if sample.server_reachable is not True:
                 return False
-            metric_prefixes = {key.split(".", 1)[0] for key in sample.clickhouse_metrics}
-            if not _REQUIRED_CLICKHOUSE_METRIC_PREFIXES.issubset(metric_prefixes):
+            if not _REQUIRED_CLICKHOUSE_METRICS.issubset(sample.clickhouse_metrics):
+                return False
+            if any(not math.isfinite(sample.clickhouse_metrics[name]) for name in _REQUIRED_CLICKHOUSE_METRICS):
                 return False
             if sample.engine.usage_bytes is None or sample.engine.limit_bytes is None:
                 return False
-            if sample.engine.oom_killed is None or sample.engine.running is None:
+            if sample.engine.oom_killed is not False or sample.engine.running is not True:
                 return False
             if not lower_limit <= sample.engine.limit_bytes <= upper_limit:
                 return False
