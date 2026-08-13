@@ -18,6 +18,7 @@ MIGRATION_PROOF_PATH = Path("make/migration-proof.json")
 SCHEMA_VERSION = 2
 MIGRATION_PROOF_SCHEMA_VERSION = 1
 RESERVED_ROOT_VARIABLE = "BENCHBOX_MAKEFILE_ROOT"
+DEVELOPMENT_TREE_TARGETS_VARIABLE = "DEVELOPMENT_TREE_ONLY_TARGETS"
 EXPECTED_INCLUDE_ORDER = [
     "make/platform-tests.mk",
     "make/documentation.mk",
@@ -174,6 +175,13 @@ def build_inventory(root: Path) -> dict[str, Any]:
         rule = RULE_RE.match(text)
         if rule:
             targets = rule.group(1).strip().split()
+            if targets == [f"$({DEVELOPMENT_TREE_TARGETS_VARIABLE})"]:
+                records = variables.get(DEVELOPMENT_TREE_TARGETS_VARIABLE, [])
+                if len(records) != 1:
+                    raise InventoryError(
+                        f"{_relative(line.path, root)}:{line.number}: development-tree target list is ambiguous"
+                    )
+                targets = records[0]["body"].split(":=", 1)[1].replace("\\\n", " ").split()
             recipe: list[str] = []
             index += 1
             while index < len(lines):
