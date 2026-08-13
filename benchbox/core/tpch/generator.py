@@ -29,7 +29,7 @@ from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path
 from benchbox.utils.compression_mixin import CompressionMixin
 from benchbox.utils.data_validation import BenchmarkDataValidator
 from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
-from benchbox.utils.file_format import COMPRESSION_EXTENSIONS
+from benchbox.utils.file_format import COMPRESSION_EXTENSIONS, detect_data_format
 from benchbox.utils.scale_factor import format_scale_factor
 from benchbox.utils.stale_artifact_pruning import TableArtifactPattern, prune_stale_table_artifacts
 from benchbox.utils.tpc_compilation import CompilationStatus, ensure_tpc_binaries
@@ -906,7 +906,12 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
                 self.validator.print_validation_report(validation_result, verbose=False)
                 self.logger.info("Skipping data generation (existing data is valid)")
 
-            return self._collect_existing_table_files(target_dir)
+            existing_paths = self._collect_existing_table_files(target_dir)
+            # Refresh the manifest even when the data files are reused. Older
+            # manifests may contain estimated shard counts and would otherwise
+            # keep blocking the exact certification gate indefinitely.
+            self._write_manifest(target_dir, existing_paths)
+            return existing_paths
 
         removed_stale = self._prune_stale_table_artifacts(target_dir)
         if removed_stale and self.verbose_enabled:
@@ -1341,9 +1346,12 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
             if isinstance(file_path_or_paths, list):
                 chunk_files = file_path_or_paths
                 if chunk_files:
-                    rows_per_chunk = expected_rows_total // len(chunk_files)
                     for chunk_file in chunk_files:
-                        manifest.add_entry(table, chunk_file, row_count=rows_per_chunk)
+                        manifest.add_entry(
+                            table,
+                            chunk_file,
+                            row_count=self._manifest_row_count(chunk_file, expected_rows_total // len(chunk_files)),
+                        )
                     self.log_very_verbose(f"Added {len(chunk_files)} chunk files for {table} to manifest")
                 continue
 
@@ -1378,19 +1386,47 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
                 )
 
                 if chunk_files:
-                    # Distribute row count across chunks (approximately equal)
-                    rows_per_chunk = expected_rows_total // len(chunk_files) if chunk_files else expected_rows_total
-
                     for chunk_file in chunk_files:
-                        manifest.add_entry(table, chunk_file, row_count=rows_per_chunk)
+                        manifest.add_entry(
+                            table,
+                            chunk_file,
+                            row_count=self._manifest_row_count(chunk_file, expected_rows_total // len(chunk_files)),
+                        )
 
                     self.log_very_verbose(f"Added {len(chunk_files)} chunk files for {table} to manifest")
                     continue
 
             # Single file (not sharded)
-            manifest.add_entry(table, first_file_path, row_count=expected_rows_total)
+            manifest.add_entry(
+                table,
+                first_file_path,
+                row_count=self._manifest_row_count(first_file_path, expected_rows_total),
+            )
 
         manifest.write()
+
+    def _manifest_row_count(self, file_path: Path, fallback: int) -> int:
+        """Return the measured row count for a TPC-H text file.
+
+        Generated and reused ``.tbl`` files are the source of truth for the
+        manifest. A fallback remains only for non-TBL organized outputs (for
+        example Parquet), whose row metadata is owned by that format's writer.
+        """
+        file_path = Path(file_path)
+        if detect_data_format(file_path) != "tbl":
+            return fallback
+        return self._count_file_rows(file_path)
+
+    def _count_file_rows(self, file_path: Path) -> int:
+        """Count records in an uncompressed or supported compressed TPC-H file."""
+        compression_type = self.compression_manager.detect_compression(file_path)
+        if compression_type == "none":
+            with file_path.open("rt", encoding="utf-8", newline="") as stream:
+                return sum(1 for _ in stream)
+
+        compressor = self.compression_manager.get_compressor(compression_type)
+        with compressor.open_for_read(file_path, "rt") as stream:
+            return sum(1 for _ in stream)
 
     def _expected_row_count(self, table: str) -> int:
         base = _TPCH_BASE_ROW_COUNTS.get(table.lower())
@@ -1399,5 +1435,3 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
         if table.lower() in {"nation", "region"}:
             return base
         return max(0, int(round(base * float(self.scale_factor))))
-
-    # No post-generation compressed-file counting; counts captured during compression or plain-text counting for uncompressed

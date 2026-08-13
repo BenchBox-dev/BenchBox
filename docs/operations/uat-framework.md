@@ -881,6 +881,10 @@ cannot silently fall back to a 1 GiB setting.
 Before certifying an SF0.01 or SF1 ClickHouse result, compare the result's
 per-table loaded rows with the generated manifest. Aggregate totals are
 insufficient: the gate rejects a missing, extra, or differently-sized table.
+The TPC-H generator records `row_count` by measuring each generated or reused
+`.tbl` file (including compressed shards); it does not derive a uniform shard
+count from the scale-factor estimate. Regenerate the manifest from the data
+files rather than editing its JSON by hand.
 
 ```bash
 uv run -- python -m tests.uat.clickhouse_certification \
