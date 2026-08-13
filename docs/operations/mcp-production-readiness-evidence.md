@@ -94,11 +94,13 @@ of the exact image found no importable `duckdb` package, so adapter construction
 failed with the missing-driver error. This is a packaging defect, not a static
 registry or runtime-policy defect.
 
-PR #1716 adds the repository's supported `duckdb>=1.0.0,<2.0.0` dependency to
-the MCP extra and adds real synchronous and durable surface tests. That change
-must merge, and a new image must be built, published by immutable registry
-digest, and exercised through an actual DuckDB benchmark before execution
-acceptance can pass.
+PR #1716 merged into `develop` as
+`3ffa5ba0265e065805e28aab6f092682d3039f2a`. It adds the repository's
+supported `duckdb>=1.0.0,<2.0.0` dependency to the MCP extra and real
+synchronous and durable surface tests. No corrected immutable image has been
+built or exercised from that merged revision. A new image must still be built,
+published by immutable registry digest, and exercised through an actual DuckDB
+benchmark before execution acceptance can pass.
 
 ## Required production evidence
 
