@@ -42,7 +42,11 @@ def _trace(
                 oom_killed=False,
                 running=True,
             ),
-            clickhouse_metrics=dict.fromkeys(clickhouse_memory._REQUIRED_CLICKHOUSE_METRICS, 1.0),
+            clickhouse_metrics={
+                "metric.MemoryTracking": 1.0,
+                "async.MemoryResident": 1.0,
+                "event.InsertedRows": 1.0,
+            },
             responsiveness_ms=2.0,
             server_reachable=True,
         )

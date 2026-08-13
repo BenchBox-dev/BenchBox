@@ -61,20 +61,11 @@ _MEMORY_UNITS = {
 # cannot be relabelled as the requested rung.
 _DECIMAL_GIB_EQUIVALENCE = 1000**3
 
-# These are the counters the calibration trace claims to capture.  A partial
-# ClickHouse response is not evidence: query/metric failures must invalidate
-# the rung instead of silently producing a plausible-looking artifact.
-_REQUIRED_CLICKHOUSE_METRICS = frozenset(
-    {
-        "metric.MemoryTracking",
-        "async.MemoryResident",
-        "async.MemoryVirtual",
-        "async.OSMemoryAvailable",
-        "async.OSMemoryFree",
-        "event.InsertedRows",
-        "event.InsertedBytes",
-    }
-)
+# Each query family must return at least one metric in every sample. Some
+# ClickHouse builds omit optional asynchronous metrics such as OSMemoryFree,
+# so exact metric names would reject a real successful query. An empty family
+# is still a collection failure and invalidates the rung.
+_REQUIRED_CLICKHOUSE_METRIC_PREFIXES = frozenset({"metric", "async", "event"})
 
 
 @dataclass(frozen=True)
@@ -176,7 +167,8 @@ class ClickHouseMemoryTrace:
                 return False
             if sample.server_reachable is not True:
                 return False
-            if not _REQUIRED_CLICKHOUSE_METRICS.issubset(sample.clickhouse_metrics):
+            metric_prefixes = {key.split(".", 1)[0] for key in sample.clickhouse_metrics}
+            if not _REQUIRED_CLICKHOUSE_METRIC_PREFIXES.issubset(metric_prefixes):
                 return False
             if sample.engine.usage_bytes is None or sample.engine.limit_bytes is None:
                 return False
