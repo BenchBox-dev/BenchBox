@@ -66,6 +66,12 @@ _DECIMAL_GIB_EQUIVALENCE = 1000**3
 # so exact metric names would reject a real successful query. An empty family
 # is still a collection failure and invalidates the rung.
 _REQUIRED_CLICKHOUSE_METRIC_PREFIXES = frozenset({"metric", "async", "event"})
+_MEMORY_FAILURE_MARKERS = (
+    "memory limit exceeded",
+    "out of memory",
+    "oomkilled",
+    "cgroup",
+)
 
 
 @dataclass(frozen=True)
@@ -207,6 +213,19 @@ class ClickHouseMemoryTrace:
         values = [sample.engine.limit_bytes for sample in self.samples if sample.engine.limit_bytes is not None]
         return max(values) if values else None
 
+    @property
+    def memory_limit_exceeded(self) -> bool:
+        """Report measured or command-reported memory-limit failures."""
+        if any(
+            sample.engine.usage_bytes is not None
+            and sample.engine.limit_bytes is not None
+            and sample.engine.usage_bytes > sample.engine.limit_bytes
+            for sample in self.samples
+        ):
+            return True
+        failure = (self.failure_reason or "").lower()
+        return any(marker in failure for marker in _MEMORY_FAILURE_MARKERS)
+
     def finish(self, *, outcome: str, failure_reason: str | None = None) -> None:
         if outcome not in {"passed", "failed", "timed-out", "aborted"}:
             raise ValueError(f"unsupported trace outcome {outcome!r}")
@@ -238,12 +257,7 @@ class ClickHouseMemoryTrace:
                 "runtime_memory_limit_bytes": self.runtime_memory_limit_bytes,
                 "driver_timeout_source": self.driver_timeout_source,
                 "oom_killed": self._oom_killed_summary(),
-                "memory_limit_exceeded": any(
-                    sample.engine.usage_bytes is not None
-                    and sample.engine.limit_bytes is not None
-                    and sample.engine.usage_bytes > sample.engine.limit_bytes
-                    for sample in self.samples
-                ),
+                "memory_limit_exceeded": self.memory_limit_exceeded,
                 "minimum_host_available_gib": self.peak_host_available_gib,
                 "maximum_responsiveness_ms": self.max_responsiveness_ms,
             },

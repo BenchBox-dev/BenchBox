@@ -149,6 +149,13 @@ def test_trace_rejects_runtime_usage_above_declared_limit():
     assert trace.to_dict()["summary"]["memory_limit_exceeded"] is True
 
 
+def test_trace_summary_marks_command_reported_memory_failure():
+    trace = _trace(outcome="failed")
+    trace.finish(outcome="failed", failure_reason="DB::Exception: memory limit exceeded while joining")
+    assert trace.valid_for_calibration is False
+    assert trace.to_dict()["summary"]["memory_limit_exceeded"] is True
+
+
 def test_trace_rejects_runtime_limit_outside_named_rung_unit_window():
     trace = _trace()
     sample = trace.samples[0]
