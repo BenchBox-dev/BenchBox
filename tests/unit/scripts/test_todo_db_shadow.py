@@ -347,10 +347,11 @@ def test_zero_item_import_is_rejected_instead_of_passing(tmp_path: Path, monkeyp
     (todo_dir / "item.yaml").write_text("id: item\n", encoding="utf-8")
     target = tmp_path / "shadow.sqlite"
 
-    monkeypatch.setattr(shadow, "legacy_snapshot", lambda connection: {"items": [], "events": [], "meta": []})
+    monkeypatch.setattr(shadow, "database_snapshot", lambda connection: {"items": [], "events": [], "meta": []})
     monkeypatch.setattr(shadow, "_run", lambda command, *, cwd, env: None)
+    monkeypatch.setattr(shadow, "_canonical_todo_command", lambda _: ["todo-db"])
 
-    with pytest.raises(shadow.ShadowMigrationError, match="legacy import produced zero items"):
+    with pytest.raises(shadow.ShadowMigrationError, match="database import produced zero items"):
         shadow.run_shadow(
             repo_root=tmp_path,
             todo_dir=todo_dir,
@@ -370,7 +371,7 @@ def test_failed_import_rolls_back_new_target(tmp_path: Path, monkeypatch: pytest
     target = tmp_path / "shadow.sqlite"
 
     monkeypatch.setattr(
-        shadow, "legacy_snapshot", lambda connection: {"items": [{"id": "item"}], "events": [], "meta": []}
+        shadow, "database_snapshot", lambda connection: {"items": [{"id": "item"}], "events": [], "meta": []}
     )
     monkeypatch.setattr(shadow, "_canonical_todo_command", lambda _: ["uv", "run", "--", "todo-db"])
 

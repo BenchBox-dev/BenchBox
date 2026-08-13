@@ -2,199 +2,105 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import sqlite3
-import sys
+import zipfile
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-SCRIPTS_DIR = REPO_ROOT / "_project" / "scripts"
-sys.path.insert(0, str(SCRIPTS_DIR))
-
-import todo_db  # noqa: E402
+SCRIPT = REPO_ROOT / "_project/scripts/todo_schema_migration_check.py"
+SPEC = importlib.util.spec_from_file_location("todo_schema_migration_check", SCRIPT)
+assert SPEC and SPEC.loader
+check = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(check)
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-SPEC = importlib.util.spec_from_file_location(
-    "todo_schema_migration_check", SCRIPTS_DIR / "todo_schema_migration_check.py"
-)
-assert SPEC and SPEC.loader
-todo_schema_migration_check = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(todo_schema_migration_check)
-
 
 def _contract_paths(root: Path = REPO_ROOT) -> dict[str, Path]:
+    wheels = sorted((root / "_project/scripts/vendor").glob("todo_db-*-py3-none-any.whl"))
+    assert len(wheels) == 1
     return {
-        "tracker": root / "_project/scripts/todo_db.py",
+        "package_wheel": wheels[0],
         "wrapper": root / "_project/scripts/todo",
         "inventory": root / "_project/todo-schema-migrations.json",
     }
 
 
-def test_todo_schema_migration_contract_is_current() -> None:
-    todo_schema_migration_check.validate_contract(**_contract_paths())
+def _wheel(path: Path, *, schema: int = 5, migrations: tuple[int, ...] = (1, 2, 3, 4, 5)) -> Path:
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("todo_db/database.py", f"SCHEMA_VERSION = {schema}\n")
+        for revision in migrations:
+            archive.writestr(f"todo_db/migrations/{revision:03d}_migration.sql", "SELECT 1;\n")
+    return path
 
 
-def test_todo_schema_migration_contract_rejects_cli_bump_without_migration(tmp_path: Path) -> None:
-    tracker = tmp_path / "todo_db.py"
-    tracker.write_text(
-        "SCHEMA_VERSION = 5\nMIGRATIONS = {2: ['a'], 3: ['b'], 4: ['c']}\n"
-        "MIGRATION_STATEMENT_COUNTS = {2: 1, 3: 1, 4: 1}\n",
-        encoding="utf-8",
-    )
-    paths = _contract_paths()
-    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="contiguous"):
-        todo_schema_migration_check.validate_contract(
-            tracker=tracker, wrapper=paths["wrapper"], inventory=paths["inventory"]
-        )
-
-
-def test_todo_schema_migration_contract_rejects_wrapper_revision_skew(tmp_path: Path) -> None:
-    wrapper = tmp_path / "todo"
-    wrapper.write_text("TODO_SCHEMA_VERSION=3\n", encoding="utf-8")
-    paths = _contract_paths()
-    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="does not match CLI"):
-        todo_schema_migration_check.validate_contract(
-            tracker=paths["tracker"], wrapper=wrapper, inventory=paths["inventory"]
-        )
-
-
-def test_todo_schema_migration_contract_requires_current_deployment_evidence(tmp_path: Path) -> None:
-    inventory = tmp_path / "migrations.json"
-    record = json.loads(_contract_paths()["inventory"].read_text(encoding="utf-8"))
-    record["migrations"][-1].pop("deployment_evidence")
-    inventory.write_text(json.dumps(record), encoding="utf-8")
-    paths = _contract_paths()
-    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="deployment_evidence"):
-        todo_schema_migration_check.validate_contract(
-            tracker=paths["tracker"], wrapper=paths["wrapper"], inventory=inventory
-        )
-
-
-def test_todo_schema_migration_contract_requires_statement_count_inventory(tmp_path: Path) -> None:
-    inventory = tmp_path / "migrations.json"
-    record = json.loads(_contract_paths()["inventory"].read_text(encoding="utf-8"))
-    record["migrations"][-1].pop("statement_count")
-    inventory.write_text(json.dumps(record), encoding="utf-8")
-    paths = _contract_paths()
-
-    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="statement_count"):
-        todo_schema_migration_check.validate_contract(
-            tracker=paths["tracker"], wrapper=paths["wrapper"], inventory=inventory
-        )
-
-
-def test_todo_schema_migration_contract_requires_static_count_contract(tmp_path: Path) -> None:
-    tracker = tmp_path / "todo_db.py"
-    tracker.write_text(
-        "SCHEMA_VERSION = 2\nMIGRATIONS = {2: build_migration()}\n",
-        encoding="utf-8",
-    )
-    paths = _contract_paths()
-
-    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="MIGRATION_STATEMENT_COUNTS"):
-        todo_schema_migration_check.validate_contract(
-            tracker=tracker, wrapper=paths["wrapper"], inventory=paths["inventory"]
-        )
-
-
-def _database_at_revision(path: Path, revision: int) -> None:
-    conn = sqlite3.connect(path)
-    conn.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
-    conn.execute("INSERT INTO meta (key, value) VALUES ('schema_version', ?)", (str(revision),))
-    conn.commit()
-    conn.close()
-
-
-def test_todo_schema_revision_cli_ahead_refuses_read_connection(tmp_path: Path) -> None:
-    database = tmp_path / "older.sqlite"
-    _database_at_revision(database, todo_db.SCHEMA_VERSION - 1)
-    with pytest.raises(todo_db.TodoError, match=r"run `todo migrate`"):
-        todo_db.connect(database)
-
-
-def test_todo_schema_revision_database_ahead_refuses_unknown_revision(tmp_path: Path) -> None:
-    database = tmp_path / "newer.sqlite"
-    _database_at_revision(database, todo_db.SCHEMA_VERSION + 1)
-    with pytest.raises(todo_db.TodoError, match="newer than this CLI"):
-        todo_db.connect(database)
-    with pytest.raises(todo_db.TodoError, match="newer than this CLI"):
-        todo_db.migrate_db(database)
-
-
-def test_todo_schema_migration_revision_is_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    database = tmp_path / "revision-3.sqlite"
-    _database_at_revision(database, 3)
-    monkeypatch.setitem(
-        todo_db.MIGRATIONS,
-        4,
-        ["CREATE TABLE migration_probe (value TEXT)", "NOT VALID SQL"],
-    )
-
-    with pytest.raises(sqlite3.OperationalError):
-        todo_db.migrate_db(database)
-
-    conn = sqlite3.connect(database)
-    version = conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0]
-    probe = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='migration_probe'").fetchone()
-    conn.close()
-    assert version == "3"
-    assert probe is None
-
-
-def _inventory_with(tmp_path: Path, mutate) -> Path:
+def _inventory(tmp_path: Path, mutate) -> Path:
     record = json.loads(_contract_paths()["inventory"].read_text(encoding="utf-8"))
     mutate(record)
-    inventory = tmp_path / "migrations.json"
-    inventory.write_text(json.dumps(record), encoding="utf-8")
-    return inventory
+    path = tmp_path / "todo-schema-migrations.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    return path
 
 
-def _expect(inventory: Path, match: str) -> None:
+def test_package_schema_migration_contract_is_current() -> None:
+    check.validate_contract(**_contract_paths())
+
+
+def test_package_migrations_must_be_contiguous(tmp_path: Path) -> None:
     paths = _contract_paths()
-    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match=match):
-        todo_schema_migration_check.validate_contract(
-            tracker=paths["tracker"], wrapper=paths["wrapper"], inventory=inventory
+    with pytest.raises(check.SchemaMigrationError, match="must be contiguous"):
+        check.validate_contract(
+            package_wheel=_wheel(tmp_path / "todo_db.whl", migrations=(1, 2, 4, 5)),
+            wrapper=paths["wrapper"],
+            inventory=paths["inventory"],
         )
 
 
-def test_an_empty_migration_is_rejected_unless_declared_a_fence(tmp_path: Path) -> None:
-    """The guard this relaxation must not lose: a migration that ends up empty by
-    accident -- a builder returning [] -- still fails closed."""
-
-    def undeclare(record):
-        record["migrations"][-1].pop("kind")
-
-    _expect(_inventory_with(tmp_path, undeclare), "has no statements")
-
-
-def test_a_fence_may_not_smuggle_ddl(tmp_path: Path) -> None:
-    """The other direction: "fence" must not become a way to ship unreviewed DDL
-    under a label that says there is none."""
-
-    def claim_fence(record):
-        record["migrations"][-2]["kind"] = "fence"
-
-    _expect(_inventory_with(tmp_path, claim_fence), "must carry no DDL")
+def test_wheel_must_expose_literal_schema_version(tmp_path: Path) -> None:
+    wheel = tmp_path / "todo_db.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("todo_db/database.py", "SCHEMA_VERSION = current_schema()\n")
+    paths = _contract_paths()
+    with pytest.raises(check.SchemaMigrationError, match="integer literal"):
+        check.validate_contract(package_wheel=wheel, wrapper=paths["wrapper"], inventory=paths["inventory"])
 
 
-def test_a_fence_needs_a_written_rationale(tmp_path: Path) -> None:
-    def blank_rationale(record):
-        record["migrations"][-1]["fence_rationale"] = "   "
+def test_corrupt_wheel_fails_closed(tmp_path: Path) -> None:
+    wheel = tmp_path / "todo_db.whl"
+    wheel.write_text("not a zip", encoding="utf-8")
+    paths = _contract_paths()
+    with pytest.raises(check.SchemaMigrationError, match="cannot inspect"):
+        check.validate_contract(package_wheel=wheel, wrapper=paths["wrapper"], inventory=paths["inventory"])
 
-    _expect(_inventory_with(tmp_path, blank_rationale), "fence_rationale")
+
+def test_wrapper_schema_must_match_package(tmp_path: Path) -> None:
+    wrapper = tmp_path / "todo"
+    wrapper.write_text("TODO_SCHEMA_VERSION=4\n", encoding="utf-8")
+    paths = _contract_paths()
+    with pytest.raises(check.SchemaMigrationError, match="does not match package schema 5"):
+        check.validate_contract(package_wheel=paths["package_wheel"], wrapper=wrapper, inventory=paths["inventory"])
 
 
-def test_a_negative_statement_count_is_never_legal(tmp_path: Path) -> None:
-    """Relaxing `<= 0` to `< 0` must not have opened the door wider than intended."""
-    tracker = tmp_path / "todo_db.py"
-    tracker.write_text(
-        "SCHEMA_VERSION = 2\nMIGRATIONS = {2: ['a']}\nMIGRATION_STATEMENT_COUNTS = {2: -1}\n",
-        encoding="utf-8",
+def test_inventory_schema_must_match_package(tmp_path: Path) -> None:
+    paths = _contract_paths()
+    inventory = _inventory(tmp_path, lambda record: record.update(schema_version=4))
+    with pytest.raises(check.SchemaMigrationError, match="does not match package schema 5"):
+        check.validate_contract(package_wheel=paths["package_wheel"], wrapper=paths["wrapper"], inventory=inventory)
+
+
+def test_current_deployment_revision_requires_evidence(tmp_path: Path) -> None:
+    paths = _contract_paths()
+    inventory = _inventory(tmp_path, lambda record: record["migrations"][-1].pop("deployment_evidence"))
+    with pytest.raises(check.SchemaMigrationError, match="needs deployment_evidence"):
+        check.validate_contract(package_wheel=paths["package_wheel"], wrapper=paths["wrapper"], inventory=inventory)
+
+
+def test_inventory_rejects_credentials(tmp_path: Path) -> None:
+    paths = _contract_paths()
+    inventory = _inventory(
+        tmp_path,
+        lambda record: record["migrations"][-1].update(summary="token=secret"),
     )
-    paths = _contract_paths()
-    with pytest.raises(todo_schema_migration_check.SchemaMigrationError, match="non-negative"):
-        todo_schema_migration_check.validate_contract(
-            tracker=tracker, wrapper=paths["wrapper"], inventory=paths["inventory"]
-        )
+    with pytest.raises(check.SchemaMigrationError, match="must not contain backend URLs or tokens"):
+        check.validate_contract(package_wheel=paths["package_wheel"], wrapper=paths["wrapper"], inventory=inventory)
