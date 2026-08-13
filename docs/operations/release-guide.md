@@ -129,12 +129,17 @@ must not be bypassed with an undocumented local change.
    `make release-cut` (see "Resuming or aborting a cut" below).
    `RELEASE_ALLOW_RAW_CHANGELOG=1` accepts the raw draft deliberately.
 4. Curates the release branch — `git rm`'s the dev-only and deferred
-   release paths (`_project/`, `_blog/`, results explorer/data, agent
-   configs, dev-tooling root files; full list in the `release-cut:`
-   Makefile target and gated by `scripts/check_release_curation.py`).
+   release paths while retaining the curated Results Explorer publication
+   inputs: `results-data/`, `results-explorer/`,
+   `_project/scripts/explorer_pipeline/`,
+   `_project/scripts/explorer_publish.py`, and
+   `_project/scripts/results_explorer_snapshot_invariants.py`. The rest of
+   `_project/`, `_blog/`, agent configs, and dev-tooling root files remain
+   development-only; the exact list is enforced by the `release-cut:`
+   Makefile target and `scripts/check_release_curation.py`.
    For v0.3.0, `landing/` and `docs/blog/` stay in the release tree so
-   `/prompts/` and promoted release posts ship; `results-explorer/`,
-   `results-data/`, and explorer/results-data workflows do not.
+   `/prompts/` and promoted release posts ship. Explorer browser/seed/
+   submission/sync workflows remain development-only.
 5. Commits a single `Release vX.Y.Z` commit on `vX.Y.Z`.
 6. Merges `origin/release` into `vX.Y.Z` with `-s ours
    --allow-unrelated-histories`. `release` and `develop` have unrelated roots and
