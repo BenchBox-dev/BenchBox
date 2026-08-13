@@ -336,12 +336,14 @@ def test_compose_environment_raises_for_relative_benchmark_runs_dir(platform, re
 
 @pytest.mark.parametrize("platform", ["postgresql", "clickhouse-server", "questdb"])
 def test_compose_environment_ignores_relative_dir_for_non_path_mirroring_platforms(platform):
-    """Only lakesail/velox reference BENCHBOX_DATA_DIR at all -- a relative
-    benchmark_runs_dir must not raise for any other platform, since
-    compose_environment() returns {} for them regardless."""
+    """Only lakesail/velox reference BENCHBOX_DATA_DIR; ClickHouse separately
+    requires its explicit memory request, while other platforms return no env."""
     spec = docker_assets.docker_platform_spec(platform)
 
-    assert docker_assets.compose_environment(spec, benchmark_runs_dir=Path("relative_runs")) == {}
+    expected = {docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR: "4g"} if platform == "clickhouse-server" else {}
+    assert (
+        docker_assets.compose_environment(spec, benchmark_runs_dir=Path("relative_runs"), memory_limit="4g") == expected
+    )
 
 
 @pytest.mark.parametrize("platform", ["lakesail", "velox"])
@@ -377,12 +379,29 @@ def test_compose_environment_raises_for_missing_benchmark_runs_dir(platform):
 
 @pytest.mark.parametrize("platform", ["postgresql", "clickhouse-server", "questdb"])
 def test_compose_environment_returns_empty_for_missing_dir_on_non_path_mirroring_platforms(platform):
-    """Only lakesail/velox reference BENCHBOX_DATA_DIR at all -- a missing
-    benchmark_runs_dir must not raise for any other platform."""
+    """Only lakesail/velox reference BENCHBOX_DATA_DIR; a missing directory
+    must not raise for other platforms (ClickHouse still returns its memory env)."""
     spec = docker_assets.docker_platform_spec(platform)
 
-    assert docker_assets.compose_environment(spec, benchmark_runs_dir=None) == {}
-    assert docker_assets.compose_environment(spec) == {}
+    expected = {docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR: "4g"} if platform == "clickhouse-server" else {}
+    assert docker_assets.compose_environment(spec, benchmark_runs_dir=None, memory_limit="4g") == expected
+    assert docker_assets.compose_environment(spec, memory_limit="4g") == expected
+
+
+def test_clickhouse_compose_environment_requires_an_explicit_memory_request(monkeypatch):
+    monkeypatch.delenv(docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR, raising=False)
+    spec = docker_assets.docker_platform_spec("clickhouse-server")
+    with pytest.raises(docker_assets.DockerAssetError, match="CLICKHOUSE_MEMORY_LIMIT"):
+        docker_assets.compose_environment(spec)
+
+
+def test_clickhouse_compose_environment_process_override_wins(monkeypatch):
+    monkeypatch.setenv(docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR, "8g")
+    spec = docker_assets.docker_platform_spec("clickhouse-server")
+    assert (
+        docker_assets.compose_environment(spec, memory_limit="4g")[docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR]
+        == "8g"
+    )
 
 
 @pytest.mark.parametrize("platform", ["postgresql", "pg-duckdb", "pg-mooncake", "timescaledb"])
@@ -800,6 +819,13 @@ def test_compose_declared_memory_limits_reads_mem_limit(tmp_path: Path):
     assert docker_assets.compose_declared_memory_limits(spec) == {"db": "4g"}
 
 
+def test_compose_declared_memory_limits_resolves_required_environment_value(tmp_path: Path):
+    spec = _spec_for_compose(tmp_path, "services:\n  db:\n    mem_limit: ${CLICKHOUSE_MEMORY_LIMIT}\n")
+    with pytest.raises(docker_assets.DockerAssetError, match="CLICKHOUSE_MEMORY_LIMIT"):
+        docker_assets.compose_declared_memory_limits(spec, env={})
+    assert docker_assets.compose_declared_memory_limits(spec, env={"CLICKHOUSE_MEMORY_LIMIT": "4g"}) == {"db": "4g"}
+
+
 def test_compose_declared_memory_limits_reads_deploy_resources_limits(tmp_path: Path):
     spec = _spec_for_compose(
         tmp_path,
@@ -843,6 +869,50 @@ def test_compose_declared_memory_limits_survives_degenerate_limits_blocks(tmp_pa
 def test_compose_declared_memory_limits_ignores_unparseable_file(tmp_path: Path):
     spec = _spec_for_compose(tmp_path, "services: [oops\n")
     assert docker_assets.compose_declared_memory_limits(spec) == {}
+
+
+@pytest.mark.parametrize("value", ["", "0", "0g", "garbage", "-1g", "1.2.3g"])
+def test_parse_memory_bytes_rejects_missing_malformed_or_zero_values(value):
+    with pytest.raises(docker_assets.DockerAssetError, match="invalid memory limit"):
+        docker_assets.parse_memory_bytes(value)
+
+
+def test_resolve_clickhouse_memory_limit_has_no_implicit_one_gib_fallback(monkeypatch):
+    monkeypatch.delenv(docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR, raising=False)
+    with pytest.raises(docker_assets.DockerAssetError, match="required"):
+        docker_assets.resolve_clickhouse_memory_limit()
+
+
+def test_resolve_clickhouse_memory_limit_prefers_environment_override(monkeypatch):
+    monkeypatch.setenv(docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR, "8g")
+    value, size = docker_assets.resolve_clickhouse_memory_limit("4g")
+    assert value == "8g"
+    assert size == 8_000_000_000
+
+
+def test_resolve_clickhouse_memory_limit_does_not_replace_empty_environment_with_config(monkeypatch):
+    monkeypatch.setenv(docker_assets.CLICKHOUSE_MEMORY_LIMIT_ENV_VAR, "")
+    with pytest.raises(docker_assets.DockerAssetError, match="required"):
+        docker_assets.resolve_clickhouse_memory_limit("4g")
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ('{"Name":"clickhouse","MemUsage":"512MB / 4GB"}', 4_000_000_000),
+        ("clickhouse 512MB / 4GB 12%", 4_000_000_000),
+        ("CONTAINER ID NAME CPU % MEM USAGE / LIMIT MEM %\nabc clickhouse 0% 512MiB / 4GiB 1%", 4 * 1024**3),
+    ],
+)
+def test_parse_runtime_memory_limit_supports_docker_and_mocker_shapes(text, expected):
+    assert docker_assets.parse_runtime_memory_limit(text) == expected
+
+
+def test_compose_stats_command_targets_first_service():
+    spec = docker_assets.docker_platform_spec("clickhouse-server")
+    argv = docker_assets.compose_stats_command(spec, "benchbox-uat-clickhouse-server")
+    assert argv[-1] == "benchbox-uat-clickhouse-server-clickhouse-1"
+    assert argv[-3:] == ["--format", "{{json .}}", "benchbox-uat-clickhouse-server-clickhouse-1"]
 
 
 # ---------------------------------------------------------------------------

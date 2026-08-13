@@ -50,14 +50,16 @@ def docker_verb(argv) -> str:
     change never touched. Any new compose verb must be added HERE, once, or
     the same failure repeats.
 
-    `compose_up_command`, `compose_ps_command` and `compose_down_command`
-    argvs each contain exactly one of these three literal verb tokens (see
-    docker_assets.py), so match order does not matter.
+    `compose_up_command`, `compose_ps_command`, `compose_down_command`, and
+    the runtime `stats` command each contain exactly one of these literal verb
+    tokens (see docker_assets.py), so match order does not matter.
     """
     if "up" in argv:
         return "up"
     if "ps" in argv:
         return "ps"
+    if "stats" in argv:
+        return "stats"
     return "down"
 
 
