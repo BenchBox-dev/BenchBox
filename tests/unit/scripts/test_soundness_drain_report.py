@@ -95,7 +95,7 @@ def test_required_lane_picks_latest_started_run() -> None:
     runs = [
         _run("ci-required-result", "failure", started_at="2026-07-23T07:00:00Z"),
         _run("ci-required-result", "success", started_at="2026-07-23T08:00:00Z"),
-        _run("Results Explorer browser gate", "success"),
+        *[_run(name, "success") for name in mod.REQUIRED_CHECK_NAMES if name != "ci-required-result"],
     ]
     assert mod.is_required_lane_green(runs) is True
 
@@ -104,7 +104,7 @@ def test_required_lane_stale_success_does_not_beat_latest_failure() -> None:
     runs = [
         _run("ci-required-result", "success", started_at="2026-07-23T07:00:00Z"),
         _run("ci-required-result", "failure", started_at="2026-07-23T08:00:00Z"),
-        _run("Results Explorer browser gate", "success"),
+        *[_run(name, "success") for name in mod.REQUIRED_CHECK_NAMES if name != "ci-required-result"],
     ]
     assert mod.is_required_lane_green(runs) is False
 
@@ -155,18 +155,22 @@ def test_latest_check_run_returns_none_for_unknown_name() -> None:
 def test_green_at_is_the_last_required_context_to_finish() -> None:
     # The lane is green only once every context has finished, so the anchor
     # is the maximum completed_at -- not the first context's.
-    runs = [
-        _run("ci-required-result", "success", completed_at="2026-07-21T08:00:00Z"),
-        _run("Results Explorer browser gate", "success", completed_at="2026-07-23T02:00:00Z"),
-    ]
+    completed_at = {
+        "ci-required-result": "2026-07-21T08:00:00Z",
+        "Results Explorer browser gate": "2026-07-23T02:00:00Z",
+        "ruleset-drift": "2026-07-22T08:00:00Z",
+    }
+    runs = [_run(name, "success", completed_at=completed_at[name]) for name in mod.REQUIRED_CHECK_NAMES]
     assert mod.required_lane_green_at(runs) == "2026-07-23T02:00:00Z"
 
 
 def test_green_at_is_order_independent() -> None:
-    runs = [
-        _run("Results Explorer browser gate", "success", completed_at="2026-07-23T02:00:00Z"),
-        _run("ci-required-result", "success", completed_at="2026-07-21T08:00:00Z"),
-    ]
+    completed_at = {
+        "ci-required-result": "2026-07-21T08:00:00Z",
+        "Results Explorer browser gate": "2026-07-23T02:00:00Z",
+        "ruleset-drift": "2026-07-22T08:00:00Z",
+    }
+    runs = [_run(name, "success", completed_at=completed_at[name]) for name in reversed(mod.REQUIRED_CHECK_NAMES)]
     assert mod.required_lane_green_at(runs) == "2026-07-23T02:00:00Z"
 
 
@@ -195,6 +199,7 @@ def test_park_time_anchors_on_the_last_required_context() -> None:
         "check_runs": [
             _run("ci-required-result", "success", completed_at="2026-07-21T08:00:00Z"),
             _run("Results Explorer browser gate", "success", completed_at="2026-07-23T02:00:00Z"),
+            _run("ruleset-drift", "success", completed_at="2026-07-22T08:00:00Z"),
         ],
     }
     assert mod.park_time_hours(pr, _now(), required_green=True) == pytest.approx(10.0)

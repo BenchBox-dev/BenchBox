@@ -15,10 +15,11 @@ and alerts only when all of the following hold:
     (a) required-lane green -- EVERY develop-ruleset required status
         context in `REQUIRED_CHECK_NAMES` has its LATEST check run on the
         PR's head SHA completed with conclusion `success`. Today that is
-        both `ci-required-result` and `Results Explorer browser gate`
+        `ci-required-result`, `Results Explorer browser gate`, and
+        `ruleset-drift`
         (docs/operations/repo-admin-settings.md; live ruleset
         develop-squash-only). Partial green (one context success, another
-        missing or red) is NOT required-green. The browser gate always
+        missing or red) is NOT required-green. Every required context
         reports (path-aware skip still concludes success); a missing run
         is fail-closed not-green.
     (b) auto-merge is OFF    -- the PR's own `auto_merge` field is falsy
