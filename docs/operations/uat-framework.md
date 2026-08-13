@@ -876,6 +876,22 @@ CLICKHOUSE_MEMORY_LIMIT=8g docker compose -f docker/clickhouse/docker-compose.ym
 The UAT harness passes the same environment to `up`, readiness, runtime
 stats, and teardown, so every lifecycle action is tied to one request and
 cannot silently fall back to a 1 GiB setting.
+## ClickHouse SF1 certification exact-row gate
+
+Before certifying an SF0.01 or SF1 ClickHouse result, compare the result's
+per-table loaded rows with the generated manifest. Aggregate totals are
+insufficient: the gate rejects a missing, extra, or differently-sized table.
+
+```bash
+uv run -- python -m tests.uat.clickhouse_certification \
+  --manifest "$BENCHBOX_OUTPUT_DIR/datagen/tpch_sf1/_datagen_manifest.json" \
+  --result "$BENCHBOX_OUTPUT_DIR/results/tpch_sf1_clickhouse_server_sql_<id>.json"
+```
+
+The command prints `PASS` only when every manifest table has an exact result
+count. A manifest whose shard metadata does not describe the files actually
+loaded is a certification failure and must be regenerated or corrected before
+the memory and query gates can be considered complete.
 
 ## Troubleshooting
 
