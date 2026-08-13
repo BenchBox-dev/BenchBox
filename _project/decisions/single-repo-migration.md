@@ -251,6 +251,30 @@ extension above because they are not part of the v0.3.0 release tree.
 addition to the top-level split, so the drift guard fails if a future edit
 accidentally reclassifies the results explorer as shipping content.
 
+## Amendment 2026-08-13 — curated Results Explorer preview
+
+The Results Explorer is now an intentional curated-preview publication
+surface. The release branch retains the corpus under `results-data/`, the
+static application under `results-explorer/`, and only the three build-time
+helpers required by `.github/workflows/docs.yml`:
+
+- `_project/scripts/explorer_pipeline/`
+- `_project/scripts/explorer_publish.py`
+- `_project/scripts/results_explorer_snapshot_invariants.py`
+
+These release-shipped paths extend the curation guard's allowlist:
+
+- **`main` only** (curated-preview release extension): `results-data`,
+  `results-explorer`, `_project/scripts/explorer_pipeline`,
+  `_project/scripts/explorer_publish.py`,
+  `_project/scripts/results_explorer_snapshot_invariants.py`.
+
+All other `_project/` content remains development-only and is removed by
+`make release-cut`. The browser, seed, submission, and corpus-sync workflows
+remain development-only; publication uses the existing protected `release`
+push through `.github/workflows/docs.yml`. This is a curated preview and does
+not make a broad leaderboard or full-cohort coverage claim.
+
 ## Amendment 2026-07-09 — v0.3.1 recovery release; Phase 4 closed, Phase 8 retired
 
 The `v0.3.1` recovery release published successfully (tag `v0.3.1`,
