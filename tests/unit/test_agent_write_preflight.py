@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,41 @@ AGENT_IDENTITY = {
     "GIT_AUTHOR_NAME": "Claude",
     "GIT_AUTHOR_EMAIL": "noreply@anthropic.com",
 }
+
+
+def _configured_write_hook() -> dict[str, object]:
+    import yaml
+
+    config = yaml.safe_load(Path(".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    hooks = [hook for repo in config["repos"] for hook in repo.get("hooks", [])]
+    return next(hook for hook in hooks if hook["id"] == "agent-write-preflight")
+
+
+def _install_configured_write_hook(repo: Path) -> None:
+    hook = _configured_write_hook()
+    scripts = repo / "scripts"
+    scripts.mkdir()
+    (scripts / SCRIPT.name).write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
+    (repo / ".pre-commit-config.yaml").write_text(
+        "repos:\n"
+        "  - repo: local\n"
+        "    hooks:\n"
+        f"      - id: {hook['id']}\n"
+        f"        name: {hook['name']}\n"
+        f"        entry: {hook['entry']}\n"
+        "        language: system\n"
+        f"        pass_filenames: {str(hook['pass_filenames']).lower()}\n"
+        f"        always_run: {str(hook['always_run']).lower()}\n"
+        "        stages: [pre-commit]\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [sys.executable, "-m", "pre_commit", "install", "--hook-type", "pre-commit"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
 
 def _run_preflight(*, primary_clone: Path, allow: bool = False) -> subprocess.CompletedProcess[str]:
@@ -100,6 +136,82 @@ def test_preflight_allows_non_primary_worktree(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert "BenchBox write preflight OK" in result.stdout
+
+
+def test_configured_hook_refuses_primary_commit_before_object_and_preserves_declarations(tmp_path: Path) -> None:
+    repo = _init_clone(tmp_path / "BenchBox")
+    _install_configured_write_hook(repo)
+    before = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "README.md").write_text("primary change\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md", ".pre-commit-config.yaml", "scripts"], cwd=repo, check=True)
+
+    refused = subprocess.run(
+        ["git", "commit", "-m", "must refuse primary"],
+        cwd=repo,
+        env={**os.environ, **HUMAN_IDENTITY},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert refused.returncode != 0
+    assert "Refusing BenchBox write preflight in the primary clone" in refused.stdout + refused.stderr
+    assert (
+        subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+        ).stdout.strip()
+        == before
+    )
+
+    allowed = subprocess.run(
+        ["git", "commit", "-m", "authorized primary"],
+        cwd=repo,
+        env={**os.environ, **HUMAN_IDENTITY, "BENCHBOX_ALLOW_MAIN_CLONE_WRITE": "1"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert allowed.returncode == 0, allowed.stdout + allowed.stderr
+
+    (repo / "README.md").write_text("ephemeral change\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    ephemeral = subprocess.run(
+        ["git", "commit", "-m", "disposable clone"],
+        cwd=repo,
+        env={**os.environ, **HUMAN_IDENTITY, "BENCHBOX_EPHEMERAL_CLONE": "1"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ephemeral.returncode == 0, ephemeral.stdout + ephemeral.stderr
+
+
+def test_configured_hook_allows_linked_worktree_commit(tmp_path: Path) -> None:
+    primary = _init_clone(tmp_path / "BenchBox")
+    _install_configured_write_hook(primary)
+    subprocess.run(["git", "add", ".pre-commit-config.yaml", "scripts"], cwd=primary, check=True)
+    subprocess.run(["git", "commit", "--no-verify", "-m", "install fixture hook"], cwd=primary, check=True)
+    linked = primary.parent / "BenchBox.wt-linked"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "fix/linked-commit", str(linked), "HEAD"],
+        cwd=primary,
+        check=True,
+    )
+    (linked / "README.md").write_text("linked change\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=linked, check=True)
+
+    result = subprocess.run(
+        ["git", "commit", "-m", "linked commit"],
+        cwd=linked,
+        env={**os.environ, **HUMAN_IDENTITY},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_claude_pr_command_runs_write_preflight_before_pr_workflow() -> None:
