@@ -1,0 +1,256 @@
+"""Unit coverage for measured ClickHouse memory traces."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from tests.uat import clickhouse_memory
+
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+
+def _trace(
+    *, outcome: str = "passed", application_batch_rows: int | None = None
+) -> clickhouse_memory.ClickHouseMemoryTrace:
+    trace = clickhouse_memory.ClickHouseMemoryTrace(
+        platform="clickhouse-server",
+        rung=clickhouse_memory.DEFAULT_MEMORY_RUNGS[0],
+        started_at_utc=clickhouse_memory.utc_now(),
+        driver_timeout_s=300,
+        driver_timeout_source="test fixture",
+        application_batch_rows=application_batch_rows,
+    )
+    trace.samples.append(
+        clickhouse_memory.TraceSample(
+            observed_at_utc=clickhouse_memory.utc_now(),
+            elapsed_s=0.1,
+            host=clickhouse_memory.HostMemorySample(available_gib=4.0, free_gib=1.0, swap_used_percent=0.0),
+            engine=clickhouse_memory.EngineMemorySample(
+                "mocker", "clickhouse", 512 * 1024**2, 1 * clickhouse_memory.GIB
+            ),
+            clickhouse_metrics={"event.InsertedRows": 100.0},
+            responsiveness_ms=2.0,
+            server_reachable=True,
+        )
+    )
+    trace.finish(outcome=outcome)
+    return trace
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("1GiB", 1024**3), ("1.5GiB", int(1.5 * 1024**3)), ("512MiB / 1GiB", 512 * 1024**2), ("bad", None)],
+)
+def test_parse_memory_bytes_preserves_engine_units(value, expected):
+    assert clickhouse_memory.parse_memory_bytes(value) == expected
+
+
+def test_parse_engine_stats_handles_json_and_mem_usage():
+    sample = clickhouse_memory.parse_engine_stats(
+        '{"Name":"benchbox-clickhouse","MemUsage":"512MiB / 1GiB"}\n',
+        engine="mocker",
+        service="clickhouse",
+    )
+    assert sample.usage_bytes == 512 * 1024**2
+    assert sample.limit_bytes == 1024**3
+    assert sample.raw_status == "benchbox-clickhouse"
+
+
+def test_parse_engine_stats_handles_mocker_table_output():
+    sample = clickhouse_memory.parse_engine_stats(
+        "CONTAINER ID   NAME                                      CPU %    MEM USAGE / LIMIT   MEM %\n"
+        "benchbox-cal   benchbox-clickhouse-1                     8.40%   70.3MB / 1.00GB     6.87%\n",
+        engine="mocker",
+        service="clickhouse",
+    )
+    assert sample.usage_bytes == int(70.3 * 1000**2)
+    assert sample.limit_bytes == 1000**3
+    assert sample.raw_status == "benchbox-clickhouse-1"
+
+
+def test_parse_engine_inspect_captures_oom_and_running_state():
+    sample = clickhouse_memory.parse_engine_inspect(
+        '[{"State":{"OOMKilled":false,"Running":true,"Status":"running"}}]',
+        engine="mocker",
+        service="clickhouse",
+    )
+    assert sample.oom_killed is False
+    assert sample.running is True
+    assert sample.raw_status == "running"
+
+
+def test_native_loader_contract_rejects_legacy_application_batching():
+    ok, reason = clickhouse_memory.verify_native_streaming_loader()
+    assert ok, reason
+
+
+def test_trace_rejects_application_batch_rows_even_when_run_passes():
+    trace = _trace(application_batch_rows=1000)
+    assert trace.valid_for_calibration is False
+    payload = trace.to_dict()
+    assert payload["loader_contract"]["legacy_1000_row_fallback"] is True
+
+
+def test_trace_requires_native_streaming_and_responsive_sample():
+    trace = _trace()
+    trace.native_streaming = False
+    assert trace.valid_for_calibration is False
+
+    trace = _trace()
+    trace.samples[0] = clickhouse_memory.TraceSample(
+        observed_at_utc=trace.samples[0].observed_at_utc,
+        elapsed_s=trace.samples[0].elapsed_s,
+        host=trace.samples[0].host,
+        engine=trace.samples[0].engine,
+        clickhouse_metrics=trace.samples[0].clickhouse_metrics,
+        responsiveness_ms=None,
+        server_reachable=False,
+    )
+    assert trace.valid_for_calibration is False
+
+
+def test_trace_rejects_runtime_usage_above_declared_limit():
+    trace = _trace()
+    trace.samples[0] = clickhouse_memory.TraceSample(
+        observed_at_utc=trace.samples[0].observed_at_utc,
+        elapsed_s=trace.samples[0].elapsed_s,
+        host=trace.samples[0].host,
+        engine=clickhouse_memory.EngineMemorySample(
+            "mocker", "clickhouse", 2 * clickhouse_memory.GIB, 1 * clickhouse_memory.GIB
+        ),
+        clickhouse_metrics=trace.samples[0].clickhouse_metrics,
+        responsiveness_ms=trace.samples[0].responsiveness_ms,
+        server_reachable=True,
+    )
+    assert trace.valid_for_calibration is False
+    assert trace.to_dict()["summary"]["memory_limit_exceeded"] is True
+
+
+def test_trace_rejects_missing_engine_limit_sample():
+    trace = _trace()
+    sample = trace.samples[0]
+    trace.samples.append(
+        clickhouse_memory.TraceSample(
+            observed_at_utc=sample.observed_at_utc,
+            elapsed_s=sample.elapsed_s + 1,
+            host=sample.host,
+            engine=clickhouse_memory.EngineMemorySample("mocker", "clickhouse", 512, None),
+            clickhouse_metrics=sample.clickhouse_metrics,
+            responsiveness_ms=sample.responsiveness_ms,
+            server_reachable=True,
+        )
+    )
+    assert trace.valid_for_calibration is False
+
+
+def test_select_lowest_successful_rung_does_not_choose_failed_or_unmeasured():
+    low = _trace()
+    high = _trace()
+    high.rung = clickhouse_memory.DEFAULT_MEMORY_RUNGS[1]
+    failed_low = _trace(outcome="failed")
+    failed_low.rung = clickhouse_memory.DEFAULT_MEMORY_RUNGS[0]
+    assert clickhouse_memory.select_lowest_successful_rung([failed_low, high]) == high.rung
+    assert clickhouse_memory.select_lowest_successful_rung([low, high]) == low.rung
+
+
+def test_select_lowest_successful_rung_fails_closed_without_trace():
+    with pytest.raises(ValueError, match="no valid passing memory trace"):
+        clickhouse_memory.select_lowest_successful_rung([_trace(outcome="timed-out")])
+
+
+def test_write_trace_is_atomic_and_contains_schema_and_summary(tmp_path: Path):
+    output = tmp_path / "trace.json"
+    clickhouse_memory.write_trace(output, _trace())
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["trace_schema_version"] == clickhouse_memory.TRACE_SCHEMA_VERSION
+    assert payload["summary"]["valid_for_calibration"] is True
+    assert not (tmp_path / ".trace.json.tmp").exists()
+
+
+def test_read_trace_reconstructs_loader_and_engine_guards(tmp_path: Path):
+    output = tmp_path / "trace.json"
+    original = _trace()
+    clickhouse_memory.write_trace(output, original)
+    loaded = clickhouse_memory.read_trace(output)
+    assert loaded.valid_for_calibration is True
+    assert loaded.rung == original.rung
+    assert loaded.samples[0].engine.limit_bytes == original.samples[0].engine.limit_bytes
+
+
+def test_collector_records_injected_engine_stats_without_live_daemon(monkeypatch, tmp_path: Path):
+    monkeypatch.setattr(
+        clickhouse_memory,
+        "read_host_memory",
+        lambda: clickhouse_memory.HostMemorySample(available_gib=3.0, free_gib=1.0, swap_used_percent=4.0),
+    )
+    monkeypatch.setattr(
+        clickhouse_memory,
+        "read_clickhouse_metrics",
+        lambda *args, **kwargs: ({"event.InsertedRows": 42.0}, 3.5),
+    )
+    seen_argv = []
+
+    def command_runner(argv):
+        seen_argv.append(tuple(argv))
+        return 0, '{"Name":"clickhouse","MemUsage":"1GiB / 4GiB"}\n', ""
+
+    trace = clickhouse_memory.ClickHouseMemoryTrace(
+        platform="clickhouse-server",
+        rung=clickhouse_memory.DEFAULT_MEMORY_RUNGS[1],
+        started_at_utc=clickhouse_memory.utc_now(),
+    )
+    collector = clickhouse_memory.MemoryTraceCollector(
+        trace=trace,
+        output_path=tmp_path / "trace.json",
+        interval_s=0.01,
+        engine="mocker",
+        project_name="benchbox-uat-test",
+        compose_files=[Path("docker/clickhouse/docker-compose.yml")],
+        command_runner=command_runner,
+    )
+    collector.start()
+    collector.stop(outcome="passed")
+    assert trace.samples
+    assert trace.samples[0].engine.usage_bytes == clickhouse_memory.GIB
+    assert trace.samples[0].responsiveness_ms == 3.5
+    assert seen_argv[0][-1] == "benchbox-uat-test-clickhouse-1"
+
+
+def test_rung_matrix_excludes_1000_row_language():
+    rendered = clickhouse_memory.rung_matrix_text()
+    assert "baseline-1g" in rendered
+    assert "1000" not in rendered
+
+
+def test_summarize_command_failure_preserves_memory_root_cause():
+    reason = clickhouse_memory.summarize_command_failure(
+        "Code: 241. DB::Exception: memory limit exceeded: current RSS: 871 MiB",
+        1,
+    )
+    assert "memory limit exceeded" in reason
+    assert "871 MiB" in reason
+
+
+def test_parse_driver_timeout_requires_explicit_platform_option():
+    assert clickhouse_memory.parse_driver_timeout(["benchbox", "--platform-option", "send_receive_timeout=600"]) == 600
+    assert clickhouse_memory.parse_driver_timeout(["benchbox", "--platform-option", "password=benchbox"]) is None
+
+
+def test_default_driver_timeout_matches_server_setup():
+    assert clickhouse_memory.default_clickhouse_driver_timeout_s() == clickhouse_memory.DEFAULT_DRIVER_TIMEOUT_S
+    timeout, source = clickhouse_memory.resolve_driver_timeout(["benchbox", "--platform-option", "password=benchbox"])
+    assert timeout == 300
+    assert source == "ClickHouseSetupMixin server default"
+
+
+def test_read_trace_rejects_unknown_schema(tmp_path: Path):
+    output = tmp_path / "trace.json"
+    clickhouse_memory.write_trace(output, _trace())
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    payload["trace_schema_version"] = 1
+    output.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="unsupported ClickHouse memory trace schema"):
+        clickhouse_memory.read_trace(output)
