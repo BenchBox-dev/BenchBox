@@ -15,7 +15,7 @@ def test_workflow_uses_only_the_locked_package_runtime() -> None:
 
     assert text.count("uv sync --project _project/scripts --locked") == 1
     assert "_project/scripts/todo export" in text
-    assert text.count("uv run --project _project/scripts --locked") == 5
+    assert text.count("uv run --project _project/scripts --locked") == 4
     for forbidden in (
         "todo_db.py",
         "BENCHBOX_TODO_DB_STANDALONE",
@@ -27,11 +27,12 @@ def test_workflow_uses_only_the_locked_package_runtime() -> None:
         assert forbidden not in text
 
 
-def test_restore_validation_compares_the_complete_export_envelope() -> None:
+def test_restore_validation_compares_the_exact_recovery_artifact_bytes() -> None:
     text = WORKFLOW.read_text()
 
-    assert "assert source == restored" in text
-    assert 'k not in {"schema_migrations", "audit_head"}' not in text
+    assert 'cmp -s "${LOSSLESS_DIR}/todo-db.json" "${restore_dir}/restored.json"' in text
+    assert "sha256sum" in text
+    assert "assert source == restored" not in text
 
 
 def test_versioned_recovery_artifacts_have_bounded_retention() -> None:
