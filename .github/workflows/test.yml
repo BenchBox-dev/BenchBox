@@ -369,11 +369,11 @@ jobs:
       - name: Check release branch curation
         run: |
           missing=0
+          # The curated preview deliberately retains the Explorer corpus,
+          # application, and build-time helpers. Everything else under
+          # _project remains development-only and must not reach release.
           for forbidden in \
-            _project \
             _blog \
-            results-data \
-            results-explorer \
             .claude \
             .codex \
             .gemini \
@@ -397,6 +397,32 @@ jobs:
               missing=1
             fi
           done
+
+          for required in \
+            results-data \
+            results-explorer \
+            _project/scripts/explorer_pipeline \
+            _project/scripts/explorer_publish.py \
+            _project/scripts/results_explorer_snapshot_invariants.py; do
+            if [ ! -e "$required" ]; then
+              echo "::error::Curated Explorer publication path is missing: $required"
+              missing=1
+            fi
+          done
+
+          while IFS= read -r path; do
+            case "$path" in
+              _project/scripts/explorer_pipeline/*|\
+              _project/scripts/explorer_publish.py|\
+              _project/scripts/results_explorer_snapshot_invariants.py)
+                ;;
+              *)
+                echo "::error::Release branch contains non-curated _project path: $path"
+                missing=1
+                ;;
+            esac
+          done < <(git ls-files -- _project)
+
           exit "$missing"
 
       - name: Upload dependency bounds report

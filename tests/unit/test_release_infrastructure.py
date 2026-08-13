@@ -308,6 +308,17 @@ class TestReleaseInfrastructure:
         assert "--fail-on=cap-reached" in readiness_run_text
         assert "Check release branch curation" in str(jobs["release-readiness"]["steps"])
         assert "Release branch still contains curated path" in readiness_run_text
+        assert "Curated Explorer publication path is missing" in readiness_run_text
+        assert "non-curated _project path" in readiness_run_text
+        assert "git ls-files -- _project" in readiness_run_text
+        for retained_path in [
+            "results-data",
+            "results-explorer",
+            "_project/scripts/explorer_pipeline",
+            "_project/scripts/explorer_publish.py",
+            "_project/scripts/results_explorer_snapshot_invariants.py",
+        ]:
+            assert retained_path in readiness_run_text
         assert "_project" in readiness_run_text
         assert ".github/workflows/validate-submission.yml" in readiness_run_text
 
@@ -580,6 +591,10 @@ class TestReleaseInfrastructure:
             assert "post-merge" in normalized
             assert "pre-merge" in normalized
             assert "patch release or incident" in content
+
+        assert "curated Results Explorer inputs" in release_template
+        assert "three curated Explorer" in release_template
+        assert "non-curated portions of `_project/`" in release_template
 
     def test_release_cut_generates_changelog_from_main_delta(self):
         """The release branch changelog boundary is the main patch delta, not tag ancestry."""
