@@ -16,18 +16,18 @@ represented in the repository, but the default wheel still ships the
 experimental package. No companion package or extra is justified until demand,
 install-size benefit, CI burden, and release cost are measured.
 
-Measured on `origin/develop` at `723126bf3` with `uv build --wheel`:
+Measured on `origin/develop` at `723126bf3` with `uv build --wheel`. Reproduction
+steps are in `_project/decisions/future-state-extraction-evidence-2026-08-13.md`.
 
 | Measure | Result |
 | --- | --- |
 | Wheel | 10,219,657 bytes; 1,325 archive entries |
 | `benchbox.experimental` entries | 24; 307,255 uncompressed bytes |
-| Warm `import benchbox` in five fresh processes | 0.298–0.409 seconds; environment setup excluded |
-| Broad CI/release touchpoint search | 18 matching files; no CI-minute or release-cost measurement |
 
 The measured contents confirm that experimental code remains packaged, but do
 not establish that extraction is worth its versioning, CI, and dependency-skew
-cost. Default-wheel contents remain unchanged in this item.
+cost. No CI-minute or release-cost measurement was taken. Default-wheel contents
+remain unchanged in this item.
 
 ## Future State
 

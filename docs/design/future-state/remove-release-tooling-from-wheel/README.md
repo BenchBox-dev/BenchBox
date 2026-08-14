@@ -14,18 +14,18 @@ contains no `benchbox-maintainer`, `benchbox/release`, or maintainer/sync
 package paths. The product publishing paths that remain in the wheel are not
 maintainer-package evidence and must not be removed under this proposal.
 
-Measured on `origin/develop` at `723126bf3` with `uv build --wheel`:
+Measured on `origin/develop` at `723126bf3` with `uv build --wheel`. Reproduction
+steps are in `_project/decisions/future-state-extraction-evidence-2026-08-13.md`.
 
 | Measure | Result |
 | --- | --- |
 | Wheel | 10,219,657 bytes; 1,325 archive entries |
 | Release/maintainer/sync package-path entries | 0 |
-| Warm `import benchbox` in five fresh processes | 0.298–0.409 seconds; environment setup excluded |
-| Broad CI/release touchpoint search | 18 matching files; no CI-minute or release-cost measurement |
 
 The remaining gate is demand, CI-minute impact, and release-cost evidence for
-creating a companion maintainer package. No extraction or packaging change is
-authorized by this status.
+creating a companion maintainer package. No CI-minute or release-cost
+measurement was taken. No extraction or packaging change is authorized by this
+status.
 
 ## Future State
 

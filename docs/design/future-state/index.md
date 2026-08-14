@@ -9,7 +9,13 @@ These documents describe the intended end state for high-impact cleanup and
 refactoring TODOs. Each proposal is tied to a planning item under
 `_project/TODO/main/planning/` and makes the destination architecture explicit:
 what gets pruned, excluded from the wheel, or reorganized within BenchBox.
-Current extraction evidence is recorded in
+
+The priority labels below are planning hypotheses, not measured demand or cost
+claims. Package size, cold-import time, CI touchpoints, user demand, and support
+obligations must be measured before a distribution or extraction decision is
+treated as actionable. The support-tier freeze is
+`_project/decisions/architecture-support-tier-commitment.md`. Current extraction
+evidence is
 `_project/decisions/future-state-extraction-evidence-2026-08-13.md`.
 
 ## Sequencing and Priority
