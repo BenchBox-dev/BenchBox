@@ -19,8 +19,9 @@ Use this checklist before opening a platform-support PR. It is deliberately conc
 
 - Add the adapter under `benchbox/platforms/` or an existing platform family package.
 - Keep platform SDK imports lazy or guarded so `import benchbox` remains cheap.
-- Register the adapter in `_OPTIONAL_ADAPTERS` in `benchbox/core/platform_registry.py`.
-- Add metadata in `PlatformRegistry._build_platform_metadata()` and one explicit `support_status` entry.
+- Add the platform's canonical entry to `benchbox/core/platform_manifest.py`, including one explicit `support_status`.
+  The registry's `_OPTIONAL_ADAPTERS` and `_build_platform_metadata()` paths are live pass-throughs and should not
+  be treated as independent registration authorities.
 - Fill `capabilities`: `supports_sql`, `supports_dataframe`, `default_mode`, `platform_family`, `inherits_from`, `cost_class`, and deployment modes when relevant.
 - Add `driver_package` and `installation_command`; dependency extras belong in `pyproject.toml`.
 - Add DDL/query compatibility rules or an explicit exemption in the SQL compatibility inventory when the adapter rewrites SQL or DDL.

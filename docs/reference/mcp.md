@@ -412,6 +412,13 @@ above.
 | Velox `deployment` (`remote`/`docker`) | Omitted | security-scoped | Remote Velox would require an operator-approved endpoint and runtime controls; only local Velox is exposed over MCP to avoid caller-controlled destination selection. |
 | `--plan-config` | Omitted | not-yet-demanded | MCP exposes only the `capture_plans` boolean; per-query plan-capture selection is promotable. |
 | `--no-monitoring` | Omitted | not-yet-demanded | Metrics-collection toggle; bounded boolean, no client demand yet. |
+| `--show-plans` | Omitted | interaction-scoped | Live plan display is terminal presentation; MCP returns structured results and captured plans through result tools. |
+| `--normalize-plan-literals` | Omitted | not-yet-demanded | Plan normalization toggle is a bounded control with no client demand yet. |
+| `--stats-per-table-timing` | Omitted | not-yet-demanded | Per-table timing detail is a bounded reporting control with no client demand yet. |
+| `--strict-translation` | Omitted | not-yet-demanded | Strict SQL-translation behavior is a bounded execution control with no client demand yet. |
+| `--ignore-memory-warnings` | Omitted | not-yet-demanded | Memory-warning handling is a bounded execution control with no client demand yet. |
+| `--funding` | Omitted | not-yet-demanded | Funding metadata is a bounded provenance field with no client demand yet. |
+| `--result-source` | Omitted | not-yet-demanded | Result-source selection is a bounded provenance control with no client demand yet. |
 
 The textcharts MCP server remains a separate-client integration, not a bundled or proxied part of `benchbox-mcp`. See `docs/design/textcharts-mcp-boundary.md` for the accepted separate textcharts configuration and the rejected bundle/proxy alternatives.
 ### Discovery Tools
