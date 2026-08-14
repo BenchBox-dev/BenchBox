@@ -40,3 +40,6 @@ https://docs\.aws\.amazon\.com/(redshift|s3)/.*
 
 # H2O documentation rejects automated CI requests with HTTP 403.
 https://docs\.h2o\.ai/.*
+
+# HammerDB site intermittently returns 502 / connect timeouts
+https://www\.hammerdb\.com/.*

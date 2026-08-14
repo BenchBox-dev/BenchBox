@@ -1789,60 +1789,6 @@ class ResultCaptureMixin:
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
 
-    def _setup_fresh_database_phases(self, benchmark, connection: Any, effective_tuning_config) -> tuple:
-        """Set up phases for fresh database (schema creation, tuning, data loading).
-
-        When ``self.table_mode == "external"`` the adapter skips native schema
-        creation and tuning, and calls ``create_external_tables`` instead of
-        ``load_data``.
-
-        Returns:
-            Tuple of (schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved)
-        """
-        data_dir = Path(benchmark.output_dir) if hasattr(benchmark, "output_dir") else Path(".")
-
-        if self.table_mode == "external":
-            # External table mode: skip native schema/tuning, create external references
-            if not self.supports_external_tables:
-                raise RuntimeError(f"Platform '{self.platform_name}' does not support --table-mode external")
-            validate_fn = getattr(self, "validate_external_table_requirements", None)
-            if callable(validate_fn):
-                validate_fn()
-
-            schema_time = 0.0
-            schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, 0.0)
-            schema_creation_phase.status = "SKIPPED"
-
-            quiet_console.print("Creating external tables...")
-            table_stats, loading_time, per_table_timings = self.create_external_tables(benchmark, connection, data_dir)
-            _fmt_tag = f" [{self.external_format}]" if self.external_format else ""
-            quiet_console.print(f"✅ External tables created in {loading_time:.2f}s{_fmt_tag}")
-            data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
-            return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
-
-        quiet_console.print("Creating database schema...")
-        schema_time = self.create_schema(benchmark, connection)
-        schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, schema_time)
-
-        tuning_metadata_saved = False
-        if self.tuning_enabled and effective_tuning_config:
-            quiet_console.print("Applying unified tuning configuration...")
-            self.apply_unified_tuning(effective_tuning_config, connection)
-            quiet_console.print("✅ Unified tuning configuration applied")
-
-            quiet_console.print("Saving tuning metadata...")
-            tuning_metadata_saved = self.save_tuning_metadata(connection)
-            if tuning_metadata_saved:
-                quiet_console.print("✅ Tuning metadata saved")
-            else:
-                quiet_console.print("⚠️ Failed to save tuning metadata")
-
-        quiet_console.print("Loading benchmark data...")
-        table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
-        quiet_console.print(f"✅ Data loading completed in {loading_time:.2f}s")
-        data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
-        return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
-
     def _check_validation_failure(self, validation_phase) -> bool:
         """Check if validation failed and log details. Returns True if validation failed."""
         if (

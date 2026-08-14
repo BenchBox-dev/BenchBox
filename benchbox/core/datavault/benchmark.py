@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from benchbox.core.base_benchmark import BaseBenchmark
+from benchbox.base import BaseBenchmark
 
 if TYPE_CHECKING:
     from cloudpathlib import CloudPath
@@ -468,6 +468,14 @@ class DataVaultBenchmark(BaseBenchmark):
         if self._tpch_generator is not None and hasattr(self._tpch_generator, "cleanup"):
             self._tpch_generator.cleanup()  # type: ignore[call-non-callable]
         super().cleanup()
+
+    def __enter__(self) -> "DataVaultBenchmark":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        """Preserve the deprecated-base context-manager cleanup contract."""
+        self.cleanup()
+        return False
 
 
 # ---------------------------------------------------------------------------

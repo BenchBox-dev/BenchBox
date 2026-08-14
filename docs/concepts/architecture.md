@@ -48,12 +48,15 @@ BenchBox is built on three core principles:
 
 ### 1. Benchmark Layer
 
-**Location**: `benchbox/core/{benchmark}/`
+**Location**: Public wrappers live in `benchbox/*.py` on `benchbox.base.BaseBenchmark`.
+Core implementations live under `benchbox/core/{benchmark}/`.
 
 **Responsibility**: Encapsulates benchmark-specific logic
 
 **Key Classes**:
-- `BaseBenchmark`: Abstract base class all benchmarks inherit from
+- `BaseBenchmark`: Public wrapper base in `benchbox/base.py` for benchmark
+  construction and the `run_with_platform` API. It remains a supported public
+  base; it is not a retired execution model.
 - `{Benchmark}`: Implementation class (e.g., `TPCH`, `TPCDS`)
 - `{Benchmark}Generator`: Data generation logic
 - `{Benchmark}Queries`: Query templates and parameterization
@@ -111,8 +114,14 @@ See: [Platform Selection Guide](../platforms/platform-selection-guide.md)
 **Responsibility**: Structured representation of benchmark execution results
 
 **Key Classes**:
-- `BenchmarkResults`: Main result object with timing, metadata, validation
-- `QueryResult`: Individual query execution details
+- `QueryResult`: Schema-facing query row model used by compatibility and
+  validation boundaries (`benchbox/core/schemas.py`); it is not the canonical
+  in-memory execution object.
+- `QueryExecution`: Canonical in-memory result for one executed query
+  (`benchbox/core/results/models.py`), including timing, status, validation,
+  resource usage, and optional plan data.
+- `BenchmarkResults`: Aggregate benchmark result with timing, metadata,
+  validation, and query-result summaries.
 - `ExecutionPhases`: Setup, power test, throughput test phases
 - `ValidationResult`: Data quality and correctness checks
 
@@ -138,7 +147,7 @@ See: [Platform Selection Guide](../platforms/platform-selection-guide.md)
 }
 ```
 
-See: [Result Schema Reference](../reference/result_schema_v1.md)
+See: [Result Schema Reference](../reference/result-schema-v1.md)
 
 ### 4. Connection Abstraction
 
@@ -284,7 +293,10 @@ See: [Custom Benchmarks Guide](../advanced/custom-benchmarks.md)
    - `{Platform}Adapter`
    - `{Platform}Connection(DatabaseConnection)`
 3. Add platform extras to `pyproject.toml`
-4. Register in `benchbox/platforms/__init__.py`
+4. Add the platform's canonical entry to `benchbox/core/platform_manifest.py`,
+   including one explicit `support_status`. The registry's `_OPTIONAL_ADAPTERS`
+   and `_build_platform_metadata()` paths are live pass-throughs, not
+   independent registration authorities.
 
 #### External Table Support
 
@@ -325,9 +337,13 @@ See: [TPC Patterns Usage](../guides/tpc/tpc-patterns-usage.md)
 
 Platform adapters isolate database-specific logic, allowing benchmarks to remain platform-agnostic.
 
-### 2. Template Method Pattern
+### 2. Benchmark Lifecycle
 
-`BaseBenchmark` defines the benchmark execution workflow, with subclasses providing specific implementations.
+The lifecycle is orchestrated by the core run service and lifecycle runner:
+configuration and platform setup flow through `execute_run(...)`, which calls
+`run_benchmark_lifecycle(...)`. `BaseBenchmark` remains the public wrapper base
+and benchmark-facing API boundary; it is not the owner of the entire runtime
+execution workflow.
 
 ### 3. Strategy Pattern
 
