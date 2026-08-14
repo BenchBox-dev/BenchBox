@@ -72,6 +72,22 @@ class TestIsDataFrameExecution:
         """Test case insensitive detection."""
         assert is_dataframe_execution(types.SimpleNamespace(type="Polars-DF")) is True
 
+    def test_explicit_mode_sql_wins_over_df_suffix(self):
+        """Explicit mode overrides a -df platform name."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="polars-df", mode="sql")) is False
+
+    def test_explicit_mode_dataframe_wins_over_sql_platform(self):
+        """Explicit dataframe mode overrides a SQL platform name."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="duckdb", mode="dataframe")) is True
+
+    def test_deployment_suffix_is_stripped(self):
+        """Deployment suffixes are not treated as DataFrame mode by themselves."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="clickhouse:cloud")) is False
+
+    def test_combined_df_and_deployment_suffix(self):
+        """Combined -df and :deployment suffixes still imply DataFrame mode."""
+        assert is_dataframe_execution(types.SimpleNamespace(type="databricks-df:serverless")) is True
+
 
 class TestGetExecutionMode:
     """Tests for get_execution_mode function."""

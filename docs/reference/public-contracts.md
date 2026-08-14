@@ -368,7 +368,7 @@ editing:
 | `docs/reference/backward-compatibility.md:24-84` | Compatibility registry tracks shims; wrapper cleanup notes preserve top-level wrappers while `benchbox.core.base_benchmark.BaseBenchmark` remains only as a deprecated module pending its deletion-only item. |
 | `tests/unit/test_wrapper_facades_fast.py:30-260` | Wrapper facades are tested public behavior, not accidental reachability. |
 | `_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml:25-47` | Completed decision moved MCP away from CLI internals and onto public benchmark/adapter APIs. |
-| `docs/design/future-state/index.md:19-41` | Future-state proposals already classify MCP API formalization and experimental isolation as active architecture decisions. |
+| `docs/design/future-state/index.md` | Future-state extraction proposals are evidence-gated; MCP API formalization remains a later contract item. |
 | `benchbox/base.py:476` | `run_with_platform` remains the programmatic execution hook used by orchestration tools. |
 | `benchbox/core/platform_registry.py:85-89` | Platform registry declares itself the metadata and adapter-registration source of truth. |
 | `benchbox/core/benchmark_registry.py:1-5` | Benchmark registry declares itself the shared benchmark metadata source for CLI and MCP. |
@@ -380,7 +380,7 @@ Checked SHA: `1d454632ba73911bc4ff0cf0a3fb8ec22227a7a8`
 | Evidence | Finding |
 |---|---|
 | `benchbox/base.py` | Public `BaseBenchmark` remains the beta-public base for top-level wrappers and orchestration helpers; `run_with_platform()` remains the beta-public adapter execution hook. |
-| `benchbox/core/base_benchmark.py` | Deprecated internal compatibility base remains distinct; only `benchbox/core/datavault/benchmark.py` and `benchbox/core/tpcds_obt/benchmark.py` import it in production code. |
+| `benchbox/core/base_benchmark.py` | Deprecated internal compatibility base remains distinct and has no remaining production implementation consumers after the Data Vault and TPC-DS OBT migrations. |
 | `tests/unit/test_wrapper_facades_fast.py` | Wrapper methods are asserted behavior and should not be treated as accidental duplicate reachability. |
 | `benchbox/__init__.py` | Top-level package exposes 21 benchmark facades: 6 eager imports and 15 lazy `_BENCHMARK_REGISTRY` entries. |
 | `benchbox/core/benchmark_loader.py` | Loader is registry-backed and internal; it resolves 23 core benchmark families from `CORE_BENCHMARK_CLASS_NAMES`. |

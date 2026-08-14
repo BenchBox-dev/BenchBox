@@ -92,6 +92,6 @@ are applied here: this matrix documents status, it does not change it.
   `benchmark-support-status-criteria-matrix`.
 - **External-dataset betas (`nyctaxi`, `flightdata`):** promotion is gated on a
   pinned, reproducible external-source contract, not on query coverage.
-- **Deprecated-base experimentals (`tpcds_obt`, `datavault`):** their status is
-  partly coupled to the `benchbox.core.base_benchmark.BaseBenchmark` migration;
-  reassess after that base is removed.
+- **Experimental families (`tpcds_obt`, `datavault`):** they now inherit
+  `benchbox.base.BaseBenchmark`. Reassess promotion on their own evidence, not
+  on the deprecated internal-base migration.
