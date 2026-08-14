@@ -34,6 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DECISION_DOC = REPO_ROOT / "_project" / "decisions" / "single-repo-migration.md"
 MAKEFILE = REPO_ROOT / "Makefile"
 DEVELOPMENT_TREE_TARGETS_VARIABLE = "DEVELOPMENT_TREE_ONLY_TARGETS"
+CURATED_RESUMABLE_PROJECT_TARGETS = {"release-cut"}
 REQUIRED_CURATED_PATHS = frozenset(
     {
         ".github/workflows/results-explorer-browser.yml",
@@ -81,7 +82,7 @@ def parse_curation_list(makefile: Path) -> set[str]:
     """Extract `git rm` paths from the `release-cut:` target body."""
     text = makefile.read_text(encoding="utf-8")
     match = re.search(
-        r"^release-cut:\s*\n((?:[ \t].*\n|\n)+)",
+        r"^release-cut:[^\n]*\n((?:[ \t].*\n|\n)+)",
         text,
         re.MULTILINE,
     )
@@ -138,7 +139,7 @@ def project_dependent_make_targets(root: Path) -> set[str]:
             if (
                 not line.startswith("\t")
                 or not target
-                or target == ".development-tree-required"
+                or target in {".development-tree-required", ".release-cut-tree-required"}
                 or "_project/" not in recipe
             ):
                 continue
@@ -151,7 +152,7 @@ def project_dependent_make_targets(root: Path) -> set[str]:
 def development_tree_target_findings(root: Path) -> list[str]:
     """Find retained Make recipes that would fail opaquely after curation."""
     declared = parse_development_tree_targets(root / "Makefile")
-    required = project_dependent_make_targets(root)
+    required = project_dependent_make_targets(root) - CURATED_RESUMABLE_PROJECT_TARGETS
     return [
         f"Make target {target!r} references _project/ but is not declared development-only"
         for target in sorted(required - declared)

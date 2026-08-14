@@ -41,7 +41,7 @@ def _makefile_text() -> str:
 
 def _make_target_recipe(target: str) -> str:
     lines = _makefile_text().splitlines()
-    start = lines.index(f"{target}:") + 1
+    start = next(index for index, line in enumerate(lines) if line.split(":", 1)[0] == target) + 1
     recipe_lines: list[str] = []
     for line in lines[start:]:
         if line and not line.startswith("\t"):
@@ -632,6 +632,15 @@ class TestReleaseInfrastructure:
         commit.
         """
         recipe = _make_target_recipe("release-cut")
+        assert "release-cut: .release-cut-tree-required" in _makefile_text()
+        development_only = (
+            _makefile_text()
+            .split("DEVELOPMENT_TREE_ONLY_TARGETS :=", 1)[1]
+            .split("\n\n.PHONY", 1)[0]
+            .replace("\\", "")
+            .split()
+        )
+        assert "release-cut" not in development_only
         assert "Resuming interrupted cut" in recipe
         assert "already carries its release commit" in recipe
         assert "git checkout -b v$(VERSION) develop" in recipe
