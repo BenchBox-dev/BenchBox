@@ -96,9 +96,7 @@ def _command_index_from(argv: list[str], commands: frozenset[str]) -> tuple[int,
         if any(value.startswith(f"{option}=") for option in GLOBAL_VALUE_OPTIONS):
             index += 1
             continue
-        if value in commands:
-            return index, value
-        index += 1
+        return (index, value) if value in commands else None
     return None
 
 

@@ -27,6 +27,7 @@ from pathlib import Path
 
 from tests.uat import docker_assets
 from tests.uat.cleanup import CellKey, can_prune, prune_database_dir, source_reuse_graph
+from tests.uat.clickhouse_memory import runtime_limit_matches_rung
 from tests.uat.config import OutputConfig, UATConfig
 from tests.uat.ladder import LadderRung, plan_ladder
 from tests.uat.matrix import (
@@ -728,7 +729,7 @@ def _check_clickhouse_runtime_memory(
             f"ClickHouse runtime memory admission failed for {project_name}: stats did not report a memory limit; "
             "refusing to infer one from host RAM or an engine default"
         )
-    if runtime_limit != selected_bytes:
+    if not runtime_limit_matches_rung(runtime_limit, selected_bytes / (1024**3)):
         return (
             f"ClickHouse runtime memory admission failed for {project_name}: requested {selected_value} "
             f"({selected_bytes} bytes), runtime reported {runtime_limit} bytes"

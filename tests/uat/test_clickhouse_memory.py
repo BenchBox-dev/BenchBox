@@ -324,6 +324,7 @@ def test_collector_records_injected_engine_stats_without_live_daemon(monkeypatch
         command_runner=command_runner,
     )
     collector.start()
+    assert json.loads((tmp_path / "trace.json").read_text(encoding="utf-8"))["outcome"] == "running"
     collector.stop(outcome="passed")
     assert trace.samples
     assert trace.samples[0].engine.usage_bytes == clickhouse_memory.GIB
