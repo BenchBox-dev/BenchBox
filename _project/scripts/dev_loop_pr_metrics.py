@@ -74,6 +74,35 @@ FAST_TEST_JOB_NAME = "test (ubuntu-latest, 3.12)"
 # rather than a reaction to a cancelled job (see pr.yml medium-test).
 MEDIUM_TEST_JOB_NAME = "medium-test"
 API_RETRY_ATTEMPTS = 3
+# Versioned synchronize-event fan-out schema. Existing PrMetrics / summarize
+# keys stay unchanged so current consumers keep working.
+EVENT_FANOUT_SCHEMA = "event_fanout_v1"
+REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
+    "ci-required-result",
+    "Results Explorer browser gate",
+    "ruleset-drift",
+)
+SYNCHRONIZE_WORKFLOW_NAMES: tuple[str, ...] = (
+    "Develop PR",
+    "Results Explorer browser tests",
+    "Develop ruleset drift",
+    "Documentation",
+    "Auto-merge revocation",
+    "PR base guard",
+)
+# Public GitHub-hosted standard runners are free for public repositories.
+PUBLIC_STANDARD_RUNNER_USD = 0.0
+_SETUP_STEP_PREFIXES: tuple[str, ...] = (
+    "Set up job",
+    "Checkout",
+    "Set up Python",
+    "Set up Node",
+    "Install uv",
+    "Install dependencies",
+    "Install Python dependencies",
+    "Post ",
+    "Complete job",
+)
 
 
 @dataclass
@@ -363,6 +392,249 @@ def _medium_test_timeout_minutes() -> int:
     return int(match.group(1))
 
 
+def _elapsed_seconds(started_at: object, completed_at: object) -> float | None:
+    if not started_at or not completed_at:
+        return None
+    try:
+        return (_iso_to_dt(str(completed_at)) - _iso_to_dt(str(started_at))).total_seconds()
+    except (TypeError, ValueError):
+        return None
+
+
+def latest_named_check_runs(check_runs: list[dict], name: str) -> dict | None:
+    """Latest check run for *name* by started_at. Missing stamp sorts oldest."""
+
+    matches = [run for run in check_runs if run.get("name") == name]
+    if not matches:
+        return None
+
+    def _key(run: dict) -> tuple[int, datetime]:
+        raw = run.get("started_at")
+        if not raw:
+            return (0, datetime.min.replace(tzinfo=timezone.utc))
+        try:
+            return (1, _iso_to_dt(str(raw)))
+        except (TypeError, ValueError):
+            return (0, datetime.min.replace(tzinfo=timezone.utc))
+
+    return max(matches, key=_key)
+
+
+def required_gate_seconds(
+    check_runs: list[dict],
+    required: tuple[str, ...] = REQUIRED_CONTEXT_NAMES,
+) -> float | None:
+    """Wall from first required-check start to last required success.
+
+    Missing, skipped, cancelled, or failed required contexts return None.
+    Reruns: only the latest same-named check counts.
+    """
+
+    latest: list[dict] = []
+    starts: list[datetime] = []
+    ends: list[datetime] = []
+    for name in required:
+        run = latest_named_check_runs(check_runs, name)
+        if run is None:
+            return None
+        if run.get("status") != "completed" or run.get("conclusion") != "success":
+            return None
+        started = run.get("started_at")
+        completed = run.get("completed_at")
+        if not started or not completed:
+            return None
+        try:
+            starts.append(_iso_to_dt(str(started)))
+            ends.append(_iso_to_dt(str(completed)))
+        except (TypeError, ValueError):
+            return None
+        latest.append(run)
+    if not starts:
+        return None
+    return (max(ends) - min(starts)).total_seconds()
+
+
+def merge_unblock_seconds(
+    check_runs: list[dict],
+    required: tuple[str, ...] = REQUIRED_CONTEXT_NAMES,
+) -> float | None:
+    """Time until every live required context is latest-success.
+
+    On this repository that is the merge-unblock instant under strict
+    current-base checks. Documentation and other fan-out workflows are not
+    required contexts and do not belong here.
+    """
+
+    return required_gate_seconds(check_runs, required)
+
+
+def queue_delay_seconds(required_gate_end: datetime | None, merged_at: str | None) -> float | None:
+    """Wait after required-gate green until squash merge.
+
+    There is no GitHub merge queue today. This is residual auto-merge /
+    human-arm delay, not queue-service time.
+    """
+
+    if required_gate_end is None or not merged_at:
+        return None
+    try:
+        delay = (_iso_to_dt(merged_at) - required_gate_end).total_seconds()
+    except (TypeError, ValueError):
+        return None
+    return delay if delay >= 0 else None
+
+
+def required_gate_end(check_runs: list[dict], required: tuple[str, ...] = REQUIRED_CONTEXT_NAMES) -> datetime | None:
+    ends: list[datetime] = []
+    for name in required:
+        run = latest_named_check_runs(check_runs, name)
+        if run is None or run.get("conclusion") != "success" or not run.get("completed_at"):
+            return None
+        try:
+            ends.append(_iso_to_dt(str(run["completed_at"])))
+        except (TypeError, ValueError):
+            return None
+    return max(ends) if ends else None
+
+
+def all_workflow_seconds(runs: list[dict]) -> float | None:
+    """Earliest run start to last completed run on the same head SHA.
+
+    In-progress or missing timestamps make the event incomplete (None).
+    Cancelled runs still close the window if they have completion stamps.
+    """
+
+    starts: list[datetime] = []
+    ends: list[datetime] = []
+    for run in runs:
+        started = run.get("run_started_at") or run.get("created_at")
+        completed = run.get("updated_at")
+        if run.get("status") not in {None, "completed"}:
+            return None
+        if not started or not completed:
+            return None
+        try:
+            starts.append(_iso_to_dt(str(started)))
+            ends.append(_iso_to_dt(str(completed)))
+        except (TypeError, ValueError):
+            return None
+    if not starts:
+        return None
+    return (max(ends) - min(starts)).total_seconds()
+
+
+def _is_setup_step(name: object) -> bool:
+    text = str(name or "")
+    return any(text.startswith(prefix) for prefix in _SETUP_STEP_PREFIXES)
+
+
+def job_setup_execution_seconds(job: dict) -> tuple[float | None, float | None, float | None]:
+    """Return (setup, execution, total) seconds for a completed job.
+
+    Cancelled, failed, or incomplete jobs return (None, None, None) so they
+    cannot enter completed-run runner-minute totals.
+    """
+
+    if job.get("conclusion") != "success" or job.get("status") not in {None, "completed"}:
+        return None, None, None
+    total = _elapsed_seconds(job.get("started_at"), job.get("completed_at"))
+    steps = job.get("steps") or []
+    setup = 0.0
+    execution = 0.0
+    saw_timed_step = False
+    for step in steps:
+        elapsed = _elapsed_seconds(step.get("started_at"), step.get("completed_at"))
+        if elapsed is None:
+            continue
+        saw_timed_step = True
+        if _is_setup_step(step.get("name")):
+            setup += elapsed
+        else:
+            execution += elapsed
+    if not saw_timed_step:
+        return None, None, total
+    return setup, execution, total
+
+
+def runner_minute_report(jobs: list[dict]) -> dict[str, float | int]:
+    """Split completed runner-minutes from cancelled/incomplete observations."""
+
+    completed = 0.0
+    cancelled = 0.0
+    cancelled_count = 0
+    incomplete_count = 0
+    setup = 0.0
+    execution = 0.0
+    for job in jobs:
+        conclusion = job.get("conclusion")
+        if conclusion == "cancelled":
+            cancelled_count += 1
+            elapsed = _elapsed_seconds(job.get("started_at"), job.get("completed_at"))
+            if elapsed is not None:
+                cancelled += elapsed / 60.0
+            continue
+        if conclusion != "success":
+            incomplete_count += 1
+            continue
+        setup_s, exec_s, total_s = job_setup_execution_seconds(job)
+        if total_s is None:
+            incomplete_count += 1
+            continue
+        completed += total_s / 60.0
+        if setup_s is not None:
+            setup += setup_s / 60.0
+        if exec_s is not None:
+            execution += exec_s / 60.0
+    return {
+        "completed_runner_minutes": completed,
+        "cancelled_runner_minutes": cancelled,
+        "cancelled_job_count": cancelled_count,
+        "incomplete_job_count": incomplete_count,
+        "setup_runner_minutes": setup,
+        "execution_runner_minutes": execution,
+        "public_standard_runner_usd": PUBLIC_STANDARD_RUNNER_USD,
+    }
+
+
+def correlate_runs_by_head(runs: list[dict]) -> dict[str, list[dict]]:
+    grouped: dict[str, list[dict]] = {}
+    for run in runs:
+        head = str(run.get("head_sha") or "")
+        if not head:
+            continue
+        grouped.setdefault(head, []).append(run)
+    return grouped
+
+
+def event_fanout_metrics(
+    *,
+    runs: list[dict],
+    jobs: list[dict],
+    check_runs: list[dict],
+    merged_at: str | None = None,
+    required: tuple[str, ...] = REQUIRED_CONTEXT_NAMES,
+) -> dict:
+    """Correlate one synchronize head SHA's workflows into fan-out metrics."""
+
+    gate = required_gate_seconds(check_runs, required)
+    unblock = merge_unblock_seconds(check_runs, required)
+    gate_end = required_gate_end(check_runs, required)
+    by_workflow: dict[str, int] = {}
+    for run in runs:
+        name = str(run.get("name") or "unknown")
+        by_workflow[name] = by_workflow.get(name, 0) + 1
+    report = runner_minute_report(jobs)
+    return {
+        "schema": EVENT_FANOUT_SCHEMA,
+        "required_gate_seconds": gate,
+        "merge_unblock_seconds": unblock,
+        "all_workflow_seconds": all_workflow_seconds(runs),
+        "queue_delay_seconds": queue_delay_seconds(gate_end, merged_at),
+        "workflow_run_counts": by_workflow,
+        **report,
+    }
+
+
 def _medium_budget_warning(p95_seconds: float | None) -> str | None:
     """Return a resize warning when medium-test p95 approaches its timeout."""
     if p95_seconds is None:
@@ -460,6 +732,16 @@ def main(argv: list[str] | None = None) -> int:
         help="emit machine-readable JSON (summary + per-PR rows) instead of text",
     )
     parser.add_argument(
+        "--event-fanout",
+        action="store_true",
+        help=(
+            f"include a versioned {EVENT_FANOUT_SCHEMA} section that separates "
+            "required-gate / merge-unblock wall time from all-workflow fan-out, "
+            "runner-minutes, cancellations, setup, and execution. Existing "
+            "summary keys are unchanged."
+        ),
+    )
+    parser.add_argument(
         "--collect-durations",
         action="store_true",
         help=(
@@ -491,17 +773,23 @@ def main(argv: list[str] | None = None) -> int:
     summary = summarize(metrics)
 
     if args.json:
-        print(
-            json.dumps(
-                {
-                    "repo": args.repo,
-                    "since": since.isoformat(),
-                    "summary": summary,
-                    "prs": [asdict(m) for m in metrics],
-                },
-                indent=2,
-            )
-        )
+        payload: dict = {
+            "repo": args.repo,
+            "since": since.isoformat(),
+            "summary": summary,
+            "prs": [asdict(m) for m in metrics],
+        }
+        if args.event_fanout:
+            payload[EVENT_FANOUT_SCHEMA] = {
+                "required_contexts": list(REQUIRED_CONTEXT_NAMES),
+                "synchronize_workflows": list(SYNCHRONIZE_WORKFLOW_NAMES),
+                "public_standard_runner_usd": PUBLIC_STANDARD_RUNNER_USD,
+                "note": (
+                    "Per-PR fan-out rows are computed by callers that supply "
+                    "same-head workflow/job/check-run sets to event_fanout_metrics()."
+                ),
+            }
+        print(json.dumps(payload, indent=2))
         return 0
 
     print(f"Dev-loop PR metrics for {args.repo} since {since.date().isoformat()} ({len(metrics)} merged develop PRs)")
