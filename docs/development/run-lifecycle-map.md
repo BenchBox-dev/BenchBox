@@ -13,7 +13,13 @@ single-path refactor.
 For real benchmark execution, `benchbox/cli/commands/run.py` delegates to:
 
 1. `BenchmarkOrchestrator.execute_benchmark(...)` in `benchbox/cli/orchestrator.py`
-2. `run_benchmark_lifecycle(...)` in `benchbox/core/runner/runner.py`
+2. `execute_run(...)` in `benchbox/core/run_service.py`
+3. `run_benchmark_lifecycle(...)` in `benchbox/core/runner/runner.py`
+
+The CLI path is therefore `run.py` -> `BenchmarkOrchestrator` -> `execute_run`
+-> `run_benchmark_lifecycle`. The MCP sync and durable-job surfaces converge on
+the same core primitive through `_execute_mcp_run_via_core(...)` in
+`benchbox/mcp/tools/benchmark.py` and its durable caller in `benchbox/mcp/jobs.py`.
 
 
 ## Branch Matrix (`benchbox/cli/commands/run.py`)
@@ -21,9 +27,9 @@ For real benchmark execution, `benchbox/cli/commands/run.py` delegates to:
 | Branch | Entry condition | Runtime path | Export path |
 | --- | --- | --- | --- |
 | Dry run | `if dry_run:` | `DryRunExecutor.execute_dry_run(...)` | `DryRunExecutor.save_dry_run_results(...)` |
-| Direct non-interactive SQL/DataFrame | `test_execution_type` not data/load-only and platform+benchmark provided | `BenchmarkOrchestrator` -> `run_benchmark_lifecycle` | Inline `ResultExporter` block with directory-manager filename override |
-| Data-only / load-only | `if test_execution_type in [\"data_only\", \"load_only\"]` | `BenchmarkOrchestrator` -> `run_benchmark_lifecycle` (phase-limited) | Separate inline `ResultExporter` block with mode-specific status rendering |
-| Interactive | fallback TTY-guided path | `BenchmarkOrchestrator` -> `run_benchmark_lifecycle` | Third inline export block (`config.get(\"output.formats\", [\"json\"])`) |
+| Direct non-interactive SQL/DataFrame | `test_execution_type` not data/load-only and platform+benchmark provided | `BenchmarkOrchestrator` -> `execute_run` -> `run_benchmark_lifecycle` | Inline `ResultExporter` block with directory-manager filename override |
+| Data-only / load-only | `if test_execution_type in [\"data_only\", \"load_only\"]` | `BenchmarkOrchestrator` -> `execute_run` -> `run_benchmark_lifecycle` (phase-limited) | Separate inline `ResultExporter` block with mode-specific status rendering |
+| Interactive | fallback TTY-guided path | `BenchmarkOrchestrator` -> `execute_run` -> `run_benchmark_lifecycle` | Third inline export block (`config.get(\"output.formats\", [\"json\"])`) |
 
 ## Duplicate Export Logic Identified
 
@@ -44,7 +50,7 @@ enrichment now runs on the canonical path via `benchbox/core/run_service.py::exe
 
 ## Refactor Baseline Decisions
 
-- Canonical runtime path: `run.py` -> `BenchmarkOrchestrator` -> `run_benchmark_lifecycle`.
+- Canonical runtime path: `run.py` -> `BenchmarkOrchestrator` -> `execute_run` -> `run_benchmark_lifecycle`.
 - `ExecutionPipeline` must not remain a parallel behavior-bearing runtime path.
 - Export policy must be centralized and called by all non-dry-run branches.
 - Metadata enrichment must run on the canonical path before result export.
@@ -55,8 +61,8 @@ enrichment now runs on the canonical path via `benchbox/core/run_service.py::exe
 
 1. `benchbox/cli/commands/run.py` builds validated CLI config and execution context.
 2. `_execute_orchestrated_run(...)` executes through `BenchmarkOrchestrator`.
-3. `BenchmarkOrchestrator.execute_benchmark(...)` delegates to `run_benchmark_lifecycle(...)`.
-4. `apply_driver_metadata(...)` enriches results on the canonical path.
+3. `BenchmarkOrchestrator.execute_benchmark(...)` delegates to `execute_run(...)`.
+4. `execute_run(...)` invokes `run_benchmark_lifecycle(...)` and applies driver metadata.
 5. `_export_orchestrated_result(...)` performs export with directory-manager naming.
 
 ### Extension points
