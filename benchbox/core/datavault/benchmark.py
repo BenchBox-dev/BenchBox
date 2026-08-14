@@ -469,6 +469,14 @@ class DataVaultBenchmark(BaseBenchmark):
             self._tpch_generator.cleanup()  # type: ignore[call-non-callable]
         super().cleanup()
 
+    def __enter__(self) -> "DataVaultBenchmark":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        """Preserve the deprecated-base context-manager cleanup contract."""
+        self.cleanup()
+        return False
+
 
 # ---------------------------------------------------------------------------
 # Register benchmark-specific CLI option specs

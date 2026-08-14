@@ -452,6 +452,16 @@ class TPCDSOBTBenchmark(BaseBenchmark):
             ddl = translate_sql_query(ddl, target_dialect=target, source_dialect="postgres", identify=True)
         return ddl
 
+    def __enter__(self) -> TPCDSOBTBenchmark:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        """Preserve the deprecated-base context-manager cleanup contract."""
+        cleanup = getattr(self, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
+        return False
+
 
 # ---------------------------------------------------------------------------
 # Register benchmark-specific CLI option specs
