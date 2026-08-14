@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -354,8 +355,8 @@ def _require_nonnegative_float(payload: dict[str, Any], key: str, *, default: fl
         coerced = float(value)
     except (TypeError, ValueError) as exc:
         raise ConfigError(f"`{section}.{key}` must be a number, got {type(value).__name__}={value!r}") from exc
-    if coerced < 0:
-        raise ConfigError(f"`{section}.{key}` must be >= 0")
+    if not math.isfinite(coerced) or coerced < 0:
+        raise ConfigError(f"`{section}.{key}` must be a finite number >= 0")
     return coerced
 
 

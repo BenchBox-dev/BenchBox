@@ -52,7 +52,7 @@ Queried 2026-08-14. Names only; secret values were not read.
 | HTTPS | certificate approved, expires 2026-10-29; HTTPS enforced | Re-issue after domain re-association |
 | Actions secret names | `CODECOV_TOKEN`, `RULESET_DRIFT_TOKEN`, `TODO_DB_RO_AUTH_TOKEN`, `TODO_DB_URL`, `TODO_EXPORT_PR_TOKEN` | Recreate in the destination; `RULESET_DRIFT_TOKEN` is required for bypass-actor visibility |
 | Actions variable | none | Low |
-| Ruleset | `15611785` develop-squash-only; `19149459` release-only; `15611787` v-release-branches-minimal; `15611787`/`18774756` tag | Re-bind IDs and required contexts after transfer |
+| Ruleset | `15611785` develop-squash-only; `19149459` release-only; `15611787` v-release-branches-minimal; `18774756` tag | Re-bind IDs and required contexts after transfer |
 | Environment | `github-pages` (branch policy); `pypi` (required reviewers); `test-pypi` | Reviewer IDs and environment protection must be rebuilt |
 | Webhook / app hook | none listed | Low today; re-check at transfer time |
 | Package API | not readable with the current token (`read:packages` missing) | Operator must inventory GHCR/npm packages before transfer |

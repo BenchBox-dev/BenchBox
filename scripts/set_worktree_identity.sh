@@ -89,6 +89,11 @@ if [ "$(git_wt config --get extensions.worktreeConfig 2>/dev/null || true)" != "
   git_wt config extensions.worktreeConfig true
 fi
 
+# Mark worktrees created through the agent-safe lifecycle so the pre-commit
+# hook applies the location guard there while leaving normal human commits in
+# the primary clone alone.
+git_wt config --worktree benchbox.agent-write-preflight true
+
 # Enabling the extension moves any pre-existing common-config [user] block out
 # of this worktree's precedence path only if we write our own. Write both keys
 # unconditionally-but-idempotently so a partially-set worktree converges.

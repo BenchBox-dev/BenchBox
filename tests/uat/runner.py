@@ -149,6 +149,25 @@ def _extract_load_failure(log_text: str) -> dict[str, object] | None:
     return None
 
 
+def _extract_load_failure_from_path(log_path: Path) -> dict[str, object] | None:
+    """Scan a cell log incrementally for its structured load-failure marker."""
+
+    try:
+        with log_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.startswith(LOAD_FAILURE_MARKER):
+                    continue
+                raw_payload = line[len(LOAD_FAILURE_MARKER) :].strip()
+                try:
+                    payload = json.loads(raw_payload)
+                except (TypeError, ValueError):
+                    return None
+                return payload if isinstance(payload, dict) else None
+    except (OSError, UnicodeDecodeError):
+        return None
+    return None
+
+
 def _write_load_failure_sidecar(
     *,
     log_path: Path,
@@ -194,7 +213,7 @@ def _materialize_load_failure_sidecar(
 ) -> tuple[Path | None, Path | None]:
     """Persist a marker payload and return its optional result and sidecar paths."""
 
-    payload = _extract_load_failure(log_path.read_text(encoding="utf-8"))
+    payload = _extract_load_failure_from_path(log_path)
     if payload is None:
         return result_path, None
 

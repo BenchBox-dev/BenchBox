@@ -62,6 +62,26 @@ _MEMORY_UNITS = {
 # cannot be relabelled as the requested rung.
 _DECIMAL_GIB_EQUIVALENCE = 1000**3
 
+
+def runtime_limit_matches_rung(
+    runtime_limit_bytes: int, requested_memory_gib: float, *, requested_bytes: int | None = None
+) -> bool:
+    """Return whether a runtime cap is the requested rung in either unit system.
+
+    The trace format stores a nominal GiB rung, so it accepts the exact decimal
+    or binary spelling of that nominal value. Runtime admission also has the
+    original parsed byte count available; passing it switches to an exact
+    comparison and avoids converting a decimal request into a smaller binary
+    nominal value.
+    """
+
+    if requested_bytes is not None:
+        return runtime_limit_bytes == requested_bytes
+    lower_limit = int(requested_memory_gib * _DECIMAL_GIB_EQUIVALENCE)
+    upper_limit = int(requested_memory_gib * GIB)
+    return runtime_limit_bytes in {lower_limit, upper_limit}
+
+
 # These are the metrics that make a trace evidence rather than a host/engine
 # health sample. Optional asynchronous metrics such as OSMemoryFree are not
 # required, but a response from the wrong metric or a partially failed query
@@ -175,8 +195,6 @@ class ClickHouseMemoryTrace:
             sample.responsiveness_ms is None or not math.isfinite(sample.responsiveness_ms) for sample in self.samples
         ):
             return False
-        lower_limit = int(self.rung.requested_memory_gib * _DECIMAL_GIB_EQUIVALENCE)
-        upper_limit = int(self.rung.requested_memory_gib * GIB)
         engine_samples = [sample.engine for sample in self.samples]
         for sample in self.samples:
             if (
@@ -195,7 +213,7 @@ class ClickHouseMemoryTrace:
                 return False
             if sample.engine.oom_killed is not False or sample.engine.running is not True:
                 return False
-            if not lower_limit <= sample.engine.limit_bytes <= upper_limit:
+            if not runtime_limit_matches_rung(sample.engine.limit_bytes, self.rung.requested_memory_gib):
                 return False
         if any(sample.oom_killed is True for sample in engine_samples):
             return False
@@ -539,6 +557,10 @@ class MemoryTraceCollector:
         if self._thread is not None:
             raise RuntimeError("memory trace collector already started")
         self._started_mono = time.monotonic()
+        # Replace any prior passing artifact before the child command starts.
+        # If the process is interrupted before stop(), a stale success must not
+        # be mistaken for evidence from this run.
+        write_trace(self.output_path, self.trace)
         self._sample_once()
         self._thread = threading.Thread(target=self._run, name="clickhouse-memory-trace", daemon=True)
         self._thread.start()

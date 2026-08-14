@@ -885,13 +885,16 @@ insufficient: the gate rejects a missing, extra, or differently-sized table.
 ```bash
 uv run -- python -m tests.uat.clickhouse_certification \
   --manifest "$BENCHBOX_OUTPUT_DIR/datagen/tpch_sf1/_datagen_manifest.json" \
+  --table-format tbl \
   --result "$BENCHBOX_OUTPUT_DIR/results/tpch_sf1_clickhouse_server_sql_<id>.json"
 ```
 
 The command prints `PASS` only when every manifest table has an exact result
-count. A manifest whose shard metadata does not describe the files actually
-loaded is a certification failure and must be regenerated or corrected before
-the memory and query gates can be considered complete.
+count, the result identifies ClickHouse Server, and its benchmark and scale
+factor match the manifest. `--table-format` must name the format actually
+loaded; a manifest whose shard metadata does not describe those files is a
+certification failure and must be regenerated or corrected before the memory
+and query gates can be considered complete.
 
 ## Troubleshooting
 
