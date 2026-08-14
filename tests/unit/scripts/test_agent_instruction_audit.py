@@ -111,6 +111,24 @@ def test_project_commit_coauthor_consent_drift_fails(tmp_path: Path) -> None:
     assert any("project COMMIT-IDENTITY-001 semantics drifted" in error for error in errors)
 
 
+@pytest.mark.parametrize(
+    "anchor",
+    [
+        "## Code Review Rules",
+        "Do not report commit identity.",
+        "Review sandboxes may use synthetic identities.",
+        "Hooks and CI check actual commits.",
+        "Report only PR defects.",
+    ],
+)
+def test_code_review_identity_noise_guard_drift_fails(tmp_path: Path, anchor: str) -> None:
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(agents.read_text().replace(anchor, "removed review guard", 1))
+    _, errors = audit(project, CORPUS)
+    assert any("Code Review Rules" in error for error in errors)
+
+
 def test_executable_hook_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     settings = project / ".claude/settings.json"
