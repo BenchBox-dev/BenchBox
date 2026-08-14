@@ -77,7 +77,6 @@ ignore_imports =
     benchbox.core.equivalence.dataframe_surface -> benchbox.platforms.dataframe.polars_df
     benchbox.core.manifest.preferences -> benchbox.platforms.base.format_capabilities
     benchbox.core.platform_registry -> benchbox.platforms.base
-    benchbox.core.runner.dataframe_runner -> benchbox.platforms.adapter_factory
     benchbox.core.runner.runner -> benchbox.platforms
     benchbox.core.runner.runner -> benchbox.platforms.base.format_capabilities
     benchbox.core.runner.runner -> benchbox.platforms.base.runtime_metadata
