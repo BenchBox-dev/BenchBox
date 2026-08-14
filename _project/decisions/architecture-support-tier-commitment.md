@@ -72,10 +72,15 @@ cross-reference and must keep extraction blocked on the evidence gate.
 
 ## Explicit deferrals and preserved contracts
 
-- MCP production publication remains **BLOCKED** under
-  `docs/operations/mcp-production-readiness-evidence.md`; TLS, storage,
-  OTLP, multi-host, and named-approver evidence is outside this program.
+- Tracker deferral **#711** (MCP production publication: TLS, storage, OTLP,
+  multi-host, and named approver) remains documented out of scope. MCP
+  production publication stays **BLOCKED** under
+  `docs/operations/mcp-production-readiness-evidence.md` and is not absorbed
+  by this program.
 - No registry metadata, runtime code, packaging file, or test file is changed
   by this decision.
-- Stable, beta, experimental, deprecated, and repo-only remain distinct
-  classifications; this record does not collapse them into one support claim.
+- The public `support_status` vocabulary remains
+  `stable` / `beta` / `experimental` / `deprecated` / `repo_only` /
+  `document_only`. `repo_only` and `document_only` stay distinct registry
+  values; this record does not promote or collapse them into one support
+  claim.
