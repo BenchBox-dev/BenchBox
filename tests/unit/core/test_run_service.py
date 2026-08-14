@@ -1,4 +1,4 @@
-"""The core run service: request/plan types and configuration resolution.
+"""The core run service: configuration resolution and execution orchestration.
 
 `one-engine-core-run-service` w2. The characterization suite in
 tests/unit/cli/test_run_config_resolution_characterization.py already runs
@@ -18,8 +18,6 @@ import pytest
 from benchbox.core.config import BenchmarkConfig
 from benchbox.core.constants import GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
 from benchbox.core.run_service import (
-    RunPlan,
-    RunRequest,
     SilentVerbosity,
     resolve_run_config,
 )
@@ -44,6 +42,12 @@ def _config(**kwargs) -> BenchmarkConfig:
 
 class TestLayering:
     """The constraint that shapes every signature in the module."""
+
+    def test_run_service_does_not_export_unused_request_or_plan_models(self):
+        import benchbox.core.run_service as run_service
+
+        assert not hasattr(run_service, "RunRequest")
+        assert not hasattr(run_service, "RunPlan")
 
     def test_run_service_imports_neither_platforms_nor_cli(self):
         tree = ast.parse(RUN_SERVICE_SOURCE.read_text(encoding="utf-8"))
@@ -117,46 +121,6 @@ class TestOrchestratorDelegatesRatherThanDuplicates:
         assert "resolve_run_config" in source
         # The moved arithmetic must not survive alongside the delegation.
         assert "GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS" not in source
-
-
-class TestRequestAndPlanTypes:
-    def test_run_request_carries_a_fully_resolved_description(self):
-        request = RunRequest(platform="duckdb", benchmark="tpch", scale_factor=1.0)
-
-        assert request.queries is None
-        assert request.phases is None
-        assert request.capture_plans is False
-        assert dict(request.platform_options) == {}
-
-    def test_run_request_is_immutable(self):
-        """The service never renegotiates its inputs."""
-        request = RunRequest(platform="duckdb", benchmark="tpch", scale_factor=1.0)
-
-        with pytest.raises(AttributeError):
-            request.platform = "sqlite"  # type: ignore[misc]
-
-    def test_two_requests_with_the_same_inputs_are_equal(self):
-        first = RunRequest(platform="duckdb", benchmark="tpch", scale_factor=1.0)
-        second = RunRequest(platform="duckdb", benchmark="tpch", scale_factor=1.0)
-
-        assert first == second
-
-    def test_run_plan_binds_a_request_to_its_resolved_config(self):
-        request = RunRequest(platform="duckdb", benchmark="tpch", scale_factor=1.0)
-        config = _config()
-        run_config = resolve_run_config(config, database_path="x", verbosity=SilentVerbosity())
-
-        plan = RunPlan(
-            request=request,
-            benchmark_config=config,
-            run_config=run_config,
-            execution_type="power",
-        )
-
-        assert plan.request is request
-        assert plan.run_config is run_config
-        assert plan.execution_type == "power"
-        assert plan.resolved_mode is None
 
 
 class TestExecutionPort:
