@@ -74,10 +74,11 @@ streams and compliance would obscure the seam. TPC-H is runnable at 0.01 but
 has `supports_streams: true`.
 
 `BenchmarkFamilyPlugin` lives in `benchbox.core.benchmark_registry`. The
-registry `family_plugins` map points at the family object. The internal loader
-calls `plugin.create(...)` when a row exists and keeps the heuristic
-constructor path for every other family. SSB's public wrapper facade is
-unchanged.
+registry module's `FAMILY_PLUGIN_IMPORTS` map points at the family object.
+The catalog YAML cannot grow a new top-level key without a schema change, so
+the pilot map stays next to the registry loader. The internal loader calls
+`plugin.create(...)` when a row exists and keeps the heuristic constructor
+path for every other family. SSB's public wrapper facade is unchanged.
 
 ## Extension-cost measurement (SSB-like family)
 
@@ -105,12 +106,12 @@ registry identity. The seam removes the loader-heuristic decisions:
 | Cost | After SSB plugin |
 |---|---|
 | Identity decisions | Unchanged registry metadata |
-| Construction decisions | Implement `default_scale`, `create`, `phases`, and `result_metadata`; add one `family_plugins` row. No loader allowlist edit |
+| Construction decisions | Implement `default_scale`, `create`, `phases`, and `result_metadata`; add one `FAMILY_PLUGIN_IMPORTS` row. No loader allowlist edit |
 | Repeated code | Wrapper facade remains (non-goal to remove). Constructor policy lives in `create()` instead of another loader branch |
 | Required tests | Existing wrapper/schema tests plus the plugin contract. Contract counts stay unchanged when no new family is added |
 | Contributor time | Same package and facade work; constructor/loader policy drops to the four plugin methods and one YAML row |
 
-SSB itself is the first row: `family_plugins.ssb` resolves
+SSB itself is the first row: `FAMILY_PLUGIN_IMPORTS["ssb"]` resolves
 `benchbox.core.ssb.family:SSBFamily`. No other family is on the seam.
 
 ## Non-Goals

@@ -85,6 +85,12 @@ _FAMILY_PLUGIN_REQUIRED_ATTRS = (
     "result_metadata",
 )
 
+# Kept in the registry module rather than YAML: BenchmarkRegistryCatalog
+# forbids unknown top-level keys, and this item cannot expand that schema.
+FAMILY_PLUGIN_IMPORTS: dict[str, str] = {
+    "ssb": "benchbox.core.ssb.family:SSBFamily",
+}
+
 
 @dataclass(frozen=True)
 class _RegistryData:
@@ -113,9 +119,7 @@ def _build_registry() -> _RegistryData:
         benchmark_id: _normalize_benchmark_metadata(meta)
         for benchmark_id, meta in payload["benchmark_metadata"].items()
     }
-    family_plugin_imports = {
-        str(benchmark_id): str(spec) for benchmark_id, spec in dict(payload.get("family_plugins") or {}).items()
-    }
+    family_plugin_imports = dict(FAMILY_PLUGIN_IMPORTS)
     data = _RegistryData(
         category_order=list(payload["category_order"]),
         benchmark_order={category: list(benchmarks) for category, benchmarks in payload["benchmark_order"].items()},
@@ -595,6 +599,7 @@ __all__ = sorted(
         "BENCHMARK_SUPPORT_STATUS_VALUES",
         "BenchmarkFamilyPlugin",
         "BenchmarkSupportStatus",
+        "FAMILY_PLUGIN_IMPORTS",
         "get_all_benchmarks",
         "get_family_plugin",
         "get_benchmark_class",
