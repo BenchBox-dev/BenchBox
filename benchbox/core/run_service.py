@@ -70,7 +70,6 @@ def validate_stream_count(streams: int | None, phases: str | None = None) -> Non
 
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.driver_metadata import apply_driver_metadata
-from benchbox.core.runner.dataframe_runner import is_dataframe_execution
 from benchbox.core.runner.runner import (
     LifecyclePhases,
     ValidationOptions,
@@ -253,6 +252,35 @@ def resolve_execution_mode(database_config: Any) -> str | None:
     if is_dataframe_execution(database_config):
         execution_mode = "dataframe"
     return execution_mode
+
+
+def is_dataframe_execution(database_config: Any) -> bool:
+    """Return whether a database configuration selects DataFrame execution.
+
+    This mode predicate belongs beside run-plan resolution, not in the
+    deprecated compatibility DataFrame runner. The core platform registry
+    remains the authority for default modes, while the suffix handling keeps
+    the legacy ``adapter_factory.is_dataframe_mode`` behavior intact.
+    """
+    if database_config is None:
+        return False
+
+    platform_type = getattr(database_config, "type", "")
+    explicit_mode = getattr(database_config, "mode", None)
+    if explicit_mode is not None:
+        return explicit_mode == "dataframe"
+
+    platform_lower = platform_type.lower()
+    if ":" in platform_lower:
+        platform_lower = platform_lower.rsplit(":", 1)[0]
+    if platform_lower.endswith("-df"):
+        return True
+    return PlatformRegistry.get_default_mode(platform_lower) == "dataframe"
+
+
+def get_execution_mode(database_config: Any) -> str:
+    """Return the concrete execution-mode label for a database configuration."""
+    return "dataframe" if is_dataframe_execution(database_config) else "sql"
 
 
 def stamp_requested_phases(config: BenchmarkConfig, phases_to_run: list[str] | None) -> None:

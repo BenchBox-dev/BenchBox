@@ -89,6 +89,15 @@ class TestPlatformRegistry:
         assert isinstance(duckdb_spec["libraries"], list)
         assert len(duckdb_spec["libraries"]) > 0
 
+    def test_get_platform_names_matches_metadata_keys_and_returns_a_fresh_list(self):
+        metadata_names = list(PlatformRegistry.get_all_platform_metadata())
+
+        with patch("benchbox.core.platform_registry.deepcopy", side_effect=AssertionError("unexpected deepcopy")):
+            names = PlatformRegistry.get_platform_names()
+            names.pop()
+
+            assert PlatformRegistry.get_platform_names() == metadata_names
+
     def test_get_all_platform_metadata_returns_deeply_isolated_copy(self):
         """Nested mutations must not poison registry decisions or the manifest."""
         metadata1 = PlatformRegistry.get_all_platform_metadata()

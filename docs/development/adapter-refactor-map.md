@@ -3,10 +3,14 @@
 > **Status: COMPLETED (2026-04-13)**
 >
 > The refactor described in this document has been executed. `benchbox/platforms/base/adapter.py`
-> is now a ~600-line thin facade that composes nine mixin classes extracted into:
+> is now a 1,291-line facade that composes nine mixin classes extracted into:
 > `connection.py`, `connection_lifecycle.py`, `connection_wrappers.py`, `data_loading.py`,
 > `dialect_translation.py`, `execution.py`, `result_capture.py`, `tuning.py`, `tuning_config.py`.
 > All public symbols and import paths are preserved for backward compatibility.
+>
+> The remaining behavior-bearing modules are still substantial: `data_loading.py` is
+> 3,169 lines, `result_capture.py` is 2,015 lines, and `execution.py` is 1,618 lines.
+> These are the next simplification boundaries; this map does not claim that they are retired.
 >
 > The line ranges below reference the **original monolithic file (5,178 lines)** and are
 > intentionally preserved for archaeological reference - they describe the pre-refactor state

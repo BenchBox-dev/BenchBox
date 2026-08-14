@@ -279,14 +279,14 @@ class PlatformManager:
     def _load_config(self) -> dict[str, Any]:
         """Load platform configuration from file."""
         if not self.config_path.exists():
-            return {"enabled_platforms": list(PlatformRegistry.get_all_platform_metadata().keys())}
+            return {"enabled_platforms": PlatformRegistry.get_platform_names()}
 
         try:
             with open(self.config_path, encoding="utf-8") as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
             console.print(f"[yellow]Warning: Failed to load platform config: {e}[/yellow]")
-            return {"enabled_platforms": list(PlatformRegistry.get_all_platform_metadata().keys())}
+            return {"enabled_platforms": PlatformRegistry.get_platform_names()}
 
     def _save_config(self):
         """Save platform configuration to file."""

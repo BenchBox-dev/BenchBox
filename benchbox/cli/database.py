@@ -243,7 +243,7 @@ class DatabaseManager:
             List of platform names that match the filter but aren't enabled
         """
         # Get all platforms from registry
-        all_platforms = list(PlatformRegistry.get_all_platform_metadata().keys())
+        all_platforms = PlatformRegistry.get_platform_names()
 
         # Filter all platforms with the same criteria
         all_matching = self.filter_platforms(all_platforms, style_filter)

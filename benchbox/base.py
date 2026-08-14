@@ -150,6 +150,16 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
+    def cleanup(self) -> None:
+        """Release benchmark-owned resources when a wrapper is discarded.
+
+        The deprecated internal base exposed this no-op lifecycle hook, and
+        older core implementations may call ``super().cleanup()`` after
+        releasing their own generators. Keep the hook on the public base while
+        those implementations migrate so the compatibility boundary remains
+        behaviorally neutral.
+        """
+
     @property
     def output_dir(self) -> Any:
         """Return the resolved output directory handler."""
