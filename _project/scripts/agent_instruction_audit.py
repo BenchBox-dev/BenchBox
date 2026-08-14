@@ -69,6 +69,12 @@ PROJECT_COMMIT_ANCHORS = {
 }
 PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling review and remediation")}
 AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
+CODE_REVIEW_RULE_ANCHORS = (
+    "Do not report commit identity.",
+    "Review sandboxes may use synthetic identities.",
+    "Hooks and CI check actual commits.",
+    "Report only PR defects.",
+)
 AUTHORITY_CLASSES = {"task", "repository", "mechanical", "recommendation"}
 EVALUATION_ACTIONS = {
     "commit_with_human_identity",
@@ -168,6 +174,15 @@ def audit_review_policy(project: Path) -> list[str]:
         errors.append(f"missing active policy IDs: {', '.join(missing_ids)}")
     if "docs/development/agent-review-protocol.md" not in agents:
         errors.append("AGENTS.md does not select the active project review binding")
+
+    marker = "## Code Review Rules"
+    if marker not in agents:
+        errors.append("AGENTS.md misses the Code Review Rules section")
+    else:
+        review_rules = agents.split(marker, 1)[1].split("\n## ", 1)[0]
+        missing_anchors = [anchor for anchor in CODE_REVIEW_RULE_ANCHORS if anchor not in review_rules]
+        if missing_anchors:
+            errors.append(f"AGENTS.md Code Review Rules drifted; missing anchors: {', '.join(missing_anchors)}")
 
     missing_canonical_ids = sorted(
         policy_id for policy_id in REVIEW_POLICY_IDS if f"[{policy_id}]" not in canonical_review

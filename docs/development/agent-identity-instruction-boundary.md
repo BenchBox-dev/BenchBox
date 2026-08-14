@@ -78,6 +78,13 @@ Merge time is the only one that reads what a branch actually carries; the
 config-reading guards say nothing about a branch on a CI runner, where the
 config is the runner's own.
 
+## Code Review boundary
+
+Code Review must not report commit identity. Its sandbox may use a synthetic
+identity. Codex made six false P1 findings (#1695, #1698, #1715, #1717, #1719,
+and #1721). Each cited commit had a human author. Hooks and CI check actual
+commits. Code Review should report only PR defects.
+
 ## Related
 
 - `[AUTH-PROVENANCE-001]` in `AGENTS.md` — a tool convention or an earlier task
