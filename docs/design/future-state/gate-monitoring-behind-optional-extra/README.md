@@ -7,6 +7,26 @@
 
 Related TODO: `gate-monitoring-behind-optional-extra`
 
+## Status (2026-08-13)
+
+**Blocked on evidence; the proposal is not implemented.** The current default
+wheel still contains five `benchbox.monitoring` entries, and `psutil>=5.9.0`
+remains a core dependency. The measured baseline does not show an install-size
+win for moving monitoring behind an optional extra.
+
+Measured on `origin/develop` at `723126bf3` with `uv build --wheel`. Reproduction
+steps are in `_project/decisions/future-state-extraction-evidence-2026-08-13.md`.
+
+| Measure | Result |
+| --- | --- |
+| Wheel | 10,219,657 bytes; 1,325 archive entries |
+| `benchbox.monitoring` entries | 5 |
+
+Keep monitoring in the default wheel and keep `psutil` as a core dependency
+until a follow-up supplies a measured size win and a second-consumer or demand
+case. `import benchbox` does not load this package, so import-time is not
+extraction evidence here.
+
 ## Future State
 
 The monitoring package is excluded from the default wheel via MANIFEST.in and
