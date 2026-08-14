@@ -97,6 +97,17 @@ two PRs can each pass against the same older base and exceed an invariant when
 merged in sequence. The tradeoff is deliberate: when `develop` advances, an
 otherwise-green PR must refresh its required checks before it can merge.
 
+`refresh-shadow` (added with the strict-base refresh shadow rollout) is the
+observational job in `.github/workflows/develop-refresh-shadow.yml`. It is
+**not a required** context. It classifies exact `develop` refreshes using the
+trusted base copy of `scripts/pr_refresh_certification.py` and publishes a
+bounded artifact. It cannot skip Develop PR lanes, cannot satisfy
+`ci-required-result`, and does not change auto-merge or ruleset 15611785.
+`.github/workflows/pr.yml` also uploads `pr-certification-identity` and
+`pr-certification-lanes` artifacts so a later activation gate can bind a full
+run to a specific head, base, merge tree, workflow fingerprint, and lane
+set. Missing artifacts fail closed to `full_required`.
+
 Verify:
 
 ```bash
