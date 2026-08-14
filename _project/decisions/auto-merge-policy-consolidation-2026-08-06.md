@@ -1,9 +1,9 @@
 # Auto-merge policy: adversarial evaluation and consolidation
 
 **Date**: 2026-08-06
-**Status**: historical evaluation; decisions D1–D7 were later accepted and
-dispositioned below. At the time of this evaluation, no mechanism had yet been
-modified.
+**Status**: historical evaluation; D1–D4 and D6 were later implemented.
+D5 and D7 remain recommendations pending explicit authorization. At the time
+of this evaluation, no mechanism had yet been modified.
 **Related**: PRs #1567, #1592, #1622, #1623, #1624 (policy lineage);
 #1568/#1569 (live arm-on-open failure); #1503/#1521/#1531 (stranded review
 fixes); #1512 (anonymization auto-merge escape); #1543 (red-develop revert);
@@ -185,9 +185,9 @@ the mechanism set.
 
 ## Decisions and disposition (D1–D7)
 
-The recommendations below are no longer merely proposed. The merge of PR
-#1636 authorized and implemented D1–D4; PR #1634 implemented D6. D5 and D7
-remain accepted policy decisions rather than code changes. This record
+The recommendations below are not all accepted. The merge of PR #1636
+authorized and implemented D1–D4; PR #1634 implemented D6. D5 and D7 remain
+proposed policy recommendations and are not authorized by this record. This record
 preserves the evaluation and rationale; the current source and operational
 runbook are the operative implementation record.
 

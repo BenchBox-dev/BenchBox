@@ -8,7 +8,6 @@ docs/benchmarks/read-primitives.md	../reference/cli-reference.md
 docs/benchmarks/tpc-h.md	../reference/cli-reference.md
 docs/benchmarks/tpc-h.md	README.md
 docs/blog/2026-01-22-welcome.md	../getting-started/quick-start.md
-docs/concepts/architecture.md	../reference/result_schema_v1.md
 docs/concepts/data-model.md	../reference/result_schema_v1.md
 docs/concepts/data-model.md	../reference/result_schema_v1.md
 docs/development/duplication-residuals.md	./duplication-inventory.csv

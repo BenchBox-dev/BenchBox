@@ -151,9 +151,8 @@ def _benchmark_gate_records() -> list[BaselineRecord]:
     """Blocked platform×benchmark combinations (from platform_registry)."""
     from benchbox.core.platform_registry import PlatformRegistry
 
-    metadata = PlatformRegistry.get_all_platform_metadata()
     records: list[BaselineRecord] = []
-    for platform_key in sorted(metadata):
+    for platform_key in sorted(PlatformRegistry.get_platform_names()):
         caps = PlatformRegistry.get_platform_capabilities(platform_key)
         if caps is None or not caps.unsupported_benchmarks:
             continue

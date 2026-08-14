@@ -91,10 +91,12 @@ dedicated multi-day TODO or are accepted residuals.
   four call sites as part of that TODO.
 - **Status**: Deferred to adapter-base refactor.
 
-### R-03: LakeSail ↔ PySpark DataFrame family (632 lines)
+### R-03: LakeSail ↔ PySpark DataFrame family (thin subclass residual)
 
-- **Pattern**: Both DataFrame families implement the same Spark DSL surface
-  area via `pyspark.sql.functions` compatibility.
+- **Pattern**: LakeSail uses the shared PySpark DataFrame family through the
+  approximately 156-line `LakeSailDataFrameAdapter` subclass in
+  `benchbox/platforms/dataframe/lakesail_df.py`; it is not a 632-line
+  independent implementation of the Spark DSL.
 - **Rationale**: LakeSail is a drop-in PySpark replacement; the API surface
   deliberately mirrors PySpark, and consolidation would require building a
   shared module that both families import from - which reintroduces a

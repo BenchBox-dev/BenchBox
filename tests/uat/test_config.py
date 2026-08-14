@@ -220,6 +220,12 @@ def test_validate_config_rejects_negative_docker_memory_reserve():
         config.validate_config({"name": "smoke", "preflight": {"docker_memory_reserve_gib": -0.1}})
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), "nan", "inf"])
+def test_validate_config_rejects_non_finite_docker_memory_reserve(value):
+    with pytest.raises(config.ConfigError, match="finite"):
+        config.validate_config({"name": "smoke", "preflight": {"docker_memory_reserve_gib": value}})
+
+
 @pytest.mark.parametrize(
     ("field", "cleanup"),
     [

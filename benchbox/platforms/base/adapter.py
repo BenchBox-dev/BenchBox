@@ -1210,8 +1210,8 @@ class PlatformAdapter(
     def _setup_fresh_database_phases(self, benchmark, connection: Any, effective_tuning_config) -> tuple:
         """Run fresh-database setup while capturing schema-phase tuning DDL.
 
-        The shared result-capture mixin owns the historical setup implementation,
-        but schema creation is an adapter lifecycle seam: platform adapters render
+        The adapter owns the setup implementation because schema creation is an
+        adapter lifecycle seam: platform adapters render
         tuning clauses while creating tables. Keep the wrapper limited to that
         call so data loading and the subsequent tuning/session wrappers retain
         their existing ledger boundaries.

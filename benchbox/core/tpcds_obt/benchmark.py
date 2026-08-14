@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Union
 
-from benchbox.core.base_benchmark import BaseBenchmark
+from benchbox.base import BaseBenchmark
 from benchbox.core.tpcds.generator import TPCDSDataGenerator
 from benchbox.core.tpcds_obt.etl.transformer import SUPPORTED_CHANNELS, TPCDSOBTTransformer
 from benchbox.core.tpcds_obt.queries import TPCDSOBTQueryManager
@@ -451,6 +451,16 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         if target not in {"duckdb", "postgres", "ansi", "standard"}:
             ddl = translate_sql_query(ddl, target_dialect=target, source_dialect="postgres", identify=True)
         return ddl
+
+    def __enter__(self) -> TPCDSOBTBenchmark:
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> bool:
+        """Preserve the deprecated-base context-manager cleanup contract."""
+        cleanup = getattr(self, "cleanup", None)
+        if callable(cleanup):
+            cleanup()
+        return False
 
 
 # ---------------------------------------------------------------------------

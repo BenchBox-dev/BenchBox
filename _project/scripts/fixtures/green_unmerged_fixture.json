@@ -27,6 +27,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -55,6 +61,12 @@
         },
         {
           "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -94,6 +106,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -118,6 +136,12 @@
         },
         {
           "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -152,6 +176,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -180,6 +210,12 @@
         },
         {
           "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -223,6 +259,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -251,6 +293,12 @@
         },
         {
           "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -288,6 +336,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -318,6 +372,12 @@
         },
         {
           "name": "Results Explorer browser gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -376,6 +436,12 @@
           "name": "Results Explorer browser gate",
           "status": "completed",
           "conclusion": "failure",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         }
       ]
