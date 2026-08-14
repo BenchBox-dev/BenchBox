@@ -17,6 +17,10 @@ Install BenchBox with MCP dependencies:
 uv sync --extra mcp
 ```
 
+The MCP extra includes DuckDB because `duckdb` is the advertised local
+execution platform in the MCP surface. Other platforms keep their separate
+optional extras.
+
 ### Starting the Server
 
 ```bash
@@ -249,7 +253,10 @@ modes remain available because they do not hold the request for execution.
   The CLI derives that execution type from `--phases generate`, so it has no
   reason to name it on `--mode`. MCP's phase surface is a single string with no
   interactive selection behind it, so it names the execution type directly.
-  `datagen` and `generate` remain accepted spellings of `data_only`.
+  `datagen` and `generate` remain accepted spellings of `data_only`. Both
+  synchronous requests and durable workers route this execution through the
+  shared core run service; MCP owns only the structured response envelope and
+  tenant-scoped artifact path.
 - `phases` is validated against
   `benchbox.core.constants.VALID_PHASES` at admission, on both `run_benchmark`
   and `start_benchmark`. An unknown phase is rejected with the valid list;
