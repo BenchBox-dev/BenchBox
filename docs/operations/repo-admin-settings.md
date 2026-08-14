@@ -54,6 +54,7 @@ Required status checks:
 ```text
 - ci-required-result
 - Results Explorer browser gate
+- ruleset-drift
 ```
 
 `ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
@@ -477,8 +478,12 @@ For the first release that introduces `release-canary.yml`, before GitHub can
 run the workflow from the default branch, `validate-base` runs the same
 non-fast canary suite and ruleset drift check inline as bootstrap evidence.
 
-Ruleset drift is checked by `scripts/ruleset_drift_check.py` inside
-`release-canary.yml`. The script parses this runbook for
+Ruleset drift is checked for every develop PR by
+`develop-ruleset-drift.yml` and independently by `release-canary.yml`. The PR
+workflow uses `pull_request_target`, checks out only the trusted base SHA, and
+never executes pull-request-head code with the admin-visible token. Its
+`ruleset-drift` job is a required `develop-squash-only` context, so drift blocks
+the next merge instead of waiting for the scheduled canary. The script parses this runbook for
 `develop-squash-only` and `release-only`, then compares live GitHub
 rulesets for required status check contexts, strict-base settings, bypass
 actors, linear history, non-fast-forward protection, deletion protection, and
@@ -486,7 +491,7 @@ target refs. For `develop-squash-only`, it also applies the shared
 `review_enforcement_findings` predicate and treats a missing or false
 `require_code_owner_review` as a blocking finding through
 `DEVELOP_REVIEW_RULE_ENFORCED = True`. The
-workflow must use the repository secret `RULESET_DRIFT_TOKEN`
+Both workflows must use the repository secret `RULESET_DRIFT_TOKEN`
 with enough ruleset write/admin visibility for the API to expose
 `bypass_actors`; the default `GITHUB_TOKEN` is intentionally not used for this
 check. If GitHub API access fails, the canary is red; release PRs then fail on

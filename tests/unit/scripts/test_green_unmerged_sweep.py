@@ -87,7 +87,7 @@ def test_required_lane_picks_latest_started_run() -> None:
     runs = [
         _run("ci-required-result", "failure", "2026-07-23T07:00:00Z"),
         _run("ci-required-result", "success", "2026-07-23T08:00:00Z"),
-        _run("Results Explorer browser gate", "success"),
+        *[_run(name, "success") for name in mod.REQUIRED_CHECK_NAMES if name != "ci-required-result"],
     ]
     assert mod.is_required_lane_green(runs) is True
 
@@ -96,7 +96,7 @@ def test_required_lane_stale_success_does_not_beat_latest_failure() -> None:
     runs = [
         _run("ci-required-result", "success", "2026-07-23T07:00:00Z"),
         _run("ci-required-result", "failure", "2026-07-23T08:00:00Z"),
-        _run("Results Explorer browser gate", "success"),
+        *[_run(name, "success") for name in mod.REQUIRED_CHECK_NAMES if name != "ci-required-result"],
     ]
     assert mod.is_required_lane_green(runs) is False
 

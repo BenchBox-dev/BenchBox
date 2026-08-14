@@ -22,6 +22,7 @@ from typing import Any
 REQUIRED_CHECK_NAMES: tuple[str, ...] = (
     "ci-required-result",
     "Results Explorer browser gate",
+    "ruleset-drift",
 )
 
 
