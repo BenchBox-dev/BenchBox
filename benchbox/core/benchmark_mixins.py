@@ -189,9 +189,23 @@ class CursorValidationQueryExecutionMixin:
                     f"Ensure a parent class (e.g. PlatformAdapter) provides it."
                 )
 
-    def _build_query_stats(self, execution_time: float) -> dict[str, Any]:
-        """Build default query stats payload for cursor-based adapters."""
+    def _build_query_stats(
+        self,
+        execution_time: float,
+        *,
+        connection: Any = None,
+        query_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Build default query stats payload for cursor-based adapters.
+
+        Platform adapters may override this hook to attach engine telemetry.
+        The default ignores ``connection`` and ``query_id``.
+        """
         return {"execution_time_seconds": execution_time}
+
+    def _format_query_error(self, exc: BaseException) -> str:
+        """Return a non-empty error string for a failed DB-API execute."""
+        return str(exc) or repr(exc) or type(exc).__name__
 
     def _attach_query_stats(self, result_dict: dict[str, Any], query_stats: dict[str, Any]) -> None:
         """Attach platform query stats and resource usage to result payload.
@@ -223,7 +237,11 @@ class CursorValidationQueryExecutionMixin:
 
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(result) if result else 0
-            query_stats = self._build_query_stats(execution_time)
+            query_stats = self._build_query_stats(
+                execution_time,
+                connection=connection,
+                query_id=query_id,
+            )
 
             validation_result = None
             if validate_row_count and benchmark_type:
@@ -266,7 +284,7 @@ class CursorValidationQueryExecutionMixin:
                 "status": "FAILED",
                 "execution_time_seconds": execution_time,
                 "rows_returned": 0,
-                "error": str(e),
+                "error": self._format_query_error(e),
                 "error_type": type(e).__name__,
             }
         finally:
