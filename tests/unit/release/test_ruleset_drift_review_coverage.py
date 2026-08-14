@@ -83,6 +83,7 @@ def _live_develop_ruleset(*, review_count: int = 0, code_owner_review: bool = Tr
                     "required_status_checks": [
                         {"context": "ci-required-result"},
                         {"context": "Results Explorer browser gate"},
+                        {"context": "ruleset-drift"},
                     ],
                 },
             },
