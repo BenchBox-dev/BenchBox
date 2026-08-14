@@ -70,3 +70,26 @@ def test_runner_accepts_prebuilt_adapter_without_factory_lookup() -> None:
     assert is_dataframe is False
     assert adapter.benchmark_instance is benchmark
     assert adapter.scale_factor == 0.01
+
+
+def test_runner_fallback_looks_up_adapter_when_none_is_supplied() -> None:
+    """The current fallback still calls get_platform_adapter when no adapter is injected."""
+    adapter = SimpleNamespace(is_dataframe_adapter=False)
+    benchmark = object()
+    benchmark_config = SimpleNamespace(scale_factor=0.01)
+
+    with patch.object(runner, "get_platform_adapter", return_value=adapter) as factory:
+        configured, is_dataframe = runner._configure_lifecycle_adapter(
+            adapter=None,
+            database_config=SimpleNamespace(type="duckdb"),
+            platform_config={"database_path": ":memory:"},
+            benchmark=benchmark,
+            benchmark_config=benchmark_config,
+            validation_opts=runner.ValidationOptions(),
+            verbosity_settings=None,
+            table_mode="native",
+        )
+
+    factory.assert_called_once_with("duckdb", database_path=":memory:")
+    assert configured is adapter
+    assert is_dataframe is False

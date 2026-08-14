@@ -35,8 +35,8 @@ primitives already disagree:
 
 | Incumbent | Current boundary | Observable behavior |
 |---|---|---|
-| `CursorValidationQueryExecutionMixin` in `benchbox/core/benchmark_mixins.py` | Core mixin inherited by Firebolt and Presto-family adapters | Always creates and closes `connection.cursor()`, attaches shared query statistics/resource usage, logs validation PASS/FAIL, does not rollback, and does not emit a result digest. |
-| `execute_sql_query` in `benchbox/platforms/base/sql_execution.py` | Platform-layer helper called by Psycopg, MySQL-wire, QuestDB, and StarRocks paths | Accepts a connection or pre-created cursor, rolls back failures, emits the canonical legacy result through `QueryExecution`, supports the gated result digest, and does not attach the mixin's PASS/FAIL log or query-statistics fields. |
+| `CursorValidationQueryExecutionMixin` in `benchbox/core/benchmark_mixins.py` | Core mixin inherited by Firebolt and Presto-family adapters | Always creates and closes `connection.cursor()`. On success it attaches `query_statistics`/`resource_usage` after the injected builder returns and can log validation PASS/FAIL. On failure it returns a raw dict and does not roll back or emit a result digest. |
+| `execute_sql_query` in `benchbox/platforms/base/sql_execution.py` | Platform-layer helper called by Psycopg, MySQL-wire, QuestDB, and StarRocks paths | Accepts a connection or pre-created cursor and rolls back failures. Success returns the injected builder payload; production adapters typically supply `ResultCaptureMixin._build_query_result_with_validation`, which may round-trip `QueryExecution` internally. The helper itself constructs `QueryExecution` only on failure. It can pass a gated result digest into the builder and does not attach the mixin's PASS/FAIL log or query-statistics fields. |
 
 Folding either implementation into the other without first choosing its home
 layer would silently change cursor ownership, transaction recovery, result
@@ -57,12 +57,14 @@ digests, query statistics/resource usage, and explicit validation logging.
 
 This is a target boundary, not a production fold in this ADR. The executable
 prototypes in
-`tests/unit/platforms/test_composition_boundary_sql_prototypes.py` preserve the
-current two behaviors and make their deltas visible before a later migration.
-The runner prototype in
-`tests/unit/core/runner/test_composition_boundary_runner_prototype.py` proves
-that `run_service.AdapterFactory` and a prebuilt adapter can cross the core
-boundary without a platform import at the call site.
+`tests/unit/platforms/test_composition_boundary_sql_prototypes.py` lock the
+deltas that later migration PRs must name before changing behavior. The runner
+prototype in
+`tests/unit/core/runner/test_composition_boundary_runner_prototype.py` shows
+that `run_service.AdapterFactory` can supply a prebuilt adapter and that
+`_configure_lifecycle_adapter(...)` skips its `get_platform_adapter` fallback
+when that adapter is already present. The runner module still imports
+`get_platform_adapter` at `runner.py:66`; this ADR does not remove that import.
 
 `benchbox.runtime` is **not introduced**. The existing run service already
 provides the needed composition seam; adding a third package would create a
@@ -74,22 +76,26 @@ made canonical.
 
 ### SQL execute/validate edge
 
-The core-mixin prototype and platform-injected-function prototype both execute
+The core-mixin prototype and incumbent platform-helper prototype both execute
 the same fake DB-API query. The tests prove that they cannot be considered
 behaviorally interchangeable today:
 
 1. The core mixin owns and closes a newly created cursor and attaches
    `query_statistics` and `resource_usage` to a successful result.
 2. The platform helper can run on a pre-created stream cursor and leaves cursor
-   ownership with its caller.
+   ownership with its caller; when it receives a connection it closes the cursor
+   it created.
 3. The platform helper rolls back a failed query; the core mixin returns a
    failure without rolling back.
-4. The core mixin has validation PASS/FAIL logging hooks; the platform helper
-   has the result-digest and canonical `QueryExecution` path.
+4. When validation runs, the core mixin logs PASS/FAIL and the platform helper
+   does not. When the digest gate is on, the helper passes `result_digest` into
+   the builder and the mixin does not. The helper constructs `QueryExecution`
+   only on the failure path.
 
-The migration must therefore be characterization-first and must name every
-intentional result-field, logging, cursor-lifecycle, and rollback change in
-its own implementation PR.
+The stub builder used by the prototypes is not the production
+`ResultCaptureMixin` payload. The migration must therefore be
+characterization-first and must name every intentional result-field, logging,
+cursor-lifecycle, and rollback change in its own implementation PR.
 
 ### Runner edge
 

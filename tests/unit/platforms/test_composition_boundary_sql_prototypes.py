@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -46,11 +47,14 @@ class _Connection:
 class _CoreHooks:
     """Minimal hooks required by the core mixin prototype."""
 
-    def log_verbose(self, _message: str) -> None:
-        pass
+    def __init__(self) -> None:
+        self.messages: list[str] = []
 
-    def log_very_verbose(self, _message: str) -> None:
-        pass
+    def log_verbose(self, message: str) -> None:
+        self.messages.append(message)
+
+    def log_very_verbose(self, message: str) -> None:
+        self.messages.append(message)
 
     def _build_query_result_with_validation(self, **kwargs: Any) -> dict[str, Any]:
         return {"status": "SUCCESS", **kwargs}
@@ -60,19 +64,36 @@ class _CoreSqlPrototype(CursorValidationQueryExecutionMixin, _CoreHooks):
     """Option A prototype: core owns cursor-based SQL execution behavior."""
 
 
-def _platform_injected_prototype(
+def _incumbent_platform_helper(
     connection_or_cursor: Any,
     *,
     hooks: _CoreHooks,
+    benchmark_type: str | None = None,
+    stream_id: int | None = None,
 ) -> dict[str, Any]:
-    """Option B prototype: a platform helper receives core result callbacks."""
+    """Incumbent platform helper with injected core result callbacks.
+
+    This is not Option B. Option B in the ADR is a rejected ``benchbox.runtime``
+    package. This function characterizes ``execute_sql_query`` as it exists today.
+    """
     return execute_sql_query(
         connection_or_cursor,
         "SELECT 1",
         "q1",
         log_verbose=hooks.log_verbose,
         build_query_result_with_validation=hooks._build_query_result_with_validation,
+        benchmark_type=benchmark_type,
+        stream_id=stream_id,
     )
+
+
+def _passed_validation() -> MagicMock:
+    validation = MagicMock()
+    validation.warning_message = None
+    validation.is_valid = True
+    validation.error_message = None
+    validation.expected_row_count = 1
+    return validation
 
 
 def test_sql_prototypes_characterize_success_contracts() -> None:
@@ -83,7 +104,7 @@ def test_sql_prototypes_characterize_success_contracts() -> None:
 
     platform_cursor = _Cursor(rows=[(1,)])
     platform_connection = _Connection(platform_cursor)
-    platform_result = _platform_injected_prototype(platform_cursor, hooks=_CoreHooks())
+    platform_result = _incumbent_platform_helper(platform_cursor, hooks=_CoreHooks())
 
     assert core_result["query_statistics"] is core_result["resource_usage"]
     assert "query_statistics" not in platform_result
@@ -100,7 +121,7 @@ def test_sql_prototypes_characterize_failure_recovery_contracts() -> None:
 
     platform_cursor = _Cursor(error=RuntimeError("platform failure"))
     platform_connection = _Connection(platform_cursor)
-    platform_result = _platform_injected_prototype(platform_cursor, hooks=_CoreHooks())
+    platform_result = _incumbent_platform_helper(platform_cursor, hooks=_CoreHooks())
 
     assert core_result["status"] == "FAILED"
     assert platform_result["status"] == "FAILED"
@@ -108,3 +129,43 @@ def test_sql_prototypes_characterize_failure_recovery_contracts() -> None:
     assert platform_connection.rollback_count == 1
     assert core_cursor.closed is True
     assert platform_cursor.closed is False
+    assert "error_type" in core_result
+    assert "error" in platform_result
+
+
+def test_sql_prototypes_characterize_helper_owned_cursor_close() -> None:
+    """When the helper receives a connection, it closes the cursor it created."""
+    cursor = _Cursor(rows=[(1,)])
+    connection = _Connection(cursor)
+    _incumbent_platform_helper(connection, hooks=_CoreHooks())
+    assert cursor.closed is True
+
+
+def test_sql_prototypes_characterize_validation_logging_and_digest() -> None:
+    """Mixin logs validation; helper can pass a gated digest and stays silent."""
+    proto = _CoreSqlPrototype()
+    platform_hooks = _CoreHooks()
+    validation = _passed_validation()
+
+    with (
+        patch("benchbox.core.validation.query_validation.QueryValidator") as validator_cls,
+        patch("benchbox.core.results.result_digest.result_digest_enabled", return_value=True),
+        patch("benchbox.core.results.result_digest.compute_result_digest", return_value="digest"),
+    ):
+        validator_cls.return_value.validate_query_result.return_value = validation
+        core_result = proto.execute_query(
+            _Connection(_Cursor(rows=[(1,)])),
+            "SELECT 1",
+            "q1",
+            benchmark_type="tpch",
+        )
+        platform_result = _incumbent_platform_helper(
+            _Cursor(rows=[(1,)]),
+            hooks=platform_hooks,
+            benchmark_type="tpch",
+        )
+
+    assert any("PASSED" in message for message in proto.messages)
+    assert not any("PASSED" in message or "FAILED" in message for message in platform_hooks.messages)
+    assert "result_digest" not in core_result
+    assert platform_result.get("result_digest") == "digest"
