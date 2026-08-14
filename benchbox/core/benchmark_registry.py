@@ -15,7 +15,7 @@ import importlib
 from collections import Counter
 from dataclasses import dataclass
 from importlib import resources
-from typing import Any, Literal, cast
+from typing import Any, Literal, Protocol, cast, runtime_checkable
 
 import yaml
 
@@ -54,6 +54,38 @@ def _normalize_benchmark_metadata(raw: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+@runtime_checkable
+class BenchmarkFamilyPlugin(Protocol):
+    """Small registry-backed family seam. This is not a BaseBenchmark subclass."""
+
+    benchmark_id: str
+    public_class_name: str | None
+    surface: str
+
+    @property
+    def core_class(self) -> type[Any]: ...
+
+    def default_scale(self, scale_factor: float | None = None) -> float: ...
+
+    def create(self, config: Any, system_profile: Any) -> Any: ...
+
+    def phases(self) -> tuple[str, ...]: ...
+
+    def result_metadata(self) -> dict[str, Any]: ...
+
+
+_FAMILY_PLUGIN_REQUIRED_ATTRS = (
+    "benchmark_id",
+    "core_class",
+    "public_class_name",
+    "surface",
+    "default_scale",
+    "create",
+    "phases",
+    "result_metadata",
+)
+
+
 @dataclass(frozen=True)
 class _RegistryData:
     """Derived registry structures, built once from the YAML payload."""
@@ -66,6 +98,7 @@ class _RegistryData:
     data_source_probe_ids: tuple[str, ...]
     tpc_official_scale_options: tuple[float, ...]
     benchmark_metadata: dict[str, dict[str, Any]]
+    family_plugin_imports: dict[str, str]
 
 
 def _build_registry() -> _RegistryData:
@@ -80,6 +113,9 @@ def _build_registry() -> _RegistryData:
         benchmark_id: _normalize_benchmark_metadata(meta)
         for benchmark_id, meta in payload["benchmark_metadata"].items()
     }
+    family_plugin_imports = {
+        str(benchmark_id): str(spec) for benchmark_id, spec in dict(payload.get("family_plugins") or {}).items()
+    }
     data = _RegistryData(
         category_order=list(payload["category_order"]),
         benchmark_order={category: list(benchmarks) for category, benchmarks in payload["benchmark_order"].items()},
@@ -92,8 +128,10 @@ def _build_registry() -> _RegistryData:
         data_source_probe_ids=tuple(payload["data_source_probe_ids"]),
         tpc_official_scale_options=tuple(payload["tpc_official_scale_options"]),
         benchmark_metadata=benchmark_metadata,
+        family_plugin_imports=family_plugin_imports,
     )
     _validate_registry(data.benchmark_metadata)
+    _validate_family_plugins(set(data.benchmark_metadata), data.family_plugin_imports)
     return data
 
 
@@ -188,6 +226,21 @@ def _is_valid_time_range(value: Any) -> bool:
 
 def _is_valid_base_memory(value: Any) -> bool:
     return isinstance(value, (int, float)) and value > 0
+
+
+def _validate_family_plugins(benchmark_ids: set[str], family_plugins: dict[str, str]) -> None:
+    """Reject plugin rows that do not name a registry benchmark or import spec."""
+    unknown = sorted(plugin_id for plugin_id in family_plugins if plugin_id not in benchmark_ids)
+    invalid = sorted(
+        f"{plugin_id}={spec!r}" for plugin_id, spec in family_plugins.items() if not spec or ":" not in spec
+    )
+    if unknown or invalid:
+        details: list[str] = []
+        if unknown:
+            details.append(f"unknown benchmark ids: {', '.join(unknown)}")
+        if invalid:
+            details.append(f"invalid import specs: {', '.join(invalid)}")
+        raise ValueError("Invalid family_plugins metadata: " + "; ".join(details))
 
 
 def _validate_registry(metadata: dict[str, dict[str, Any]]) -> None:
@@ -486,6 +539,39 @@ def presort_capable_benchmarks() -> tuple[str, ...]:
     )
 
 
+def list_family_plugin_ids() -> list[str]:
+    """Return registry keys that declare a family plugin import spec."""
+    return sorted(_registry().family_plugin_imports)
+
+
+def get_family_plugin(benchmark_id: str) -> BenchmarkFamilyPlugin | None:
+    """Load the registry-backed family plugin for *benchmark_id*, if declared.
+
+    Plugin imports stay lazy so registry metadata load does not import family
+    packages. A declared spec that cannot be imported or does not match the
+    seam shape fails closed.
+    """
+    spec = _registry().family_plugin_imports.get(benchmark_id.lower())
+    if spec is None:
+        return None
+    module_name, _, attr_name = spec.partition(":")
+    try:
+        module = importlib.import_module(module_name)
+        raw = getattr(module, attr_name)
+    except (ImportError, AttributeError) as exc:
+        raise ValueError(f"family plugin {spec!r} for {benchmark_id!r} could not be imported") from exc
+    plugin = raw() if isinstance(raw, type) else raw
+    missing = [name for name in _FAMILY_PLUGIN_REQUIRED_ATTRS if not hasattr(plugin, name)]
+    if missing:
+        raise ValueError(f"family plugin {spec!r} is missing: {', '.join(missing)}")
+    plugin_id = str(plugin.benchmark_id)
+    if plugin_id != benchmark_id.lower():
+        raise ValueError(
+            f"family plugin {spec!r} benchmark_id {plugin_id!r} does not match registry key {benchmark_id!r}"
+        )
+    return plugin
+
+
 def get_benchmark_surface(benchmark_id: str) -> str:
     """Return the registry-declared surface visibility for a benchmark.
 
@@ -507,8 +593,10 @@ __all__ = sorted(
     list(_PUBLIC_REGISTRY_ATTRS)
     + [
         "BENCHMARK_SUPPORT_STATUS_VALUES",
+        "BenchmarkFamilyPlugin",
         "BenchmarkSupportStatus",
         "get_all_benchmarks",
+        "get_family_plugin",
         "get_benchmark_class",
         "get_benchmark_class_name",
         "get_presort_table_configs",
@@ -526,6 +614,7 @@ __all__ = sorted(
         "get_public_benchmark_class",
         "is_benchmark_available",
         "list_benchmark_ids",
+        "list_family_plugin_ids",
         "list_loader_benchmark_ids",
         "list_public_benchmark_ids",
         "validate_scale_factor",

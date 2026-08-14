@@ -66,6 +66,8 @@ benchmark_class_names:
 core_class_name_overrides:
   h2odb: H2OBenchmark
   vector_search: VectorSearchBenchmark
+family_plugins:
+  ssb: benchbox.core.ssb.family:SSBFamily
 data_source_probe_ids:
 - read_primitives
 - write_primitives
