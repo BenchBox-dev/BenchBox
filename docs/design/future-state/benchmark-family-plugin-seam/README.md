@@ -7,6 +7,10 @@
 
 Related TODO: `benchmark-api-and-core-boundary-cleanup`
 
+Composition prerequisite: [`Core Kernel and Runtime Composition Boundary`](../../../development/adr/adr-runtime-composition-boundary.md).
+The plugin seam must use the selected core-kernel boundary; it must not create
+`benchbox.runtime` or a second generic execution helper.
+
 ## Decision
 
 Benchmark family logic should move behind an explicit family-plugin seam before
