@@ -12,6 +12,7 @@ import pytest
 
 from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
 from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+from benchbox.platforms.base.result_capture import ResultCaptureMixin
 from benchbox.platforms.sqlite import SQLiteAdapter
 
 pytestmark = [
@@ -63,6 +64,11 @@ class TestSQLiteAdapter:
             ("baseline",),
             ("tuned",),
         ]
+
+    def test_fresh_setup_is_adapter_owned_not_mixin_owned(self):
+        """The deleted mixin fork must stay gone so ledger capture cannot be shadowed."""
+        assert not hasattr(ResultCaptureMixin, "_setup_fresh_database_phases")
+        assert hasattr(SQLiteAdapter, "_setup_fresh_database_phases")
 
     def test_initialization_with_defaults(self):
         """Test initialization with default configuration."""
