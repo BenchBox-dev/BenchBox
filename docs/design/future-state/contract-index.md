@@ -19,6 +19,7 @@ that are not fully implemented yet.
 | Gate monitoring behind an optional extra | Blocked on evidence | core-runtime | Demonstrate an install-size win and a second-consumer or demand case; `psutil` remains core and monitoring remains in the default wheel. | `docs/design/future-state/gate-monitoring-behind-optional-extra/README.md`, `benchbox/monitoring/`, `pyproject.toml` |
 | Preserve top-level wrapper facades while benchmark API cleanup proceeds | Active compatibility boundary | benchmark-api | Wrapper facade tests stay green or a deprecation row/migration lands. | `docs/reference/backward-compatibility.md`, `tests/unit/test_wrapper_facades_fast.py`, top-level `benchbox/*.py` wrappers |
 | Retain `benchbox.core.base_benchmark.BaseBenchmark` during staged migration | Deprecated compatibility surface | core-runtime | Dedicated migration/removal item completes and updates the compatibility registry. | `docs/reference/backward-compatibility.md`, `benchbox/core/base_benchmark.py` |
+| Keep composition below CLI and MCP in the core kernel | Accepted architecture boundary | architecture | Remove allowlisted core-to-platforms edges in the ADR's order; canonicalize the SQL execute primitive before broad injection work. | `docs/development/adr/adr-runtime-composition-boundary.md`, `benchbox/core/run_service.py`, `benchbox/core/runner/runner.py` |
 
 ## Review Rule
 
