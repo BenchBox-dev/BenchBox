@@ -65,6 +65,11 @@ def _envelope() -> dict:
     }
 
 
+def _package_export_bytes(envelope: dict) -> bytes:
+    """A deliberately non-canonical package payload used to prove byte preservation."""
+    return (json.dumps(envelope, ensure_ascii=False, indent=2) + "\n").encode()
+
+
 def test_lifecycle_commands_receive_identity_and_actor(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     calls: list[tuple[list[str], str]] = []
 
@@ -157,9 +162,45 @@ def test_option_values_that_match_commands_are_not_parsed_as_commands() -> None:
     assert compat._command_index(["--actor", "audit", "show", "item"]) == (2, "show")
 
 
-def test_destructive_standalone_only_commands_are_not_routable() -> None:
-    assert compat._command_index(["restore", "--input", "backup.json"]) is None
+@pytest.mark.parametrize("command", sorted(compat.STANDALONE_ONLY_COMMANDS))
+def test_destructive_standalone_only_commands_are_not_routable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str
+) -> None:
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setattr(compat, "_delegate", lambda *args, **kwargs: pytest.fail("must not delegate"))
+
+    assert compat.main(["--db", str(tmp_path / "todo.sqlite"), command]) == 2
+    assert "does not expose standalone-only" in capsys.readouterr().err
     assert compat._command_index(["audit", "verify"]) == (0, "audit")
+
+
+def test_root_help_describes_only_the_compatibility_commands(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setattr(compat, "_delegate", lambda *args, **kwargs: pytest.fail("help must not delegate"))
+
+    assert compat.main(["--help"]) == 0
+
+    output = capsys.readouterr().out
+    assert "scope-update" in output
+    assert "freeze" in output
+    for command in compat.STANDALONE_ONLY_COMMANDS:
+        assert command not in output
+
+
+def test_unknown_command_help_is_left_for_the_package_parser(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        calls.append(argv)
+        return CompletedProcess(argv, 2, stdout="", stderr="invalid command\n")
+
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+
+    assert compat.main(["frobnicate", "--help"]) == 2
+    assert calls == [["frobnicate", "--help"]]
 
 
 def test_missing_db_refuses_implicit_fork_database(
@@ -227,7 +268,9 @@ def test_broken_pipe_is_a_clean_exit(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert compat.main(["--db", str(tmp_path / "todo.sqlite"), "show", "item"]) == 0
 
 
-def test_no_command_output_redacts_both_token_names(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys) -> None:
+def test_unknown_command_output_redacts_both_token_names(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys
+) -> None:
     monkeypatch.setenv("TODO_DB_AUTH_TOKEN", "rw-secret")
     monkeypatch.setenv("TODO_DB_RO_AUTH_TOKEN", "ro-secret")
     monkeypatch.setattr(compat, "_repo_root", lambda: tmp_path)
@@ -238,7 +281,7 @@ def test_no_command_output_redacts_both_token_names(monkeypatch: pytest.MonkeyPa
         return CompletedProcess(command, 2, stdout="rw-secret ro-secret\n", stderr="rw-secret ro-secret\n")
 
     monkeypatch.setattr(compat.subprocess, "run", fake_run)
-    assert compat.main(["--help"]) == 2
+    assert compat.main(["frobnicate"]) == 2
     captured = capsys.readouterr()
     assert "rw-secret" not in captured.out + captured.err
     assert "ro-secret" not in captured.out + captured.err
@@ -246,10 +289,12 @@ def test_no_command_output_redacts_both_token_names(monkeypatch: pytest.MonkeyPa
 
 def test_export_writes_lossless_envelope_and_legacy_views(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     envelope = _envelope()
+    envelope["metadata"]["label"] = "Café"
+    package_export = _package_export_bytes(envelope)
 
     def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
         output = Path(argv[argv.index("--output") + 1])
-        output.write_text(json.dumps(envelope), encoding="utf-8")
+        output.write_bytes(package_export)
         return CompletedProcess(argv, 0, stdout="export complete\n", stderr="")
 
     monkeypatch.setattr(compat, "_delegate", fake_delegate)
@@ -275,10 +320,11 @@ def test_export_writes_lossless_envelope_and_legacy_views(monkeypatch: pytest.Mo
 
     # The lossless envelope is the recovery artifact -- complete, and OUTSIDE the
     # committed snapshot directory.
-    lossless_text = (lossless_dir / "todo-db.json").read_text(encoding="utf-8")
+    lossless_path = lossless_dir / "todo-db.json"
+    lossless_text = lossless_path.read_text(encoding="utf-8")
     lossless = json.loads(lossless_text)
     assert lossless == envelope
-    assert lossless_text == json.dumps(envelope, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n"
+    assert lossless_path.read_bytes() == package_export
     assert not (output_dir / "todo-db.json").exists()
     item = json.loads((output_dir / "items.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert item["work"][0]["wid"] == "w0"
@@ -344,13 +390,13 @@ def test_export_rerun_removes_legacy_in_tree_envelope(tmp_path: Path) -> None:
     output_dir = tmp_path / "snapshot"
     lossless_dir = tmp_path / "lossless"
     envelope = _envelope()
-    compat._write_legacy_export(output_dir, envelope, lossless_dir)
+    compat._write_legacy_export(output_dir, envelope, _package_export_bytes(envelope), lossless_dir)
 
     legacy_envelope = output_dir / "todo-db.json"
     legacy_envelope.write_text('{"legacy": true}\n', encoding="utf-8")
     updated = {**envelope, "metadata": {"rerun": True}}
 
-    compat._write_legacy_export(output_dir, updated, lossless_dir)
+    compat._write_legacy_export(output_dir, updated, _package_export_bytes(updated), lossless_dir)
 
     assert not legacy_envelope.exists()
     assert json.loads((lossless_dir / "todo-db.json").read_text(encoding="utf-8")) == updated
@@ -410,7 +456,7 @@ def test_export_never_commits_findings_domain_prose(monkeypatch: pytest.MonkeyPa
 def test_export_views_are_byte_identical_to_legacy_format(tmp_path: Path) -> None:
     envelope = _envelope()
     envelope["tables"]["items"][0]["title"] = "Café | table"
-    compat._write_legacy_export(tmp_path / "out", envelope, tmp_path / "lossless")
+    compat._write_legacy_export(tmp_path / "out", envelope, _package_export_bytes(envelope), tmp_path / "lossless")
     tmp_path = tmp_path / "out"
     item = compat._item_rows(envelope)[0]
     assert (tmp_path / "items.jsonl").read_text(encoding="utf-8") == json.dumps(item, sort_keys=True) + "\n"
