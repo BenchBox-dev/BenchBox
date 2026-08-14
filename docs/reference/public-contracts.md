@@ -33,7 +33,7 @@ the map is unchanged.
 | `benchbox.base.BaseBenchmark` | `beta-public` | core-runtime | Public base for wrapper benchmarks and orchestration helpers; result helper compatibility is tracked. | Compatibility registry row when kwargs, result helpers, or method contracts change. | Runtime contract and wrapper tests. | `benchbox/base.py`, `docs/reference/backward-compatibility.md` |
 | `BaseBenchmark.run_with_platform` | `beta-public` | core-runtime | Standard programmatic execution hook for CLI-adjacent tools and MCP; callers pass an adapter and run options. | ADR or contract-map update before replacing it as the orchestration API. | MCP benchmark tests plus runtime contract tests. | `benchbox/base.py`, `_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml` |
 | `benchbox.core.benchmark_loader` | `internal` | benchmark-api | Registry-backed runtime loader for CLI/core orchestration. It is not a public Python API and should not be imported by external callers. | Promote only through a contract-map update and migration docs. | Loader/registry parity tests and benchmark API contract tests. | `benchbox/core/benchmark_loader.py`, `benchbox/core/benchmark_registry.py` |
-| `benchbox.core.base_benchmark.BaseBenchmark` | `deprecated` | core-runtime | Documented internal compatibility base retained for the remaining `datavault` and `tpcds_obt` core implementations; not an alias and not the extension path for new benchmarks. | Remove only after those implementations migrate to `benchbox.base.BaseBenchmark` and the compatibility registry target is satisfied. | Backward-compatibility registry review, benchmark loader/runtime tests, benchmark API contract tests. | `benchbox/core/base_benchmark.py`, `docs/reference/backward-compatibility.md` |
+| `benchbox.core.base_benchmark.BaseBenchmark` | `deprecated` | core-runtime | Documented internal compatibility base with no remaining production implementation consumers; not an alias and not the extension path for new benchmarks. | Remove only through the deletion-only compatibility item after the registry target and remaining internal import checks are satisfied. | Backward-compatibility registry review, benchmark loader/runtime tests, benchmark API contract tests. | `benchbox/core/base_benchmark.py`, `docs/reference/backward-compatibility.md` |
 | Adapter subclassing hooks and base mixins | `beta-public` | platform-runtime | Adapter authors can depend on documented `PlatformAdapter` hooks, ABC signatures, and adapter authoring docs. | Adapter refactor map update, migration note, and representative adapter tests. | `tests/unit/platforms/test_abc_conformance.py`, focused adapter tests. | `benchbox/platforms/base/`, `docs/development/adapter-refactor-map.md`, `docs/development/adding-new-platforms.md` |
 | `PlatformAdapter` lifecycle | `beta-public` | platform-runtime | Adapter instances are serial execution objects. One instance may be reused for multiple benchmark runs sequentially; `run_benchmark()` resets run-scoped caches at run start and restores run-config plan-capture overrides at run end. Concurrent calls on one adapter instance are not supported. | A concurrency or service-mode promotion needs a contract-map update and a shared run-context design before claiming support. | `tests/unit/platforms/test_adapter_lifecycle.py`, focused adapter lifecycle tests. | `benchbox/platforms/base/adapter.py`, `benchbox/platforms/base/result_capture.py`, `docs/development/adapter-refactor-map.md` |
 | DataFrame adapter execution path | `beta-public` | dataframe-runtime | Production DataFrame execution routes through `benchbox.core.runner.runner` to `adapter.run_benchmark()`, implemented by `BenchmarkExecutionMixin` for production DataFrame platforms such as `polars-df`, `pandas-df`, `datafusion-df`, and `dask-df`. | Changes need DataFrame mixin tests, result-bundle parity coverage, and same-PR docs. | DataFrame mixin tests plus exported SQL/DataFrame result parity. | `benchbox/core/runner/runner.py`, `benchbox/platforms/dataframe/benchmark_mixin.py`, `tests/unit/core/results/test_result_parity.py` |
@@ -240,9 +240,10 @@ Checked for `dataframe-runner-lifecycle-and-bundle-parity` at
 Production DataFrame execution is `run_benchmark_lifecycle()` ->
 `adapter.run_benchmark()` -> `BenchmarkExecutionMixin.run_benchmark()`.
 `benchbox.core.runner.dataframe_runner.run_dataframe_benchmark()` is a
-deprecated internal compatibility runner. The module still provides internal
-mode/query helpers used by CLI/dry-run code, but new lifecycle behavior belongs
-in `benchbox/platforms/dataframe/benchmark_mixin.py`.
+deprecated internal compatibility runner. Its mode predicate now lives in
+`benchbox.core.run_service` beside run-plan resolution; the remaining module
+provides legacy lifecycle/query helpers for compatibility tests. New lifecycle
+behavior belongs in `benchbox/platforms/dataframe/benchmark_mixin.py`.
 
 Production behavior tests are the DataFrame mixin and adapter lifecycle tests,
 plus exported result parity in `tests/unit/core/results/test_result_parity.py`.
@@ -364,7 +365,7 @@ editing:
 | Evidence | Finding |
 |---|---|
 | `README.md:35-48` | Beta disclaimer exists; `benchbox.experimental` is explicitly outside the supported beta product surface; feature count bullets were hand-maintained. |
-| `docs/reference/backward-compatibility.md:24-84` | Compatibility registry tracks shims; wrapper cleanup notes preserve top-level wrappers and keep `benchbox.core.base_benchmark.BaseBenchmark` pending a dedicated item. |
+| `docs/reference/backward-compatibility.md:24-84` | Compatibility registry tracks shims; wrapper cleanup notes preserve top-level wrappers while `benchbox.core.base_benchmark.BaseBenchmark` remains only as a deprecated module pending its deletion-only item. |
 | `tests/unit/test_wrapper_facades_fast.py:30-260` | Wrapper facades are tested public behavior, not accidental reachability. |
 | `_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml:25-47` | Completed decision moved MCP away from CLI internals and onto public benchmark/adapter APIs. |
 | `docs/design/future-state/index.md:19-41` | Future-state proposals already classify MCP API formalization and experimental isolation as active architecture decisions. |

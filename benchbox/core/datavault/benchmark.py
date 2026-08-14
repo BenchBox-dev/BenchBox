@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from benchbox.core.base_benchmark import BaseBenchmark
+from benchbox.base import BaseBenchmark
 
 if TYPE_CHECKING:
     from cloudpathlib import CloudPath

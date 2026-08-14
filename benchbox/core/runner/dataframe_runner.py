@@ -6,9 +6,10 @@ Production DataFrame execution is routed by ``benchbox.core.runner.runner`` to
 module is retained as a deprecated internal compatibility runner while older
 tests and helper imports are migrated.
 
-The mode-detection helpers remain internal utility compatibility points for
-CLI/dry-run paths. New DataFrame lifecycle behavior should be added to the
-adapter mixin path, not here.
+The mode-detection helpers now live in ``benchbox.core.run_service`` beside
+run-plan resolution. New DataFrame lifecycle behavior should be added to the
+adapter mixin path, not here; this module remains only for legacy lifecycle
+helpers until the deletion-only compatibility item is claimed.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -824,42 +825,3 @@ def _get_clickbench_dataframe_queries(
 ) -> list[Any]:
     """Get ClickBench DataFrame queries."""
     return get_clickbench_dataframe_queries(benchmark_config, benchmark_instance, stream_id)
-
-
-def is_dataframe_execution(database_config: Any) -> bool:
-    """Check if execution should use DataFrame mode.
-
-    DataFrame mode is determined by platform naming convention:
-    - polars-df: DataFrame mode
-    - pandas-df: DataFrame mode
-    - polars: SQL mode (if exists)
-    - duckdb: SQL mode
-
-    Args:
-        database_config: Database configuration with platform type
-
-    Returns:
-        True if DataFrame mode should be used
-    """
-    if database_config is None:
-        return False
-
-    from benchbox.platforms.adapter_factory import is_dataframe_mode
-
-    platform_type = getattr(database_config, "type", "")
-    explicit_mode = getattr(database_config, "mode", None)
-    return is_dataframe_mode(platform_type, explicit_mode)
-
-
-def get_execution_mode(database_config: Any) -> str:
-    """Get the execution mode for a platform.
-
-    Args:
-        database_config: Database configuration
-
-    Returns:
-        "dataframe" or "sql"
-    """
-    if is_dataframe_execution(database_config):
-        return "dataframe"
-    return "sql"

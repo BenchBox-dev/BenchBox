@@ -20,6 +20,7 @@ import pytest
 from benchbox.core.dataframe.query_resolution import build_dataframe_query_filter
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_info import PlatformInfoInput
+from benchbox.core.run_service import get_execution_mode, is_dataframe_execution
 from benchbox.core.runner.dataframe_runner import (
     DATAFRAME_PRODUCTION_EXECUTION_PATH,
     DATAFRAME_RUNNER_API_SURFACE,
@@ -27,8 +28,6 @@ from benchbox.core.runner.dataframe_runner import (
     DataFramePhases,
     DataFrameRunOptions,
     _get_queries_for_benchmark,
-    get_execution_mode,
-    is_dataframe_execution,
     run_dataframe_benchmark,
 )
 from benchbox.core.schemas import BenchmarkConfig
