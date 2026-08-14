@@ -34,7 +34,7 @@ DEVELOPMENT_TREE_ONLY_TARGETS := \
 	quality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \
 	audit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \
 	explorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \
-	agent-commit-range-check ci-lint release-cut pr-arm-auto-merge shrink-rollup \
+	agent-commit-range-check ci-lint pr-arm-auto-merge shrink-rollup \
 	pr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \
 	platform-manifest-check test-docker-parity blind-spots-list blind-spots-report \
 	soundness-drain-report soundness-drain-self-test
@@ -959,7 +959,22 @@ run-test:
 
 RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 
-.PHONY: release-cut release-cut-abort release-finalize
+.PHONY: release-cut release-cut-abort release-finalize .release-cut-tree-required
+
+.release-cut-tree-required:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make release-cut VERSION=X.Y.Z" >&2; \
+		exit 1; \
+	fi; \
+	if [ ! -d "$(BENCHBOX_MAKEFILE_ROOT)_project/decisions" ]; then \
+		BRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true); \
+		if [ "$$BRANCH" != "v$(VERSION)" ] \
+				|| ! git rev-parse --verify --quiet refs/heads/develop >/dev/null \
+				|| ! git merge-base --is-ancestor develop HEAD; then \
+			echo "Error: release-cut requires the BenchBox development tree unless resuming v$(VERSION) after curation." >&2; \
+			exit 2; \
+		fi; \
+	fi
 
 # Cut a release branch from develop in one shot:
 #   1. Create v$(VERSION) branch off develop (develop is not modified).
@@ -981,7 +996,7 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 # v0.3.1 cut died at step 3 twice and left exactly that half-applied state.
 # `make release-cut-abort VERSION=X.Y.Z` discards it instead.
 # Usage: make release-cut VERSION=X.Y.Z
-release-cut:
+release-cut: .release-cut-tree-required
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut VERSION=X.Y.Z" && exit 1)
 	@# Resume guard. --first-parent matters: the `-s ours` alignment merge below
 	@# puts origin/release's whole release ledger -- which contains commits literally

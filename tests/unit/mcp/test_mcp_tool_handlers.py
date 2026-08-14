@@ -958,14 +958,16 @@ class TestModeParameterValidation:
         assert result["execution_mode"] == "data_only"
 
     def test_run_benchmark_data_only_mode(self, tool_functions, tmp_path):
-        """run_benchmark with data_only mode generates data without running queries."""
+        """The public run_benchmark surface routes data_only through core."""
         fn = tool_functions["run_benchmark"]
 
         mock_bm = MagicMock()
-        mock_bm.generate_data = MagicMock()
         mock_bm_class = MagicMock(return_value=mock_bm)
 
-        with patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class):
+        with (
+            patch("benchbox.mcp.tools.benchmark.get_public_benchmark_class", return_value=mock_bm_class),
+            patch("benchbox.core.run_service.execute_run", return_value=MagicMock()) as execute_run,
+        ):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, mode="data_only")
 
         assert result["mcp_metadata"]["status"] == "completed"
@@ -973,6 +975,9 @@ class TestModeParameterValidation:
         assert "data_generation" in result
         assert result["data_generation"]["benchmark"] == "tpch"
         assert result["data_generation"]["scale_factor"] == 0.01
+        assert execute_run.call_args.kwargs["database_config"] is None
+        assert execute_run.call_args.kwargs["phases_to_run"] == ["generate"]
+        assert execute_run.call_args.kwargs["config"].test_execution_type == "data_only"
 
     def test_dry_run_accepts_data_only_mode(self, tool_functions):
         """run_benchmark with dry_run accepts data_only mode."""

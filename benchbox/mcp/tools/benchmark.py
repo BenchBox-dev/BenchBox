@@ -365,22 +365,33 @@ def _execute_mcp_run_via_core(
     from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, ExecutionContext
     from benchbox.core.system import SystemProfiler
 
-    benchmark_instance = benchmark_class(scale_factor=scale_factor)
+    data_only = resolved_mode == "data_only"
+    data_dir = get_benchmark_runs_datagen_path(benchmark, scale_factor, results_dir / "datagen") if data_only else None
+    benchmark_instance = (
+        benchmark_class(scale_factor=scale_factor, output_dir=data_dir)
+        if data_only
+        else benchmark_class(scale_factor=scale_factor)
+    )
 
-    try:
-        adapter_input = dict(normalized_platform_options)
-        platform_name = platform.lower().removesuffix("-df")
-        if platform_name in {"clickhouse", "clickhouse-server"} and "connection_profile" in normalized_platform_options:
-            profile = resolve_clickhouse_connection_profile(str(normalized_platform_options["connection_profile"]))
-            adapter_input["port"] = profile["port"]
-            adapter_input["secure"] = profile["secure"]
-            adapter_input.pop("connection_profile", None)
-        adapter_options = _translate_platform_options_for_adapter(platform, adapter_input)
-    except MCPValidationError as exc:
-        return _make_failed_response(
-            make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform}),
-            execution_id,
-        )
+    adapter_options: dict[str, object] = {}
+    if not data_only:
+        try:
+            adapter_input = dict(normalized_platform_options)
+            platform_name = platform.lower().removesuffix("-df")
+            if (
+                platform_name in {"clickhouse", "clickhouse-server"}
+                and "connection_profile" in normalized_platform_options
+            ):
+                profile = resolve_clickhouse_connection_profile(str(normalized_platform_options["connection_profile"]))
+                adapter_input["port"] = profile["port"]
+                adapter_input["secure"] = profile["secure"]
+                adapter_input.pop("connection_profile", None)
+            adapter_options = _translate_platform_options_for_adapter(platform, adapter_input)
+        except MCPValidationError as exc:
+            return _make_failed_response(
+                make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform}),
+                execution_id,
+            )
 
     query_subset = [query.strip() for query in queries.split(",")] if queries else None
     execution_context = ExecutionContext(
@@ -404,27 +415,33 @@ def _execute_mcp_run_via_core(
         benchmark_config.options["gather_statistics"] = True
         benchmark_config.options["statistics_benchmark_name"] = benchmark
 
-    database_config = DatabaseConfig(
-        type=platform.lower(),
-        name=f"mcp_{platform.lower()}",
-        execution_mode=resolved_mode,
-        options=dict(adapter_options),
-    )
+    database_config = None
+    if not data_only:
+        database_config = DatabaseConfig(
+            type=platform.lower(),
+            name=f"mcp_{platform.lower()}",
+            execution_mode=resolved_mode,
+            options=dict(adapter_options),
+        )
     profiler = SystemProfiler()
     system_profile = profiler.get_system_profile()
     from benchbox.core.platform_config import get_platform_config
 
-    platform_config = get_platform_config(
-        database_config,
-        system_profile,
-        benchmark_name=benchmark,
-        scale_factor=scale_factor,
-        tuning_config=benchmark_config.options.get("unified_tuning_configuration")
-        if benchmark_config.options
-        else None,
-    )
+    platform_config = None
+    if database_config is not None:
+        platform_config = get_platform_config(
+            database_config,
+            system_profile,
+            benchmark_name=benchmark,
+            scale_factor=scale_factor,
+            tuning_config=benchmark_config.options.get("unified_tuning_configuration")
+            if benchmark_config.options
+            else None,
+        )
 
     def adapter_factory(*, execution_mode, output_root, phases):
+        if database_config is None:
+            return None
         if not (phases.load or phases.execute):
             return None
         if execution_mode == "dataframe":
@@ -478,6 +495,15 @@ def _execute_mcp_run_via_core(
         )
     if result is not None:
         result.execution_context = execution_context.model_dump()
+
+    if data_only and result is not None and data_dir is not None:
+        return _build_data_only_response(
+            benchmark=benchmark,
+            scale_factor=scale_factor,
+            execution_id=execution_id,
+            start_time=start_time,
+            data_dir=data_dir,
+        )
 
     execution_time = elapsed_seconds(start_time)
     result_file_path, result_payload = (
@@ -556,17 +582,11 @@ def _run_benchmark_impl(
         if mode_error:
             return _make_failed_response(mode_error, execution_id)
 
-        if resolved_mode == "data_only":
-            return _generate_data_impl(
-                benchmark_lower,
-                benchmark_class,
-                scale_factor,
-                execution_id,
-                start_time,
-                results_dir=results_dir,
-            )
-
-        phases_list = [p.strip() for p in (phases or "load,power").split(",")]
+        phases_list = (
+            ["generate"]
+            if resolved_mode == "data_only"
+            else [phase.strip() for phase in (phases or "load,power").split(",")]
+        )
         return _execute_mcp_run_via_core(
             platform=platform,
             benchmark=benchmark_lower,
@@ -598,37 +618,15 @@ def _run_benchmark_impl(
         return error_response
 
 
-def _generate_data_impl(
-    benchmark_lower: str,
-    benchmark_class: type,
+def _build_data_only_response(
+    *,
+    benchmark: str,
     scale_factor: float,
     execution_id: str,
     start_time: float,
-    *,
-    results_dir: Path,
+    data_dir: Path,
 ) -> dict[str, Any]:
-    """Generate benchmark data without running queries."""
-    data_dir = get_benchmark_runs_datagen_path(benchmark_lower, scale_factor, results_dir / "datagen")
-    data_dir.mkdir(parents=True, exist_ok=True)
-
-    bm = benchmark_class(scale_factor=scale_factor)
-
-    if hasattr(bm, "generate_data"):
-        with silence_output(enabled=True):
-            bm.generate_data(output_dir=data_dir, format="parquet")
-    elif hasattr(bm, "generate"):
-        with silence_output(enabled=True):
-            bm.generate(output_dir=data_dir)
-    else:
-        error_response = make_error(
-            ErrorCode.INTERNAL_ERROR,
-            f"Benchmark '{benchmark_lower}' does not support data generation",
-            details={"benchmark": benchmark_lower},
-        )
-        error_response["execution_id"] = execution_id
-        error_response["status"] = "failed"
-        return error_response
-
+    """Adapt a successful core data-only result to the stable MCP envelope."""
     generated_files = list(data_dir.glob("*.parquet"))
     if not generated_files:
         generated_files = list(data_dir.glob("*.*"))
@@ -646,7 +644,7 @@ def _generate_data_impl(
         },
         "data_generation": {
             "status": "generated",
-            "benchmark": benchmark_lower,
+            "benchmark": benchmark,
             "scale_factor": scale_factor,
             "data_path": str(data_dir),
             "file_count": len(generated_files),
