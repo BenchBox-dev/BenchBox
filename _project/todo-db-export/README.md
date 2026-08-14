@@ -7,7 +7,7 @@ Deterministic weekly snapshot of the hosted TODO tracker database
 `.github/workflows/todo-db-export.yml` with a read-only token.
 
 The committed snapshot is the **items domain only** — exactly the tables in
-`todo_db.py`'s `EXPORT_TABLE_ALLOWLIST`. Findings-domain tables are excluded
+the package adapter's compatibility export allowlist. Findings-domain tables are excluded
 by construction: their review prose is deliberately not version-controlled and
 travels via the workflow's 90-day CI artifact channel only, never this
 directory (see `_project/specs/findings-domain.md`, "Export boundary").
@@ -19,8 +19,8 @@ directory (see `_project/specs/findings-domain.md`, "Export boundary").
   ordered by `seq`. A plain audit log (not hash-chained).
 - `index.md` — rendered `id / state / priority / worktree / title`.
 
-When the optional standalone package export is enabled it rewrites the three
-files above from a single read snapshot and writes a lossless `todo-db.json`
+The package-only export writes the three files above from a single read
+snapshot and writes a lossless `todo-db.json`
 envelope (project identity, metadata, migrations, every table, and a
 hash-chained audit trail) **outside this directory**, to the workflow's
 90-day CI artifact only. Restore validation replays that envelope into a

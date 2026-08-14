@@ -363,6 +363,8 @@ cloud-spark = [
 mcp = [
     # MCP SDK 2 migration is complete; keep future majors behind explicit review.
     "mcp>=2,<3",
+    # The MCP surface advertises DuckDB as its local executable default.
+    "duckdb>=1.0.0,<2.0.0",
     "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
     "opentelemetry-sdk>=1.44,<2",
 ]

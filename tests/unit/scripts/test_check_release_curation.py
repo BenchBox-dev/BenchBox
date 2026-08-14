@@ -53,6 +53,13 @@ def test_parse_curation_list_handles_ignore_unmatch(tmp_path):
     assert paths == {"_project", "_blog", ".mcp.json", "todo.config.yaml"}
 
 
+def test_parse_curation_list_accepts_target_prerequisites(tmp_path: Path) -> None:
+    makefile = _write_makefile(tmp_path, ["git rm -rf --ignore-unmatch _project"])
+    makefile.write_text(makefile.read_text().replace("release-cut:", "release-cut: guard"), encoding="utf-8")
+
+    assert check_release_curation.parse_curation_list(makefile) == {"_project"}
+
+
 def test_parse_curation_list_handles_legacy_prefixed_lines(tmp_path):
     """Pre---ignore-unmatch form (`-git rm -rf <paths>`) still parses."""
     makefile = _write_makefile(
@@ -135,7 +142,7 @@ def test_curated_release_make_runtime_executes_help_and_inventory(tmp_path: Path
     assert help_result.returncode == 0, help_result.stderr
     assert "makefile-inventory-check" in help_result.stdout
     assert inventory_result.returncode == 0, inventory_result.stderr
-    assert "Makefile inventory OK: 188 targets, 184 public, default=test" in inventory_result.stdout
+    assert "Makefile inventory OK: 189 targets, 184 public, default=test" in inventory_result.stdout
 
 
 @pytest.mark.parametrize(
@@ -156,6 +163,35 @@ def test_curated_release_development_targets_fail_with_explicit_policy(tmp_path:
     assert result.returncode == 2
     assert "requires the BenchBox development tree" in result.stderr
     assert "No such file or directory" not in result.stderr
+
+
+def test_curated_release_cut_guard_allows_only_the_matching_develop_descendant(tmp_path: Path) -> None:
+    _copy_curated_make_runtime(tmp_path)
+    subprocess.run(["git", "init", "-b", "develop"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "Release Test"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "release-test@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "Makefile", "make"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-m", "fixture"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "-b", "v9.9.9"], cwd=tmp_path, check=True, capture_output=True)
+
+    allowed = subprocess.run(
+        ["make", "--no-print-directory", ".release-cut-tree-required", "VERSION=9.9.9"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    rejected = subprocess.run(
+        ["make", "--no-print-directory", ".release-cut-tree-required", "VERSION=9.9.8"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert allowed.returncode == 0, allowed.stderr
+    assert rejected.returncode == 2
+    assert "unless resuming v9.9.8 after curation" in rejected.stderr
 
 
 def test_every_project_dependent_make_recipe_is_declared_development_only(tmp_path: Path) -> None:
