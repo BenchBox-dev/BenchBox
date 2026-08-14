@@ -17,6 +17,7 @@ from typing import Any
 
 from benchbox.core.benchmark_registry import (
     get_core_benchmark_class_name,
+    get_family_plugin,
     list_loader_benchmark_ids,
     validate_scale_factor,
 )
@@ -28,6 +29,9 @@ BENCHMARK_LOADER_API_SURFACE = "internal"
 def get_benchmark_instance(config: BenchmarkConfig, system_profile: SystemProfile | None) -> Any:
     """Get benchmark instance based on configuration."""
     validate_scale_factor(config.name, config.scale_factor)
+    plugin = get_family_plugin(config.name)
+    if plugin is not None:
+        return plugin.create(config, system_profile)
     benchmark_class = get_core_benchmark_class(config.name)
 
     cpu_cores = 1
@@ -78,6 +82,9 @@ def constructor_accepts_argument(benchmark_class: type[Any], argument_name: str)
 def get_core_benchmark_class(benchmark_name: str) -> Any:
     """Dynamically load benchmark class using importlib."""
     benchmark_name = benchmark_name.lower()
+    plugin = get_family_plugin(benchmark_name)
+    if plugin is not None:
+        return plugin.core_class
     module_name = f"benchbox.core.{benchmark_name}.benchmark"
     class_name = get_core_benchmark_class_name(benchmark_name) or f"{benchmark_name.capitalize()}Benchmark"
 
