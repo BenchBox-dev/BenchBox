@@ -145,7 +145,7 @@ def test_deprecated_core_base_usage_is_pinned_to_current_migration_exceptions() 
         if issubclass(get_core_benchmark_class(benchmark_id), CoreBaseBenchmark)
     }
 
-    assert deprecated_consumers == {"datavault", "tpcds_obt"}
+    assert deprecated_consumers == set()
 
 
 def test_benchmark_registry_wrapper_and_loader_counts_match_contract_map() -> None:

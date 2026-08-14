@@ -26,7 +26,7 @@ contracts while internal family implementations converge on a shared interface.
 | `benchbox.base.BaseBenchmark` | `beta-public` | Public base for wrappers and orchestration helpers. |
 | `BaseBenchmark.run_with_platform()` | `beta-public` | Programmatic adapter execution hook used by CLI-adjacent tools and MCP. |
 | `benchbox.core.benchmark_loader` | `internal` | Registry-backed runtime loader for core orchestration. |
-| `benchbox.core.base_benchmark.BaseBenchmark` | `deprecated` | Internal compatibility base retained for `datavault` and `tpcds_obt`. |
+| `benchbox.core.base_benchmark.BaseBenchmark` | `deprecated` | Internal compatibility module with no remaining production implementation consumers. |
 | Benchmark registry metadata | `beta-public` | Source of truth for benchmark identity, discovery, public/internal surface, and class-name mappings. |
 
 ## Target Seam
