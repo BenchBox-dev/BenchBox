@@ -100,6 +100,7 @@ _SETUP_STEP_PREFIXES: tuple[str, ...] = (
     "Install uv",
     "Install dependencies",
     "Install Python dependencies",
+    "Install ",
     "Post ",
     "Complete job",
 )
@@ -118,6 +119,7 @@ class PrMetrics:
     first_pass_green: bool | None
     fast_test_job_seconds: float | None
     medium_test_job_seconds: float | None
+    event_fanout: dict | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -347,13 +349,34 @@ def first_pass_green_and_job_seconds(
     return green, seconds_by_job.get(FAST_TEST_JOB_NAME), seconds_by_job.get(MEDIUM_TEST_JOB_NAME)
 
 
-def collect_pr_metrics(client: GitHubClient, pr: dict) -> PrMetrics:
+def event_fanout_for_pr(client: GitHubClient, pr: dict) -> dict:
+    """Measure all same-head workflow, job, and check-run fan-out for a PR."""
+
+    head_sha = str((pr.get("head") or {}).get("sha") or "")
+    if not head_sha:
+        return event_fanout_metrics(runs=[], jobs=[], check_runs=[], merged_at=pr.get("merged_at"))
+    runs = client.get_paginated(
+        f"/repos/{client.repo}/actions/runs?head_sha={head_sha}",
+        item_key="workflow_runs",
+    )
+    jobs: list[dict] = []
+    for run in runs:
+        jobs.extend(client.get_paginated(f"/repos/{client.repo}/actions/runs/{run['id']}/jobs", item_key="jobs"))
+    check_runs = client.get_paginated(
+        f"/repos/{client.repo}/commits/{head_sha}/check-runs",
+        item_key="check_runs",
+    )
+    return event_fanout_metrics(runs=runs, jobs=jobs, check_runs=check_runs, merged_at=pr.get("merged_at"))
+
+
+def collect_pr_metrics(client: GitHubClient, pr: dict, *, include_event_fanout: bool = False) -> PrMetrics:
     number = pr["number"]
     head_ref = pr["head"]["ref"]
     created_at = pr["created_at"]
     merged_at = pr["merged_at"]
     open_to_merge = (_iso_to_dt(merged_at) - _iso_to_dt(created_at)).total_seconds()
     first_pass_green, fast_test_seconds, medium_test_seconds = first_pass_green_and_job_seconds(client, head_ref)
+    fanout = event_fanout_for_pr(client, pr) if include_event_fanout else None
     return PrMetrics(
         number=number,
         title=pr.get("title", ""),
@@ -366,6 +389,7 @@ def collect_pr_metrics(client: GitHubClient, pr: dict) -> PrMetrics:
         first_pass_green=first_pass_green,
         fast_test_job_seconds=fast_test_seconds,
         medium_test_job_seconds=medium_test_seconds,
+        event_fanout=fanout,
     )
 
 
@@ -766,7 +790,7 @@ def main(argv: list[str] | None = None) -> int:
     # partial-but-valid-looking baseline. Mirrors the no-API-access branch above.
     try:
         prs = fetch_merged_prs(client, since)
-        metrics = [collect_pr_metrics(client, pr) for pr in prs]
+        metrics = [collect_pr_metrics(client, pr, include_event_fanout=args.event_fanout) for pr in prs]
     except ApiFailure as exc:
         print(f"SKIPPED: GitHub API access failed mid-collection, metrics would be understated ({exc}).")
         return 0
@@ -777,17 +801,17 @@ def main(argv: list[str] | None = None) -> int:
             "repo": args.repo,
             "since": since.isoformat(),
             "summary": summary,
-            "prs": [asdict(m) for m in metrics],
+            "prs": [
+                ({key: value for key, value in asdict(m).items() if args.event_fanout or key != "event_fanout"})
+                for m in metrics
+            ],
         }
         if args.event_fanout:
             payload[EVENT_FANOUT_SCHEMA] = {
                 "required_contexts": list(REQUIRED_CONTEXT_NAMES),
                 "synchronize_workflows": list(SYNCHRONIZE_WORKFLOW_NAMES),
                 "public_standard_runner_usd": PUBLIC_STANDARD_RUNNER_USD,
-                "note": (
-                    "Per-PR fan-out rows are computed by callers that supply "
-                    "same-head workflow/job/check-run sets to event_fanout_metrics()."
-                ),
+                "pr_count_with_fanout": sum(m.event_fanout is not None for m in metrics),
             }
         print(json.dumps(payload, indent=2))
         return 0
@@ -807,6 +831,9 @@ def main(argv: list[str] | None = None) -> int:
         f"  medium-test job seconds avg/p95: {summary['medium_test_job_seconds_avg']!r} / "
         f"{summary['medium_test_job_seconds_p95']!r}"
     )
+    if args.event_fanout:
+        for metric in metrics:
+            print(f"  PR #{metric.number} {EVENT_FANOUT_SCHEMA}: {json.dumps(metric.event_fanout, sort_keys=True)}")
     if summary["medium_test_budget_warning"]:
         print(f"  MEDIUM_TEST_BUDGET_WARNING: {summary['medium_test_budget_warning']}")
     for m in metrics:

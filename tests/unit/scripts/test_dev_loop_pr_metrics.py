@@ -32,15 +32,18 @@ class _NoRunsClient:
 class _FakeClient:
     repo = "joeharris76/BenchBox"
 
-    def __init__(self, runs: list[dict], jobs: list[dict] | None = None) -> None:
+    def __init__(self, runs: list[dict], jobs: list[dict] | None = None, checks: list[dict] | None = None) -> None:
         self.runs = runs
         self.jobs = jobs or []
+        self.checks = checks or []
 
     def get_paginated(self, path: str, *, item_key: str) -> list[dict]:
         if item_key == "workflow_runs":
             return self.runs
-        assert item_key == "jobs"
-        return self.jobs
+        if item_key == "jobs":
+            return self.jobs
+        assert item_key == "check_runs"
+        return self.checks
 
 
 def test_empty_first_pass_run_returns_all_metric_slots() -> None:
@@ -86,6 +89,42 @@ def test_runtime_metrics_only_include_successful_jobs() -> None:
     result = metrics.first_pass_green_and_job_seconds(_FakeClient(runs, jobs), "feature/metrics")
 
     assert result == (True, 20.0, 45.0)
+
+
+def test_event_fanout_for_pr_fetches_same_head_runs_jobs_and_checks() -> None:
+    checks = [
+        _check("ci-required-result", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:05:00Z"),
+        _check("Results Explorer browser gate", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:01:00Z"),
+        _check("ruleset-drift", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:02:00Z"),
+    ]
+    runs = [
+        {
+            "id": 7,
+            "name": "Develop PR",
+            "head_sha": "abc",
+            "run_started_at": "2026-07-27T10:00:00Z",
+            "updated_at": "2026-07-27T10:05:00Z",
+            "status": "completed",
+        }
+    ]
+    jobs = [
+        {
+            "name": "Install results-explorer dependencies",
+            "conclusion": "success",
+            "status": "completed",
+            "started_at": "2026-07-27T10:00:00Z",
+            "completed_at": "2026-07-27T10:01:00Z",
+            "steps": [],
+        }
+    ]
+    fanout = metrics.event_fanout_for_pr(
+        _FakeClient(runs, jobs, checks),
+        {"head": {"sha": "abc"}, "merged_at": "2026-07-27T10:06:00Z"},
+    )
+    assert fanout["required_gate_seconds"] == 300.0
+    assert fanout["all_workflow_seconds"] == 300.0
+    assert fanout["queue_delay_seconds"] == 60.0
+    assert fanout["workflow_run_counts"] == {"Develop PR": 1}
 
 
 def test_medium_budget_reads_workflow_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
