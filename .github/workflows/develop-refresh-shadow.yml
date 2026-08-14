@@ -1,0 +1,392 @@
+name: Develop refresh shadow
+
+# Observational only. Never a required context. Never skips another workflow.
+# pull_request_target so the classifier script comes from the trusted base.
+# PR commits are fetched as Git objects only; they are never checked out.
+
+on:
+  pull_request_target:
+    branches:
+      - develop
+    types: [opened, reopened, synchronize, ready_for_review]
+
+concurrency:
+  group: develop-refresh-shadow-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  refresh-shadow:
+    name: refresh-shadow
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout trusted base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Fetch PR commits as Git objects
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "pull/${PR_NUMBER}/head:refs/shadow/pr-head"
+          git fetch --no-tags origin "${{ github.event.pull_request.base.sha }}"
+
+      - name: Classify refresh in shadow mode
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_ACTION: ${{ github.event.action }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_AFTER: ${{ github.event.after }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REPO_ID: ${{ github.event.pull_request.head.repo.id }}
+          BASE_REPO_ID: ${{ github.event.pull_request.base.repo.id }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import io
+          import json
+          import os
+          import subprocess
+          import time
+          import urllib.error
+          import urllib.request
+          import zipfile
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          started = time.monotonic()
+          collected_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+          def git(*args: str) -> str:
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def api(path: str, accept: str = "application/vnd.github+json"):
+              req = urllib.request.Request(
+                  f"https://api.github.com{path}",
+                  headers={
+                      "Accept": accept,
+                      "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      return json.loads(resp.read().decode("utf-8"))
+              except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+                  return {"_error": "request-failed"}
+
+          def is_git_sha(value: object) -> bool:
+              if not isinstance(value, str) or len(value) not in {40, 64}:
+                  return False
+              allowed = set("0123456789abcdefABCDEF")
+              return all(ch in allowed for ch in value) and set(value) != {"0"}
+
+          def commit_info(sha: str):
+              if not sha:
+                  return None
+              try:
+                  parents = [line for line in git("rev-parse", f"{sha}^@").splitlines() if line]
+                  tree = git("rev-parse", f"{sha}^{{tree}}")
+              except subprocess.CalledProcessError:
+                  return None
+              return {"sha": sha, "parents": parents, "tree": tree}
+
+          def parse_identity(raw):
+              if not isinstance(raw, dict):
+                  return None
+              kind = raw.get("certification_kind")
+              fingerprint = raw.get("workflow_fingerprint")
+              base = raw.get("base_sha")
+              head = raw.get("pr_head_sha")
+              if kind != "full":
+                  return None
+              if not isinstance(fingerprint, str) or len(fingerprint) != 64:
+                  return None
+              hex_digits = set("0123456789abcdefABCDEF")
+              if any(ch not in hex_digits for ch in fingerprint):
+                  return None
+              if not is_git_sha(base) or not is_git_sha(head):
+                  return None
+              return {
+                  "certification_kind": "full",
+                  "workflow_fingerprint": fingerprint.lower(),
+                  "base_sha": base,
+                  "pr_head_sha": head,
+              }
+
+          def load_identity_artifact(artifact_id: int):
+              # gh follows the artifact zip redirect and drops Authorization
+              # on the signed URL. urllib would forward the token and fail.
+              completed = subprocess.run(
+                  [
+                      "gh",
+                      "api",
+                      "-H",
+                      "Accept: application/vnd.github+json",
+                      f"repos/{repo}/actions/artifacts/{artifact_id}/zip",
+                  ],
+                  check=False,
+                  capture_output=True,
+              )
+              if completed.returncode != 0 or not completed.stdout.startswith(b"PK"):
+                  return None
+              try:
+                  with zipfile.ZipFile(io.BytesIO(completed.stdout)) as archive:
+                      for name in archive.namelist():
+                          if name.endswith(".json"):
+                              return parse_identity(json.loads(archive.read(name).decode("utf-8")))
+              except (zipfile.BadZipFile, json.JSONDecodeError, UnicodeDecodeError, OSError, ValueError):
+                  return None
+              return None
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          ruleset = api("/repos/{0}/rulesets/15611785".format(repo))
+          contexts = []
+          if isinstance(ruleset, dict) and "_error" not in ruleset:
+              for rule in ruleset.get("rules") or []:
+                  if rule.get("type") == "required_status_checks":
+                      for check in (rule.get("parameters") or {}).get("required_status_checks") or []:
+                          if check.get("context"):
+                              contexts.append(str(check["context"]))
+
+          head = os.environ.get("HEAD_SHA") or ""
+          before = os.environ.get("EVENT_BEFORE") or ""
+          base = os.environ.get("BASE_SHA") or ""
+          after = os.environ.get("EVENT_AFTER") or ""
+          commits = {}
+          for sha in (head, before, base):
+              info = commit_info(sha)
+              if info:
+                  commits[sha] = info
+
+          merge_tree = None
+          merge_tree_error = None
+          if before and base:
+              completed = subprocess.run(
+                  ["git", "merge-tree", "--write-tree", before, base],
+                  check=False,
+                  text=True,
+                  capture_output=True,
+              )
+              if completed.returncode == 0:
+                  merge_tree = completed.stdout.strip() or None
+              else:
+                  merge_tree_error = "merge-tree-failed"
+
+          check_payload = api(f"/repos/{repo}/commits/{before}/check-runs?per_page=100") if before else {}
+          raw_checks = check_payload.get("check_runs") if isinstance(check_payload, dict) else None
+          check_runs = []
+          run_ids = set()
+          if isinstance(raw_checks, list):
+              for item in raw_checks:
+                  html = str(item.get("html_url") or "")
+                  run_id = None
+                  if "/actions/runs/" in html:
+                      try:
+                          run_id = int(html.split("/actions/runs/")[1].split("/")[0])
+                          run_ids.add(run_id)
+                      except (IndexError, ValueError):
+                          run_id = None
+                  check_runs.append({
+                      "id": item.get("id") or 0,
+                      "name": item.get("name") or "",
+                      "status": item.get("status") or "",
+                      "conclusion": item.get("conclusion") or "",
+                      "started_at": item.get("started_at") or "",
+                      "head_sha": item.get("head_sha") or "",
+                      "run_id": run_id,
+                  })
+
+          wf_files = [
+              ".github/workflows/pr.yml",
+              ".github/workflows/results-explorer-browser.yml",
+              ".github/workflows/develop-ruleset-drift.yml",
+          ]
+          entries = {}
+          for path in wf_files:
+              data = Path(path).read_bytes() if Path(path).is_file() else b""
+              entries[path] = hashlib.sha256(data).hexdigest()
+          fingerprint = hashlib.sha256(
+              "\n".join(f"{path}={entries[path]}" for path in sorted(entries)).encode()
+          ).hexdigest()
+
+          run_meta = {}
+          identity_by_head = {}
+          for run_id in sorted(run_ids):
+              run = api(f"/repos/{repo}/actions/runs/{run_id}")
+              if not isinstance(run, dict) or run.get("_error"):
+                  continue
+              arts = api(f"/repos/{repo}/actions/runs/{run_id}/artifacts")
+              artifacts = arts.get("artifacts") if isinstance(arts, dict) else None
+              names = []
+              identity = None
+              if isinstance(artifacts, list):
+                  for artifact in artifacts:
+                      name = artifact.get("name")
+                      if name:
+                          names.append(name)
+                      if name == "pr-certification-identity" and artifact.get("id"):
+                          identity = load_identity_artifact(int(artifact["id"]))
+              run_head = str(run.get("head_sha") or "")
+              run_meta[run_id] = {
+                  "id": run.get("id") or run_id,
+                  "name": run.get("name") or "",
+                  "path": run.get("path") or "",
+                  "head_sha": run_head,
+                  "event": run.get("event") or "",
+                  "artifact_names": names,
+                  "identity": identity,
+              }
+              if (
+                  identity
+                  and "pr-certification-identity" in names
+                  and "pr-certification-lanes" in names
+              ):
+                  identity_by_head[identity["pr_head_sha"]] = identity
+
+          actions_runs = []
+          for run_id in sorted(run_meta):
+              info = run_meta[run_id]
+              identity = identity_by_head.get(info["head_sha"])
+              if identity:
+                  kind = "full"
+                  run_fingerprint = identity["workflow_fingerprint"]
+                  run_base = identity["base_sha"]
+              else:
+                  kind = ""
+                  run_fingerprint = ""
+                  run_base = ""
+              actions_runs.append({
+                  "id": info["id"],
+                  "name": info["name"],
+                  "path": info["path"],
+                  "head_sha": info["head_sha"],
+                  "event": info["event"],
+                  "certification_kind": kind,
+                  "workflow_fingerprint": run_fingerprint,
+                  "base_sha": run_base,
+              })
+
+          pr = api(f"/repos/{repo}/pulls/{os.environ['PR_NUMBER']}")
+          current_head = ""
+          current_base = ""
+          if isinstance(pr, dict) and "_error" not in pr:
+              current_head = str((pr.get("head") or {}).get("sha") or "")
+              current_base = str((pr.get("base") or {}).get("sha") or "")
+
+          authored = None
+          intervening = None
+          try:
+              if base and head:
+                  authored = [line for line in git("diff", "--name-only", f"{base}...{head}").splitlines() if line]
+              if before and base:
+                  intervening = [line for line in git("diff", "--name-only", f"{before}...{base}").splitlines() if line]
+          except subprocess.CalledProcessError:
+              authored = None
+              intervening = None
+
+          request = {
+              "action": os.environ.get("EVENT_ACTION") or "",
+              "before": before,
+              "after": after,
+              "head_sha": head,
+              "base_sha": base,
+              "current_head_sha": current_head or head,
+              "current_base_sha": current_base or base,
+              "head_repo_id": int(os.environ["HEAD_REPO_ID"]) if os.environ.get("HEAD_REPO_ID") else None,
+              "base_repo_id": int(os.environ["BASE_REPO_ID"]) if os.environ.get("BASE_REPO_ID") else None,
+              "is_fork": os.environ.get("IS_FORK") == "true",
+              "pr_number": int(os.environ["PR_NUMBER"]),
+              "synthetic_merge_sha": "",
+              "required_contexts": contexts,
+              "commits": commits,
+              "merge_tree": merge_tree,
+              "merge_tree_error": merge_tree_error,
+              "check_runs": check_runs,
+              "actions_runs": actions_runs,
+              "current_workflow_fingerprint": fingerprint,
+              "authored_paths": authored,
+              "intervening_paths": intervening,
+          }
+          Path("/tmp/shadow-request.json").write_text(json.dumps(request), encoding="utf-8")
+          duration_ms = int((time.monotonic() - started) * 1000)
+          Path("/tmp/shadow-timing.json").write_text(
+              json.dumps({"collected_at": collected_at, "duration_ms": duration_ms}),
+              encoding="utf-8",
+          )
+          PY
+          if [ ! -f scripts/pr_refresh_certification.py ]; then
+            printf '%s\n' '{"decision":"full_required","reasons":["missing_path_evidence"],"version":1}' > shadow-decision.json
+          else
+            python scripts/pr_refresh_certification.py --input /tmp/shadow-request.json --json-out shadow-decision.json
+          fi
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          decision = json.loads(Path("shadow-decision.json").read_text(encoding="utf-8"))
+          timing = {}
+          timing_path = Path("/tmp/shadow-timing.json")
+          if timing_path.is_file():
+              timing = json.loads(timing_path.read_text(encoding="utf-8"))
+          record = {
+              "decision": decision.get("decision"),
+              "reasons": decision.get("reasons") or [],
+              "pr_number": decision.get("pr_number"),
+              "feature_head": decision.get("feature_head"),
+              "tested_base_sha": decision.get("tested_base_sha"),
+              "parent1": decision.get("parent1"),
+              "parent2": decision.get("parent2"),
+              "required_contexts": decision.get("required_contexts") or [],
+              "check_run_ids": decision.get("check_run_ids") or {},
+              "actions_run_ids": decision.get("actions_run_ids") or {},
+              "workflow_fingerprint": decision.get("workflow_fingerprint"),
+              "certification_kind": decision.get("certification_kind"),
+              "version": decision.get("version"),
+              "event_action": os.environ.get("EVENT_ACTION") or "",
+              "collected_at": timing.get("collected_at"),
+              "duration_ms": timing.get("duration_ms"),
+          }
+          Path("shadow-decision.json").write_text(
+              json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              reasons = ",".join(record["reasons"]) or "(none)"
+              Path(summary).open("a", encoding="utf-8").write(
+                  "\n".join(
+                      [
+                          "### Refresh shadow classification",
+                          "",
+                          f"- Decision: `{record['decision']}`",
+                          f"- Reasons: `{reasons}`",
+                          f"- Duration: `{record.get('duration_ms')} ms`",
+                          "- This record is not a required check and cannot skip CI.",
+                          "",
+                      ]
+                  )
+              )
+          PY
+
+      - name: Upload shadow decision
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: refresh-shadow-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: shadow-decision.json
+          if-no-files-found: warn
+          retention-days: 30

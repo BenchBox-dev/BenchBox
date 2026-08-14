@@ -162,6 +162,28 @@ def test_option_values_that_match_commands_are_not_parsed_as_commands() -> None:
     assert compat._command_index(["--actor", "audit", "show", "item"]) == (2, "show")
 
 
+def test_recovery_verb_cannot_be_hidden_by_a_later_wrapper_option_value(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    args = [
+        "--db",
+        str(tmp_path / "todo.sqlite"),
+        "--project-id",
+        "benchbox",
+        "--repository",
+        "https://example.invalid/repo",
+        "restore",
+        "--input",
+        "show",
+        "--replace",
+    ]
+    assert compat._command_index(args) is None
+    assert compat._command_index_from(args, compat.STANDALONE_ONLY_COMMANDS) == (6, "restore")
+    monkeypatch.setattr(compat, "_delegate", lambda *args, **kwargs: pytest.fail("must not delegate"))
+    assert compat.main(args) == 2
+    assert "does not expose standalone-only" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("command", sorted(compat.STANDALONE_ONLY_COMMANDS))
 def test_destructive_standalone_only_commands_are_not_routable(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str

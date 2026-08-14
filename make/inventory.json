@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "254edcbac7f63f2347951c5627ed8edd2d06d619a76ed38908923cf473bc71eb",
+  "contract_sha256": "5f423e6e69ccde0cb2e560645626bacc3eec13f8c27a077a20caa301624ecdb2",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -360,8 +360,8 @@
     ".release-cut-tree-required": [
       {
         "header": ".release-cut-tree-required:",
-        "recipe": "\t@if [ -z \"$(VERSION)\" ]; then \\\n\t\techo \"Usage: make release-cut VERSION=X.Y.Z\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\tif [ ! -d \"$(BENCHBOX_MAKEFILE_ROOT)_project/decisions\" ]; then \\\n\t\tBRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true); \\\n\t\tif [ \"$$BRANCH\" != \"v$(VERSION)\" ] \\\n\t\t\t\t|| ! git rev-parse --verify --quiet refs/heads/develop >/dev/null \\\n\t\t\t\t|| ! git merge-base --is-ancestor develop HEAD; then \\\n\t\t\techo \"Error: release-cut requires the BenchBox development tree unless resuming v$(VERSION) after curation.\" >&2; \\\n\t\t\texit 2; \\\n\t\tfi; \\\n\tfi",
-        "recipe_sha256": "70be74f63f6153e366734b8a086faa019b3c34e8fc777e43cf9ad754bbc7f29a"
+        "recipe": "\t@if [ -z \"$(VERSION)\" ]; then \\\n\t\techo \"Usage: make release-cut VERSION=X.Y.Z\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\tif [ ! -d \"$(BENCHBOX_MAKEFILE_ROOT)_project/decisions\" ]; then \\\n\t\tBRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true); \\\n\t\tif [ \"$$BRANCH\" != \"v$(VERSION)\" ]; then \\\n\t\t\techo \"Error: release-cut requires the BenchBox development tree unless resuming v$(VERSION) after curation.\" >&2; \\\n\t\t\texit 2; \\\n\t\tfi; \\\n\tfi",
+        "recipe_sha256": "a04c5612862d7dc287bf74b3b064e60a5d12110c33a24f242cb62fb976555ce9"
       }
     ],
     "agent-commit-range-check": [
@@ -1870,7 +1870,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "a8b3fc85e825fa51a91fab98a014651ee1ea3c545b9e84768b1145da983b83e9",
+  "semantic_sha256": "ff69a160c2a35250e3888221263206d89c3c0ae52db84f74de7b19d7326fcf85",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3370,9 +3370,9 @@
       ]
     },
     {
-      "body": ".release-cut-tree-required:\n\t@if [ -z \"$(VERSION)\" ]; then \\\n\t\techo \"Usage: make release-cut VERSION=X.Y.Z\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\tif [ ! -d \"$(BENCHBOX_MAKEFILE_ROOT)_project/decisions\" ]; then \\\n\t\tBRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true); \\\n\t\tif [ \"$$BRANCH\" != \"v$(VERSION)\" ] \\\n\t\t\t\t|| ! git rev-parse --verify --quiet refs/heads/develop >/dev/null \\\n\t\t\t\t|| ! git merge-base --is-ancestor develop HEAD; then \\\n\t\t\techo \"Error: release-cut requires the BenchBox development tree unless resuming v$(VERSION) after curation.\" >&2; \\\n\t\t\texit 2; \\\n\t\tfi; \\\n\tfi",
+      "body": ".release-cut-tree-required:\n\t@if [ -z \"$(VERSION)\" ]; then \\\n\t\techo \"Usage: make release-cut VERSION=X.Y.Z\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\tif [ ! -d \"$(BENCHBOX_MAKEFILE_ROOT)_project/decisions\" ]; then \\\n\t\tBRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true); \\\n\t\tif [ \"$$BRANCH\" != \"v$(VERSION)\" ]; then \\\n\t\t\techo \"Error: release-cut requires the BenchBox development tree unless resuming v$(VERSION) after curation.\" >&2; \\\n\t\t\texit 2; \\\n\t\tfi; \\\n\tfi",
       "kind": "rule",
-      "sha256": "5301261cd9ecb0bc1d71d8b544fc31958fe4aeb32911e6d2f22ee8e8c2859a84",
+      "sha256": "4cf3f94c9586016f3d89d1e40d5f91555123a3cbc9b13bd74b331afb4c9b7d86",
       "targets": [
         ".release-cut-tree-required"
       ]

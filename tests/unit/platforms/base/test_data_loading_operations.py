@@ -15,6 +15,7 @@ from __future__ import annotations
 import gzip
 import io
 import json
+import logging
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -24,6 +25,7 @@ import pytest
 from benchbox.platforms.base.data_loading import (
     BenchmarkImplTablesSource,
     BenchmarkTablesSource,
+    ClickHouseNativeHandler,
     ClickHouseServerLoadError,
     DataLoader,
     DataLoadingError,
@@ -77,6 +79,52 @@ class TestDataLoaderClickHouseFailurePropagation:
             loader._load_single_file("events", data_file)
 
         assert exc_info.value is failure
+
+
+class _ServerConnection:
+    def __init__(self) -> None:
+        self.rows: list[tuple] = []
+        self.query: str | None = None
+
+    def execute(self, query: str, rows=None, **_kwargs):
+        self.query = query
+        if rows is not None:
+            self.rows.extend(rows)
+
+
+class _ServerAdapter:
+    deployment_mode = "server"
+    insert_block_size = 16
+
+
+def test_clickhouse_delimited_loader_skips_empty_first_shard(tmp_path: Path) -> None:
+    empty = tmp_path / "part-0.tbl"
+    populated = tmp_path / "part-1.tbl"
+    empty.write_text("", encoding="utf-8")
+    populated.write_text("1|alpha\n", encoding="utf-8")
+    connection = _ServerConnection()
+    handler = ClickHouseNativeHandler("|", _ServerAdapter(), object())
+
+    assert (
+        handler._load_delimited_via_client_insert(
+            "events", [empty, populated], connection, object(), logging.getLogger()
+        )
+        == 1
+    )
+    assert connection.rows == [("1", "alpha")]
+
+
+def test_clickhouse_parquet_loader_uses_logical_nested_names(tmp_path: Path) -> None:
+    pa = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
+    path = tmp_path / "events.parquet"
+    pq.write_table(pa.table({"embedding": [[1, 2]], "event_id": [1]}), path)
+    connection = _ServerConnection()
+    handler = ClickHouseNativeHandler("|", _ServerAdapter(), object())
+
+    assert handler._load_parquet_via_client_insert("events", [path], connection) == 1
+    assert "embedding,event_id" in (connection.query or "")
+    assert connection.rows == [([1, 2], 1)]
 
 
 # ---------------------------------------------------------------------------

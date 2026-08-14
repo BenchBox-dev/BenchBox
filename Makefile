@@ -968,9 +968,7 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 	fi; \
 	if [ ! -d "$(BENCHBOX_MAKEFILE_ROOT)_project/decisions" ]; then \
 		BRANCH=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true); \
-		if [ "$$BRANCH" != "v$(VERSION)" ] \
-				|| ! git rev-parse --verify --quiet refs/heads/develop >/dev/null \
-				|| ! git merge-base --is-ancestor develop HEAD; then \
+		if [ "$$BRANCH" != "v$(VERSION)" ]; then \
 			echo "Error: release-cut requires the BenchBox development tree unless resuming v$(VERSION) after curation." >&2; \
 			exit 2; \
 		fi; \

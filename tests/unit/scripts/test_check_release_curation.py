@@ -173,6 +173,11 @@ def test_curated_release_cut_guard_allows_only_the_matching_develop_descendant(t
     subprocess.run(["git", "add", "Makefile", "make"], cwd=tmp_path, check=True)
     subprocess.run(["git", "commit", "-m", "fixture"], cwd=tmp_path, check=True, capture_output=True)
     subprocess.run(["git", "checkout", "-b", "v9.9.9"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "develop"], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / "README.md").write_text("develop advanced\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-m", "advance develop"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "checkout", "v9.9.9"], cwd=tmp_path, check=True, capture_output=True)
 
     allowed = subprocess.run(
         ["make", "--no-print-directory", ".release-cut-tree-required", "VERSION=9.9.9"],
