@@ -285,6 +285,29 @@ def test_run_cell_writes_clickhouse_load_failure_sidecar(tmp_path: Path):
     assert artifact["log_path"] == str(result.log_path)
 
 
+def test_load_failure_sidecar_scans_large_log_incrementally(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    log_path = tmp_path / "cell.log"
+    payload = {"table": "lineitem", "rows_attempted": 1, "result_json": None}
+    log_path.write_text("noise\n" * 10_000 + runner.LOAD_FAILURE_MARKER + json.dumps(payload) + "\n", encoding="utf-8")
+
+    def fail_full_read(*_args, **_kwargs):
+        raise AssertionError("load-failure extraction must not read the complete log")
+
+    monkeypatch.setattr(Path, "read_text", fail_full_read)
+    _result_path, sidecar = runner._materialize_load_failure_sidecar(
+        log_path=log_path,
+        platform="clickhouse-server",
+        benchmark="tpch",
+        scale=1.0,
+        runs_dir=tmp_path,
+        result_path=None,
+    )
+
+    assert sidecar is not None
+    monkeypatch.undo()
+    assert json.loads(sidecar.read_text(encoding="utf-8"))["table"] == "lineitem"
+
+
 def test_run_cell_diagnostic_rerun_fires_for_empty_stdout_failure(tmp_path: Path):
     captured_quiet = []
 
