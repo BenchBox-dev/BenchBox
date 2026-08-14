@@ -2138,12 +2138,15 @@ class ClickHouseNativeHandler(FileFormatHandler):
         row_count = 0
         row_generator: Any | None = None
         try:
-            first_path = file_paths[0]
-            compression_handler = FileFormatRegistry.get_compression_handler(first_path)
-            with compression_handler.open(first_path) as file_handle:
-                column_count = SchemaInspector.get_column_count(
-                    benchmark, validated_table, file_handle, self.delimiter_char
-                )
+            column_count = None
+            for file_path in file_paths:
+                compression_handler = FileFormatRegistry.get_compression_handler(file_path)
+                with compression_handler.open(file_path) as file_handle:
+                    column_count = SchemaInspector.get_column_count(
+                        benchmark, validated_table, file_handle, self.delimiter_char
+                    )
+                if column_count is not None:
+                    break
             if column_count is None:
                 logger.debug(f"Could not determine column count for {validated_table}")
                 return 0
@@ -2294,12 +2297,12 @@ class ClickHouseNativeHandler(FileFormatHandler):
                 raise RuntimeError("pyarrow is required for Parquet loading") from exc
 
             first_table = pq.ParquetFile(file_paths[0])
-            column_names = first_table.schema.names
+            column_names = first_table.schema_arrow.names
             validated_columns = [validate_sql_identifier(col, "column name") for col in column_names]
             expected_rows = 0
             for file_path in file_paths:
                 parquet_file = pq.ParquetFile(file_path)
-                if parquet_file.schema.names != column_names:
+                if parquet_file.schema_arrow.names != column_names:
                     raise DataLoadingError(
                         f"ClickHouse server Parquet shards for {validated_table!r} have different columns: {file_path}"
                     )

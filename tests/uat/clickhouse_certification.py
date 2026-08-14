@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,8 +71,8 @@ def _non_negative_count(value: Any, *, path: Path, table: str, field: str) -> in
     return value
 
 
-def manifest_table_rows(path: Path) -> dict[str, int]:
-    """Aggregate the selected manifest format into exact table row counts."""
+def manifest_table_rows(path: Path, table_format: str) -> dict[str, int]:
+    """Aggregate the format that the ClickHouse run was instructed to load."""
     payload = _read_json(path)
     tables = payload.get("tables")
     if not isinstance(tables, dict) or not tables:
@@ -83,17 +85,9 @@ def manifest_table_rows(path: Path) -> dict[str, int]:
         format_block = raw_formats.get("formats", raw_formats)
         if not isinstance(format_block, dict):
             raise CertificationArtifactError(f"{path}: {table} has invalid format data")
-        preferred = payload.get("format_preference")
-        formats = list(preferred) if isinstance(preferred, list) else []
-        formats.extend(name for name in format_block if name not in formats)
-        selected_entries: list[Any] | None = None
-        for format_name in formats:
-            candidate = format_block.get(format_name)
-            if isinstance(candidate, list) and candidate:
-                selected_entries = candidate
-                break
-        if selected_entries is None:
-            raise CertificationArtifactError(f"{path}: {table} has no usable manifest entries")
+        selected_entries = format_block.get(table_format)
+        if not isinstance(selected_entries, list) or not selected_entries:
+            raise CertificationArtifactError(f"{path}: {table} has no usable {table_format!r} manifest entries")
         total = 0
         for index, entry in enumerate(selected_entries):
             if not isinstance(entry, dict) or "row_count" not in entry:
@@ -118,10 +112,35 @@ def result_table_rows(path: Path) -> dict[str, int]:
     return actual
 
 
-def validate_exact_manifest_rows(manifest_path: Path, result_path: Path) -> ExactRowValidation:
-    """Compare manifest and result counts without accepting aggregate-only proof."""
+def validate_exact_manifest_rows(manifest_path: Path, result_path: Path, table_format: str) -> ExactRowValidation:
+    """Compare the loaded ClickHouse workload with its exact manifest format."""
+    manifest = _read_json(Path(manifest_path))
+    benchmark = manifest.get("benchmark")
+    scale_factor = manifest.get("scale_factor")
+    if not isinstance(benchmark, str) or not benchmark:
+        raise CertificationArtifactError(f"{manifest_path}: manifest lacks benchmark identity")
+    if isinstance(scale_factor, bool) or not isinstance(scale_factor, (int, float)) or not math.isfinite(scale_factor):
+        raise CertificationArtifactError(f"{manifest_path}: manifest lacks a finite scale_factor")
+
+    result = _read_json(Path(result_path))
+    platform = result.get("platform")
+    benchmark_payload = result.get("benchmark")
+    platform_name = platform.get("name") if isinstance(platform, dict) else None
+    benchmark_id = benchmark_payload.get("id") if isinstance(benchmark_payload, dict) else None
+    result_scale = benchmark_payload.get("scale_factor") if isinstance(benchmark_payload, dict) else None
+    normalized_platform = re.sub(r"[^a-z0-9]+", "-", str(platform_name or "").lower()).strip("-")
+    if normalized_platform != "clickhouse-server":
+        raise CertificationArtifactError(f"{result_path}: result platform must be ClickHouse Server")
+    if benchmark_id != benchmark:
+        raise CertificationArtifactError(
+            f"{result_path}: result benchmark {benchmark_id!r} does not match manifest {benchmark!r}"
+        )
+    if isinstance(result_scale, bool) or not isinstance(result_scale, (int, float)) or result_scale != scale_factor:
+        raise CertificationArtifactError(
+            f"{result_path}: result scale_factor {result_scale!r} does not match manifest {scale_factor!r}"
+        )
     validation = ExactRowValidation(
-        expected=manifest_table_rows(Path(manifest_path)),
+        expected=manifest_table_rows(Path(manifest_path), table_format),
         actual=result_table_rows(Path(result_path)),
     )
     validation.require_pass()
@@ -132,9 +151,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--result", type=Path, required=True)
+    parser.add_argument(
+        "--table-format", required=True, help="Exact manifest format loaded by ClickHouse (for example tbl)"
+    )
     args = parser.parse_args(argv)
     try:
-        validation = validate_exact_manifest_rows(args.manifest, args.result)
+        validation = validate_exact_manifest_rows(args.manifest, args.result, args.table_format)
     except CertificationArtifactError as exc:
         print(f"FAIL {exc}", file=sys.stderr)
         return 2

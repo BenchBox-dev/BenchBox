@@ -125,7 +125,7 @@ repos:
       # preflight cover authorized primary-clone and disposable-clone commits.
       - id: agent-write-preflight
         name: agent write location and identity preflight
-        entry: sh scripts/agent_write_preflight.sh
+        entry: sh scripts/agent_pre_commit_guard.sh
         language: system
         pass_filenames: false
         always_run: true
