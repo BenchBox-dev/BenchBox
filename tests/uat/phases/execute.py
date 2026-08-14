@@ -729,7 +729,7 @@ def _check_clickhouse_runtime_memory(
             f"ClickHouse runtime memory admission failed for {project_name}: stats did not report a memory limit; "
             "refusing to infer one from host RAM or an engine default"
         )
-    if not runtime_limit_matches_rung(runtime_limit, selected_bytes / (1024**3)):
+    if not runtime_limit_matches_rung(runtime_limit, selected_bytes / (1024**3), requested_bytes=selected_bytes):
         return (
             f"ClickHouse runtime memory admission failed for {project_name}: requested {selected_value} "
             f"({selected_bytes} bytes), runtime reported {runtime_limit} bytes"

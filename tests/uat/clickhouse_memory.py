@@ -63,12 +63,23 @@ _MEMORY_UNITS = {
 _DECIMAL_GIB_EQUIVALENCE = 1000**3
 
 
-def runtime_limit_matches_rung(runtime_limit_bytes: int, requested_memory_gib: float) -> bool:
-    """Return whether a runtime cap is the requested rung in either unit system."""
+def runtime_limit_matches_rung(
+    runtime_limit_bytes: int, requested_memory_gib: float, *, requested_bytes: int | None = None
+) -> bool:
+    """Return whether a runtime cap is the requested rung in either unit system.
 
+    The trace format stores a nominal GiB rung, so it accepts the exact decimal
+    or binary spelling of that nominal value. Runtime admission also has the
+    original parsed byte count available; passing it switches to an exact
+    comparison and avoids converting a decimal request into a smaller binary
+    nominal value.
+    """
+
+    if requested_bytes is not None:
+        return runtime_limit_bytes == requested_bytes
     lower_limit = int(requested_memory_gib * _DECIMAL_GIB_EQUIVALENCE)
     upper_limit = int(requested_memory_gib * GIB)
-    return lower_limit <= runtime_limit_bytes <= upper_limit
+    return runtime_limit_bytes in {lower_limit, upper_limit}
 
 
 # These are the metrics that make a trace evidence rather than a host/engine

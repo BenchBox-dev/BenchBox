@@ -177,6 +177,25 @@ def test_trace_accepts_decimal_runtime_spelling_for_named_gib_rung():
     assert trace.valid_for_calibration is True
 
 
+@pytest.mark.parametrize(
+    ("runtime_limit", "requested_bytes", "expected"),
+    [
+        (8_000_000_000, 8_000_000_000, True),
+        (8 * clickhouse_memory.GIB, 8_000_000_000, False),
+        (7_500_000_000, 8_000_000_000, False),
+    ],
+)
+def test_runtime_admission_compares_the_resolved_byte_count(runtime_limit, requested_bytes, expected):
+    assert (
+        clickhouse_memory.runtime_limit_matches_rung(
+            runtime_limit,
+            requested_bytes / clickhouse_memory.GIB,
+            requested_bytes=requested_bytes,
+        )
+        is expected
+    )
+
+
 @pytest.mark.parametrize("missing", ["usage", "oom", "running", "host", "metrics"])
 def test_trace_fails_closed_on_required_telemetry_gaps(missing):
     trace = _trace()

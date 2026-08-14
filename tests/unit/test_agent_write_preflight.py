@@ -140,7 +140,7 @@ def test_preflight_allows_non_primary_worktree(tmp_path: Path) -> None:
     assert "BenchBox write preflight OK" in result.stdout
 
 
-def test_configured_hook_allows_human_primary_commit_and_preserves_declarations(tmp_path: Path) -> None:
+def test_configured_hook_requires_primary_clone_declaration_and_preserves_escape_hatches(tmp_path: Path) -> None:
     repo = _init_clone(tmp_path / "BenchBox")
     _install_configured_write_hook(repo)
     before = subprocess.run(
@@ -158,16 +158,9 @@ def test_configured_hook_allows_human_primary_commit_and_preserves_declarations(
         check=False,
     )
 
-    assert human_commit.returncode == 0, human_commit.stdout + human_commit.stderr
-    assert (
-        subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
-        ).stdout.strip()
-        != before
-    )
+    assert human_commit.returncode != 0
+    assert "Refusing BenchBox write preflight in the primary clone" in human_commit.stderr
 
-    (repo / "README.md").write_text("authorized primary\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
     allowed = subprocess.run(
         ["git", "commit", "-m", "authorized primary"],
         cwd=repo,
@@ -177,6 +170,12 @@ def test_configured_hook_allows_human_primary_commit_and_preserves_declarations(
         check=False,
     )
     assert allowed.returncode == 0, allowed.stdout + allowed.stderr
+    assert (
+        subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+        ).stdout.strip()
+        != before
+    )
 
     (repo / "README.md").write_text("ephemeral change\n", encoding="utf-8")
     subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
