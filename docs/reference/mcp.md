@@ -416,7 +416,10 @@ above.
 | `--normalize-plan-literals` | Omitted | not-yet-demanded | Plan normalization toggle is a bounded control with no client demand yet. |
 | `--stats-per-table-timing` | Omitted | not-yet-demanded | Per-table timing detail is a bounded reporting control with no client demand yet. |
 | `--strict-translation` | Omitted | not-yet-demanded | Strict SQL-translation behavior is a bounded execution control with no client demand yet. |
-| `--ignore-memory-warnings` | Omitted | not-yet-demanded | Memory-warning handling is a bounded execution control with no client demand yet. |
+| `--analyze-plans` | Omitted | not-yet-demanded | Plan-capture detail toggle is a bounded control with no client demand yet; MCP already exposes only `capture_plans`. |
+| `--stats-reset` | Omitted | not-yet-demanded | Statistics rebuild/reset is a bounded measurement control with no client demand yet. |
+| `--concurrency` | Omitted | security-scoped | Concurrent streams are a resource-budget control; MCP must not admit caller-chosen unbounded fan-out. |
+| `--ignore-memory-warnings` | Omitted | security-scoped | Skips memory-admission checks. Resource-budget bypasses stay permanently omitted from MCP. |
 | `--funding` | Omitted | not-yet-demanded | Funding metadata is a bounded provenance field with no client demand yet. |
 | `--result-source` | Omitted | not-yet-demanded | Result-source selection is a bounded provenance control with no client demand yet. |
 

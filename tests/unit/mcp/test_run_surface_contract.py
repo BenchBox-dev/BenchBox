@@ -93,6 +93,9 @@ OMITTED_CLI_OPTIONS = {
     "--table-format": "table_format",
     "--table-mode": "table_mode",
     "--stats-per-table-timing": "stats_per_table_timing",
+    "--analyze-plans": "analyze_plans",
+    "--stats-reset": "stats_reset",
+    "--concurrency": "concurrency",
     "--strict-translation": "strict_translation",
     "--ignore-memory-warnings": "ignore_memory_warnings",
     "--funding": "funding",
@@ -141,8 +144,11 @@ EXPECTED_OMISSION_TIERS = {
     "--table-format": "not-yet-demanded",
     "--table-mode": "not-yet-demanded",
     "--stats-per-table-timing": "not-yet-demanded",
+    "--analyze-plans": "not-yet-demanded",
+    "--stats-reset": "not-yet-demanded",
+    "--concurrency": "security-scoped",
     "--strict-translation": "not-yet-demanded",
-    "--ignore-memory-warnings": "not-yet-demanded",
+    "--ignore-memory-warnings": "security-scoped",
     "--funding": "not-yet-demanded",
     "--result-source": "not-yet-demanded",
     "--tuning": "not-yet-demanded",
@@ -637,6 +643,8 @@ class TestMCPDocsContract:
             "--publish",
             "--publish-target",
             "--publish-label",
+            "--concurrency",
+            "--ignore-memory-warnings",
         } <= security_scoped
 
     def test_docs_do_not_keep_stale_standalone_tool_sections(self):
