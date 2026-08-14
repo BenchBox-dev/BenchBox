@@ -96,6 +96,8 @@ CERTIFICATION_FAST = "fast"
 SELF_CHANGE_PATHS = (
     "scripts/pr_refresh_certification.py",
     "scripts/path_filter_decision.py",
+    "scripts/ruleset_drift_check.py",
+    "_project/scripts/browser_gate_aggregate.py",
     ".github/path-filters.yml",
 )
 WORKFLOW_PREFIX = ".github/workflows/"
@@ -342,7 +344,7 @@ def pred_not_synthetic_head(req: ClassificationRequest, _out: Classification) ->
 
 def pred_head_object(req: ClassificationRequest, out: Classification) -> str | None:
     commit = req.commits.get(req.head_sha)
-    if commit is None:
+    if commit is None or commit.sha != req.head_sha:
         return REASON_HEAD_OBJECT_MISSING
     out.feature_head = commit.sha
     return None
@@ -514,7 +516,7 @@ def classify(request: ClassificationRequest) -> Classification:
         out.decision = DECISION_SHADOW
         out.tested_base_sha = request.base_sha
         return out
-    except (TypeError, ValueError, KeyError, IndexError):
+    except (AttributeError, TypeError, ValueError, KeyError, IndexError):
         out.reasons.append(REASON_MALFORMED_PAYLOAD)
         out.decision = DECISION_FULL
         return out
@@ -526,10 +528,14 @@ def _commit_from_mapping(raw: Mapping[str, Any]) -> CommitInfo:
 
 
 def request_from_mapping(raw: Mapping[str, Any]) -> ClassificationRequest:
-    commits = {
-        sha: _commit_from_mapping(body) if isinstance(body, Mapping) else body
-        for sha, body in (raw.get("commits") or {}).items()
-    }
+    raw_commits = raw.get("commits") or {}
+    if not isinstance(raw_commits, Mapping):
+        raise TypeError("commits must be a mapping")
+    commits: dict[str, CommitInfo] = {}
+    for sha, body in raw_commits.items():
+        if not isinstance(sha, str) or not isinstance(body, Mapping):
+            raise TypeError("commit entries must be mappings keyed by SHA")
+        commits[sha] = _commit_from_mapping(body)
     checks = tuple(
         CheckRunInfo(
             id=int(item["id"]),
@@ -557,6 +563,11 @@ def request_from_mapping(raw: Mapping[str, Any]) -> ClassificationRequest:
     )
     authored = raw.get("authored_paths")
     intervening = raw.get("intervening_paths")
+    for name, paths in (("authored_paths", authored), ("intervening_paths", intervening)):
+        if paths is not None and (
+            not isinstance(paths, (list, tuple)) or any(not isinstance(path, str) for path in paths)
+        ):
+            raise TypeError(f"{name} must be a sequence of strings")
     return ClassificationRequest(
         action=str(raw.get("action") or ""),
         before=str(raw.get("before") or ""),
@@ -614,7 +625,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         try:
             decision = classify(request_from_mapping(raw))
-        except (TypeError, ValueError, KeyError):
+        except (AttributeError, TypeError, ValueError, KeyError):
             decision = Classification(decision=DECISION_FULL, reasons=[REASON_MALFORMED_PAYLOAD])
     text = json.dumps(decision.to_json(), indent=2, sort_keys=True) + "\n"
     if args.json_out:

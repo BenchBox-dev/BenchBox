@@ -215,6 +215,14 @@ def test_negative_head_object_missing_is_full_required() -> None:
     assert result.reasons == [REASON_HEAD_OBJECT_MISSING]
 
 
+def test_negative_head_object_key_and_embedded_sha_must_match() -> None:
+    raw = _eligible_raw()
+    raw["commits"][R1]["sha"] = H0
+    result = classify(request_from_mapping(raw))
+    assert result.decision == DECISION_FULL
+    assert result.reasons == [REASON_HEAD_OBJECT_MISSING]
+
+
 def test_negative_authored_commit_not_two_parents() -> None:
     raw = _eligible_raw()
     raw["commits"][R1]["parents"] = [H0]
@@ -307,6 +315,13 @@ def test_tamper_workflow_fingerprint_mismatch() -> None:
 
 def test_fallback_self_change() -> None:
     result = classify(_eligible_request(authored_paths=["scripts/pr_refresh_certification.py"]))
+    assert result.decision == DECISION_FULL
+    assert result.reasons == [REASON_SELF_CHANGE]
+
+
+@pytest.mark.parametrize("path", ["scripts/ruleset_drift_check.py", "_project/scripts/browser_gate_aggregate.py"])
+def test_fallback_required_context_helper_change(path: str) -> None:
+    result = classify(_eligible_request(authored_paths=[path]))
     assert result.decision == DECISION_FULL
     assert result.reasons == [REASON_SELF_CHANGE]
 
@@ -477,6 +492,30 @@ def test_malformed_mapping_defaults_to_full(capsys: pytest.CaptureFixture[str]) 
         assert main([]) == 0
     finally:
         sys.stdin = sys.__stdin__
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["decision"] == DECISION_FULL
+    assert payload["reasons"] == [REASON_MALFORMED_PAYLOAD]
+
+
+def test_malformed_nested_mapping_defaults_to_full(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    raw = _eligible_raw()
+    raw["commits"][R1] = []
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    assert main(["--input", str(request_path)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["decision"] == DECISION_FULL
+    assert payload["reasons"] == [REASON_MALFORMED_PAYLOAD]
+
+
+def test_malformed_authored_path_defaults_to_full(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    raw = _eligible_raw()
+    raw["authored_paths"] = [7]
+    request_path = tmp_path / "request.json"
+    request_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    assert main(["--input", str(request_path)]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["decision"] == DECISION_FULL
     assert payload["reasons"] == [REASON_MALFORMED_PAYLOAD]
