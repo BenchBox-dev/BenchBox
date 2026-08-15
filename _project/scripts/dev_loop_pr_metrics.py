@@ -57,6 +57,7 @@ import re
 import shutil
 import statistics
 import subprocess
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -130,23 +131,31 @@ def _gh_available() -> bool:
 
 
 def _gh_api(path: str) -> object | None:
-    """GET *path* via the `gh api` CLI. Returns None on any failure."""
-    try:
-        proc = subprocess.run(
-            ["gh", "api", path],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    if proc.returncode != 0:
-        return None
-    try:
-        return json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return None
+    """GET *path* via the `gh api` CLI, retrying transient CLI/API failures."""
+    for attempt in range(API_RETRY_ATTEMPTS):
+        try:
+            proc = subprocess.run(
+                ["gh", "api", path],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            proc = None
+
+        if proc is not None and proc.returncode == 0:
+            try:
+                return json.loads(proc.stdout)
+            except json.JSONDecodeError:
+                pass
+
+        if attempt + 1 < API_RETRY_ATTEMPTS:
+            # Keep retries bounded while allowing transient 5xx, transport,
+            # and CLI startup failures to recover before the collector fails
+            # closed rather than publishing understated metrics.
+            time.sleep(0.5 * (attempt + 1))
+    return None
 
 
 def _urllib_api(path: str, token: str) -> object | None:
@@ -239,9 +248,36 @@ class GitHubClient:
         return items
 
 
+def _gh_auth_token() -> str | None:
+    """Read the authenticated gh token without writing it to output or disk."""
+    if not _gh_available():
+        return None
+    try:
+        proc = subprocess.run(
+            ["gh", "auth", "token"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    token = proc.stdout.strip() if proc.returncode == 0 else ""
+    return token or None
+
+
 def make_client(repo: str) -> GitHubClient | None:
     """Return a usable GitHubClient, or None if no API access is available."""
     if _gh_available():
+        # Prefer one token lookup plus direct GETs over spawning `gh api` for
+        # every paginated request. The latter is correct but too slow for the
+        # event-fanout window and can fail closed on an isolated subprocess
+        # startup/transport hiccup. The token remains in memory only.
+        gh_token = _gh_auth_token()
+        if gh_token:
+            probe = _urllib_api(f"/repos/{repo}", gh_token)
+            if probe is not None:
+                return GitHubClient(repo, use_gh=False, token=gh_token)
         probe = _gh_api(f"/repos/{repo}")
         if probe is not None:
             return GitHubClient(repo, use_gh=True, token=None)
