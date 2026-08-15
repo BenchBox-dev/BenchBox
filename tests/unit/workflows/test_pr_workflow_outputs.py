@@ -23,6 +23,7 @@ def test_required_umbrella_jobs_are_unchanged(workflow: dict[str, Any]) -> None:
     needs = workflow["jobs"]["ci-required-result"]["needs"]
     assert needs == [
         "ci-paths",
+        "tpch-binary-framing",
         "content-guard",
         "code-lint",
         "code-test",
@@ -64,3 +65,11 @@ def test_lane_evidence_cannot_fail_the_required_umbrella(workflow: dict[str, Any
     assert evidence.get("continue-on-error") is True
     assert "pr-certification-lanes.json" in record["run"]
     assert evidence["with"]["name"] == "pr-certification-lanes"
+
+
+def test_tpch_binary_framing_is_observed_by_the_required_umbrella(workflow: dict[str, Any]) -> None:
+    aggregate = workflow["jobs"]["ci-required-result"]
+    assert "tpch-binary-framing" in aggregate["needs"]
+    step = next(step for step in aggregate["steps"] if step.get("name") == "Aggregate required result")
+    assert step["env"]["TPCH_BINARY_FRAMING_RESULT"] == "${{ needs.tpch-binary-framing.result }}"
+    assert 'TPCH_BINARY_FRAMING_RESULT" != "success"' in step["run"]
