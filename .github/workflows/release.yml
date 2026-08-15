@@ -41,6 +41,32 @@ jobs:
           fi
           echo "OK: $target_sha is origin/release or an ancestor of it."
 
+  verify-uat-charter:
+    needs: verify-tag-on-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require a committed UAT charter or pointer
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates=(
+            tests/uat/CHARTER.md
+            _project/release-evidence/README.md
+          )
+          found=0
+          for path in "${candidates[@]}"; do
+            if git ls-files --error-unmatch "$path" >/dev/null 2>&1 && test -s "$path"; then
+              echo "Found committed UAT charter or pointer: $path"
+              found=1
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::Release ref contains neither a committed UAT charter nor a release-evidence pointer."
+            exit 1
+          fi
+
   dependency-bounds:
     needs: verify-tag-on-release
     runs-on: ubuntu-latest
@@ -79,7 +105,7 @@ jobs:
           retention-days: 90
 
   build:
-    needs: [verify-tag-on-release, dependency-bounds]
+    needs: [verify-tag-on-release, verify-uat-charter, dependency-bounds]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
