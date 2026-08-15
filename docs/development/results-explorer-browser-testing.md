@@ -64,6 +64,19 @@ Failure artifacts (traces, screenshots, video, HTML report) land under
 `results-explorer/test-results/` and `results-explorer/playwright-report/`
 and are both gitignored.
 
+## Public-site visual baseline policy
+
+The full public-site visual suite is broader than the Explorer's current
+functional gate. Its baseline policy is recorded in
+`_project/audits/public-site-visual-baseline-policy-2026-08-15.md`:
+raw screenshots stay out of Git, protected `develop` produces SHA-bound
+baseline artifacts, and pull requests compare against the exact base-SHA
+artifact. Missing or unverifiable baselines fail closed; a PR diagnostic
+artifact is never promoted directly to a baseline. The capture harness at `results-explorer/e2e/captures/public-site-pages.spec.ts`
+and Pages-shaped server are now reusable building blocks. The protected
+baseline upload and exact-base retrieval jobs must land before this suite is
+made blocking.
+
 ## What CI gates
 
 [`.github/workflows/results-explorer-browser.yml`](../../.github/workflows/results-explorer-browser.yml)
