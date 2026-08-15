@@ -3,21 +3,6 @@ name: Documentation
 on:
   push:
     branches: [release, develop]
-    paths:
-      - "benchbox/**"
-      - "docs/**"
-      - "examples/**"
-      - "landing/**"
-      - "_project/scripts/explorer_pipeline/**"
-      - "_project/scripts/explorer_publish.py"
-      - "_project/scripts/results_explorer_snapshot_invariants.py"
-      - "results-data/**"
-      - "results-explorer/**"
-      - "scripts/**"
-      - ".github/workflows/docs.yml"
-      - "Makefile"
-      - "README.md"
-      - "pyproject.toml"
   pull_request:
     branches: [release, develop]
     paths:
@@ -214,6 +199,7 @@ jobs:
     name: Public-site visual regression
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop') ||
       (github.event_name == 'pull_request' && github.base_ref == 'develop')
     needs: build
     runs-on: ubuntu-latest
@@ -277,7 +263,7 @@ jobs:
           E2E_PAGES_SHAPED: "1"
           E2E_SITE_DIR: ${{ github.workspace }}/site
           PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/public-site-visual-current
-          PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
+          PUBLIC_SITE_VISUAL_BASELINE: ${{ steps.baseline-mode.outputs.require == '1' && format('{0}/public-site-visual-baseline', runner.temp) || '' }}
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: ${{ steps.baseline-mode.outputs.require }}
           PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ github.sha }}
@@ -285,7 +271,9 @@ jobs:
         working-directory: results-explorer
 
       - name: Upload protected-develop visual baseline
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop')
         uses: actions/upload-artifact@v4
         with:
           name: public-site-visual-baseline

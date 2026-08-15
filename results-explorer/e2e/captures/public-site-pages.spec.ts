@@ -60,17 +60,27 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
   };
   await writeFile(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
-  if (!BASELINE) {
+  if (!REQUIRE_BASELINE) {
     expect(REQUIRE_BASELINE, "PUBLIC_SITE_VISUAL_BASELINE is required for comparison").toBe(false);
     return;
   }
 
+  if (!BASELINE) {
+    throw new Error("PUBLIC_SITE_VISUAL_BASELINE is required when comparison is enabled");
+  }
   const baseline = JSON.parse(await readFile(path.join(BASELINE, "manifest.json"), "utf8")) as typeof manifest;
   expect(baseline.browser).toBe("chromium");
   if (process.env.PUBLIC_SITE_VISUAL_BASE_SHA) {
     expect(baseline.source_sha).toBe(process.env.PUBLIC_SITE_VISUAL_BASE_SHA);
   }
   const expected = new Map(baseline.captures.map((capture) => [`${capture.route}@${capture.viewport_width}`, capture.digest]));
+  const actualKeys = new Set(captures.map((capture) => `${capture.route}@${capture.viewport_width}`));
+  const missing = [...expected.keys()].filter((key) => !actualKeys.has(key));
+  const unexpected = [...actualKeys].filter((key) => !expected.has(key));
+  expect(
+    { missing, unexpected },
+    "visual baseline route/viewport matrix must match exactly",
+  ).toEqual({ missing: [], unexpected: [] });
   const changed = captures
     .filter((capture) => expected.get(`${capture.route}@${capture.viewport_width}`) !== capture.digest)
     .map((capture) => `${capture.route}@${capture.viewport_width}`);

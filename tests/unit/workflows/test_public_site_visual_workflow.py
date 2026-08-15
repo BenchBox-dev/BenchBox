@@ -21,6 +21,7 @@ def _workflow() -> dict[str, Any]:
 def test_develop_pushes_produce_a_public_site_visual_baseline() -> None:
     workflow = _workflow()
     assert "develop" in workflow[True]["push"]["branches"]
+    assert "paths" not in workflow[True]["push"]
     assert workflow["permissions"]["actions"] == "read"
 
     build_steps = workflow["jobs"]["build"]["steps"]
@@ -31,12 +32,14 @@ def test_develop_pushes_produce_a_public_site_visual_baseline() -> None:
     visual = workflow["jobs"]["public-site-visual-regression"]
     assert visual["needs"] == "build"
     assert "refs/heads/develop" in visual["if"]
+    assert "workflow_dispatch" in visual["if"]
     assert "base_ref == 'develop'" in visual["if"]
 
     baseline_upload = next(
         step for step in visual["steps"] if step.get("name") == "Upload protected-develop visual baseline"
     )
     assert "refs/heads/develop" in baseline_upload["if"]
+    assert "workflow_dispatch" in baseline_upload["if"]
     assert baseline_upload["with"]["name"] == "public-site-visual-baseline"
     assert baseline_upload["with"]["retention-days"] == 30
 
@@ -50,6 +53,7 @@ def test_pull_requests_compare_exact_base_sha_or_run_bootstrap_capture() -> None
     assert download["env"]["PUBLIC_SITE_VISUAL_BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
     assert "download-public-site-visual-baseline.mjs" in download["run"]
     assert "PUBLIC_SITE_VISUAL_REQUIRE_BASELINE" in run["env"]
+    assert "steps.baseline-mode.outputs.require" in run["env"]["PUBLIC_SITE_VISUAL_BASELINE"]
     assert run["env"]["E2E_PAGES_SHAPED"] == "1"
     assert "public-site-visual" in run["env"]["PUBLIC_SITE_VISUAL_OUTPUT"]
 
