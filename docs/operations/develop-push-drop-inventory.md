@@ -43,6 +43,7 @@ Re-run the method when adding a new develop-push workflow.
 | `submission-validator-drift-check.yml` | `develop` + validator path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — develop vs `published-results` validator copy | Weekly schedule + dispatch bound drift even if path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
 | `sync-results-data-to-published.yml` | `develop` + `results-data/**` (and related validator paths) | **none** | yes | Safety-critical — only automated mirror of develop corpus → `published-results` | Dropped path-matched push leaves public corpus stale until human recovery | **Accepted risk** — daily `corpus-drift-check.yml` canary detects develop-ahead drift and recommends `gh workflow run sync-results-data-to-published.yml`; workflow retains write-heavy mirror on push/dispatch only (no schedule mutation of public branch) |
 | `results-explorer-browser.yml` | `release` + `develop` + explorer/`results-data` path filter | **none** | yes | Mixed — required PR gate (`Results Explorer browser gate`); develop push is post-merge tip re-build for path-matched merges | Dropped develop push can leave tip without a post-merge browser rebuild until the next matching push or dispatch | **Accepted risk** — pre-merge required check on every PR into develop is the primary safety property; develop push is additive tip verification; suite is expensive (Chromium full + smoke browsers) so no hourly schedule; recover with `gh workflow run results-explorer-browser.yml --ref develop` |
+| `docs.yml` | `develop` + public-site/docs path filter | **none** | yes | Mixed — assembles the Pages-shaped site and produces the SHA-bound public-site visual baseline | A dropped push delays baseline refresh; exact-base PR comparison fails closed once any baseline exists | **Accepted risk** — the develop PR visual job remains the review gate; the protected push is an additive baseline producer; recover with `gh workflow run docs.yml --ref develop` |
 
 ### Explicit non-entries (push, but not develop)
 
@@ -51,7 +52,7 @@ inventory's risk class:
 
 | Workflow | Why excluded |
 | --- | --- |
-| `docs.yml` | `push.branches: [release]` only (develop is PR-only) |
+| `docs.yml` | Pages deployment occurs only on `release`; the `develop` push is baseline production and is included above |
 | `lint.yml` / `test.yml` | `push.branches: [release]` only |
 | `release.yml` | tag push `v*` only |
 
@@ -163,7 +164,7 @@ PY
 ```
 
 Expected subject set (names only):
-`develop-post-merge.yml`, `orphaned-commit-detector.yml`,
+`develop-post-merge.yml`, `docs.yml`, `orphaned-commit-detector.yml`,
 `results-explorer-browser.yml`, `submission-validator-drift-check.yml`,
 `sync-results-data-to-published.yml`.
 
