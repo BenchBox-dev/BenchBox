@@ -90,7 +90,7 @@ benchbox run --platform duckdb --benchmark tpch \
 
 The active driver version is displayed in the run announcement line.
 
-On the install side, DuckDB, Polars, ClickHouse Connect, and psycopg2 are no longer hard dependencies. The default install is leaner; use `pip install benchbox[duckdb]` (or `benchbox[all]`) to restore the previous behavior.
+On the install side, DuckDB, Polars, ClickHouse Connect, and psycopg2 are no longer hard dependencies. The default install is leaner; use `pip install "benchbox[duckdb]"` (or `pip install "benchbox[all]"`) to restore the previous behavior.
 
 ## Major additions
 
@@ -160,7 +160,7 @@ Corrected display names for several platforms:
 
 ## Changed behavior to be aware of
 
-- DuckDB, Polars, ClickHouse Connect, and psycopg2 are no longer installed by default. If your workflow uses these platforms, add the relevant extras after upgrading: `pip install benchbox[duckdb]` or `pip install benchbox[all]`.
+- DuckDB, Polars, ClickHouse Connect, and psycopg2 are no longer installed by default. If your workflow uses these platforms, add the relevant extras after upgrading: `pip install "benchbox[duckdb]"` or `pip install "benchbox[all]"`.
 - All user-facing terminal output in the run pipeline now flows through `emit()`. `--quiet` suppression and output capture in tests are now consistent across all pipeline stages.
 
 ## Quick upgrade checks

@@ -10,11 +10,11 @@ verdict: green
 
 ## Verdict
 
-**Green.** The audit found no stale present-tense Alpha claim or invalid
-BenchBox installation instruction in the maintained public blog and historical
-release-summary set. No public post was rewritten: the Alpha references are
-explicitly historical, and the version-specific installation examples remain
-accurate for the releases that introduced them.
+**Green after follow-up corrections.** The initial audit missed two issues:
+the v0.1.3 extra-install examples were unsafe under default zsh glob handling,
+and the source/docs comparison understated substantive content differences.
+Both issues are corrected in this follow-up; the remaining Alpha references
+are explicitly historical.
 
 ## Evidence inputs
 
@@ -32,19 +32,22 @@ accurate for the releases that introduced them.
   summary and its v0.2.1 backlink. They describe the Alpha-to-Beta transition
   in that release and do not claim that the current project is Alpha.
 - The v0.1.3 optional-extra commands are release-specific upgrade guidance;
-  the extras still exist in the current package and the commands remain valid.
+  the extras still exist in the current package, and both maintained copies now
+  quote the bracketed requirement strings for zsh-safe use.
 - The v0.2.0 `download-answers` examples remain valid. The current CLI still
   supports both named benchmarks and `all`, including offline cache priming.
 - The v0.3.0 DuckDB examples use the current `uv add` extra syntax. The
   standalone `textcharts` installation example belongs to that separate
   package-extraction post and is not BenchBox installation guidance.
-- The source and docs copies intentionally differ only where their relative
-  image and companion-post paths require different roots.
+- The source and docs copies share the release content but are not path-only
+  clones: relative image/companion-post paths differ, and the docs copy carries
+  a current JoinOrder behavior note that the historical source copy does not.
 
 ## Decision
 
-No public-content remediation was warranted. This audit record is the durable
-result; future release-language changes should rerun the same inventory against
+The follow-up corrected the two missed public-content issues in both maintained
+v0.1.3 copies and in this audit record. This audit is the durable result; future
+release-language changes should rerun the same inventory against
 `pyproject.toml`, `README.md`, and the installation guide before editing
 historical posts.
 
