@@ -239,6 +239,7 @@ def test_push_drop_inventory_subject_set_matches_workflows() -> None:
 
     expected = {
         "develop-post-merge.yml",
+        "docs.yml",
         "orphaned-commit-detector.yml",
         "results-explorer-browser.yml",
         "submission-validator-drift-check.yml",
