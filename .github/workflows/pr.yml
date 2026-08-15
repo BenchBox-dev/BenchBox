@@ -63,6 +63,41 @@ jobs:
           path: ci-path-decision.json
           retention-days: 30
 
+  # Pre-merge foreign-platform smoke coverage for the bundled TPC-H binaries.
+  # Keep this separate from ci-required-result: the existing required Ubuntu
+  # contract is unchanged, while every code PR gets direct macOS and Windows
+  # execution before merge. Nightly retains the complete three-platform matrix.
+  tpch-binary-framing:
+    name: TPC-H binary framing (${{ matrix.os }})
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify bundled dbgen binaries emit clean framing
+        run: uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m 'unit or slow' -v
+
   content-guard:
     name: content-guard
     needs: ci-paths
