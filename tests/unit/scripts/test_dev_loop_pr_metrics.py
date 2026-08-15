@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -44,6 +45,23 @@ class _FakeClient:
             return self.jobs
         assert item_key == "check_runs"
         return self.checks
+
+
+def test_gh_api_retries_transient_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def fake_run(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            return SimpleNamespace(returncode=1, stdout="", stderr="temporary failure")
+        return SimpleNamespace(returncode=0, stdout='{"ok": true}', stderr="")
+
+    monkeypatch.setattr(metrics.subprocess, "run", fake_run)
+    monkeypatch.setattr(metrics.time, "sleep", lambda _seconds: None)
+
+    assert metrics._gh_api("/repos/example/project") == {"ok": True}
+    assert calls == 3
 
 
 def test_empty_first_pass_run_returns_all_metric_slots() -> None:

@@ -155,6 +155,37 @@ nightly ratchet signal above starts accumulating exactly that data (each
 fired/cleared cycle is a headroom-vs-time data point). Revisit after
 roughly 4 weeks of that signal running, per the TODO's guidance.
 
+## Wall-clock decision record (2026-08-15)
+
+The four-week decision sample is now available. The read-only metrics
+collection covered **491 merged develop PRs** from 2026-07-18 through
+2026-08-14. It contained **395 completed-success fast-test job durations**:
+
+| Measure | Fast-test job wall time |
+| --- | ---: |
+| Median | 675 seconds (11.25 minutes) |
+| P95 | 752 seconds (12.53 minutes) |
+| P99 | 778 seconds (12.97 minutes) |
+| Maximum observed successful job | 797 seconds (13.28 minutes) |
+
+The remaining 96 PRs are censored or absent observations: failed, cancelled,
+missing, or otherwise non-successful jobs do not expose a completed duration in
+this dataset. They are not evidence that the lane stayed below any budget.
+
+**Decision: retain the count regime.** Do not replace the absolute
+`max_fast_tests` ceiling or the per-PR delta guard with a wall-clock failure
+at this time. The observed successful tail leaves useful room below a
+candidate 15-minute cap, while the censored failures mean this sample cannot
+calibrate a hard timeout's failure behavior. The count ceiling remains the
+cheap fail-closed structural backstop, and the delta guard still catches a
+single PR's runaway test growth before it consumes shared runway.
+
+Reconsider this decision after another complete 28-day sample, or sooner if a
+completed fast-test job approaches 15 minutes or the censored-job rate changes
+materially. Any future wall-clock gate must publish its timeout, cancellation
+handling, and rollback behavior alongside a fresh uncensored sample; it must
+not silently demote the count guards.
+
 ## medium-test wall-clock budget (distinct from w6 above)
 
 Not to be confused with w6: that gate is about *replacing* the fast lane's
