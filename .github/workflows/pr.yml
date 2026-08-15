@@ -64,9 +64,8 @@ jobs:
           retention-days: 30
 
   # Pre-merge foreign-platform smoke coverage for the bundled TPC-H binaries.
-  # Keep this separate from ci-required-result: the existing required Ubuntu
-  # contract is unchanged, while every code PR gets direct macOS and Windows
-  # execution before merge. Nightly retains the complete three-platform matrix.
+  # Every code PR gets direct macOS and Windows execution before merge, while
+  # nightly retains the complete three-platform matrix.
   tpch-binary-framing:
     name: TPC-H binary framing (${{ matrix.os }})
     needs: ci-paths
@@ -1268,13 +1267,14 @@ jobs:
 
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check]
+    needs: [ci-paths, tpch-binary-framing, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate required result
         env:
           CI_PATHS_RESULT: ${{ needs.ci-paths.result }}
+          TPCH_BINARY_FRAMING_RESULT: ${{ needs.tpch-binary-framing.result }}
           CONTENT_RESULT: ${{ needs.content-guard.result }}
           LINT_RESULT: ${{ needs.code-lint.result }}
           TEST_RESULT: ${{ needs.code-test.result }}
@@ -1296,6 +1296,11 @@ jobs:
 
           if [ "$CI_PATHS_RESULT" != "success" ]; then
             echo "ci-paths=$CI_PATHS_RESULT"
+            exit 1
+          fi
+
+          if [ "$NEEDS_CODE_CI" = "true" ] && [ "$TPCH_BINARY_FRAMING_RESULT" != "success" ]; then
+            echo "tpch-binary-framing=$TPCH_BINARY_FRAMING_RESULT"
             exit 1
           fi
 
@@ -1390,6 +1395,7 @@ jobs:
         if: always()
         env:
           CI_PATHS_RESULT: ${{ needs.ci-paths.result }}
+          TPCH_BINARY_FRAMING_RESULT: ${{ needs.tpch-binary-framing.result }}
           CONTENT_RESULT: ${{ needs.content-guard.result }}
           LINT_RESULT: ${{ needs.code-lint.result }}
           TEST_RESULT: ${{ needs.code-test.result }}
@@ -1421,6 +1427,7 @@ jobs:
               "needs_code_ci": os.environ.get("NEEDS_CODE_CI") or "",
               "lanes": {
                   "ci-paths": os.environ.get("CI_PATHS_RESULT") or "",
+                  "tpch-binary-framing": os.environ.get("TPCH_BINARY_FRAMING_RESULT") or "",
                   "content-guard": os.environ.get("CONTENT_RESULT") or "",
                   "code-lint": os.environ.get("LINT_RESULT") or "",
                   "code-test": os.environ.get("TEST_RESULT") or "",
