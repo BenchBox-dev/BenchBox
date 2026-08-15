@@ -65,6 +65,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
     env = {
         **os.environ,
         "CI_PATHS_RESULT": "success",
+        "TPCH_BINARY_FRAMING_RESULT": "success",
         "CONTENT_RESULT": "skipped",
         "LINT_RESULT": "skipped",
         "TEST_RESULT": "skipped",
@@ -136,6 +137,39 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
 
     assert result.returncode == 1
     assert "explorer-tokens=failure" in result.stdout
+
+
+def test_ci_required_result_fails_on_tpch_binary_framing_failure() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        TPCH_BINARY_FRAMING_RESULT="failure",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+    )
+
+    assert result.returncode == 1
+    assert "tpch-binary-framing=failure" in result.stdout
+
+
+def test_ci_required_result_accepts_tpch_binary_framing_success() -> None:
+    result = _run_ci_required_result(
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        TPCH_BINARY_FRAMING_RESULT="success",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+    )
+
+    assert result.returncode == 0
 
 
 def test_ci_required_result_fails_on_explorer_vitest_failure() -> None:
