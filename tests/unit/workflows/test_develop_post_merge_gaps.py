@@ -250,6 +250,7 @@ def test_push_drop_inventory_subject_set_matches_workflows() -> None:
     inventory = INVENTORY_DOC.read_text(encoding="utf-8")
     for name in expected:
         assert name in inventory, f"inventory does not list {name}"
+    assert "| `docs.yml` | `develop`, all paths |" in inventory
 
 
 # ---------------------------------------------------------------------------

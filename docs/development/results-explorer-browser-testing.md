@@ -73,9 +73,10 @@ raw screenshots stay out of Git, protected `develop` produces SHA-bound
 baseline artifacts, and pull requests compare against the exact base-SHA
 artifact. Missing or unverifiable baselines fail closed; a PR diagnostic
 artifact is never promoted directly to a baseline. The capture harness at `results-explorer/e2e/captures/public-site-pages.spec.ts`
-and Pages-shaped server are now reusable building blocks. The protected
-baseline upload and exact-base retrieval jobs must land before this suite is
-made blocking.
+and Pages-shaped server are reusable building blocks. `.github/workflows/docs.yml`
+now uploads the protected baseline from `develop` and retrieves the exact
+base-SHA artifact for pull requests; the comparison is blocking once the
+one-time bootstrap baseline exists.
 
 ## What CI gates
 

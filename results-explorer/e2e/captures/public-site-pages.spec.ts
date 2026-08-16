@@ -4,6 +4,8 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+import { waitForDataLoaded } from "../support/fixtures";
+
 const OUTPUT = path.resolve(
   process.env.PUBLIC_SITE_VISUAL_OUTPUT ?? path.join("test-results", "public-site-visual"),
 );
@@ -21,11 +23,14 @@ const ROUTES = [
     path: "/blog/2026-05-18-v0-3-0-release-overview.html",
     heading: /v0\.3\.0/i,
   },
-  { slug: "results", path: "/results/", heading: /results/i },
+  { slug: "results", path: "/results/", heading: /results/i, ready: /Recent Results/i },
 ] as const;
 const MANIFEST = path.join(OUTPUT, "manifest.json");
 
-test.describe.configure({ mode: "serial" });
+// Each Results viewport can spend up to 46 seconds on bounded cold-snapshot
+// recovery. Give the four independent waits enough aggregate budget while
+// keeping the per-attempt limits in `waitForDataLoaded` unchanged.
+test.describe.configure({ mode: "serial", timeout: 240_000 });
 // The public-site suite requires the assembled Pages-shaped site. Keep it out
 // of the Explorer-only blocking command unless that site is explicitly mounted.
 test.skip(!process.env.E2E_PAGES_SHAPED || !process.env.E2E_SITE_DIR, "requires E2E_PAGES_SHAPED and E2E_SITE_DIR");
@@ -40,6 +45,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
       const page = await context.newPage();
       await page.goto(route.path, { waitUntil: "networkidle" });
       await expect(page.locator("body")).toContainText(route.heading);
+      if ("ready" in route) await waitForDataLoaded(page, route.ready);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
       expect(overflow, `${route.path} overflows at ${width}px`).toBe(false);
 
@@ -47,17 +53,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
       const screenshotPath = path.join(OUTPUT, filename);
       await page.screenshot({ path: screenshotPath, fullPage: true });
       const digest = createHash("sha256").update(await readFile(screenshotPath)).digest("hex");
-      // DuckDB-WASM can still be painting its cold-load skeleton when the
-      // browser reaches networkidle.  That shell is timing-dependent (the
-      // protected baseline may capture a different loading frame), so keep
-      // route/viewport coverage blocking while deferring the digest check
-      // until the results page has actually rendered its corpus.
-      const coldResultsLoad = route.path === "/results/"
-        && await page.getByText("Initializing static DuckDB snapshot...").isVisible().catch(() => false);
-      captures.push({ cold_results_load: coldResultsLoad, digest, filename, route: route.path, viewport_width: width });
-      if (coldResultsLoad) {
-        console.warn(`Skipping cold-load visual digest for ${route.path}@${width}`);
-      }
+      captures.push({ digest, filename, route: route.path, viewport_width: width });
       await context.close();
     }
   }
@@ -84,6 +80,15 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     expect(baseline.source_sha).toBe(process.env.PUBLIC_SITE_VISUAL_BASE_SHA);
   }
   const expected = new Map(baseline.captures.map((capture) => [`${capture.route}@${capture.viewport_width}`, capture.digest]));
+  // Baselines produced by the initial implementation may contain a
+  // `cold_results_load` marker.  Ignore those legacy digests during the
+  // transition so the first readiness-enforced develop baseline can replace
+  // them without making every intervening PR fail against a skeleton image.
+  const legacyColdKeys = new Set(
+    baseline.captures
+      .filter((capture) => capture.cold_results_load === true)
+      .map((capture) => `${capture.route}@${capture.viewport_width}`),
+  );
   const actualKeys = new Set(captures.map((capture) => `${capture.route}@${capture.viewport_width}`));
   const missing = [...expected.keys()].filter((key) => !actualKeys.has(key));
   const unexpected = [...actualKeys].filter((key) => !expected.has(key));
@@ -92,7 +97,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     "visual baseline route/viewport matrix must match exactly",
   ).toEqual({ missing: [], unexpected: [] });
   const changed = captures
-    .filter((capture) => capture.cold_results_load !== true)
+    .filter((capture) => !legacyColdKeys.has(`${capture.route}@${capture.viewport_width}`))
     .filter((capture) => expected.get(`${capture.route}@${capture.viewport_width}`) !== capture.digest)
     .map((capture) => `${capture.route}@${capture.viewport_width}`);
   expect(changed, `visual baseline mismatch; changed captures: ${changed.join(", ")}`).toEqual([]);
