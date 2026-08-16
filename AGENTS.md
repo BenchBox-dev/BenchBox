@@ -123,15 +123,15 @@ Stacked/feature-base PRs unsupported: zero CI by filters; `pr-base-guard.yml` fa
 
 ## TODO tracker
 
-The shared database is the only TODO record. `_project/scripts/todo` is the
-only write path; global `--db`/`--actor` flags precede the subcommand. Tracker
-writes follow the same worktree policy. `todo claim <id>` prints the binding
-work order; follow its scope, preserve rules, anti-patterns, dependencies, and
-verification. Exit 2 means fix the cause, never bypass it. `todo ready` and
-`todo stats` print an untriaged-findings banner on stderr when open findings or
-unsynced drafts exist; triage via `todo finding candidates` (`finding
-list`/`show`/`candidates` are read-only; findings are review blind spots, never
-claimable items).
+The shared database is the only TODO record. `_project/scripts/todo` is the only write path;
+global `--db`/`--actor` flags precede the subcommand. Tracker writes follow the same worktree
+policy. Item prose is public — exported to tracked `_project/todo-db-export/` — so name the
+token or field, never recovered plaintext. `todo claim <id>` prints the binding work order;
+follow its scope, preserve rules, anti-patterns, dependencies, and verification. Exit 2 means
+fix the cause, never bypass it. `todo ready` and `todo stats` print an untriaged-findings
+banner on stderr when open findings or unsynced drafts exist; triage via `todo finding
+candidates` (`finding list`/`show`/`candidates` are read-only; findings are review blind
+spots, never claimable items).
 
 ## BenchBox invariants
 
@@ -155,11 +155,10 @@ lifecycle, cleanup, and caveats. Never globally prune without approval.
 
 Stable wrappers are `code`, `test`, `todo`, `todo-db`, `blog`, `benchbox`,
 `skill-sync`, and `tidy-perms`. `todo` authors ideas/specs; `todo-db` owns tracker
-actions. Skill source is `/Users/joe/.skill-sync/skills`; `.claude/skills`, `.codex/skills`,
-`.gemini/skills`, and `.antigravity/skills` are generated mirrors. Run `make skill-sync` to
-regenerate mirrors, never hand-edit one. Integrity comes from PR review of the mirror diff
-plus the untracked-mirror drift guard (`scripts/check_untracked_skill_mirrors.sh`), not a
-lock-verify step.
+actions. `.claude/skills`, `.codex/skills`, `.gemini/skills`, and `.antigravity/skills`
+are generated mirrors: run `make skill-sync` to regenerate, never hand-edit one. Integrity
+comes from PR review of the mirror diff plus the untracked-mirror drift guard, not a
+lock-verify step. Mechanics: `docs/development/skill-sync-operations.md`.
 
 ## Operational references
 

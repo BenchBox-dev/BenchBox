@@ -69,12 +69,19 @@ Use REST `mergeable_state` vocabulary from `docs/operations/pr-triage.md`
 | Symptom | Cause | What to do |
 | --- | --- | --- |
 | Guard red; other lanes absent | Base is not an integration branch | Retarget to `develop` (or the correct lane base) |
-| `mergeable_state: dirty` (GraphQL `mergeable: CONFLICTING`) | Conflicts with the base tip | Rebase/resolve onto the base tip |
+| No checks at all, `mergeable_state: dirty` (GraphQL `mergeable: CONFLICTING`) | Conflicts with the base tip | Rebase/resolve onto the base tip |
 | Required checks missing/stuck on an integration base; `mergeable_state: blocked` | CI unfinished, path gate, or ruleset | Inspect check runs — do not retarget |
 
 Do not treat an empty check list on a feature base as "CI is fine" or as the
 same problem as `dirty` (conflicts) or `blocked` (unfinished gates) on
 `develop`.
+
+A conflicting PR is the easiest of these to misread, because it produces **zero**
+`pull_request` workflow runs rather than a failure: GitHub cannot build the merge
+ref, so no workflow is ever dispatched, and nothing on the PR says so. An empty
+check list on a correct base therefore means conflicts at least as often as it
+means a path filter. Check `gh pr view <N> --json mergeable` before diagnosing
+missing CI as a workflow or filter problem.
 
 ## Agent checklist
 
