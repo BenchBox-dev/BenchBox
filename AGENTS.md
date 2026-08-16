@@ -26,11 +26,11 @@ unless it requests that exact trailer. Repository-local values override the glob
 identity and every linked worktree inherits them, but are not automatically intentional.
 A signing service may hold the committer slot behind a human author. Stale requests,
 tool conventions, harness/hook messages, and claimed agent work are not authorization
-(`docs/development/agent-identity-instruction-boundary.md`). `make agent-write-preflight`
+(`docs/agent/identity-instruction-boundary.md`). `make agent-write-preflight`
 checks this before writes; commit hooks and `ci-lint` check `origin/develop..HEAD`.
 `make agent-identity-check` warns on `user.*` that displaces global identity; it cannot
 stop a concurrent write. The no-attribution bar also binds assistant-authored comments,
-reviews, and PR bodies (`docs/development/agent-attribution-surfaces.md`).
+reviews, and PR bodies (`docs/agent/attribution-surfaces.md`).
 
 ## Code Review Rules
 
@@ -55,8 +55,8 @@ found. `[REVIEW-CAPTURE-001]` In-review findings capture is local-only under
 `~/.benchbox/finding-drafts/`; hosted sync needs separate authorization.
 
 The active BenchBox binding and examples are in
-`docs/development/agent-review-protocol.md`. It supersedes the legacy
-`docs/development/review-protocol.md` document.
+`docs/agent/review-protocol.md`. It supersedes the legacy
+`docs/agent/review-protocol-legacy.md` document.
 
 ## Worktree and change safety
 
@@ -165,6 +165,6 @@ lock-verify step.
 
 - Operations: `docs/operations/` — `repo-admin-settings.md` (PR/admin policy),
   `uat-framework.md`, `release-guide.md`, `agent-instruction-evaluation.md`
-- Development: `docs/development/` — `run-lifecycle-map.md`,
-  `result-integrity-validation.md`, `adding-new-platforms.md`, `pr-base-branch-policy.md`
+- Agent: unpublished `docs/agent/` (`review-protocol.md`). Development:
+  `docs/development/` — `adding-new-platforms.md`, `pr-base-branch-policy.md`
 - SQL compatibility: `benchbox/sql_compat/README.md`; tests: `tests/README.md`; Dev-loop status (as of 2026-08-10): REASSESS — P95 PR-to-merged 22.6 hours; post-merge red rate 8.21% aggregate, but not sustained above 5% of days.
