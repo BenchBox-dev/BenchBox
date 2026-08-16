@@ -69,19 +69,20 @@ Use REST `mergeable_state` vocabulary from `docs/operations/pr-triage.md`
 | Symptom | Cause | What to do |
 | --- | --- | --- |
 | Guard red; other lanes absent | Base is not an integration branch | Retarget to `develop` (or the correct lane base) |
-| No checks at all, `mergeable_state: dirty` (GraphQL `mergeable: CONFLICTING`) | Conflicts with the base tip | Rebase/resolve onto the base tip |
+| `mergeable_state: dirty` (GraphQL `mergeable: CONFLICTING`) | Conflicts with the base tip | Rebase/resolve onto the base tip |
 | Required checks missing/stuck on an integration base; `mergeable_state: blocked` | CI unfinished, path gate, or ruleset | Inspect check runs — do not retarget |
 
 Do not treat an empty check list on a feature base as "CI is fine" or as the
 same problem as `dirty` (conflicts) or `blocked` (unfinished gates) on
 `develop`.
 
-A conflicting PR can produce **zero** `pull_request` workflow runs because GitHub
-cannot build its merge ref. This repository still runs
-`develop-refresh-shadow.yml` and `develop-ruleset-drift.yml` with
-`pull_request_target` from trusted `develop`, so an empty check list is not a
-universal conflict diagnostic. Check `gh pr view <N> --json mergeable` and the
-expected workflow names before diagnosing a workflow or filter problem.
+On a conflicting PR, GitHub cannot build the merge ref, so `pull_request`
+workflows (`pr.yml` and most other lanes) never start. That is not the same as
+"no workflows at all": `develop-refresh-shadow.yml` and
+`develop-ruleset-drift.yml` use `pull_request_target` against trusted `develop`
+and can still report. Diagnose with `gh pr view <N> --json mergeable` plus the
+expected workflow names — do not infer conflicts, or a filter bug, from an
+empty or partial check list alone.
 
 ## Agent checklist
 

@@ -98,21 +98,6 @@ the package-only cutover.
 
 ## Export workflow and restore validation
 
-### Item prose is published
-
-The tracker database is hosted, but `todo export` writes
-`_project/todo-db-export/` (`README.md`, `index.md`, `events.jsonl`,
-`items.jsonl`) and those files are tracked in Git. Item titles, descriptions,
-approaches, work-unit summaries, verification rungs, and drop reasons therefore
-reach the public repository on the next snapshot PR.
-
-Treat every tracker write as publication. When logging a privacy or security
-finding, reference the token or the field name, never the recovered plaintext or
-the mapping between them: writing "pseudonym X decodes to /Users/<name>/..."
-into an item description publishes exactly the deanonymization that the item
-exists to close. This is separate from the secret redaction described above,
-which covers credentials in transport and logs, not prose an author types.
-
 `.github/workflows/todo-db-export.yml` syncs the locked scripts project and runs
 the package-only wrapper when the two database secrets are available:
 
