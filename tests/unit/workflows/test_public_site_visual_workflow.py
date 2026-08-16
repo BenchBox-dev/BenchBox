@@ -12,6 +12,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DOCS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "docs.yml"
+CAPTURE_SPEC = REPO_ROOT / "results-explorer" / "e2e" / "captures" / "public-site-pages.spec.ts"
 
 
 def _workflow() -> dict[str, Any]:
@@ -65,8 +66,19 @@ def test_pull_requests_compare_exact_base_sha_or_run_bootstrap_capture() -> None
 def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
     script = REPO_ROOT / "results-explorer" / "scripts" / "download-public-site-visual-baseline.mjs"
     package = __import__("json").loads((REPO_ROOT / "results-explorer" / "package.json").read_text(encoding="utf-8"))
+    script_source = script.read_text(encoding="utf-8")
 
     assert script.is_file()
-    assert "bootstrap=true" in script.read_text(encoding="utf-8")
+    assert "bootstrap=true" in script_source
+    assert "page=${page}" in script_source
+    assert "BASELINE_LOOKUP_ATTEMPTS" in script_source
     assert "test:e2e:public-site" in package["scripts"]
     assert "e2e/captures/public-site-pages.spec.ts" in package["scripts"]["test:e2e:public-site"]
+
+
+def test_public_results_capture_waits_for_data_before_digesting() -> None:
+    source = CAPTURE_SPEC.read_text(encoding="utf-8")
+
+    assert "waitForDataLoaded" in source
+    assert "Recent Results" in source
+    assert "coldResultsLoad" not in source

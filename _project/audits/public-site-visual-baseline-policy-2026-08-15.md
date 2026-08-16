@@ -16,8 +16,8 @@ when all of the following are true:
 
 - it was produced by the protected `develop` push workflow after the complete
   visual suite passed;
-- its manifest binds the source commit SHA, route, viewport, browser project,
-  fixture/read-model identity, and screenshot digest;
+- its manifest binds the source commit SHA (the assembled site and read-model
+  identity), route, viewport, browser project, and screenshot digest;
 - a pull request compares against the exact base SHA's artifact, never against
   a mutable live site or an arbitrary latest run;
 - a missing, stale, or unverifiable baseline fails the relevant visual gate
@@ -31,21 +31,27 @@ PR failures may upload screenshots, traces, and a diff report as short-lived
 review artifacts. Those artifacts are diagnostic only and must not become the
 next baseline without the protected-develop refresh path.
 
-## Current implementation boundary
+## Implementation status
 
 The repository now provides the route/viewport capture and digest-comparison
-harness in `results-explorer/e2e/captures/public-site-pages.spec.ts`. It still
-does not provide the protected-develop baseline upload or exact-base artifact
-retrieval. The implementation work must add those two pieces before calling
-the suite blocking. Until then, existing Chromium functional coverage remains
-the only blocking browser gate.
+harness in `results-explorer/e2e/captures/public-site-pages.spec.ts`, the
+protected-develop baseline upload, and exact-base artifact retrieval in
+`.github/workflows/docs.yml`. The pull-request visual job is blocking whenever
+an exact base-SHA baseline is available; missing baselines fail closed after
+the one-time bootstrap. The downloader paginates the artifact list and waits
+for eventual-consistency lag before declaring an exact baseline absent.
+
+This audit records the decision state at
+`e03c75382be312c1368ef98fd53f1e5ac68fe4bc`, before PR #1745 landed. The
+implementation status above reflects the current develop tree.
 
 ## Required matrix
 
 The initial matrix is Chromium at 390, 768, 1280, and 1600 CSS pixels across
 stable public landing, documentation/blog, and Results Explorer routes. Dynamic
 content must use the deterministic fixture/read-model inputs already used by
-the Explorer harness. Fonts, animation, clock, and network-dependent content
+the Explorer harness, with the assembled source SHA recorded in the manifest.
+Fonts, animation, clock, and network-dependent content
 must be controlled or excluded from the comparison.
 
 ## Retention and rollback
