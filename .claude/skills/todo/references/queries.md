@@ -2,8 +2,18 @@
 
 ## Create and update
 
-* Create: `todo create --title ... --worktree ... --priority ...`, or `--from -` with JSON. Items that involve code need scope rules, must-preserve notes, anti-patterns, and verification steps.
-* Update: `todo update <id>` changes an item after you create it. You can change `--title`, `--description`, `--priority`, `--worktree`, `--add-work`, `--edit-work` (only for work units that are still pending; done units are immutable because they carry evidence), `--add-verify`, and `--drop-verify SEQ --reason ...`. Each update creates one audit event with before/after diffs. You must give `--reason` when you edit items that are done or dropped. The id, state, and identity never change through `update` — use lifecycle commands to change state. Prefer `update` over dropping and recreating. It keeps history and links.
+- Create with `todo create --title ... --worktree ... --priority ...` or JSON
+  through `--from -`. Code items need scope rules, must-preserve notes,
+  anti-patterns, and verification steps.
+- Update with `todo update <id>`. It accepts `--title`, `--description`,
+  `--priority`, `--worktree`, `--add-work`, `--edit-work`, `--add-verify`, and
+  `--drop-verify SEQ --reason ...`.
+- Edit work units only while pending. Done units are immutable because they
+  carry evidence.
+- Each update records one audit event with before-and-after differences. Give
+  `--reason` when editing done or dropped items.
+- `update` cannot change an item's id, state, or identity. Use lifecycle
+  commands for state and prefer updates over dropping and recreating items.
 
 ## Inspect
 
@@ -11,16 +21,21 @@
 * `todo show <id> [--json]` — show one item
 * `todo stats` — counts by state, priority, worktree, and deferral
 * `todo deps <id>` — show dependencies
-* `todo export` — write a deterministic snapshot (JSONL plus a markdown index). This is the CLI command. It is different from the committed snapshot at `_project/todo-db-export/` (written by `write_export`). Prefer live commands (`list`, `show`, `stats`) for day-to-day work. Use the committed snapshot only for offline review.
+- `todo export` — write a deterministic JSONL snapshot and Markdown index. This
+  CLI output differs from `_project/todo-db-export/`, which `write_export`
+  commits. Prefer live `list`, `show`, and `stats`; use the committed snapshot
+  only for offline review.
 
 ## Rank and group
 
-Ranking and grouping open work is a skill-only analysis. It has no CLI command. Follow `references/prioritize.md`. Do not invent a `prioritize` command.
+Follow `references/prioritize.md`; there is no `prioritize` CLI command.
 
 ## Block, release, and drop
 
 * `todo block <id> --reason ...` — mark blocked
 * `todo unblock <id>` — clear the blocked flag
-* `todo release <id>` — release your claim. Fails with exit 2 if another actor holds it. Checking `claimed_by` with `todo show --json` can still race. You cannot release another actor's expired claim. Use `todo claim` (may take it over if expired) or `todo sweep-stale`. Does nothing if unclaimed.
+- `todo release <id>` — release your claim. It does nothing when unclaimed and
+  exits 2 for another actor's claim. `todo show --json` can race. For another
+  actor's expired claim, use `todo claim` to take it over or `todo sweep-stale`.
 * `todo sweep-stale` — release expired claims
 * `todo drop <id> --reason ...` — drop an item

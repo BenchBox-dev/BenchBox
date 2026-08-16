@@ -7,40 +7,34 @@ tools: Bash, Read, Edit, Write, Task
 
 # Todo — Idea to Done
 
-## Purpose
-
-Use this skill to turn a rough idea into a clear specification and manage its
-TODO items through the full lifecycle: idea, specification, creation,
-implementation, and completion.
-
 ## Critical rules
 
-Use `_project/scripts/todo`. Check that the wrapper supports the command you need:
+After bootstrap, use `_project/scripts/todo` for every tracker command.
 
-* Run `_project/scripts/todo --help` and confirm the subcommand appears.
-* If the subcommand is missing, report the gap and stop.
+- Run `_project/scripts/todo --help`; treat the chosen subcommand's help as its full contract.
+- If the subcommand is missing, report the gap and stop.
+- Put global flags before it: `todo --db <path> --actor <name> <command>`.
 
 Skill-only actions: `prioritize`, `batch`, `handoff`, and `closeout`; follow their guides, not the CLI.
 
-If one request combines review or validation with close-out, perform the
-read-only review and stop at findings under `SHARED/review-protocol/SKILL.md`.
-A later user message may authorize `closeout`.
+If one request combines review or validation with close-out, perform the read-only review and stop at findings under
+`SHARED/review-protocol/SKILL.md`. A later user message may authorize `closeout`.
 
-Put global flags before the subcommand: `todo --db <path> --actor <name> <command>`.
+### Failures and claims
 
-Exit code 2 means a general failure. Exit code 4 means the hosted database rejected your credentials. When you get exit code 4, stop all writes, run `todo doctor`, and show the error. Some wrappers try once to refresh the token before they return exit code 4.
+- Exit code 2 means a general failure.
+- Exit code 4 means the hosted database rejected the credentials. Stop writes, run `todo doctor`, and show the error;
+  the wrapper may first try one token refresh.
+- Only the holder can run `todo release`; it exits 2 for another actor's claim, and checking `claimed_by` can race.
+  `complete` and `drop` may clear any claim. `--actor` prevents mistakes, not impersonation.
 
-Only the holder can release a claim. `todo release` fails with exit 2 if another actor holds it. Checking `claimed_by` with `todo show --json` can still race. `complete` and `drop` can still clear any claim. The actor comes from `--actor`, so this prevents mistakes, not impersonation.
+### Lifecycle rules
 
-The `--help` output for the command you chose is the full contract.
-
-* Read the selected action guide before acting.
-* When the user agrees to a specification, create its item with `todo create`
-  or the supported create-from-spec command.
-* Store tracker state only in the database. Do not write it to files by hand.
-* Commit only through `SHARED/change-framework/SKILL.md`.
-* `TODO_DB_URL` may select the hosted database. The CLI never prints its
-  connection string.
+- Read the selected action guide before acting.
+- After specification approval, track it with `todo create` or the supported create-from-spec command.
+- Store tracker state only in the database; do not create tracker files by hand.
+- Commit through `SHARED/change-framework/SKILL.md`.
+- `TODO_DB_URL` may select the hosted database; the CLI never prints its connection string.
 
 ## Actions
 
@@ -59,4 +53,5 @@ The `--help` output for the command you chose is the full contract.
 | `closeout` — skill-only, no CLI command | You remediate a separately reviewed batch and close its items | `references/closeout.md` |
 | `help` | You need the action list | This table |
 
-`todo ready` and `todo stats` may print a one-line warning on stderr when there are untriaged findings (open findings or unsynced drafts). The warning does not affect stdout. When you see it, run `todo finding candidates` to triage. The warning is silent when there are no findings.
+`todo ready` and `todo stats` may warn on stderr about open findings or unsynced drafts without changing stdout. Run
+`todo finding candidates` when warned; no warning appears when there are no findings.
