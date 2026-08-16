@@ -76,6 +76,14 @@ Do not treat an empty check list on a feature base as "CI is fine" or as the
 same problem as `dirty` (conflicts) or `blocked` (unfinished gates) on
 `develop`.
 
+On a conflicting PR, GitHub cannot build the merge ref, so `pull_request`
+workflows (`pr.yml` and most other lanes) never start. That is not the same as
+"no workflows at all": `develop-refresh-shadow.yml` and
+`develop-ruleset-drift.yml` use `pull_request_target` against trusted `develop`
+and can still report. Diagnose with `gh pr view <N> --json mergeable` plus the
+expected workflow names — do not infer conflicts, or a filter bug, from an
+empty or partial check list alone.
+
 ## Agent checklist
 
 - `make pr-open` (and manual `gh pr create`) must target `develop` unless the
