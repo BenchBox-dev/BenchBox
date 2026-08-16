@@ -11,36 +11,30 @@ tools: Bash, Read, Edit, Write, Task
 
 After bootstrap, use `_project/scripts/todo` for every tracker command.
 
-- Run `_project/scripts/todo --help` and confirm the chosen subcommand.
-- Treat that subcommand's `--help` output as its full contract.
+- Run `_project/scripts/todo --help`; treat the chosen subcommand's help as its full contract.
 - If the subcommand is missing, report the gap and stop.
 - Put global flags before it: `todo --db <path> --actor <name> <command>`.
 
 Skill-only actions: `prioritize`, `batch`, `handoff`, and `closeout`; follow their guides, not the CLI.
 
-If one request combines review or validation with close-out, perform the
-read-only review and stop at findings under `SHARED/review-protocol/SKILL.md`.
-A later user message may authorize `closeout`.
+If one request combines review or validation with close-out, perform the read-only review and stop at findings under
+`SHARED/review-protocol/SKILL.md`. A later user message may authorize `closeout`.
 
 ### Failures and claims
 
 - Exit code 2 means a general failure.
-- Exit code 4 means the hosted database rejected the credentials. Stop writes,
-  run `todo doctor`, and show the error. The wrapper may first try one token
-  refresh.
-- Only the holder can run `todo release`. It exits 2 for another actor's claim;
-  checking `claimed_by` can still race. `complete` and `drop` may clear any
-  claim. `--actor` prevents mistakes, not impersonation.
+- Exit code 4 means the hosted database rejected the credentials. Stop writes, run `todo doctor`, and show the error;
+  the wrapper may first try one token refresh.
+- Only the holder can run `todo release`; it exits 2 for another actor's claim, and checking `claimed_by` can race.
+  `complete` and `drop` may clear any claim. `--actor` prevents mistakes, not impersonation.
 
 ### Lifecycle rules
 
 - Read the selected action guide before acting.
-- When the user approves a specification and asks to track it, create its item
-  with `todo create` or the supported create-from-spec command.
+- After specification approval, track it with `todo create` or the supported create-from-spec command.
 - Store tracker state only in the database; do not create tracker files by hand.
 - Commit through `SHARED/change-framework/SKILL.md`.
-- `TODO_DB_URL` may select the hosted database. The CLI never prints its
-  connection string.
+- `TODO_DB_URL` may select the hosted database; the CLI never prints its connection string.
 
 ## Actions
 
@@ -59,6 +53,5 @@ A later user message may authorize `closeout`.
 | `closeout` — skill-only, no CLI command | You remediate a separately reviewed batch and close its items | `references/closeout.md` |
 | `help` | You need the action list | This table |
 
-`todo ready` and `todo stats` may warn on stderr about open findings or unsynced
-drafts without changing stdout. Run `todo finding candidates` when warned; no
-warning appears when there are no findings.
+`todo ready` and `todo stats` may warn on stderr about open findings or unsynced drafts without changing stdout. Run
+`todo finding candidates` when warned; no warning appears when there are no findings.

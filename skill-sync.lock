@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lockedAt": "2026-08-16T21:51:23.750Z",
+  "lockedAt": "2026-08-16T22:49:47.409Z",
   "skills": {
     "blog": {
       "source": {
@@ -161,10 +161,10 @@
         "type": "git",
         "name": "todo-context-efficiency",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "740eeab3a585af162523c5b5e653fea18fae19f1",
+        "ref": "e0af1fe8b6751ee7cae42fa7a9adc374d96dd690",
         "subdir": "skills",
-        "revision": "740eeab3a585af162523c5b5e653fea18fae19f1",
-        "fetchedAt": "2026-08-16T21:51:19.533Z"
+        "revision": "e0af1fe8b6751ee7cae42fa7a9adc374d96dd690",
+        "fetchedAt": "2026-08-16T22:49:43.374Z"
       },
       "installMode": "mirror",
       "files": {
@@ -209,8 +209,8 @@
           "size": 463
         },
         "SKILL.md": {
-          "sha256": "428de89b09cbd538890152e547a30a2828a190c3f8689bc8d1979ea878a39941",
-          "size": 3933
+          "sha256": "4f039e8b410b0150748a2da619bacc07d7020ac86c163bfe8fc038bdef17bf4e",
+          "size": 3844
         },
         "skill.yaml": {
           "sha256": "e2c0b40d9935492621e6d21ab216a6227f4bae8f3808ed004d995d0f1b5bbff3",
