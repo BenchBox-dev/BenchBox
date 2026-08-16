@@ -10,7 +10,7 @@
 | adapter-capability-protocols-20260808 | done | medium-high | adapter-architecture | Introduce adapter capability protocols behind the PlatformAdapter facade |
 | adapter-run-context-and-reuse-contract | done | medium-high | main | Architecture hardening: document adapter lifecycle and isolate run-scoped state if needed |
 | adapter-schema-phase-ddl-ledger-capture-20260724 | done | high | main | Schema-phase tuning DDL bypasses the ledger recorder (ClickHouse exports noop despite physical tuning) |
-| add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the | planning | medium | main | Add a CI check that the UAT charter (or pointer) exists on the release branch |
+| add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the | done | medium | main | Add a CI check that the UAT charter (or pointer) exists on the release branch |
 | add-a-streams-concurrency-cli-option-to-benchbox-run-itself | planning | medium | main | Add a --streams/--concurrency CLI option to `benchbox run` itself
 (benchbox/cli/commands/run.py) so BenchmarkConfig.concurrency is
 reachable from the canonical (non-deprecated) `run` command, not just |
@@ -52,7 +52,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | address-outstanding-todos | done | medium | unknown | ✅ Address Outstanding TODOs |
 | adopt-apple-container-ci-parity | done | medium-high | main | Adopt Apple container for local Linux CI-parity validation before PRs |
 | adopt-locked-todo-db-runtime-for-secondary-consumers | dropped | medium | todo-db-standalone-extraction | Adopt the locked todo-db runtime in secondary consumers |
-| adopt-locked-todo-db-runtime-for-secondary-consumers-gated | planning | medium | todo-db-standalone-extraction | Adopt the locked todo-db runtime in secondary consumers |
+| adopt-locked-todo-db-runtime-for-secondary-consumers-gated | done | medium | todo-db-standalone-extraction | Adopt the locked todo-db runtime in secondary consumers |
 | adopt-todo-db-standalone-cli-for-amendable-items | dropped | medium | main | Adopt todo-db >= 0.3 so items can be amended (update is standalone-only) |
 | advanced-cost-analysis-framework-multi-region-pricing-models | done | high | cost-intelligence-advanced | Advanced Cost Analysis Framework - Multi-Region & Pricing Models |
 | adversarial-review-cost-framework-enhancement-warnings-metadata-timing-storage | done | high | unknown | ✅ Adversarial Review - Cost Framework Enhancement (Warnings, Metadata, Timing, Storage) |
@@ -96,6 +96,14 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | applicability-sweep-ignores-data-acquisition-cost | planning | low | dataframe-benchmarks | Cross-surface applicability sweep reports joinorder as gateable though it forbids a bounded scale |
 | applied-receipt-anonymization-error-reason-leak-20260801 | done | critical | main | Anonymized exports leak raw introspection error text and identifiers via receipt.error and entries[].reason; scrub them and stop interpolating raw detail into reason |
 | approx-analytics-cloud-survey | planning | medium-high | benchmark-expansion | Approximate Analytics Cloud SQL Survey — read_primitives + SQL write_primitives at SF=0.1/1/10 |
+| arch-canonical-sql-execute-primitive | done | medium-high | arch-simplification | Fold one SQL adapter at a time onto the ADR-chosen execute/validate primitive |
+| arch-composition-boundary-adr | done | high | arch-simplification | ADR: core-as-kernel vs benchbox.runtime, prototyped on the SQL execute edge |
+| arch-delete-dead-setup-lifecycle-fork | done | high | arch-simplification | Delete unreachable ResultCaptureMixin._setup_fresh_database_phases; keep adapter ledger wrapper |
+| arch-docs-truth-refresh | done | high | arch-simplification | Fix stale architecture docs that the simplification program will be planned from |
+| arch-future-state-index-reconciliation | done | high | arch-simplification | One status in one place for release-tooling and experimental isolation |
+| arch-retire-compat-surfaces | done | medium | arch-simplification | Retire deprecated BaseBenchmark and dataframe_runner through recorded compatibility gates |
+| arch-ssb-family-plugin-seam-pilot | done | medium-high | arch-simplification | Pilot the benchmark-family plugin seam on SSB at scale 0.01 |
+| arch-tier-commitment-decision | done | high | arch-simplification | Record which platform/benchmark support tiers BenchBox commits to carry |
 | architecture-contract-map-and-support-taxonomy | done | high | main | Architecture hardening: create the public contract map and support taxonomy |
 | archive-terminal-items-out-of-hot-db | planning | medium | todo-db | Archive terminal items out of the hot DB into the git export |
 | ascii-chart-cdf | done | medium | core-functionality | Add ASCII CDF chart (cumulative distribution of query latency) |
@@ -111,7 +119,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | athena-parquet-optimization | done | medium-high | platform-expansion | Athena: Convert text tables to Parquet using CTAS for query performance |
 | athena-spark-emr-serverless-gcp-dataproc-live-tests | planning | medium | main | Athena Spark, EMR Serverless, GCP Dataproc live tests |
 | athena-spark-platform | done | medium | platform-expansion | Amazon Athena for Apache Spark Platform |
-| audit-blog-posts-and-historical-release-summaries-for-outdat | planning | medium | main | Audit blog posts and historical release summaries for outdated Alpha/install language |
+| audit-blog-posts-and-historical-release-summaries-for-outdat | done | medium | main | Audit blog posts and historical release summaries for outdated Alpha/install language |
 | audit-develop-sha-stamping-and-ci-gate | done | medium-high | main | Stamp develop SHA into release-readiness audits and gate stale audits in CI |
 | audit-evidence-measured-sha-binding | done | medium-high | main | Bind numeric audit evidence to the exact measured Git tree |
 | audit-imported-dependencies-for-elimination | done | medium | main | Audit all imported dependencies and eliminate any not strictly required |
@@ -201,7 +209,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | centralize-file-format-detection | done | medium-high | core-functionality | Centralize File Format and Compression Extension Detection |
 | centralize-output-control-and-eliminate-print-leaks | done | high | main | Centralize user output control and eliminate print leaks across CLI/core/MCP paths |
 | certify-benchbox-package-only-todo-runtime | dropped | high | main | Certify BenchBox package-only TODO runtime and remove fallback paths |
-| certify-benchbox-package-only-todo-runtime-gated | active | high | main | Certify BenchBox package-only TODO runtime and remove fallback paths |
+| certify-benchbox-package-only-todo-runtime-gated | done | high | main | Certify BenchBox package-only TODO runtime and remove fallback paths |
 | check-scope-reports-ok-when-no-scope-rules-exist | done | medium | main | check-scope prints 'scope OK' for items with no scope rules, reporting a pass when nothing was checked |
 | check-scope-reports-ok-when-nothing-was-diffed-20260806 | done | low | main | check-scope prints 'scope OK' when the diff was empty or targeted the wrong branch |
 | chromium-blocking-suite-not-in-required-checks | done | high | main | Wire the Chromium full-suite e2e into the required merge gate — its job says 'blocking' but nothing enforces it |
@@ -724,7 +732,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | fast-lane-ceiling-reservation-erosion | done | medium | ci-failure-reduction | Fast-lane headroom reserved for a named program is silently consumed by unrelated PRs |
 | fast-lane-decouple-ceiling-contention | dropped | high | ci-failure-reduction | Fast-lane budget: remove per-PR contention on fast_test_lane_policy.json (log split, quantum, base-relative delta, auto-ratchet) |
 | fast-lane-decouple-ceiling-contention-2 | done | high | ci-failure-reduction | Fast-lane budget: remove per-PR contention on fast_test_lane_policy.json (log split, quantum, base-relative delta, auto-ratchet) |
-| fast-lane-wallclock-budget-decision | planning | medium | ci-failure-reduction | DECISION GATE: adopt a wall-clock fast-lane budget once 4 weeks of WS9 duration data exist |
+| fast-lane-wallclock-budget-decision | done | medium | ci-failure-reduction | DECISION GATE: adopt a wall-clock fast-lane budget once 4 weeks of WS9 duration data exist |
 | finalize-monitoring-module-scope | done | medium | observability-quality | Finalize Monitoring Module Scope |
 | finding-drafts-dir-bridge | done | medium-high | findings-domain | Bridge ~/.benchbox/finding-drafts with the standalone drafts convention |
 | findings-bulk-import-transfer-test-coverage | done | medium | findings-domain | The findings bulk-import transfer path has no automated test, only a manual rehearsal |
@@ -793,7 +801,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | follow-up-visualization-template-chart-integration | done | high | main | Integrate additional ASCII chart types into template workflows |
 | formalize-mcp-internal-apis | done | medium-high | main | Promote 3 internal MCP API references to public exports |
 | format-converter-remaining-work | done | high | table-formats | Format Converter Integration - Remaining Work (Phases 3-6) |
-| full-public-site-visual-regression-suite | planning | medium | main | Full public-site visual regression suite |
+| full-public-site-visual-regression-suite | done | medium | main | Full public-site visual regression suite |
 | full-string-to-array-support-returning-actual-list-expressio | planning | medium | dataframe-benchmarks | Full string_to_array support (returning actual list expressions, not split_part proxy) |
 | future-ideas-backlog | planning | low | main | Future Ideas Backlog - Specialized Benchmarks and Infrastructure |
 | gate-cloud-output-default-by-deployment-mode | done | medium | core-functionality | Cloud output-location default is applied by platform category, ignoring the deployment mode |
@@ -1049,10 +1057,10 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | medium-tier-ci-home | done | medium | main | Give the medium pytest speed tier a CI ring (currently local-only for ~81 files) |
 | medium-tier-pre-merge-lane | done | high | auto-revert-incident | Run the medium test tier pre-merge on code PRs so medium breakage cannot land unexecuted |
 | medium-tier-red-disposition-and-promotion | done | medium-high | main | Disposition the medium tier's live failures on develop, get medium-test green, then wire it into auto-revert per its recorded criterion |
-| memory-adr-0001-oracle-grounding-decision | planning | medium-high | memory-evaluation | Accept or amend ADR 0001 oracle grounding |
+| memory-adr-0001-oracle-grounding-decision | active | medium-high | memory-evaluation | Accept or amend ADR 0001 oracle grounding |
 | memory-authority-gold-set | planning | low | memory-evaluation | Human gold set for authority field (deferred irreducible input) |
 | memory-behavioral-ab-evaluation-promotion-gate | done | high | memory-evaluation | Memory remediation phase 3: Codex and Claude behavioral A/B promotion gate |
-| memory-behavioral-gate-install-policy | planning | medium | memory-governance | Decide whether behavioral gate remains on the install path |
+| memory-behavioral-gate-install-policy | active | medium | memory-governance | Decide whether behavioral gate remains on the install path |
 | memory-behavioral-gate-remediation | done | high | memory-evaluation | Memory remediation phase 3 prerequisite: behavioral gate remediation (scoring circularity, harness launch blockers, provenance durability) |
 | memory-behavioral-independent-oracle-redesign | done | high | memory-evaluation | Memory remediation phase 3 prerequisite: independent behavioral oracle and treatment utility redesign |
 | memory-canary-rollout-monitoring-and-cleanup | dropped | medium-high | memory-rollout | Memory remediation phase 4: canary rollout, monitoring, rollback, and approved cleanup |
@@ -1062,7 +1070,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | memory-claude-deletion-ledger-decision | planning | high | memory-rollout | Claude deletion ledger: explicit none, approve entries, or rebuild |
 | memory-claude-deletion-ledger-disposition | dropped | high | memory-rollout | Claude deletion ledger: explicit none, approve entries, or rebuild |
 | memory-claude-monitoring-window-close | dropped | critical | memory-rollout | Claude rollout window close: final accept, reject, or extend |
-| memory-claude-window-final-disposition | planning | critical | memory-rollout | Claude rollout window close: final accept, reject, or extend |
+| memory-claude-window-final-disposition | active | critical | memory-rollout | Claude rollout window close: final accept, reject, or extend |
 | memory-codex-candidate-regeneration | done | high | memory-evaluation | Memory remediation: regenerate the Codex candidate against current live memory (D2) |
 | memory-codex-v4-candidate-behavioral-gate | done | high | memory-evaluation | Memory remediation v4: repair the Codex candidate and behavioral gate |
 | memory-codex-v5-candidate-behavioral-gate | done | high | memory-evaluation | Memory remediation v5: repair historical semantics and complete Codex gate |
@@ -1076,7 +1084,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | memory-governance-harness-defects | done | medium-high | memory-evaluation | Memory governance harness defects: package collision, clobbering pilot rung, version coupling, transcript tripwire |
 | memory-governance-human-decision-queue | done | high | memory-evaluation | Memory governance human decision queue: rulings agents must not make |
 | memory-governance-measurements-not-wired-into-gates | done | medium-high | memory-evaluation | Memory governance: the new integrity measurements are never consulted by a gate or CLI |
-| memory-monitor-index-update-classification | planning | medium-high | memory-rollout | Recalibrate monitor so MEMORY.md index-only growth is not BREACH |
+| memory-monitor-index-update-classification | active | medium-high | memory-rollout | Recalibrate monitor so MEMORY.md index-only growth is not BREACH |
 | memory-phase6-v8-matrix-authorization | planning | medium | memory-evaluation | Authorize and run v8 behavioral matrix (quota spend) |
 | memory-real-corpus-experimental-land | planning | medium | memory-evaluation | Land parked real-corpus path as experimental non-gate CLI |
 | memory-real-corpus-scoring-bridge | planning | high | memory-evaluation | Design real-record scoring bridge (taxonomy + ID mismatch) |
@@ -1085,9 +1093,9 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | memory-refinement-v3-retrieval-evaluation-corrected | done | high | memory-evaluation | Memory refinement v3: corrected retrieval-aware evaluation implementation |
 | memory-rollout-tooling-prerequisites | done | medium-high | memory-rollout | Memory remediation phase 4 prerequisite: reversible rollout, backup, and canary tooling |
 | memory-rollout-v2-system-split-execution | active | high | memory-rollout | Memory remediation phase 4 successor: system-split canary, atomic rollout, monitoring, and cleanup |
-| memory-scenario-hardening-saturated-criteria | planning | medium-high | memory-evaluation | Harden or demote saturated and non-separating criteria |
-| memory-unreachable-decision-oracles | planning | medium-high | memory-evaluation | Resolve three arm-independent decision oracles (defect ledger #5) |
-| memory-v7-contract-apply-and-cli | planning | medium-high | memory-evaluation | Apply behavioral contract v7 and wire --contract v7 |
+| memory-scenario-hardening-saturated-criteria | active | medium-high | memory-evaluation | Harden or demote saturated and non-separating criteria |
+| memory-unreachable-decision-oracles | active | medium-high | memory-evaluation | Resolve three arm-independent decision oracles (defect ledger #5) |
+| memory-v7-contract-apply-and-cli | active | medium-high | memory-evaluation | Apply behavioral contract v7 and wire --contract v7 |
 | metadata-primitives-benchmark | done | medium | benchmark-expansion | Metadata Primitives Benchmark - INFORMATION_SCHEMA, SHOW, DESCRIBE |
 | metadata-primitives-complexity-enhancements | done | high | benchmark-expansion | Metadata Primitives Complexity Enhancements |
 | metrics-command-group | done | low | ux-improvements | Create metrics command group and consolidate calculate-qphh |
@@ -1169,6 +1177,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | one-engine-unify-regression-policy | done | medium | one-engine | One core regression/trend policy consumed by CLI compare, report, and MCP analytics |
 | one-engine-unify-remaining-statistics | done | medium | one-engine | Unify the three percentile/stdev implementations outside benchbox/core/results |
 | one-engine-unify-statistics | done | medium-high | one-engine | Single core statistics implementation for geomean/percentiles/stddev across CLI and MCP |
+| one-engine-unrun-ladders-and-red-presort-rung | planning | medium-high | one-engine | One-engine items completed with verification ladders that were never run, and a keystone rung still red |
 | onehouse-quanton-platform | done | high | platform-expansion | Add Onehouse Quanton platform support for managed Spark benchmarking |
 | open-file-and-table-format-support | done | medium | benchmark-expansion | Open File and Table Format Support |
 | open-table-format-gap-analysis | done | medium-high | main | Close open table format support gaps across all BenchBox platforms |
@@ -1263,9 +1272,10 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | postgresql-first-class-platform | done | high | platform-expansion | Promote PostgreSQL to first-class platform status |
 | postgresql-platform-documentation | done | medium | docs-experience | PostgreSQL Platform Documentation |
 | power-run-iterations-configuration-completed | done | medium | unknown | Power Run Iterations Configuration ✅ COMPLETED |
+| pr-1644-fix-commit-nits-20260811 | planning | low | run-lifecycle | Clean up three defects introduced by the PR 1644 fix commits |
 | pr-gate-package-and-audit-promotion | done | medium-high | main | Promote package build/install smoke and pip-audit to the develop-PR required lane |
 | pr-gate-path-filter-output-lockstep-test | done | medium-high | main | Pin ci-paths job-level outputs to the path-filter groups so a missing output mapping can never silently disable a gate again |
-| pr-gate-tpch-binary-framing-coverage | planning | medium | ci-infrastructure | Close PR-gate gap: darwin/windows TPC-H binaries behaviorally validated only on nightly |
+| pr-gate-tpch-binary-framing-coverage | done | medium | ci-infrastructure | Close PR-gate gap: darwin/windows TPC-H binaries behaviorally validated only on nightly |
 | pr-open-auto-merge-partial-stack-race-20260804 | done | medium-high | main | make pr-open auto-merge can land a PR before its later commits are pushed |
 | pr-open-auto-merge-prevent-not-just-detect-20260804 | done | high | main | Stop make pr-open enabling auto-merge before the work is finished |
 | pr-postgres-sample-antiskip-guard | done | medium | main | Back-port nightly's anti-skip guard to pr.yml's non-blocking postgres-integration sample |
@@ -1677,6 +1687,7 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | run-lifecycle-and-export-unification-refactor | done | high | main | Refactor run lifecycle to a single execution path with unified export and metadata wiring |
 | run-lighthouse-a11y-audit | planning | medium | main | Run Lighthouse a11y audit |
 | run-official-command-consolidation | done | low | ux-improvements | Consolidate run-official into run --official flag |
+| run-service-all-exports-private-names | planning | medium | one-engine | benchbox.core.run_service exports three underscore-prefixed names in __all__ |
 | runtime-module-refactor-batch-two | done | low | runtime-ops | Runtime Module Refactor - Batch Two |
 | scaffold-results-explorer-frontend | done | high | main | Scaffold the results explorer frontend with Vite, TypeScript, and DuckDB-WASM |
 | scd2-basic-idempotency-and-cleanup-scoping | done | medium | scd2-audit-followup | Make merge_scd_type2_basic idempotent (cross-op cleanup isolation deferred) |
@@ -1795,6 +1806,15 @@ reachable from the canonical (non-deprecated) `run` command, not just |
 | stats-json-stale-flag-for-quiescence-probe | done | medium | todo-db | stats --json: expose replica staleness so the quiescence probe cannot false-pass on a dead sync |
 | stop-manufactured-zero-durations-20260811 | done | medium-high | result-integrity | Stop manufacturing zero durations in throughput result capture |
 | streamline-pytest-run-profiles | done | high | unknown | ✅ Streamline Pytest Run Profiles |
+| strict-base-refresh-00-policy-and-legacy-gate-reconciliation | done | high | ci-failure-reduction | Strict-base refresh policy - 00: lock the safety contract and reconcile the legacy queue gate |
+| strict-base-refresh-01-trusted-certification-classifier | done | high | ci-failure-reduction | Strict-base refresh policy - 01: implement the trusted full-certification and exact-refresh classifier |
+| strict-base-refresh-02-shadow-certification-workflows | done | high | ci-failure-reduction | Strict-base refresh policy - 02: wire trusted certification evidence and shadow classification without skipping CI |
+| strict-base-refresh-03-historical-replay-and-negative-controls | done | high | ci-failure-reduction | Strict-base refresh policy - 03: replay refresh history and prove classifier negative controls |
+| strict-base-refresh-04-whole-event-latency-and-full-ci-profile | done | medium-high | ci-failure-reduction | Strict-base refresh policy - 04: profile whole-event latency and the full CI critical path |
+| strict-base-refresh-05-native-merge-queue-transfer-assessment | done | high | ci-failure-reduction | Strict-base refresh policy - 05: produce an operator-ready native merge queue and repository-transfer assessment |
+| strict-base-refresh-06-activation-decision-and-selected-path-handoff | done | critical | ci-failure-reduction | Strict-base refresh policy - 06: decide shadow-only, reduced refresh, or native queue and authorize exactly one path |
+| strict-base-refresh-07a-reduced-fast-refresh-rollout | planning | high | ci-failure-reduction | Strict-base refresh policy - 07a: activate and roll out the selected reduced exact-refresh policy |
+| strict-base-refresh-07b-native-merge-queue-migration | planning | high | ci-failure-reduction | Strict-base refresh policy - 07b: transfer to an organization and deploy the selected native merge queue policy |
 | structural-debt-base-layer-tpc-and-module-split | done | low | main | Structural debt: extract TPC harnesses out of platforms/base/execution.py and split the cross_surface god-module |
 | submission-validator-drift-develop-vs-published-results | done | medium-high | main | validate-submission.yml has drifted between develop and published-results; the drift gate is red |
 | submission-validator-plans-tuning-backmap-20260803 | dropped | medium-high | main | Close the plans and tuning companion bypass in submission validation |
