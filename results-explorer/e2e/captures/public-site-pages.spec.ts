@@ -27,7 +27,10 @@ const ROUTES = [
 ] as const;
 const MANIFEST = path.join(OUTPUT, "manifest.json");
 
-test.describe.configure({ mode: "serial" });
+// Each Results viewport can spend up to 46 seconds on bounded cold-snapshot
+// recovery. Give the four independent waits enough aggregate budget while
+// keeping the per-attempt limits in `waitForDataLoaded` unchanged.
+test.describe.configure({ mode: "serial", timeout: 240_000 });
 // The public-site suite requires the assembled Pages-shaped site. Keep it out
 // of the Explorer-only blocking command unless that site is explicitly mounted.
 test.skip(!process.env.E2E_PAGES_SHAPED || !process.env.E2E_SITE_DIR, "requires E2E_PAGES_SHAPED and E2E_SITE_DIR");

@@ -72,6 +72,7 @@ def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
     assert "bootstrap=true" in script_source
     assert "page=${page}" in script_source
     assert "BASELINE_LOOKUP_ATTEMPTS" in script_source
+    assert "lookupFailed = false" in script_source
     assert "test:e2e:public-site" in package["scripts"]
     assert "e2e/captures/public-site-pages.spec.ts" in package["scripts"]["test:e2e:public-site"]
 
@@ -81,4 +82,5 @@ def test_public_results_capture_waits_for_data_before_digesting() -> None:
 
     assert "waitForDataLoaded" in source
     assert "Recent Results" in source
+    assert "timeout: 240_000" in source
     assert "coldResultsLoad" not in source

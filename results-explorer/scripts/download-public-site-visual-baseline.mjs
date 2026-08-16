@@ -59,6 +59,8 @@ for (let attempt = 1; attempt <= BASELINE_LOOKUP_ATTEMPTS; attempt += 1) {
   try {
     const validArtifacts = await listValidArtifacts();
     lookupSucceeded = true;
+    lookupFailed = false;
+    lastLookupError = undefined;
     sawValidArtifact ||= validArtifacts.length > 0;
     artifact = validArtifacts.find((candidate) => candidate.workflow_run?.head_sha === baseSha);
     if (artifact) break;
