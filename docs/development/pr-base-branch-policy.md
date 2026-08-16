@@ -76,12 +76,12 @@ Do not treat an empty check list on a feature base as "CI is fine" or as the
 same problem as `dirty` (conflicts) or `blocked` (unfinished gates) on
 `develop`.
 
-A conflicting PR is the easiest of these to misread, because it produces **zero**
-`pull_request` workflow runs rather than a failure: GitHub cannot build the merge
-ref, so no workflow is ever dispatched, and nothing on the PR says so. An empty
-check list on a correct base therefore means conflicts at least as often as it
-means a path filter. Check `gh pr view <N> --json mergeable` before diagnosing
-missing CI as a workflow or filter problem.
+A conflicting PR can produce **zero** `pull_request` workflow runs because GitHub
+cannot build its merge ref. This repository still runs
+`develop-refresh-shadow.yml` and `develop-ruleset-drift.yml` with
+`pull_request_target` from trusted `develop`, so an empty check list is not a
+universal conflict diagnostic. Check `gh pr view <N> --json mergeable` and the
+expected workflow names before diagnosing a workflow or filter problem.
 
 ## Agent checklist
 

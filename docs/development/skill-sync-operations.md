@@ -9,13 +9,12 @@ Skill source is `/Users/joe/.skill-sync/skills`. `.claude/skills` is tracked;
 `.codex/skills`, `.gemini/skills`, and `.antigravity/skills` are generated
 mirrors that are not.
 
-## `make skill-sync` always dirties two files it did not change
+## `make skill-sync` can dirty two files it did not change
 
-**`skill-sync.lock`** is rewritten on every run with timestamp-only churn: the
-`lockedAt` and `fetchedAt` fields move, while digests and pins stay identical.
-The lockfile diff is therefore noise by default. `git checkout skill-sync.lock`
-after syncing keeps the PR diff to the real change; `make skill-sync-check`
-still passes without the rewritten timestamps.
+**`skill-sync.lock`** is rewritten on every run. If only `lockedAt` and
+`fetchedAt` move, the diff is timestamp-only noise; retain source refs,
+revisions, and file digests when they change. Inspect the diff and revert only
+timestamp-only changes; `make skill-sync-check` still passes without them.
 
 **`.gitattributes`** is rewritten too: the CLI moves its managed block
 
@@ -43,8 +42,10 @@ roughly 11 missing skills each. Those mirrors are local-only and unmaterialized
 in a fresh checkout; only `claude` is tracked. The same command is clean in the
 primary clone.
 
-Judge a worktree run on the `claude` rows alone, or re-run in the primary clone
-before treating drift as real.
+Judge a fresh-worktree run on the `claude` rows alone. To check local mirrors,
+run `make skill-sync` in that worktree, then rerun `make skill-sync-check` and
+`scripts/check_untracked_skill_mirrors.sh` there; do not use the primary clone
+as proof.
 
 ## Project review checks need `config.code.review_checklist`
 
