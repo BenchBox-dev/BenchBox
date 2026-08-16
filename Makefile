@@ -533,6 +533,11 @@ skill-sync:
 		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
 	fi
 
+# Fresh worktrees lack the gitignored codex/gemini/antigravity mirrors, so
+# doctor reports materialization/drift there until `make skill-sync` runs in
+# THIS worktree. Judge those rows only after that; a clean primary-clone check
+# does not certify a worktree that changed skill-sync.yaml or tracked Claude
+# mirrors. The tracked `.claude/skills` rows are the durable signal.
 skill-sync-check:
 	@if [ -f "$(SKILL_SYNC)" ]; then \
 		node "$(SKILL_SYNC)" doctor; \
