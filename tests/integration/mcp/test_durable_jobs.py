@@ -100,7 +100,7 @@ def test_normalized_platform_options_survive_repository_round_trip(tmp_path: Pat
 
 def test_durable_replay_applies_duckdb_threads_to_the_real_adapter(tmp_path: Path) -> None:
     """A replayed request must still change DuckDB execution, not just forward a key."""
-    from benchbox.core.run_service import _translate_platform_options_for_adapter as _prepare_adapter_platform_options
+    from benchbox.core.run_service import translate_platform_options_for_adapter as _prepare_adapter_platform_options
     from benchbox.platforms.duckdb import DuckDBAdapter
 
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())

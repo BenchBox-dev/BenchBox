@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.core.run_service import (
-    _map_phases_to_execution_type,
+    map_phases_to_execution_type,
     resolve_lifecycle_phases,
 )
 
@@ -36,7 +36,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 )
 def test_execution_type_and_lifecycle_resolution_agree(phases, expected_type, expected_execute):
     """Core phase resolution keeps execution type and lifecycle flags aligned."""
-    execution_type = _map_phases_to_execution_type(phases)
+    execution_type = map_phases_to_execution_type(phases)
     lifecycle = resolve_lifecycle_phases(phases if phases else None)
 
     assert execution_type == expected_type

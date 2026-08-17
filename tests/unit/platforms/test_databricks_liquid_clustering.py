@@ -289,7 +289,7 @@ def test_mcp_clustering_options_reach_the_effective_resolver(_mock_databricks_sq
     dropped. Only the translated `tuning_config` becomes
     `unified_tuning_configuration`, which is what the resolver reads.
     """
-    from benchbox.core.run_service import _translate_platform_options_for_adapter as _prepare_adapter_platform_options
+    from benchbox.core.run_service import translate_platform_options_for_adapter as _prepare_adapter_platform_options
     from benchbox.mcp.schemas import validate_platform_options
 
     normalized = validate_platform_options(
@@ -320,7 +320,7 @@ def test_mcp_clustering_options_reach_the_effective_resolver(_mock_databricks_sq
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
 def test_mcp_columns_alone_infer_liquid_clustering_at_the_resolver(_mock_databricks_sql):
-    from benchbox.core.run_service import _translate_platform_options_for_adapter as _prepare_adapter_platform_options
+    from benchbox.core.run_service import translate_platform_options_for_adapter as _prepare_adapter_platform_options
     from benchbox.mcp.schemas import validate_platform_options
 
     normalized = validate_platform_options("databricks", {"liquid_clustering_columns": "event_time"})

@@ -5,7 +5,7 @@ below both surfaces. This module pins the shared execution-type behavior so
 both surfaces remain reviewable and cannot silently diverge again.
 
 The CLI wrapper and MCP execution both derive a benchmark's execution type from
-`benchbox/core/run_service.py::_map_phases_to_execution_type`. Mixed
+`benchbox/core/run_service.py::map_phases_to_execution_type`. Mixed
 query-phase requests use `combined`, ensuring the runner executes every
 requested query phase.
 """
@@ -31,9 +31,9 @@ def _cli_derive(phases: list[str]) -> str:
 
 
 def _mcp_derive(phases: list[str]) -> str:
-    from benchbox.core.run_service import _map_phases_to_execution_type
+    from benchbox.core.run_service import map_phases_to_execution_type
 
-    return _map_phases_to_execution_type(phases)
+    return map_phases_to_execution_type(phases)
 
 
 def _all_phase_subsets() -> list[list[str]]:

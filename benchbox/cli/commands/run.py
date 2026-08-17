@@ -525,9 +525,9 @@ class BenchmarkOptionParamType(click.ParamType):
 
 def _derive_execution_type(phases: list[str]) -> str:
     """Derive benchmark execution type through the shared core service."""
-    from benchbox.core.run_service import _map_phases_to_execution_type
+    from benchbox.core.run_service import map_phases_to_execution_type
 
-    return _map_phases_to_execution_type(phases)
+    return map_phases_to_execution_type(phases)
 
 
 def _describe_platform_options(platform_names: Iterable[str]) -> None:

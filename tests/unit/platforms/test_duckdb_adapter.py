@@ -1645,7 +1645,7 @@ class TestMCPThreadsReachTheEffectiveSetting:
     @staticmethod
     def _adapter_from_mcp_request(tmp_path: Path, options: dict):
         from benchbox.core.run_service import (
-            _translate_platform_options_for_adapter as _prepare_adapter_platform_options,
+            translate_platform_options_for_adapter as _prepare_adapter_platform_options,
         )
         from benchbox.mcp.schemas import validate_platform_options
 
