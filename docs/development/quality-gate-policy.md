@@ -97,6 +97,12 @@ green run.
 
 ## Complexity measurement and exceptions
 
+Per-function McCabe and file cloc are hygiene. They do not measure the
+extension cost of adding one SQL platform, one DataFrame platform, or one
+benchmark family. Architecture reviews treat that extension-cost count as the
+primary complexity metric; this gate remains the hard CC ceiling and advisory
+band only. See `docs/agent/review-protocol.md`.
+
 The former list contained 152 function exclusions. Every entry was remeasured
 against current Ruff C901 output before removal:
 
