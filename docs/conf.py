@@ -149,7 +149,19 @@ napoleon_use_rtype = True
 napoleon_type_aliases = None
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "_project"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "_project",
+    "agent",
+    "development/task-management-design.md",
+    "development/dependency-audit-raw.md",
+    "development/duplication-inventory.csv",
+    "development/duplication-residuals.md",
+    "development/unified_frame_any_survey.md",
+    "development/unified_frame_any_survey.csv",
+]
 
 language = "en"
 
