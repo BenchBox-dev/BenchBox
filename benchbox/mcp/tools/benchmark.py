@@ -271,9 +271,9 @@ def _make_failed_response(error_response: dict[str, Any], execution_id: str) -> 
 
 def _resolve_mcp_mode_with_registry(platform: str, mode: str | None):
     """Resolve a mode through core and adapt unsupported-mode errors for MCP."""
-    from benchbox.core.run_service import _resolve_mode_with_registry
+    from benchbox.core.run_service import resolve_mode_with_registry
 
-    resolved_mode, mode_error = _resolve_mode_with_registry(platform, mode)
+    resolved_mode, mode_error = resolve_mode_with_registry(platform, mode)
     if mode_error is None:
         return resolved_mode, None
     return resolved_mode, make_unsupported_mode_error(platform, mode_error.mode, list(mode_error.supported))
@@ -358,9 +358,9 @@ def _execute_mcp_run_via_core(
     """Execute a validated MCP run through the shared core run service."""
     from benchbox.core.run_service import (
         SilentVerbosity,
-        _map_phases_to_execution_type,
-        _translate_platform_options_for_adapter,
         execute_run,
+        map_phases_to_execution_type,
+        translate_platform_options_for_adapter,
     )
     from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, ExecutionContext
     from benchbox.core.system import SystemProfiler
@@ -386,7 +386,7 @@ def _execute_mcp_run_via_core(
                 adapter_input["port"] = profile["port"]
                 adapter_input["secure"] = profile["secure"]
                 adapter_input.pop("connection_profile", None)
-            adapter_options = _translate_platform_options_for_adapter(platform, adapter_input)
+            adapter_options = translate_platform_options_for_adapter(platform, adapter_input)
         except MCPValidationError as exc:
             return _make_failed_response(
                 make_error(ErrorCode.VALIDATION_ERROR, str(exc), details={"platform": platform}),
@@ -409,7 +409,7 @@ def _execute_mcp_run_via_core(
         queries=query_subset,
         capture_plans=capture_plans,
     )
-    benchmark_config.test_execution_type = _map_phases_to_execution_type(phases)
+    benchmark_config.test_execution_type = map_phases_to_execution_type(phases)
     if "statistics" in phases:
         benchmark_config.options = dict(benchmark_config.options or {})
         benchmark_config.options["gather_statistics"] = True

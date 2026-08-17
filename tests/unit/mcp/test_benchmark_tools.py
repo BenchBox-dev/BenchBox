@@ -386,7 +386,7 @@ class TestRunBenchmarkTool:
 
     def test_databricks_layout_options_build_unified_tuning_config(self):
         from benchbox.core.run_service import (
-            _translate_platform_options_for_adapter as _prepare_adapter_platform_options,
+            translate_platform_options_for_adapter as _prepare_adapter_platform_options,
         )
 
         options = _prepare_adapter_platform_options(
@@ -402,7 +402,7 @@ class TestRunBenchmarkTool:
 
     def test_databricks_columns_infer_liquid_clustering_strategy(self):
         from benchbox.core.run_service import (
-            _translate_platform_options_for_adapter as _prepare_adapter_platform_options,
+            translate_platform_options_for_adapter as _prepare_adapter_platform_options,
         )
 
         options = _prepare_adapter_platform_options("databricks", {"liquid_clustering_columns": "customer_id,order_id"})
@@ -418,7 +418,7 @@ class TestRunBenchmarkTool:
         from unittest.mock import MagicMock, patch
 
         from benchbox.core.run_service import (
-            _translate_platform_options_for_adapter as _prepare_adapter_platform_options,
+            translate_platform_options_for_adapter as _prepare_adapter_platform_options,
         )
         from benchbox.mcp.schemas import (
             MCP_CLICKHOUSE_PROFILE_ENV,

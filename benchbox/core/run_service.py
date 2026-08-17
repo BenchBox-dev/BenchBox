@@ -356,7 +356,7 @@ def execute_run(
 # ---------------------------------------------------------------------------
 
 
-def _translate_platform_options_for_adapter(platform: str, options: dict) -> dict:
+def translate_platform_options_for_adapter(platform: str, options: dict) -> dict:
     """Translate validated platform options to adapter kwargs.
 
     ClickHouse profile resolution stays surface-owned because it needs server
@@ -407,7 +407,7 @@ def build_databricks_clustering_intent(options: dict[str, object]):
     return tuning_config
 
 
-def _resolve_mode_with_registry(platform: str, mode: str | None):
+def resolve_mode_with_registry(platform: str, mode: str | None):
     """Resolve a requested mode against the shared platform registry."""
     if mode is not None:
         mode = mode.lower()
@@ -435,7 +435,7 @@ def _resolve_mode_with_registry(platform: str, mode: str | None):
     return caps.default_mode, None
 
 
-def _map_phases_to_execution_type(phases: list[str]) -> str:
+def map_phases_to_execution_type(phases: list[str]) -> str:
     """Map the requested phases to the shared benchmark execution type."""
     phases_set = set(phases)
     query_phases = set(QUERY_PHASES)
@@ -471,9 +471,9 @@ __all__ = [
     "resolve_run_config",
     "resolve_validation_options",
     "stamp_requested_phases",
-    "_translate_platform_options_for_adapter",
+    "translate_platform_options_for_adapter",
     "build_databricks_clustering_intent",
-    "_resolve_mode_with_registry",
+    "resolve_mode_with_registry",
     "UnsupportedExecutionMode",
-    "_map_phases_to_execution_type",
+    "map_phases_to_execution_type",
 ]
