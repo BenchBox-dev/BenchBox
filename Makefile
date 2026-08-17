@@ -1263,17 +1263,22 @@ pr-preflight:
 	$(MAKE) -s uat-artifact-hygiene
 
 # Consume the classifier decision only; never reimplement path globs here.
-# Mixed skill/product diffs run both lanes. Content-only remains on the full
-# product preflight until a separately authorized optimization exists.
+# Mixed skill/product diffs run both lanes. Skill plus safe content stays on
+# the two narrow lanes. Content-only remains on the full product preflight
+# until a separately authorized optimization exists.
 .pr-preflight-route:
 	@set -eu; \
 	[ -n "$(PATH_DECISION)" ] && [ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
 	[ -n "$(PATH_LISTS)" ] && [ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
-	ROUTE=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding="utf-8")); keys=("skill_integrity_needed", "content_guard_needed", "skill_integrity_only", "needs_code_ci"); assert all(type(d.get(k)) is bool for k in keys), "invalid preflight decision"; assert not d["skill_integrity_only"] or (d["skill_integrity_needed"] and not d["content_guard_needed"] and not d["needs_code_ci"]), "contradictory preflight decision"; print(*(str(d[k]).lower() for k in keys))' "$(PATH_DECISION)"); \
+	ROUTE=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding="utf-8")); keys=("skill_integrity_needed", "content_guard_needed", "skill_integrity_only", "needs_code_ci"); assert all(type(d.get(k)) is bool for k in keys), "invalid preflight decision"; assert not d["skill_integrity_only"] or (d["skill_integrity_needed"] and not d["needs_code_ci"]), "contradictory preflight decision"; print(*(str(d[k]).lower() for k in keys))' "$(PATH_DECISION)"); \
 	set -- $$ROUTE; SKILL=$$1; CONTENT=$$2; SKILL_ONLY=$$3; \
-	if [ "$$SKILL_ONLY" = true ]; then \
+	if [ "$$SKILL_ONLY" = true ] && [ "$$CONTENT" != true ]; then \
 		echo "Selected preflight lanes: skill-integrity"; \
 		$(MAKE) -s skill-integrity-check; \
+	elif [ "$$SKILL_ONLY" = true ]; then \
+		echo "Selected preflight lanes: skill-integrity content"; \
+		$(MAKE) -s skill-integrity-check; \
+		$(MAKE) -s pr-content-guard PATH_LISTS="$(PATH_LISTS)"; \
 	else \
 		LANES=product; [ "$$CONTENT" = true ] && LANES="$$LANES content"; [ "$$SKILL" = true ] && LANES="$$LANES skill-integrity"; \
 		echo "Selected preflight lanes: $$LANES"; \
@@ -1286,11 +1291,24 @@ pr-preflight:
 # needs-code-ci decision gates only the fast-test run below. Pure approved
 # skill-integrity diffs do not enter this target; their focused lane carries
 # its own artifact, provenance, mirror, instruction, and identity controls.
+# Direct invocation (the opt-in pre-push hook) creates classifier artifacts
+# when the parent preflight did not already supply them.
 pr-preflight-fast-tests:
-	@[ -n "$(PATH_DECISION)" ] && [ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
-	[ -n "$(PATH_LISTS)" ] && [ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
-	$(MAKE) -s pr-content-guard PATH_LISTS="$(PATH_LISTS)"; \
-	if uv run -- python scripts/path_filter_decision.py --json-in "$(PATH_DECISION)" --check needs-code-ci >/dev/null; then \
+	@set -eu; \
+	if [ -n "$(PATH_DECISION)" ] || [ -n "$(PATH_LISTS)" ]; then \
+		[ -n "$(PATH_DECISION)" ] && [ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
+		[ -n "$(PATH_LISTS)" ] && [ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
+		DECISION="$(PATH_DECISION)"; \
+		LISTS="$(PATH_LISTS)"; \
+	else \
+		DECISION=$$(mktemp); \
+		LISTS=$$(mktemp -d); \
+		trap 'rm -f "$$DECISION"; rm -rf "$$LISTS"' EXIT; \
+		git fetch origin develop --quiet; \
+		uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
+	fi; \
+	$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
+	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
 		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
 		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
 	else \
