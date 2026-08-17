@@ -57,6 +57,13 @@ Required status checks:
 - ruleset-drift
 ```
 
+A code-PR `synchronize` is not one Develop PR run. The same head SHA also
+starts Documentation, Results Explorer browser tests, PR base guard,
+auto-merge revocation, and ruleset-drift (plus path-filtered siblings such as
+extension-smoke and gitignore lint). Split runner minutes from wall minutes by
+workflow when judging savings; the next-slowest sibling can dominate remaining
+wall time after `pr.yml` jobs are skipped.
+
 `ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
 that aggregates the required-lane jobs: `ci-paths`, `content-guard`,
 `code-lint`, `code-test`, `correctness-gate`, `plan-capture-gate`,
