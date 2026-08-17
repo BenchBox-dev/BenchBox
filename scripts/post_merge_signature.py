@@ -31,6 +31,7 @@ precedent): this runs in a bare `python` step with no dependency sync.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import subprocess
 import sys
@@ -154,21 +155,100 @@ def paths_related_to_test(test_path: str) -> list[str]:
     return related
 
 
-def attribution_action(failure_ids: list[object], changed_paths: list[str]) -> str:
+def _dotted_module_to_candidate_paths(module: str) -> list[str]:
+    """Return the repo-relative file path candidates for a dotted module name."""
+    base = "/".join(module.split("."))
+    return [f"{base}.py", f"{base}/__init__.py"]
+
+
+def imported_module_paths(test_path: str, repo_root: Path) -> list[str]:
+    """Return repo-relative paths ``test_path`` actually imports, via its AST.
+
+    Real import/dependency analysis rather than basename matching: parses
+    every ``import``/``from ... import`` statement anywhere in the test file
+    (module-level or nested inside functions - most of these tests import
+    lazily), resolves each dotted module name (relative imports included) to
+    a candidate file path, and keeps only paths that exist on disk. This is
+    what lets a merge that breaks a same-package dependency the test imports
+    under an unrelated basename (e.g. a test file exercising
+    ``throughput_test.py`` via ``from benchbox.core.tpcds.throughput_test
+    import ...``) still be attributed correctly, instead of relying on
+    filename overlap.
+
+    Best-effort: returns ``[]`` if the test file cannot be read or parsed.
+    Callers must not treat an empty result as proof the blamed SHA is
+    innocent - only as "this signal found nothing", since it is not a full
+    transitive import graph (only direct imports of the test file itself are
+    resolved).
+    """
+    full_path = repo_root / test_path
+    try:
+        source = full_path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(full_path))
+    except (OSError, SyntaxError, UnicodeDecodeError):
+        return []
+
+    test_dir_parts = Path(test_path).parent.parts
+    module_names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module_names.add(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                # Relative import: resolve against the test file's own
+                # package directory. level=1 is "from . import x" (same
+                # package as the test file); each extra level climbs one
+                # more directory.
+                climb = node.level - 1
+                anchor = test_dir_parts[: len(test_dir_parts) - climb] if climb else test_dir_parts
+                if node.module:
+                    module_names.add(".".join([*anchor, node.module]))
+                elif anchor:
+                    module_names.add(".".join(anchor))
+            elif node.module:
+                module_names.add(node.module)
+
+    paths: list[str] = []
+    seen: set[str] = set()
+    for module in sorted(module_names):
+        for candidate in _dotted_module_to_candidate_paths(module):
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            if (repo_root / candidate).is_file():
+                paths.append(candidate)
+    return paths
+
+
+def attribution_action(
+    failure_ids: list[object],
+    changed_paths: list[str],
+    repo_root: Path | None = None,
+) -> str:
     """Return ``revert`` or ``advisory`` for a blamed SHA's changed paths.
 
-    Advisory only when every extractable failing test path (and its stem
-    match) is absent from ``changed_paths``. No extractable test path keeps
+    Checks two signals before downgrading to advisory: the test path/stem
+    heuristic (``paths_related_to_test``) and, since that heuristic misses a
+    dependency whose basename differs from the test file, real import
+    analysis (``imported_module_paths``) - a changed path the test file
+    actually imports still triggers revert even when neither its name nor
+    its stem matches. Advisory only when both signals clear the blamed SHA
+    for every extractable failing test path. No extractable test path keeps
     revert so lint/job failures stay fail-closed.
     """
     test_paths = failure_id_test_paths(failure_ids)
     if not test_paths:
         return "revert"
+    root = repo_root or Path.cwd()
     changed = set(changed_paths)
     changed_names = {Path(path).name for path in changed_paths}
     for test_path in test_paths:
         for related in paths_related_to_test(test_path):
             if related in changed or Path(related).name in changed_names:
+                return "revert"
+        for imported in imported_module_paths(test_path, root):
+            if imported in changed:
                 return "revert"
     return "advisory"
 
