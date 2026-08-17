@@ -58,11 +58,14 @@ Required status checks:
 ```
 
 A code-PR `synchronize` is not one Develop PR run. The same head SHA also
-starts Documentation, Results Explorer browser tests, PR base guard,
-auto-merge revocation, and ruleset-drift (plus path-filtered siblings such as
-extension-smoke and gitignore lint). Split runner minutes from wall minutes by
-workflow when judging savings; the next-slowest sibling can dominate remaining
-wall time after `pr.yml` jobs are skipped.
+starts Results Explorer browser tests, PR base guard, auto-merge revocation,
+the unconditional `develop-refresh-shadow` observational workflow, and
+ruleset-drift (plus path-filtered siblings such as extension-smoke and
+gitignore lint). Documentation (`docs.yml`) only starts when the diff touches
+its own path filter (`benchbox/**`, `docs/**`, `examples/**`, and similar) —
+for example a `tests/**`-only PR does not start it. Split runner minutes from
+wall minutes by workflow when judging savings; the next-slowest sibling can
+dominate remaining wall time after `pr.yml` jobs are skipped.
 
 `ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
 that aggregates the required-lane jobs: `ci-paths`, `content-guard`,
