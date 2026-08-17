@@ -286,6 +286,20 @@ execute:
                                  # rejected at validation time. UAT W3
                                  # line 222: parallel platforms
                                  # contaminate timings.
+  platform_chunking: false       # optional, bool, default false. When
+                                 # true, execute walks one platform at a
+                                 # time (already sequential) and, after
+                                 # each platform, prunes that platform's
+                                 # loaded databases through the reuse-
+                                 # aware helpers. Chunking operates
+                                 # inside one stage; it does not change
+                                 # release-gate stage order or the single
+                                 # cells.jsonl stream. Datagen is never
+                                 # pruned. The concurrent vs chunked
+                                 # loaded-database terms come from
+                                 # measured inventory rows at the
+                                 # configured rungs -- never a guessed
+                                 # 15 GiB constant.
   official: false                # optional, bool, default false. When
                                  # true, cells run via `benchbox
                                  # run-official --streams N` instead of
@@ -372,12 +386,14 @@ preflight:
 # contribute 0 GiB and are counted as unknown; rows may additionally
 # declare `peak_database_gib_status = unmeasured` (every checked-in row
 # currently does, so the loaded-database term is identically zero for want
-# of data). Preflight prints `Disk budget coverage:` and a
-# `Disk budget verdict:` line disclosing both gaps on EVERY run, warns
+# of data). Measured rows are also summed per platform: concurrent demand
+# is the sum, chunked demand is the max. Preflight prints those terms and
+# `Disk budget coverage:` / `Disk budget verdict:` on EVERY run, warns
 # when coverage is partial, and renders the free-space requirement as
 # `required >= N GiB` in that case -- a passing gate means "no shortfall
 # detected against the measured subset", not "fits". Refusing on the
-# lower bound stays sound in either state.
+# lower bound stays sound in either state; the abort names the computed
+# shortfall instead of discovering it mid-sweep.
 #
 # `preflight.free_space_min_gib` remains the hard cutoff via
 # `max(min_free_gib, estimate)` in `check_disk_headroom` -- the only

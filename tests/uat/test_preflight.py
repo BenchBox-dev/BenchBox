@@ -296,6 +296,10 @@ def test_preflight_disk_headroom_gate_aborts_short_root(tmp_path: Path, monkeypa
     assert result.aborted is True
     assert "disk headroom gate failed" in (result.abort_reason or "")
     assert f"tmp {scratch_tmp}: 8.0 GiB free < 10.0 GiB required" in (result.abort_reason or "")
+    assert "computed shortfall 2.0 GiB" in (result.abort_reason or "")
+    assert "database concurrent=3.00 GiB" in (result.abort_reason or "")
+    assert "chunked_max=3.00 GiB" in (result.abort_reason or "")
+    assert "failing now rather than exhausting disk mid-sweep" in (result.abort_reason or "")
 
 
 def test_preflight_disk_headroom_gate_respects_zero_override(tmp_path: Path, monkeypatch):

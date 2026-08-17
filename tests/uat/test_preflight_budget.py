@@ -55,6 +55,49 @@ def test_estimate_peak_disk_counts_datagen_once_and_reports_unknown(tmp_path: Pa
     assert budget.est_steady_gib == pytest.approx(1.5 + 2.0 + 3.0)
     assert budget.est_peak_gib == pytest.approx(1.5 + 2.0 + 3.0 + 0.5 + 0.25)
     assert [cell.key for cell in budget.unknown_cells] == ["datafusion|tpch|0.01"]
+    # Tables without peak_database_gib_status keep the historical measured meaning.
+    assert budget.database_by_platform_gib == (("duckdb", 2.0), ("sqlite", 3.0))
+    assert budget.concurrent_database_gib == pytest.approx(5.0)
+    assert budget.chunked_database_gib == pytest.approx(3.0)
+    assert budget.platforms_total == 3
+    assert budget.platforms_with_measured_database == 2
+
+
+def test_estimate_cells_models_measured_per_platform_database_only(tmp_path: Path):
+    """w0: the per-platform term is the sum of measured rows at configured rungs.
+
+    Unmeasured placeholders and missing platforms contribute 0 to that map, not a
+    guessed 15 GiB constant. Concurrent demand is the sum; chunked demand is the
+    max. The overall peak remains a lower bound over the measured subset.
+    """
+    table = tmp_path / "disk_budget.tsv"
+    table.write_text(
+        "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\t"
+        "peak_database_gib_status\ttransient_growth_gib\n"
+        "duckdb\ttpch\t1\t10.0\t20.0\tmeasured\t1.0\n"
+        "duckdb\ttpcds\t1\t8.0\t12.0\tmeasured\t1.0\n"
+        "sqlite\ttpch\t1\t11.0\t15.0\tmeasured\t1.0\n"
+        "lakesail\ttpch\t1\t9.0\t0.0\tunmeasured\t1.0\n",
+        encoding="utf-8",
+    )
+    cfg = validate_config(
+        {
+            "name": "per-platform-db",
+            "platforms": {"include": ["duckdb", "sqlite", "lakesail", "datafusion"]},
+            "benchmarks": {"include": ["tpch", "tpcds"]},
+            "scales": {"rungs": [1.0]},
+        }
+    )
+
+    budget = estimate_peak_disk(cfg, table_path=table)
+
+    assert budget.database_by_platform_gib == (("duckdb", 32.0), ("sqlite", 15.0))
+    assert budget.concurrent_database_gib == pytest.approx(47.0)
+    assert budget.chunked_database_gib == pytest.approx(32.0)
+    assert budget.platforms_total == 4
+    assert budget.platforms_with_measured_database == 2
+    assert "datafusion|tpch|1" in {cell.key for cell in budget.unknown_cells}
+    assert "15 GiB" not in format_disk_budget(budget)
 
 
 def test_format_disk_budget_includes_operator_fields(tmp_path: Path):
@@ -79,6 +122,10 @@ def test_format_disk_budget_includes_operator_fields(tmp_path: Path):
     assert "GiB peak" in line
     assert "cells=1" in line
     assert "unknown=0" in line
+    assert "measured-db platforms=1/1" in line
+    assert "database concurrent=2.00 GiB" in line
+    assert "chunked_max=2.00 GiB" in line
+    assert "basis=measured inventory rows" in line
 
 
 def test_largest_scale_cells_selects_the_largest_rung_through_the_live_path(tmp_path: Path):
@@ -138,6 +185,11 @@ def test_largest_scale_cells_selects_the_largest_rung_through_the_live_path(tmp_
     assert budget.est_steady_gib == pytest.approx(120.0 + 200.0 + 300.0)
     assert budget.est_peak_gib == pytest.approx(120.0 + 200.0 + 300.0 + 50.0 + 70.0)
     assert budget.unknown_cells == ()
+    assert budget.database_by_platform_gib == (("duckdb", 200.0), ("sqlite", 300.0))
+    assert budget.concurrent_database_gib == pytest.approx(500.0)
+    assert budget.chunked_database_gib == pytest.approx(300.0)
+    assert budget.platforms_total == 2
+    assert budget.platforms_with_measured_database == 2
 
 
 def test_disk_headroom_gate_reports_short_root(tmp_path: Path):
@@ -157,6 +209,23 @@ def test_disk_headroom_gate_reports_short_root(tmp_path: Path):
     assert len(check.shortfalls) == 1
     assert check.shortfalls[0].label == "tmp"
     assert f"tmp {tmp_root}: 4.0 GiB free < 10.0 GiB required" in format_disk_headroom_failure(check)
+    named = format_disk_headroom_failure(
+        check,
+        DiskBudget(
+            cells=2,
+            est_peak_gib=10.0,
+            est_steady_gib=8.0,
+            unknown_cells=(),
+            concurrent_database_gib=7.0,
+            chunked_database_gib=4.0,
+            platforms_total=2,
+            platforms_with_measured_database=2,
+        ),
+    )
+    assert "computed shortfall 6.0 GiB" in named
+    assert "database concurrent=7.00 GiB" in named
+    assert "chunked_max=4.00 GiB" in named
+    assert "failing now rather than exhausting disk mid-sweep" in named
 
 
 # ---------------------------------------------------------------------------

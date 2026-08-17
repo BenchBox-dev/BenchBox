@@ -264,7 +264,7 @@ def run_preflight(
     abort_kind: str | None = None
     if free_space_min_gib > 0 and budget_gate is not None and budget_gate.headroom.shortfalls:
         aborted = True
-        abort_reason = format_disk_headroom_failure(budget_gate.headroom)
+        abort_reason = format_disk_headroom_failure(budget_gate.headroom, budget_gate.budget)
         abort_kind = "disk_floor"
     elif free_space_min_gib > 0:
         short_roots = tuple(root for root in free_space_entries if root.free_gib < free_space_min_gib)
@@ -543,8 +543,8 @@ def format_free_space_report(
     )
 
 
-def format_disk_headroom_failure(check: DiskHeadroomCheck) -> str:
+def format_disk_headroom_failure(check: DiskHeadroomCheck, budget: DiskBudget | None = None) -> str:
     """Return a disk-budget gate failure message."""
     from tests.uat.preflight_budget import format_disk_headroom_failure as _format
 
-    return _format(check)
+    return _format(check, budget)

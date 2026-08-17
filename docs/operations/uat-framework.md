@@ -531,24 +531,31 @@ into an undisclosed fabrication, and `check_disk_headroom`'s
 `max(preflight.free_space_min_gib, estimate)` already guarantees the
 configured floor holds regardless of how low the estimate runs.
 
-> **Withdrawn: `execute.platform_chunking`.** An earlier iteration of this
-> section proposed a config flag that pruned each platform's loaded
-> databases at the platform boundary, on the premise that the flat
-> estimate hides a per-platform term and that ~11 platforms' databases
-> coexist at 90-150 GiB. Both premises were wrong. With the default
-> `cleanup.prune_databases: true` (`tests/uat/config.py`), `_maybe_prune_completed`
-> (`tests/uat/phases/execute.py`) already runs after every benchmark
-> including a platform's last, and `remaining_consumers` only counts
-> same-platform pending cells -- so at a platform boundary that platform's
-> databases are already pruned and the proposed step measured zero bytes
-> freed in every realistic case. (With `prune_databases: false` nothing is
-> pruned at all, platform boundary or not, so the flag would not have
-> helped there either.) And with the loaded-database column
-> unmeasured (gap 2 above), the "concurrent" and "chunked" figures differ
-> by under 1 MiB on every checked-in config, so the recommendation could
-> never fire. The flag, its execute wiring and its preflight branch were
-> removed; the honest disclosure above replaces them. Reopen this only
-> with measured per-platform database footprints in hand.
+### Chunked execute and the disk math
+
+`execute.platform_chunking: true` is a config-driven mode, not an
+out-of-tree shell driver. Execute already walks platforms sequentially;
+chunking makes that contract explicit and, after each platform, calls the
+existing reuse-aware prune helpers for that platform's `(platform,
+benchmark, scale)` loaded databases. It does not `rm -rf` the databases
+root, does not prune `datagen/`, and does not change release-gate stage
+order or the single `cells.jsonl` stream.
+
+The printed estimate now names both loaded-database terms from **measured
+inventory rows at the configured rungs**:
+
+- `database concurrent` -- sum across platforms (all loaded databases coexist)
+- `chunked_max` -- max across platforms (one platform at a time)
+
+Until rows flip to `peak_database_gib_status = measured`, both terms stay
+near zero and the estimate remains a lower bound. That is honest: do not
+substitute 15 GiB or any other guessed constant. When measured rows exist
+and even the concurrent lower bound exceeds free space, preflight aborts
+with the computed shortfall (`failing now rather than exhausting disk
+mid-sweep`) instead of discovering it hours later. Enable chunking when
+you have measured per-platform footprints and want the smaller
+`chunked_max` envelope; the abort still uses the concurrent figure as the
+fail-closed floor until that mode is on and the inventory supports it.
 
 ## Submission terminal states
 
