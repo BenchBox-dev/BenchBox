@@ -5,7 +5,7 @@ enforced mechanically by `_project/scripts/audit_sha_check.py` (`make
 audit-sha-check`), which is the authority; this page explains what each field
 means and why the distinctions matter.
 
-This lives outside `docs/development/agent-review-protocol.md` because it is a
+This lives outside `docs/agent/review-protocol.md` because it is a
 records convention for one directory, not review behaviour every session must
 carry. The protocol file counts against the agent instruction byte budget
 enforced by `_project/scripts/agent_instruction_audit.py`; reference material

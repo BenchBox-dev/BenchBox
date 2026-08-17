@@ -46,9 +46,9 @@ the design does not silently contradict a settled decision:
    **finding draft files** are a permitted local write: they carry no
    cross-session consistency contract and are landed later through the
    separately authorized `todo finding sync` step, never queued into the primary.
-2. **`docs/development/agent-review-protocol.md` `[REVIEW-CAPTURE-001]`**
+2. **`docs/agent/review-protocol.md` `[REVIEW-CAPTURE-001]`**
    (with its `SHARED/review-protocol` skill mirror; unabridged rationale in
-   the historical `docs/development/review-protocol.md` §4) names the
+   the historical `docs/agent/review-protocol-legacy.md` §4) names the
    append-only draft file under
    `~/.benchbox/finding-drafts/` as the **sole** in-review finding write.
    Writing a finding straight into the hosted DB during a review is *landing*
@@ -336,7 +336,7 @@ pre-approved `make blind-spots-*` commands and capture-path bindings.
 
 **Kept**: `validate_blind_spot.py` (retargeted in phase 1 as the draft
 validator); the `/blind-spot` command (rewritten in phase 1); the directory
-`README.md` content, relocated to `docs/development/` as the findings-domain
+`README.md` content, relocated to `docs/agent/` as the findings-domain
 doc.
 
 Git **history is untouched** — see Assumptions.

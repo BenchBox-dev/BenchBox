@@ -16,7 +16,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CORPUS = ROOT / "_project/evals/agent-instructions/scenarios.json"
 ADAPTERS = ("CLAUDE.md", "GEMINI.md", "ANTIGRAVITY.md")
-ACTIVE_TEXT = ("AGENTS.md", *ADAPTERS, ".claude/commands/pr.md", "docs/development/agent-review-protocol.md")
+ACTIVE_REVIEW_PROTOCOL = "docs/agent/review-protocol.md"
+ACTIVE_TEXT = ("AGENTS.md", *ADAPTERS, ".claude/commands/pr.md", ACTIVE_REVIEW_PROTOCOL)
 CANONICAL_REVIEW_SKILL = ".claude/skills/SHARED/review-protocol/SKILL.md"
 CANONICAL_COMMIT_SKILL = ".claude/skills/SHARED/change-framework/SKILL.md"
 REQUIRED_POLICY_IDS = {
@@ -93,7 +94,12 @@ EVALUATION_BOOLEAN_FIELDS = {
     "would_write_local_draft",
 }
 EVALUATION_FIELDS = {"action", "git_identity", *EVALUATION_BOOLEAN_FIELDS}
-LEGACY_REVIEW_DOC = "docs/development/review-protocol.md"
+LEGACY_REVIEW_DOC = "docs/agent/review-protocol-legacy.md"
+RETIRED_REVIEW_DOCS = (
+    LEGACY_REVIEW_DOC,
+    "docs/development/review-protocol.md",
+    "docs/development/agent-review-protocol.md",
+)
 AUTHORITY_CONFLICT_MARKERS = ("this file wins", "canonical, unabridged", "conflicts resolve in favor of this")
 AGENT_NAMES = {"chatgpt", "claude", "codex", "gemini", "openai"}
 AGENT_EMAILS = {"noreply@anthropic.com", "noreply@openai.com"}
@@ -170,14 +176,14 @@ def _missing_anchors(text: str, anchors: Iterable[str]) -> list[str]:
 def audit_review_policy(project: Path) -> list[str]:
     errors: list[str] = []
     agents = _read(project, "AGENTS.md")
-    protocol = _read(project, "docs/development/agent-review-protocol.md")
+    protocol = _read(project, ACTIVE_REVIEW_PROTOCOL)
     canonical_review = _read(project, CANONICAL_REVIEW_SKILL)
     policy_text = agents + "\n" + protocol
 
     missing_ids = sorted(policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id not in policy_text)
     if missing_ids:
         errors.append(f"missing active policy IDs: {', '.join(missing_ids)}")
-    if "docs/development/agent-review-protocol.md" not in agents:
+    if ACTIVE_REVIEW_PROTOCOL not in agents:
         errors.append("AGENTS.md does not select the active project review binding")
 
     marker = "## Code Review Rules"
@@ -502,6 +508,23 @@ def budget_headroom_warnings(metrics: Metrics, budgets: dict[str, Any]) -> list[
     return warnings
 
 
+def audit_docs_placement(project: Path) -> list[str]:
+    """Keep agent governance out of the published contributor handbook."""
+    errors: list[str] = []
+    development = project / "docs/development"
+    if development.is_dir():
+        leaked = sorted(path.relative_to(project).as_posix() for path in development.glob("agent-*.md"))
+        if leaked:
+            errors.append("agent governance files must live under docs/agent/, not " + ", ".join(leaked))
+    conf = project / "docs/conf.py"
+    if conf.exists():
+        match = re.search(r"exclude_patterns\s*=\s*\[(.*?)\]", conf.read_text(encoding="utf-8"), re.S)
+        excluded = match.group(1) if match else ""
+        if not re.search(r"[\"']agent[\"']", excluded):
+            errors.append("docs/conf.py must exclude the docs/agent/ tree from Sphinx")
+    return errors
+
+
 def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     """Run every non-Git check and return its errors tagged with the check name.
 
@@ -536,8 +559,9 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
         path.read_text(encoding="utf-8") for path in sorted((project / ".claude/commands").glob("*.md"))
     )
     surface_errors: list[str] = []
-    if LEGACY_REVIEW_DOC in command_text:
-        surface_errors.append(f"a .claude/commands surface binds to the superseded {LEGACY_REVIEW_DOC}")
+    for retired in RETIRED_REVIEW_DOCS:
+        if retired in command_text:
+            surface_errors.append(f"a .claude/commands surface binds to the superseded {retired}")
     settings = json.loads(_read(project, ".claude/settings.json"))
     if settings.get("hooks"):
         surface_errors.append(".claude/settings.json contains executable hooks; use explicit gates")
@@ -558,8 +582,9 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
             surface_errors.append(f"{label} pattern remains in project settings: {needle}")
     errors.extend(_tag("surface", surface_errors))
 
-    policy_text = _read(project, "AGENTS.md") + "\n" + _read(project, "docs/development/agent-review-protocol.md")
+    policy_text = _read(project, "AGENTS.md") + "\n" + _read(project, ACTIVE_REVIEW_PROTOCOL)
     errors.extend(_tag("review-policy", audit_review_policy(project)))
+    errors.extend(_tag("docs-placement", audit_docs_placement(project)))
     errors.extend(_tag("commit-policy", audit_commit_policy(project)))
 
     errors.extend(_tag("scenarios", audit_scenarios(corpus["scenarios"], policy_text)))

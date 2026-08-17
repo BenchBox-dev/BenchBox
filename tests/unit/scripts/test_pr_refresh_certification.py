@@ -401,7 +401,7 @@ def test_agent_instruction_budget_history_is_not_a_skip_proof() -> None:
 
     result = classify(
         _eligible_request(
-            authored_paths=["AGENTS.md", "docs/development/agent-identity-instruction-boundary.md"],
+            authored_paths=["AGENTS.md", "docs/agent/identity-instruction-boundary.md"],
             intervening_paths=["AGENTS.md", "Makefile"],
         )
     )
