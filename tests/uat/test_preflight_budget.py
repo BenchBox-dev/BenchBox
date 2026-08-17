@@ -272,6 +272,33 @@ def test_disk_headroom_gate_uses_budget_when_it_exceeds_the_floor(tmp_path: Path
     assert len(check.shortfalls) == 1
 
 
+def test_disk_headroom_gate_uses_chunked_envelope_when_platform_chunking(tmp_path: Path):
+    """`platform_chunking=True` must gate on the chunked (max), not concurrent
+    (sum), loaded-database term -- otherwise an operator who selected
+    chunking to shrink concurrent disk demand is refused against the
+    envelope they explicitly opted out of.
+    """
+    budget = DiskBudget(
+        cells=2,
+        est_peak_gib=90.0,
+        est_steady_gib=90.0,
+        unknown_cells=(),
+        concurrent_database_gib=70.0,
+        chunked_database_gib=40.0,
+        platforms_total=2,
+        platforms_with_measured_database=2,
+    )
+    roots = (DiskRootFreeSpace("output", tmp_path, 65.0),)
+
+    default_check = check_disk_headroom(budget, roots, min_free_gib=5.0)
+    chunked_check = check_disk_headroom(budget, roots, min_free_gib=5.0, platform_chunking=True)
+
+    assert default_check.required_gib == pytest.approx(90.0)
+    assert len(default_check.shortfalls) == 1
+    assert chunked_check.required_gib == pytest.approx(60.0)
+    assert chunked_check.shortfalls == ()
+
+
 # ---------------------------------------------------------------------------
 # Coverage disclosure: an estimate over a partially-measured inventory is a
 # lower bound, and must never render as "fits".

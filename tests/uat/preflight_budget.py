@@ -515,6 +515,7 @@ def check_disk_headroom(
     roots: Iterable[DiskRootFreeSpace],
     *,
     min_free_gib: float,
+    platform_chunking: bool = False,
 ) -> DiskHeadroomCheck:
     """Compare an estimated peak budget against required disk roots.
 
@@ -525,8 +526,18 @@ def check_disk_headroom(
     `max` would let a sweep start with a fraction of a GiB free against a
     5 GiB configured floor. `test_disk_headroom_gate_enforces_configured_floor`
     pins it.
+
+    `platform_chunking` swaps the loaded-database term from
+    `concurrent_database_gib` (all platforms' databases coexisting, the
+    default execution envelope) to `chunked_database_gib` (one platform's
+    databases at a time, the envelope `execute.platform_chunking` actually
+    runs). Without this swap the gate refuses operators who selected chunking
+    specifically to shrink concurrent disk demand.
     """
-    required_gib = max(min_free_gib, budget.est_peak_gib)
+    peak_gib = budget.est_peak_gib
+    if platform_chunking:
+        peak_gib += budget.chunked_database_gib - budget.concurrent_database_gib
+    required_gib = max(min_free_gib, peak_gib)
     shortfalls = tuple(
         DiskHeadroomShortfall(root.label, root.path, root.free_gib, required_gib)
         for root in roots

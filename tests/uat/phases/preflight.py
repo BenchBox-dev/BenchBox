@@ -427,7 +427,12 @@ def estimate_disk_budget_summary_and_gate(
     summary = format_disk_budget(estimate_peak_disk(config))
     gated_cells = largest_scale_cells(config)
     budget = estimate_cells(gated_cells, table=table)
-    headroom = check_disk_headroom(budget, free_space_entries, min_free_gib=min_free_gib)
+    headroom = check_disk_headroom(
+        budget,
+        free_space_entries,
+        min_free_gib=min_free_gib,
+        platform_chunking=config.execute.platform_chunking,
+    )
     coverage = assess_budget_coverage(gated_cells, table=table)
     return summary, DiskBudgetGate(budget=budget, headroom=headroom, coverage=coverage)
 
