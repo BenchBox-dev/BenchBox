@@ -61,6 +61,10 @@ class ExecuteConfig:
     official: bool = False
     streams: int | None = None
     seed: int | None = None
+    # One-platform-at-a-time execute mode. Sequential walking already exists;
+    # this flag makes that contract explicit so later chunk pruning can hang
+    # off a real config field instead of an out-of-tree shell driver.
+    platform_chunking: bool = False
 
 
 @dataclass(frozen=True)
@@ -459,6 +463,7 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
                 "official",
                 "streams",
                 "seed",
+                "platform_chunking",
             }
         ),
         "execute",
@@ -514,6 +519,7 @@ def _validate_execute(payload: dict[str, Any]) -> ExecuteConfig:
         official=official,
         streams=streams,
         seed=seed,
+        platform_chunking=_require_bool(payload, "platform_chunking", default=False, section="execute"),
     )
 
 

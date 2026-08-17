@@ -214,12 +214,25 @@ class UnknownDiskCell:
 
 @dataclass(frozen=True)
 class DiskBudget:
-    """Estimated disk demand for a config."""
+    """Estimated disk demand for a config.
+
+    ``database_by_platform_gib`` is the measured loaded-database term only,
+    keyed by platform, derived from the configured cells' inventory rows.
+    Unmeasured or missing rows stay out of that map rather than being modelled
+    as free. ``concurrent_database_gib`` is the sum (all platforms coexist);
+    ``chunked_database_gib`` is the max (one platform at a time). Both are
+    lower bounds over the measured subset.
+    """
 
     cells: int
     est_peak_gib: float
     est_steady_gib: float
     unknown_cells: tuple[UnknownDiskCell, ...]
+    database_by_platform_gib: tuple[tuple[str, float], ...] = ()
+    concurrent_database_gib: float = 0.0
+    chunked_database_gib: float = 0.0
+    platforms_total: int = 0
+    platforms_with_measured_database: int = 0
 
 
 @dataclass(frozen=True)
@@ -306,9 +319,11 @@ def estimate_peak_disk(config: UATConfig, *, table_path: Path | None = None) -> 
     """Return an advisory disk estimate for all cells enumerated by *config*.
 
     Datagen is counted once per (benchmark, scale) because UAT reuses
-    source data across platforms where possible. Database and transient
-    growth are counted per cell. Unknown cells are reported separately;
-    callers must not treat them as a hard gate.
+    source data across platforms where possible. Measured loaded-database
+    demand is summed per platform (not guessed: only inventory rows marked
+    ``measured`` contribute). Transient growth is counted per cell. Unknown
+    and unmeasured cells are reported separately; callers must not treat a
+    missing database figure as zero demand.
     """
     return estimate_cells(enumerate_cells(config), table=load_budget_table(table_path))
 
@@ -317,7 +332,7 @@ def estimate_cells(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudget:
     """Estimate a concrete cell iterable; public for focused tests."""
     cells_tuple = tuple(cells)
     datagen_by_source: dict[tuple[str, float], float] = {}
-    database_gib = 0.0
+    database_by_platform: dict[str, float] = {}
     transient_gib = 0.0
     unknown: list[UnknownDiskCell] = []
 
@@ -328,15 +343,23 @@ def estimate_cells(cells: Iterable[Cell], *, table: BudgetTable) -> DiskBudget:
             continue
         datagen_key = (cell.benchmark, cell.scale)
         datagen_by_source[datagen_key] = max(datagen_by_source.get(datagen_key, 0.0), row.peak_datagen_gib)
-        database_gib += row.peak_database_gib
+        if row.database_measured:
+            database_by_platform[cell.platform] = database_by_platform.get(cell.platform, 0.0) + row.peak_database_gib
         transient_gib += row.transient_growth_gib
 
+    database_gib = sum(database_by_platform.values())
+    platform_totals = tuple(sorted(database_by_platform.items()))
     steady_gib = sum(datagen_by_source.values()) + database_gib
     return DiskBudget(
         cells=len(cells_tuple),
         est_peak_gib=steady_gib + transient_gib,
         est_steady_gib=steady_gib,
         unknown_cells=tuple(unknown),
+        database_by_platform_gib=platform_totals,
+        concurrent_database_gib=database_gib,
+        chunked_database_gib=max(database_by_platform.values(), default=0.0),
+        platforms_total=len({cell.platform for cell in cells_tuple}),
+        platforms_with_measured_database=len(database_by_platform),
     )
 
 
@@ -492,6 +515,7 @@ def check_disk_headroom(
     roots: Iterable[DiskRootFreeSpace],
     *,
     min_free_gib: float,
+    platform_chunking: bool = False,
 ) -> DiskHeadroomCheck:
     """Compare an estimated peak budget against required disk roots.
 
@@ -502,8 +526,18 @@ def check_disk_headroom(
     `max` would let a sweep start with a fraction of a GiB free against a
     5 GiB configured floor. `test_disk_headroom_gate_enforces_configured_floor`
     pins it.
+
+    `platform_chunking` swaps the loaded-database term from
+    `concurrent_database_gib` (all platforms' databases coexisting, the
+    default execution envelope) to `chunked_database_gib` (one platform's
+    databases at a time, the envelope `execute.platform_chunking` actually
+    runs). Without this swap the gate refuses operators who selected chunking
+    specifically to shrink concurrent disk demand.
     """
-    required_gib = max(min_free_gib, budget.est_peak_gib)
+    peak_gib = budget.est_peak_gib
+    if platform_chunking:
+        peak_gib += budget.chunked_database_gib - budget.concurrent_database_gib
+    required_gib = max(min_free_gib, peak_gib)
     shortfalls = tuple(
         DiskHeadroomShortfall(root.label, root.path, root.free_gib, required_gib)
         for root in roots
@@ -518,15 +552,30 @@ def format_disk_budget(budget: DiskBudget) -> str:
         "Disk budget estimate: "
         f"{budget.est_peak_gib:.2f} GiB peak "
         f"({budget.est_steady_gib:.2f} GiB steady; "
-        f"cells={budget.cells}; unknown={len(budget.unknown_cells)})"
+        f"cells={budget.cells}; unknown={len(budget.unknown_cells)}; "
+        f"measured-db platforms={budget.platforms_with_measured_database}/{budget.platforms_total}; "
+        f"database concurrent={budget.concurrent_database_gib:.2f} GiB "
+        f"chunked_max={budget.chunked_database_gib:.2f} GiB; "
+        "basis=measured inventory rows at configured rungs, not a guessed per-platform constant)"
     )
 
 
-def format_disk_headroom_failure(check: DiskHeadroomCheck) -> str:
+def format_disk_headroom_failure(check: DiskHeadroomCheck, budget: DiskBudget | None = None) -> str:
     """Operator-facing abort reason for disk-budget shortfalls."""
     details = "; ".join(
         f"{shortfall.label} {shortfall.path}: "
         f"{shortfall.free_gib:.1f} GiB free < {shortfall.required_gib:.1f} GiB required"
         for shortfall in check.shortfalls
     )
-    return f"disk headroom gate failed: {details}"
+    message = f"disk headroom gate failed: {details}"
+    if budget is None or not check.shortfalls:
+        return message
+    worst = min(check.shortfalls, key=lambda shortfall: shortfall.free_gib - shortfall.required_gib)
+    shortfall_gib = worst.required_gib - worst.free_gib
+    return (
+        f"{message}; computed shortfall {shortfall_gib:.1f} GiB "
+        f"(measured-db platforms={budget.platforms_with_measured_database}/{budget.platforms_total}, "
+        f"database concurrent={budget.concurrent_database_gib:.2f} GiB, "
+        f"chunked_max={budget.chunked_database_gib:.2f} GiB; "
+        "failing now rather than exhausting disk mid-sweep)"
+    )

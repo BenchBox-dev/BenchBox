@@ -42,6 +42,7 @@ def test_validate_config_minimal():
     assert "execute" in cfg.phases or cfg.phases  # default phases applied
     assert cfg.execute.per_cell_timeout_s == 600
     assert cfg.execute.parallel_platforms is False
+    assert cfg.execute.platform_chunking is False
     assert cfg.output.benchmark_runs_dir_template == "~/Developer/benchmark_runs"
     assert cfg.preflight.free_space_min_gib == 5.0
     assert cfg.preflight.free_memory_min_gib == 2.0
@@ -84,6 +85,12 @@ def test_validate_matrix_filter_tracks_explicit_empty_include():
 def test_validate_config_rejects_parallel_platforms():
     with pytest.raises(config.ConfigError, match="parallel_platforms"):
         config.validate_config({"name": "smoke", "execute": {"parallel_platforms": True}})
+
+
+def test_validate_config_accepts_platform_chunking():
+    cfg = config.validate_config({"name": "smoke", "execute": {"platform_chunking": True}})
+    assert cfg.execute.platform_chunking is True
+    assert "platform_chunking" in config.ExecuteConfig.__dataclass_fields__
 
 
 def test_validate_config_rejects_unknown_phase():

@@ -289,6 +289,7 @@ def run_execute(
     abort_kind: str | None = None
 
     for platform, platform_pairs in by_platform:
+        _log_platform_chunk_start(config, platform=platform, platform_pairs=platform_pairs, log_dir=log_dir)
         platform_abort_reason, platform_abort_kind = _pre_start_abort_reason(
             config,
             platform=platform,
@@ -397,6 +398,17 @@ def run_execute(
             abort_reason = platform_abort_reason
             abort_kind = platform_abort_kind
             break
+        _prune_platform_chunk_if_enabled(
+            config,
+            platform=platform,
+            by_pb=by_pb,
+            results=results,
+            completed_pairs=completed_pairs,
+            already_pruned=already_pruned,
+            databases_root=databases_root,
+            cleanup_enabled=cleanup_enabled,
+            log_dir=log_dir,
+        )
         last_completed_platform = platform
 
     return ExecuteOutcome(
@@ -1163,6 +1175,52 @@ def _topological_sort(
         for dependent in dependents.get(ready, ()):  # pragma: no branch - tiny loop
             indegree[dependent] -= 1
     return out
+
+
+def _log_platform_chunk_start(
+    config: UATConfig,
+    *,
+    platform: str,
+    platform_pairs: list[tuple[str, list[Cell]]],
+    log_dir: Path | None,
+) -> None:
+    if not config.execute.platform_chunking:
+        return
+    append_lifecycle_log(
+        log_dir,
+        f"[platform-chunk] start platform={platform} "
+        f"benchmarks={','.join(benchmark for benchmark, _ in platform_pairs)} "
+        "mode=one-platform-at-a-time",
+    )
+
+
+def _prune_platform_chunk_if_enabled(
+    config: UATConfig,
+    *,
+    platform: str,
+    by_pb: dict[tuple[str, str], list[Cell]],
+    results: list[CellResult],
+    completed_pairs: set[tuple[str, str]],
+    already_pruned: set[tuple[str, str, float]],
+    databases_root: Path | None,
+    cleanup_enabled: bool,
+    log_dir: Path | None,
+) -> None:
+    if not config.execute.platform_chunking or not cleanup_enabled or databases_root is None:
+        return
+    _maybe_prune_completed(
+        platform=platform,
+        by_pb=by_pb,
+        results=results,
+        completed_pairs=completed_pairs,
+        already_pruned=already_pruned,
+        databases_root=databases_root,
+        dry_run=config.dry_run,
+    )
+    append_lifecycle_log(
+        log_dir,
+        f"[platform-chunk] prune platform={platform} via=reuse-aware helpers scope=per-platform-benchmark-scale",
+    )
 
 
 def _maybe_prune_completed(
