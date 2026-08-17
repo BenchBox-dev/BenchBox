@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -68,6 +70,61 @@ def test_empty_diff_routes_to_full_ci(rules: dict[str, list[str]]) -> None:
     decision = classify_paths([], rules)
     assert decision["safe_content_only"] is False
     assert decision["needs_code_ci"] is True
+
+
+def test_skill_integrity_only_skips_product_ci(rules: dict[str, list[str]]) -> None:
+    paths = [
+        ".claude/skills/todo/SKILL.md",
+        ".claude/skills/todo/references/batch.md",
+        "skill-sync.yaml",
+        "skill-sync.lock",
+    ]
+
+    decision = classify_paths(paths, rules)
+
+    assert decision["skill_integrity_needed"] is True
+    assert decision["skill_integrity_only"] is True
+    assert decision["needs_code_ci"] is False
+    assert decision["safe_content_only"] is False
+    assert decision["unknown_paths"] == []
+
+
+def test_skill_integrity_plus_safe_content_runs_both_narrow_lanes(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths([".claude/skills/todo/SKILL.md", "docs/guide.md"], rules)
+
+    assert decision["skill_integrity_only"] is True
+    assert decision["content_guard_needed"] is True
+    assert decision["needs_code_ci"] is False
+
+
+def test_skill_integrity_plus_product_code_runs_both_required_lanes(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths([".claude/skills/todo/SKILL.md", "benchbox/cli/run.py"], rules)
+
+    assert decision["skill_integrity_needed"] is True
+    assert decision["skill_integrity_only"] is False
+    assert decision["needs_code_ci"] is True
+
+
+def test_structural_manifest_decision_forces_product_ci(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths(
+        ["skill-sync.yaml", "skill-sync.lock"],
+        rules,
+        forced_code_paths=["skill-sync.yaml"],
+        manifest_decision_reason="manifest_structural_change",
+    )
+
+    assert decision["skill_integrity_needed"] is True
+    assert decision["skill_integrity_only"] is False
+    assert decision["needs_code_ci"] is True
+    assert decision["forced_code_paths"] == ["skill-sync.yaml"]
+    assert decision["unknown_paths"] == []
+
+
+def test_path_filter_rules_self_edit_is_explicit_product_code(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths([".github/path-filters.yml"], rules)
+
+    assert decision["needs_code_ci"] is True
+    assert decision["unknown_paths"] == []
 
 
 def test_explorer_vitest_group_covers_the_full_contract(rules: dict[str, list[str]]) -> None:
@@ -147,6 +204,18 @@ def test_github_output_exposes_explorer_paths_alias(rules: dict[str, list[str]],
 
     text = output.read_text(encoding="utf-8")
     assert "explorer-paths-needed=true\n" in text
+
+
+def test_github_output_exposes_skill_integrity_lane(rules: dict[str, list[str]], tmp_path: Path) -> None:
+    decision = classify_paths([".claude/skills/todo/SKILL.md"], rules)
+    output = tmp_path / "github-output.txt"
+
+    write_github_output(output, decision)
+
+    text = output.read_text(encoding="utf-8")
+    assert "skill-integrity-needed=true\n" in text
+    assert "skill-integrity-only=true\n" in text
+    assert "needs-code-ci=false\n" in text
 
 
 # F2 regression: docs/** glob originally treated all of docs/ as safe-content,
@@ -231,6 +300,60 @@ def _git(repo: Path, *args: str) -> str:
         text=True,
         stdout=subprocess.PIPE,
     ).stdout
+
+
+def test_event_base_sha_stays_authoritative_when_origin_develop_moves(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "--initial-branch=develop", "-q")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test")
+    manifest = (REPO_RULES.parents[1] / "skill-sync.yaml").read_text(encoding="utf-8")
+    (repo / "skill-sync.yaml").write_text(manifest, encoding="utf-8")
+    (repo / "skill-sync.lock").write_text("{}\n", encoding="utf-8")
+    _git(repo, "add", "skill-sync.yaml", "skill-sync.lock")
+    _git(repo, "commit", "-m", "base", "-q")
+    event_base = _git(repo, "rev-parse", "HEAD").strip()
+
+    _git(repo, "checkout", "-b", "feature", "-q")
+    feature_manifest = manifest.replace("7b63719927992bd7f7fff6b90449bbba2bb94ba3", "a" * 40, 1)
+    (repo / "skill-sync.yaml").write_text(feature_manifest, encoding="utf-8")
+    _git(repo, "add", "skill-sync.yaml")
+    _git(repo, "commit", "-m", "ref only", "-q")
+
+    _git(repo, "checkout", "-b", "moving-base", event_base, "-q")
+    (repo / "README.md").write_text("develop moved\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-m", "move develop", "-q")
+    moved_base = _git(repo, "rev-parse", "HEAD").strip()
+    _git(repo, "update-ref", "refs/remotes/origin/develop", moved_base)
+    _git(repo, "checkout", "feature", "-q")
+
+    changed = repo / "changed.txt"
+    changed.write_text("skill-sync.yaml\nskill-sync.lock\n", encoding="utf-8")
+    script = REPO_RULES.parents[1] / "scripts" / "path_filter_decision.py"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--rules",
+            str(REPO_RULES),
+            "--base-ref",
+            event_base,
+            "--changed-file",
+            str(changed),
+        ],
+        cwd=repo,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    decision = json.loads(result.stdout)
+
+    assert decision["manifest_base_sha"] == event_base
+    assert decision["manifest_base_sha"] != moved_base
+    assert decision["manifest_decision_reason"] == "approved_ref_only_change"
+    assert decision["skill_integrity_only"] is True
 
 
 def test_git_changed_paths_includes_deletions(tmp_path: Path) -> None:

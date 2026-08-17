@@ -82,9 +82,13 @@ def test_repository_candidate_passes() -> None:
         "skill-sync.lock",
     ],
 )
-def test_governed_paths_route_to_required_code_ci(path: str) -> None:
+def test_governed_paths_route_to_a_required_instruction_lane(path: str) -> None:
     rules = load_rules(ROOT / ".github/path-filters.yml")
-    assert classify_paths([path], rules)["needs_code_ci"] is True
+    decision = classify_paths([path], rules)
+
+    assert decision["needs_code_ci"] is True or decision["skill_integrity_needed"] is True
+    if path.startswith(".claude/skills/") or path == "skill-sync.lock":
+        assert decision["skill_integrity_needed"] is True
 
 
 def test_imposed_identity_fails(tmp_path: Path) -> None:

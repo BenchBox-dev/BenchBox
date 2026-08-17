@@ -67,6 +67,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "CI_PATHS_RESULT": "success",
         "TPCH_BINARY_FRAMING_RESULT": "success",
         "CONTENT_RESULT": "skipped",
+        "SKILL_INTEGRITY_RESULT": "skipped",
         "LINT_RESULT": "skipped",
         "TEST_RESULT": "skipped",
         "CORRECTNESS_RESULT": "skipped",
@@ -80,6 +81,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "PARITY_CHECK_RESULT": "skipped",
         "EXPLORER_VITEST_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
+        "SKILL_INTEGRITY_NEEDED": "false",
         "NEEDS_CODE_CI": "false",
         "SAFE_CONTENT_ONLY": "true",
         **env_overrides,
@@ -137,6 +139,46 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
 
     assert result.returncode == 1
     assert "explorer-tokens=failure" in result.stdout
+
+
+def test_ci_required_result_requires_selected_skill_integrity_success() -> None:
+    result = _run_ci_required_result(
+        SKILL_INTEGRITY_NEEDED="true",
+        SKILL_INTEGRITY_RESULT="skipped",
+        SAFE_CONTENT_ONLY="false",
+    )
+
+    assert result.returncode == 1
+    assert "skill-integrity=skipped" in result.stdout
+
+
+def test_ci_required_result_accepts_skill_integrity_only_success() -> None:
+    result = _run_ci_required_result(
+        SKILL_INTEGRITY_NEEDED="true",
+        SKILL_INTEGRITY_RESULT="success",
+        SAFE_CONTENT_ONLY="false",
+    )
+
+    assert result.returncode == 0
+    assert "Skill-integrity-only PR" in result.stdout
+
+
+def test_ci_required_result_requires_skill_and_product_for_mixed_diff() -> None:
+    result = _run_ci_required_result(
+        SKILL_INTEGRITY_NEEDED="true",
+        SKILL_INTEGRITY_RESULT="failure",
+        NEEDS_CODE_CI="true",
+        SAFE_CONTENT_ONLY="false",
+        LINT_RESULT="success",
+        TEST_RESULT="success",
+        CORRECTNESS_RESULT="success",
+        PLAN_CAPTURE_RESULT="success",
+        MEDIUM_TEST_RESULT="success",
+        EXPLORER_TOKENS_RESULT="success",
+    )
+
+    assert result.returncode == 1
+    assert "skill-integrity=failure" in result.stdout
 
 
 def test_ci_required_result_fails_on_tpch_binary_framing_failure() -> None:
@@ -294,6 +336,7 @@ def test_ci_required_result_required_jobs_in_needs() -> None:
     workflow_yaml = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
     needs = workflow_yaml["jobs"]["ci-required-result"]["needs"]
     assert "explorer-tokens" in needs
+    assert "skill-integrity" in needs
     assert "correctness-gate" in needs
     assert "plan-capture-gate" in needs
     # Path-filtered packaging promotion (pr-gate-package-and-audit-promotion):
@@ -302,6 +345,37 @@ def test_ci_required_result_required_jobs_in_needs() -> None:
     assert "package-smoke" in needs
     assert "dependency-audit" in needs
     assert "explorer-vitest" in needs
+
+
+def test_skill_integrity_job_is_required_read_only_and_pinned() -> None:
+    workflow_text = (REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8")
+    workflow = yaml.safe_load(workflow_text)
+    job = workflow["jobs"]["skill-integrity"]
+
+    assert job["needs"] == "ci-paths"
+    assert job["if"] == "${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }}"
+    assert job["timeout-minutes"] == 10
+    assert "permissions" not in job  # inherits workflow-level contents: read
+    assert "6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa" in workflow_text
+    assert "scripts/skill_sync_ci_policy.py validate" in workflow_text
+    assert 'verify --project "$GITHUB_WORKSPACE"' in workflow_text
+    assert "test_todo_wrapper.py::TestSkillThinness" in workflow_text
+    assert '--check-commit-range "$BASE_SHA"' in workflow_text
+
+
+def test_classifier_and_certification_bind_to_pull_request_event_base() -> None:
+    workflow = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    classify = next(step for step in workflow["jobs"]["ci-paths"]["steps"] if step.get("id") == "classify")
+    certification = workflow["jobs"]["certification-identity"]
+
+    assert '--base-ref "${{ github.event.pull_request.base.sha }}"' in classify["run"]
+    assert "origin/${{ github.base_ref }}" not in classify["run"]
+    assert certification["needs"] == "ci-paths"
+    record = next(step for step in certification["steps"] if step.get("name") == "Record certification identity")
+    assert record["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
+    assert record["env"]["SKILL_INTEGRITY_NEEDED"] == ("${{ needs.ci-paths.outputs.skill-integrity-needed }}")
+    assert 'certification_kind = "skill_integrity"' in record["run"]
+    assert 'certification_kind = "full"' in record["run"]
 
 
 def test_explorer_vitest_job_uses_contract_filter_and_exact_command() -> None:
