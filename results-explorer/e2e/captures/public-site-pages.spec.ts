@@ -46,6 +46,21 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
       await page.goto(route.path, { waitUntil: "networkidle" });
       await expect(page.locator("body")).toContainText(route.heading);
       if ("ready" in route) await waitForDataLoaded(page, route.ready);
+      // The landing page fades in `.feature-card`/`.benchmark-card`/`.install-step`
+      // via an IntersectionObserver (landing/script.js) independent of
+      // `networkidle`, so capture timing races the fade-in transition and
+      // produces a non-deterministic screenshot digest at viewports where
+      // those elements start in view. Force the settled end state before
+      // every capture so the digest reflects layout, not animation timing.
+      await page.addStyleTag({
+        content: `
+          .feature-card, .benchmark-card, .install-step {
+            opacity: 1 !important;
+            transform: none !important;
+            transition: none !important;
+          }
+        `,
+      });
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
       expect(overflow, `${route.path} overflows at ${width}px`).toBe(false);
 
