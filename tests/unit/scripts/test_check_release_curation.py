@@ -142,7 +142,7 @@ def test_curated_release_make_runtime_executes_help_and_inventory(tmp_path: Path
     assert help_result.returncode == 0, help_result.stderr
     assert "makefile-inventory-check" in help_result.stdout
     assert inventory_result.returncode == 0, inventory_result.stderr
-    assert "Makefile inventory OK: 189 targets, 184 public, default=test" in inventory_result.stdout
+    assert "Makefile inventory OK: 191 targets, 185 public, default=test" in inventory_result.stdout
 
 
 @pytest.mark.parametrize(

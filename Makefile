@@ -34,7 +34,7 @@ DEVELOPMENT_TREE_ONLY_TARGETS := \
 	quality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \
 	audit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \
 	explorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \
-	agent-commit-range-check ci-lint pr-arm-auto-merge shrink-rollup \
+	agent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \
 	pr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \
 	platform-manifest-check test-docker-parity blind-spots-list blind-spots-report \
 	soundness-drain-report soundness-drain-self-test
@@ -544,6 +544,32 @@ skill-sync-check:
 	else \
 		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
 	fi
+
+# Fail-closed local counterpart of pr.yml's required skill-integrity job. The
+# verifier revision comes from the same policy module as CI, is built in an
+# isolated temporary directory on every run, and uses an empty HOME so a
+# developer's global skill-sync configuration cannot make verification pass.
+# Missing git/npm/node or an unavailable trusted revision is a hard failure.
+skill-integrity-check:
+	@set -eu; \
+	uv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml; \
+	VERIFIER=$$(uv run -- python -c 'from scripts.skill_sync_ci_policy import VERIFIER_REF, VERIFIER_REPOSITORY; print(VERIFIER_REF, VERIFIER_REPOSITORY)'); \
+	set -- $$VERIFIER; VERIFIER_REF=$$1; VERIFIER_REPOSITORY=$$2; \
+	VERIFIER_DIR=$$(mktemp -d "$${TMPDIR:-/tmp}/benchbox-skill-sync-verifier.XXXXXX"); \
+	trap 'rm -rf "$$VERIFIER_DIR"' EXIT; \
+	mkdir -p "$$VERIFIER_DIR/home"; \
+	git clone --quiet "$$VERIFIER_REPOSITORY" "$$VERIFIER_DIR/tool"; \
+	git -C "$$VERIFIER_DIR/tool" checkout --detach --quiet "$$VERIFIER_REF"; \
+	test "$$(git -C "$$VERIFIER_DIR/tool" rev-parse HEAD)" = "$$VERIFIER_REF"; \
+	(cd "$$VERIFIER_DIR/tool" && npm ci --ignore-scripts && npm run build); \
+	test -f "$$VERIFIER_DIR/tool/dist/cli/index.js"; \
+	env HOME="$$VERIFIER_DIR/home" node "$$VERIFIER_DIR/tool/dist/cli/index.js" verify --project "$(CURDIR)"; \
+	sh scripts/check_untracked_skill_mirrors.sh; \
+	$(MAKE) agent-instructions-check; \
+	$(MAKE) agent-identity-check; \
+	$(MAKE) agent-commit-range-check; \
+	uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness -q; \
+	$(MAKE) artifact-hygiene
 
 # Duplicate code detection (AST structural clone detection)
 duplicate-check:
@@ -1216,32 +1242,55 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
 
-# Lightweight local gate before pushing. Mirrors CI lint and fast marker
-# selection, but not CI's coverage fail-under; run ci-test for the exact
-# coverage-enforced test workflow.
+# Local gate before pushing. One classifier artifact selects the same product
+# and skill-integrity lanes as CI. Content-only, product, unknown, empty, and
+# structurally unsafe skill diffs retain the full historical ci-lint + content
+# guard + fast-test contract; only an approved pure skill-integrity diff uses
+# the focused pinned-verifier lane. CI coverage thresholds remain CI-only.
 pr-preflight:
-	@$(MAKE) ci-lint
-	@$(MAKE) pr-preflight-fast-tests
-	@$(MAKE) -s uat-artifact-hygiene
-
-# Always runs pr-content-guard (YAML/markdown/docs hygiene + artifact
-# hygiene) regardless of whether code changes are present -- it used to run
-# only on the no-code-changes path, so a docs-plus-code PR could skip it
-# locally and hit those guards for the first time in CI's content-guard job.
-# The needs-code-ci decision still gates only the fast-test run below.
-pr-preflight-fast-tests:
-	@DECISION=$$(mktemp); \
+	@set -eu; \
+	DECISION=$$(mktemp); \
 	LISTS=$$(mktemp -d); \
 	trap 'rm -f "$$DECISION"; rm -rf "$$LISTS"' EXIT; \
 	git fetch origin develop --quiet; \
 	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
-	$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
-	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
+	$(MAKE) -s .pr-preflight-route PATH_DECISION="$$DECISION" PATH_LISTS="$$LISTS"; \
+	$(MAKE) -s uat-artifact-hygiene
+
+# Consume the classifier decision only; never reimplement path globs here.
+# Mixed skill/product diffs run both lanes. Content-only remains on the full
+# product preflight until a separately authorized optimization exists.
+.pr-preflight-route:
+	@set -eu; \
+	[ -n "$(PATH_DECISION)" ] && [ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
+	[ -n "$(PATH_LISTS)" ] && [ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
+	ROUTE=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding="utf-8")); keys=("skill_integrity_needed", "content_guard_needed", "skill_integrity_only", "needs_code_ci"); assert all(type(d.get(k)) is bool for k in keys), "invalid preflight decision"; assert not d["skill_integrity_only"] or (d["skill_integrity_needed"] and not d["content_guard_needed"] and not d["needs_code_ci"]), "contradictory preflight decision"; print(*(str(d[k]).lower() for k in keys))' "$(PATH_DECISION)"); \
+	set -- $$ROUTE; SKILL=$$1; CONTENT=$$2; SKILL_ONLY=$$3; \
+	if [ "$$SKILL_ONLY" = true ]; then \
+		echo "Selected preflight lanes: skill-integrity"; \
+		$(MAKE) -s skill-integrity-check; \
+	else \
+		LANES=product; [ "$$CONTENT" = true ] && LANES="$$LANES content"; [ "$$SKILL" = true ] && LANES="$$LANES skill-integrity"; \
+		echo "Selected preflight lanes: $$LANES"; \
+		$(MAKE) ci-lint; \
+		if [ "$$SKILL" = true ]; then $(MAKE) -s skill-integrity-check; fi; \
+		$(MAKE) -s pr-preflight-fast-tests PATH_DECISION="$(PATH_DECISION)" PATH_LISTS="$(PATH_LISTS)"; \
+	fi
+
+# Always runs pr-content-guard for the historical full-preflight path. The
+# needs-code-ci decision gates only the fast-test run below. Pure approved
+# skill-integrity diffs do not enter this target; their focused lane carries
+# its own artifact, provenance, mirror, instruction, and identity controls.
+pr-preflight-fast-tests:
+	@[ -n "$(PATH_DECISION)" ] && [ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
+	[ -n "$(PATH_LISTS)" ] && [ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
+	$(MAKE) -s pr-content-guard PATH_LISTS="$(PATH_LISTS)"; \
+	if uv run -- python scripts/path_filter_decision.py --json-in "$(PATH_DECISION)" --check needs-code-ci >/dev/null; then \
 		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
 		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
 	else \

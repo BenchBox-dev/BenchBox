@@ -898,6 +898,19 @@ class TestReleaseInfrastructure:
         assert "worktree remove" in worktree_helper
         assert "git branch -D" not in worktree_recipe
 
+    def test_skill_integrity_preflight_cannot_refresh_or_bypass_pr_open_currency(self):
+        preflight = _make_target_recipe("pr-preflight")
+        route = _make_target_recipe(".pr-preflight-route")
+        combined = preflight + route
+
+        assert "git fetch origin develop --quiet" in preflight
+        assert "git merge --no-edit origin/develop" not in combined
+        assert "STALE" not in combined
+        assert "pr-refresh" not in combined
+        assert "pr-fanout" not in combined
+        assert "pr-open" not in combined
+        assert "pr-arm-auto-merge" not in combined
+
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
         templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
