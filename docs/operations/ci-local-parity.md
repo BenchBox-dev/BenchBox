@@ -191,12 +191,35 @@ unless that guard is *also* covered for real somewhere else in CI:
   reads the commits a branch actually carries, not resolved config) and is
   never in the gate's table; it keeps running unconditionally, in `ci-lint`
   and in `pr.yml`.
-- `skill-sync-check`'s real CI-side coverage is `pr.yml`'s
-  `guard-skill-sync-verify` step (the pinned-SHA network checkout described
-  above), which runs against every PR before it can reach develop. Skipping
-  the local-path-based `skill-sync-check` inside `ci-lint`'s own CI
-  invocation does not remove coverage that existed there -- it removes a
-  guard that was already structurally unable to check anything on a runner.
+- `skill-sync-check`'s real CI-side coverage is `pr.yml`'s required
+  `skill-integrity` job. It runs when `.claude/skills/**`, `skill-sync.yaml`,
+  or `skill-sync.lock` changes, validates the approved source/target policy,
+  builds an independently pinned public skill-sync verifier, verifies the
+  tracked Claude mirror and lock, and runs instruction/wrapper/identity
+  controls before `ci-required-result` can pass. Skipping the
+  local-path-based `skill-sync-check` inside `ci-lint`'s own CI invocation
+  does not remove coverage that existed there -- it removes a guard that was
+  already structurally unable to check anything on a runner.
+
+### Required skill-integrity lane
+
+Skill integrity is a specialized control-plane lane, not generic content and
+not BenchBox product execution. Pure approved ref/mirror/lock changes skip
+product tests because BenchBox does not import or execute skill Markdown.
+Unknown paths, structural manifest changes, workflow/classifier/policy edits,
+and mixed product changes still run full product CI; mixed changes also run
+skill integrity. Generated skill Markdown has no generic markdownlint or
+spellcheck contract: the required lane proves trusted provenance, byte/lock
+integrity, instruction anchors, focused wrapper budgets, tracked-artifact
+hygiene, and commit identity. It does not claim that arbitrary prose is
+semantically safe or human-reviewed.
+
+The verifier revision is fixed independently in
+`scripts/skill_sync_ci_policy.py`. A maintainer advances it only with an
+empty-home clean clone/build/verify proof and full CI. GitHub classification
+binds to `github.event.pull_request.base.sha`, never a mutable branch tip; if
+`develop` advances during the run, strict current-base enforcement may mark
+that correctly certified run BEHIND. Refresh such PRs one at a time.
 
 `GITHUB_ACTIONS` is never hand-toggled here: it is the platform-set variable
 every GitHub Actions job already has, so local runs (including
