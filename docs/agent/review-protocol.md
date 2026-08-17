@@ -6,8 +6,8 @@ BenchBox binding for `SHARED/review-protocol`. Supersedes
 ## Authority boundary
 
 - `[REVIEW-AUTH-001]`: reviews are read-only except local capture. Remediation,
-  hosted writes, commits, pushes, PRs, and auto-merge need a later user turn;
-  bundling review and remediation does not. Findings only: zero tracked
+  hosted writes, commits, pushes, PRs, and auto-merge need authorization in a
+  later user turn; bundling review and remediation does not. Findings only: zero tracked
   worktree-content changes; do not review and then edit.
 - `[AUTH-PROVENANCE-001]`: label task, repository, mechanical, or
   recommendation. A prior task's author identity is not policy.
