@@ -861,6 +861,32 @@ class TestReleaseInfrastructure:
         recipe = _make_target_recipe("pr-refresh")
         assert 'develop|main|release|"") echo "Refusing to refresh $$CURRENT' in recipe
 
+    def test_pr_open_refuses_behind_origin_develop(self):
+        """Open-stale branches must not reach git push / gh pr create.
+
+        #1751 opened already behind because pr-open fetched origin/develop
+        for path filters and then ignored ancestry. The absorb stays
+        make pr-refresh (one PR at a time). pr-open must not merge
+        develop itself or pr-fanout becomes a refresh storm.
+        """
+        recipe = _make_target_recipe("pr-open")
+        assert "git merge-base --is-ancestor origin/develop HEAD" in recipe
+        assert '$(STALE)" != "1"' in recipe
+        assert "git merge --no-edit origin/develop" not in recipe
+        fetch_at = recipe.find("git fetch origin develop --quiet")
+        gate_at = recipe.find("git merge-base --is-ancestor origin/develop HEAD")
+        push_at = recipe.find("git push -u origin")
+        assert fetch_at != -1 and gate_at != -1 and push_at != -1
+        assert fetch_at < gate_at < push_at
+
+        refresh = _make_target_recipe("pr-refresh")
+        assert "git merge --no-edit origin/develop" in refresh
+        assert "$(MAKE) -s pr-open" in refresh
+
+        fanout = _make_target_recipe("pr-fanout")
+        assert "$(MAKE) -s pr-open" in fanout
+        assert "pr-refresh" not in fanout
+
         makefile_content = _makefile_text()
         assert "worktree-release-locked" not in makefile_content
 
