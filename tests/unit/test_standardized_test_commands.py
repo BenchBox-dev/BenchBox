@@ -32,9 +32,18 @@ CORRECTNESS_GATE_QUERY_IDS = "1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22"
 
 
 def _makefile_target_body(makefile_content: str, target_name: str) -> str:
-    match = re.search(rf"(?ms)^{re.escape(target_name)}:\n(?P<body>(?:\t.*\n|@.*\n|[ \t].*\n)*)", makefile_content)
-    assert match, f"Makefile target not found: {target_name}"
-    return match.group("body")
+    lines = makefile_content.splitlines(keepends=True)
+    start = next(
+        (index for index, line in enumerate(lines) if line.split(":", 1)[0] == target_name),
+        None,
+    )
+    assert start is not None, f"Makefile target not found: {target_name}"
+    body: list[str] = []
+    for line in lines[start + 1 :]:
+        if line.strip() and not line.startswith(("\t", " ")):
+            break
+        body.append(line)
+    return "".join(body)
 
 
 def _cross_surface_make_target(gate_name: str) -> str:
@@ -294,6 +303,17 @@ class TestMakefileCommands:
         assert calls[1] == "-s skill-integrity-check"
         assert calls[2].startswith("-s pr-preflight-fast-tests ")
 
+    def test_skill_integrity_preflight_skill_plus_content_runs_both_narrow_lanes(self, tmp_path: Path):
+        result, calls = _run_skill_integrity_preflight_route(
+            tmp_path,
+            _skill_preflight_decision(skill=True, skill_only=True, code=False, content=True),
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == "Selected preflight lanes: skill-integrity content"
+        assert calls == ["-s skill-integrity-check", f"-s pr-content-guard PATH_LISTS={tmp_path / 'lists'}"]
+        assert all("ci-lint" not in call and "pr-preflight-fast-tests" not in call for call in calls)
+
     @pytest.mark.parametrize("case", ["product", "unknown", "empty"])
     def test_skill_integrity_preflight_non_skill_cases_retain_full_contract(self, tmp_path: Path, case: str):
         result, calls = _run_skill_integrity_preflight_route(
@@ -383,17 +403,77 @@ class TestMakefileCommands:
         assert any(".pr-preflight-route" in call for call in calls)
         assert all("uat-artifact-hygiene" not in call for call in calls)
 
+    def test_pr_preflight_fast_tests_creates_classifier_artifacts_when_absent(self, tmp_path: Path):
+        tool_bin = tmp_path / "bin"
+        tool_bin.mkdir()
+        for command in ("mktemp", "rm", "mkdir"):
+            executable = shutil.which(command)
+            assert executable is not None
+            (tool_bin / command).symlink_to(executable)
+        (tool_bin / "git").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        (tool_bin / "git").chmod(0o755)
+        (tool_bin / "uv").write_text(
+            "#!/bin/sh\n"
+            "json_out=\n"
+            "lists_dir=\n"
+            "check=\n"
+            "while [ $# -gt 0 ]; do\n"
+            '  case "$1" in\n'
+            "    --json-out) json_out=$2; shift 2 ;;\n"
+            "    --lists-dir) lists_dir=$2; shift 2 ;;\n"
+            "    --check) check=$2; shift 2 ;;\n"
+            "    *) shift ;;\n"
+            "  esac\n"
+            "done\n"
+            'if [ -n "$json_out" ]; then\n'
+            '  printf "%s\n" "{"needs_code_ci": false}" > "$json_out"\n'
+            '  mkdir -p "$lists_dir"\n'
+            '  : > "$lists_dir/yaml.txt"\n'
+            '  : > "$lists_dir/markdown.txt"\n'
+            '  : > "$lists_dir/docs.txt"\n'
+            "  exit 0\n"
+            "fi\n"
+            'if [ "$check" = "needs-code-ci" ]; then exit 1; fi\n'
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        (tool_bin / "uv").chmod(0o755)
+        trace = tmp_path / "trace.txt"
+        fake_make = tmp_path / "fake-make"
+        fake_make.write_text('#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$PREFLIGHT_TRACE"\n', encoding="utf-8")
+        fake_make.chmod(0o755)
+        make = shutil.which("make")
+        assert make is not None
+
+        result = subprocess.run(
+            [make, "--no-print-directory", "pr-preflight-fast-tests", f"MAKE={fake_make}"],
+            cwd=Path.cwd(),
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env={**os.environ, "PATH": str(tool_bin), "PREFLIGHT_TRACE": str(trace)},
+        )
+        calls = trace.read_text(encoding="utf-8").splitlines() if trace.exists() else []
+
+        assert result.returncode == 0, result.stderr
+        assert "PATH_DECISION is required" not in result.stderr
+        assert any("pr-content-guard" in call for call in calls)
+        assert "No code changes detected; skipping fast tests." in result.stdout
+
     def test_skill_integrity_preflight_consumes_one_classifier_artifact_without_path_globs(self):
         makefile_content = (Path.cwd() / "Makefile").read_text(encoding="utf-8")
         preflight_body = _makefile_target_body(makefile_content, "pr-preflight")
         route_body = _makefile_target_body(makefile_content, ".pr-preflight-route")
+        fast_tests_body = _makefile_target_body(makefile_content, "pr-preflight-fast-tests")
 
-        assert preflight_body.count("scripts/path_filter_decision.py --base-ref origin/develop") == 1
         assert 'PATH_DECISION="$$DECISION"' in preflight_body
+        assert "scripts/path_filter_decision.py --base-ref origin/develop" in preflight_body
         assert "path_filter_decision.py --base-ref" not in route_body
         assert ".claude/skills" not in route_body
         assert "skill-sync.yaml" not in route_body
         assert "skill-sync.lock" not in route_body
+        assert 'if [ -n "$(PATH_DECISION)" ] || [ -n "$(PATH_LISTS)" ]; then' in fast_tests_body
+        assert "scripts/path_filter_decision.py --base-ref origin/develop" in fast_tests_body
 
     def test_pr_preflight_fast_tests_uses_required_ci_marker_expression(self):
         repo_root = Path.cwd()

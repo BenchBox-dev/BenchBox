@@ -230,6 +230,9 @@ no skill path globs of its own. Its lane output is explicit:
 - `Selected preflight lanes: skill-integrity` means an approved pure skill diff
   runs `skill-integrity-check` without the product `ci-lint` or fast pytest
   selection.
+- `Selected preflight lanes: skill-integrity content` means an approved skill
+  diff plus safe content runs the focused integrity lane and `pr-content-guard`,
+  still without product `ci-lint` or fast pytest.
 - `Selected preflight lanes: product ...` preserves the historical full local
   lint, content-guard, and fast-test contract. Content-only, unknown, empty,
   structural-manifest, and ordinary product diffs remain here.
@@ -261,6 +264,8 @@ On the full product path, `make pr-preflight-fast-tests` always runs
 of whether the branch's `needs-code-ci` path-filter decision is true. This
 preserves the fix for docs-plus-code PRs that previously hit those guards for
 the first time in CI. The `needs-code-ci` decision still gates only the
-fast-test pytest run. An approved pure skill diff does not enter this generic
+fast-test pytest run. Direct invocation, including the opt-in `BENCHBOX_PREPUSH=1`
+hook, creates the classifier JSON and path lists when the parent preflight did
+not already supply them. An approved pure skill diff does not enter this generic
 content target; its focused lane carries the integrity and artifact controls
-listed above.
+listed above. A skill-plus-safe-content diff uses the two narrow lanes instead.
