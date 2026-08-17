@@ -125,7 +125,7 @@ Stacked/feature-base PRs unsupported: zero CI by filters; `pr-base-guard.yml` fa
 
 The shared database is the only TODO record. `_project/scripts/todo` is the
 only write path; global `--db`/`--actor` flags precede the subcommand. Tracker
-writes follow the same worktree policy. `todo claim <id>` prints the binding
+writes follow the same worktree policy (`_project/todo-db-export/` is public; no recovered plaintext). `todo claim <id>` prints the binding
 work order; follow its scope, preserve rules, anti-patterns, dependencies, and
 verification. Exit 2 means fix the cause, never bypass it. `todo ready` and
 `todo stats` print an untriaged-findings banner on stderr when open findings or

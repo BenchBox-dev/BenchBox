@@ -168,6 +168,11 @@ def _policy_section(text: str, policy_id: str) -> str:
     return section.split("\n## ", 1)[0]
 
 
+def _missing_anchors(text: str, anchors: Iterable[str]) -> list[str]:
+    normalized_text = " ".join(text.casefold().split())
+    return [anchor for anchor in anchors if " ".join(anchor.casefold().split()) not in normalized_text]
+
+
 def audit_review_policy(project: Path) -> list[str]:
     errors: list[str] = []
     agents = _read(project, "AGENTS.md")
@@ -186,7 +191,7 @@ def audit_review_policy(project: Path) -> list[str]:
         errors.append("AGENTS.md misses the Code Review Rules section")
     else:
         review_rules = agents.split(marker, 1)[1].split("\n## ", 1)[0]
-        missing_anchors = [anchor for anchor in CODE_REVIEW_RULE_ANCHORS if anchor not in review_rules]
+        missing_anchors = _missing_anchors(review_rules, CODE_REVIEW_RULE_ANCHORS)
         if missing_anchors:
             errors.append(f"AGENTS.md Code Review Rules drifted; missing anchors: {', '.join(missing_anchors)}")
 
@@ -197,7 +202,7 @@ def audit_review_policy(project: Path) -> list[str]:
         errors.append(f"canonical review skill misses policy IDs: {', '.join(missing_canonical_ids)}")
     for policy_id, anchors in CANONICAL_REVIEW_ANCHORS.items():
         section = _policy_section(canonical_review, policy_id)
-        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        missing_anchors = _missing_anchors(section, anchors)
         if section and missing_anchors:
             errors.append(f"canonical {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
     for policy_id, anchors in PROJECT_REVIEW_ANCHORS.items():
@@ -205,12 +210,12 @@ def audit_review_policy(project: Path) -> list[str]:
         if not section:
             errors.append(f"project review binding misses policy ID: {policy_id}")
             continue
-        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        missing_anchors = _missing_anchors(section, anchors)
         if missing_anchors:
             errors.append(f"project {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
     for policy_id, anchors in AGENT_REVIEW_ANCHORS.items():
         section = _policy_section(agents, policy_id)
-        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        missing_anchors = _missing_anchors(section, anchors)
         if not section:
             errors.append(f"AGENTS.md review policy misses policy ID: {policy_id}")
         elif missing_anchors:
@@ -234,14 +239,14 @@ def audit_commit_policy(project: Path) -> list[str]:
     canonical_commit = _read(project, CANONICAL_COMMIT_SKILL)
     for policy_id, anchors in CANONICAL_COMMIT_ANCHORS.items():
         section = _policy_section(canonical_commit, policy_id)
-        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        missing_anchors = _missing_anchors(section, anchors)
         if not section:
             errors.append(f"canonical commit skill misses policy ID: {policy_id}")
         elif missing_anchors:
             errors.append(f"canonical {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
     for policy_id, anchors in PROJECT_COMMIT_ANCHORS.items():
         section = _policy_section(agents, policy_id)
-        missing_anchors = [anchor for anchor in anchors if anchor.casefold() not in section.casefold()]
+        missing_anchors = _missing_anchors(section, anchors)
         if not section:
             errors.append(f"project commit policy misses policy ID: {policy_id}")
         elif missing_anchors:

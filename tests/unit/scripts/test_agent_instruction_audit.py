@@ -111,6 +111,16 @@ def test_project_commit_coauthor_consent_drift_fails(tmp_path: Path) -> None:
     assert any("project COMMIT-IDENTITY-001 semantics drifted" in error for error in errors)
 
 
+def test_project_commit_anchor_reflow_passes(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    agents.write_text(
+        agents.read_text().replace("agent work are not authorization\n(", "agent work are not\nauthorization (")
+    )
+    _, errors = audit(project, CORPUS)
+    assert errors == []
+
+
 @pytest.mark.parametrize(
     "anchor",
     [

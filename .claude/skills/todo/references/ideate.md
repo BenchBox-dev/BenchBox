@@ -8,4 +8,6 @@ Use this guide to refine a rough idea.
 4. Stress-test assumptions.
 5. Recommend a minimal viable scope, what you will not do, and open questions.
 
-Before you recommend, apply `SHARED/review-protocol/SKILL.md` (Planning-Depth Layers) L3 and the L2 missed-dimension question. Note any reframe. Save only after the user confirms.
+Before recommending, apply Layers 2 and 3 of
+`SHARED/review-protocol/SKILL.md`. Record any reframe and save only after the
+user confirms.
