@@ -14,6 +14,22 @@ from benchbox.core.schemas import DatabaseConfig, SystemProfile
 
 logger = logging.getLogger(__name__)
 
+# Semantically required producer keys. get_platform_config may emit many more
+# extras; adapters may ignore metadata. These keys must be forwarded by
+# ``build_adapter_config`` when present. Inventory (w0):
+# - consumed via helper: TUNING_FORWARD_KEYS in platforms/base/config_utils.py
+# - stripped metadata: type, name, connection_string
+# - adapter-specific extras: remaining DatabaseConfig fields (not required)
+REQUIRED_FROM_CONFIG_KEYS: frozenset[str] = frozenset(
+    {
+        "tuning_config",
+        "tuning_enabled",
+        "unified_tuning_configuration",
+        "tuning_source",
+        "tuning_source_file",
+    }
+)
+
 
 def get_platform_config(
     database_config: DatabaseConfig,
