@@ -119,7 +119,7 @@ help:
 	@echo "PR Workflow & Worktrees:"
 	@echo "  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden"
 	@echo "  make pr-preflight    Run lint + fast marker tests locally (coverage remains CI-only)"
-	@echo "  make pr-open [PR_BODY_FILE=path] [READY=1]  Push branch + open PR vs develop (auto-merge withheld unless READY=1)"
+	@echo "  make pr-open [PR_BODY_FILE=path] [READY=1] [STALE=1]  Push branch + open PR vs develop (refuses if behind origin/develop unless STALE=1; auto-merge withheld unless READY=1)"
 	@echo "  make pr-ready        Arm squash auto-merge for the open PR on this branch (when final)"
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop"
