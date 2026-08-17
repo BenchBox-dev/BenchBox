@@ -18,9 +18,12 @@ if _SCRIPTS_DIR not in sys.path:
 
 from post_merge_signature import (  # noqa: E402
     SignatureError,
+    attribution_action,
     build_signature_from_job_failure,
     build_signature_from_junit,
     diff_signatures,
+    failure_id_test_paths,
+    imported_module_paths,
     load_signature,
     main,
 )
@@ -455,3 +458,105 @@ def test_cli_diff_prints_new_ids_to_stdout(tmp_path: Path, capsys: pytest.Captur
     assert exit_code == 0
     captured = capsys.readouterr()
     assert captured.out.strip() == "tests/a.py::test_a"
+
+
+def test_failure_id_test_paths_extracts_junit_paths_only() -> None:
+    paths = failure_id_test_paths(
+        [
+            "tests/unit/test_query_generation_preflight.py::test_tpcds_throughput_preflight_detects_generation_failures",
+            "lint:Run CI lint mirror",
+            12,
+        ]
+    )
+    assert paths == ["tests/unit/test_query_generation_preflight.py"]
+
+
+def test_attribution_advisory_when_blamed_sha_misses_failing_test() -> None:
+    failure_ids = [
+        "tests/unit/test_query_generation_preflight.py::test_tpcds_throughput_preflight_detects_generation_failures"
+    ]
+    changed = ["benchbox/platforms/ducklake.py", "docs/operations/uat-framework.md"]
+    assert attribution_action(failure_ids, changed) == "advisory"
+
+
+def test_attribution_reverts_when_blamed_sha_touches_code_under_test() -> None:
+    failure_ids = [
+        "tests/unit/test_post_merge_signature.py::test_build_signature_from_junit_extracts_failures_and_errors"
+    ]
+    changed = ["scripts/post_merge_signature.py"]
+    assert attribution_action(failure_ids, changed) == "revert"
+
+
+def test_attribution_reverts_job_level_failures() -> None:
+    assert attribution_action(["lint:Run CI lint mirror"], ["README.md"]) == "revert"
+
+
+# ---------------------------------------------------------------------------
+# imported_module_paths / real dependency attribution (finding #1)
+# ---------------------------------------------------------------------------
+
+
+def test_imported_module_paths_finds_lazy_function_local_imports(tmp_path: Path) -> None:
+    (tmp_path / "pkg").mkdir()
+    (tmp_path / "pkg" / "dep.py").write_text("VALUE = 1\n", encoding="utf-8")
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    test_file = test_dir / "test_thing.py"
+    test_file.write_text(
+        "def test_it():\n    from pkg.dep import VALUE\n    assert VALUE == 1\n",
+        encoding="utf-8",
+    )
+
+    paths = imported_module_paths("tests/test_thing.py", tmp_path)
+
+    assert "pkg/dep.py" in paths
+
+
+def test_imported_module_paths_skips_nonexistent_modules(tmp_path: Path) -> None:
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    (test_dir / "test_thing.py").write_text("import os\nimport totally.missing.module\n", encoding="utf-8")
+
+    paths = imported_module_paths("tests/test_thing.py", tmp_path)
+
+    assert paths == []
+
+
+def test_imported_module_paths_missing_file_returns_empty(tmp_path: Path) -> None:
+    assert imported_module_paths("tests/does_not_exist.py", tmp_path) == []
+
+
+def test_attribution_reverts_via_real_import_when_basename_differs(tmp_path: Path) -> None:
+    # The finding #1 repro: a test imports a module whose basename does not
+    # match the test's own basename or its `test_` stem, so the old
+    # basename-only heuristic wrongly returned advisory. Real import
+    # analysis must still catch it.
+    (tmp_path / "benchbox").mkdir()
+    (tmp_path / "benchbox" / "throughput_test.py").write_text("def run():\n    pass\n", encoding="utf-8")
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_query_generation_preflight.py").write_text(
+        "def test_it():\n    from benchbox.throughput_test import run\n    run()\n",
+        encoding="utf-8",
+    )
+
+    failure_ids = ["tests/test_query_generation_preflight.py::test_it"]
+    changed = ["benchbox/throughput_test.py"]
+
+    assert attribution_action(failure_ids, changed, repo_root=tmp_path) == "revert"
+
+
+def test_attribution_stays_advisory_when_import_analysis_also_clears_sha(tmp_path: Path) -> None:
+    (tmp_path / "benchbox").mkdir()
+    (tmp_path / "benchbox" / "unrelated.py").write_text("def run():\n    pass\n", encoding="utf-8")
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_query_generation_preflight.py").write_text(
+        "def test_it():\n    from benchbox.unrelated import run\n    run()\n",
+        encoding="utf-8",
+    )
+
+    failure_ids = ["tests/test_query_generation_preflight.py::test_it"]
+    changed = ["docs/operations/uat-framework.md"]
+
+    assert attribution_action(failure_ids, changed, repo_root=tmp_path) == "advisory"
