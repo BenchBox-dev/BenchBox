@@ -24,6 +24,7 @@ Read the project-root `skill-sync.yaml`, then read
 |---|---|
 | `setup`, `sync`, `status`, `validate`, `verify`, `diff`, `doctor` | `references/operations.md` |
 | `pin`, `unpin`, `prune`, `promote`, `settings` | `references/operations.md` |
+| `agent-config` | `references/operations.md` |
 | `help` | this table |
 
 ## Flags
@@ -31,4 +32,6 @@ Read the project-root `skill-sync.yaml`, then read
 - Global: `--json`/`-j`, `--project`/`-p`, `--help`/`-h`.
 - Sync: `--dry-run`/`-n`, `--force`/`-f`.
 - Validate: `--exit-code`. Settings: `--agent`. Prune: `--dry-run`.
+- Agent config: `capture`, `validate`, or `restore`; supports `--dry-run`,
+  `--force` for restore, and `--json`.
 - Use `--force` only when source and target ownership is known.

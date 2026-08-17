@@ -319,20 +319,20 @@
         "type": "git",
         "name": "product",
         "url": "https://github.com/joeharris76/skill-sync.git",
-        "ref": "6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa",
+        "ref": "6139085a35455fe90c8d6c94d7567e131a24db96",
         "subdir": "skills",
-        "revision": "6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa",
+        "revision": "6139085a35455fe90c8d6c94d7567e131a24db96",
         "fetchedAt": "2026-08-16T21:50:32.655Z"
       },
       "installMode": "mirror",
       "files": {
         "references/operations.md": {
-          "sha256": "26f661822c7a6be5ac81e68a80827ba4b0bd2a0f375772eb239dd9baa2c8d47a",
-          "size": 1910
+          "sha256": "4835e79ceba1b314be879705cb3b42812fd341486ae0bd1cb2a215b0227b5860",
+          "size": 2776
         },
         "SKILL.md": {
-          "sha256": "0264f64484bd31941fad4cbf09db9e170ac4372916346cd131335705a2914e34",
-          "size": 1259
+          "sha256": "68f73b8880bcf6534e97d2fa1f6b4fb5a6675eb17e8dff7929bd46445717906b",
+          "size": 1421
         },
         "skill.yaml": {
           "sha256": "01ece1a29901cca51c02f6042d087f1053b7e22c3d5102458ec8b8bf13436804",
