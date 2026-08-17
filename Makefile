@@ -1290,6 +1290,11 @@ pr-content-guard:
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
 # before landing. Warn-only — does not block the push.
+#
+# Currency: after fetching origin/develop, refuse unless that tip is an
+# ancestor of HEAD. Run `make pr-refresh` (one stale PR at a time) to absorb
+# develop. Do not merge develop here — pr-fanout would otherwise refresh
+# every worktree at once. STALE=1 is the explicit escape hatch.
 pr-open:
 	@$(MAKE) -s agent-write-preflight
 	@CURRENT=$$(git branch --show-current); \
@@ -1301,6 +1306,12 @@ pr-open:
 		exit 1; \
 	fi; \
 	git fetch origin develop --quiet; \
+	if [ "$(STALE)" != "1" ]; then \
+		git merge-base --is-ancestor origin/develop HEAD || { \
+			echo "Refusing to open PR: HEAD is behind origin/develop. Run 'make pr-refresh' (one PR at a time) or retry with STALE=1." >&2; \
+			exit 1; \
+		}; \
+	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
 	URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
