@@ -461,19 +461,26 @@ def map_phases_to_execution_type(phases: list[str]) -> str:
         return "standard"
 
 
+# Sorted so that additions land in one obvious place and a missing export is
+# visible on inspection rather than by grepping the call sites.
 __all__ = [
+    "TPC_ALLOWED_SCALE_FACTORS",
     "AdapterFactory",
     "SilentVerbosity",
+    "UnsupportedExecutionMode",
     "VerbosityLike",
+    "build_databricks_clustering_intent",
     "execute_run",
+    "get_execution_mode",
+    "is_dataframe_execution",
+    "map_phases_to_execution_type",
     "resolve_execution_mode",
     "resolve_lifecycle_phases",
+    "resolve_mode_with_registry",
     "resolve_run_config",
     "resolve_validation_options",
     "stamp_requested_phases",
     "translate_platform_options_for_adapter",
-    "build_databricks_clustering_intent",
-    "resolve_mode_with_registry",
-    "UnsupportedExecutionMode",
-    "map_phases_to_execution_type",
+    "validate_stream_count",
+    "validate_tpc_scale_factor",
 ]

@@ -324,3 +324,62 @@ class TestInteractionStaysInTheCli:
 
         assert "_warn_on_execute_without_load" in source
         assert "assuming data already exists" in source
+
+
+class TestTheExportedSurface:
+    """`__all__` is the layering contract's public face, so it must be true.
+
+    Three helpers migrated from MCP were once listed here under their old
+    module-private names while both surfaces imported them across package
+    boundaries, and five genuinely public names were missing entirely. Both
+    directions are checked so neither can drift back silently.
+    """
+
+    @staticmethod
+    def _module_level_public_names() -> set[str]:
+        tree = ast.parse(RUN_SERVICE_SOURCE.read_text(encoding="utf-8"))
+        names: set[str] = set()
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef | ast.ClassDef):
+                names.add(node.name)
+            elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                names.add(node.target.id)
+            elif isinstance(node, ast.Assign):
+                names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+        return {name for name in names if not name.startswith("_")}
+
+    def test_no_private_name_is_advertised_as_public(self):
+        from benchbox.core import run_service
+
+        assert [name for name in run_service.__all__ if name.startswith("_")] == []
+
+    def test_every_public_definition_is_exported(self):
+        from benchbox.core import run_service
+
+        missing = sorted(self._module_level_public_names() - set(run_service.__all__))
+
+        assert missing == [], f"defined but not exported: {missing}"
+
+    def test_every_export_resolves(self):
+        from benchbox.core import run_service
+
+        unresolved = sorted(name for name in run_service.__all__ if not hasattr(run_service, name))
+
+        assert unresolved == [], f"exported but undefined: {unresolved}"
+
+    def test_no_surface_imports_a_private_run_service_symbol(self):
+        """The underscore names were reachable because the surfaces imported them."""
+        offenders = []
+        for surface in ("benchbox/cli", "benchbox/mcp"):
+            for path in sorted((REPO_ROOT / surface).rglob("*.py")):
+                tree = ast.parse(path.read_text(encoding="utf-8"))
+                for node in ast.walk(tree):
+                    if not isinstance(node, ast.ImportFrom) or node.module != "benchbox.core.run_service":
+                        continue
+                    offenders.extend(
+                        f"{path.relative_to(REPO_ROOT)}:{node.lineno} {alias.name}"
+                        for alias in node.names
+                        if alias.name.startswith("_")
+                    )
+
+        assert offenders == [], f"surfaces importing private core symbols: {offenders}"
