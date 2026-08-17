@@ -78,7 +78,7 @@ def test_repository_candidate_passes() -> None:
         ".claude/settings.json",
         ".claude/skills/SHARED/investigation-framework/SKILL.md",
         "_project/evals/agent-instructions/scenarios.json",
-        "docs/development/agent-review-protocol.md",
+        "docs/agent/review-protocol.md",
         "skill-sync.lock",
     ],
 )
@@ -208,7 +208,7 @@ def test_invalid_evaluation_values_fail(tmp_path: Path) -> None:
 
 def test_superseded_review_doc_claiming_authority_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
-    legacy = project / "docs/development/review-protocol.md"
+    legacy = project / "docs/agent/review-protocol-legacy.md"
     legacy.write_text(
         "# Review Protocol\n\n> Canonical, unabridged form.\n\nIf a wrapper conflicts with this file, this file wins.\n"
     )
@@ -220,11 +220,11 @@ def test_superseded_review_doc_claiming_authority_fails(tmp_path: Path) -> None:
 
 def test_superseded_review_doc_with_banner_passes(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
-    legacy = project / "docs/development/review-protocol.md"
+    legacy = project / "docs/agent/review-protocol-legacy.md"
     legacy.write_text(
         "# Review Protocol (historical)\n\n"
         "> Historical, non-authoritative. The active behavioral authority is\n"
-        "> docs/development/agent-review-protocol.md.\n\nRetained rationale.\n"
+        "> docs/agent/review-protocol.md.\n\nRetained rationale.\n"
     )
     _, errors = audit(project, CORPUS)
     assert errors == []
@@ -248,7 +248,7 @@ def test_canonical_review_policy_semantic_drift_fails(tmp_path: Path) -> None:
 
 def test_project_review_policy_separate_turn_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
-    protocol = project / "docs/development/agent-review-protocol.md"
+    protocol = project / "docs/agent/review-protocol.md"
     protocol.write_text(protocol.read_text().replace("in a\n  later user turn", "separately"))
     _, errors = audit(project, CORPUS)
     assert any("project REVIEW-AUTH-001 semantics drifted" in error for error in errors)
@@ -264,7 +264,7 @@ def test_agents_bundled_review_zero_mutation_drift_fails(tmp_path: Path) -> None
 
 def test_project_review_policy_id_missing_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
-    protocol = project / "docs/development/agent-review-protocol.md"
+    protocol = project / "docs/agent/review-protocol.md"
     protocol.write_text(protocol.read_text().replace("[REVIEW-AUTH-001]", "[REMOVED-AUTH-ID]"))
     _, errors = audit(project, CORPUS)
     assert any("project review binding misses policy ID: REVIEW-AUTH-001" in error for error in errors)
@@ -276,6 +276,25 @@ def test_missing_canonical_review_policy_id_fails(tmp_path: Path) -> None:
     canonical.write_text(canonical.read_text().replace("[REVIEW-L2-001]", "[REMOVED-L2-ID]"))
     _, errors = audit(project, CORPUS)
     assert any("canonical review skill misses policy IDs: REVIEW-L2-001" in error for error in errors)
+
+
+def test_development_agent_doc_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    leaked = project / "docs/development/agent-extra.md"
+    leaked.parent.mkdir(parents=True, exist_ok=True)
+    leaked.write_text("# stray agent note\n")
+    _, errors = audit(project, CORPUS)
+    assert any("must live under docs/agent/" in error for error in errors)
+    assert any("docs/development/agent-extra.md" in error for error in errors)
+
+
+def test_missing_sphinx_agent_exclude_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    conf = project / "docs/conf.py"
+    conf.parent.mkdir(parents=True, exist_ok=True)
+    conf.write_text('exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]\n')
+    _, errors = audit(project, CORPUS)
+    assert any("must exclude the docs/agent/ tree from Sphinx" in error for error in errors)
 
 
 def _git_configured_repo(tmp_path: Path, name: str, email: str) -> Path:

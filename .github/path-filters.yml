@@ -84,7 +84,7 @@ code-ci:
   - "docs/**.html"
   - "docs/**.jinja"
   - "docs/**.j2"
-  - "docs/development/agent-*.md"
+  - "docs/agent/**"
   - "docs/operations/agent-instruction*.md"
   - "pyproject.toml"
   - "uv.lock"

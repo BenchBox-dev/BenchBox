@@ -2,7 +2,7 @@
 
 This is the active BenchBox binding for the canonical generated
 `SHARED/review-protocol` skill — the single behavioral authority for
-review-shaped work. It supersedes `docs/development/review-protocol.md`,
+review-shaped work. It supersedes `docs/agent/review-protocol-legacy.md`,
 retained only as non-authoritative historical rationale. Stable IDs make
 the contract mechanically auditable.
 
@@ -44,4 +44,4 @@ shorter here, but a contradiction is drift and the canonical behavior wins.
 
 Audit records bind numbers to the tree that produced them through distinct SHA
 fields. `make audit-sha-check` enforces it; the conventions are documented in
-`docs/development/audit-evidence-provenance.md`.
+`docs/agent/audit-evidence-provenance.md`.

@@ -1,7 +1,7 @@
 # Review Protocol (historical)
 
 > **Historical, non-authoritative.** The active behavioral authority is
-> `docs/development/agent-review-protocol.md` (stable `REVIEW-*` policy IDs,
+> `docs/agent/review-protocol.md` (stable `REVIEW-*` policy IDs,
 > bound to the canonical `SHARED/review-protocol` skill). This unabridged
 > text is retained only as rationale; where it disagrees with the active
 > authority, the active authority wins. Do not bind new commands, skills,
@@ -150,6 +150,6 @@ A project that adopts this protocol provides:
 
 See the project's agent instructions and the blind-spot directory's
 `README.md` for project-specific bindings. Behavior is governed by
-`docs/development/agent-review-protocol.md`; the project README governs
+`docs/agent/review-protocol.md`; the project README governs
 *storage*. The two should never restate each other; duplicated behavior
 rules belong in the active authority, not here.

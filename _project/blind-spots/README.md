@@ -29,7 +29,7 @@ remains the **capture format** for drafts.
 
 The rules for **when** to write a finding here, **what** counts as a
 blind spot vs a defect, and **what** capture authorizes (and does not
-authorize) live in `docs/development/agent-review-protocol.md`. This
+authorize) live in `docs/agent/review-protocol.md`. This
 README documents only **storage**: frontmatter schema, file naming,
 validation, and sweep workflow.
 
@@ -111,7 +111,7 @@ the top-level title plus the three required `##` sections below.
 
 ## Recording bindings
 
-Behavior is governed by `docs/development/agent-review-protocol.md`. This
+Behavior is governed by `docs/agent/review-protocol.md`. This
 directory stores the file shape used by the `/blind-spot` slash command
 and any other agent capture flow that the shared protocol authorizes.
 

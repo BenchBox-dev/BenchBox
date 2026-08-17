@@ -89,6 +89,6 @@ commits. Code Review should report only PR defects.
 
 - `[AUTH-PROVENANCE-001]` in `AGENTS.md` — a tool convention or an earlier task
   instruction never becomes a standing requirement.
-- `docs/development/agent-attribution-surfaces.md` — the same class of problem
+- `docs/agent/attribution-surfaces.md` — the same class of problem
   on GitHub comments and PR bodies.
 - `~/.benchbox/git-identity-forensics/` — preserved evidence and the timeline.

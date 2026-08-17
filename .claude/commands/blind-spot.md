@@ -11,7 +11,7 @@ description: Capture a blind-spot audit finding as a draft in ~/.benchbox/findin
 
 ## Your task
 
-Follow `docs/development/agent-review-protocol.md` exactly. Apply the
+Follow `docs/agent/review-protocol.md` exactly. Apply the
 defect gate `[REVIEW-DEFECT-001]` **before** anything else: a finding that
 materially affects correctness, performance, or security is a defect, not a
 blind spot. If the gate triggers, refuse to file and offer the user the
@@ -53,6 +53,6 @@ TODO / inline-fix / escalation menu instead. If the gate passes:
 
 ## Notes
 
-Behavior is governed by `docs/development/agent-review-protocol.md`.
+Behavior is governed by `docs/agent/review-protocol.md`.
 Storage is governed by `_project/blind-spots/README.md`. Don't restate
 either here.
