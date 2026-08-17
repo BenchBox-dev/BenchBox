@@ -18,9 +18,11 @@ if _SCRIPTS_DIR not in sys.path:
 
 from post_merge_signature import (  # noqa: E402
     SignatureError,
+    attribution_action,
     build_signature_from_job_failure,
     build_signature_from_junit,
     diff_signatures,
+    failure_id_test_paths,
     load_signature,
     main,
 )
@@ -455,3 +457,34 @@ def test_cli_diff_prints_new_ids_to_stdout(tmp_path: Path, capsys: pytest.Captur
     assert exit_code == 0
     captured = capsys.readouterr()
     assert captured.out.strip() == "tests/a.py::test_a"
+
+
+def test_failure_id_test_paths_extracts_junit_paths_only() -> None:
+    paths = failure_id_test_paths(
+        [
+            "tests/unit/test_query_generation_preflight.py::test_tpcds_throughput_preflight_detects_generation_failures",
+            "lint:Run CI lint mirror",
+            12,
+        ]
+    )
+    assert paths == ["tests/unit/test_query_generation_preflight.py"]
+
+
+def test_attribution_advisory_when_blamed_sha_misses_failing_test() -> None:
+    failure_ids = [
+        "tests/unit/test_query_generation_preflight.py::test_tpcds_throughput_preflight_detects_generation_failures"
+    ]
+    changed = ["benchbox/platforms/ducklake.py", "docs/operations/uat-framework.md"]
+    assert attribution_action(failure_ids, changed) == "advisory"
+
+
+def test_attribution_reverts_when_blamed_sha_touches_code_under_test() -> None:
+    failure_ids = [
+        "tests/unit/test_post_merge_signature.py::test_build_signature_from_junit_extracts_failures_and_errors"
+    ]
+    changed = ["scripts/post_merge_signature.py"]
+    assert attribution_action(failure_ids, changed) == "revert"
+
+
+def test_attribution_reverts_job_level_failures() -> None:
+    assert attribution_action(["lint:Run CI lint mirror"], ["README.md"]) == "revert"

@@ -619,9 +619,32 @@ jobs:
             echo "EOF_NEW_IDS"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: Attribute new failures to the blamed SHA
+        id: attribute
+        if: steps.signature-decision.outputs.should-revert == 'true'
+        shell: bash
+        env:
+          NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
+        run: |
+          set -euo pipefail
+          # Fail-open comparisons have empty/unusable new IDs: keep revert.
+          if [ -z "${NEW_FAILURE_IDS}" ] || [ "${NEW_FAILURE_IDS}" = "null" ]; then
+            echo "action=revert" >> "${GITHUB_OUTPUT}"
+            echo "Attribution skipped (no new-failure-id payload); keeping revert."
+            exit 0
+          fi
+          printf '%s\n' "${NEW_FAILURE_IDS}" > new-failure-ids.json
+          python3 scripts/post_merge_signature.py attribute \
+            --sha "${FAILING_SHA}" \
+            --failure-ids new-failure-ids.json \
+            --out attribution.json
+          action="$(jq -r '.action' attribution.json)"
+          echo "action=${action}" >> "${GITHUB_OUTPUT}"
+          echo "Attribution action: ${action}"
+
       - name: Open revert PR or conflict issue
         id: open-revert
-        if: steps.signature-decision.outputs.should-revert == 'true'
+        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action != 'advisory'
         shell: bash
         env:
           FAIL_OPEN_REASON: ${{ steps.signature-decision.outputs.fail-open-reason }}
@@ -811,6 +834,24 @@ jobs:
               "Auto-revert conflict for develop red at ${short_sha}" \
               "The automatic \`git revert ${FAILING_SHA}\` conflicted."
           fi
+
+      - name: Comment advisory instead of reverting
+        id: advisory-comment
+        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action == 'advisory'
+        shell: bash
+        env:
+          NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
+        run: |
+          set -euo pipefail
+          body="Post-merge is red with new failure IDs, but blamed SHA \`${FAILING_SHA}\` did not touch the failing test file(s) or a matching code-under-test basename. Skipping auto-revert; fix-forward the latent break.
+
+          Failing run: ${RUN_URL}
+          New failure IDs: ${NEW_FAILURE_IDS}"
+          echo "${body}"
+          gh issue create \
+            --title "Auto-revert advisory: ${FAILING_SHA:0:12} did not own the failing test" \
+            --label incident:develop-red \
+            --body "${body}" || true
 
       - name: Upsert develop-red incident issue
         id: upsert-incident

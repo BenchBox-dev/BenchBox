@@ -17,6 +17,13 @@ auto-revert-on-failure attribute a red develop run to the merge that actually
 introduced a new failure, instead of blaming whichever commit merged last
 while develop was already red for an unrelated reason.
 
+Blame rule today: revert ``github.sha`` of the first post-merge run whose
+signature has new failure IDs. Residual: a latent environment-dependent
+break can still make that SHA the first red run even when the blamed commit
+did not touch the failing test. ``attribute`` downgrades that case to an
+advisory when every extractable failing test path is outside the SHA's diff.
+Job-level failures (lint, missing junit paths) stay fail-closed (revert).
+
 Stdlib-only by design (see scripts/path_filter_decision.py for the same
 precedent): this runs in a bare `python` step with no dependency sync.
 """
@@ -25,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -110,6 +118,61 @@ def load_signature(path: Path) -> dict[str, object]:
     return data
 
 
+def failure_id_test_paths(failure_ids: list[object]) -> list[str]:
+    """Extract repository test paths from junit-style failure IDs.
+
+    ``tests/unit/foo.py::test_bar`` yields ``tests/unit/foo.py``. Job-level
+    IDs such as ``lint:Run CI lint mirror`` yield nothing.
+    """
+    paths: list[str] = []
+    seen: set[str] = set()
+    for raw in failure_ids:
+        if not isinstance(raw, str):
+            continue
+        candidate = raw.split("::", 1)[0].strip()
+        if not candidate.endswith(".py"):
+            continue
+        if "/" not in candidate and not candidate.startswith("tests"):
+            continue
+        if candidate not in seen:
+            seen.add(candidate)
+            paths.append(candidate)
+    return paths
+
+
+def paths_related_to_test(test_path: str) -> list[str]:
+    """Return the test path plus a conservative code-under-test stem match.
+
+    ``tests/unit/test_foo.py`` also matches a changed ``foo.py`` basename so a
+    PR that edits the module under test still reverts. This is not a full
+    import graph.
+    """
+    related = [test_path]
+    name = Path(test_path).name
+    if name.startswith("test_") and name.endswith(".py"):
+        related.append(name[len("test_") :])
+    return related
+
+
+def attribution_action(failure_ids: list[object], changed_paths: list[str]) -> str:
+    """Return ``revert`` or ``advisory`` for a blamed SHA's changed paths.
+
+    Advisory only when every extractable failing test path (and its stem
+    match) is absent from ``changed_paths``. No extractable test path keeps
+    revert so lint/job failures stay fail-closed.
+    """
+    test_paths = failure_id_test_paths(failure_ids)
+    if not test_paths:
+        return "revert"
+    changed = set(changed_paths)
+    changed_names = {Path(path).name for path in changed_paths}
+    for test_path in test_paths:
+        for related in paths_related_to_test(test_path):
+            if related in changed or Path(related).name in changed_names:
+                return "revert"
+    return "advisory"
+
+
 def diff_signatures(previous: dict[str, object], current: dict[str, object]) -> list[str]:
     """Return the failure IDs present in `current` but absent from `previous`.
 
@@ -148,6 +211,51 @@ def _build_command(args: argparse.Namespace) -> int:
     text = json.dumps(signature, indent=2, sort_keys=True) + "\n"
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(text, encoding="utf-8")
+    print(text, end="")
+    return 0
+
+
+def changed_paths_for_sha(sha: str) -> list[str]:
+    """List paths changed by ``sha`` (stdlib git, no shell)."""
+    result = subprocess.run(
+        ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", sha],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SignatureError(result.stderr.strip() or f"git diff-tree failed for {sha}")
+    return [line for line in result.stdout.splitlines() if line]
+
+
+def _attribute_command(args: argparse.Namespace) -> int:
+    try:
+        payload = json.loads(Path(args.failure_ids).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"error: could not read failure ids: {exc}", file=sys.stderr)
+        return 1
+    if isinstance(payload, dict):
+        failure_ids = payload.get("new_failure_ids", payload.get("failure_ids", []))
+    else:
+        failure_ids = payload
+    if not isinstance(failure_ids, list):
+        print("error: failure id payload must be a list or signature object", file=sys.stderr)
+        return 1
+    try:
+        changed_paths = changed_paths_for_sha(args.sha)
+    except SignatureError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    action = attribution_action(failure_ids, changed_paths)
+    result = {
+        "action": action,
+        "test_paths": failure_id_test_paths(failure_ids),
+        "changed_paths": changed_paths,
+    }
+    text = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(text, encoding="utf-8")
     print(text, end="")
     return 0
 
@@ -201,6 +309,20 @@ def main(argv: list[str] | None = None) -> int:
     diff_parser.add_argument("--current", type=Path, required=True, help="Path to the current run's signature JSON")
     diff_parser.add_argument("--out", type=Path, help="Path to write {new_failure_ids: [...]}")
     diff_parser.set_defaults(func=_diff_command)
+
+    attribute_parser = subparsers.add_parser(
+        "attribute",
+        help="Decide revert vs advisory from new failure IDs and the blamed SHA diff.",
+    )
+    attribute_parser.add_argument("--sha", required=True, help="Blamed commit SHA")
+    attribute_parser.add_argument(
+        "--failure-ids",
+        type=Path,
+        required=True,
+        help="JSON list or {new_failure_ids: [...]} from diff",
+    )
+    attribute_parser.add_argument("--out", type=Path, help="Path to write the attribution JSON")
+    attribute_parser.set_defaults(func=_attribute_command)
 
     args = parser.parse_args(argv)
     return args.func(args)
