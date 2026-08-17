@@ -307,6 +307,17 @@ def test_chain_prior_fast_certification_is_full_required() -> None:
     assert result.reasons == [REASON_PRIOR_NOT_FULL]
 
 
+def test_skill_only_prior_certification_is_not_full_refresh_evidence() -> None:
+    raw = _eligible_raw()
+    for run in raw["actions_runs"]:
+        run["certification_kind"] = "skill_integrity"
+
+    result = classify(request_from_mapping(raw))
+
+    assert result.decision == DECISION_FULL
+    assert result.reasons == [REASON_PRIOR_NOT_FULL]
+
+
 def test_tamper_workflow_fingerprint_mismatch() -> None:
     result = classify(_eligible_request(current_workflow_fingerprint="0" * 64))
     assert result.decision == DECISION_FULL

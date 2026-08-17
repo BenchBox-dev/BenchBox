@@ -1,11 +1,12 @@
 # Shared path rules for the develop PR CI classifier.
 #
 # The classifier fails closed: every changed path must match `safe-content`
-# before Python code CI can be skipped. Any non-matching path, including a new
-# top-level area, is treated as `code-ci`. `safe-content` lists prose-only
-# extensions, not directories. Directories like `docs/` and `_project/` mix
-# prose with executable code (Sphinx config, extension modules, helper
-# scripts) — those code paths must run lint/type/test like any other code.
+# or the explicitly governed `skill-integrity` class before product code CI
+# can be skipped. Any other non-code-ci path, including a new top-level area,
+# is treated as unknown code. `safe-content` lists prose-only extensions, not
+# directories. Directories like `docs/` and `_project/` mix prose with
+# executable code (Sphinx config, extension modules, helper scripts) — those
+# code paths must run lint/type/test like any other code.
 safe-content:
   - "_project/blind-spots/**"
   - "_project/decisions/**"
@@ -89,16 +90,15 @@ code-ci:
   - "uv.lock"
   - "Makefile"
   - ".github/workflows/**"
+  # Self-protection: editing the classifier rules must always receive full CI.
+  - ".github/path-filters.yml"
   - ".pre-commit-config.yaml"
   - ".claude/commands/**"
   - ".claude/settings.json"
-  - ".claude/skills/**"
   - "CLAUDE.md"
   - "GEMINI.md"
   - "ANTIGRAVITY.md"
   - "AGENTS.md"
-  - "skill-sync.yaml"
-  - "skill-sync.lock"
   - ".gitignore"
   - ".gitattributes"
 
@@ -106,8 +106,15 @@ code-ci:
 # here becomes a `<group>-needed` boolean output from ci-paths, computed by
 # path_filter_decision.py, so a pr.yml job can gate on
 # `needs.ci-paths.outputs.<group>-needed == 'true'` without inventing a
-# second classifier. Add a new group by adding a key here — no script
-# changes required.
+# second classifier. Most extra groups only select an additional job. The
+# skill-integrity group is also a first-class specialized class: when no
+# explicit/unknown code path or structural manifest change exists, its paths
+# are excluded from product CI and receive the dedicated integrity lane.
+
+skill-integrity:
+  - ".claude/skills/**"
+  - "skill-sync.yaml"
+  - "skill-sync.lock"
 
 # Packaging-metadata changes: build/install/audit signal (package-smoke,
 # dependency-audit jobs in pr.yml) only needs to run when one of these

@@ -68,11 +68,12 @@ RUNNER_INAPPLICABLE_GUARDS: dict[str, str] = {
         "developer path that does not exist on a runner; left ungated it "
         "hits the target's own 'not installed; skipping' branch and exits 0, "
         "reporting success while verifying nothing. The real CI-side "
-        "skill-sync integrity check is pr.yml's `guard-skill-sync-verify` "
-        "step, a pinned-SHA network checkout of the public skill-sync tool "
-        "run against every PR before it can reach develop -- see "
-        "docs/operations/ci-local-parity.md's 'Pinned skill-sync checkout "
-        "verify' section for why that check has no local/ci-lint equivalent "
+        "coverage is pr.yml's required `skill-integrity` job: for changed "
+        "skill surfaces it validates source policy, builds an independently "
+        "pinned public skill-sync verifier, and checks the tracked mirror and "
+        "lock before ci-required-result can pass. See "
+        "docs/operations/ci-local-parity.md's 'Required skill-integrity "
+        "lane' section for why that check has no local/ci-lint equivalent "
         "of its own."
     ),
 }

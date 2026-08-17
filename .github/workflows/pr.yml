@@ -20,6 +20,8 @@ jobs:
       safe-content-only: ${{ steps.classify.outputs.safe-content-only }}
       needs-code-ci: ${{ steps.classify.outputs.needs-code-ci }}
       content-guard-needed: ${{ steps.classify.outputs.content-guard-needed }}
+      skill-integrity-needed: ${{ steps.classify.outputs.skill-integrity-needed }}
+      skill-integrity-only: ${{ steps.classify.outputs.skill-integrity-only }}
       changed-paths: ${{ steps.classify.outputs.changed-paths }}
       code-paths: ${{ steps.classify.outputs.code-paths }}
       unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
@@ -49,8 +51,11 @@ jobs:
         # Bare python is intentional: the classifier is stdlib-only so
         # content-only PRs do not pay a dependency-sync cost before deciding.
         run: |
+          # Bind classification to the immutable pull-request event base. A
+          # later develop merge may make this PR BEHIND, but must not change
+          # the tree whose paths and manifest structure this run certifies.
           python scripts/path_filter_decision.py \
-            --base-ref "origin/${{ github.base_ref }}" \
+            --base-ref "${{ github.event.pull_request.base.sha }}" \
             --json-out ci-path-decision.json \
             --lists-dir .ci-paths \
             --github-output "$GITHUB_OUTPUT" \
@@ -122,7 +127,7 @@ jobs:
         # Bare python is intentional: the classifier is stdlib-only.
         run: |
           python scripts/path_filter_decision.py \
-            --base-ref "origin/${{ github.base_ref }}" \
+            --base-ref "${{ github.event.pull_request.base.sha }}" \
             --json-out ci-path-decision.json \
             --lists-dir .ci-paths
 
@@ -274,6 +279,77 @@ jobs:
           if missing_fragments:
               raise SystemExit(f"public-contracts.md source-derived claims are stale: {missing_fragments}")
           PY
+
+  skill-integrity:
+    name: skill-integrity
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate skill source and target trust policy
+        run: python3 scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build independently pinned skill-sync verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none \
+            https://github.com/joeharris76/skill-sync.git \
+            "$RUNNER_TEMP/skill-sync-verifier"
+          git -C "$RUNNER_TEMP/skill-sync-verifier" checkout --quiet \
+            6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa
+          (
+            cd "$RUNNER_TEMP/skill-sync-verifier"
+            npm ci --ignore-scripts
+            npm run build
+          )
+
+      - name: Verify tracked skill mirror and lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/empty-home"
+          HOME="$RUNNER_TEMP/empty-home" node \
+            "$RUNNER_TEMP/skill-sync-verifier/dist/cli/index.js" \
+            verify --project "$GITHUB_WORKSPACE"
+
+      - name: Enforce untracked mirror boundary
+        run: sh scripts/check_untracked_skill_mirrors.sh
+
+      - name: Audit instruction authority and PR commit identity
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 _project/scripts/agent_instruction_audit.py
+          python3 _project/scripts/agent_instruction_audit.py --check-commit-range "$BASE_SHA"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install focused test dependencies
+        run: uv sync --group dev
+
+      - name: Run skill wrapper and instruction audit contracts
+        run: |
+          uv run -- python -m pytest \
+            tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness \
+            tests/unit/scripts/test_agent_instruction_audit.py \
+            -q
+
+      - name: Validate tracked artifact hygiene
+        run: uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
 
   code-lint:
     name: lint
@@ -1200,6 +1276,7 @@ jobs:
 
   certification-identity:
     name: certification-identity
+    needs: ci-paths
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -1215,6 +1292,9 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           SYNTHETIC_MERGE_SHA: ${{ github.sha }}
           RUN_ID: ${{ github.run_id }}
+          NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
+          SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
+          CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -1242,6 +1322,24 @@ jobs:
           fingerprint = hashlib.sha256(
               "\n".join(f"{path}={entries[path]}" for path in sorted(entries)).encode()
           ).hexdigest()
+          needs_code_ci = os.environ["NEEDS_CODE_CI"] == "true"
+          skill_integrity_needed = os.environ["SKILL_INTEGRITY_NEEDED"] == "true"
+          content_guard_needed = os.environ["CONTENT_GUARD_NEEDED"] == "true"
+          if needs_code_ci:
+              certification_kind = "full"
+          elif skill_integrity_needed:
+              certification_kind = "skill_integrity"
+          else:
+              certification_kind = "content"
+          selected_lanes = [
+              lane
+              for lane, selected in (
+                  ("content", content_guard_needed),
+                  ("product-code", needs_code_ci),
+                  ("skill-integrity", skill_integrity_needed),
+              )
+              if selected
+          ]
           record = {
               "pr_head_sha": head,
               "base_sha": base,
@@ -1249,7 +1347,8 @@ jobs:
               "synthetic_merge_tree": git("rev-parse", "HEAD^{tree}"),
               "workflow_fingerprint": fingerprint,
               "run_id": int(os.environ["RUN_ID"]),
-              "certification_kind": "full",
+              "certification_kind": certification_kind,
+              "selected_lanes": selected_lanes,
           }
           Path("pr-certification-identity.json").write_text(
               json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -1267,7 +1366,7 @@ jobs:
 
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, tpch-binary-framing, content-guard, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check]
+    needs: [ci-paths, tpch-binary-framing, content-guard, skill-integrity, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -1276,6 +1375,7 @@ jobs:
           CI_PATHS_RESULT: ${{ needs.ci-paths.result }}
           TPCH_BINARY_FRAMING_RESULT: ${{ needs.tpch-binary-framing.result }}
           CONTENT_RESULT: ${{ needs.content-guard.result }}
+          SKILL_INTEGRITY_RESULT: ${{ needs.skill-integrity.result }}
           LINT_RESULT: ${{ needs.code-lint.result }}
           TEST_RESULT: ${{ needs.code-test.result }}
           CORRECTNESS_RESULT: ${{ needs.correctness-gate.result }}
@@ -1289,6 +1389,7 @@ jobs:
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
+          SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SAFE_CONTENT_ONLY: ${{ needs.ci-paths.outputs.safe-content-only }}
         run: |
@@ -1306,6 +1407,17 @@ jobs:
 
           if [ "$CONTENT_GUARD_NEEDED" = "true" ] && [ "$CONTENT_RESULT" != "success" ]; then
             echo "content-guard=$CONTENT_RESULT"
+            exit 1
+          fi
+
+          if [ "$SKILL_INTEGRITY_NEEDED" = "true" ]; then
+            if [ "$SKILL_INTEGRITY_RESULT" != "success" ]; then
+              echo "skill-integrity=$SKILL_INTEGRITY_RESULT"
+              exit 1
+            fi
+          elif [ "$SKILL_INTEGRITY_RESULT" != "skipped" ] \
+              && [ "$SKILL_INTEGRITY_RESULT" != "success" ]; then
+            echo "unexpected skill-integrity result=$SKILL_INTEGRITY_RESULT"
             exit 1
           fi
 
@@ -1346,7 +1458,11 @@ jobs:
           fi
 
           if [ "$NEEDS_CODE_CI" = "false" ]; then
-            echo "Content-only PR; skipped Python code CI."
+            if [ "$SKILL_INTEGRITY_NEEDED" = "true" ]; then
+              echo "Skill-integrity-only PR; required skill checks passed and product CI was skipped."
+            else
+              echo "Content-only PR; applicable content checks passed and product CI was skipped."
+            fi
             echo "safe-content-only=$SAFE_CONTENT_ONLY"
             exit 0
           fi
@@ -1397,6 +1513,7 @@ jobs:
           CI_PATHS_RESULT: ${{ needs.ci-paths.result }}
           TPCH_BINARY_FRAMING_RESULT: ${{ needs.tpch-binary-framing.result }}
           CONTENT_RESULT: ${{ needs.content-guard.result }}
+          SKILL_INTEGRITY_RESULT: ${{ needs.skill-integrity.result }}
           LINT_RESULT: ${{ needs.code-lint.result }}
           TEST_RESULT: ${{ needs.code-test.result }}
           CORRECTNESS_RESULT: ${{ needs.correctness-gate.result }}
@@ -1410,6 +1527,7 @@ jobs:
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
+          SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           RUN_ID: ${{ github.run_id }}
@@ -1425,10 +1543,12 @@ jobs:
               "pr_head_sha": os.environ.get("HEAD_SHA") or "",
               "base_sha": os.environ.get("BASE_SHA") or "",
               "needs_code_ci": os.environ.get("NEEDS_CODE_CI") or "",
+              "skill_integrity_needed": os.environ.get("SKILL_INTEGRITY_NEEDED") or "",
               "lanes": {
                   "ci-paths": os.environ.get("CI_PATHS_RESULT") or "",
                   "tpch-binary-framing": os.environ.get("TPCH_BINARY_FRAMING_RESULT") or "",
                   "content-guard": os.environ.get("CONTENT_RESULT") or "",
+                  "skill-integrity": os.environ.get("SKILL_INTEGRITY_RESULT") or "",
                   "code-lint": os.environ.get("LINT_RESULT") or "",
                   "code-test": os.environ.get("TEST_RESULT") or "",
                   "correctness-gate": os.environ.get("CORRECTNESS_RESULT") or "",

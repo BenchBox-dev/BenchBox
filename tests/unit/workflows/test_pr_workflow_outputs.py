@@ -19,12 +19,13 @@ def workflow() -> dict[str, Any]:
     return yaml.safe_load(PR_WORKFLOW.read_text(encoding="utf-8"))
 
 
-def test_required_umbrella_jobs_are_unchanged(workflow: dict[str, Any]) -> None:
+def test_required_umbrella_observes_every_selected_lane(workflow: dict[str, Any]) -> None:
     needs = workflow["jobs"]["ci-required-result"]["needs"]
     assert needs == [
         "ci-paths",
         "tpch-binary-framing",
         "content-guard",
+        "skill-integrity",
         "code-lint",
         "code-test",
         "correctness-gate",
