@@ -54,6 +54,8 @@ def classify_tpcds_run(scale_factor: float, *, official: bool = False) -> TpcdsC
 
 def validate_tpcds_scale(
     scale_factor: float,
+    *,
+    official: bool = False,
 ) -> TpcdsComplianceClass:
     """Validate *scale_factor* and return its compliance class.
 
@@ -62,6 +64,9 @@ def validate_tpcds_scale(
 
     Args:
         scale_factor: The requested TPC-DS scale factor.
+        official: True when the run was invoked in ``--official`` mode. This
+            must be forwarded from the run configuration: without it every run
+            classifies as ``UNOFFICIAL_NONSTANDARD`` and can never be submitted.
 
     Returns:
         The :class:`TpcdsComplianceClass` for the run.
@@ -74,7 +79,7 @@ def validate_tpcds_scale(
     if scale_factor > 100000:
         raise ValueError(f"TPC-DS scale factor {scale_factor} exceeds maximum (100000)")
 
-    compliance = classify_tpcds_run(scale_factor)
+    compliance = classify_tpcds_run(scale_factor, official=official)
 
     if compliance is TpcdsComplianceClass.UNOFFICIAL_SUBSCALE and scale_factor < TPCDS_MIN_SUBSCALE:
         raise ValueError(

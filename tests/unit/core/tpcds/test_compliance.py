@@ -147,3 +147,85 @@ class TestTpcdsComplianceClassEnum:
     def test_value_attribute_matches_string(self):
         assert TpcdsComplianceClass.OFFICIAL.value == "official"
         assert TpcdsComplianceClass.UNOFFICIAL_SUBSCALE.value == "unofficial_subscale"
+
+
+class TestOfficialFlagReachesTheClassifier:
+    """Guard the wiring, not just the pure function.
+
+    `classify_tpcds_run` was always correct, but no production caller passed
+    `official=True`: `validate_tpcds_scale` did not accept the argument, so
+    `TpcdsComplianceClass.OFFICIAL` was unreachable and every TPC-DS run was
+    refused by `benchbox submit`. The existing tests in this module all call
+    `classify_tpcds_run` directly and so could not catch that.
+    """
+
+    def test_validate_tpcds_scale_forwards_official(self):
+        assert validate_tpcds_scale(1.0, official=True) is TpcdsComplianceClass.OFFICIAL
+        assert validate_tpcds_scale(1.0) is TpcdsComplianceClass.UNOFFICIAL_NONSTANDARD
+
+    def test_official_only_applies_at_official_scale_points(self):
+        assert validate_tpcds_scale(2.0, official=True) is TpcdsComplianceClass.UNOFFICIAL_NONSTANDARD
+        assert validate_tpcds_scale(0.5, official=True) is TpcdsComplianceClass.UNOFFICIAL_SUBSCALE
+
+    def test_benchmark_runner_classifies_an_official_run_as_official(self):
+        """The runner is the seam that was broken."""
+        from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
+
+        assert TPCDSBenchmark(scale_factor=1.0, official=True).compliance_class is TpcdsComplianceClass.OFFICIAL
+        assert TPCDSBenchmark(scale_factor=1.0).compliance_class is TpcdsComplianceClass.UNOFFICIAL_NONSTANDARD
+
+    def test_loader_forwards_official_from_the_benchmark_config(self):
+        """BenchmarkConfig -> get_benchmark_instance -> runner must carry the flag."""
+        from benchbox.core.benchmark_loader import get_benchmark_instance
+        from benchbox.core.schemas import BenchmarkConfig
+
+        config = BenchmarkConfig(name="tpcds", display_name="TPC-DS", scale_factor=1.0, official=True)
+        assert get_benchmark_instance(config, None).compliance_class is TpcdsComplianceClass.OFFICIAL
+
+        default = BenchmarkConfig(name="tpcds", display_name="TPC-DS", scale_factor=1.0)
+        assert get_benchmark_instance(default, None).compliance_class is TpcdsComplianceClass.UNOFFICIAL_NONSTANDARD
+
+    def test_an_official_run_is_not_refused_by_submit_classification(self):
+        """The whole point: an official run must clear the submit gate."""
+        from benchbox.validation.bundle import CLI_REFUSED_COMPLIANCE_CLASSES
+
+        official = validate_tpcds_scale(1.0, official=True)
+        assert official.value not in CLI_REFUSED_COMPLIANCE_CLASSES
+        assert validate_tpcds_scale(1.0).value in CLI_REFUSED_COMPLIANCE_CLASSES
+
+    def test_both_construction_paths_carry_compliance_mode(self):
+        """There are two builders; a fix applied to only one is invisible to unit tests.
+
+        `benchmark_loader.get_benchmark_instance` is used by the core runner,
+        while `cli/orchestrator.py` has its own `_get_benchmark_instance`. The
+        original wiring fix passed unit tests while the CLI still emitted
+        unofficial results, because only the first path had been updated.
+        """
+        import inspect
+
+        from benchbox.cli import orchestrator
+        from benchbox.core import benchmark_loader
+
+        for module in (benchmark_loader, orchestrator):
+            source = inspect.getsource(module)
+            assert "compliance_mode_kwargs" in source, (
+                f"{module.__name__} builds benchmark instances but does not apply "
+                "compliance_mode_kwargs; CLI runs would be unsubmittable"
+            )
+
+    def test_compliance_mode_kwargs_only_targets_gated_benchmarks(self):
+        from benchbox.core.benchmark_loader import compliance_mode_kwargs
+        from benchbox.core.schemas import BenchmarkConfig
+
+        gated = BenchmarkConfig(name="tpcds", display_name="TPC-DS", scale_factor=1.0, official=True)
+        assert compliance_mode_kwargs(gated) == {"official": True}
+
+        ungated = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=1.0, official=True)
+        assert compliance_mode_kwargs(ungated) == {}
+
+    def test_official_benchmark_wrapper_defaults_to_official(self):
+        from benchbox.core.tpcds.compliance import TpcdsComplianceClass
+        from benchbox.core.tpcds.official_benchmark import TPCDSOfficialBenchmark
+
+        wrapper = TPCDSOfficialBenchmark(scale_factor=1.0)
+        assert wrapper.benchmark.compliance_class is TpcdsComplianceClass.OFFICIAL

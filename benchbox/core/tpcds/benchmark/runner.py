@@ -115,6 +115,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         verbose: Union[int, bool] = 0,
         parallel: int = 1,
         force_regenerate: bool = False,
+        official: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize a TPC-DS benchmark instance.
@@ -125,6 +126,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             verbose: Whether to print verbose output during operations
             parallel: Number of parallel processes for data generation
             force_regenerate: Force data regeneration even if valid data exists
+            official: True for a ``--official`` run. Required for the run to
+                classify as ``official`` and therefore to be submittable; see
+                :func:`benchbox.core.tpcds.compliance.classify_tpcds_run`.
             **kwargs: Additional implementation-specific options
 
         Raises:
@@ -136,7 +140,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise TypeError(f"scale_factor must be a number, got {type(scale_factor).__name__}")
 
         # Single shared validator - no silent rounding.
-        self.compliance_class = validate_tpcds_scale(scale_factor)
+        self.compliance_class = validate_tpcds_scale(scale_factor, official=official)
 
         # Validate parallel parameter
         if not isinstance(parallel, int):
