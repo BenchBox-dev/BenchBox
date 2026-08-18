@@ -27,6 +27,7 @@ def report() -> None:
     Commands for analyzing benchmark results over time, generating platform
     rankings, and detecting performance regressions.
 
+    \b
     Examples:
         benchbox report rankings --benchmark TPC-H --scale-factor 1
         benchbox report trends --platform DuckDB --benchmark TPC-H
@@ -87,6 +88,7 @@ def rankings(
     Ranks platforms based on performance metrics from historical results.
     Shows trend indicators comparing current to previous period.
 
+    \b
     Examples:
         benchbox report rankings --benchmark TPC-H --scale-factor 1
         benchbox report rankings -b TPC-DS -s 10 --metric power_at_size
@@ -166,6 +168,7 @@ def trends(
     Displays period-over-period performance changes for a platform,
     highlighting any regressions (>10% slowdown).
 
+    \b
     Examples:
         benchbox report trends --platform DuckDB --benchmark TPC-H --scale-factor 1
     """
@@ -228,6 +231,7 @@ def regressions(
     Scans all platforms and benchmarks for significant performance
     slowdowns compared to the previous period.
 
+    \b
     Examples:
         benchbox report regressions
         benchbox report regressions --threshold 15 --lookback-days 14
@@ -294,6 +298,7 @@ def import_results(
     are excluded from the database to prevent contamination of comparative rankings.
     Use --include-unofficial to import them explicitly.
 
+    \b
     Examples:
         benchbox report import benchmark_runs/results/
         benchbox report import ./results --pattern "*.json"
@@ -328,6 +333,7 @@ def stats(db_path: Path | None) -> None:
     Displays overview of stored results including counts, platforms,
     and date ranges.
 
+    \b
     Examples:
         benchbox report stats
     """
@@ -382,6 +388,7 @@ def list_results(
 
     Shows recent results with optional platform and benchmark filters.
 
+    \b
     Examples:
         benchbox report list
         benchbox report list --platform DuckDB --limit 10

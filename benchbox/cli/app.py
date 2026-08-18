@@ -21,12 +21,12 @@ SQL dialect translation, and performance measurement.
 
 \b
 Quick start:
-  benchbox run                   Interactive benchmark runner
-  benchbox run -p duckdb -b tpch  Direct execution
-  benchbox check-deps            Check platform dependencies
-  benchbox platforms list        View available platforms
+  benchbox run                                     Interactive benchmark runner
+  benchbox run --platform duckdb --benchmark tpch  Direct execution
+  benchbox check-deps                              Check platform dependencies
+  benchbox platforms list                          View available platforms
 
-For complete documentation: https://docs.benchbox.dev
+For complete documentation: https://benchbox.dev/docs/
 """
 
 

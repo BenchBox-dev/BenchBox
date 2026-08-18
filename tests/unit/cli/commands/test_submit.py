@@ -230,7 +230,7 @@ def test_submit_contributing_md_includes_canonical_required_items(
         "published-results",
         "generate_corpus_inventory",
         "validate_submission",
-        "docs.benchbox.dev",
+        "benchbox.dev/docs/contributing-results.html",
         "<result>.manifest.json",
     ):
         assert required in contributing, f"missing {required!r} in packaged CONTRIBUTING.md"

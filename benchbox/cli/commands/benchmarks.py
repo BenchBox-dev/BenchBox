@@ -22,6 +22,7 @@ def list_benchmarks(ctx):
     industry benchmarks (ClickBench, H2ODB), academic benchmarks (SSB, AMPLab),
     and testing benchmarks (ReadPrimitives, WritePrimitives, TPC-Havoc).
 
+    \b
     Examples:
         benchbox benchmarks list
     """
