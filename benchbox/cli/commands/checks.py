@@ -26,6 +26,7 @@ def check_dependencies(ctx, platform, verbose, show_matrix):
     Verifies platform dependencies and provides installation commands for
     missing packages. Shows comprehensive installation matrix for all platforms.
 
+    \b
     Examples:
         benchbox check-deps                      # Overview of all platforms
         benchbox check-deps --platform databricks # Check specific platform

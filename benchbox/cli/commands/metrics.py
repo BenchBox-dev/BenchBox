@@ -23,6 +23,7 @@ def metrics_group():
     \b
       qphh    Calculate TPC-H QphH@Size composite metric
 
+    \b
     Examples:
         # Calculate TPC-H QphH metric
         benchbox metrics qphh \\
@@ -75,18 +76,21 @@ def qphh(ctx, power_results, throughput_results, scale_factor, output_format, ou
         Power@Size = 3600 × SF / Power_Test_Time
         Throughput@Size = Num_Streams × 3600 × SF / Throughput_Test_Time
 
+    \b
     Examples:
         # Calculate QphH from test results
         benchbox metrics qphh \\
           --power-results results/power/results.json \\
           --throughput-results results/throughput/results.json
 
+    \b
         # Specify scale factor explicitly
         benchbox metrics qphh \\
           --power-results power.json \\
           --throughput-results throughput.json \\
           --scale-factor 100
 
+    \b
         # Export to JSON
         benchbox metrics qphh \\
           --power-results power.json \\

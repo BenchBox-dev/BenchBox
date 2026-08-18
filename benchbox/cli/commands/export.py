@@ -61,19 +61,24 @@ def export(ctx, result_file, formats, output_dir, last, benchmark, platform, for
 
     RESULT_FILE: Path to result JSON file to export (optional)
 
+    \b
     Examples:
         # Export specific result to CSV
         benchbox export results/tpch_sf1_duckdb.json --format csv
 
+    \b
         # Export to multiple formats
         benchbox export results/tpcds_sf10.json --format csv --format html
 
+    \b
         # Export most recent result
         benchbox export --last --format html
 
+    \b
         # Export latest TPC-H result to all formats
         benchbox export --last --benchmark tpc_h --format json --format csv --format html
 
+    \b
         # Export to custom directory
         benchbox export --last --format csv --output-dir ./reports/
     """

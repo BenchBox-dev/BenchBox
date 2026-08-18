@@ -98,6 +98,7 @@ def results(ctx, limit, submitted, paths):
     Displays a summary of recent benchmark executions including performance
     metrics, execution times, and result file locations.
 
+    \b
     Examples:
         benchbox results              # Show last 10 results
         benchbox results --limit 25   # Show last 25 results
@@ -179,6 +180,7 @@ def show_cli(result_file: str, full: bool) -> None:
     Reads a benchmark result JSON file and reconstructs the CLI command
     that can be used to reproduce the benchmark run.
 
+    \b
     Examples:
         benchbox results show-cli benchmark_runs/results/tpch_sf001_duckdb_20240101_120000.json
         benchbox results show-cli ./result.json --full
