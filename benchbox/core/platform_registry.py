@@ -479,6 +479,7 @@ class PlatformRegistry:
             requirements=deepcopy(platform_spec["requirements"]),
             installation_command=platform_spec["installation_command"],
             adoption=platform_spec.get("adoption", "niche"),
+            support_status=platform_spec.get("support_status"),
             category=platform_spec.get("category", "database"),
             supports=deepcopy(platform_spec.get("supports", [])),
             driver_package=driver_package,

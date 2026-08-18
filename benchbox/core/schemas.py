@@ -426,6 +426,12 @@ class PlatformInfo(BaseModel):
     requirements: list[str]
     installation_command: str
     adoption: str = "niche"  # One of: mainstream, established, emerging, niche
+    # Product support tier from the platform manifest: stable, beta, experimental,
+    # or deprecated. Distinct from `available`/`enabled`, which report only whether
+    # the driver is installed locally (see docs/reference/public-contracts.md).
+    # None when the source spec carries no status, so surfaces can render "unknown"
+    # rather than implying a support promise the registry never made.
+    support_status: Optional[str] = None
     category: str = "database"
     supports: list[str] = Field(default_factory=list)
     driver_package: Optional[str] = None

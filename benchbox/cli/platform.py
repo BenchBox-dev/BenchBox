@@ -47,6 +47,29 @@ def get_platform_alias_mode(name: str) -> DefaultMode | None:
     return PLATFORM_ALIAS_MODES.get(name.lower())
 
 
+_SUPPORT_STATUS_STYLES = {
+    "stable": "green",
+    "beta": "cyan",
+    "experimental": "yellow",
+    "deprecated": "red",
+}
+
+
+def _format_support_status(support_status: str | None) -> str:
+    """Render a platform's product support tier for display.
+
+    This is the registry's `support_status`, not local driver availability. An
+    unrecognised or absent status renders as "unknown" rather than defaulting to
+    a tier, so the CLI never invents a support promise the registry did not make.
+    """
+    if not support_status:
+        return "[dim]unknown[/dim]"
+    style = _SUPPORT_STATUS_STYLES.get(support_status)
+    if style is None:
+        return f"[dim]{support_status}[/dim]"
+    return f"[{style}]{support_status}[/{style}]"
+
+
 class NumberedSelectPrompt(Prompt):
     """A prompt that displays numbered options and accepts number or name input.
 
@@ -386,7 +409,13 @@ class PlatformManager:
 
         table = Table(title="BenchBox Platform Status")
         table.add_column("Platform", style="cyan", no_wrap=True)
-        table.add_column("Status", style="bold")
+        # "Driver" is local dependency availability; "Support" is the product
+        # support tier from the registry. They are independent: a stable platform
+        # can be Missing locally, and an installed driver implies nothing about
+        # the tier. See docs/reference/public-contracts.md ("Support Status
+        # Taxonomy"), which states the two must not be conflated.
+        table.add_column("Driver", style="bold")
+        table.add_column("Support", style="bold")
         table.add_column("Libraries", style="dim")
         table.add_column("Category", style="magenta")
         table.add_column("Description", style="dim")
@@ -405,13 +434,16 @@ class PlatformManager:
                 continue
 
             for name, info in platform_list:
-                # Status column
+                # Driver column - is the local dependency installed?
                 if info.enabled:
                     status = "[green]✅ Enabled[/green]"
                 elif info.available:
                     status = "[yellow]○ Available[/yellow]"
                 else:
                     status = "[red]❌ Missing[/red]"
+
+                # Support column - product support tier, independent of the above
+                support = _format_support_status(info.support_status)
 
                 # Libraries column
                 lib_statuses = []
@@ -427,6 +459,7 @@ class PlatformManager:
                 table.add_row(
                     info.display_name,
                     status,
+                    support,
                     libraries,
                     category_name.title(),
                     info.description,
@@ -458,7 +491,10 @@ class PlatformManager:
             status_icon = "✅" if info.enabled else ("○" if info.available else "❌")
             status_color = "green" if info.enabled else ("yellow" if info.available else "red")
 
-            self.console.print(f"[{status_color}]{status_icon}[/{status_color}] {info.display_name} ({name})")
+            support = _format_support_status(info.support_status)
+            self.console.print(
+                f"[{status_color}]{status_icon}[/{status_color}] {info.display_name} ({name}) - {support}"
+            )
             self.console.print(f"   {info.description}")
 
             if not info.available:
