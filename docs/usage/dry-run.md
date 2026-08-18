@@ -56,7 +56,7 @@ If a specific seed cannot generate all queries at a tiny scale, the CLI prefligh
 from benchbox.cli.dryrun import DryRunExecutor
 from benchbox.cli.system import SystemProfiler
 from benchbox.cli.database import DatabaseConfig
-from benchbox.cli.types import BenchmarkConfig
+from benchbox.core.config import BenchmarkConfig
 from pathlib import Path
 
 # Setup dry run

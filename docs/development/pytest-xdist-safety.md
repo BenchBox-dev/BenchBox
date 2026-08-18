@@ -39,7 +39,7 @@ A minimal reproducer with 114 tests showed that `-n 8` created too many workers:
 
 ```bash
 uv run -- python -m pytest -vv -n 8 \
-  tests/unit/test_release_sync.py \
+  tests/unit/test_release_readiness.py \
   tests/unit/test_marker_strategy.py \
   tests/unit/platforms/dataframe/test_unified_frame.py
 ```
@@ -221,7 +221,7 @@ Run the reproducer serially:
 
 ```bash
 uv run -- python -m pytest -vv -n 0 \
-  tests/unit/test_release_sync.py \
+  tests/unit/test_release_readiness.py \
   tests/unit/test_marker_strategy.py \
   tests/unit/platforms/dataframe/test_unified_frame.py
 ```
@@ -230,7 +230,7 @@ Run the reproducer with a capped explicit request:
 
 ```bash
 uv run -- python -m pytest -vv -n 8 \
-  tests/unit/test_release_sync.py \
+  tests/unit/test_release_readiness.py \
   tests/unit/test_marker_strategy.py \
   tests/unit/platforms/dataframe/test_unified_frame.py
 ```

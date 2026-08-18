@@ -62,42 +62,41 @@ cd docker/lakesail && docker compose up -d lakesail-connect
 
 ### Configuration Methods
 
-**CLI Options:**
+The CLI runs LakeSail with its defaults:
 
 ```bash
-benchbox run --platform lakesail --benchmark tpch --scale 1.0 \
-    --lakesail-endpoint sc://localhost:50051 \
-    --lakesail-mode local \
-    --driver-memory 8g \
-    --shuffle-partitions 16
+benchbox run --platform lakesail --benchmark tpch --scale 1.0
 ```
 
-**Environment Variables:**
+LakeSail registers no `--platform-option` keys, so the settings below are set by
+constructing the adapter directly:
 
-```bash
-# Store credentials for reuse
-benchbox credentials set lakesail \
-    --option endpoint=sc://my-sail-server:50051 \
-    --option sail_mode=distributed \
-    --option sail_workers=4
+```python
+from benchbox.platforms.lakesail import LakeSailAdapter
 
-benchbox run --platform lakesail --benchmark tpch --scale 1.0
+adapter = LakeSailAdapter(
+    endpoint="sc://my-sail-server:50051",
+    sail_mode="distributed",
+    sail_workers=4,
+    driver_memory="8g",
+    shuffle_partitions=16,
+)
 ```
 
 ### Configuration Options
 
-| Option | CLI Flag | Default | Description |
-|--------|----------|---------|-------------|
-| `endpoint` | `--lakesail-endpoint` | `sc://localhost:50051` | Sail server Spark Connect URL |
-| `sail_mode` | `--lakesail-mode` | `local` | Deployment mode: `local` or `distributed` |
-| `sail_workers` | `--lakesail-workers` | - | Worker count for distributed mode |
-| `app_name` | `--app-name` | `BenchBox-LakeSail` | Application name for the session |
-| `driver_memory` | `--driver-memory` | `4g` | Driver memory allocation (e.g., `4g`, `8g`) |
-| `shuffle_partitions` | `--shuffle-partitions` | `200` | Number of shuffle partitions |
-| `table_format` | `--table-format` | `parquet` | Table format: `parquet` or `orc` |
-| `adaptive_enabled` | `--adaptive-enabled` | `true` | Enable Adaptive Query Execution (AQE) |
-| `disable_cache` | - | `true` | Disable result caching for accurate benchmarking |
-| `spark_config` | - | `{}` | Additional Spark configuration properties (dict) |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `endpoint` | `sc://localhost:50051` | Sail server Spark Connect URL |
+| `sail_mode` | `local` | Deployment mode: `local` or `distributed` |
+| `sail_workers` | - | Worker count for distributed mode |
+| `app_name` | `BenchBox-LakeSail` | Application name for the session |
+| `driver_memory` | `4g` | Driver memory allocation (e.g., `4g`, `8g`) |
+| `shuffle_partitions` | `200` | Number of shuffle partitions |
+| `table_format` | `parquet` | Table format: `parquet` or `orc` |
+| `adaptive_enabled` | `true` | Enable Adaptive Query Execution (AQE) |
+| `disable_cache` | `true` | Disable result caching for accurate benchmarking |
+| `spark_config` | `{}` | Additional Spark configuration properties (dict) |
 
 ## Usage Examples
 
@@ -107,10 +106,9 @@ benchbox run --platform lakesail --benchmark tpch --scale 1.0
 # TPC-H at scale factor 1
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
-# TPC-DS at scale factor 10 with tuned settings
-benchbox run --platform lakesail --benchmark tpcds --scale 10.0 \
-    --driver-memory 16g \
-    --shuffle-partitions 32
+# TPC-DS at scale factor 10
+# (driver_memory / shuffle_partitions are adapter parameters, not CLI options)
+benchbox run --platform lakesail --benchmark tpcds --scale 10.0
 
 # Specific queries only
 benchbox run --platform lakesail --benchmark tpch --scale 1.0 --queries Q1,Q6,Q17
@@ -123,12 +121,8 @@ benchbox run --dry-run ./preview --platform lakesail --benchmark tpch
 
 ```bash
 # TPC-H DataFrame benchmark
+# (a custom endpoint or driver memory needs the Python adapter below)
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
-
-# With custom endpoint and memory
-benchbox run --platform lakesail-df --benchmark tpch --scale 1.0 \
-    --lakesail-endpoint sc://sail-server:50051 \
-    --driver-memory 8g
 ```
 
 ### Comparison with Apache Spark
@@ -143,7 +137,7 @@ benchbox run --platform lakesail --benchmark tpch --scale 10.0
 benchbox run --platform spark --benchmark tpch --scale 10.0
 
 # Compare results
-benchbox results compare lakesail_tpch_sf10.json spark_tpch_sf10.json
+benchbox compare lakesail_tpch_sf10.json spark_tpch_sf10.json
 ```
 
 ## Python API
@@ -233,9 +227,8 @@ LakeSail supports the following tuning types:
 Single-node, multi-threaded execution. Best for development, testing, and small-to-medium scale benchmarks.
 
 ```bash
-benchbox run --platform lakesail --benchmark tpch --scale 1.0 \
-    --lakesail-mode local \
-    --driver-memory 8g
+# local is the default sail_mode
+benchbox run --platform lakesail --benchmark tpch --scale 1.0
 ```
 
 - Sail server runs on a single machine
@@ -248,11 +241,9 @@ benchbox run --platform lakesail --benchmark tpch --scale 1.0 \
 Multi-node cluster execution for large-scale benchmarks.
 
 ```bash
-benchbox run --platform lakesail --benchmark tpch --scale 100.0 \
-    --lakesail-mode distributed \
-    --lakesail-workers 4 \
-    --driver-memory 16g \
-    --shuffle-partitions 200
+# Distributed mode is selected through the Python adapter
+# (sail_mode="distributed", sail_workers=4)
+benchbox run --platform lakesail --benchmark tpch --scale 100.0
 ```
 
 - Multiple Rust worker nodes coordinated by a Sail server
@@ -333,9 +324,9 @@ Query execution timed out
 ```
 
 **Solutions:**
-1. Increase driver memory: `--driver-memory 16g`
-2. Adjust shuffle partitions: `--shuffle-partitions 32`
-3. For large-scale benchmarks, use distributed mode: `--lakesail-mode distributed`
+1. Increase driver memory: `driver_memory="16g"`
+2. Adjust shuffle partitions: `shuffle_partitions=32`
+3. For large-scale benchmarks, use distributed mode: `sail_mode="distributed"`
 4. Check Sail server resource availability
 
 ### Table Already Exists

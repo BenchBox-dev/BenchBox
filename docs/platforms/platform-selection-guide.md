@@ -157,8 +157,8 @@ benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar
 
 # Velox - remote (connect to a Gluten-enabled Spark Connect server, e.g. via Docker)
-benchbox run --platform velox --velox-deployment remote \
-    --velox-endpoint sc://localhost:50051 \
+benchbox run --platform velox --platform-option deployment=remote \
+    --platform-option endpoint=sc://localhost:50051 \
     --benchmark tpch --scale 0.1
 ```
 
@@ -591,7 +591,7 @@ adapter = BigQueryAdapter(
 
 ```python
 # Azure Synapse Analytics
-from benchbox.platforms.synapse import AzureSynapseAdapter
+from benchbox.platforms.azure_synapse import AzureSynapseAdapter
 adapter = AzureSynapseAdapter(
     # Dedicated or serverless SQL pools
     # PolyBase staging
@@ -599,7 +599,7 @@ adapter = AzureSynapseAdapter(
 )
 
 # Microsoft Fabric Warehouse
-from benchbox.platforms.fabric_dw import FabricWarehouseAdapter
+from benchbox.platforms.fabric_warehouse import FabricWarehouseAdapter
 adapter = FabricWarehouseAdapter(
     # T-SQL interface via pyodbc
     # Entra ID authentication

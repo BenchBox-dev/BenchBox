@@ -209,8 +209,7 @@ flowchart TD
 
 **Examples:**
 - `examples/features/result_analysis.py` - Programmatic analysis
-- `examples/notebooks/analyze_results.ipynb` - Interactive analysis
-- `examples/programmatic/aggregate_results.py` - Multi-run aggregation
+- `examples/notebooks/result_analysis_patterns.ipynb` - Interactive analysis
 
 ---
 
@@ -220,8 +219,8 @@ flowchart TD
 
 **Examples:**
 - `examples/features/multi_platform.py` - Sequential execution
-- `examples/programmatic/orchestrate_benchmarks.py` - Advanced orchestration
-- `examples/use_cases/platform_comparison.py` - Comparison workflow
+- `examples/use_cases/platform_evaluation.py` - Comparison workflow
+- `examples/notebooks/platform_comparison.ipynb` - Interactive comparison
 
 ---
 
@@ -231,7 +230,7 @@ flowchart TD
 
 **Examples:**
 - `examples/dry_run/ci_validation.py` - Dry-run validation
-- `examples/use_cases/ci_smoke_tests.py` - Quick smoke tests
+- `examples/use_cases/ci_regression_test.py` - Regression gate for CI
 - Sample GitHub Actions workflow in docs
 
 ---

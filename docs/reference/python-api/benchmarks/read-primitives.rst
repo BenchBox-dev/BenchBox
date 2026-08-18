@@ -707,14 +707,14 @@ Read Primitives provides full DataFrame support for both expression-family and p
         aggregation_distinct_pandas_impl,
         SKIP_FOR_DATAFRAME,
     )
-    from benchbox.core.dataframe.context import create_dataframe_context
+    from benchbox.platforms import get_dataframe_adapter
 
     # Expression family (Polars, PySpark, DataFusion)
-    ctx = create_dataframe_context("polars-df", data_path="./data")
+    ctx = get_dataframe_adapter("polars-df", working_dir="./data").create_context()
     result = aggregation_distinct_expression_impl(ctx)
 
     # Pandas family (Pandas, Modin, Dask, cuDF)
-    pandas_ctx = create_dataframe_context("pandas-df", data_path="./data")
+    pandas_ctx = get_dataframe_adapter("pandas-df", working_dir="./data").create_context()
     result = aggregation_distinct_pandas_impl(pandas_ctx)
 
     # Check which queries are skipped for DataFrame

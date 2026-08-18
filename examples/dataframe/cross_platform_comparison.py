@@ -46,7 +46,7 @@ if not any(platforms_available.values()):
 
 def load_polars_context(data_dir: Path):
     """Load data into Polars DataFrame context."""
-    from benchbox.core.dataframe.context import PolarsDataFrameContext
+    from benchbox.platforms.polars_platform import PolarsDataFrameContext
 
     ctx = PolarsDataFrameContext()
     parquet_dir = data_dir / "parquet"
@@ -63,9 +63,9 @@ def load_polars_context(data_dir: Path):
 
 def load_pandas_context(data_dir: Path):
     """Load data into Pandas DataFrame context."""
-    from benchbox.core.dataframe.context import PandasDataFrameContext
+    from benchbox.platforms import get_dataframe_adapter
 
-    ctx = PandasDataFrameContext()
+    ctx = get_dataframe_adapter("pandas-df", working_dir=str(data_dir)).create_context()
     parquet_dir = data_dir / "parquet"
 
     tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
@@ -95,7 +95,7 @@ def run_query_timed(query, ctx, family: str) -> tuple[float, int]:
 
 def main() -> int:
     """Run cross-platform DataFrame comparison."""
-    from benchbox.core.tpch.dataframe_queries import get_tpch_query
+    from benchbox.core.tpch.dataframe_queries import get_query
 
     print("=" * 70)
     print("Cross-Platform DataFrame Comparison")
@@ -135,8 +135,9 @@ def main() -> int:
     print("-" * 70)
 
     for qid in query_ids:
-        query = get_tpch_query(qid)
-        if query is None:
+        try:
+            query = get_query(qid)
+        except KeyError:
             print(f"\nQuery {qid} not found, skipping")
             continue
 

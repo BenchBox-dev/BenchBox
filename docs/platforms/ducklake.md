@@ -38,21 +38,24 @@ The first run also needs network access once, to `INSTALL` the `ducklake` extens
 
 ## Configuration Options
 
-| Option | CLI Flag | Default | Description |
-|--------|----------|---------|--------------|
-| `metadata_path` | `--ducklake-metadata-path` | Generated under `benchmark_runs/databases/` | Path to the DuckLake catalog metadata file (`.ducklake`, or `.sqlite` for the sqlite backend) |
-| `data_path` | `--ducklake-data-path` | Generated under `benchmark_runs/databases/.../ducklake_data/` | Path to the DuckLake Parquet data directory (local path or `s3://` URI) |
-| `catalog` | `--ducklake-catalog` | `duckdb` | Catalog metadata backend: `duckdb`, `sqlite`, or `postgres` |
-| `pg_host` | *(platform-option only)* | `localhost` | PostgreSQL hostname (`catalog=postgres` only) |
-| `pg_port` | *(platform-option only)* | `5432` | PostgreSQL port (`catalog=postgres` only) |
-| `pg_database` | *(platform-option only)* | `ducklake_catalog` | PostgreSQL database name - **must already exist** (`catalog=postgres` only) |
-| `pg_user` | *(platform-option only)* | `postgres` | PostgreSQL username (`catalog=postgres` only) |
-| `pg_password` | *(platform-option only)* | *(none)* | PostgreSQL password (`catalog=postgres` only) |
-| `s3_key_id` | *(platform-option only)* | *(none - uses `credential_chain`)* | AWS access key ID for S3 `DATA_PATH` |
-| `s3_secret` | *(platform-option only)* | *(none - uses `credential_chain`)* | AWS secret access key for S3 `DATA_PATH` |
-| `s3_region` | *(platform-option only)* | *(none)* | AWS region for S3 `DATA_PATH` |
+All options are passed as `--platform-option KEY=VALUE`.
 
-`metadata_path`/`data_path` can also be set with `--platform-option`:
+| Option | Default | Description |
+|--------|---------|--------------|
+| `metadata_path` | Generated under `benchmark_runs/databases/` | Path to the DuckLake catalog metadata file (`.ducklake`, or `.sqlite` for the sqlite backend) |
+| `data_path` | Generated under `benchmark_runs/databases/.../ducklake_data/` | Path to the DuckLake Parquet data directory (local path or `s3://` URI) |
+| `catalog` | `duckdb` | Catalog metadata backend: `duckdb`, `sqlite`, or `postgres` |
+| `deployment_mode` | *(derived)* | `local`, `local_catalog_s3`, `postgres_catalog`, or `postgres_catalog_s3` |
+| `pg_host` | `localhost` | PostgreSQL hostname (`catalog=postgres` only) |
+| `pg_port` | `5432` | PostgreSQL port (`catalog=postgres` only) |
+| `pg_database` | `ducklake_catalog` | PostgreSQL database name - **must already exist** (`catalog=postgres` only) |
+| `pg_user` | `postgres` | PostgreSQL username (`catalog=postgres` only) |
+| `pg_password` | *(none)* | PostgreSQL password (`catalog=postgres` only) |
+| `s3_key_id` | *(none - uses `credential_chain`)* | AWS access key ID for S3 `DATA_PATH` |
+| `s3_secret` | *(none - uses `credential_chain`)* | AWS secret access key for S3 `DATA_PATH` |
+| `s3_region` | *(none)* | AWS region for S3 `DATA_PATH` |
+
+For example, `metadata_path` and `data_path`:
 
 ```bash
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
@@ -124,8 +127,8 @@ benchbox run --platform ducklake --benchmark tpcds --scale 1.0
 
 ```bash
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
-    --ducklake-metadata-path ./ducklake_catalogs/tpch_sf0.1.ducklake \
-    --ducklake-data-path ./ducklake_catalogs/tpch_sf0.1_data
+    --platform-option metadata_path=./ducklake_catalogs/tpch_sf0.1.ducklake \
+    --platform-option data_path=./ducklake_catalogs/tpch_sf0.1_data
 ```
 
 ### Clean Rebuild

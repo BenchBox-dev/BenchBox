@@ -26,8 +26,7 @@ uv run -- python -m pytest -m "integration and not live_integration"
 
 **E2E Tests** (validates complete CLI workflows):
 ```bash
-make test-e2e-quick  # Dry-run mode, fast
-# or
+# Dry-run mode, fast
 uv run -- python -m pytest -m e2e_quick
 
 # Full E2E with local platforms
@@ -176,7 +175,7 @@ To run tests that require specific dependencies:
 uv pip install -e ".[bigquery,databricks,snowflake]"
 
 # Run BigQuery tests
-make test-bigquery
+make test-live-bigquery
 # or
 uv run -- python -m pytest -m bigquery
 
@@ -213,7 +212,7 @@ Use this checklist when introducing or updating this lane:
 
 Current test suite status:
 - ✅ **CLI Exporter Tests**: 30/30 passing (`tests/unit/cli/test_cli_output.py`)
-- ✅ **Result Schema Tests**: 12/12 passing (`tests/unit/core/test_result_schema.py`)
+- ✅ **Result Schema Tests**: `tests/unit/core/results/`
 - ✅ **Test Collection**: 3576 tests collected with 0 errors
 - ⚠️ **Full Suite**: Some tests skipped when optional dependencies unavailable
 

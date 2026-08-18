@@ -45,7 +45,7 @@ export DATABRICKS_TOKEN=dapi1234567890abcdef
 ### Interactive Setup
 
 ```bash
-benchbox platforms setup --platform databricks
+benchbox setup --platform databricks
 ```
 
 ### CLI Options
@@ -223,8 +223,7 @@ For large datasets, use external cloud storage:
 ```bash
 # Configure external staging
 benchbox run --platform databricks --benchmark tpch --scale 100.0 \
-  --staging-root s3://bucket/benchbox/ \
-  --platform-option external_location=s3://bucket/benchbox/
+  --output s3://bucket/benchbox/
 ```
 
 ### DBFS (Legacy)

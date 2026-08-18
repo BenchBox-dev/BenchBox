@@ -30,8 +30,8 @@ except ImportError:
 
 def main() -> int:
     """Run Polars DataFrame TPC-H benchmark demonstration."""
-    from benchbox.core.dataframe.context import PolarsDataFrameContext
-    from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES, get_tpch_query
+    from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES, get_query
+    from benchbox.platforms.polars_platform import PolarsDataFrameContext
 
     print("=" * 60)
     print("Polars DataFrame TPC-H Benchmark")
@@ -80,8 +80,9 @@ def main() -> int:
 
     sample_queries = ["Q1", "Q3", "Q6"]
     for qid in sample_queries:
-        query = get_tpch_query(qid)
-        if query is None:
+        try:
+            query = get_query(qid)
+        except KeyError:
             print(f"\nQuery {qid} not found")
             continue
 

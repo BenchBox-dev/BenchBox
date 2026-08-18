@@ -551,26 +551,28 @@ benchbox run --platform pyspark-df --benchmark read-primitives --scale 0.01
 ### Programmatic DataFrame Usage
 
 ```python
-from benchbox.core.read_primitives import ReadPrimitives
+from benchbox import ReadPrimitives
 from benchbox.core.read_primitives.dataframe_queries import (
     aggregation_distinct_expression_impl,
     aggregation_distinct_pandas_impl,
 )
-from benchbox.core.dataframe.context import create_dataframe_context
+from benchbox.platforms import get_dataframe_adapter
 
 # Create benchmark
 primitives = ReadPrimitives(scale_factor=0.01)
 primitives.generate_data()
 
 # Create DataFrame context for Polars
-ctx = create_dataframe_context("polars-df", data_path=primitives.output_dir)
+polars_adapter = get_dataframe_adapter("polars-df", working_dir=str(primitives.output_dir))
+ctx = polars_adapter.create_context()
 
 # Execute expression-family query
 result = aggregation_distinct_expression_impl(ctx)
 print(result.collect())
 
 # Or create context for Pandas
-pandas_ctx = create_dataframe_context("pandas-df", data_path=primitives.output_dir)
+pandas_adapter = get_dataframe_adapter("pandas-df", working_dir=str(primitives.output_dir))
+pandas_ctx = pandas_adapter.create_context()
 result = aggregation_distinct_pandas_impl(pandas_ctx)
 print(result)
 ```

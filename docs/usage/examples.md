@@ -128,13 +128,13 @@ for query_id in [1, 3, 6]:
 ### Multiple Benchmarks Comparison
 
 ```python
-from benchbox import TPCH, SSB, Primitives
+from benchbox import TPCH, SSB, ReadPrimitives
 
 # Initialize different benchmarks
 benchmarks = {
     "TPC-H": TPCH(scale_factor=0.01),
     "SSB": SSB(scale_factor=0.01),
-    "Primitives": Primitives(scale_factor=0.001)
+    "Primitives": ReadPrimitives(scale_factor=0.001)
 }
 
 # Compare characteristics
@@ -588,7 +588,7 @@ The dry run feature allows you to preview benchmark configurations, queries, and
 from benchbox.cli.dryrun import DryRunExecutor
 from benchbox.cli.system import SystemProfiler
 from benchbox.cli.database import DatabaseConfig
-from benchbox.cli.types import BenchmarkConfig
+from benchbox.core.config import BenchmarkConfig
 
 # Setup and execute dry run
 dry_run = DryRunExecutor(Path("./preview"))
@@ -1118,7 +1118,7 @@ if __name__ == "__main__":
 ### Comprehensive Performance Analysis
 
 ```python
-from benchbox import TPCH, Primitives
+from benchbox import TPCH, ReadPrimitives
 import time
 import psutil
 import statistics
@@ -1268,7 +1268,7 @@ if __name__ == "__main__":
 ### Regression Testing Example
 
 ```python
-from benchbox import Primitives
+from benchbox import ReadPrimitives
 import json
 import time
 from pathlib import Path
@@ -1735,7 +1735,7 @@ import json
 import sys
 import time
 from pathlib import Path
-from benchbox import Primitives
+from benchbox import ReadPrimitives
 import duckdb
 
 def run_performance_tests():

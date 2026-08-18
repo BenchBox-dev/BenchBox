@@ -130,13 +130,13 @@ The scale factor controls the volume of data generated. SF=1 targets approximate
 
 ```bash
 # Generate CoffeeShop data
-benchbox run coffeeshop --platform duckdb --scale-factor 1.0
+benchbox run --benchmark coffeeshop --platform duckdb --scale 1.0
 
 # Run specific queries
-benchbox run coffeeshop --platform duckdb --queries SA1,SA2,PR1
+benchbox run --benchmark coffeeshop --platform duckdb --queries SA1,SA2,PR1
 
-# Run all sales analysis queries
-benchbox run coffeeshop --platform duckdb --query-pattern "SA*"
+# Run the sales analysis queries (list them; there is no pattern option)
+benchbox run --benchmark coffeeshop --platform duckdb --queries SA1,SA2,SA3
 ```
 
 ## Use Cases
