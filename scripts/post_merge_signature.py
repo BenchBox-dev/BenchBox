@@ -205,7 +205,11 @@ def imported_module_paths(test_path: str, repo_root: Path) -> list[str]:
                 if node.module:
                     module_names.add(".".join([*anchor, node.module]))
                 elif anchor:
-                    module_names.add(".".join(anchor))
+                    # "from . import sibling[, other]": each imported name is
+                    # itself a candidate module (e.g. a same-package helper
+                    # file), not just the anchor package.
+                    for alias in node.names:
+                        module_names.add(".".join([*anchor, alias.name]))
             elif node.module:
                 module_names.add(node.module)
 
