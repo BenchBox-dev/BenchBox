@@ -52,6 +52,10 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
       // produces a non-deterministic screenshot digest at viewports where
       // those elements start in view. Force the settled end state before
       // every capture so the digest reflects layout, not animation timing.
+      // Trade-off: this also means a real CSS regression that leaves one of
+      // these elements permanently mis-transformed or invisible can no
+      // longer be caught here, since the override always paints the
+      // settled state regardless of what the page actually renders.
       await page.addStyleTag({
         content: `
           .feature-card, .benchmark-card, .install-step {

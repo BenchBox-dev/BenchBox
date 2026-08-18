@@ -526,6 +526,20 @@ def test_imported_module_paths_missing_file_returns_empty(tmp_path: Path) -> Non
     assert imported_module_paths("tests/does_not_exist.py", tmp_path) == []
 
 
+def test_imported_module_paths_finds_same_package_import_without_module(tmp_path: Path) -> None:
+    test_dir = tmp_path / "tests" / "foo"
+    test_dir.mkdir(parents=True)
+    (test_dir / "helpers.py").write_text("def run():\n    return 1\n", encoding="utf-8")
+    (test_dir / "test_thing.py").write_text(
+        "from . import helpers\n\ndef test_it():\n    assert helpers.run() == 1\n",
+        encoding="utf-8",
+    )
+
+    paths = imported_module_paths("tests/foo/test_thing.py", tmp_path)
+
+    assert "tests/foo/helpers.py" in paths
+
+
 def test_attribution_reverts_via_real_import_when_basename_differs(tmp_path: Path) -> None:
     # The finding #1 repro: a test imports a module whose basename does not
     # match the test's own basename or its `test_` stem, so the old

@@ -21,12 +21,23 @@ def test_from_config_required_keys_are_forwarded_by_shared_helper() -> None:
         assert built[key] == payload[key]
 
 
-def test_from_config_required_key_missing_from_helper_fails_the_contract() -> None:
-    """Negative control: a required key omitted by the helper is a contract break."""
-    helper_keys = frozenset(TUNING_FORWARD_KEYS)
-    assert "not_a_real_required_field" not in helper_keys
-    leaked = frozenset({"not_a_real_required_field"})
-    assert not leaked <= helper_keys
+def test_from_config_required_key_missing_from_helper_fails_the_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Negative control: a required key dropped from the forwarding set is silently lost.
+
+    Simulates the exact break this contract guards against: if a required key
+    were ever removed from ``TUNING_FORWARD_KEYS``, ``build_adapter_config``
+    would stop forwarding it with no error, rather than raising.
+    """
+    key = next(iter(REQUIRED_FROM_CONFIG_KEYS))
+    reduced_keys = tuple(k for k in TUNING_FORWARD_KEYS if k != key)
+    monkeypatch.setattr("benchbox.platforms.base.config_utils.TUNING_FORWARD_KEYS", reduced_keys)
+
+    payload = {k: f"value-{k}" for k in REQUIRED_FROM_CONFIG_KEYS}
+    payload["benchmark"] = "tpch"
+    payload["scale_factor"] = 1.0
+    built = build_adapter_config(payload, platform="sqlite", generated_key=None)
+
+    assert key not in built
 
 
 def test_from_config_required_get_platform_config_emits_tuning_config() -> None:

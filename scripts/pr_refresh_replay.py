@@ -120,8 +120,6 @@ def _percentile(values: list[float], pct: float) -> float | None:
     if len(values) == 1:
         return values[0]
     ordered = sorted(values)
-    if pct >= 95 and len(ordered) >= 2:
-        return ordered[-1]
     return statistics.median(ordered) if pct == 50 else ordered[min(len(ordered) - 1, int(len(ordered) * pct / 100))]
 
 
