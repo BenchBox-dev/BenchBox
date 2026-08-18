@@ -144,9 +144,8 @@ class SnowflakeAdapter(PlatformAdapter):
             raise ConfigurationError(
                 f"Snowflake configuration is incomplete. Missing: {', '.join(missing)}\n"
                 "Configure with one of:\n"
-                "  1. CLI: benchbox platforms setup --platform snowflake\n"
-                "  2. Environment variables: SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, etc.\n"
-                "  3. CLI options: --platform-option account=<account> --platform-option warehouse=<wh>"
+                "  1. CLI: benchbox setup --platform snowflake\n"
+                "  2. Environment variables: SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, etc."
             )
 
     @property

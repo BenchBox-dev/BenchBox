@@ -58,11 +58,8 @@ class StarburstAdapter(TrinoAdapter):
         export STARBURST_PASSWORD="my-password"
         benchbox run --platform starburst --benchmark tpch --scale 0.01
 
-        # Using explicit configuration
-        benchbox run --platform starburst --benchmark tpch \\
-            --platform-option host=my-cluster.trino.galaxy.starburst.io \\
-            --platform-option username=joe@example.com/accountadmin \\
-            --platform-option password=my-password
+        # Or place the connection values in the platform configuration
+        # consumed by BenchBox, then run the same command without inline secrets.
     """
 
     plan_capture_phase_eligible = True
@@ -127,26 +124,20 @@ class StarburstAdapter(TrinoAdapter):
         if not config.get("host"):
             raise ValueError(
                 "Starburst Galaxy requires host configuration.\n"
-                "Provide via:\n"
-                "  - Environment variable: STARBURST_HOST\n"
-                "  - Config option: --platform-option host=<cluster>.trino.galaxy.starburst.io"
+                "Provide STARBURST_HOST in the environment or in the platform configuration."
             )
 
         if not config.get("username"):
             raise ValueError(
                 "Starburst Galaxy requires username configuration.\n"
-                "Provide via:\n"
-                "  - Environment variable: STARBURST_USER or STARBURST_USERNAME\n"
-                "  - Config option: --platform-option username=<email>/<role>\n"
+                "Provide STARBURST_USER or STARBURST_USERNAME in the environment or in the platform configuration.\n"
                 "Example format: joe@example.com/accountadmin"
             )
 
         if not config.get("password"):
             raise ValueError(
                 "Starburst Galaxy requires password configuration.\n"
-                "Provide via:\n"
-                "  - Environment variable: STARBURST_PASSWORD\n"
-                "  - Config option: --platform-option password=<password>"
+                "Provide STARBURST_PASSWORD in the environment or in the platform configuration."
             )
 
     @property
@@ -210,8 +201,8 @@ class StarburstAdapter(TrinoAdapter):
                 "SSL certificate error connecting to Starburst Galaxy.\n"
                 "Options:\n"
                 "  - Check network proxy settings\n"
-                "  - Verify SSL certificate chain\n"
-                "  - Use --platform-option verify_ssl=false (not recommended for production)"
+                "  - Verify the SSL certificate chain\n"
+                "  - Adjust SSL verification in the platform configuration only when required"
             )
 
         return None

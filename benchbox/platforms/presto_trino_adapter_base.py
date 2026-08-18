@@ -387,8 +387,8 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         port = self.port or 8080
         return (
             f"{self.platform_log_name} is not running on {host}:{port}. {self.local_start_hint}"
-            " or point this benchmark at a running cluster via "
-            "`--platform-option host=<host> --platform-option port=<port>`."
+            " or configure host and port for a running cluster in the platform "
+            "configuration before retrying."
         )
 
     def create_connection(self, **connection_config) -> Any:
