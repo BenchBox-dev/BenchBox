@@ -1,8 +1,8 @@
 # Schema 6 rollout: claim-coordination columns (todo-db 0.4.0)
 
 **Date**: 2026-08-18
-**Status**: wrapper and inventory bumped to 6; **hosted primary migration not yet
-performed**.
+**Status**: wrapper and inventory bumped to 6; hosted primary migrated to
+schema 6 on 2026-08-18.
 **Related**: `_project/decisions/todo-db-cutover-write-freeze-2026-08-01.md`
 (D2, D9, D10).
 
@@ -25,13 +25,15 @@ ALTER TABLE items ADD COLUMN git_baseline TEXT;
 
 ## Current state
 
-The local embedded replica `.todo-db/standalone-replica.db` was checked on
-2026-08-18: `meta.schema_version = '5'`, and `items` has none of the five
-revision-6 columns. The hosted primary has therefore not been migrated by this
-change.
+The local embedded replica `.todo-db/standalone-replica.db` was checked before
+migration on 2026-08-18: `meta.schema_version = '5'`, and `items` had none of
+the five revision-6 columns. A Turso snapshot was exported outside the
+repository before the migration.
 
-`todo-db` applies revision 6 automatically when the first 0.4.0 client opens
-the primary. No hosted credential was read or used here.
+The migration was then applied with the locked `todo-db 0.4.0` client using
+`todo-db ... migrate` and a short-lived RW token minted by the Turso CLI. A
+post-migration `todo doctor` read-only probe confirmed the hosted primary at
+schema v6. No credential was written to the repository.
 
 ## Deployment order
 
@@ -41,13 +43,13 @@ Propagate the 0.4.0 runtime to every active clone/worktree before the first
 1. Land this change on `develop`.
 2. Every active clone/worktree pulls and runs `uv sync --project _project/scripts`.
 3. Confirm `todo doctor` reports schema OK v6 from each active worktree.
-4. Open the hosted primary with a 0.4.0 client; migration 006 then applies
-   automatically.
+4. Open the hosted primary with a 0.4.0 client; migration 006 then applies.
 
-`_migrate()` fails closed with `E_SCHEMA_DIVERGED` when a stale 0.3.2 clone
-encounters the newly applied revision. This includes read-only commands, so
-step 2 must precede step 4. The behavior is the same stale-clone protection
-accepted in D2 and does not mutate the stale clone.
+This rollout applied step 4 on 2026-08-18 after the pre-migration snapshot and
+post-migration probe. Any active clone still on 0.3.2 now fails closed with
+`E_SCHEMA_DIVERGED`, including read-only commands; those clones must complete
+step 2 before using the tracker again. The behavior is the same stale-clone
+protection accepted in D2 and does not mutate the stale clone.
 
 ## CI guard placement
 
