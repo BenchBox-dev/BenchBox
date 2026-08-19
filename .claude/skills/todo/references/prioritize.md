@@ -8,8 +8,8 @@ Rank open items by topic without changing tracker state. There is no
 1. Run `_project/scripts/todo --help` and confirm `doctor`, `stats`, `ready`,
    `list`, `show`, and `deps`.
 2. Run `todo doctor`. Use the production database:
-   - Hosted: `TODO_DB_URL` and `TODO_DB_AUTH_TOKEN`; the wrapper may refresh the
-     token once.
+   - Hosted: `TODO_DB_URL` and credentials resolved via `TODO_DB_CREDENTIAL_COMMAND`
+     (or explicit `TODO_DB_RO_AUTH_TOKEN` / `TODO_DB_AUTH_TOKEN`).
    - Read-only fallback: an explicit `--db <git-root>/.todo-db/replica.db` or
      `TODO_DB_REPLICA`, but only when `doctor` approves its schema and shows a
      non-trivial item count.

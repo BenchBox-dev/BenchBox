@@ -63,10 +63,10 @@ TODO_DB_AUTH_TOKEN=... todo-db init-project \
   across worktrees.
 - Hosted `todo verify --run` requires `TODO_DB_ALLOW_HOSTED_VERIFY_RUN=1`
   because stored verification commands can execute other people's code.
-- Use `todo doctor` to check config, identity, database access, and Turso CLI
-  authentication. Use `--json` for automation. Exit code 4 means
-  authentication failed: stop writes, refresh the token, and show the error.
-  Wrappers try one refresh first.
+- Use `todo doctor` to check config, identity, database access, and credential
+  resolution. Use `--json` for automation. Exit code 4 means authentication
+  failed: stop writes, run `todo doctor`, and rotate or provision the credential
+  via `TODO_DB_CREDENTIAL_COMMAND` (see `docs/operations/hosted-credentials.md`).
 - Install hosted adapters with `uv sync --extra hosted --extra audit` in the
   tool checkout.
 - `scripts/turso_acceptance.sh` creates a temporary live database, runs the

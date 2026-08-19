@@ -1,6 +1,6 @@
 # TODO Tracker on a Shared Database — Design Spec
 
-Status: proposed (decision-ready; not yet implemented).
+Status: implemented (live in production at schema v7; todo-db v0.4.3).
 Author: agent session, 2026-07-18, from the TODO-infrastructure review.
 Decision owner: maintainer.
 
