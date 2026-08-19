@@ -1,8 +1,18 @@
 # TODO Tracker on a Shared Database — Design Spec
 
-Status: implemented (live in production at schema v7; todo-db v0.4.3).
+Status: historical design spec (implemented; live in production at schema v7, todo-db v0.4.3).
 Author: agent session, 2026-07-18, from the TODO-infrastructure review.
 Decision owner: maintainer.
+
+> **Architecture & Operational Evolution:**
+> This document records the original 2026-07-18 design specification for the shared database tracker.
+> The core system (SQLite/libSQL backend, constraint-enforcing CLI, and structured guardrails) is
+> implemented and active. Operational contracts that evolved during deployment—including external
+> credential resolution via `TODO_DB_CREDENTIAL_COMMAND`, removal of in-process token minting/auto-provisioning,
+> and wrapper isolation—are canonically governed by:
+> - [`docs/operations/todo-db-benchbox-extraction.md`](../docs/operations/todo-db-benchbox-extraction.md)
+> - [`docs/operations/hosted-credentials.md`](../docs/operations/hosted-credentials.md)
+> - [`_project/decisions/`](../_project/decisions/)
 
 ## Problem statement
 
@@ -604,12 +614,13 @@ Clones discover the production tracker without embedding secrets:
 
    Turso CLI accepts day-granularity expirations or `never`; sub-day values
    like `30m` are rejected. Prefer 1d session tokens over long-lived ones.
-3. **Auto-provision (no config, no env).** When no `--db` / `TODO_DB_PATH` /
-   `TODO_DB_URL` / config URL is set and `turso` is on PATH and logged in,
-   `_try_turso_auto_provision` mints both URL and a 1d token in-process
-   (never written to disk or printed) and selects the hosted backend as
-   auto-provisioned. This is the zero-config path for a logged-in operator
-   on a machine that has not yet pulled `config.json`.
+3. **Auto-provision (historical prototype; superseded).** *Historical note:* When
+   no `--db` / `TODO_DB_PATH` / `TODO_DB_URL` / config URL was set, early prototype
+   experiments tested in-process token minting via `_try_turso_auto_provision`.
+   This was subsequently removed during security hardening in favor of external
+   credential resolution (`TODO_DB_CREDENTIAL_COMMAND` pointing to the OS keychain
+   or secret store) and explicit environment credentials; the wrapper and CLI
+   never mint or refresh tokens in-process. See `docs/operations/hosted-credentials.md`.
 4. **Precedence reminder.** Config supplies the URL the way `TODO_DB_URL`
    would; it does **not** mint a token. A selected hosted backend with a
    missing token fails at connect / `doctor` auth (exit 4), never by silently
@@ -877,26 +888,13 @@ TODO tree from an untrusted source would plant shell commands; do not.
     environment. Local access authenticated via the maintainer's
     logged-in `turso` CLI, minting short-lived DB tokens per invocation
     (`turso db tokens create benchbox-todo`), never stored or echoed.
-    **Local auto-provisioning now exists** (`_project/scripts/todo_db.py`,
-    `_resolve_backend`/`_try_turso_auto_provision`): when none of --db,
-    `TODO_DB_PATH`, `TODO_DB_URL`, or a `.todo-db/config.json` URL is set,
-    the CLI shells out to the logged-in `turso` CLI itself
-    (`turso db show <name> --url` + `turso db tokens create <name>
-    --expiration 1d` (Turso CLI requires day granularity or ``never``;
-    sub-day values are rejected), db name from `TODO_DB_TURSO_DB`, default
-    `benchbox-todo`) and uses the hosted backend transparently, falling
-    back to the local implicit DB (with a refusal-on-write pointing at
-    `turso auth login` / `TODO_DB_URL`+`TODO_DB_AUTH_TOKEN` /
-    `--db`/`TODO_DB_PATH`/config) if turso is absent, not logged in, or the
-    mint fails. When turso is on PATH but mint fails, a short reason class
-    (`db-show-failed`, `token-create-failed`, etc. — never stderr/URL/token)
-    is surfaced via stderr WARN, the doctor `turso-provision` check, and the
-    write-refusal message, so the fallthrough is not silent. Tracked
-    credential-free config discovery (`.todo-db/config.json` with URL only)
-    is the clone-default path for selecting the production hosted URL;
-    session tokens still mint as above or via `TODO_DB_AUTH_TOKEN`. This
-    closes the former open provisioning item without requiring the two
-    variables in local `.env`.
+    **Local auto-provisioning (historical prototype note):** Early prototype
+    implementations explored shelling out to the logged-in `turso` CLI in-process.
+    During production extraction and security hardening (ADR 0004/0005), in-process
+    minting and refreshing were removed entirely; credentials are provided externally
+    via `TODO_DB_CREDENTIAL_COMMAND` (pointing to the OS keychain or secret store) or
+    explicit environment variables. See `docs/operations/hosted-credentials.md` and
+    `docs/operations/todo-db-benchbox-extraction.md`.
 - **G2 — CLI MVP:** schema DDL + `create/show/claim/start/done/defer/
   promote/dismiss/complete/ready/list/stats/export` + tests. No repo changes
   to the YAML system yet.
