@@ -874,6 +874,27 @@ driver batch size. The existing `free_memory_min_gib: 0` setting remains an
 explicit, supervised opt-out of the pre-start floor, but it does not permit
 an unverified ClickHouse runtime limit or post-start reserve shortfall.
 
+#### Why the selected rung is 8 GiB
+
+The 8 GiB rung is a ceiling with headroom, not a measured demand. The failed
+SF1 4 GiB trace (`clickhouse-memory-sf1-4g.json`, 2026-08-13) recorded
+`peak_engine_usage_bytes = 3.4 GB` and a peak `metric.MemoryTracking` of
+3.21 GB at t=127s of a 142-second load, back down to 589 MB by the final
+sample. That peak is a transient from background MergeTree merges over
+accumulated `lineitem` parts while inserts are still streaming, so it tracks
+concurrent merges, part size, and `max_threads` rather than dataset size --
+SF1 TPC-H is about 1.26 GB of compressed input. ClickHouse also derives its
+own server-wide cap from the RAM it detects, so the 4 GiB run tripped at
+"would use 3.51 GiB" against a 3.73 GiB cgroup, roughly 94% of the cap; a
+larger container raises that internal ceiling while the working peak stays
+put. 8 GiB is simply the next rung above the one that failed.
+
+Note that on macOS the container runs inside a Linux VM, so the request is
+backed by host RAM plus VM overhead and the effective host cost is roughly
+double the engine's actual need. SF1 certification therefore runs on Linux;
+macOS keeps the SF0.01 smoke at `baseline-1g`. See
+[ADR: `clickhouse-server` Containerization and Linux SF1 Certification](../development/adr/adr-clickhouse-server-containerization.md).
+
 For a direct operator compose check, export the selected rung explicitly:
 
 ```bash
