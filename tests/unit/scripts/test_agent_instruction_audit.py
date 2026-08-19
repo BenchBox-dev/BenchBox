@@ -315,6 +315,22 @@ def test_missing_canonical_review_policy_id_fails(tmp_path: Path) -> None:
     assert any("canonical review skill misses policy IDs: REVIEW-L2-001" in error for error in errors)
 
 
+def test_canonical_plan_reconciliation_policy_drift_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    canonical = project / CANONICAL_REVIEW_SKILL
+    canonical.write_text(canonical.read_text().replace("Claim-against-code checking", "Casual code checking"))
+    _, errors = audit(project, CORPUS)
+    assert any("canonical REVIEW-PLAN-RECON-001 semantics drifted" in error for error in errors)
+
+
+def test_project_plan_reconciliation_policy_drift_fails(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    protocol = project / "docs/agent/review-protocol.md"
+    protocol.write_text(protocol.read_text().replace("Enumerate recorded decision", "Skim prior decision"))
+    _, errors = audit(project, CORPUS)
+    assert any("project REVIEW-PLAN-RECON-001 semantics drifted" in error for error in errors)
+
+
 def test_development_agent_doc_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     leaked = project / "docs/development/agent-extra.md"

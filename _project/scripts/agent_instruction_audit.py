@@ -28,6 +28,7 @@ REQUIRED_POLICY_IDS = {
     "REVIEW-L2-001",
     "REVIEW-CAPTURE-001",
     "REVIEW-PARITY-001",
+    "REVIEW-PLAN-RECON-001",
     "WRITE-CLOSEOUT-001",
 }
 REVIEW_POLICY_IDS = {policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id.startswith("REVIEW-")}
@@ -45,6 +46,16 @@ CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-L2-001": ("gaps in the review framework", "not defects already found"),
     "REVIEW-CAPTURE-001": ("protocol governs behavior", "governs storage formats"),
     "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "skill governs behavior"),
+    "REVIEW-PLAN-RECON-001": (
+        "Claim-against-code checking",
+        "enumerate the recorded decision surfaces",
+        "future-state index and its priority tiers",
+        "migration gates in design docs",
+        "readiness and evidence documents",
+        "open tracker items at the relevant priority",
+        "cite each one or explicitly supersede it",
+        "dropped open gate, is a plan defect",
+    ),
 }
 # The author/committer anchors are load-bearing: the audit previously pinned
 # only the trailer semantics, so the canonical skill could require a human
@@ -69,7 +80,18 @@ PROJECT_COMMIT_ANCHORS = {
         "committer slot behind a human author",
     )
 }
-PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling review and remediation")}
+PROJECT_REVIEW_ANCHORS = {
+    "REVIEW-AUTH-001": ("later user turn", "bundling review and remediation"),
+    "REVIEW-PLAN-RECON-001": (
+        "Enumerate recorded decision",
+        "future-state index/tiers",
+        "migration gates",
+        "readiness docs",
+        "open tracker items",
+        "Cite or supersede each",
+        "dropped open gate is a defect",
+    ),
+}
 AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
 AGENT_WRITE_ANCHORS = {
     "WRITE-CLOSEOUT-001": (
