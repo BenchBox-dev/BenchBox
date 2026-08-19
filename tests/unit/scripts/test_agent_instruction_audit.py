@@ -102,7 +102,7 @@ def test_imposed_identity_fails(tmp_path: Path) -> None:
 def test_canonical_commit_coauthor_consent_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     canonical = project / CANONICAL_COMMIT_SKILL
-    canonical.write_text(canonical.read_text().replace("stale author request", "earlier context"))
+    canonical.write_text(canonical.read_text().replace("Stale requests", "earlier context"))
     _, errors = audit(project, CORPUS)
     assert any("canonical COMMIT-IDENTITY-001 semantics drifted" in error for error in errors)
 
@@ -241,7 +241,9 @@ def test_command_bound_to_superseded_review_doc_fails(tmp_path: Path) -> None:
 def test_canonical_review_policy_semantic_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     canonical = project / CANONICAL_REVIEW_SKILL
-    canonical.write_text(canonical.read_text().replace("read-only plus local capture", "may modify reviewed code"))
+    canonical.write_text(
+        canonical.read_text().replace("read-only except for local capture", "may modify reviewed code")
+    )
     _, errors = audit(project, CORPUS)
     assert any("canonical REVIEW-AUTH-001 semantics drifted" in error for error in errors)
 

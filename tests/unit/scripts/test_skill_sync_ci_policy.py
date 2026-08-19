@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,12 @@ ROOT = Path(__file__).resolve().parents[3]
 MANIFEST = (ROOT / "skill-sync.yaml").read_text(encoding="utf-8")
 
 
+def _canonical_ref(text: str) -> str:
+    match = re.search(r"name:\s*canonical.*?ref:\s*([0-9a-f]{40})", text, re.DOTALL)
+    assert match is not None
+    return match.group(1)
+
+
 def _replace_ref(text: str, old: str, new: str) -> str:
     assert old in text
     return text.replace(old, new, 1)
@@ -32,7 +39,7 @@ def test_current_manifest_satisfies_source_and_target_policy() -> None:
 def test_approved_immutable_ref_only_change_is_narrow_eligible() -> None:
     head = _replace_ref(
         MANIFEST,
-        "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
+        _canonical_ref(MANIFEST),
         "a" * 40,
     )
 
@@ -66,7 +73,7 @@ def test_structural_trust_boundary_change_forces_full_ci(old: str, new: str) -> 
 def test_floating_manifest_ref_is_rejected() -> None:
     head = _replace_ref(
         MANIFEST,
-        "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
+        _canonical_ref(MANIFEST),
         "main",
     )
 

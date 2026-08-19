@@ -1,11 +1,12 @@
 ---
 name: review-protocol
-description: Shared protocol for review-shaped actions, authorization scope, defect routing, L1/L2/L3 planning-depth layers, and local-only capture.
+description: Shared protocol for review-shaped actions, authorization scope, defect routing, L1/L2/L3 planning-depth layers, local-only capture, and plan prior-decision reconciliation.
 ---
 
 # Review Protocol
 
-Governs code reviews, audits, research, compare, to-spec, security reviews, and L1/L2/L3 planning-depth layers (including blind-spot audits). If a wrapper conflicts with this file, this file wins.
+Governs reviews, audits, research, comparisons, to-spec work, security reviews,
+and L1/L2/L3 planning. This file wins if a wrapper conflicts with it.
 
 For an adversarial review, also read
 `references/adversarial-review.md`. The selected domain wrapper supplies its
@@ -13,46 +14,69 @@ own rubric.
 
 ## 1. Scope [REVIEW-AUTH-001]
 
-Review-shaped actions are read-only plus local capture. They may read code, run analyses, produce findings, and write capture files to designated TODO/blind-spot/audit/decision/handoff locations.
+Review-shaped actions are read-only except for local capture. They may inspect
+artifacts, run analyses, report findings, and write only to designated TODO,
+blind-spot, audit, decision, or handoff locations.
 
-A single request that bundles review with fixing or remediation remains review-only: the immediate action reports findings with zero tracked worktree-content changes. Do not interpret the bundle as permission to review and then edit locally in the same turn. Only a later user message, sent after the findings and explicitly authorizing implementation, permits remediation.
+A request that combines review and remediation remains review-only. Report the
+findings without changing tracked worktree content. Remediation requires a
+later user message, sent after the findings, that explicitly authorizes it.
 
-An internal quality check inside an already-authorized write action is
-verification. It is not a review-shaped action if it stays within scope and
-adds no permissions. This rule does not apply when the user asks for a review,
-audit, or other review-shaped result.
+An internal quality check within an authorized write action is verification,
+not review, when it stays in scope and adds no permissions. A user-requested
+review or audit remains review-shaped.
 
-They must not, as a side effect:
+A named write-shaped action that inspects before changing state, such as a
+sweep, backlog clearance, iteration, batch, or closeout, is not review-shaped
+when the request explicitly invokes its write behavior. A request only to
+inspect, review, or audit that action remains review-shaped.
+
+Review-shaped actions must not:
 
 - Commit any file.
 - Push to a remote.
 - Open PRs or run `make pr-open` / `gh pr create`.
 - Enable auto-merge.
-- Chain into write-shaped skills without explicit user authorization in a separate turn.
+- Chain into write-shaped skills without authorization in a later turn.
 
-A later request to fix/address review findings is write authorization; follow the normal project commit/PR flow.
+A later request to fix review findings is a repository write action. Follow
+`SHARED/change-framework/SKILL.md`, including its branch, commit, push, and
+draft-PR workflow unless the user requires local-only work or another
+publication mode.
 
-Capture authorizes only the local file write. Final terminal action is a chat line such as `Recorded: <path>`; the user decides whether to PR.
+Capture authorizes only the local file write. End with `Recorded: <path>`; the
+user decides whether to open a PR.
 
-For verification, run only commands the review scope demands. Long output goes to a temp log; cite paths/lines, do not paste large source blocks or command output.
+Run only commands required by the review scope. Save long output to a temporary
+log and cite relevant paths and lines instead of pasting large excerpts.
 
 ## 2. Defect Gate [REVIEW-DEFECT-001]
 
-Before classifying a finding, ask: if left as-is, will the observed code behave incorrectly, leak data, or miss a performance budget?
+Before classification, ask whether the observed code would behave incorrectly,
+leak data, or miss a performance budget if left unchanged.
 
-If yes, it is a defect. Defects belong in the severity table/action items and may become a TODO/fix only after authorization. They do not belong in blind-spots. Treat uncertain cases as defects; over-capturing TODOs is safer than degrading blind-spot signal.
+If yes, classify it as a defect. Put defects in the severity table and action
+items, never in blind-spots. Create a TODO or fix only after authorization.
+Route uncertain concrete cases through defect action items rather than
+blind-spots. Mark their evidence incomplete and make the action item the needed
+verification. Do not assign Critical without source, contract, reproduction, or
+equivalent runtime evidence.
 
 ## 3. Planning-Depth Layers (L1/L2/L3) [REVIEW-DEPTH-001]
 
-Use before committing to a plan or interpretation, in both review-shaped and generative actions.
+Apply these layers before committing to a plan or interpretation:
 
 1. **L1 — Obvious answer:** state the straightforward solution/finding first.
-2. **L2 — Blind-spot audit:** after findings, ask what class of issue the framework misses, what a domain expert would notice, and what production-use assumption is hidden. In review-shaped actions, route L2 through Section 4 (L2 Audit Scope) below; in generative actions, apply the question inline (no capture).
-3. **L3 — Problem reframe:** before commitment, ask whether the stated problem is the real constraint or an upstream symptom. Document any reframe.
+2. **L2 — Blind-spot audit:** after findings, ask what issue class the
+   framework misses, what a domain expert would notice, and which production
+   assumption is hidden. For reviews, apply Section 4. For generative actions,
+   ask inline without capture.
+3. **L3 — Problem reframe:** ask whether the stated problem is the real
+   constraint or an upstream symptom. Record any reframe.
 
 ## 4. L2 Audit Scope [REVIEW-L2-001]
 
-Layer 2 asks what class of issue the review framework failed to catch. It captures framework gaps, not the instance-level defects already found.
+Layer 2 captures gaps in the review framework, not defects already found.
 
 - Findings already in the severity table stay there.
 - Critical/Required defects need an owner/action item even if L2 also captures a broader class.
@@ -60,7 +84,8 @@ Layer 2 asks what class of issue the review framework failed to catch. It captur
 
 ## 5. Capture and Project Bindings [REVIEW-CAPTURE-001]
 
-Projects provide storage locations/specs and sweep workflows. This protocol governs behavior; project docs govern storage format. Do not duplicate behavior rules in storage docs.
+This protocol governs behavior. Project documentation governs storage formats,
+locations, and sweep workflows; it must not duplicate behavioral rules.
 
 For projects without their own binding:
 
@@ -70,9 +95,9 @@ For projects without their own binding:
 
 ## 6. Semantic Parity [REVIEW-PARITY-001]
 
-This compressed skill is the cross-project behavioral contract. A project may
-maintain a longer protocol for rationale and storage bindings, but that form
-must carry these stable policy IDs and preserve their semantics:
+This skill is the cross-project behavioral contract. A longer project protocol
+may add rationale and storage bindings, but it must preserve these policy IDs
+and their semantics:
 
 - `REVIEW-AUTH-001`
 - `REVIEW-DEFECT-001`
@@ -80,7 +105,22 @@ must carry these stable policy IDs and preserve their semantics:
 - `REVIEW-L2-001`
 - `REVIEW-CAPTURE-001`
 - `REVIEW-PARITY-001`
+- `REVIEW-PLAN-RECON-001`
 
-Wording and section layout may differ. Missing IDs or contradictory semantics
-are drift; until reconciled, this canonical skill wins for agent behavior and
-the project document wins only for project-specific storage details.
+Wording and layout may differ. Missing IDs or contradictory semantics are
+drift. Until reconciled, this skill governs behavior and the project document
+governs only project-specific storage.
+
+## 7. Plan prior-decision reconciliation [REVIEW-PLAN-RECON-001]
+
+Claim-against-code checking is necessary and not sufficient for plan reviews.
+Before judging a plan's steps, enumerate the recorded decision surfaces the
+plan's scope touches:
+
+- future-state index and its priority tiers
+- migration gates in design docs
+- readiness and evidence documents
+- open tracker items at the relevant priority
+
+The plan must cite each one or explicitly supersede it. An unexplained
+demotion of recorded priority, or a dropped open gate, is a plan defect.

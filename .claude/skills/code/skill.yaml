@@ -21,7 +21,6 @@ config_inputs:
   - key: code.verify
     type: string
     description: Verification command
-    default: npm test
   - key: code.line_length
     type: number
     description: Max line length for review

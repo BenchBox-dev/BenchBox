@@ -7,9 +7,8 @@ tools: Bash, Read, Write, Edit, Glob, Grep, Task
 
 # BenchBox Workflow
 
-Route benchmark, platform, quality, and architecture work to one action.
-Before acting, read the file in the Read column for the selected action. Auto-
-detect the runner, honor non-interactive mode, and produce human plus JSON/file
+Route the request below and read the selected action file. Detect the runner,
+honor non-interactive mode, and produce human-readable and machine-readable
 artifacts when supported.
 
 ## Actions
@@ -35,9 +34,8 @@ Aliases remain accepted: `benchmark-test`, `quality-check`, `qa`,
 ## Hard rules
 
 - Use `uv run --` for Python; Makefile wrappers are fine.
-- Propagate phases via `--phases`: `generate`, `load`, `power`, `throughput`,
-  and `maintenance`. Default smoke scale is `0.01`; scale >=1 is a whole
-  integer.
+- Pass `generate`, `load`, `power`, `throughput`, and `maintenance` through
+  `--phases`. Smoke scale defaults to `0.01`; scales >=1 are whole integers.
 - Do not run live cloud tests without explicit approval and credentials.
 - Use `benchbox.utils.clock.mono_time()` / `elapsed_seconds()` for durations.
 - Register adapter DDL rewrites under
@@ -47,5 +45,5 @@ Aliases remain accepted: `benchmark-test`, `quality-check`, `qa`,
 
 ## Output
 
-Report commands, pass/fail, artifacts, key findings, and next steps. For
-failures include a root-cause hypothesis and the narrowest next check.
+Report commands, results, artifacts, findings, and next steps. For failures,
+include a root-cause hypothesis and the narrowest next check.

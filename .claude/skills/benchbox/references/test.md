@@ -11,4 +11,6 @@ Use `uv run --` for Python and prefer Makefile targets.
 
 ## Rules
 
-Report command, benchmark/platform/scale/query subset, result, failures, artifacts, and narrow next command. Avoid live/cloud/docker tests without the required approval/environment.
+Report the command, benchmark, platform, scale, query subset, result, failures,
+artifacts, and narrow next command. Run live, cloud, or Docker tests only with
+the required approval and environment.
