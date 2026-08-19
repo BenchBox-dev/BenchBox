@@ -24,7 +24,7 @@ If one request combines review or validation with close-out, perform the read-on
 
 - Exit code 2 means a general failure.
 - Exit code 4 means the hosted database rejected the credentials. Stop writes, run `todo doctor`, and show the error;
-  the wrapper uses the external-credential v2 contract and never mints or refreshes tokens for you.
+  the wrapper may first try one token refresh.
 - Only the holder can run `todo release`; it exits 2 for another actor's claim, and checking `claimed_by` can race.
   `complete` and `drop` may clear any claim. `--actor` prevents mistakes, not impersonation.
 

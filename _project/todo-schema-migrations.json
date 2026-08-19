@@ -40,7 +40,7 @@
       "statement_count": 1,
       "summary": "Add verification workspace attestation storage",
       "deployment_order": "Apply migration 007 before verification-attesting clients write the tracker, and do not reopen the database with an older binary afterward.",
-      "deployment_evidence": "_project/decisions/todo-db-upgrade-0-4-1-migration-007-2026-08-19.md"
+      "deployment_evidence": "_project/decisions/todo-db-upgrade-0-4-2-migration-007-2026-08-19.md"
     }
   ]
 }

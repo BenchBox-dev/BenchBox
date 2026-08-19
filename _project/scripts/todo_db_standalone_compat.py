@@ -56,6 +56,7 @@ COMMANDS = frozenset(
         "freeze",
         "finding",
         "audit",
+        "agent",
         "doctor",
     }
 )
@@ -67,10 +68,11 @@ OFFLINE_FINDING_SUBCOMMANDS = frozenset({"create", "candidates"})
 PACKAGE_COMMAND_TRANSLATIONS = {"scope-update": "update"}
 EXTENSION_COMMANDS = frozenset({"renew", "freeze"})
 READ_ONLY_COMMANDS = frozenset({"show", "deps", "list", "ready", "stats", "check-scope", "lint", "audit", "doctor"})
+AGENT_READ_ONLY_SUBCOMMANDS = frozenset({"instructions", "next", "context", "claims"})
 _READY_BANNER_RE = re.compile(
     r"^(?P<open>\d+) open finding\(s\), (?P<drafts>\d+) unsynced draft\(s\) -- todo-db finding candidates$"
 )
-_DEFAULT_EXPECTED_TODO_DB_VERSION = "0.4.1"
+_DEFAULT_EXPECTED_TODO_DB_VERSION = "0.4.2"
 
 
 def _repo_root() -> Path:
@@ -153,6 +155,7 @@ def _can_run_without_database(args: list[str], command_index: int, command: str)
         any(value in {"-h", "--help", "--version"} for value in args)
         or command == "doctor"
         or _is_offline_finding_command(args, command_index, command)
+        or (command == "agent" and args[command_index + 1 : command_index + 2] == ["instructions"])
     )
 
 
@@ -340,6 +343,11 @@ def _command_mutates_tracker(argv: list[str], command: str) -> bool:
         return False
     if command in READ_ONLY_COMMANDS:
         return False
+    if command == "agent":
+        located = _command_index(argv)
+        assert located is not None
+        subcommand = argv[located[0] + 1] if located[0] + 1 < len(argv) else None
+        return subcommand not in AGENT_READ_ONLY_SUBCOMMANDS
     if command == "import-yaml":
         return not _has_option(argv, "--dry-run")
     if command == "verify":
@@ -437,6 +445,9 @@ def _item_rows(envelope: dict[str, Any]) -> list[dict[str, Any]]:
     prior_art = tables.get("prior_art") or []
     deferrals = tables.get("deferrals") or []
     for item in items:
+        # Claim generation tokens coordinate private mutations and must remain
+        # only in the separate lossless recovery artifact, never public views.
+        item.pop("claim_token", None)
         item_id = item["id"]
         item["work"] = []
         for unit in units:

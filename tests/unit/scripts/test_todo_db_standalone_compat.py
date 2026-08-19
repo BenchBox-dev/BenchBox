@@ -33,8 +33,9 @@ def _envelope() -> dict:
                     "category": "Core",
                     "description": "A description longer than ten characters.",
                     "approach": "Keep the adapter thin.",
-                    "claimed_by": None,
-                    "claimed_at": None,
+                    "claimed_by": "alice",
+                    "claimed_at": "2026-07-20T01:00:00Z",
+                    "claim_token": "private-claim-generation-token",
                     "created_at": "2026-07-20T00:00:00Z",
                     "completed_at": None,
                     "completed_pr": None,
@@ -350,6 +351,8 @@ def test_export_writes_lossless_envelope_and_legacy_views(monkeypatch: pytest.Mo
     assert not (output_dir / "todo-db.json").exists()
     item = json.loads((output_dir / "items.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert item["work"][0]["wid"] == "w0"
+    assert "claim_token" not in item
+    assert lossless["tables"]["items"][0]["claim_token"] == "private-claim-generation-token"
     assert "sample-item" in (output_dir / "index.md").read_text(encoding="utf-8")
     # events.jsonl comes from THIS envelope (one read snapshot), not a stale
     # leftover from a separate main-path export.
@@ -591,7 +594,7 @@ def test_explicit_missing_local_read_target_is_initialized(monkeypatch: pytest.M
 
 
 @pytest.mark.parametrize(
-    ("argv", "stdout"), [(["stats", "--help"], "stats help\n"), (["--version", "stats"], "todo-db 0.4.1\n")]
+    ("argv", "stdout"), [(["stats", "--help"], "stats help\n"), (["--version", "stats"], "todo-db 0.4.2\n")]
 )
 def test_stats_metadata_skips_activity_lookup(
     monkeypatch: pytest.MonkeyPatch,
@@ -657,6 +660,45 @@ def test_renew_stops_when_freeze_guard_rejects(monkeypatch: pytest.MonkeyPatch, 
 
 def test_audit_verify_is_read_only_during_freeze() -> None:
     assert not compat._command_mutates_tracker(["audit", "verify"], "audit")
+
+
+@pytest.mark.parametrize("subcommand", sorted(compat.AGENT_READ_ONLY_SUBCOMMANDS))
+def test_agent_read_commands_do_not_run_freeze_guard(subcommand: str) -> None:
+    assert not compat._command_mutates_tracker(["agent", subcommand], "agent")
+
+
+@pytest.mark.parametrize("subcommand", ["take", "progress", "finish", "adopt", "release", "rebaseline"])
+def test_agent_mutations_run_freeze_guard(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, subcommand: str) -> None:
+    calls: list[str] = []
+    target = tmp_path / "todo.sqlite"
+    target.touch()
+
+    def fake_extension(argv: list[str], *, cwd: Path) -> CompletedProcess[str]:
+        calls.append("freeze-guard")
+        return CompletedProcess(argv, 2, stdout="", stderr="frozen\n")
+
+    monkeypatch.setattr(compat, "_delegate_extension", fake_extension)
+    monkeypatch.setattr(compat, "_delegate", lambda *args, **kwargs: pytest.fail("frozen mutation must not delegate"))
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+
+    assert compat.main(["--db", str(target), "agent", subcommand]) == 2
+    assert calls == ["freeze-guard"]
+
+
+def test_agent_instructions_remain_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
+        calls.append(argv)
+        return CompletedProcess(argv, 0, stdout="instructions\n", stderr="")
+
+    monkeypatch.setattr(compat, "_delegate", fake_delegate)
+    monkeypatch.setenv("BENCHBOX_REPO_ROOT", str(tmp_path))
+    monkeypatch.delenv("TODO_DB_PATH", raising=False)
+    monkeypatch.delenv("TODO_DB_URL", raising=False)
+
+    assert compat.main(["agent", "instructions"]) == 0
+    assert calls and "--db" not in calls[0]
 
 
 @pytest.mark.parametrize(
@@ -787,7 +829,7 @@ def test_env_passthrough_includes_finding_drafts_and_ro_token(monkeypatch: pytes
             }
         )
         if "--version" in cmd:
-            return CompletedProcess(cmd, 0, stdout="todo-db 0.4.1\n", stderr="")
+            return CompletedProcess(cmd, 0, stdout="todo-db 0.4.2\n", stderr="")
         return CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(compat.subprocess, "run", fake_run)
@@ -809,7 +851,7 @@ def test_finding_sync_defaults_to_benchbox_drafts_dir(monkeypatch: pytest.Monkey
     def fake_run(cmd, *, cwd, env, capture_output, text, check):
         captured.update({"TODO_DB_FINDING_DRAFTS_DIR": env["TODO_DB_FINDING_DRAFTS_DIR"]})
         if "--version" in cmd:
-            return CompletedProcess(cmd, 0, stdout="todo-db 0.4.1\n", stderr="")
+            return CompletedProcess(cmd, 0, stdout="todo-db 0.4.2\n", stderr="")
         return CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(compat.subprocess, "run", fake_run)
