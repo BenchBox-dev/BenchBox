@@ -72,7 +72,7 @@ AGENT_READ_ONLY_SUBCOMMANDS = frozenset({"instructions", "next", "context", "cla
 _READY_BANNER_RE = re.compile(
     r"^(?P<open>\d+) open finding\(s\), (?P<drafts>\d+) unsynced draft\(s\) -- todo-db finding candidates$"
 )
-_DEFAULT_EXPECTED_TODO_DB_VERSION = "0.4.2"
+_DEFAULT_EXPECTED_TODO_DB_VERSION = "0.4.3"
 
 
 def _repo_root() -> Path:
