@@ -22,6 +22,7 @@ from benchbox.cli.platform import (
     LibraryInfo,
     PlatformInfo,
     PlatformManager,
+    _format_support_status,
     check_platforms,
     disable_platform,
     enable_platform,
@@ -185,6 +186,65 @@ class TestPlatformInfo:
         assert platform.category == "analytical"
         assert len(platform.libraries) == 1
         assert platform.libraries[0].name == "duckdb"
+
+
+class TestSupportStatusIsDistinctFromDriverAvailability:
+    """Guard the two independent platform signals.
+
+    `support_status` is the product support tier from the registry;
+    `available`/`enabled` report only whether the driver imports locally.
+    docs/reference/public-contracts.md states these are different things, and the
+    platform table conflated them by labelling driver availability "Status".
+    """
+
+    def test_registry_populates_support_status_from_the_manifest(self):
+        """The tier must survive the manifest -> PlatformInfo hop, not be dropped."""
+        info = PlatformRegistry.get_platform_info("duckdb")
+
+        assert info is not None
+        assert info.support_status == "stable"
+
+    def test_an_installed_driver_does_not_imply_a_support_tier(self):
+        """An enabled experimental platform must still read as experimental."""
+        info = PlatformRegistry.get_platform_info("quanton")
+
+        assert info is not None
+        assert info.support_status == "experimental"
+
+    def test_a_missing_driver_does_not_downgrade_the_support_tier(self):
+        """Snowflake is beta whether or not its connector is installed here."""
+        info = PlatformRegistry.get_platform_info("snowflake")
+
+        assert info is not None
+        assert info.support_status == "beta"
+
+    def test_absent_status_renders_unknown_rather_than_inventing_a_tier(self):
+        """Never default to a tier the registry did not assert."""
+        assert "unknown" in _format_support_status(None)
+        assert "unknown" in _format_support_status("")
+        assert "stable" not in _format_support_status(None)
+
+    def test_unrecognised_status_is_shown_verbatim_not_remapped(self):
+        assert "some-future-tier" in _format_support_status("some-future-tier")
+
+    def test_known_statuses_render_their_own_label(self):
+        for status in ("stable", "beta", "experimental", "deprecated"):
+            assert status in _format_support_status(status)
+
+    def test_table_shows_both_signals_under_separate_headings(self):
+        """The rendered table must carry driver state and support tier separately."""
+        console = Console(file=StringIO(), width=200)
+        manager = PlatformManager()
+        manager.console = console
+
+        manager.display_platform_status()
+        output = console.file.getvalue()
+
+        header = next(line for line in output.splitlines() if "Platform" in line and "Category" in line)
+        assert "Driver" in header
+        assert "Support" in header
+        # The old conflated heading must not come back as a column of its own.
+        assert "Status" not in header
 
 
 class TestPlatformManager:
