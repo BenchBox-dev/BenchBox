@@ -27,7 +27,7 @@ def _contract_paths(root: Path = REPO_ROOT) -> dict[str, Path]:
     }
 
 
-def _wheel(path: Path, *, schema: int = 5, migrations: tuple[int, ...] = (1, 2, 3, 4, 5)) -> Path:
+def _wheel(path: Path, *, schema: int = 7, migrations: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7)) -> Path:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("todo_db/database.py", f"SCHEMA_VERSION = {schema}\n")
         for revision in migrations:
@@ -78,14 +78,14 @@ def test_wrapper_schema_must_match_package(tmp_path: Path) -> None:
     wrapper = tmp_path / "todo"
     wrapper.write_text("TODO_SCHEMA_VERSION=4\n", encoding="utf-8")
     paths = _contract_paths()
-    with pytest.raises(check.SchemaMigrationError, match="does not match package schema 5"):
+    with pytest.raises(check.SchemaMigrationError, match="does not match package schema 7"):
         check.validate_contract(package_wheel=paths["package_wheel"], wrapper=wrapper, inventory=paths["inventory"])
 
 
 def test_inventory_schema_must_match_package(tmp_path: Path) -> None:
     paths = _contract_paths()
     inventory = _inventory(tmp_path, lambda record: record.update(schema_version=4))
-    with pytest.raises(check.SchemaMigrationError, match="does not match package schema 5"):
+    with pytest.raises(check.SchemaMigrationError, match="does not match package schema 7"):
         check.validate_contract(package_wheel=paths["package_wheel"], wrapper=paths["wrapper"], inventory=inventory)
 
 

@@ -32,4 +32,4 @@ dependencies = [
 managed = true
 
 [tool.uv.sources]
-todo-db = { path = "vendor/todo_db-0.3.2-py3-none-any.whl" }
+todo-db = { path = "vendor/todo_db-0.4.2-py3-none-any.whl" }
