@@ -14,7 +14,6 @@ budget-gated.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -33,7 +32,8 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SHIM_PATH = REPO_ROOT / "_project" / "scripts" / "todo"
 SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "todo" / "SKILL.md"
-VENDORED_WHEEL = REPO_ROOT / "_project" / "scripts" / "vendor" / "todo_db-0.3.2-py3-none-any.whl"
+TODO_DB_TAG = "v0.4.0"
+TODO_DB_COMMIT = "da060081261dbcc297c9c1923838e993a7f79d5b"
 
 sys_path = str(REPO_ROOT / "_project" / "scripts")
 if sys_path not in sys.path:
@@ -106,14 +106,17 @@ class TestShim:
         assert "todo_db.py" not in text
         assert "uv run --project" in text
 
-    def test_scripts_project_uses_verified_vendored_todo_db_release(self):
-        assert VENDORED_WHEEL.is_file()
-        assert hashlib.sha256(VENDORED_WHEEL.read_bytes()).hexdigest() == (
-            "ddc8c56a8b9f11c550d8f3b81df568c6d111cc79c076cbc4bf7c03fd68a95fa4"
-        )
-        project = (REPO_ROOT / "_project" / "scripts" / "pyproject.toml").read_text(encoding="utf-8")
-        assert 'todo-db = { path = "vendor/todo_db-0.3.2-py3-none-any.whl" }' in project
-        assert "github.com/joeharris76/todo-db" not in project
+    def test_scripts_project_pins_todo_db_release_tag(self):
+        """The runtime resolves from an immutable release tag, locked to one commit."""
+        scripts = REPO_ROOT / "_project" / "scripts"
+        project = (scripts / "pyproject.toml").read_text(encoding="utf-8")
+        assert (f'todo-db = {{ git = "https://github.com/joeharris76/todo-db", tag = "{TODO_DB_TAG}" }}') in project
+        # No mutable branch and no local/sibling path may creep back in.
+        assert "branch =" not in project
+        assert "vendor/" not in project
+
+        lock = (scripts / "uv.lock").read_text(encoding="utf-8")
+        assert f"?tag={TODO_DB_TAG}#{TODO_DB_COMMIT}" in lock
 
     @pytest.mark.parametrize("subcommand", ["create", "candidates"])
     def test_offline_finding_commands_do_not_mint_hosted_credentials(self, tmp_path: Path, subcommand: str):

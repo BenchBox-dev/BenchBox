@@ -706,6 +706,8 @@ ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
 	set +e; failed=""; \
+	uv run -- python _project/scripts/todo_schema_migration_check.py; \
+	[ $$? -eq 0 ] || failed="$$failed todo-schema-migration"; \
 	uv run ruff check .; \
 	[ $$? -eq 0 ] || failed="$$failed ruff-check"; \
 	uv run ruff format --check .; \

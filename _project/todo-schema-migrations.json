@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "migrations": [
     {
       "revision": 2,
@@ -28,6 +28,13 @@
       "summary": "Write fence against stale clones; carries no DDL",
       "deployment_order": "Fence code must ship BEFORE the cutover freeze is taken: a clone that pulls after the freeze starts can neither read nor migrate until the freeze lifts.",
       "deployment_evidence": "_project/decisions/todo-db-cutover-write-freeze-2026-08-01.md"
+    },
+    {
+      "revision": 6,
+      "statement_count": 5,
+      "summary": "Add claim-coordination columns to items",
+      "deployment_order": "Every clone must upgrade to todo-db 0.4.0 before the first 0.4.0 client opens the hosted primary. Migration 006 applies automatically on connect; once applied, a clone still on 0.3.2 fails closed with E_SCHEMA_DIVERGED on every subcommand, including read-only ones.",
+      "deployment_evidence": "_project/decisions/todo-db-schema-6-claim-coordination-2026-08-18.md"
     }
   ]
 }

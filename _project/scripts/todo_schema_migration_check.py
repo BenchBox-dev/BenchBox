@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Fail closed when the locked todo-db package, wrapper, or rollout record drift.
 
-This guard is stdlib-only so the required ``ci-paths`` job can inspect the
-vendored wheel before dependency installation. Package migration correctness
-belongs to todo-db; BenchBox pins the exact release, schema handshake, and
-deployment evidence that make that release safe to consume.
+This guard is stdlib-only, but it inspects the todo-db package as installed into
+``_project/scripts/.venv`` rather than a committed wheel, because the runtime is
+pinned by git tag and has no artifact to inspect before installation. It therefore
+runs in the dependency-synced ``lint`` job rather than the dependency-free
+``ci-paths`` job. Package migration correctness belongs to todo-db; BenchBox pins
+the exact release, schema handshake, and deployment evidence that make that
+release safe to consume.
 """
 
 from __future__ import annotations
@@ -13,7 +16,6 @@ import argparse
 import ast
 import json
 import re
-import zipfile
 from pathlib import Path
 
 
@@ -34,26 +36,36 @@ def _integer_assignment(source_text: str, name: str, source: Path) -> int:
     raise SchemaMigrationError(f"{source}: missing {name} assignment")
 
 
-def _package_contract(wheel: Path) -> tuple[int, list[int]]:
+def _installed_package_dir(scripts_root: Path) -> Path:
+    """Locate the todo_db package inside the scripts project's virtualenv."""
+    candidates = sorted((scripts_root / ".venv" / "lib").glob("python3.*/site-packages/todo_db"))
+    if len(candidates) != 1:
+        raise SchemaMigrationError(
+            f"{scripts_root}: expected exactly one installed todo_db package, found {len(candidates)}; "
+            "run `uv sync --project _project/scripts` first"
+        )
+    return candidates[0]
+
+
+def _package_contract(package_dir: Path) -> tuple[int, list[int]]:
     try:
-        with zipfile.ZipFile(wheel) as archive:
-            database_source = archive.read("todo_db/database.py").decode("utf-8")
-            versions = sorted(
-                int(match.group(1))
-                for name in archive.namelist()
-                if (match := re.fullmatch(r"todo_db/migrations/([0-9]{3})_[^/]+\.sql", name))
-            )
-    except (OSError, KeyError, UnicodeDecodeError, zipfile.BadZipFile) as exc:
-        raise SchemaMigrationError(f"{wheel}: cannot inspect locked todo-db wheel: {exc}") from exc
-    schema_version = _integer_assignment(database_source, "SCHEMA_VERSION", wheel)
+        database_source = (package_dir / "database.py").read_text(encoding="utf-8")
+        versions = sorted(
+            int(match.group(1))
+            for path in (package_dir / "migrations").glob("*.sql")
+            if (match := re.fullmatch(r"([0-9]{3})_[^/]+\.sql", path.name))
+        )
+    except (OSError, UnicodeDecodeError) as exc:
+        raise SchemaMigrationError(f"{package_dir}: cannot inspect installed todo-db package: {exc}") from exc
+    schema_version = _integer_assignment(database_source, "SCHEMA_VERSION", package_dir)
     expected = list(range(1, schema_version + 1))
     if versions != expected:
-        raise SchemaMigrationError(f"{wheel}: package migrations {versions!r} must be contiguous {expected!r}")
+        raise SchemaMigrationError(f"{package_dir}: package migrations {versions!r} must be contiguous {expected!r}")
     return schema_version, versions
 
 
-def validate_contract(*, package_wheel: Path, wrapper: Path, inventory: Path) -> None:
-    schema_version, _ = _package_contract(package_wheel)
+def validate_contract(*, package_dir: Path, wrapper: Path, inventory: Path, repo_root: Path) -> None:
+    schema_version, _ = _package_contract(package_dir)
 
     wrapper_text = wrapper.read_text(encoding="utf-8")
     wrapper_match = re.search(r"(?m)^TODO_SCHEMA_VERSION=([0-9]+)$", wrapper_text)
@@ -94,7 +106,6 @@ def validate_contract(*, package_wheel: Path, wrapper: Path, inventory: Path) ->
     evidence_path = Path(evidence)
     if evidence_path.is_absolute() or ".." in evidence_path.parts:
         raise SchemaMigrationError(f"{inventory}: deployment_evidence must be a repository-relative path")
-    repo_root = package_wheel.resolve().parents[3]
     if not (repo_root / evidence_path).is_file():
         raise SchemaMigrationError(f"{inventory}: deployment_evidence path does not exist")
 
@@ -104,13 +115,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
     args = parser.parse_args(argv)
     root = args.repo_root.resolve()
-    wheels = sorted((root / "_project/scripts/vendor").glob("todo_db-*-py3-none-any.whl"))
-    if len(wheels) != 1:
-        raise SchemaMigrationError(f"expected exactly one vendored todo-db wheel, found {len(wheels)}")
     validate_contract(
-        package_wheel=wheels[0],
+        package_dir=_installed_package_dir(root / "_project/scripts"),
         wrapper=root / "_project/scripts/todo",
         inventory=root / "_project/todo-schema-migrations.json",
+        repo_root=root,
     )
     print("TODO package/schema migration contract: OK")
     return 0

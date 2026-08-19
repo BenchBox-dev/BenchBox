@@ -5,12 +5,12 @@
 set -euo pipefail
 # Keep this declaration synchronized with todo_db.SCHEMA_VERSION. The required
 # schema-migration inventory gate rejects a wrapper/CLI mismatch before merge.
-TODO_SCHEMA_VERSION=5
+TODO_SCHEMA_VERSION=6
 # Resolve the tree that owns this shim, not cwd's git toplevel. An absolute
 # path to another clone's shim must still run that clone's adapter and lock.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-export BENCHBOX_TODO_DB_EXPECTED_VERSION=0.3.2
+export BENCHBOX_TODO_DB_EXPECTED_VERSION=0.4.0
 
 is_offline_finding_command() {
     local -a args=("$@")

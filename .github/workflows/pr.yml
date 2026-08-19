@@ -38,11 +38,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate TODO schema migration contract
-        # Bare python is intentional: this static guard is stdlib-only and
-        # must run for every PR without tracker credentials or dependencies.
-        run: python _project/scripts/todo_schema_migration_check.py
-
       - name: Fetch base branch
         run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
 
@@ -373,6 +368,9 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --group dev
+          # The TODO schema guard inspects the installed, git-pinned todo-db
+          # runtime, so sync the scripts project before running that guard.
+          uv sync --project _project/scripts --locked
 
       # --- Lint guards ------------------------------------------------
       # Every guard below is independent: `id: guard-*` (the naming
@@ -384,6 +382,11 @@ jobs:
       # which is what `ci-required-result` actually gates on. Setup steps
       # above (checkout/setup-python/setup-uv/install deps) are not
       # guards and carry neither `id: guard-*` nor `continue-on-error`.
+      - name: Validate TODO schema migration contract
+        id: guard-todo-schema-migration
+        continue-on-error: true
+        run: uv run -- python _project/scripts/todo_schema_migration_check.py
+
       - name: Validate uv.lock revision against the PR base
         id: guard-uv-lock-revision
         continue-on-error: true
