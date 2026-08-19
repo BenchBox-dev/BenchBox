@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 from benchbox.cli.config import DirectoryManager
 from benchbox.core.benchmark_loader import (
+    compliance_mode_kwargs,
     get_core_benchmark_class,
     instantiate_benchmark_class,
 )
@@ -155,6 +156,10 @@ class BenchmarkOrchestrator:
         construction_output_dir = self._resolve_construction_output_dir(config, benchmark_class)
         if construction_output_dir is not None:
             optional_kwargs["output_dir"] = construction_output_dir
+        # This builder is a second construction path alongside
+        # benchmark_loader.get_benchmark_instance; both must carry compliance mode
+        # or the CLI silently produces unsubmittable results.
+        optional_kwargs.update(compliance_mode_kwargs(config))
 
         benchmark_instance = instantiate_benchmark_class(benchmark_class, kwargs, optional_kwargs)
 

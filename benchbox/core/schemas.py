@@ -284,6 +284,10 @@ class BenchmarkConfig(BaseModel):
     compression_type: str = "zstd"
     compression_level: Optional[int] = None
     test_execution_type: str = "standard"  # standard, power, throughput, maintenance, combined
+    # TPC-compliant mode. Benchmarks with a compliance gate (currently TPC-DS)
+    # must receive this to classify as `official`; without it a run can never
+    # pass `benchbox submit`.
+    official: bool = False
 
     @field_validator("scale_factor")
     @classmethod
