@@ -73,10 +73,12 @@ PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling revie
 AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
 AGENT_WRITE_ANCHORS = {
     "WRITE-CLOSEOUT-001": (
-        "named branch",
+        "authorized write workflow closes at a named branch",
         "make pr-open",
+        "auto-merge stays withheld until",
         "make pr-ready",
-        "close-out steps",
+        "required close-out steps of write authorization, not separate permissions",
+        "do not stop before",
     )
 }
 CODE_REVIEW_RULE_ANCHORS = (
@@ -174,7 +176,8 @@ def _policy_section(text: str, policy_id: str) -> str:
     if marker not in text:
         return ""
     section = text.split(marker, 1)[1]
-    return section.split("\n## ", 1)[0]
+    parts = re.split(r"\n\s*(?:##\s+|`?\[[A-Z0-9_-]+\])", section, maxsplit=1)
+    return parts[0]
 
 
 def _missing_anchors(text: str, anchors: Iterable[str]) -> list[str]:

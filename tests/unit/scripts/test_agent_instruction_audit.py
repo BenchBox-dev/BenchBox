@@ -118,7 +118,12 @@ def test_project_commit_coauthor_consent_drift_fails(tmp_path: Path) -> None:
 def test_project_write_closeout_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
-    agents.write_text(agents.read_text().replace("make pr-open", "ask for confirmation"))
+    agents.write_text(
+        agents.read_text().replace(
+            "required close-out steps of write authorization, not separate permissions",
+            "optional suggestions that require separate user approval",
+        )
+    )
     _, errors = audit(project, CORPUS)
     assert any("AGENTS.md WRITE-CLOSEOUT-001 semantics drifted" in error for error in errors)
 

@@ -12,46 +12,22 @@ description: BenchBox PR workflow - path-aware preflight, push, open PR vs devel
 
 ## Your task
 
-This is the BenchBox-specific PR workflow. `develop` is PR-gated through
-`ci-required-result`; linear history and squash-only merging are enforced. The
-umbrella uses `.github/path-filters.yml`: content-only PRs run content
-validation and skip Python fast tests, while code/infra/unknown-path PRs run the
-post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. The goal is to land a green
-PR with one command and walk away - auto-merge handles the rest.
+BenchBox PR workflow targeting `develop` with linear history and squash-only merging.
 
 Execute the following in order, stopping on the first failure:
 
-1. **Run `make agent-write-preflight`.** If it refuses because this is the
-   BenchBox primary clone, stop and tell the user to create a disposable
-   worktree with `make worktree-create BRANCH=<name> WORKTREE_PATH=<path>`. Do not commit, push, or open a PR from
-   the primary clone unless the user explicitly set
-   `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`.
+1. **Run `make agent-write-preflight`.** If it refuses (BenchBox primary clone), stop and tell
+   the user to create a worktree (`make worktree-create BRANCH=<name> WORKTREE_PATH=<path>`).
+   Do not commit, push, or open a PR from the primary clone without `BENCHBOX_ALLOW_MAIN_CLONE_WRITE=1`.
 
-2. **Refuse if on `develop` or `main`.** If `git branch --show-current` returns
-   one of those, stop and tell the user to switch to a feature branch worktree
-   (offer `make worktree-create BRANCH=<name> WORKTREE_PATH=<path>`).
+2. **Refuse if on `develop` or `main`.** Stop and switch to a feature branch worktree if needed.
 
-3. **If there are authorized uncommitted changes**, inspect the diff and refuse
-   to sweep unrelated or ambiguous files into the commit. Stage each authorized
-   path explicitly — never `git add -A` — and create a conventional commit
-   (`feat:`/`fix:`/`docs:`/`test:`/`chore:`/`ci:`/`refactor:` prefix). Run
-   `make agent-identity-check`: repository-local values override the user's
-   global identity but may be stale. Reject agent/service identities unless the
-   user explicitly requested that exact identity for this task. Add a co-author
-   trailer only when explicitly requested.
-   If pre-commit hooks rewrite files, re-stage and commit again (do NOT use
-   `--amend`; create a new commit).
+3. **Stage authorized changes and commit.** Stage authorized paths explicitly (never `git add -A`),
+   verify `make agent-identity-check`, and create a conventional commit.
 
-4. **Run `make pr-preflight`** to mirror the CI gate locally. If it fails, fix
-   the root cause and loop back to step 3. Do NOT bypass with `--no-verify`.
+4. **Run `make pr-preflight`** to mirror CI locally. Fix root causes if failing; do not use `--no-verify`.
 
-5. **Run `make pr-open`** — pushes the branch, opens a PR vs `develop` with
-   `gh pr create --fill`, and enables `gh pr merge --auto --squash`.
+5. **Run `make pr-open`** — pushes branch and opens a PR vs `develop`. Note: auto-merge stays withheld
+   unless `READY=1` (`make pr-open READY=1` or `make pr-ready`).
 
-6. **Print the PR URL** and a one-line summary of what auto-merge will do
-   ("will squash-merge once `ci-required-result` goes green").
-   Do NOT poll for CI completion — auto-merge handles it.
-
-You have the capability to call multiple tools in a single response. Call them
-all in one message wherever the calls are independent. Do not narrate
-intermediate steps unless you hit a blocker that needs the user's input.
+6. **Print the PR URL** and reported auto-merge status. Do not poll CI: pending is terminal.
