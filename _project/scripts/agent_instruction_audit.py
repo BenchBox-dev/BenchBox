@@ -79,6 +79,9 @@ AGENT_WRITE_ANCHORS = {
         "make pr-ready",
         "required close-out steps of write authorization, not separate permissions",
         "do not stop before",
+        "explicitly forbids publication",
+        "authorizes only a local commit",
+        "gate fails",
     )
 }
 CODE_REVIEW_RULE_ANCHORS = (

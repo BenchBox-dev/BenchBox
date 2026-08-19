@@ -35,7 +35,7 @@ Before a release PR can merge, the `release-only` ruleset must require:
   generate/load/execute with EXACT stored answer-set row-count validation of the
   18 answer-stable TPC-H queries; Q11/Q16/Q18/Q20 are excluded for answer-set
   boundary sensitivity, and validation is cardinality-level, not value-level).
-  The stored digests are Linux-generated, so on Apple silicon and macOS run
+  The stored digests are Linux-generated, so on Apple silicon with macOS 26 or newer run
   `make ci-linux` for parity rather than reading a local mismatch as a defect;
 - the credential-free integration-not-slow suite:
   `tests/integration -m "integration and not (slow or stress or resource_heavy or live_integration)"`;

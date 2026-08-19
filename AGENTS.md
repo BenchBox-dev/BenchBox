@@ -52,8 +52,8 @@ implementation workflow, not unrelated cleanup or external actions.
 commit, and `make pr-open`; auto-merge stays withheld until `make pr-ready`. These
 are required close-out steps of write authorization, not separate permissions.
 Within an authorized write workflow, do not stop before `make pr-open` unless the
-prompt explicitly forbids publication or requests local-only work, or a gate fails
-(keep commit and report blocker).
+prompt explicitly forbids publication, authorizes only a local commit, or a gate
+fails (in which case keep the commit and report the blocker).
 
 `[REVIEW-DEFECT-001]` Keep concrete correctness, security, or performance
 defects in the review/action path; do not relabel them as blind spots.

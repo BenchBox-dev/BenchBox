@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -124,6 +125,27 @@ def test_project_write_closeout_drift_fails(tmp_path: Path) -> None:
             "optional suggestions that require separate user approval",
         )
     )
+    _, errors = audit(project, CORPUS)
+    assert any("AGENTS.md WRITE-CLOSEOUT-001 semantics drifted" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "explicitly forbids publication",
+        "authorizes only a local commit",
+        "gate fails",
+        "do not stop before",
+    ],
+)
+def test_project_write_closeout_exception_drift_fails(tmp_path: Path, phrase: str) -> None:
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    content = agents.read_text()
+    pattern = re.compile(r"\s+".join(re.escape(w) for w in phrase.split()))
+    new_content, count = pattern.subn("deleted constraint", content)
+    assert count > 0, f"Pattern {phrase} was not found in AGENTS.md"
+    agents.write_text(new_content)
     _, errors = audit(project, CORPUS)
     assert any("AGENTS.md WRITE-CLOSEOUT-001 semantics drifted" in error for error in errors)
 
