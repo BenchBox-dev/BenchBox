@@ -21,8 +21,12 @@ Observed tip: `origin/develop` `360cd918756597b298af3f0d18434f35387b0fe1`
 
 ## Sample
 
-- Develop merges: 33 squash-merges to `develop` from 2026-08-14T00:15:10Z
-  through 2026-08-17T00:49:53Z (`#1721` … `#1753`). 32 interarrival gaps.
+- Develop merges: 34 squash-merges to `develop` from 2026-08-14T00:15:09Z
+  through 2026-08-17T00:49:53Z (`#1721` … `#1753`). 33 interarrival gaps.
+  Counted with `git log --first-parent`; an earlier revision of this audit
+  reported 33 merges / 32 gaps because it omitted `#1711`, which landed at
+  2026-08-14T00:36:32Z between `#1721` and `#1719`. No exclusion criterion
+  justified dropping it, so the table below is recomputed over every merge.
 - Required-gate wall: reuse profile #1734 (2026-08-14 code refreshes
   `#1717`/`#1718`/`#1719`) plus #1751 first `ci-required-result`
   (22:54:12Z–23:13:53Z = 19.7 min).
@@ -34,13 +38,15 @@ Observed tip: `origin/develop` `360cd918756597b298af3f0d18434f35387b0fe1`
 | Stat | Minutes |
 |---|---:|
 | min | 4.3 |
-| p50 | 31.3 |
-| p75 | 66.2 |
-| p95 | 634.0 |
-| mean | 136.1 |
+| p50 | 27.5 |
+| p75 | 44.9 |
+| p95 | 802.5 |
+| mean | 132.0 |
 | max | 1361.8 |
 
-18.8% of gaps are under 20 min. **50% of gaps are under 31 min**, the
+Percentiles use the repo-wide nearest-rank definition (`percentile_ms`).
+
+18.2% of gaps are under 20 min. **51.5% of gaps are under 31 min**, the
 #1734 `medium-test` merge-unblock wall.
 
 ## Required-gate duration
@@ -52,9 +58,17 @@ Observed tip: `origin/develop` `360cd918756597b298af3f0d18434f35387b0fe1`
 | #1734 `#1719` | 27.0 min; medium-test 26.6 |
 | #1751 first `ci-required-result` | 19.7 min |
 
-Gate duration is a material fraction of interarrival. A PR that opens
-current still has about even odds of seeing another develop merge before
-a 31-minute gate finishes, in this window.
+Gate duration is a material fraction of interarrival. For a PR that opens
+*immediately after a merge*, this window puts the odds of another develop
+merge landing inside a 31-minute gate at about even.
+
+That bound does not generalize to a PR opening at an arbitrary moment. The
+share of *gaps* shorter than the gate is not the probability an arbitrary
+PR is overtaken: that depends on where within a gap PRs actually open, and
+arbitrary-time sampling lands in long gaps more often than their count
+suggests (length-biased sampling). This sample records merge times only,
+with no PR-open distribution, so the stronger claim is not supported here -
+measuring current PR open times would be needed to make it.
 
 Open-time currency (`behind-pr-occurrence-01-pr-open-currency`) removes
 the open-stale residual. It does not remove this in-flight residual.
@@ -87,7 +101,7 @@ earned.
 
 ## Refresh-storm cost
 
-If every one of N open develop PRs auto-refreshed on each of the 32 gaps,
+If every one of N open develop PRs auto-refreshed on each of the 33 gaps,
 that is N full required gates per merge. At 27–31 min/gate and 50% of
 gaps under 31 min, the first refresh to land re-stales the rest. That is
 why bulk update is rejected.

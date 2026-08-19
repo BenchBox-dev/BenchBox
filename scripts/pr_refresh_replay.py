@@ -8,7 +8,6 @@ Actions-run data so unit tests do not touch the network.
 
 import argparse
 import json
-import statistics
 import sys
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -21,6 +20,27 @@ from pr_refresh_certification import (
     classify,
     request_from_mapping,
 )
+
+from benchbox.core.results.metrics import percentile_ms
+
+# GitHub check-run conclusions that represent a settled outcome. A lane whose
+# recorded value is absent, null, empty, "pending", or an unrecognized string has
+# no terminal result yet, so completeness must reject it rather than accept the
+# key's mere presence - `_failed_lanes` reads such a value as "not failed", which
+# would report a shadow-eligible record as having no full-only failure before the
+# lane actually finished.
+TERMINAL_LANE_CONCLUSIONS = frozenset(
+    {"success", "failure", "neutral", "cancelled", "timed_out", "action_required", "skipped", "stale"}
+)
+
+# Synthetic fixtures (the eligible template and the negative controls) exist to
+# pin classifier behaviour, and carry placeholder durations - 100 seconds, 20
+# runner-minutes. They are legitimate classification records but are not
+# measurements, so performance aggregates must exclude them or the published p50
+# / p95 / runner-minute totals describe the fixtures rather than the historical
+# window. Records without an explicit kind are treated as observations.
+RECORD_KIND_CONTROL = "control"
+RECORD_KIND_OBSERVATION = "observation"
 
 FULL_LANE_NAMES = (
     "code-lint",
@@ -42,6 +62,7 @@ class ReplayResult:
     required_gate_seconds: float | None = None
     all_workflow_seconds: float | None = None
     runner_minutes: float | None = None
+    kind: str = RECORD_KIND_OBSERVATION
 
 
 @dataclass
@@ -56,6 +77,8 @@ class ReplaySummary:
     required_gate_p95: float | None
     all_workflow_p50: float | None
     runner_minutes_total: float | None
+    observations: int
+    controls: int
 
 
 def _as_float(value: object) -> float | None:
@@ -65,6 +88,12 @@ def _as_float(value: object) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _record_kind(raw: Mapping[str, Any]) -> str:
+    """Classify a record as a synthetic control or a real observation."""
+    kind = str(raw.get("kind") or "").strip().lower()
+    return RECORD_KIND_CONTROL if kind == RECORD_KIND_CONTROL else RECORD_KIND_OBSERVATION
 
 
 def _failed_lanes(raw: Mapping[str, Any]) -> list[str]:
@@ -99,6 +128,7 @@ def replay_record(raw: Mapping[str, Any]) -> ReplayResult:
             pr_number=int(raw["pr_number"]) if raw.get("pr_number") else None,
             decision=DECISION_FULL,
             reasons=["malformed_payload"],
+            kind=_record_kind(raw),
         )
     failed = _failed_lanes(raw)
     return ReplayResult(
@@ -111,16 +141,23 @@ def replay_record(raw: Mapping[str, Any]) -> ReplayResult:
         required_gate_seconds=_as_float(raw.get("required_gate_seconds")),
         all_workflow_seconds=_as_float(raw.get("all_workflow_seconds")),
         runner_minutes=_as_float(raw.get("runner_minutes")),
+        kind=_record_kind(raw),
     )
 
 
 def _percentile(values: list[float], pct: float) -> float | None:
+    """Percentile via the repo-wide nearest-rank definition.
+
+    The previous index arithmetic - `ordered[int(n * pct / 100)]` - degenerated
+    to `max()` for any sample of 20 or fewer values, which is every realistic
+    replay history, so `required_gate_p95` tracked a single outlier. Delegating
+    to `percentile_ms` also keeps one percentile definition across the repo; note
+    it takes `p` as a fraction, and passing 95 instead of 0.95 is exactly the
+    silent max() this replaced.
+    """
     if not values:
         return None
-    if len(values) == 1:
-        return values[0]
-    ordered = sorted(values)
-    return statistics.median(ordered) if pct == 50 else ordered[min(len(ordered) - 1, int(len(ordered) * pct / 100))]
+    return percentile_ms(sorted(values), pct / 100)
 
 
 def summarize(results: list[ReplayResult]) -> ReplaySummary:
@@ -130,9 +167,13 @@ def summarize(results: list[ReplayResult]) -> ReplaySummary:
     for item in results:
         for reason in item.reasons or ["(none)"]:
             reasons[reason] = reasons.get(reason, 0) + 1
-    gate = [item.required_gate_seconds for item in results if item.required_gate_seconds is not None]
-    whole = [item.all_workflow_seconds for item in results if item.all_workflow_seconds is not None]
-    minutes = [item.runner_minutes for item in results if item.runner_minutes is not None]
+    # Classification counts cover every record; timing aggregates cover only
+    # observations. Both counts are reported so an excluded control is visible
+    # rather than silently dropped.
+    observed = [item for item in results if item.kind != RECORD_KIND_CONTROL]
+    gate = [item.required_gate_seconds for item in observed if item.required_gate_seconds is not None]
+    whole = [item.all_workflow_seconds for item in observed if item.all_workflow_seconds is not None]
+    minutes = [item.runner_minutes for item in observed if item.runner_minutes is not None]
     total = len(results)
     return ReplaySummary(
         records=total,
@@ -145,6 +186,8 @@ def summarize(results: list[ReplayResult]) -> ReplaySummary:
         required_gate_p95=_percentile(gate, 95),
         all_workflow_p50=_percentile(whole, 50),
         runner_minutes_total=sum(minutes) if minutes else None,
+        observations=len(observed),
+        controls=total - len(observed),
     )
 
 
@@ -173,6 +216,13 @@ def completeness_errors(records: list[Mapping[str, Any]], results: list[ReplayRe
         missing = [name for name in FULL_LANE_NAMES if name not in lanes]
         if missing:
             errors.append(f"{record_id}: missing lane outcomes {missing}")
+        invalid = sorted(
+            f"{name}={lanes.get(name)!r}"
+            for name in FULL_LANE_NAMES
+            if name in lanes and str(lanes.get(name) or "").lower() not in TERMINAL_LANE_CONCLUSIONS
+        )
+        if invalid:
+            errors.append(f"{record_id}: non-terminal lane conclusions {invalid}")
     return errors
 
 

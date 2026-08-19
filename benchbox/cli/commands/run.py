@@ -2493,6 +2493,12 @@ def _finalize_normal_interactive_plan(s: types.SimpleNamespace) -> None:
     s.resolved_run_plan = _capture_resolved_run_plan(s)
 
     plan: ResolvedRunPlan = s.resolved_run_plan
+    # The wizard can turn official mode ON after `select_benchmark()` already
+    # built this config with `official=False` - `_interactive_collect_flags`
+    # updates only `s.official`. Without this copy `compliance_mode_kwargs()`
+    # reads the stale config value, so a run the wizard reported as official
+    # classifies as `unofficial_nonstandard` and `benchbox submit` refuses it.
+    s.benchmark_config.official = bool(getattr(s, "official", False))
     s.benchmark_config.scale_factor = plan.scale
     s.benchmark_config.queries = list(plan.queries) if plan.queries is not None else None
     s.benchmark_config.compress_data = plan.compression_enabled

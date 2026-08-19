@@ -116,5 +116,7 @@
   },
   "required_gate_seconds": 900,
   "all_workflow_seconds": 2100,
-  "runner_minutes": 40
+  "runner_minutes": 40,
+  "kind": "control",
+  "note": "Synthetic, despite the historical-* name: the nested `request` this record feeds the classifier is copied from the eligible template - it identifies PR 1717, not 1732, with placeholder head/base SHAs and a null run id. Marked control so its durations stay out of the performance aggregates. Replaying the real #1732 event requires populating `request` from the recorded GitHub payload; until then this directory holds no historical observations and the replay summary must not be cited as historical evidence."
 }

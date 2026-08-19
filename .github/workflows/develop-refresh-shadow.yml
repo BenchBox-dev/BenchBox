@@ -241,7 +241,21 @@ jobs:
                       if name == "pr-certification-identity" and artifact.get("id"):
                           identity = load_identity_artifact(int(artifact["id"]))
               run_head = str(run.get("head_sha") or "")
+              # A `pull_request_target` run is dispatched from the trusted base,
+              # so GitHub records the BASE tip as its head_sha - never the PR
+              # head. Binding certification by that value cannot match, which
+              # left a required run (e.g. `ruleset-drift`) without a
+              # certification_kind and forced `prior_check_unbound`, so an
+              # otherwise valid exact refresh could never be shadow-eligible.
+              # GitHub carries the PR association on the run itself; keep it as
+              # a secondary key used only when the direct head match fails, so
+              # no run that already bound can bind differently.
+              associated = run.get("pull_requests") or []
+              assoc_head = ""
+              if isinstance(associated, list) and associated and isinstance(associated[0], dict):
+                  assoc_head = str(((associated[0].get("head") or {}).get("sha")) or "")
               run_meta[run_id] = {
+                  "assoc_head_sha": assoc_head,
                   "id": run.get("id") or run_id,
                   "name": run.get("name") or "",
                   "path": run.get("path") or "",
@@ -261,19 +275,23 @@ jobs:
           for run_id in sorted(run_meta):
               info = run_meta[run_id]
               identity = identity_by_head.get(info["head_sha"])
+              if not identity and info.get("assoc_head_sha"):
+                  identity = identity_by_head.get(info["assoc_head_sha"])
               if identity:
                   kind = "full"
                   run_fingerprint = identity["workflow_fingerprint"]
                   run_base = identity["base_sha"]
+                  run_head = identity.get("pr_head_sha") or info.get("assoc_head_sha") or info["head_sha"]
               else:
                   kind = ""
                   run_fingerprint = ""
                   run_base = ""
+                  run_head = info["head_sha"]
               actions_runs.append({
                   "id": info["id"],
                   "name": info["name"],
                   "path": info["path"],
-                  "head_sha": info["head_sha"],
+                  "head_sha": run_head,
                   "event": info["event"],
                   "certification_kind": kind,
                   "workflow_fingerprint": run_fingerprint,

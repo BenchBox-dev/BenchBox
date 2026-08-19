@@ -694,3 +694,64 @@ def test_normal_interactive_finalization_refreshes_plan_when_selectors_and_phase
     ) == (plan.compression_enabled, plan.compression_type, plan.compression_level)
     assert execution_context.mode == plan.resolved_mode
     assert execution_context.tuning_mode == plan.canonical_tuning_mode
+
+
+def test_finalization_propagates_the_wizard_official_choice_into_the_config() -> None:
+    """The wizard's official-mode answer must reach `benchmark_config.official`.
+
+    `select_benchmark()` builds the config before the prompt runs, so it starts
+    `official=False` and `_interactive_collect_flags` updates only `s.official`.
+    Without the copy, `compliance_mode_kwargs()` reads the stale config value and
+    the run classifies as `unofficial_nonstandard`, which `benchbox submit`
+    refuses - even though the wizard reported official mode as enabled.
+    """
+    compression = CompressionConfig(enabled=False, type="none", level=None)
+    state = SimpleNamespace(
+        official=True,
+        platform="duckdb",
+        platform_key="duckdb",
+        benchmark="tpcds",
+        scale=1.0,
+        phases="load,power",
+        phases_to_run=["load", "power"],
+        queries=None,
+        queries_to_run=None,
+        tuning="tuned",
+        table_mode="native",
+        output=None,
+        mode=None,
+        seed=11,
+        compression=compression,
+        comp_config=compression,
+        compress_data=compression.enabled,
+        compression_type=compression.type,
+        compression_level=compression.level,
+        compression_cli_set=True,
+        concurrency=1,
+        test_execution_type="power",
+        execution_mode="power",
+        resolved_mode="sql",
+        tuning_resolution=SimpleNamespace(canonical_mode="tuned"),
+        tuning_enabled=True,
+        tuning_config_file=None,
+        use_auto_tuning=False,
+        loaded_unified_config=None,
+        data_organization_payload=None,
+        df_tuning_config=None,
+        benchmark_config=BenchmarkConfig(
+            name="tpcds",
+            display_name="TPC-DS",
+            scale_factor=1.0,
+            queries=None,
+            concurrency=1,
+            official=False,
+        ),
+        database_config=SimpleNamespace(type="duckdb", execution_mode="sql"),
+        stats_reset=None,
+        stats_per_table_timing=False,
+    )
+    assert state.benchmark_config.official is False
+
+    _run_module._finalize_normal_interactive_plan(state)
+
+    assert state.benchmark_config.official is True

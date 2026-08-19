@@ -120,8 +120,19 @@ refresh-shadow observations, revocation, orphan detection, browser umbrella,
 and post-merge work where present; do not report only the skill job.
 
 Cancelled and incomplete jobs never enter successful completed runner-minutes.
-They remain visible in the cancelled/incomplete buckets, including superseded
-synchronize attempts, so concurrency cancellation cannot flatter savings.
+They remain visible in the cancelled/incomplete buckets, so concurrency
+cancellation cannot flatter savings *on the head that was measured*.
+
+Superseded synchronize attempts are a stated prerequisite, not something the
+current collector already does. `event_fanout_for_pr` reads only the merged
+PR's `pr.head.sha` and queries runs, jobs, and check-runs for that single SHA
+(`_project/scripts/dev_loop_pr_metrics.py`), so jobs cancelled on a prior head
+- exactly what a refresh or fix-forward push produces - are omitted rather
+than bucketed, which understates runner cost and flatters the savings. Before
+this protocol's accounting is published, either extend the collector to
+enumerate every recorded synchronize head, or run it once per recorded head
+and sum the per-head buckets. Reporting a single-head fan-out as if it covered
+the PR's whole synchronize history is not a valid substitute.
 Reruns use the collector's existing same-named/latest-success behavior, and a
 missing required context is a failure rather than a zero-duration result.
 
