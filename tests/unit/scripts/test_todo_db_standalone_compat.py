@@ -591,7 +591,7 @@ def test_explicit_missing_local_read_target_is_initialized(monkeypatch: pytest.M
 
 
 @pytest.mark.parametrize(
-    ("argv", "stdout"), [(["stats", "--help"], "stats help\n"), (["--version", "stats"], "todo-db 0.3.2\n")]
+    ("argv", "stdout"), [(["stats", "--help"], "stats help\n"), (["--version", "stats"], "todo-db 0.4.1\n")]
 )
 def test_stats_metadata_skips_activity_lookup(
     monkeypatch: pytest.MonkeyPatch,
@@ -756,7 +756,7 @@ def test_standalone_finding_sync_still_requires_db(monkeypatch: pytest.MonkeyPat
 
     # honors config.json — with config present, refusal must not trigger
     (tmp_path / ".todo-db").mkdir(parents=True, exist_ok=True)
-    (tmp_path / ".todo-db" / "config.json").write_text('{"url": "libsql://example.turso.io"}', encoding="utf-8")
+    (tmp_path / ".todo-db" / "config.json").write_text('{"db": "libsql://example.turso.io"}', encoding="utf-8")
 
     def fake_delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True) -> CompletedProcess[str]:
         return CompletedProcess(argv, 0, stdout="", stderr="")
@@ -787,7 +787,7 @@ def test_env_passthrough_includes_finding_drafts_and_ro_token(monkeypatch: pytes
             }
         )
         if "--version" in cmd:
-            return CompletedProcess(cmd, 0, stdout="todo-db 0.3.2\n", stderr="")
+            return CompletedProcess(cmd, 0, stdout="todo-db 0.4.1\n", stderr="")
         return CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(compat.subprocess, "run", fake_run)
@@ -809,7 +809,7 @@ def test_finding_sync_defaults_to_benchbox_drafts_dir(monkeypatch: pytest.Monkey
     def fake_run(cmd, *, cwd, env, capture_output, text, check):
         captured.update({"TODO_DB_FINDING_DRAFTS_DIR": env["TODO_DB_FINDING_DRAFTS_DIR"]})
         if "--version" in cmd:
-            return CompletedProcess(cmd, 0, stdout="todo-db 0.3.2\n", stderr="")
+            return CompletedProcess(cmd, 0, stdout="todo-db 0.4.1\n", stderr="")
         return CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr(compat.subprocess, "run", fake_run)

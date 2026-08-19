@@ -70,6 +70,7 @@ READ_ONLY_COMMANDS = frozenset({"show", "deps", "list", "ready", "stats", "check
 _READY_BANNER_RE = re.compile(
     r"^(?P<open>\d+) open finding\(s\), (?P<drafts>\d+) unsynced draft\(s\) -- todo-db finding candidates$"
 )
+_DEFAULT_EXPECTED_TODO_DB_VERSION = "0.4.1"
 
 
 def _repo_root() -> Path:
@@ -226,7 +227,7 @@ def _delegate(argv: list[str], *, command: str, cwd: Path, capture: bool = True)
     reported = version.stdout.strip()
     if version.returncode or not reported.startswith("todo-db "):
         raise RuntimeError("standalone todo-db command does not expose a compatible --version handshake")
-    expected = os.environ.get("BENCHBOX_TODO_DB_EXPECTED_VERSION")
+    expected = os.environ.get("BENCHBOX_TODO_DB_EXPECTED_VERSION", _DEFAULT_EXPECTED_TODO_DB_VERSION)
     if expected and reported != f"todo-db {expected}":
         raise RuntimeError(f"standalone todo-db version mismatch: expected {expected}, got {reported}")
     return subprocess.run(

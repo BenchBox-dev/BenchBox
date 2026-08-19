@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 7,
   "migrations": [
     {
       "revision": 2,
@@ -28,6 +28,19 @@
       "summary": "Write fence against stale clones; carries no DDL",
       "deployment_order": "Fence code must ship BEFORE the cutover freeze is taken: a clone that pulls after the freeze starts can neither read nor migrate until the freeze lifts.",
       "deployment_evidence": "_project/decisions/todo-db-cutover-write-freeze-2026-08-01.md"
+    },
+    {
+      "revision": 6,
+      "statement_count": 5,
+      "summary": "Add claim-coordination columns and tokens to items metadata",
+      "deployment_order": "Migration 006 must land before claim-coordinated finish/release/rebaseline checks rely on the stored claim session and generation fields."
+    },
+    {
+      "revision": 7,
+      "statement_count": 1,
+      "summary": "Add verification workspace attestation storage",
+      "deployment_order": "Apply migration 007 before verification-attesting clients write the tracker, and do not reopen the database with an older binary afterward.",
+      "deployment_evidence": "_project/decisions/todo-db-upgrade-0-4-1-migration-007-2026-08-19.md"
     }
   ]
 }

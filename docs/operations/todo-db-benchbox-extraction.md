@@ -1,7 +1,7 @@
 # BenchBox todo-db extraction: staged integration and acceptance handoff
 
 Status: migration and compatibility evidence complete. BenchBox now uses the
-locked `todo-db` 0.3.2 package exclusively, while `_project/scripts/todo`
+locked `todo-db` 0.4.1 package exclusively, while `_project/scripts/todo`
 remains the stable repository entry point.
 
 ## Live evidence at this handoff
@@ -15,29 +15,35 @@ remains the stable repository entry point.
   tracker/meta table equal, event provenance equal, a verified
   `sha256-chain-v2` audit chain, and an exactly equal second clean export
   including all three migration records.
-- `todo-db` 0.3.2 is published as the private GitHub release tag `v0.3.2`,
-  built from merged commit `389a3592cb92a8afde47d6d3b807ba3930f98316`. BenchBox vendors the verified wheel
-  under `_project/scripts/vendor/`; consumers resolve that artifact through the
-  locked scripts environment, never a sibling checkout or private Git fetch.
+- `todo-db` 0.4.1 is published as the private GitHub release tag `v0.4.1`.
+  BenchBox vendors the checksum-verified wheel under
+  `_project/scripts/vendor/`; consumers resolve that artifact through the
+  locked scripts environment, never a sibling checkout, private Git fetch, or
+  registry install.
 - No hosted write credential was used and the hosted primary was not modified.
 
 ## Compatibility boundary
 
 `_project/scripts/todo` remains the stable entry point and always runs the
-package-backed BenchBox adapter:
+package-backed BenchBox adapter. BenchBox's wrapper is custom, so
+`todo-db refresh-wrapper` intentionally leaves it unmanaged; BenchBox carries
+its own manual `# todo-db-wrapper: v2` contract instead:
 
 ```sh
 _project/scripts/todo --db PATH_OR_URL <command>
 ```
 
 The adapter passes an argv list to the canonical `todo-db` executable, verifies
-its `--version` handshake (and an exact expected version when configured), pins
-an explicit BenchBox database path, adds the BenchBox project identity, and
-preserves actor/worktree context and exit statuses. It has no shell interpolation and
+its `--version` handshake against the pinned 0.4.1 release, pins the BenchBox
+project identity, and preserves actor/worktree context and exit statuses. The
+custom wrapper carries the v2 external-credential contract: it exports only the
+non-secret `TODO_DB_AUTH_CONTRACT=v2` marker and never calls Turso, mints,
+caches, prints, or retries credentials. It has no shell interpolation and
 redacts both `TODO_DB_AUTH_TOKEN` and `TODO_DB_RO_AUTH_TOKEN` in delegated
 output. Export keeps the old `items.jsonl` and `index.md` views while adding a
 lossless `todo-db.json` envelope containing metadata/config, all tracker tables,
-schema migrations, and hash-chained events.
+schema migrations, verification workspace attestations, and hash-chained
+events.
 
 | Command family | Generic operation | BenchBox adapter responsibility |
 |---|---|---|
@@ -109,16 +115,16 @@ the package-only wrapper when the two database secrets are available:
 CI supplies `TODO_DB_URL` and `TODO_DB_RO_AUTH_TOKEN` as secrets. Local commands
 must select a database with `--db`, `TODO_DB_PATH`, `TODO_DB_URL`, or
 `.todo-db/config.json`; the wrapper refuses to create an implicit fork database.
-For a selected hosted database with no supplied token, the wrapper preserves
-the maintainer convenience path: it asks the logged-in `turso` CLI for a
-one-day token without printing or persisting it. It does not fall back to a
-sibling checkout, embedded runtime, or local database. The sole database-free
+For a selected hosted database, inject credentials externally with bounded
+lifetime via `TODO_DB_AUTH_TOKEN` or `TODO_DB_RO_AUTH_TOKEN`. The v2 wrapper
+contract never mints or refreshes them. It does not fall back to a sibling
+checkout, embedded runtime, or local database. The sole database-free
 exceptions are `doctor`, help/version output, and finding commands that operate
 only on local drafts.
 
 The verified wheel is committed under `_project/scripts/vendor/` and resolved
-by `_project/scripts/uv.lock`. The wrapper enforces version 0.3.2. The workflow
-does not download or select a runtime through repository variables.
+by `_project/scripts/uv.lock`. The compatibility adapter enforces version 0.4.1.
+The workflow does not download or select a runtime through repository variables.
 
 The job remains weekly, deterministic, path-scoped, and outage-alerting. Each
 successful run uploads a uniquely named recovery artifact with 90-day automatic
@@ -186,7 +192,7 @@ without those credentials the live lane skips cleanly.
 | 7 | Migration checksum rollback guard | A tampered recorded migration is rejected before use. |
 | 8 | Prior-package/schema rollback guard | The current package refuses a database containing an unknown future migration. |
 | 9 | Lossless clean restore | Restore, audit verification, and a second export require exact full-envelope equality, including migrations and audit head. |
-| 10 | Package supply chain | BenchBox vendors the wheel downloaded from the immutable v0.3.2 release, pins it in `uv.lock`, and verifies its published SHA-256 digest in wrapper tests. |
+| 10 | Package supply chain | BenchBox vendors the wheel downloaded from the immutable v0.4.1 release, pins it in `uv.lock`, and verifies its published SHA-256 digest in wrapper tests. |
 | 11 | Versioned recovery and rotation | Weekly snapshot PRs are supplemented by run/attempt-versioned artifacts retained for 90 days; failures reuse the operational incident. |
 
 Before any package release, require a changelog entry describing public CLI/API
@@ -246,7 +252,53 @@ These decisions authorize the operational work but do not themselves publish
 the package, reserve PyPI, provision or rotate credentials, or cut over a
 consumer. Those actions remain gated by the operational and adoption TODOs.
 
-## Hosted schema migration (v3 -> v4)
+## 0.4.1 upgrade / migration 007
+
+Upgrade from a verified private GitHub release checkout only:
+
+```sh
+gh release download v0.4.1 \
+  --repo joeharris76/todo-db \
+  --pattern 'todo_db-0.4.1-py3-none-any.whl' \
+  --pattern 'todo_db-0.4.1.tar.gz' \
+  --pattern 'todo-db-pi-adapter-0.1.1.tgz' \
+  --pattern 'SHA256SUMS'
+shasum -a 256 -c SHA256SUMS
+uv run --isolated --with ./todo_db-0.4.1-py3-none-any.whl -- todo-db --version
+```
+
+Expected version: `todo-db 0.4.1`.
+
+Migration 007 is additive and adds verification workspace attestations in
+`verifications.workspace_fingerprint`. BenchBox's hosted tracker had already
+advanced to schema 6 before this upgrade, so the verified pre-upgrade backup
+was taken read-only, rehearsed locally, and retained before reopening the live
+tracker with write credentials for `todo-db init`.
+
+BenchBox's custom wrapper now carries the v2 external-credential contract even
+though it is intentionally left unmanaged by `refresh-wrapper`:
+
+- `# todo-db-wrapper: v2` marker present;
+- exports only `TODO_DB_AUTH_CONTRACT=v2`;
+- does not call Turso, mint, cache, print, or retry credentials;
+- relies on external bounded `TODO_DB_AUTH_TOKEN` / `TODO_DB_RO_AUTH_TOKEN`;
+- keeps claim/release/finish coordination in the locked compatibility adapter.
+
+If `todo-db doctor --json` reports `legacy generated wrapper`, run
+`todo-db refresh-wrapper`. If it reports `unrecognized wrapper left unmanaged`,
+do not overwrite it blindly; audit and maintain the custom wrapper manually.
+
+Rollback remains the retained pre-upgrade lossless envelope plus its verified
+scratch restore rehearsal. Replay that artifact only through an explicitly
+approved recovery procedure. Hosted agent mutations remain experimental because
+commit-outcome fault injection is not yet certified.
+
+Claim-coordinated clients must preserve the current claim token/generation on
+progress, finish, and release paths after migration 006/007; do not expose
+verification execution, environment passthrough, takeover, rebaseline, restore,
+migration, or destructive administration through model-facing tools.
+
+## Historical hosted schema migration (v3 -> v4)
 
 The CLI refuses any database whose `schema_version` is below its own
 `SCHEMA_VERSION`, and migrations never auto-apply. Landing v4 code therefore

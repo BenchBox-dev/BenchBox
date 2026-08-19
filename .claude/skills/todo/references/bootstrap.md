@@ -23,9 +23,11 @@ This command sets identity and creates:
 - `.todo-db/.gitignore`, which ignores database files but tracks `config.json`.
   Do not add `.todo-db/` to the repository `.gitignore`; that would hide the
   committed configuration. The command warns if the config is ignored.
-- `_project/scripts/todo` when `--wrapper` is set. It resolves `TODO_DB_TOOL`,
-  then `todo-db` on `PATH`, then `../todo-db`. It sets `TODO_DB_CONFIG`, works
-  from any directory, and does not hard-code identity.
+- `_project/scripts/todo` when `--wrapper` is set. In BenchBox the committed
+  wrapper is custom but carries the v2 external-credential contract: it sets
+  `TODO_DB_CONFIG`, exports only `TODO_DB_AUTH_CONTRACT=v2`, works from any
+  directory, and routes to the locked compatibility adapter without minting,
+  caching, printing, or retrying credentials.
 
 `--db` stores a local path, defaulting to `.todo-db/standalone.sqlite`, or a
 `libsql://` URL. Existing scaffolding requires `--force` to overwrite. Commit
@@ -65,8 +67,8 @@ TODO_DB_AUTH_TOKEN=... todo-db init-project \
   because stored verification commands can execute other people's code.
 - Use `todo doctor` to check config, identity, database access, and Turso CLI
   authentication. Use `--json` for automation. Exit code 4 means
-  authentication failed: stop writes, refresh the token, and show the error.
-  Wrappers try one refresh first.
+  authentication failed: stop writes, refresh the token externally, and show
+  the error. The v2 wrapper contract never refreshes credentials for you.
 - Install hosted adapters with `uv sync --extra hosted --extra audit` in the
   tool checkout.
 - `scripts/turso_acceptance.sh` creates a temporary live database, runs the
