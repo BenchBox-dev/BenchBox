@@ -33,7 +33,7 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SHIM_PATH = REPO_ROOT / "_project" / "scripts" / "todo"
 SKILL_PATH = REPO_ROOT / ".claude" / "skills" / "todo" / "SKILL.md"
-VENDORED_WHEEL = REPO_ROOT / "_project" / "scripts" / "vendor" / "todo_db-0.3.2-py3-none-any.whl"
+VENDORED_WHEEL = REPO_ROOT / "_project" / "scripts" / "vendor" / "todo_db-0.4.2-py3-none-any.whl"
 
 sys_path = str(REPO_ROOT / "_project" / "scripts")
 if sys_path not in sys.path:
@@ -102,17 +102,20 @@ class TestShim:
 
     def test_shim_execs_locked_package_adapter_via_uv(self):
         text = SHIM_PATH.read_text(encoding="utf-8")
+        assert "# todo-db-wrapper: v2" in text
+        assert "TODO_DB_AUTH_CONTRACT=v2" in text
         assert "todo_db_standalone_compat.py" in text
         assert "todo_db.py" not in text
         assert "uv run --project" in text
+        assert "turso db tokens create" not in text
 
     def test_scripts_project_uses_verified_vendored_todo_db_release(self):
         assert VENDORED_WHEEL.is_file()
         assert hashlib.sha256(VENDORED_WHEEL.read_bytes()).hexdigest() == (
-            "ddc8c56a8b9f11c550d8f3b81df568c6d111cc79c076cbc4bf7c03fd68a95fa4"
+            "c9f1b97f04f1bc9bd92647abbeb1b2ef1ef8665d6b0db8dc1dfda9f1a06731b7"
         )
         project = (REPO_ROOT / "_project" / "scripts" / "pyproject.toml").read_text(encoding="utf-8")
-        assert 'todo-db = { path = "vendor/todo_db-0.3.2-py3-none-any.whl" }' in project
+        assert 'todo-db = { path = "vendor/todo_db-0.4.2-py3-none-any.whl" }' in project
         assert "github.com/joeharris76/todo-db" not in project
 
     @pytest.mark.parametrize("subcommand", ["create", "candidates"])
@@ -168,6 +171,22 @@ class TestShim:
 
         assert result.returncode == 0, result.stderr
         assert not marker.exists()
+
+    def test_v2_auth_exit_contract_is_negotiated_without_endpoint_disclosure(self) -> None:
+        endpoint = "libsql://auth-contract.invalid"
+        result = subprocess.run(
+            [str(SHIM_PATH), "--db", endpoint, "list"],
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            env={"PATH": os.environ["PATH"], "HOME": str(Path.home())},
+            check=False,
+            timeout=120,
+        )
+
+        assert result.returncode == 4
+        assert endpoint not in result.stdout + result.stderr
+        assert "bounded credential" in result.stderr
 
     def test_shim_runs_stats_from_repo_subdir(self, tmp_path):
         result = _run_shim(["stats"], tmp_path / "wrapper.sqlite", cwd=REPO_ROOT / "tests")
