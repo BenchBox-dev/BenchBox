@@ -117,5 +117,6 @@
   },
   "required_gate_seconds": 100,
   "all_workflow_seconds": 400,
-  "runner_minutes": 20
+  "runner_minutes": 20,
+  "kind": "control"
 }

@@ -574,3 +574,36 @@ def test_attribution_stays_advisory_when_import_analysis_also_clears_sha(tmp_pat
     changed = ["docs/operations/uat-framework.md"]
 
     assert attribution_action(failure_ids, changed, repo_root=tmp_path) == "advisory"
+
+
+def test_imported_module_paths_keeps_the_anchor_package(tmp_path: Path) -> None:
+    """`from . import VALUE` must record the package initializer that defines it.
+
+    Recording only alias-derived paths dropped `tests/pkg/__init__.py`, so a
+    merge that broke the initializer looked non-owning and was downgraded to
+    advisory - skipping the revert the workflow gates on.
+    """
+    pkg = tmp_path / "tests" / "pkg"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (pkg / "test_it.py").write_text(
+        "def test_it():\n    from . import VALUE\n    assert VALUE == 1\n",
+        encoding="utf-8",
+    )
+
+    found = imported_module_paths("tests/pkg/test_it.py", tmp_path)
+    assert "tests/pkg/__init__.py" in found
+
+
+def test_attribution_reverts_when_the_package_initializer_changed(tmp_path: Path) -> None:
+    """The anchor-package signal must reach `attribution_action`, not just the finder."""
+    pkg = tmp_path / "tests" / "pkg"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (pkg / "test_it.py").write_text(
+        "def test_it():\n    from . import VALUE\n    assert VALUE == 1\n",
+        encoding="utf-8",
+    )
+
+    failure_ids = ["tests/pkg/test_it.py::test_it"]
+    assert attribution_action(failure_ids, ["tests/pkg/__init__.py"], repo_root=tmp_path) == "revert"

@@ -202,6 +202,14 @@ def imported_module_paths(test_path: str, repo_root: Path) -> list[str]:
                 # more directory.
                 climb = node.level - 1
                 anchor = test_dir_parts[: len(test_dir_parts) - climb] if climb else test_dir_parts
+                if anchor:
+                    # The anchor package itself, not only what is imported from
+                    # it. `from . import VALUE` where VALUE lives in the package
+                    # initializer resolves to no alias file at all, and even a
+                    # sibling import executes that initializer - so a merge that
+                    # broke `__init__.py` was scored as non-owning and downgraded
+                    # to advisory, skipping the revert.
+                    module_names.add(".".join(anchor))
                 if node.module:
                     module_names.add(".".join([*anchor, node.module]))
                 elif anchor:

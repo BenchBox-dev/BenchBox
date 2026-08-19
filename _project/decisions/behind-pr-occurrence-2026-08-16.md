@@ -70,7 +70,7 @@ refreshing several PRs at once is self-defeating.
 | `make pr-refresh` (one PR at a time) | **reuse** | Intended absorb. Policy-blessed. |
 | Fail `pr-open` when `origin/develop` is not an ancestor of `HEAD` | **accept for 01** | Would have absorbed `#1749`. Does not keep a PR current for the whole gate. Must not silently merge inside `pr-open` (that would turn `pr-fanout` into a refresh storm). |
 | Flip `allow_update_branch` | **reject** | Suggestion affordance, not an updater. Would absorb neither intervening commit. |
-| Update every open develop PR when `develop` moves | **reject** | Refresh storm. `Makefile` `pr-refresh` already forbids this. |
+| Update every open develop PR when `develop` moves | **reject** | Refresh storm. `Makefile` `pr-refresh` acts on the current worktree's branch only and refuses to run on `develop`/`main`/`release`; it holds no lock against concurrent invocation from other worktrees, so avoiding bulk refresh is convention here, not enforcement. |
 | Arm auto-merge at `pr-open` | **reject as the fix for this class** | Would not have saved #1751 (already behind). Reintroduces merge-before-follow-up (`#1503`/`#1521`/`#1531`). `make pr-ready` stays the only local arm path. |
 | Unblock `07a` or `07b` from this item | **reject** | `06` selected `SHADOW_ONLY`. Measurement lives in 02; a later activation, not this record, may unblock one path. |
 | `refresh-shadow` as a branch updater | **reject** | Observational only. Not a required context. Cannot skip lanes or update heads. |

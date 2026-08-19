@@ -49,19 +49,20 @@ Required contexts across the window: `ci-required-result`,
 ## Replay result
 
 Normalized fixtures under `tests/fixtures/ci/pr-refresh-replay/` replay
-through the classifier. The eligible fixture is `shadow_eligible`. Historical
+through the classifier. The eligible fixture is `shadow_eligible`. Synthetic control
 and negative fixtures are `full_required`.
 
 | Class | Decision | Full-only failure? |
 |---|---|---|
 | Eligible exact refresh | `shadow_eligible` | no |
-| Historical cancelled medium (no identity artifacts) | `full_required` (`prior_check_unbound`) | no |
+| Synthetic cancelled medium control (no identity artifacts) | `full_required` (`prior_check_unbound`) | no |
 | Fork, chained refresh, self-change, merge-driver, semantic schema, head-drift race, malformed | `full_required` | no |
 
 `full-only` means the classifier would have waived long lanes while those
-lanes actually failed on the recorded full run. This window has **zero**
-full-only failures: the cancelled refreshes are not `shadow_eligible`
-because prior full-certification artifacts were absent.
+lanes actually failed on the recorded full run. The fixture set holds **zero**
+recorded historical observations (the cancelled-medium fixture is a synthetic
+control carrying the eligible template's payload); populating recorded GitHub
+payloads is needed before citing historical full-only rates.
 
 Hit rate on the fixture set is not an activation number. Discarding
 fallback reasons from the denominator would make a classifier that always

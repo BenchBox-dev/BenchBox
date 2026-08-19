@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 from pr_refresh_certification import DECISION_FULL, DECISION_SHADOW
 from pr_refresh_replay import (
+    _percentile,
+    completeness_errors,
     load_records,
     main,
     replay_record,
@@ -124,3 +126,46 @@ def test_check_completeness_fails_when_lane_outcomes_missing(tmp_path: Path) -> 
     del record["actual_lane_conclusions"]
     (source / "bad.json").write_text(json.dumps(record), encoding="utf-8")
     assert main(["--fixtures", str(source), "--check-completeness"]) == 1
+
+
+def test_percentile_uses_nearest_rank_not_an_off_by_one_index() -> None:
+    """p95 must be the nearest-rank value, not one position past it.
+
+    The previous arithmetic indexed `int(n * pct / 100)` where nearest-rank is
+    `ceil(n * p) - 1`, so it overshot by one and clamped to `max()` at the top
+    of the sample: p95 of 1..20 came back 20 rather than 19, making
+    `required_gate_p95` track a single outlier. A 5-element sample cannot show
+    this - there nearest-rank p95 genuinely *is* the maximum.
+    """
+    assert _percentile([float(n) for n in range(1, 21)], 95) == 19.0
+    assert _percentile([float(n) for n in range(1, 101)], 95) == 95.0
+    assert _percentile([1.0, 2.0, 3.0, 4.0, 100.0], 50) == 3.0
+    assert _percentile([], 95) is None
+    assert _percentile([7.0], 95) == 7.0
+
+
+def test_synthetic_controls_are_excluded_from_performance_aggregates() -> None:
+    """Control fixtures carry placeholder durations and must not be measured."""
+    observation = _eligible_record(id="obs")
+    observation["required_gate_seconds"] = 900
+    observation["runner_minutes"] = 40
+    control = _eligible_record(id="ctl")
+    control["kind"] = "control"
+    control["required_gate_seconds"] = 100
+    control["runner_minutes"] = 20
+
+    summary = summarize([replay_record(observation), replay_record(control)])
+
+    assert summary.records == 2
+    assert summary.observations == 1
+    assert summary.controls == 1
+    assert summary.required_gate_p50 == 900
+    assert summary.runner_minutes_total == 40
+
+
+def test_completeness_rejects_non_terminal_lane_conclusions() -> None:
+    """A key whose value is null/pending is not a settled outcome."""
+    record = _eligible_record(id="pending")
+    record["actual_lane_conclusions"]["medium-test"] = None
+    errors = completeness_errors([record], [replay_record(record)])
+    assert any("non-terminal lane conclusions" in error for error in errors)

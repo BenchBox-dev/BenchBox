@@ -57,8 +57,11 @@ No sample-size or calendar threshold is used as the sole gate.
   stay `full_required`.
 - Kill switch: disable or delete `develop-refresh-shadow.yml`. There is no
   skip path to unwind.
-- rollback: checkout the parent of this decision; no GitHub setting
-  changes to reverse.
+- rollback: `git revert` the commit that landed this decision, on a branch,
+  through the normal PR flow. Checking out its parent only detaches a local
+  HEAD - once merged it neither removes the decision from `develop` nor leaves
+  a reviewable record, and rewriting history is not an option on a protected
+  branch. No GitHub setting changes to reverse.
 - Operator: no settings mutation, no repository transfer, no custom merge
   steward.
 

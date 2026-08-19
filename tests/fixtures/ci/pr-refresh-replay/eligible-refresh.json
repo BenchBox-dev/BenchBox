@@ -116,5 +116,6 @@
     "correctness-gate": "success",
     "plan-capture-gate": "success",
     "medium-test": "success"
-  }
+  },
+  "kind": "control"
 }
