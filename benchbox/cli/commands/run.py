@@ -1367,6 +1367,7 @@ def _build_benchmark_config(
         strict_plan_capture=s.strict_plan_capture,
         stats_reset=s.stats_reset,
         stats_per_table_timing=s.stats_per_table_timing,
+        official=s.official,
         options=options,
     )
 

@@ -26,6 +26,25 @@ from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 BENCHMARK_LOADER_API_SURFACE = "internal"
 
 
+# Benchmarks whose result carries a compliance classification. Only these accept
+# `official`; passing it wholesale is unsafe because constructor_accepts_argument()
+# is satisfied by a bare **kwargs, so any benchmark with one would swallow it.
+COMPLIANCE_GATED_BENCHMARKS = frozenset({"tpcds"})
+
+
+def compliance_mode_kwargs(config: BenchmarkConfig) -> dict[str, Any]:
+    """Return constructor kwargs that carry compliance mode for *config*.
+
+    Both construction paths -- :func:`get_benchmark_instance` and the CLI
+    orchestrator's own builder -- must apply this. A run that does not receive
+    `official` classifies as ``unofficial_nonstandard`` and is then refused by
+    ``benchbox submit``, so dropping it silently makes results unpublishable.
+    """
+    if config.name.lower() not in COMPLIANCE_GATED_BENCHMARKS:
+        return {}
+    return {"official": bool(getattr(config, "official", False))}
+
+
 def get_benchmark_instance(config: BenchmarkConfig, system_profile: SystemProfile | None) -> Any:
     """Get benchmark instance based on configuration."""
     validate_scale_factor(config.name, config.scale_factor)
@@ -51,6 +70,7 @@ def get_benchmark_instance(config: BenchmarkConfig, system_profile: SystemProfil
     optional_kwargs = {"parallel": cpu_cores}
     if benchmark_id in {"tpcds", "joinorder", "joinorder_synthetic"}:
         optional_kwargs["force_regenerate"] = force_regenerate
+    optional_kwargs.update(compliance_mode_kwargs(config))
 
     return instantiate_benchmark_class(benchmark_class, benchmark_kwargs, optional_kwargs)
 
