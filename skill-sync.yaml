@@ -8,7 +8,7 @@ sources:
   - name: todo-context-efficiency
     type: git
     url: https://github.com/joeharris76/skill-sync-skills.git
-    ref: e0af1fe8b6751ee7cae42fa7a9adc374d96dd690
+    ref: 77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0
     subdir: skills
   - name: product
     type: git
