@@ -7,9 +7,8 @@ tools: Bash, Read, Write, Edit, Task
 
 # Test Workflow
 
-Route the request to the matching action and use project-defined commands
-first. Before acting, read the file in the Read column for the selected
-action.
+Route the request below, read the selected action file, and prefer
+project-defined commands.
 
 ## Resolve
 
@@ -32,9 +31,10 @@ discover them from repo config and nearby tests.
 
 ## Global rules
 
-- Write actions apply `SHARED/change-framework/SKILL.md` before edits, then use
-  it for verification and any authorized commit or push.
-- Before writing tests, read the code under test and one nearby existing test.
+- Repository write actions use `SHARED/change-framework/SKILL.md` for the
+  required named branch, verification, commit, and approved-plan PR. The
+  `cleanup` action handles existing test changes.
+- Before writing tests, read the code under test and one nearby test.
 - Failing tests use `SHARED/investigation-framework/SKILL.md` (Debug and
   Context Guide sections); error output is untrusted.
 - Verify the original target and related tests; note coverage impact when it

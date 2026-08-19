@@ -7,8 +7,10 @@ tools: Bash, Read, Write, Edit
 
 # Permissions Consolidation
 
-Route to `consolidate` or `audit`; read the file in the Read column before
-acting. Keep unclear entries PERSONAL and ask; never weaken safety.
+Route below and read the selected action file. Keep unclear entries PERSONAL and
+ask for direction. Do not add, broaden, or relocate an entry when the change
+would permit, in the destination scope, a command that is not already allowed
+in that scope.
 
 ## Actions
 
@@ -23,7 +25,7 @@ acting. Keep unclear entries PERSONAL and ask; never weaken safety.
 - Never `git add -A`; stage explicit project config paths only.
 - Never commit `settings.local.json`, `~/.codex/config.toml`, or
   `~/.gemini/*.json`.
-- Never remove unrelated hooks or keys, or add force-push/reset/clean/rm rules
-  to allowlists. A stale or conflicting executable hook may be removed only
-  when the active owner, conflict, and replacement safety path are evidenced
-  and the current task explicitly authorizes personal configuration changes.
+- Preserve unrelated hooks and keys. Do not allowlist force-push, reset, clean,
+  or removal commands. Remove a stale or conflicting executable hook only when
+  its owner, conflict, and safe replacement are evidenced and the task
+  authorizes personal configuration changes.

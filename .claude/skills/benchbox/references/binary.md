@@ -11,4 +11,6 @@ Verify TPC binary packaging and wrappers.
 
 ## Rules
 
-Do not compile stock TPC-DS dsdgen at SF<1; BenchBox uses patched bundled binaries. Report missing binary, permission, wrapper, or output-shape failures separately.
+Do not compile stock TPC-DS `dsdgen` below SF1; BenchBox uses patched bundled
+binaries. Separate missing-binary, permission, wrapper, and output-shape
+failures.

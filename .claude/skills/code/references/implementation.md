@@ -17,11 +17,12 @@ make a conventional commit, and push through the commit framework.
 
 ## Debug
 
-Use `SHARED/investigation-framework/SKILL.md` (Debug and Context Guide sections). A blocker requires a
-known root cause, tried/ruled-out fixes, and remaining work outside authority.
+Use the Debug and Context Guide sections of
+`SHARED/investigation-framework/SKILL.md`.
 
 ## Perf
 
-Measure baseline, profile, optimize, and remeasure. Keep the performance
-budget explicit; apply `SHARED/review-protocol/SKILL.md` (Planning-Depth Layers) L3 before optimizing to confirm the
-measured bottleneck is the real constraint.
+Measure a baseline, profile, optimize, and remeasure. State the performance
+budget. Before optimizing, apply Layer 3 of
+`SHARED/review-protocol/SKILL.md` to confirm the measured bottleneck is the
+real constraint.

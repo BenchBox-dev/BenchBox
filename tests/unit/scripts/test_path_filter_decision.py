@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -316,7 +317,8 @@ def test_event_base_sha_stays_authoritative_when_origin_develop_moves(tmp_path: 
     event_base = _git(repo, "rev-parse", "HEAD").strip()
 
     _git(repo, "checkout", "-b", "feature", "-q")
-    feature_manifest = manifest.replace("7b63719927992bd7f7fff6b90449bbba2bb94ba3", "a" * 40, 1)
+    canonical_ref = re.search(r"name:\s*canonical.*?ref:\s*([0-9a-f]{40})", manifest, re.DOTALL).group(1)
+    feature_manifest = manifest.replace(canonical_ref, "a" * 40, 1)
     (repo / "skill-sync.yaml").write_text(feature_manifest, encoding="utf-8")
     _git(repo, "add", "skill-sync.yaml")
     _git(repo, "commit", "-m", "ref only", "-q")
