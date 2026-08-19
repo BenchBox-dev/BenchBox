@@ -1,63 +1,57 @@
 # Five-Axis Code Review Reference
 
-Every review evaluates five dimensions with severity classification.
-
-> **Scope:** This file is for code reviews only. Use it to check the five axes, what to delete, how to rate issues, size limits, and code-specific branches.
->
-> It does not control permissions or workflow. `SHARED/review-protocol/SKILL.md` controls those. It covers authorization, defect handling, L1/L2/L3 steps, saving findings, and parity (`REVIEW-AUTH-001` to `REVIEW-PARITY-001`).
->
-> `SHARED/review-protocol/SKILL.md` defines the authorization boundary. Only a later user message, in a separate turn, can authorize remediation. This file cannot authorize changes.
+Evaluate code on five axes and classify findings by severity. This file adds a
+code rubric only; `SHARED/review-protocol/SKILL.md` controls authorization,
+planning depth, defect handling, capture, and remediation.
 
 ## Router-specific checks
 
-- Accept any review scope: a file path, directory, staged changes, recent commits, a PR, a topic, or no scope. List severity findings first: Critical, Required, Nit, Consider.
-- Route L2 blind-spot audits through `SHARED/review-protocol/SKILL.md`.
-- For review-shape triggers, use the matching branch below: matrix/audit-doc,
-  mixed tooling+data, repo-shape ADR, multi-W spec, defect follow-up
-  artifact-freshness, or verification-only.
+- Accept a file, directory, staged diff, commit range, PR, topic, or repository.
+  List Critical, Required, Nit, and Consider findings first.
 - For multi-PR work, run `gh pr diff <N> --name-only` and classify blockers
   before content; avoid `--json body,files` unless needed.
-- Put project-specific checks (for example, SQLGlot dialect checks) in `code.review_checklist` (`code/skill.yaml:28`). Do not add them to this shared rubric. Use them only when `skill-sync.config.yaml` sets `code.review_checklist`.
-- `review --chain` stays read-only unless a later user message explicitly authorizes remediation in a separate turn under `SHARED/review-protocol/SKILL.md` [REVIEW-AUTH-001]. If authorized, it can fix only non-structural issues. Verify the fixes. Then use the commit framework to save, push, or open a PR.
+- Load project-specific checks, such as SQLGlot dialect checks, only from
+  `code.review_checklist` (`code/skill.yaml:28`) when `skill-sync.config.yaml`
+  configures it. Do not add them here.
+- `review --chain` remains read-only under [REVIEW-AUTH-001]. After a later
+  message authorizes remediation, fix only non-structural issues, verify them,
+  then use the commit framework and project PR flow.
 
 ## The Five Axes
 
 ### 1. Correctness
-- Matches spec/task requirements?
-- Edge cases handled (null, empty, boundary)?
-- Error paths handled (not just happy path)?
-- Tests adequate and testing the right things?
-- Off-by-one, race conditions, state inconsistencies?
-- **Empirical-claim durability**: if you change numbers that were measured (like `verified <tool>` comments, doc storage sizes, or expected-bytes limits), add two things. First, a check-in smoke or make target that reproduces the measurement. Second, a test that fails when the docs no longer match the catalog.
+- Does the code meet the specification and task?
+- Does it handle null, empty, boundary, and error cases?
+- Do tests cover the correct behavior?
+- Are there off-by-one errors, races, or inconsistent states?
+- For changed measured values, add a checked-in smoke or Make target that
+  reproduces the measurement and a test that detects catalog/document drift.
 
 ### 2. Readability & Simplicity
-- Names descriptive, consistent with project conventions?
-- Control flow straightforward (no nested ternaries, deep callbacks)?
-- Abstractions earning their complexity?
-- Dead code removed (`_unused` vars, compat shims, stale comments)?
+- Are names clear and consistent with project conventions?
+- Is control flow direct, without nested ternaries or deep callbacks?
+- Does each abstraction justify its complexity?
+- Can dead code, compatibility shims, or stale comments be removed?
 
-**Deletion sub-checklist (what can be cut):**
-- Check source-code diffs against `SHARED/change-framework/SKILL.md` Section 1.
+**Deletion checks:** Apply `SHARED/change-framework/SKILL.md` Section 1.
 - For each finding, report `file:line`, what to cut, and its replacement.
-- Findings are report-only; never apply deletions during a review.
 
 ### 3. Architecture
-- Follows existing patterns or introduces justified new one?
-- Clean module boundaries, no circular deps?
-- Code duplication that should be shared?
-- Abstraction level appropriate (not over-engineered, not too coupled)?
+- Does the change follow existing patterns or justify a new one?
+- Are module boundaries clean and free of circular dependencies?
+- Should duplicated code be shared?
+- Is the abstraction neither over-engineered nor tightly coupled?
 
 ### 4. Security
-- User input validated/sanitized at boundaries?
-- Secrets out of code, logs, version control?
-- SQL parameterized (no string concatenation)?
-- External data treated as untrusted?
+- Is user input validated at boundaries?
+- Are secrets absent from code, logs, and version control?
+- Is SQL parameterized rather than concatenated?
+- Is external data treated as untrusted?
 
 ### 5. Performance
-- N+1 query patterns?
-- Unbounded loops or unconstrained data fetching?
-- Large objects in hot paths?
-- Sync operations that should be async?
+- Are there N+1 queries, unbounded loops, or unconstrained fetches?
+- Are large objects used in hot paths?
+- Should synchronous work be asynchronous?
 
 ## Severity Classification
 
@@ -68,53 +62,67 @@ Every review evaluates five dimensions with severity classification.
 | **Nit** | Minor, optional | May ignore |
 | **Consider** | Suggestion worth evaluating | Not required |
 
-Critical and Required findings are **defects** per
-`SHARED/review-protocol/SKILL.md` §2; they belong in the severity table and
-action items, never in the blind-spot directory.
+Critical and Required findings are defects under the shared protocol. Put them
+in the severity table and action items, never in blind-spots.
 
 ## Change Sizing
 
-- ~100 lines: Good (reviewable in one sitting)
-- ~300 lines: Acceptable (single logical change)
-- ~1000 lines: Too large (split it)
+- About 100 lines: reviewable in one sitting.
+- About 300 lines: acceptable for one logical change.
+- About 1,000 lines: too large; split it.
 
 ## Rules
 
-- Every review must include "What's Done Well" -- criticism-only reviews are incomplete
-- Separate refactoring from feature work
-- Approve when change definitely improves code health, even if imperfect
-- No rubber-stamps -- "LGTM" without evidence helps no one
+- Include "What's Done Well"; criticism-only reviews are incomplete.
+- Separate refactoring from feature work.
+- Approve an imperfect change when it clearly improves code health.
+- Support approval with evidence; do not rubber-stamp with "LGTM."
 
 ## Branches
 
-Apply when the change matches a trigger; skip otherwise.
+Apply a branch only when its trigger matches.
 
 ### Matrix/audit-doc branch
-Trigger: doc whose payload is tables of numbers (audit/curation/inventory).
-- Regenerate every numeric claim from source and diff; stale arithmetic is the dominant failure mode.
-- Policy-gated recommendations need an "Alternatives considered" section that quantifies, not narrates.
+**Trigger:** An audit, curation, or inventory document built around numeric
+tables.
+
+- Regenerate and diff every numeric claim from source.
+- For policy-gated recommendations, include an "Alternatives considered"
+  section and quantify it.
 
 ### Mixed tooling+data branch
-Trigger: PR bundles tooling artifacts (CI/lint/build) with data artifacts (fixtures, JSON, bundles).
-- Assess reversibility per component, not aggregate.
-- If tooling silences a data-side defect, require a follow-up TODO id for the upstream fix.
+**Trigger:** A PR combines tooling artifacts with fixtures, JSON, bundles, or
+other data artifacts.
+
+- Assess each component's reversibility.
+- If tooling hides a data defect, require a follow-up TODO for the upstream fix.
 
 ### Repo-shape ADR branch
-Trigger: ADR proposes branch-shape changes, CI moves, or cross-branch vendoring.
-- Enumerate consumers (CI, contributors, automation, downstream).
-- Confirm each works under the stated allowlist; undocumented carve-outs mean the ADR isn't ready.
+**Trigger:** An ADR changes branch shape, moves CI, or vendors across branches.
+
+- List CI, contributor, automation, and downstream consumers.
+- Verify each consumer under the allowlist. Undocumented exceptions block the
+  ADR.
 
 ### Multi-W spec branch
-Trigger: spec decomposes into W1..Wn.
-- Estimate LOC per W from the module breakdown.
-- Flag any W >300 LOC pre-approval; require a split or rationale.
+**Trigger:** A specification is divided into W1 through Wn.
+
+- Estimate lines per work unit from the module breakdown.
+- Before approval, require a split or rationale for any unit over 300 lines.
 
 ### Defect follow-up branch
-Trigger: orchestration/phase-output fix where artifacts are parsed by another phase.
-- Confirm parsed files came from the current invocation, not an earlier failed run.
-- Flag stale-file reuse: `os.path.exists` + skip, cached-result short-circuits.
+**Trigger:** One orchestration phase parses artifacts from another.
+
+- Confirm parsed files came from the current invocation.
+- Flag stale-file reuse, including `os.path.exists` skips and cached-result
+  short-circuits.
 
 ### Verification-only branch
-Trigger: verification-only PR, or a commit asserts evidence without a committed artifact.
-- Require a committed transcript or pin file (for example, the project's verification-log convention) a later reviewer can replay.
-- Reject "trust me, I ran it" — transient terminal output isn't durable.
+**Trigger:** A verification-only PR or a commit that claims evidence without a
+durable artifact.
+
+- Require durable, replayable evidence under the project's convention: a
+  committed command with a pinned SHA or version and a PASS/FAIL result. A
+  referenced retained CI artifact may accompany that pin. Raw logs need not be
+  committed.
+- Reject claims supported only by transient terminal output.

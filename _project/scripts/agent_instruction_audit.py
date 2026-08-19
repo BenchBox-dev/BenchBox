@@ -33,18 +33,18 @@ REQUIRED_POLICY_IDS = {
 REVIEW_POLICY_IDS = {policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id.startswith("REVIEW-")}
 CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-AUTH-001": (
-        "read-only plus local capture",
+        "read-only except for local capture",
         "Commit any file.",
         "Push to a remote.",
         "Open PRs",
-        "separate turn",
-        "zero tracked worktree-content changes",
-        "Do not interpret the bundle",
+        "authorization in a later turn",
+        "without changing tracked worktree content",
+        "combines review and remediation remains review-only",
     ),
-    "REVIEW-DEFECT-001": ("it is a defect", "do not belong in blind-spots"),
-    "REVIEW-L2-001": ("framework gaps", "not the instance-level defects already found"),
-    "REVIEW-CAPTURE-001": ("Projects provide storage locations/specs", "protocol governs behavior"),
-    "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "canonical skill wins"),
+    "REVIEW-DEFECT-001": ("classify it as a defect", "never in blind-spots"),
+    "REVIEW-L2-001": ("gaps in the review framework", "not defects already found"),
+    "REVIEW-CAPTURE-001": ("protocol governs behavior", "governs storage formats"),
+    "REVIEW-PARITY-001": ("Missing IDs or contradictory semantics", "skill governs behavior"),
 }
 # The author/committer anchors are load-bearing: the audit previously pinned
 # only the trailer semantics, so the canonical skill could require a human
@@ -53,11 +53,11 @@ CANONICAL_REVIEW_ANCHORS = {
 CANONICAL_COMMIT_ANCHORS = {
     "COMMIT-IDENTITY-001": (
         "Co-Authored-By",
-        "explicitly requests that exact trailer",
-        "stale author request",
-        "is not authorization",
+        "requests that exact trailer",
+        "Stale requests",
+        "do not grant permission",
         "human author identity",
-        "committer slot behind a human author",
+        "committer behind a human author",
     )
 }
 PROJECT_COMMIT_ANCHORS = {

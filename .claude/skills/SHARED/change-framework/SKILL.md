@@ -1,18 +1,15 @@
 ---
 name: change-framework
-description: "Unified source-code selection and change-execution workflow: reuse ladder, vertical slicing, post-edit verification, and authorized commits."
+description: "Unified source-code selection and change-execution workflow: reuse ladder, vertical slicing, post-edit verification, named branches, commits, and authorized-write PRs."
 ---
 
 # Change Framework
 
-Governs how in-scope edits are selected, sliced, verified, and, when
-authorized, committed.
-
 ## 1. Source-code selection
 
 After required research and before editing source code, choose the first option
-that fully satisfies the authorized requirement and applicable repository and
-safety constraints:
+that fully satisfies the authorized requirement, repository policy, and safety
+constraints:
 
 1. No change, if the required outcome already exists.
 2. An existing helper or established pattern.
@@ -20,47 +17,65 @@ safety constraints:
 4. A declared, direct dependency supported by the project.
 5. The smallest clear new implementation.
 
-Do not weaken correctness, compatibility, validation, security, accessibility,
-or explicit requirements to use an earlier option. Document a bounded
-simplification only when its ceiling is material or non-obvious; state the
-condition that would justify replacing it.
+Do not trade correctness, compatibility, validation, security, accessibility,
+or explicit requirements for an earlier option. When a simplification has a
+material or non-obvious limit, document the limit and its replacement trigger.
 
 ## 2. Slicing discipline
 
-Use for multi-file work, features, refactors, or any change likely to exceed about 100 lines before testing.
+Use for multi-file work, features, refactors, or changes likely to exceed about
+100 lines before testing.
 
-- Touch only task-required code; surface adjacent issues as "noticed but not touching."
-- Prefer vertical slices; use contract-first for parallel components and risk-first for uncertainty.
-- Each slice must implement, test, and verify one logical behavior. When
-  Section 4 authorizes commits, commit one slice at a time.
+- Touch only task-required code. Report adjacent issues as "noticed but not
+  touching."
+- Prefer vertical slices. Use contract-first slices for parallel components and
+  risk-first slices for uncertainty.
+- Each slice must implement, test, and verify one logical behavior. Commit each
+  verified slice separately.
 - Keep the project buildable and each increment independently revertible.
 - New incomplete code stays disabled by default.
 
 ## 3. Post-edit verification ladder
 
-Run before return/stage/commit.
+Run before returning, staging, or committing changes.
 
 ### Checks
 
-1. Read back edited regions (+5 lines): indentation, nesting, stale imports, orphaned lines.
+1. Read edited regions with five surrounding lines. Check indentation, nesting,
+   stale imports, and orphaned lines.
 2. Run project lint if available.
 3. Run project typecheck if available.
 4. Run targeted tests, then fast/default suite for meaningful code changes.
 
 ### Rules
 
-- Never silently skip verification; if unavailable, report why.
-- Fix failures before committing or clearly report blocker.
+- Report why any verification step is unavailable.
+- Fix failures before committing or report the blocker.
 - Report command, result, and residual risk.
-- Narrowest check that proves the change first; full fast/preflight are final gates, not exploration. Long output → log file, report summary.
+- Run the narrowest proving check first. Use fast, full, or preflight checks as
+  final gates. Save long output to a log and report the summary.
 
 ### Delegated gate runs
 
-When a low-effort subagent is available, the main agent may delegate boilerplate deterministic gate runs — full/default test suite, project preflight, CI status check, push, PR-open equivalent, PR-followup runner, or any long run-and-report gate. The main agent chooses the command, cwd, log path, max runtime, and stop condition, and keeps all failure analysis, fixes, scope decisions, retries, and final reporting. The subagent only runs that command and reports status, log tail, PR URL, and check state — no edits, scope/command changes, unrequested retries, review-thread resolution, or policy calls. Gates still run unchanged; only who waits on them shifts. With no subagent or reasoning-effort control available, run the gate inline as before.
+A low-effort subagent may run deterministic gates, including full tests,
+preflight, CI status, push, PR opening or follow-up, and other long
+run-and-report commands.
 
-## 4. Authorized commit workflow
+- The main agent sets the command, working directory, log path, maximum runtime,
+  and stop condition.
+- The main agent retains failure analysis, fixes, scope decisions, retries, and
+  final reporting.
+- The subagent runs only the assigned command and reports its status, log tail,
+  PR URL, and check state. It must not edit, change scope or commands, retry
+  without instruction, resolve review threads, or make policy decisions.
 
-Use only when a calling skill authorizes a write-shaped commit.
+Delegation changes only who waits. Run the same gate inline when delegation or
+reasoning-effort control is unavailable.
+
+## 4. Branch, commit, and PR workflow
+
+Use for every authorized action that changes repository content. Review-only
+capture remains local under `SHARED/review-protocol/SKILL.md`.
 
 ### Inputs
 
@@ -72,31 +87,34 @@ Use only when a calling skill authorizes a write-shaped commit.
 
 ### Steps
 
-1. Discover files from `file_scope`; no files -> "No files to commit."
-2. Inspect `git status --porcelain {files}`, `git diff {files}`, and recent log.
-3. Run verification (Section 3, Post-edit verification ladder); fix failures or stop without committing.
-4. Stage and commit explicit files in one shell command.
-5. Push after successful commit; if no upstream, push with `-u origin {branch}`.
+1. Inspect the current branch, upstream, worktree status, worktree list, and
+   recent log before selecting a branch.
+2. Create or reuse a clearly named non-default branch for this task before
+   editing. Reuse it only when its name matches the scope. If edits began on
+   the default branch, switch before further edits.
+3. Discover files from `file_scope`. If none exist, report "No files to commit."
+   Inspect `git status --porcelain {files}` and `git diff {files}`.
+4. Run Section 3. Fix failures or stop without committing.
+5. Stage and commit the explicit files in one shell command.
+6. Push the branch. Use `-u origin {branch}` when it has no upstream.
+7. Open a draft PR as part of the same repository-write authorization unless
+   the user explicitly requires local-only work or another publication mode.
 
 ### Rules
 
-- **[COMMIT-IDENTITY-001] Resolve and validate human identity.** Inspect the
-  effective `user.name` and `user.email` with their config origins before the
-  first commit. A repository-local value overrides the user's global identity;
-  do not assume that makes it intentional, and every linked worktree inherits
-  it. This binds authorship: reject known agent/service identities (for example
-  Claude, Codex, Gemini, ChatGPT, or their vendor noreply addresses) as author
-  unless the current authorized task explicitly names that exact identity.
-  Otherwise use the user's effective human author identity. A commit-signing
-  service may hold the committer slot behind a human author, so signatures stay
-  verifiable without misattributing the work. Do not pass `--author` or set
-  `GIT_AUTHOR_*` / `GIT_COMMITTER_*` merely to work around a stale config; an
-  explicitly authorized task-local override applies only to that task and never
-  becomes standing repository or skill policy.
-- Do not add an agent/service `Co-Authored-By` trailer or any equivalent
-  attribution unless the current task explicitly requests that exact trailer.
-  A stale author request, tool convention, or claim that an agent contributed
-  is not authorization.
+- **[COMMIT-IDENTITY-001] Resolve and validate human identity.** Before the
+  first commit, inspect the effective `user.name` and `user.email` and their
+  config origins. Repository-local values override global values and apply to
+  linked worktrees; do not assume they are intentional.
+- Reject agent or service authors, including Claude, Codex, Gemini, ChatGPT, and
+  vendor noreply addresses, unless the current task names that exact identity.
+  Otherwise use the user's effective human author identity. A signing service
+  may remain the committer behind a human author.
+- Do not use `--author`, `GIT_AUTHOR_*`, or `GIT_COMMITTER_*` to bypass stale
+  config. An authorized task-local override applies only to that task.
+- Add an agent or service `Co-Authored-By` trailer only when the current task
+  requests that exact trailer. Stale requests, tool conventions, and claims of
+  agent contribution do not grant permission.
 - After committing, verify the resulting author and committer with
   `git show -s --format=fuller HEAD` when identity was explicitly overridden or
   identity is part of the acceptance criteria.
@@ -104,6 +122,13 @@ Use only when a calling skill authorizes a write-shaped commit.
 - Commit only authorized/session-modified files.
 - Use Conventional Commits.
 - Do not commit if verification fails or scope is ambiguous.
-- Push and other deterministic close-out gates may be delegated to a low-effort
-  subagent for run-and-report only. The caller keeps failure analysis and fixes.
-  See Section 3, Delegated gate runs.
+- Branch creation and commits are required close-out steps for completed
+  repository write actions, not separate permissions. A later user message may
+  explicitly require local-only work or another publication mode.
+- If repository policy explicitly uses trunk-based or direct-default-branch
+  development, follow that policy and report the deviation from the default
+  task-branch workflow.
+- A task branch is cheap isolation; it does not alter another user's branch or
+  linked worktree.
+- If a required push or PR is mechanically unavailable, keep the verified
+  commit and report the blocker; do not describe the workflow as complete.
