@@ -28,6 +28,7 @@ REQUIRED_POLICY_IDS = {
     "REVIEW-L2-001",
     "REVIEW-CAPTURE-001",
     "REVIEW-PARITY-001",
+    "WRITE-CLOSEOUT-001",
 }
 REVIEW_POLICY_IDS = {policy_id for policy_id in REQUIRED_POLICY_IDS if policy_id.startswith("REVIEW-")}
 CANONICAL_REVIEW_ANCHORS = {
@@ -70,6 +71,14 @@ PROJECT_COMMIT_ANCHORS = {
 }
 PROJECT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("later user turn", "bundling review and remediation")}
 AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
+AGENT_WRITE_ANCHORS = {
+    "WRITE-CLOSEOUT-001": (
+        "named branch",
+        "make pr-open",
+        "make pr-ready",
+        "close-out steps",
+    )
+}
 CODE_REVIEW_RULE_ANCHORS = (
     "Do not report commit identity.",
     "Review sandboxes may use synthetic identities.",
@@ -251,6 +260,13 @@ def audit_commit_policy(project: Path) -> list[str]:
             errors.append(f"project commit policy misses policy ID: {policy_id}")
         elif missing_anchors:
             errors.append(f"project {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
+    for policy_id, anchors in AGENT_WRITE_ANCHORS.items():
+        section = _policy_section(agents, policy_id)
+        missing_anchors = _missing_anchors(section, anchors)
+        if not section:
+            errors.append(f"AGENTS.md write policy misses policy ID: {policy_id}")
+        elif missing_anchors:
+            errors.append(f"AGENTS.md {policy_id} semantics drifted; missing anchors: {', '.join(missing_anchors)}")
     return errors
 
 
