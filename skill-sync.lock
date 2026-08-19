@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lockedAt": "2026-08-16T22:49:47.409Z",
+  "lockedAt": "2026-08-19T18:29:01.833Z",
   "skills": {
     "blog": {
       "source": {
@@ -10,7 +10,7 @@
         "ref": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
         "subdir": "skills",
         "revision": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
-        "fetchedAt": "2026-08-16T21:51:16.794Z"
+        "fetchedAt": "2026-08-19T18:28:53.115Z"
       },
       "installMode": "mirror",
       "files": {
@@ -64,7 +64,7 @@
         "ref": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
         "subdir": "skills",
         "revision": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
-        "fetchedAt": "2026-08-16T21:51:17.479Z"
+        "fetchedAt": "2026-08-19T18:28:53.886Z"
       },
       "installMode": "mirror",
       "files": {
@@ -161,10 +161,10 @@
         "type": "git",
         "name": "todo-context-efficiency",
         "url": "https://github.com/joeharris76/skill-sync-skills.git",
-        "ref": "e0af1fe8b6751ee7cae42fa7a9adc374d96dd690",
+        "ref": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
         "subdir": "skills",
-        "revision": "e0af1fe8b6751ee7cae42fa7a9adc374d96dd690",
-        "fetchedAt": "2026-08-16T22:49:43.374Z"
+        "revision": "77ab905fe66cc86a8d8a11fdc4b3500e28d8e0d0",
+        "fetchedAt": "2026-08-19T18:28:56.180Z"
       },
       "installMode": "mirror",
       "files": {
@@ -173,8 +173,8 @@
           "size": 6430
         },
         "references/bootstrap.md": {
-          "sha256": "7b3fbbe13006548df81be94aa7b6d38b177ee1f883b0f5770111c5700f8fa334",
-          "size": 3031
+          "sha256": "09c2b8f49d617b4319c8fe004184a9e7b4e83e6f13223bccd7f532049c15199d",
+          "size": 3095
         },
         "references/closeout.md": {
           "sha256": "d2bd9ba6965e76020f2184d3aca1434c067bbfaa6dfcb43e1f6f51078af01773",
@@ -193,8 +193,8 @@
           "size": 1166
         },
         "references/prioritize.md": {
-          "sha256": "b64e5834547f26e34b1269cadb7d4d04cac7784fddc0c69e20ae97eb9a131529",
-          "size": 4494
+          "sha256": "0fd22f6a8cc0f51841fea3745559132ede4be39a27b5a01cdec3dacd98913c69",
+          "size": 4548
         },
         "references/queries.md": {
           "sha256": "11ae465326ec08c012ea7beb5aadbd3d5faeee90ad2140a7f8d3a46fd022f724",
@@ -209,8 +209,8 @@
           "size": 463
         },
         "SKILL.md": {
-          "sha256": "4f039e8b410b0150748a2da619bacc07d7020ac86c163bfe8fc038bdef17bf4e",
-          "size": 3844
+          "sha256": "b2fae7c4bea44a0a6e9605f44ad480924ec0a20821e079a398585c5d1ed62589",
+          "size": 3942
         },
         "skill.yaml": {
           "sha256": "e2c0b40d9935492621e6d21ab216a6227f4bae8f3808ed004d995d0f1b5bbff3",
@@ -226,7 +226,7 @@
         "ref": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
         "subdir": "skills",
         "revision": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
-        "fetchedAt": "2026-08-16T21:51:20.232Z"
+        "fetchedAt": "2026-08-19T18:28:57.006Z"
       },
       "installMode": "mirror",
       "files": {
@@ -322,7 +322,7 @@
         "ref": "6139085a35455fe90c8d6c94d7567e131a24db96",
         "subdir": "skills",
         "revision": "6139085a35455fe90c8d6c94d7567e131a24db96",
-        "fetchedAt": "2026-08-16T21:50:32.655Z"
+        "fetchedAt": "2026-08-19T18:29:00.955Z"
       },
       "installMode": "mirror",
       "files": {
@@ -348,7 +348,7 @@
         "ref": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
         "subdir": "skills",
         "revision": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
-        "fetchedAt": "2026-08-16T21:51:20.932Z"
+        "fetchedAt": "2026-08-19T18:28:58.767Z"
       },
       "installMode": "mirror",
       "files": {
@@ -374,7 +374,7 @@
         "ref": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
         "subdir": "skills",
         "revision": "7b63719927992bd7f7fff6b90449bbba2bb94ba3",
-        "fetchedAt": "2026-08-16T21:51:18.835Z"
+        "fetchedAt": "2026-08-19T18:28:55.408Z"
       },
       "installMode": "mirror",
       "files": {
