@@ -637,12 +637,152 @@ def test_predictive_disk_floor_aborts_before_launching_oversized_known_cell(tmp_
         free_space_min_gib=3.0,
         budget_table={("duckdb", "tpch", 0.01): row},
         free_space_reader=lambda _path: 4.0,
+        # Pin the reuse probe: the default reads the real datagen cache under
+        # BENCHBOX_OUTPUT_DIR, so a developer machine holding tpch_sf001 would
+        # otherwise drop this row's datagen reserve and the guard would not fire.
+        datagen_cache_probe=lambda _source, _scale: False,
     )
 
     with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
         runner("duckdb", "tpch", 0.01, log_dir=tmp_path)
 
     assert attempted == []
+
+
+def _datagen_budget_row(benchmark: str) -> orchestrator.preflight_budget.DiskBudgetRow:
+    return orchestrator.preflight_budget.DiskBudgetRow(
+        platform="duckdb",
+        benchmark=benchmark,
+        scale_factor=0.01,
+        peak_datagen_gib=2.0,
+        peak_database_gib=0.0,
+        transient_growth_gib=0.0,
+        database_status=orchestrator.preflight_budget.DATABASE_STATUS_UNMEASURED,
+    )
+
+
+def _passed_cell(platform: str, benchmark: str, scale: float, tmp_path: Path) -> CellResult:
+    return CellResult(
+        platform=platform,
+        benchmark=benchmark,
+        scale=scale,
+        status="passed",
+        exit_code=0,
+        elapsed_s=1.0,
+        log_path=tmp_path / "cell.log",
+        result_path=tmp_path / "result.json",
+    )
+
+
+def test_failed_cell_does_not_mark_its_datagen_source_available(tmp_path: Path):
+    """A cell that died before generating data must not zero the next cell's datagen reserve."""
+    cells = [
+        CellResult(
+            platform="duckdb",
+            benchmark="tpch",
+            scale=0.01,
+            status="failed",
+            exit_code=1,
+            elapsed_s=1.0,
+            log_path=tmp_path / "cell.log",
+            result_path=None,
+        ),
+        _passed_cell("clickhouse", "tpch", 0.01, tmp_path),
+    ]
+
+    def base_runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
+        return cells.pop(0)
+
+    free_readings = iter((3.5, 3.5, 2.5, 2.5))
+
+    def free_space(_path) -> float:
+        return next(free_readings, 2.5)
+
+    runner = orchestrator._build_disk_floor_runner(
+        base_runner,
+        attempted_cells=[],
+        watch_disk_floor=True,
+        free_space_path=tmp_path,
+        free_space_min_gib=1.0,
+        budget_table={
+            ("duckdb", "tpch", 0.01): _datagen_budget_row("tpch"),
+            ("clickhouse", "tpch", 0.01): _datagen_budget_row("tpch"),
+        },
+        free_space_reader=free_space,
+        datagen_cache_probe=lambda _source, _scale: False,
+    )
+
+    runner("duckdb", "tpch", 0.01, log_dir=tmp_path)
+
+    # The second cell sees 2.5 GiB free. Reserving the datagen it still has to
+    # generate needs 2.0 + 1.0 floor and must be refused; dropping that reserve
+    # because a failed cell "covered" the source would need only the 1.0 floor
+    # and would let the cell through.
+    with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
+        runner("clickhouse", "tpch", 0.01, log_dir=tmp_path)
+
+
+def test_existing_datagen_cache_is_not_reserved_again(tmp_path: Path):
+    """A rerun over datasets already on disk must not reserve growth it will not create."""
+
+    def base_runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
+        return _passed_cell(platform, benchmark, scale, tmp_path)
+
+    runner = orchestrator._build_disk_floor_runner(
+        base_runner,
+        attempted_cells=[],
+        watch_disk_floor=True,
+        free_space_path=tmp_path,
+        free_space_min_gib=1.0,
+        budget_table={("duckdb", "tpch", 0.01): _datagen_budget_row("tpch")},
+        free_space_reader=lambda _path: 1.5,
+        datagen_cache_probe=lambda source, scale: (source, scale) == ("tpch", 0.01),
+    )
+
+    # 1.5 GiB free is under the 2.0 datagen reserve but over the 1.0 floor: the
+    # cell is refused only if the existing cache is counted as new growth.
+    assert runner("duckdb", "tpch", 0.01, log_dir=tmp_path).status == "passed"
+
+
+def test_alias_benchmark_reuses_its_canonical_datagen_source(tmp_path: Path):
+    """read_primitives consumes tpch datagen, so the second cell must not re-reserve it."""
+    probed: list[tuple[str, float]] = []
+
+    def probe(source: str, scale: float) -> bool:
+        probed.append((source, scale))
+        return False
+
+    def base_runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
+        return _passed_cell(platform, benchmark, scale, tmp_path)
+
+    runner = orchestrator._build_disk_floor_runner(
+        base_runner,
+        attempted_cells=[],
+        watch_disk_floor=True,
+        free_space_path=tmp_path,
+        free_space_min_gib=1.0,
+        budget_table={
+            ("duckdb", "tpch", 0.01): _datagen_budget_row("tpch"),
+            ("duckdb", "read_primitives", 0.01): _datagen_budget_row("read_primitives"),
+        },
+        free_space_reader=lambda _path: 3.5,
+        datagen_cache_probe=probe,
+    )
+
+    runner("duckdb", "tpch", 0.01, log_dir=tmp_path)
+    assert probed[0] == ("tpch", 0.01)
+
+    # The tpch cell generated the shared dataset; read_primitives resolves to
+    # the same source, so its datagen term is already covered.
+    assert runner("duckdb", "read_primitives", 0.01, log_dir=tmp_path).status == "passed"
+    assert all(source == "tpch" for source, _scale in probed)
+
+
+def test_canonical_datagen_source_resolves_registry_aliases():
+    assert orchestrator._canonical_datagen_source("tpch") == "tpch"
+    assert orchestrator._canonical_datagen_source("read_primitives") == "tpch"
+    assert orchestrator._canonical_datagen_source("tpcds_obt") == "tpcds"
+    assert orchestrator._canonical_datagen_source("not-a-registered-benchmark") == "not-a-registered-benchmark"
 
 
 def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
