@@ -8,11 +8,8 @@ Install dependency:
 
 Example usage:
     benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01
-    benchbox run --platform clickhouse-server --benchmark tpch \\
-        --platform-option host=my-clickhouse.example.com \\
-        --platform-option port=9000 \\
-        --platform-option username=default \\
-        --platform-option password=secret
+    For a remote server, set host, port, username, and password in the
+    BenchBox platform configuration before running the benchmark.
 
 Migration from legacy selectors:
     --platform clickhouse --mode server  → --platform clickhouse-server

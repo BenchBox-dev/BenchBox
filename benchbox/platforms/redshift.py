@@ -196,9 +196,8 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             raise ConfigurationError(
                 f"Redshift configuration is incomplete. Missing: {', '.join(missing)}\n"
                 "Configure with one of:\n"
-                "  1. CLI: benchbox platforms setup --platform redshift\n"
-                "  2. Environment variables: REDSHIFT_HOST, REDSHIFT_USER, REDSHIFT_PASSWORD\n"
-                "  3. CLI options: --platform-option host=<cluster>.redshift.amazonaws.com"
+                "  1. CLI: benchbox setup --platform redshift\n"
+                "  2. Environment variables: REDSHIFT_HOST, REDSHIFT_USER, REDSHIFT_PASSWORD"
             )
 
     @property
