@@ -45,9 +45,10 @@ Do not relocate a defect into L2 (`[REVIEW-L2-001]`).
 - **Extension-cost.** Primary extension-cost metric: files/contracts to add one SQL
   platform, one DataFrame platform, and one benchmark family. McCabe/cloc
   are hygiene (`docs/development/quality-gate-policy.md`).
-- **Prior-decision.** Enumerate recorded decision surfaces (future-state
-  index/tiers, migration gates, readiness docs, open tracker items). Cite or
-  supersede each. Unexplained demotion or a dropped open gate is a defect.
+- **Prior-decision.** `[REVIEW-PLAN-RECON-001]`: Enumerate recorded decision
+  surfaces (future-state index/tiers, migration gates, readiness docs, open
+  tracker items). Cite or supersede each. Unexplained demotion or a dropped open
+  gate is a defect.
 - **CI synchronize fan-out.** For savings/skip/path-filter plans, list every
   same-event workflow, split runner vs wall minutes, and change siblings or
   lower the target. See `docs/operations/repo-admin-settings.md`.
