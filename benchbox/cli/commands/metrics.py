@@ -13,11 +13,21 @@ from benchbox.cli.shared import console
 
 @click.group("metrics")
 def metrics_group():
-    """Calculate official TPC performance metrics from benchmark results (e.g. QphH@Size).
+    """Calculate benchmark performance metrics.
+
+    The metrics command group provides tools for calculating
+    official TPC performance metrics from benchmark results.
+
+    Available subcommands:
 
     \b
+      qphh    Calculate TPC-H QphH@Size composite metric
+
     Examples:
-        benchbox metrics qphh --power-results power.json --throughput-results throughput.json
+        # Calculate TPC-H QphH metric
+        benchbox metrics qphh \\
+          --power-results power.json \\
+          --throughput-results throughput.json
     """
 
 
@@ -65,21 +75,18 @@ def qphh(ctx, power_results, throughput_results, scale_factor, output_format, ou
         Power@Size = 3600 × SF / Power_Test_Time
         Throughput@Size = Num_Streams × 3600 × SF / Throughput_Test_Time
 
-    \b
     Examples:
         # Calculate QphH from test results
         benchbox metrics qphh \\
           --power-results results/power/results.json \\
           --throughput-results results/throughput/results.json
 
-    \b
         # Specify scale factor explicitly
         benchbox metrics qphh \\
           --power-results power.json \\
           --throughput-results throughput.json \\
           --scale-factor 100
 
-    \b
         # Export to JSON
         benchbox metrics qphh \\
           --power-results power.json \\

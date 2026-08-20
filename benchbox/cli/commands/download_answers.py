@@ -42,7 +42,6 @@ def download_answers(benchmark: str, force: bool, show_cache_dir: bool) -> None:
     Set BENCHBOX_ANSWERS_URL to override the default download URL.
     Set BENCHBOX_NO_DOWNLOAD=1 to disable all automatic downloads.
 
-    \b
     Examples:
         benchbox download-answers                        # Download both TPC-H and TPC-DS
         benchbox download-answers --benchmark tpch       # TPC-H only

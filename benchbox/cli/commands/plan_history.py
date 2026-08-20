@@ -51,12 +51,10 @@ def plan_history(
     - How plan changes correlate with performance
     - Plan flapping (unstable optimizer behavior)
 
-    \b
     Examples:
         # Show history for query q05
         benchbox plan-history --query-id q05 --history-dir ./plan_history
 
-    \b
         # Check for plan instability
         benchbox plan-history --query-id q05 --history-dir ./plan_history --check-flapping
     """

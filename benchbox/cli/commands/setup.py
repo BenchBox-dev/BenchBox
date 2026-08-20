@@ -57,7 +57,6 @@ def setup_credentials(ctx, platform, validate_only, list_platforms_flag, show_st
     secure local credential storage; MotherDuck validates MOTHERDUCK_TOKEN
     without storing the token.
 
-    \b
     Examples:
         benchbox setup --platform databricks    # Interactive Databricks setup
         benchbox setup --platform motherduck    # Validate MOTHERDUCK_TOKEN

@@ -83,20 +83,16 @@ def show_plan(
     Shows the logical query plan for a specific query from a benchmark run.
     The plan must have been captured using --capture-plans during the benchmark.
 
-    \b
     Examples:
         # Show plan as tree
         benchbox show-plan --run results.json --query-id q05
 
-    \b
         # Show summary statistics only
         benchbox show-plan --run results.json --query-id 1 --format summary
 
-    \b
         # Export plan as JSON
         benchbox show-plan --run results.json --query-id q05 --format json
 
-    \b
         # Compact tree view without properties
         benchbox show-plan --run results.json --query-id q05 --compact --no-properties
     """

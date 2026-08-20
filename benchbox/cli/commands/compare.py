@@ -334,40 +334,31 @@ def compare(
       Launch interactive wizard to guide you through comparison.
       benchbox compare
 
-    \b
     Examples:
         # Run SQL platform comparison
         benchbox compare -p duckdb -p sqlite -p clickhouse
 
-    \b
         # Run DataFrame platform comparison
         benchbox compare -p polars-df -p pandas-df --scale 0.1
 
-    \b
         # Compare two result files
         benchbox compare baseline.json current.json
 
-    \b
         # Compare with regression threshold (CI/CD)
         benchbox compare baseline.json current.json --fail-on-regression 10%
 
-    \b
         # Compare files with query plan analysis
         benchbox compare baseline.json current.json --include-plans
 
-    \b
         # Show only significant plan changes (< 90% similar)
         benchbox compare baseline.json current.json --include-plans --plan-threshold 0.9
 
-    \b
         # List available platforms
         benchbox compare --list-platforms
 
-    \b
         # Generate charts with results
         benchbox compare -p duckdb -p sqlite -o ./comparison --generate-charts
 
-    \b
         # Non-interactive mode (CI/CD)
         benchbox compare --non-interactive -p duckdb -p sqlite
     """

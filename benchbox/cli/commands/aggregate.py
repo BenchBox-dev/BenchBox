@@ -47,19 +47,16 @@ def aggregate(ctx, input_dir, output_file, benchmark, platform):
     Output includes: timestamp, benchmark, platform, scale, geometric mean,
     total time, and per-query statistics (p50, p95, p99).
 
-    \b
     Examples:
         # Aggregate all results in directory
         benchbox aggregate --input-dir benchmark_runs/ --output-file trends.csv
 
-    \b
         # Filter by benchmark
         benchbox aggregate \\
           --input-dir benchmark_runs/ \\
           --output-file tpch_trends.csv \\
           --benchmark tpch
 
-    \b
         # Filter by platform
         benchbox aggregate \\
           --input-dir benchmark_runs/ \\

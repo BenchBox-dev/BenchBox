@@ -16,7 +16,6 @@ def profile(ctx):
     Analyzes CPU, memory, disk space, and system configuration to recommend
     appropriate scale factors and benchmark configurations.
 
-    \b
     Examples:
         benchbox profile
     """
