@@ -34,10 +34,10 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.1 --table-mode externa
 
 ```bash
 # Run on DuckDB
-benchbox run --platform duckdb --benchmark tpch --scale 0.1 -o duckdb_results.json
+benchbox run --platform duckdb --benchmark tpch --scale 0.1 --output duckdb_results.json
 
 # Run on SQLite (uses same generated data)
-benchbox run --platform sqlite --benchmark tpch --scale 0.1 -o sqlite_results.json
+benchbox run --platform sqlite --benchmark tpch --scale 0.1 --output sqlite_results.json
 
 # Compare results
 benchbox compare duckdb_results.json sqlite_results.json
@@ -63,19 +63,19 @@ Compare local and cloud performance:
 
 ```bash
 # Local baseline
-benchbox run --platform duckdb --benchmark tpch --scale 1 -o local.json
+benchbox run --platform duckdb --benchmark tpch --scale 1 --output local.json
 
 # Cloud (requires credentials)
-benchbox run --platform snowflake --benchmark tpch --scale 1 -o snowflake.json
-benchbox run --platform bigquery --benchmark tpch --scale 1 -o bigquery.json
+benchbox run --platform snowflake --benchmark tpch --scale 1 --output snowflake.json
+benchbox run --platform bigquery --benchmark tpch --scale 1 --output bigquery.json
 
 # Cloud external-mode examples (file-backed registration)
 benchbox run --platform snowflake --benchmark tpch --scale 1 --table-mode external \
-  --platform-option staging_root=s3://bucket/benchbox/ -o snowflake_external.json
+  --platform-option staging_root=s3://bucket/benchbox/ --output snowflake_external.json
 benchbox run --platform athena --benchmark tpch --scale 1 --table-mode external \
-  --platform-option staging_root=s3://bucket/benchbox/ -o athena_external.json
+  --platform-option staging_root=s3://bucket/benchbox/ --output athena_external.json
 benchbox run --platform bigquery --benchmark tpch --scale 1 --table-mode external \
-  --platform-option staging_root=gs://bucket/benchbox/ -o bigquery_external.json
+  --platform-option staging_root=gs://bucket/benchbox/ --output bigquery_external.json
 
 # Multi-way comparison
 benchbox compare local.json snowflake.json bigquery.json
@@ -102,10 +102,10 @@ Compare SQL and DataFrame execution:
 
 ```bash
 # SQL execution
-benchbox run --platform duckdb --benchmark tpch --scale 0.1 -o sql.json
+benchbox run --platform duckdb --benchmark tpch --scale 0.1 --output sql.json
 
 # DataFrame execution (Polars)
-benchbox run --platform polars-df --benchmark tpch --scale 0.1 -o polars.json
+benchbox run --platform polars-df --benchmark tpch --scale 0.1 --output polars.json
 
 # Compare paradigms
 benchbox compare sql.json polars.json
@@ -131,7 +131,7 @@ For statistical significance, run multiple times:
 
 ```bash
 for i in 1 2 3; do
-  benchbox run --platform duckdb --benchmark tpch -o duckdb_run$i.json
+  benchbox run --platform duckdb --benchmark tpch --output duckdb_run$i.json
 done
 ```
 
@@ -144,7 +144,7 @@ First run includes caching overhead. For warm comparisons:
 benchbox run --platform duckdb --benchmark tpch
 
 # Measured run
-benchbox run --platform duckdb --benchmark tpch -o results.json
+benchbox run --platform duckdb --benchmark tpch --output results.json
 ```
 
 ## Comparison Script

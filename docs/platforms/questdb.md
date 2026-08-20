@@ -19,7 +19,7 @@ QuestDB is designed for time-series and event-driven workloads, with features li
 - **Autocommit mode** - PG wire protocol operates in autocommit mode (required by QuestDB)
 - **TPC file normalization** - Automatic handling of pipe-delimited `.tbl` files with trailing delimiter removal
 - **Chunked parquet loading** - Large parquet inputs are streamed through `/imp` as CSV chunks, with `parquet_chunk_rows` controlling the row budget per request
-- **TLS support** - Optional HTTPS for REST API endpoints via `--questdb-use-tls`
+- **TLS support** - Optional HTTPS for REST API endpoints via the adapter `use_tls` parameter
 
 ## Quick Start
 
@@ -65,17 +65,24 @@ benchbox run --platform questdb --benchmark tpch --scale 0.01
 
 ## Configuration Options
 
-| Option | CLI Argument | Environment Variable | Default | Description |
-|--------|-------------|---------------------|---------|-------------|
-| `host` | `--questdb-host` | `QUESTDB_HOST` | `localhost` | QuestDB server hostname |
-| `pg_port` | `--questdb-pg-port` | `QUESTDB_PG_PORT` | `8812` | PostgreSQL wire protocol port |
-| `http_port` | `--questdb-http-port` | `QUESTDB_HTTP_PORT` | `9000` | REST API HTTP port |
-| `username` | `--questdb-username` | - | `admin` | QuestDB username |
-| `password` | `--questdb-password` | - | `quest` | QuestDB password |
-| `database` | `--questdb-database` | - | `qdb` | QuestDB database name |
-| `use_tls` | `--questdb-use-tls` | - | `false` | Use HTTPS for REST API endpoints |
-| `connect_timeout` | - | - | `10` | Connection timeout in seconds |
-| `parquet_chunk_rows` | `--platform-option parquet_chunk_rows=<N>` | - | `200000` | Rows per parquet batch when streaming wide tables through `/imp` |
+CLI options are passed as `--platform-option KEY=VALUE`.
+
+| Option | CLI | Environment Variable | Default | Description |
+|--------|-----|---------------------|---------|-------------|
+| `host` | yes | `QUESTDB_HOST` | `localhost` | QuestDB server hostname |
+| `pg_port` | yes | `QUESTDB_PG_PORT` | `8812` | PostgreSQL wire protocol port |
+| `http_port` | yes | `QUESTDB_HTTP_PORT` | `9000` | REST API HTTP port |
+| `ilp_port` | yes | - | `9009` | InfluxDB Line Protocol port |
+| `username` | yes | - | `admin` | QuestDB username |
+| `password` | yes | - | `quest` | QuestDB password |
+| `database` | yes | - | `qdb` | QuestDB database name |
+| `loading_method` | yes | - | `rest` | Loading method: `rest` (CSV import) or `ilp` |
+| `use_tls` | no | - | `false` | Use HTTPS for REST API endpoints |
+| `connect_timeout` | no | - | `10` | Connection timeout in seconds |
+| `parquet_chunk_rows` | no | - | `200000` | Rows per parquet batch when streaming wide tables through `/imp` |
+
+Options marked "no" are adapter constructor parameters; the `benchbox run` CLI
+does not accept them.
 
 ## Data Loading
 
@@ -88,7 +95,7 @@ BenchBox loads data into QuestDB using the REST API `/imp` endpoint for bulk CSV
 3. **DROP TABLE adaptation** - `IF EXISTS` is added to DROP TABLE statements for idempotent schema creation
 4. **TPC file normalization** - Pipe-delimited `.tbl` files are streamed through a normalizer that removes trailing delimiters
 5. **REST API import** - CSV data is uploaded to the `/imp` endpoint with table name, delimiter, durability settings, and `forceHeader=true` for chunked parquet uploads
-6. **Chunk sizing for wide parquet tables** - `--platform-option parquet_chunk_rows=<N>` lowers the number of rows per `/imp` request when a denormalized parquet file would otherwise exceed QuestDB's HTTP receive budget
+6. **Chunk sizing for wide parquet tables** - the adapter `parquet_chunk_rows` parameter lowers the number of rows per `/imp` request when a denormalized parquet file would otherwise exceed QuestDB's HTTP receive budget
 
 ### REST API Import (`/imp`)
 
@@ -99,7 +106,7 @@ The primary data loading mechanism uses QuestDB's REST API:
 - **Parameters**: `name` (table), `delimiter`, `overwrite`, `durable` and `forceHeader=true` for chunked parquet uploads
 - **Format**: CSV with configurable delimiter (auto-detected for TPC `.tbl` files)
 - **Throughput**: Significantly higher than row-by-row INSERT for bulk datasets
-- **Wide parquet tuning**: lower `--platform-option parquet_chunk_rows=50000` (or smaller) when a very wide table would make each CSV chunk too large for a single HTTP request
+- **Wide parquet tuning**: lower `parquet_chunk_rows` to 50000 or less when a very wide table would make each CSV chunk too large for a single HTTP request
 
 ### InfluxDB Line Protocol (ILP)
 
@@ -135,27 +142,23 @@ export QUESTDB_HTTP_PORT=9000
 benchbox run --platform questdb --benchmark tpch --scale 1.0
 ```
 
-### CLI Argument Configuration
+### CLI Option Configuration
 
 ```bash
 benchbox run --platform questdb --benchmark tpch --scale 1.0 \
-    --questdb-host questdb.example.com \
-    --questdb-pg-port 8812 \
-    --questdb-http-port 9000 \
-    --questdb-username admin \
-    --questdb-password quest
+    --platform-option host=questdb.example.com \
+    --platform-option pg_port=8812 \
+    --platform-option http_port=9000 \
+    --platform-option username=admin \
+    --platform-option password=quest
 ```
 
-### TLS-Enabled REST API
+### Line Protocol Loading
 
 ```bash
 benchbox run --platform questdb --benchmark tpch --scale 1.0 \
-    --questdb-host questdb.example.com \
-    --questdb-use-tls
-
-# Lower parquet chunk size for wide denormalized tables such as tpcds_obt
-benchbox run --platform questdb --benchmark tpcds_obt --scale 0.01 \
-    --platform-option parquet_chunk_rows=50000
+    --platform-option host=questdb.example.com \
+    --platform-option loading_method=ilp
 ```
 
 ### Dry Run (Preview)
@@ -297,8 +300,8 @@ Error: REST API import failed
 1. Verify the REST API is accessible on the HTTP port (default: 9000)
 2. Check that `requests` is installed: `uv add requests`
 3. Test the REST API directly: `curl http://<host>:9000/exec?query=SELECT%201`
-4. Lower `--platform-option parquet_chunk_rows=<N>` for very wide parquet tables
-5. If using TLS, ensure `--questdb-use-tls` is set and certificates are valid
+4. Lower the adapter `parquet_chunk_rows` parameter for very wide parquet tables
+5. If using TLS, ensure the adapter `use_tls` parameter is set and certificates are valid
 
 ### Schema Creation Failures
 

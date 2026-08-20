@@ -99,17 +99,23 @@ Docker tag.
 
 ## Configuration Options
 
-| Option | CLI Argument | Environment Variable | Default | Description |
-|--------|-------------|---------------------|---------|-------------|
-| `host` | `--doris-host` | `DORIS_HOST` | `localhost` | Doris FE node hostname |
-| `port` | `--doris-port` | `DORIS_PORT` | `9030` | MySQL protocol port (FE) |
-| `username` | `--doris-username` | `DORIS_USER` / `DORIS_USERNAME` | `root` | Database username |
-| `password` | `--doris-password` | `DORIS_PASSWORD` | `""` | Database password |
-| `database` | `--doris-database` | `DORIS_DATABASE` | auto-generated | Target database name |
-| `http_port` | `--doris-http-port` | `DORIS_HTTP_PORT` | `8030` | FE HTTP port for Stream Load |
-| `use_tls` | `--doris-use-tls` | - | `false` | Use HTTPS for Stream Load API |
-| `stream_load_chunk_size` | `--platform-option stream_load_chunk_size=<bytes>` | - | `10485760` | Stream Load chunk size in bytes for CSV/TPC inputs |
-| `stream_load_max_filter_ratio` | `--platform-option stream_load_max_filter_ratio=<0..1>` | - | `0` | Allowed fraction of filtered rows; default rejects silent partial loads |
+CLI options are passed as `--platform-option KEY=VALUE`.
+
+| Option | CLI | Environment Variable | Default | Description |
+|--------|-----|---------------------|---------|-------------|
+| `host` | yes | `DORIS_HOST` | `localhost` | Doris FE node hostname |
+| `port` | yes | `DORIS_PORT` | `9030` | MySQL protocol port (FE) |
+| `username` | yes | `DORIS_USER` / `DORIS_USERNAME` | `root` | Database username |
+| `password` | yes | `DORIS_PASSWORD` | `""` | Database password |
+| `database` | yes | `DORIS_DATABASE` | auto-generated | Target database name |
+| `http_port` | yes | `DORIS_HTTP_PORT` | `8030` | FE HTTP port for Stream Load |
+| `be_http_port` | yes | `DORIS_BE_HTTP_PORT` | `8040` | BE HTTP port for Stream Load redirects |
+| `use_tls` | no | - | `false` | Use HTTPS for Stream Load API |
+| `stream_load_chunk_size` | no | - | `10485760` | Stream Load chunk size in bytes for CSV/TPC inputs |
+| `stream_load_max_filter_ratio` | no | - | `0` | Allowed fraction of filtered rows; default rejects silent partial loads |
+
+Options marked "no" are adapter constructor parameters; the `benchbox run` CLI
+does not accept them.
 
 ## Data Loading
 
@@ -131,7 +137,7 @@ Apache Doris provides a high-throughput Stream Load API on the FE HTTP port (def
 - **Protocol**: HTTP PUT with CSV payload and `100-continue` header
 - **Authentication**: HTTP Basic Auth using Doris credentials
 - **TPC format handling**: Trailing delimiters are automatically stripped before loading
-- **TLS support**: Enable `--doris-use-tls` to use HTTPS for encrypted Stream Load transfers
+- **TLS support**: Set the adapter `use_tls` parameter to use HTTPS for encrypted Stream Load transfers
 - **Throughput**: Significantly higher than row-by-row INSERT for large datasets
 
 ### INSERT Fallback
@@ -187,15 +193,15 @@ export DORIS_HTTP_PORT=8030
 benchbox run --platform doris --benchmark tpch --scale 10.0
 ```
 
-### CLI Argument Configuration
+### CLI Option Configuration
 
 ```bash
 benchbox run --platform doris --benchmark tpch --scale 1.0 \
-    --doris-host doris-fe.example.com \
-    --doris-port 9030 \
-    --doris-username benchbox \
-    --doris-password secret \
-    --doris-database my_benchmarks
+    --platform-option host=doris-fe.example.com \
+    --platform-option port=9030 \
+    --platform-option username=benchbox \
+    --platform-option password=secret \
+    --platform-option database=my_benchmarks
 ```
 
 ### Dry Run (Preview)
@@ -207,11 +213,8 @@ benchbox run --platform doris --benchmark tpch --scale 1.0 --dry-run ./preview
 
 ### TLS-Encrypted Stream Load
 
-```bash
-# Use HTTPS for Stream Load API (e.g., managed cloud deployments)
-benchbox run --platform doris --benchmark tpch --scale 1.0 \
-    --doris-use-tls
-```
+HTTPS for the Stream Load API (e.g. managed cloud deployments) is set with the
+adapter `use_tls` parameter. It has no `benchbox run` option.
 
 ## Architecture
 
@@ -357,7 +360,7 @@ Several vendors offer managed Apache Doris cloud services:
 
 When using managed cloud services:
 - The host, port, and credentials are provided by the service
-- Stream Load endpoints may use HTTPS (enable `--doris-use-tls`)
+- Stream Load endpoints may use HTTPS (set the adapter `use_tls` parameter)
 - HTTP port may differ from the default 8030
 
 ## Troubleshooting

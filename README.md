@@ -630,9 +630,8 @@ benchbox run --platform databricks --benchmark tpcds --scale 1 \
   --output dbfs:/Volumes/workspace/benchmarks/
 
 # BigQuery with custom configuration
-benchbox run --platform bigquery --benchmark tpch --scale 0.1 \
-  --platform-option project_id=my-project \
-  --verbose
+export BIGQUERY_PROJECT=my-project
+benchbox run --platform bigquery --benchmark tpch --scale 0.1 --verbose
 
 # Snowflake baseline comparison
 benchbox run --platform snowflake --benchmark tpch --scale 1 \
@@ -758,34 +757,35 @@ BENCHBOX_NON_INTERACTIVE=true benchbox run \
 ```bash
 # Databricks SQL Warehouse with Unity Catalog
 benchbox run --platform databricks --benchmark tpch --scale 1 \
-  --platform-option catalog=main \
-  --platform-option schema=benchbox \
+  --platform-option uc_catalog=main \
+  --platform-option uc_schema=benchbox \
   --output dbfs:/Volumes/main/benchbox/results/
 
-# Check available Databricks options
-benchbox run --describe-platform-options databricks
+# Check Databricks status and capabilities
+benchbox platforms status databricks
 ```
 
 **BigQuery:**
 ```bash
 # BigQuery with custom project and dataset
+export BIGQUERY_PROJECT=my-project
+export BIGQUERY_DATASET=benchbox
 benchbox run --platform bigquery --benchmark tpcds --scale 0.1 \
-  --platform-option project_id=my-project \
-  --platform-option dataset=benchbox \
   --output gs://my-bucket/benchmarks/
 
-# BigQuery with specific location
-benchbox run --platform bigquery --benchmark tpch \
-  --platform-option location=europe-west1
+# BigQuery in a specific location
+export BIGQUERY_LOCATION=europe-west1
+benchbox run --platform bigquery --benchmark tpch
 ```
 
 **Snowflake:**
 ```bash
 # Snowflake with custom warehouse
-benchbox run --platform snowflake --benchmark tpch --scale 1 \
-  --platform-option warehouse=LARGE_WH \
-  --platform-option database=BENCHBOX \
-  --tuning tuned
+# Connection settings come from the environment or `benchbox setup`,
+# not from --platform-option.
+export SNOWFLAKE_WAREHOUSE=LARGE_WH
+export SNOWFLAKE_DATABASE=BENCHBOX
+benchbox run --platform snowflake --benchmark tpch --scale 1 --tuning tuned
 
 # Snowflake baseline run
 benchbox run --platform snowflake --benchmark tpcds \
@@ -857,8 +857,8 @@ benchbox --help
 benchbox run --help
 benchbox platforms --help
 
-# Platform options
-benchbox run --describe-platform-options clickhouse
+# Platform status and capabilities
+benchbox platforms status clickhouse
 ```
 
 **Enable Verbose Output:**
@@ -903,12 +903,15 @@ benchbox run \
   --platform-option secure=true
 ```
 
-You can inspect the available options for any platform without executing a
-benchmark by using `--describe-platform-options`:
+You can inspect a platform's status and capabilities without executing a
+benchmark:
 
 ```bash
-benchbox run --describe-platform-options clickhouse
+benchbox platforms status clickhouse
 ```
+
+The supported option keys for each platform are listed in
+[Configuration](docs/reference/cli/configuration.md#platform-specific-options).
 
 Python helper:
 

@@ -381,7 +381,7 @@ benchbox visualize tpcds_result.json --chart-type query_histogram
 
 ```python
 from benchbox.core.visualization import ResultPlotter
-from benchbox.core.visualization.ascii import ASCIIBarChart
+from benchbox.core.visualization.ascii import BarChart
 from benchbox.core.visualization.ascii.bar_chart import BarData
 
 # Load results from JSON files
@@ -389,7 +389,7 @@ plotter = ResultPlotter.from_sources(["results/duckdb.json", "results/sqlite.jso
 
 # Render a bar chart
 bar_data = [BarData(label=r.platform, value=r.total_time_ms or 0) for r in plotter.results]
-chart = ASCIIBarChart(data=bar_data, title="Platform Comparison")
+chart = BarChart(data=bar_data, title="Platform Comparison")
 print(chart.render())
 
 # Export to plain-text file

@@ -152,13 +152,13 @@ Catch optimizer regressions between database versions:
 
 ```bash
 # Baseline (current version)
-benchbox run tpchavoc --platform postgres --scale-factor 1.0 --output baseline.json
+benchbox run --benchmark tpchavoc --platform postgres --scale 1.0 --output baseline.json
 
 # After upgrade (new version)
-benchbox run tpchavoc --platform postgres --scale-factor 1.0 --output new.json
+benchbox run --benchmark tpchavoc --platform postgres --scale 1.0 --output new.json
 
-# Compare results
-benchbox compare baseline.json new.json --threshold 1.5
+# Compare results, failing on a 50% regression
+benchbox compare baseline.json new.json --fail-on-regression 50%
 ```
 
 ### 3. Cross-Database Optimizer Comparison
@@ -269,16 +269,16 @@ TPC-Havoc inherits all TPC-H infrastructure:
 
 ```bash
 # Run all TPC-Havoc queries
-benchbox run tpchavoc --platform duckdb --scale-factor 1.0
+benchbox run --benchmark tpchavoc --platform duckdb --scale 1.0
 
 # Run specific query variants
-benchbox run tpchavoc --platform clickhouse-local --queries Q1_V1,Q1_V2,Q1_V3
+benchbox run --benchmark tpchavoc --platform clickhouse-local --queries Q1_V1,Q1_V2,Q1_V3
 
-# Run all variants of specific queries
-benchbox run tpchavoc --platform duckdb --query-pattern "Q8_V*"
+# Run all variants of one query (list them explicitly; there is no pattern option)
+benchbox run --benchmark tpchavoc --platform duckdb --queries Q8_V1,Q8_V2,Q8_V3
 
-# Compare variance across queries
-benchbox run tpchavoc --platform snowflake --analyze-variance
+# Variance across variants is reported in the result bundle
+benchbox run --benchmark tpchavoc --platform snowflake
 ```
 
 ## Performance Characteristics

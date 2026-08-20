@@ -44,8 +44,7 @@ install options). Default PG-wire port is `5432`.
 
 ## Configuration
 
-Connection parameters mirror PostgreSQL and are provided via BenchBox's
-standard credential flow (`benchbox credentials …`) or passed inline with
+Connection parameters mirror PostgreSQL and are passed with
 `--platform-option`:
 
 ```bash
@@ -56,10 +55,9 @@ benchbox run --platform cedardb --benchmark tpch --scale 1.0 \
   --platform-option database=benchbox
 ```
 
-Defaults come from the `cedardb` credential store entry (see
-`benchbox credentials`). If you prefer environment-driven configuration, store
-`${PGHOST}`-style placeholders in that credential entry and let BenchBox resolve
-them at runtime; there is no dedicated `CEDARDB_*` environment-variable surface.
+Unset options fall back to `host=localhost`, `port=5432`, `username=postgres`,
+and `schema=public`. There is no dedicated `CEDARDB_*` environment-variable
+surface.
 
 ## Supported Benchmarks
 

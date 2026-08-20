@@ -162,10 +162,10 @@ uv run -- benchbox visualize benchmark_runs/results/tpch_duckdb_sf0.01_*.json
 uv run -- benchbox visualize duckdb.json sqlite.json --template head_to_head
 
 # Specific chart type
-uv run -- benchbox visualize --last --chart-type performance_bar
+uv run -- benchbox visualize benchmark_runs/results/latest.json --chart-type performance_bar
 
 # Save plain-text output to file (strip ANSI colors)
-uv run -- benchbox visualize --last --no-color > charts.txt
+uv run -- benchbox visualize benchmark_runs/results/latest.json --no-color > charts.txt
 ```
 
 See the [Visualization Guide](../visualization/overview.md) for chart types, templates, and customization options.

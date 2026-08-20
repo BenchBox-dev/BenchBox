@@ -69,17 +69,12 @@ print(f"Average query time: {results.average_query_time:.3f}s")
 ```bash
 # Run TPC-H benchmark with DataFusion
 benchbox run --platform datafusion --benchmark tpch --scale 1.0 \
-  --datafusion-memory-limit 16G \
-  --datafusion-format parquet \
-  --datafusion-partitions 8
+  --platform-option memory_limit=16G \
+  --platform-option target_partitions=8
 
-# Use CSV format (direct loading, lower memory)
+# Spill to a fast disk
 benchbox run --platform datafusion --benchmark tpch --scale 1.0 \
-  --datafusion-format csv
-
-# Specify custom working directory
-benchbox run --platform datafusion --benchmark tpch --scale 1.0 \
-  --datafusion-working-dir /fast/ssd/datafusion
+  --platform-option temp_dir=/fast/ssd/datafusion
 ```
 
 ## Configuration
@@ -98,16 +93,21 @@ DataFusionAdapter(
 )
 ```
 
-### CLI Arguments
+### CLI Options
 
-| CLI Argument | Python Parameter | Type | Default | Description |
-|--------------|------------------|------|---------|-------------|
-| `--datafusion-memory-limit` | `memory_limit` | str | "16G" | Memory limit (e.g., '16G', '8GB', '4096MB') |
-| `--datafusion-partitions` | `target_partitions` | int | CPU count | Number of parallel partitions |
-| `--datafusion-format` | `data_format` | str | "parquet" | Data format: "csv" or "parquet" |
-| `--datafusion-temp-dir` | `temp_dir` | str | None | Temporary directory for disk spilling |
-| `--datafusion-batch-size` | `batch_size` | int | 8192 | RecordBatch size for query execution |
-| `--datafusion-working-dir` | `working_dir` | str | Auto | Working directory for tables and data |
+Pass these with `--platform-option KEY=VALUE`.
+
+| Key | Python Parameter | Type | Default | Description |
+|-----|------------------|------|---------|-------------|
+| `memory_limit` | `memory_limit` | str | "16G" | Memory limit (e.g., '16G', '8GB', '4096MB') |
+| `target_partitions` | `target_partitions` | int | CPU count | Number of parallel partitions |
+| `temp_dir` | `temp_dir` | str | None | Temporary directory for disk spilling |
+| `batch_size` | `batch_size` | int | 8192 | RecordBatch size for query execution |
+| `parquet_pushdown` | `parquet_pushdown` | bool | Adapter default | Enable Parquet filter pushdown |
+| `repartition_joins` | `repartition_joins` | bool | Adapter default | Repartition inputs to joins |
+
+`data_format` and `working_dir` are constructor parameters only; they have no
+CLI option.
 
 ### Testing a Specific DataFusion Version
 

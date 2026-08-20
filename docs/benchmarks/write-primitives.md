@@ -299,16 +299,15 @@ WHERE o_orderkey <= (SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER) FROM orders);
 
 ```bash
 # List available benchmarks
-benchbox list
+benchbox benchmarks list
 
 # Run Write Primitives benchmark
-benchbox run write_primitives --platform duckdb --scale-factor 0.01
+benchbox run --benchmark write_primitives --platform duckdb --scale 0.01
 
-# Run specific categories
-benchbox run write_primitives --platform duckdb --categories insert,update
-
-# Run specific operations
-benchbox run write_primitives --platform duckdb --operations insert_single_row,update_single_row_pk
+# Run specific operations (there are no --categories/--operations options;
+# select individual operations with --queries)
+benchbox run --benchmark write_primitives --platform duckdb \
+    --queries insert_single_row,update_single_row_pk
 ```
 
 **Important Notes**:
