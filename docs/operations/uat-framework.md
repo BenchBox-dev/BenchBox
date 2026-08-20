@@ -531,6 +531,17 @@ into an undisclosed fabrication, and `check_disk_headroom`'s
 `max(preflight.free_space_min_gib, estimate)` already guarantees the
 configured floor holds regardless of how low the estimate runs.
 
+Before each inventory-covered cell, execute also performs a predictive
+check. It reserves that row's known datagen and transient growth (plus a
+measured database term when one exists) above the configured free-space
+floor. Datagen is reserved only once per `(benchmark, scale)` source because
+UAT reuses it across platforms. A missing row is not treated as zero, and an
+unmeasured database term remains explicitly marked as a lower-bound
+prediction. If the known lower bound cannot fit, the cell is refused before
+launch; the existing post-cell floor remains the backstop for demand the
+inventory cannot predict. The lifecycle log records the prediction and
+whether its database component was measured.
+
 ### Chunked execute and the disk math
 
 `execute.platform_chunking: true` is a config-driven mode, not an
