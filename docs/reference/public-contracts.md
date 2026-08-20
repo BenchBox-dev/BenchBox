@@ -142,6 +142,11 @@ Authoritative count statements should come from the relevant registry metadata.
 Editorial lists may remain in narrative docs, but they must not claim to be
 exhaustive unless a generated or tested check keeps them synchronized.
 
+README platform name lists print each entry's registry `support_status` next to
+the name. A name with zero bundles in `results-data/corpus-inventory.json` is
+marked *unproven*. That marker is corpus occupancy, not a new support tier, and
+must not be used to hide a platform or to imply live warehouse results.
+
 ### Benchmark Claim Classes
 
 Public benchmark breadth claims fall into four classes:
