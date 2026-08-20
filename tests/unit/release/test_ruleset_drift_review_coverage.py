@@ -181,6 +181,19 @@ def test_tag_protection_satisfied_when_ref_is_all_tags():
     assert findings == []
 
 
+@pytest.mark.parametrize("pattern", ("refs/tags/v*", "refs/tags/*", "refs/tags/?*", "*"))
+def test_tag_glob_coverage_accepts_only_provable_full_language_containment(pattern: str):
+    assert _rre._tag_glob_covers(pattern)
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    ("refs/tags/*[v13tw]", "refs/tags/v?", "refs/tags/v*.*", "refs/tags/rc*"),
+)
+def test_tag_glob_coverage_rejects_sample_covering_or_narrow_patterns(pattern: str):
+    assert not _rre._tag_glob_covers(pattern)
+
+
 def test_tag_protection_flags_inactive_or_incomplete_tag_ruleset():
     # Present but not active.
     inactive = _rre.tag_protection_findings([_tag_ruleset(enforcement="evaluate")])

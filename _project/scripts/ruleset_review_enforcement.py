@@ -92,22 +92,54 @@ TAG_REF_PATTERN = "refs/tags/v*"
 def _tag_glob_covers(pattern: str) -> bool:
     """True if a ref-name glob ``pattern`` matches every ``refs/tags/v*`` ref.
 
-    GitHub's ``ref_name`` condition patterns are fnmatch-style globs, so
-    ``refs/tags/*`` covers (or negates, in an ``exclude``) ``refs/tags/v*``
-    just as fully as the literal pattern. Fnmatch-ing ``TAG_REF_PATTERN``
-    itself against ``pattern`` answers that without enumerating concrete tag
-    names: every character in ``refs/tags/v*`` is literal except the trailing
-    ``*``, so a pattern matches it here exactly when that pattern's own
-    wildcard structure would match any real ``refs/tags/vX...`` ref too.
+    Simulate the glob NFA over the literal ``refs/tags/v`` prefix. Coverage is
+    proven only when a reachable trailing ``*`` can consume every possible
+    suffix. Finite samples cannot establish that language containment.
     """
-    representative_refs = (
-        "refs/tags/v",
-        "refs/tags/v1",
-        "refs/tags/v1.2.3",
-        "refs/tags/vnext",
-        "refs/tags/vfeature/preview",
-    )
-    return all(fnmatch.fnmatchcase(ref, pattern) for ref in representative_refs)
+    tokens: list[str] = []
+    index = 0
+    while index < len(pattern):
+        if pattern[index] == "[":
+            closing = index + 1
+            if closing < len(pattern) and pattern[closing] == "!":
+                closing += 1
+            if closing < len(pattern) and pattern[closing] == "]":
+                closing += 1
+            while closing < len(pattern) and pattern[closing] != "]":
+                closing += 1
+            if closing < len(pattern):
+                tokens.append(pattern[index : closing + 1])
+                index = closing + 1
+                continue
+        token = pattern[index]
+        if token != "*" or not tokens or tokens[-1] != "*":
+            tokens.append(token)
+        index += 1
+
+    def closure(states: set[int]) -> set[int]:
+        expanded = set(states)
+        pending = list(states)
+        while pending:
+            state = pending.pop()
+            if state < len(tokens) and tokens[state] == "*" and state + 1 not in expanded:
+                expanded.add(state + 1)
+                pending.append(state + 1)
+        return expanded
+
+    states = closure({0})
+    for char in TAG_REF_PATTERN.removesuffix("*"):
+        following: set[int] = set()
+        for state in states:
+            if state >= len(tokens):
+                continue
+            token = tokens[state]
+            if token == "*":
+                following.add(state)
+            elif token == "?" or fnmatch.fnmatchcase(char, token):
+                following.add(state + 1)
+        states = closure(following)
+
+    return any(state < len(tokens) and all(token == "*" for token in tokens[state:]) for state in states)
 
 
 def tag_protection_findings(
@@ -135,13 +167,9 @@ def tag_protection_findings(
     not exact strings: an ``include`` of ``refs/tags/*`` covers ``refs/tags/v*``
     just as well as the literal pattern, and an ``exclude`` of ``refs/tags/*``
     negates that coverage even though it is not byte-identical to
-    ``TAG_REF_PATTERN``. Coverage is therefore tested by fnmatch-ing
-    ``TAG_REF_PATTERN`` itself against each candidate pattern (every character
-    in ``refs/tags/v*`` is literal except the trailing ``*``, so this exactly
-    answers "does this pattern's wildcard structure swallow the whole
-    refs/tags/v* domain" without enumerating concrete tag names). ``~ALL`` is
-    GitHub's literal sentinel for "every ref" and is matched by exact string,
-    not fnmatch.
+    ``TAG_REF_PATTERN``. Coverage is proven by glob-language containment, not
+    sampled ref names. ``~ALL`` is GitHub's literal sentinel for "every ref"
+    and is matched by exact string.
 
     NOTE on ``bypass_actors``: this predicate deliberately does NOT treat a
     non-empty bypass list as a structural failure. This TODO's must_preserve

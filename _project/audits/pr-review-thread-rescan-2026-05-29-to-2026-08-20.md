@@ -1,3 +1,7 @@
+---
+develop_sha: 1e8cc3dee48a4c345bb96df2e59f47cdbf6dde5f
+measured_at_sha: 1e8cc3dee48a4c345bb96df2e59f47cdbf6dde5f
+---
 # PR review thread rescan: 2026-05-29 to 2026-08-20
 
 - Sweep head: `1e8cc3dee48a4c345bb96df2e59f47cdbf6dde5f` (`origin/develop` at collection time)

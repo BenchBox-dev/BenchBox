@@ -63,8 +63,13 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
               .poll(() => card.evaluate((element) => getComputedStyle(element).opacity))
               .toBe("1");
             await expect
-              .poll(() => card.evaluate((element) => getComputedStyle(element).transform))
-              .toBe("none");
+              .poll(() =>
+                card.evaluate((element) => {
+                  const transform = getComputedStyle(element).transform;
+                  return transform === "none" || new DOMMatrixReadOnly(transform).isIdentity;
+                }),
+              )
+              .toBe(true);
           }
         }
       }
