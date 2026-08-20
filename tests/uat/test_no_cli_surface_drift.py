@@ -118,6 +118,19 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # fix-datafusion-df-mode-erasure: comment-only clarification of
     # PLATFORM_ALIASES' -df entries; no click surface in this module.
     "benchbox/cli/platform.py",
+    # fix/customer-facing-cli-url-and-help: dead docs.benchbox.dev URLs and
+    # Click \\b markers in command docstrings. No @click decorator, option,
+    # or function signature changed; the guard's decorator/signature snapshot
+    # stays equal. File-level allow is required because this test first diffs
+    # names under benchbox/cli/ against the allowlist.
+    "benchbox/cli/onboarding.py",
+    "benchbox/cli/commands/benchmarks.py",
+    "benchbox/cli/commands/config.py",
+    "benchbox/cli/commands/download_answers.py",
+    "benchbox/cli/commands/plan_history.py",
+    "benchbox/cli/commands/profile.py",
+    "benchbox/cli/commands/results.py",
+    "benchbox/cli/commands/shell.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # pr-review-followup-1394: SingleStore credential setup is intentionally
