@@ -81,7 +81,7 @@ Or use a custom configuration:
 
 ```bash
 # View available settings
-benchbox tuning show-defaults --platform polars
+benchbox tuning defaults --platform polars
 
 # Use custom tuning
 benchbox run --platform polars-df --benchmark tpch --tuning tuning.yaml

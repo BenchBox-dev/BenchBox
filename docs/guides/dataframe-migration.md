@@ -87,7 +87,7 @@ DataFrame platforms support performance tuning:
 
 ```bash
 # View platform defaults
-benchbox tuning show-defaults --platform polars
+benchbox tuning defaults --platform polars
 
 # Auto-detect optimal settings
 benchbox run --platform polars-df --benchmark tpch --tuning auto
@@ -112,7 +112,8 @@ settings:
 
 ### SQL Mode
 ```python
-from benchbox import DuckDBAdapter, TPCH
+from benchbox import TPCH
+from benchbox.platforms.duckdb import DuckDBAdapter
 
 adapter = DuckDBAdapter()
 benchmark = TPCH(scale_factor=0.1)
@@ -135,10 +136,10 @@ Run the same benchmark on both paradigms:
 
 ```bash
 # SQL execution
-benchbox run --platform duckdb --benchmark tpch --scale 1 -o sql_results.json
+benchbox run --platform duckdb --benchmark tpch --scale 1 --output sql_results.json
 
 # DataFrame execution
-benchbox run --platform polars-df --benchmark tpch --scale 1 -o df_results.json
+benchbox run --platform polars-df --benchmark tpch --scale 1 --output df_results.json
 
 # Compare results
 benchbox compare sql_results.json df_results.json

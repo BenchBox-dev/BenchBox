@@ -237,10 +237,10 @@ ORDER BY l_quantity * l_extendedprice * (1 - l_discount) * (1 + l_tax) DESC
 ### Usage Example
 
 ```python
-from benchbox.core.primitives.queries import PrimitivesQueryManager
+from benchbox.core.read_primitives.queries import ReadPrimitivesQueryManager
 
 # Initialize query manager
-query_manager = PrimitivesQueryManager()
+query_manager = ReadPrimitivesQueryManager()
 
 # Get all optimizer test queries
 optimizer_queries = [
