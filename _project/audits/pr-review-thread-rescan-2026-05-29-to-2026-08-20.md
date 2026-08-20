@@ -5,13 +5,13 @@
 - Window: 2026-05-29 through 2026-08-20, inclusive
 - Canonical inventory: 613 unmarked root review comments across 426 PRs
 - Thread state: 60 open threads (57 current, 3 outdated) and 553 resolved threads retained for phantom-resolution audit
-- Open-thread classification after current-tree revalidation: 25 fixed here, 22 already fixed, 1 deferred, 12 rejected
+- Open-thread classification after current-tree revalidation: 24 fixed here, 22 already fixed, 1 assigned to a concurrent remediation PR, 1 deferred, 12 rejected
 
 This audit records the evidence boundary for the remediation branch. Source-thread replies must link the durable remediation PR before the strict final rescan can report zero pending comments.
 
 ## Resolved By w1-wN
 
-The remediation branch fixes these 25 source threads:
+The remediation branch fixes these 24 source threads:
 
 | Source PR | Comment | Thread | Work unit |
 | --- | ---: | --- | --- |
@@ -39,7 +39,6 @@ The remediation branch fixes these 25 source threads:
 | #1777 | 3816023510 | `PRRT_kwDOQ7J64c6algfc` | w4 |
 | #1781 | 3821466178 | `PRRT_kwDOQ7J64c6aza5p` | w4 |
 | #1781 | 3821466184 | `PRRT_kwDOQ7J64c6aza5v` | w4 |
-| #1783 | 3823501314 | `PRRT_kwDOQ7J64c6a4q_Y` | w4 |
 
 Axis 3 also found and repaired two weakened tests that were not source review threads: the forced landing-page CSS state in public visual capture, and the same-output primitives concurrency test that accepted `IndexError`. Axis 5 repaired 27 stale verification rungs across 20 terminal items, amended seven known semantic false positives or exemplars, and added a bounded semantic linter.
 
@@ -50,6 +49,8 @@ Current-tree inspection showed that 22 reports were already fixed or superseded.
 `#824/3444628573`, `#913/3488713690`, `#955/3523676549`, `#1091/3558813972`, `#1096/3558989229`, `#1096/3558989240`, `#1496/3708544115`, `#1497/3708587044`, `#1500/3708628701`, `#1503/3708852791`, `#1511/3712138980`, `#1511/3712138985`, `#1515/3712300782`, `#1515/3712300793`, `#1521/3712417649`, `#1531/3712688244`, `#1538/3714375073`, `#1539/3714378345`, `#1541/3714424163`, `#1545/3714793143`, `#1545/3714793155`, `#1548/3714911966`.
 
 Twelve identity-only comments were rejected under `AGENTS.md` review policy because commit identity is not a PR defect: `#1339/3674924072`, `#1512/3712184847`, `#1514/3712244304`, `#1521/3712417657`, `#1522/3712465207`, `#1523/3712516100`, `#1524/3712560416`, `#1541/3714424167`, `#1545/3714793148`, `#1549/3714970667`, `#1552/3715414567`, and `#1553/3715752387`.
+
+PR #1783, comment 3823501314, thread `PRRT_kwDOQ7J64c6a4q_Y` is assigned to the already-open dedicated remediation PR #1792. This sweep does not duplicate its two-file change.
 
 ## Still Actionable
 
