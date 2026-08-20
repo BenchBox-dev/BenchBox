@@ -1,6 +1,7 @@
 # PR review thread rescan: 2026-05-29 to 2026-08-20
 
 - Sweep head: `1e8cc3dee48a4c345bb96df2e59f47cdbf6dde5f` (`origin/develop` at collection time)
+- Remediation PR: [#1797](https://github.com/joeharris76/BenchBox/pull/1797)
 - Merged-PR scope: latest 1,000 PRs merged to `develop`
 - Window: 2026-05-29 through 2026-08-20, inclusive
 - Canonical inventory: 613 unmarked root review comments across 426 PRs
