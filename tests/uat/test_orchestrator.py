@@ -637,10 +637,10 @@ def test_predictive_disk_floor_aborts_before_launching_oversized_known_cell(tmp_
         free_space_min_gib=3.0,
         budget_table={("duckdb", "tpch", 0.01): row},
         free_space_reader=lambda _path: 4.0,
-        # Pin the reuse probe: the default reads the real datagen cache under
-        # BENCHBOX_OUTPUT_DIR, so a developer machine holding tpch_sf001 would
-        # otherwise drop this row's datagen reserve and the guard would not fire.
-        datagen_cache_probe=lambda _source, _scale: False,
+        # No benchmark_runs_dir: the reuse probe has no root to resolve, so the
+        # datagen reserve stands and the guard fires. Machine state under
+        # BENCHBOX_OUTPUT_DIR cannot reach this test.
+        benchmark_runs_dir=None,
     )
 
     with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
@@ -674,8 +674,47 @@ def _passed_cell(platform: str, benchmark: str, scale: float, tmp_path: Path) ->
     )
 
 
-def test_failed_cell_does_not_mark_its_datagen_source_available(tmp_path: Path):
-    """A cell that died before generating data must not zero the next cell's datagen reserve."""
+def _complete_datagen(runs_dir: Path, benchmark: str, scale: float) -> Path:
+    """Materialize a finished datagen cache the way a generator leaves one."""
+    path = orchestrator._cell_datagen_dir(runs_dir, benchmark, scale)
+    assert path is not None
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "lineitem.tbl").write_text("data")
+    (path / "_datagen_manifest.json").write_text("{}")
+    return path
+
+
+def test_cell_datagen_dir_matches_the_cells_own_output_resolution(tmp_path: Path):
+    """UAT passes --output <runs>/datagen, which normalizes by REQUESTED benchmark.
+
+    A custom --output takes precedence over DATA_SOURCE_BENCHMARK sharing, so
+    read_primitives does not land in tpch's directory here even though it
+    consumes TPC-H data through the CLI's shared-root path.
+    """
+    tpch = orchestrator._cell_datagen_dir(tmp_path, "tpch", 0.01)
+    alias = orchestrator._cell_datagen_dir(tmp_path, "read_primitives", 0.01)
+
+    assert tpch == tmp_path / "datagen" / "tpch_sf001"
+    assert alias == tmp_path / "datagen" / "read_primitives_sf001"
+    assert tpch != alias
+    assert orchestrator._cell_datagen_dir(None, "tpch", 0.01) is None
+
+
+def test_partial_datagen_cache_does_not_drop_the_reserve(tmp_path: Path):
+    """A directory populated but missing its manifest is an unfinished generation."""
+    partial = orchestrator._cell_datagen_dir(tmp_path, "tpch", 0.01)
+    assert partial is not None
+    partial.mkdir(parents=True)
+    (partial / "lineitem.tbl.1").write_text("partial")
+
+    assert orchestrator._datagen_cache_complete(partial) is False
+
+    (partial / "_datagen_manifest.json").write_text("{}")
+    assert orchestrator._datagen_cache_complete(partial) is True
+
+
+def test_failed_cell_does_not_mark_its_datagen_available(tmp_path: Path):
+    """A cell that died before finishing generation must not zero the next reserve."""
     cells = [
         CellResult(
             platform="duckdb",
@@ -709,21 +748,21 @@ def test_failed_cell_does_not_mark_its_datagen_source_available(tmp_path: Path):
             ("clickhouse", "tpch", 0.01): _datagen_budget_row("tpch"),
         },
         free_space_reader=free_space,
-        datagen_cache_probe=lambda _source, _scale: False,
+        benchmark_runs_dir=tmp_path,
     )
 
     runner("duckdb", "tpch", 0.01, log_dir=tmp_path)
 
-    # The second cell sees 2.5 GiB free. Reserving the datagen it still has to
-    # generate needs 2.0 + 1.0 floor and must be refused; dropping that reserve
-    # because a failed cell "covered" the source would need only the 1.0 floor
-    # and would let the cell through.
+    # The failed cell left no manifest, so the second cell must still reserve
+    # 2.0 datagen + 1.0 floor against 2.5 GiB free and be refused. Treating the
+    # dead cell as having produced the dataset would need only the floor.
     with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
         runner("clickhouse", "tpch", 0.01, log_dir=tmp_path)
 
 
 def test_existing_datagen_cache_is_not_reserved_again(tmp_path: Path):
-    """A rerun over datasets already on disk must not reserve growth it will not create."""
+    """A rerun over a finished dataset must not reserve growth it will not create."""
+    _complete_datagen(tmp_path, "tpch", 0.01)
 
     def base_runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
         return _passed_cell(platform, benchmark, scale, tmp_path)
@@ -736,21 +775,21 @@ def test_existing_datagen_cache_is_not_reserved_again(tmp_path: Path):
         free_space_min_gib=1.0,
         budget_table={("duckdb", "tpch", 0.01): _datagen_budget_row("tpch")},
         free_space_reader=lambda _path: 1.5,
-        datagen_cache_probe=lambda source, scale: (source, scale) == ("tpch", 0.01),
+        benchmark_runs_dir=tmp_path,
     )
 
     # 1.5 GiB free is under the 2.0 datagen reserve but over the 1.0 floor: the
-    # cell is refused only if the existing cache is counted as new growth.
+    # cell is refused unless the finished cache is recognised.
     assert runner("duckdb", "tpch", 0.01, log_dir=tmp_path).status == "passed"
 
 
-def test_alias_benchmark_reuses_its_canonical_datagen_source(tmp_path: Path):
-    """read_primitives consumes tpch datagen, so the second cell must not re-reserve it."""
-    probed: list[tuple[str, float]] = []
+def test_alias_workload_keeps_its_own_datagen_reserve(tmp_path: Path):
+    """tpch data on disk must not zero read_primitives' reserve under --output.
 
-    def probe(source: str, scale: float) -> bool:
-        probed.append((source, scale))
-        return False
+    The two land in separate directories during a sweep, so the alias cell has
+    its own generation still to do.
+    """
+    _complete_datagen(tmp_path, "tpch", 0.01)
 
     def base_runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
         return _passed_cell(platform, benchmark, scale, tmp_path)
@@ -765,24 +804,45 @@ def test_alias_benchmark_reuses_its_canonical_datagen_source(tmp_path: Path):
             ("duckdb", "tpch", 0.01): _datagen_budget_row("tpch"),
             ("duckdb", "read_primitives", 0.01): _datagen_budget_row("read_primitives"),
         },
-        free_space_reader=lambda _path: 3.5,
-        datagen_cache_probe=probe,
+        free_space_reader=lambda _path: 1.5,
+        benchmark_runs_dir=tmp_path,
     )
 
-    runner("duckdb", "tpch", 0.01, log_dir=tmp_path)
-    assert probed[0] == ("tpch", 0.01)
+    # tpch reuses its finished cache and passes on 1.5 GiB.
+    assert runner("duckdb", "tpch", 0.01, log_dir=tmp_path).status == "passed"
 
-    # The tpch cell generated the shared dataset; read_primitives resolves to
-    # the same source, so its datagen term is already covered.
-    assert runner("duckdb", "read_primitives", 0.01, log_dir=tmp_path).status == "passed"
-    assert all(source == "tpch" for source, _scale in probed)
+    # read_primitives writes elsewhere, so its 2.0 GiB datagen reserve stands.
+    with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
+        runner("duckdb", "read_primitives", 0.01, log_dir=tmp_path)
 
 
-def test_canonical_datagen_source_resolves_registry_aliases():
-    assert orchestrator._canonical_datagen_source("tpch") == "tpch"
-    assert orchestrator._canonical_datagen_source("read_primitives") == "tpch"
-    assert orchestrator._canonical_datagen_source("tpcds_obt") == "tpcds"
-    assert orchestrator._canonical_datagen_source("not-a-registered-benchmark") == "not-a-registered-benchmark"
+def test_datagen_probe_uses_the_sweeps_configured_root(tmp_path: Path):
+    """The probe must read the sweep's root, not an ambient default."""
+    configured = tmp_path / "configured"
+    unrelated = tmp_path / "unrelated"
+    _complete_datagen(unrelated, "tpch", 0.01)
+
+    def base_runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
+        return _passed_cell(platform, benchmark, scale, tmp_path)
+
+    runner = orchestrator._build_disk_floor_runner(
+        base_runner,
+        attempted_cells=[],
+        watch_disk_floor=True,
+        free_space_path=tmp_path,
+        free_space_min_gib=1.0,
+        budget_table={("duckdb", "tpch", 0.01): _datagen_budget_row("tpch")},
+        free_space_reader=lambda _path: 1.5,
+        benchmark_runs_dir=configured,
+    )
+
+    # The cache under the unrelated root must not suppress the reserve for the
+    # empty configured root.
+    with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
+        runner("duckdb", "tpch", 0.01, log_dir=tmp_path)
+
+    _complete_datagen(configured, "tpch", 0.01)
+    assert runner("duckdb", "tpch", 0.01, log_dir=tmp_path).status == "passed"
 
 
 def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
