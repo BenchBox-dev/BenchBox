@@ -115,7 +115,7 @@ def test_collection_and_shard_manifests_conserve_node_ids(tmp_path: Path):
     assert sorted(assigned) == sorted(nodeids.read_text(encoding="utf-8").splitlines())
 
 
-def test_release_canary_workflow_uses_collection_artifact_and_four_single_threaded_shards():
+def test_release_canary_workflow_uses_collection_artifact_and_six_single_threaded_shards():
     workflow = _workflow()
     jobs = workflow["jobs"]
 
@@ -139,8 +139,10 @@ def test_release_canary_workflow_uses_collection_artifact_and_four_single_thread
     shards = jobs["credential-free-non-fast"]
     assert shards["needs"] == ["collect-credential-free-non-fast"]
     assert shards["strategy"]["fail-fast"] is False
-    assert [entry["shard_index"] for entry in shards["strategy"]["matrix"]["include"]] == [0, 1, 2, 3]
-    assert shards["timeout-minutes"] == 45
+    assert [entry["shard_index"] for entry in shards["strategy"]["matrix"]["include"]] == [0, 1, 2, 3, 4, 5]
+    assert shards["timeout-minutes"] == 75
+    assert shards["strategy"]["matrix"]["include"][-1]["shard_number"] == DEFAULT_SHARD_COUNT
+    assert workflow["env"]["RELEASE_CANARY_SHARD_COUNT"] == DEFAULT_SHARD_COUNT
     shard_text = _run_text("credential-free-non-fast")
     assert shard_text.count(f'-m "{MARKER_EXPRESSION}"') == 1
     assert "actions/download-artifact@v4" in "\n".join(str(step) for step in shards["steps"])
