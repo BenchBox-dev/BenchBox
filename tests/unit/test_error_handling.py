@@ -348,38 +348,13 @@ class TestFileSystemEdgeCases:
         for thread in threads:
             thread.join()
 
-        # Check results - some may succeed, some may fail with file conflicts
-        for _i, result in results.items():
-            if isinstance(result, Exception):
-                # File conflicts are expected and acceptable, as is RuntimeError
-                # for missing native binaries in environments without TPC tools.
-                # TimeoutError can occur on lock acquisition timeout.
-                # ValueError/KeyError can occur due to concurrent data access races.
-                # BlockingIOError can occur on non-blocking I/O systems.
-                # csv.Error can occur when concurrent writes corrupt CSV being read.
-                # IndexError can occur when one thread's concurrent write shrinks or
-                # reorders a shared shard/file listing after another thread already
-                # captured a position into it (observed live on develop-post-merge
-                # run 28766624010: "list index out of range").
-                import csv
-
-                assert isinstance(
-                    result,
-                    (
-                        OSError,
-                        PermissionError,
-                        FileExistsError,
-                        RuntimeError,
-                        TimeoutError,
-                        ValueError,
-                        KeyError,
-                        BlockingIOError,
-                        IndexError,
-                        csv.Error,
-                    ),
-                )
-            else:
-                assert isinstance(result, (dict, list))
+        assert len(results) == 3
+        for result in results.values():
+            assert isinstance(result, (dict, list)), result
+            assert result
+            paths = result.values() if isinstance(result, dict) else result
+            for path in paths:
+                assert Path(path).is_file()
 
     @pytest.mark.skipif(IS_WINDOWS, reason="chmod doesn't enforce permissions on Windows")
     def test_readonly_filesystem_handling(self, temp_dir):

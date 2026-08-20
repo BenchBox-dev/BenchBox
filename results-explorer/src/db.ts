@@ -56,6 +56,25 @@ let initError: Error | null = null;
 
 type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
 
+async function createCspBoundWorker(workerPath: string): Promise<Worker> {
+  const workerUrl = new URL(workerPath, window.location.href);
+  if (workerUrl.origin !== window.location.origin) {
+    throw new Error(`DuckDB worker must be same-origin: ${workerUrl.origin}`);
+  }
+  const response = await fetch(workerUrl);
+  if (!response.ok) {
+    throw new Error(`DuckDB worker fetch failed: HTTP ${response.status}`);
+  }
+  const blobUrl = URL.createObjectURL(await response.blob());
+  const worker = new Worker(blobUrl);
+  const revokeBlobUrl = () => {
+    URL.revokeObjectURL(blobUrl);
+  };
+  worker.addEventListener("message", revokeBlobUrl, { once: true });
+  worker.addEventListener("error", revokeBlobUrl, { once: true });
+  return worker;
+}
+
 // Keep this value aligned with
 // `_project/scripts/explorer_pipeline/contract.py::EXPLORER_READ_MODEL_VERSION`.
 // `results-explorer/src/lib/__tests__/db-remediation-pin.test.ts` pins the
@@ -359,10 +378,14 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
   initPromise = (async () => {
     markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.DB_INIT_START, { once: true });
     const bundle = await duckdb.selectBundle(LOCAL_DUCKDB_BUNDLES);
-    const worker = new Worker(bundle.mainWorker!);
+    const worker = await createCspBoundWorker(bundle.mainWorker!);
     const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING);
     const db = new duckdb.AsyncDuckDB(logger, worker);
-    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    const mainModule = new URL(bundle.mainModule, window.location.href).href;
+    const pthreadWorker = bundle.pthreadWorker
+      ? new URL(bundle.pthreadWorker, window.location.href).href
+      : undefined;
+    await db.instantiate(mainModule, pthreadWorker);
 
     const dbUrl = new URL("/results/data/results.duckdb", window.location.origin).href;
     // directIO=true signals to DuckDB-WASM's HTTP runtime that this file
@@ -383,6 +406,8 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
     try {
       await conn.query("ATTACH 'results.duckdb' AS bench (READ_ONLY)");
       await validateAttachedSnapshot(conn);
+      await conn.query("SET enable_external_access = false");
+      await conn.query("SET lock_configuration = true");
     } finally {
       await conn.close();
     }

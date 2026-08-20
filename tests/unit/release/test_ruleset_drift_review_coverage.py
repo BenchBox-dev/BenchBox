@@ -320,6 +320,13 @@ def test_tag_protection_include_covers_via_broader_fnmatch_glob():
     assert findings == []
 
 
+@pytest.mark.parametrize("pattern", ["refs/tags/v?", "refs/tags/v[0-9]*", "refs/tags/v?*"])
+def test_tag_protection_rejects_globs_that_do_not_cover_the_full_v_domain(pattern: str):
+    findings = _rre.tag_protection_findings([_tag_ruleset(include=(pattern,))])
+
+    assert findings and "does not cover refs/tags/v*" in findings[0]
+
+
 def test_tag_protection_flags_exclude_that_negates_v_coverage_via_broader_glob():
     # The bug this regression pins: a prior exact-string exclude check missed
     # a broader-but-still-covering exclude glob like refs/tags/* (as opposed
@@ -382,6 +389,16 @@ def test_tag_creation_findings_empty_when_ruleset_present_and_no_bypass_gap():
     findings = tag_creation_findings(all_live)
     # A non-empty bypass list is an advisory, not a failure -- still non-blocking.
     assert blocking_findings(findings) == []
+
+
+def test_tag_creation_findings_require_visible_bypass_actors_when_requested():
+    findings = tag_creation_findings(
+        [_tag_ruleset()],
+        require_bypass_actor_visibility=True,
+    )
+
+    assert findings and blocking_findings(findings) == findings
+    assert "not visible" in findings[0]
 
 
 def test_tag_creation_findings_can_be_switched_to_blocking_explicitly():

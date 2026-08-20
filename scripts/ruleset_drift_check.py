@@ -275,6 +275,7 @@ def tag_creation_findings(
     all_live_rulesets: list[dict[str, Any]],
     *,
     enforce_tag_rule: bool = TAG_RULESET_ENFORCED,
+    require_bypass_actor_visibility: bool = False,
 ) -> list[str]:
     """Findings for the ``v*`` tag-creation ruleset (release-flow hardening).
 
@@ -292,7 +293,10 @@ def tag_creation_findings(
     fixture that must retain the former warning-only behavior.
     """
     findings: list[str] = []
-    protection_findings = tag_protection_findings(all_live_rulesets)
+    protection_findings = tag_protection_findings(
+        all_live_rulesets,
+        require_bypass_actor_visibility=require_bypass_actor_visibility,
+    )
     if protection_findings:
         if enforce_tag_rule:
             findings.extend(protection_findings)
@@ -405,7 +409,12 @@ def main(argv: list[str] | None = None) -> int:
                 require_bypass_actor_visibility=args.require_bypass_actor_visibility,
             )
         )
-    findings.extend(tag_creation_findings(list(live_by_name.values())))
+    findings.extend(
+        tag_creation_findings(
+            list(live_by_name.values()),
+            require_bypass_actor_visibility=args.require_bypass_actor_visibility,
+        )
+    )
     findings.extend(environment_protection_findings(live_pypi_environment))
 
     blocking = blocking_findings(findings)

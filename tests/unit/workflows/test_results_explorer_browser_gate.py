@@ -195,10 +195,8 @@ def test_chromium_runs_the_full_suite_entrypoint(workflow: dict[str, Any]) -> No
     bare `playwright test` would quietly drop the cold-load regression guard.
     """
     steps = workflow["jobs"][CHROMIUM_JOB]["steps"]
-    run_commands = [step.get("run", "") for step in steps]
-    assert any("test:e2e:chromium" in command for command in run_commands), (
-        "Chromium job no longer runs the npm test:e2e:chromium entrypoint"
-    )
+    run_lines = {line.strip() for step in steps for line in step.get("run", "").splitlines() if line.strip()}
+    assert "npm run test:e2e:chromium" in run_lines, "Chromium job no longer runs the npm test:e2e:chromium entrypoint"
 
 
 def test_chromium_typechecks_e2e_harness_before_playwright(workflow: dict[str, Any]) -> None:

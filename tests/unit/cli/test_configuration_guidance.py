@@ -22,7 +22,6 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
             "benchbox/platforms/starburst.py",
             ("--platform-option host=", "--platform-option username=", "--platform-option password="),
         ),
-        ("benchbox/platforms/clickhouse_server.py", ("--platform-option host=", "--platform-option port=")),
         (
             "benchbox/platforms/presto_trino_adapter_base.py",
             ("--platform-option host=<host>", "--platform-option port=<port>"),
@@ -43,6 +42,10 @@ def test_connection_guidance_does_not_advertise_unregistered_platform_options(
     [
         ("fabric_dw", "warehouse", "example-warehouse"),
         ("clickhouse-cloud", "host", "example.us-east-2.aws.clickhouse.cloud"),
+        ("clickhouse-server", "host", "clickhouse.example.com"),
+        ("clickhouse-server", "port", "9000"),
+        ("clickhouse-server", "username", "benchbox"),
+        ("clickhouse-server", "password", "fixture-secret"),
     ],
 )
 def test_advertised_connection_options_are_accepted_by_the_cli(

@@ -25,16 +25,12 @@ SOUNDNESS_PREFIXES = (
     # ValidationService / DataValidator) and the plan-capture pipeline
     # (get_query_plan_parser, capture_query_plan) that feeds
     # benchbox/core/query_plans/parsers/ live in this single file.
-    "benchbox/platforms/base/result_capture.py",
     # benchbox/sql_compat/ as a whole is high-churn (routine per-platform
     # DDL/query-rewrite rule additions), so only its rule-dispatch core is
     # in scope, not the whole tree -- see soundness-surface-widening's
     # decision. These three files decide WHICH rewrite rules apply to a
     # given query/platform; a bug here silently changes what SQL actually
     # executes without touching the comparator itself.
-    "benchbox/sql_compat/resolver.py",
-    "benchbox/sql_compat/decision.py",
-    "benchbox/sql_compat/rules/_registration.py",
     # Publication privacy. This is a deliberate widening beyond "what defines a
     # correct result": the anonymizer decides every byte that leaves the
     # project and the public pseudonym identity that groups results by machine.
@@ -48,8 +44,6 @@ SOUNDNESS_PREFIXES = (
     # soundness alone. anonymization_specs.yaml is listed with it because it
     # DEFINES which keys get hashed -- dropping one entry there silently stops
     # anonymizing that field, with no code change to review.
-    "benchbox/core/results/anonymization.py",
-    "benchbox/core/results/anonymization_specs.yaml",
     # Self-protection: the review-gate machinery itself. The in-workflow
     # base-ref execution + self-touch override in auto-merge-on-open.yml is
     # best-effort only for same-repo PRs (GitHub runs the PR's OWN copy of a
@@ -71,6 +65,14 @@ SOUNDNESS_PREFIXES = (
     # required-check contract it feeds (ci-required-result) is pinned by the
     # develop ruleset + the daily ruleset-drift canary rather than by owner
     # review -- see soundness-surface-widening's recorded decision.
+)
+SOUNDNESS_FILES = (
+    "benchbox/platforms/base/result_capture.py",
+    "benchbox/sql_compat/resolver.py",
+    "benchbox/sql_compat/decision.py",
+    "benchbox/sql_compat/rules/_registration.py",
+    "benchbox/core/results/anonymization.py",
+    "benchbox/core/results/anonymization_specs.yaml",
     "_project/scripts/auto_merge_soundness_paths.py",
     ".github/workflows/auto-merge-on-open.yml",
     ".github/workflows/release.yml",
@@ -88,7 +90,11 @@ def is_soundness_path(path: str) -> bool:
     normalized = normalize_path(path)
     if not normalized:
         return False
-    return _VALIDATION_RE.match(normalized) is not None or normalized.startswith(SOUNDNESS_PREFIXES)
+    return (
+        _VALIDATION_RE.match(normalized) is not None
+        or normalized in SOUNDNESS_FILES
+        or normalized.startswith(SOUNDNESS_PREFIXES)
+    )
 
 
 def any_soundness_path(paths: Iterable[str]) -> bool:

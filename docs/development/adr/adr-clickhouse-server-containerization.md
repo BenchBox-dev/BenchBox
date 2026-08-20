@@ -135,21 +135,23 @@ contract, not the byte count on any given day. Read that field as history.
 
 ## Follow-up ownership
 
-Two follow-ups are open. **Neither is filed in the hosted tracker**, because
-`todo doctor` fails `E_AUTH_MISSING` and no `TODO_DB_*` credential is present on
-this host. Recording them here is the only durable record; file them when
-credentials are restored.
+Two follow-ups remain. Findings are captured locally first and discovered with
+`_project/scripts/todo finding candidates`; hosted synchronization is a
+separately authorized tracker action.
 
-**Per-query `max_memory_usage` equals the container limit.** It defaults to
-`"8GB"` in `benchbox/platforms/clickhouse/setup.py:33`, matching
-`clickhouse_memory_limit` in `tests/uat/config.py:122`, so a single query may
-claim the entire cgroup with nothing left for merges, caches, or page cache. The
-two values are configured independently and do not track each other. Whether
-this is a defect or an intentional ceiling is undecided. Draft at
-`~/.todo-db/finding-drafts/benchbox/clickhouse-per-query-memory-equals-container-limit-2026-08-19.md`;
-rename with the `.merged-to-todo` suffix once filed. It is a candidate lever if
-the goal ever becomes lowering the admission bar rather than satisfying it, but
-it must not be used to unblock SF1 on an unqualified host.
+**Per-query `max_memory_usage` exceeds the decimal container request.** The
+query default `"8GB"` is parsed as 8 × 1024³ bytes, while the compose request
+`"8g"` is parsed as 8 × 1000³ bytes. The query cap is therefore about 7.4%
+larger than the cgroup request, so the cgroup can kill the process before
+ClickHouse reaches its configured query ceiling. The values are also configured
+independently. Whether to lower the query cap is undecided; it is a candidate
+lever only after a qualified Linux trace, not a way to certify SF1 on macOS.
+
+Capture the finding as
+`~/.benchbox/finding-drafts/YYYY-MM-DD-HHMMSS-clickhouse-per-query-memory-exceeds-container-limit.md`.
+`_project/scripts/todo finding candidates` discovers local drafts. A separately
+authorized `_project/scripts/todo finding sync` owns hosted disposition and
+lifecycle; do not rename the immutable timestamp-first finding id.
 
 **No gate enforces the Linux requirement.** Making it real means a platform
 check in the UAT admission path that fails SF1 certification on darwin

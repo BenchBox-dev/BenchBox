@@ -840,6 +840,26 @@ class TestResultExporter:
         assert query_comparisons["2"]["improved"] is False
         assert query_comparisons["2"]["change_percent"] == 25.0  # 2500 vs 2000 = +25%
 
+    def test_compare_results_anonymizes_source_paths(self):
+        baseline_result = self.create_cli_result()
+        baseline_path = self.exporter.export_result(baseline_result, formats=["json"])["json"]
+        current_result = self.create_cli_result()
+        current_result.execution_id = "exec_private_current"
+        current_path = self.exporter.export_result(current_result, formats=["json"])["json"]
+
+        anonymous = ResultExporter(output_dir=Path(self.temp_dir), anonymize=True).compare_results(
+            baseline_path, current_path
+        )
+        private_root = str(Path(self.temp_dir))
+
+        assert anonymous["baseline_file"] == baseline_path.name
+        assert anonymous["current_file"] == current_path.name
+        assert private_root not in json.dumps(anonymous)
+
+        local = self.exporter.compare_results(baseline_path, current_path)
+        assert local["baseline_file"] == str(baseline_path)
+        assert local["current_file"] == str(current_path)
+
     def test_compare_results_file_not_found(self):
         """Test comparison with non-existent files."""
         non_existent1 = Path(self.temp_dir) / "baseline.json"

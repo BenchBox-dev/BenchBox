@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from click import Option
+
+from benchbox.cli.commands.run import run as cli_run
 
 pytestmark = [
     pytest.mark.unit,
@@ -69,41 +72,41 @@ EXPECTED_RUN_PARAMS = {
     "platform_options": {"type": "object or null", "required": False, "default": None},
 }
 
-OMITTED_CLI_OPTIONS = {
-    "--benchmark-option": "benchmark_option",
-    "--compression": "compression",
-    "--force": "force",
-    "--global-cache": "global_cache",
-    "--iterations": "iterations",
-    "--non-interactive": "non_interactive",
-    "--no-monitoring": "no_monitoring",
-    "--no-progress": "no_progress",
-    "--show-plans": "show_plans",
-    "--normalize-plan-literals": "normalize_plan_literals",
-    "--official": "official",
-    "--output": "output",
-    "--platform-option": "platform_option",
-    "--plan-config": "plan_config",
-    "--presort": "presort",
-    "--publish": "publish",
-    "--publish-label": "publish_label",
-    "--publish-target": "publish_target",
-    "--quiet": "quiet",
-    "--seed": "seed",
-    "--table-format": "table_format",
-    "--table-mode": "table_mode",
-    "--stats-per-table-timing": "stats_per_table_timing",
-    "--analyze-plans": "analyze_plans",
-    "--stats-reset": "stats_reset",
-    "--concurrency": "concurrency",
-    "--strict-translation": "strict_translation",
-    "--ignore-memory-warnings": "ignore_memory_warnings",
-    "--funding": "funding",
-    "--result-source": "result_source",
-    "--tuning": "tuning",
-    "--validation": "validation",
-    "--verbose": "verbose",
+MCP_TO_CLI_OPTIONS = {
+    "platform": "--platform",
+    "benchmark": "--benchmark",
+    "scale_factor": "--scale",
+    "queries": "--queries",
+    "phases": "--phases",
+    "mode": "--mode",
+    "capture_plans": "--capture-plans",
+    "dry_run": "--dry-run",
+    "validate_only": None,
+    "platform_options": "--platform-option",
 }
+PARTIAL_CLI_SURFACES = {"--platform-option"}
+
+
+def _actual_cli_options() -> set[str]:
+    return {
+        option
+        for param in cli_run.params
+        if isinstance(param, Option)
+        for option in param.opts
+        if option.startswith("--")
+    }
+
+
+def _omitted_cli_surfaces() -> set[str]:
+    omitted = _actual_cli_options() - {option for option in MCP_TO_CLI_OPTIONS.values() if option is not None}
+    omitted.update(PARTIAL_CLI_SURFACES)
+    omitted.difference_update({"--help", "--help-topic"})
+    sorted_ingestion = {"--sorted-ingestion-mode", "--sorted-ingestion-method"}
+    if sorted_ingestion <= omitted:
+        omitted.difference_update(sorted_ingestion)
+        omitted.add("--sorted-ingestion-*")
+    return omitted
+
 
 # Ratified tier reasons from
 # docs/development/adr/adr-one-engine-scoped-surfaces.md. Every ledgered
@@ -116,7 +119,7 @@ RATIFIED_OMISSION_TIERS = {
 
 # The ledger covers every omitted `benchbox run` option plus the grouped
 # sorted-ingestion family, which has no single flag spelling.
-LEDGERED_CLI_SURFACES = set(OMITTED_CLI_OPTIONS) | {"--sorted-ingestion-*"}
+LEDGERED_CLI_SURFACES = _omitted_cli_surfaces()
 
 EXPECTED_OMISSION_TIERS = {
     "--benchmark-option": "security-scoped",
@@ -598,10 +601,9 @@ class TestMCPDocsContract:
         schema = _registered_tools()["run_benchmark"].input_schema
         text = _doc_text()
 
-        assert not (set(schema["properties"]) & set(OMITTED_CLI_OPTIONS.values()))
-        for option in OMITTED_CLI_OPTIONS:
+        assert set(schema["properties"]) == set(MCP_TO_CLI_OPTIONS)
+        for option in LEDGERED_CLI_SURFACES:
             assert option in text
-        assert "--sorted-ingestion-*" in text
 
     def test_omission_ledger_covers_every_omitted_cli_surface(self):
         ledger = _omission_ledger(_doc_text())

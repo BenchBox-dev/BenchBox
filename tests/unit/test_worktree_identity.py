@@ -118,6 +118,38 @@ def test_refuses_agent_global_identity(fixture_repo) -> None:
     assert written.stdout.strip() != AGENT_EMAIL
 
 
+@pytest.mark.parametrize("conditional", [False, True])
+def test_reads_identity_from_global_includes(fixture_repo, conditional: bool) -> None:
+    primary, linked, home = fixture_repo
+    included = home / "identity.inc"
+    included.write_text(
+        f"[user]\n\tname = {HUMAN_NAME}\n\temail = {HUMAN_EMAIL}\n",
+        encoding="utf-8",
+    )
+    section = '[includeIf "onbranch:work"]' if conditional else "[include]"
+    (home / ".gitconfig").write_text(f"{section}\n\tpath = {included}\n", encoding="utf-8")
+
+    result = _run_helper(linked, home)
+
+    assert result.returncode == 0, result.stderr
+    assert _resolved_email(linked) == HUMAN_EMAIL
+
+
+def test_refuses_agent_identity_from_global_include(fixture_repo) -> None:
+    primary, linked, home = fixture_repo
+    included = home / "identity.inc"
+    included.write_text(
+        f"[user]\n\tname = {AGENT_NAME}\n\temail = {AGENT_EMAIL}\n",
+        encoding="utf-8",
+    )
+    (home / ".gitconfig").write_text(f"[include]\n\tpath = {included}\n", encoding="utf-8")
+
+    result = _run_helper(linked, home)
+
+    assert result.returncode != 0
+    assert "known" in result.stderr.lower() and "agent" in result.stderr.lower()
+
+
 def test_refuses_when_no_global_identity_exists(fixture_repo) -> None:
     """Nothing human to pin means there is nothing safe to write."""
     primary, linked, home = fixture_repo

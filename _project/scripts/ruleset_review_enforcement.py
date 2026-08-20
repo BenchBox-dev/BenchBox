@@ -22,13 +22,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from auto_merge_soundness_paths import SOUNDNESS_PREFIXES
+from auto_merge_soundness_paths import SOUNDNESS_FILES, SOUNDNESS_PREFIXES
 
 # Human-readable globs for the CODEOWNERS-owned soundness surface, derived from
 # the shared predicate so this narration cannot drift from auto-merge gating.
-SOUNDNESS_PATH_GLOBS: tuple[str, ...] = tuple(
-    f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES
-) + ("benchbox/core/**/validation.py",)
+SOUNDNESS_PATH_GLOBS: tuple[str, ...] = (
+    tuple(f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES)
+    + SOUNDNESS_FILES
+    + ("benchbox/core/**/validation.py",)
+)
 
 
 def extract_rules(payload: Any) -> list[dict[str, Any]]:
@@ -98,10 +100,19 @@ def _tag_glob_covers(pattern: str) -> bool:
     ``*``, so a pattern matches it here exactly when that pattern's own
     wildcard structure would match any real ``refs/tags/vX...`` ref too.
     """
-    return fnmatch.fnmatchcase(TAG_REF_PATTERN, pattern)
+    representative_refs = (
+        "refs/tags/v",
+        "refs/tags/v1",
+        "refs/tags/v1.2.3",
+        "refs/tags/vnext",
+        "refs/tags/vfeature/preview",
+    )
+    return all(fnmatch.fnmatchcase(ref, pattern) for ref in representative_refs)
 
 
-def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
+def tag_protection_findings(
+    rulesets: list[dict[str, Any]], *, require_bypass_actor_visibility: bool = False
+) -> list[str]:
     """Reasons the live rulesets fail to restrict ``v*`` tag *creation*.
 
     Empty list == at least one ACTIVE ruleset with ``target == "tag"`` whose
@@ -174,7 +185,9 @@ def tag_protection_findings(rulesets: list[dict[str, Any]]) -> list[str]:
         rule_types = {rule.get("type") for rule in ruleset.get("rules") or [] if isinstance(rule, dict)}
         if "creation" not in rule_types:
             issues.append("no 'creation' rule")
-        if ruleset.get("bypass_actors") == []:
+        if require_bypass_actor_visibility and "bypass_actors" not in ruleset:
+            issues.append("bypass actors are not visible to this token")
+        elif ruleset.get("bypass_actors") == []:
             issues.append(
                 "bypass_actors is empty -- `make release-finalize`'s `git push origin "
                 "v$(VERSION)` would be blocked with no exception for the release-finalize "

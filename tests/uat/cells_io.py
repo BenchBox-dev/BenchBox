@@ -392,10 +392,15 @@ def coerce_accounting_count(value: object, default: int = 0) -> int:
     `make uat-report`; it falls back to ``default`` like an absent sidecar
     would, rather than propagating ``int()``'s ``TypeError``/``ValueError``.
     """
+    return coerce_accounting_count_with_validity(value, default)[0]
+
+
+def coerce_accounting_count_with_validity(value: object, default: int = 0) -> tuple[int, bool]:
+    """Return a coerced count and whether the source value was valid."""
     try:
-        return int(value)  # type: ignore[arg-type]
+        return int(value), True  # type: ignore[arg-type]
     except (TypeError, ValueError):
-        return default
+        return default, False
 
 
 def read_skipped_unreachable_sidecar(cells_jsonl: Path) -> tuple[int, bool]:

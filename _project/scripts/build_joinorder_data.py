@@ -3200,6 +3200,26 @@ def _require_canonical_parquet(parquet_dir: Path) -> None:
         raise JoinOrderBuildError(f"Canonical Parquet directory {parquet_dir} is missing tables: {', '.join(missing)}")
 
 
+def _verify_canonical_parquet_hashes(parquet_dir: Path) -> None:
+    with runtime_manifest_path().open("rb") as handle:
+        manifest = tomllib.load(handle)
+    declared = {
+        str(entry.get("name")): (str(entry.get("file")), str(entry.get("sha256")))
+        for entry in manifest.get("tables", [])
+        if isinstance(entry, dict)
+    }
+    for table in TABLE_NAMES:
+        if table not in declared:
+            raise JoinOrderBuildError(f"Runtime manifest has no canonical hash for table {table}")
+        filename, expected_hash = declared[table]
+        path = parquet_dir / filename
+        actual_hash = sha256_file(path)
+        if actual_hash != expected_hash:
+            raise JoinOrderBuildError(
+                f"Canonical Parquet hash mismatch for {table}: expected {expected_hash}, got {actual_hash}"
+            )
+
+
 def resolve_canonical_parquet_dir(data_dir: str | None) -> Path:
     """Return a directory of sha256-verified canonical Parquet files.
 
@@ -3212,6 +3232,7 @@ def resolve_canonical_parquet_dir(data_dir: str | None) -> Path:
     if data_dir:
         resolved = Path(data_dir).expanduser().resolve()
         _require_canonical_parquet(resolved)
+        _verify_canonical_parquet_hashes(resolved)
         return resolved
 
     from benchbox.core.joinorder.benchmark import JoinOrderBenchmark

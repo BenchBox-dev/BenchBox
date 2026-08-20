@@ -1,5 +1,5 @@
 ---
-develop_sha: f20c3856d14542d11ece24e694009e87aef0a419
+develop_sha: 1e8cc3dee48a4c345bb96df2e59f47cdbf6dde5f
 ---
 # PR-Review Sweep — Template
 
@@ -22,16 +22,20 @@ pick a sweep window appropriate to the volume of merged PRs and the size of
 the unactioned queue (`make pr-review-followups-list` previews it). Each
 sweep produces:
 
-1. A new TODO at
-   `_project/TODO/main/planning/pr-review-followups-<window-tag>.yaml`
-   (the window tag identifies the chosen sweep range, e.g. `2026-05-01-to-05-07`
-   or `since-2026-05-01`; legacy entries used `week-YYYY-MM-DD`)
+1. A new tracker item created through `_project/scripts/todo create` with id
+   `pr-review-followups-<window-tag>` (the window tag identifies the selected
+   range; legacy entries used `week-YYYY-MM-DD`)
 2. A rescan audit at
    `_project/audits/pr-review-thread-rescan-<window-tag>.md` listing
    resolved-by-this-TODO, already-fixed-by-earlier-merges, and
    still-actionable threads
-3. Optional cross-links from in-window blind-spots filed under
-   `_project/blind-spots/YYYY-MM-DD-*` to the TODO
+3. Links from relevant in-window hosted findings or local finding drafts to the
+   tracker item
+
+At the start, record `SWEEP_HEAD=$(git rev-parse origin/develop)` and the exact
+merged-PR set returned for the window. Every axis and the rescan audit must use
+that same immutable head and PR set. The frontmatter SHA above records the head
+at which this template was last validated; do not copy it into a later audit.
 
 For routine single-pass cleanup, prefer the automated Make routine before
 creating another manual inventory:
@@ -47,9 +51,11 @@ make pr-review-followups PR_REVIEW_SINCE=YYYY-MM-DD PR_REVIEW_UNTIL=YYYY-MM-DD
 
 The routine uses the same judgment rules below: it verifies current behavior
 before editing, treats stale-but-fixed threads as no-current-action, preserves
-historical DONE verification commands when they are still executable
-documentation, and skips future reprocessing only after it has posted a reply
-containing the `benchbox-pr-review-followup-actioned` marker.
+historical DONE verification commands as executable documentation, and skips
+resolved threads during a normal action pass. Use
+`PR_REVIEW_INCLUDE_RESOLVED=1` for the separate phantom-resolution audit.
+Unresolved threads are skipped on future passes only after a durable reply
+contains the `benchbox-pr-review-followup-actioned` marker.
 
 The routine also checks top-level PR timeline comments for Codex code-review
 usage-limit failures. Those comments are not inline findings, so there is no
@@ -109,6 +115,9 @@ routine accordingly:
   each commit message includes the source PR# + comment id (see
   `commit_message_for_result`). This means a crash mid-sweep leaves a
   reviewable diff on the branch and no phantom-actioned thread on GitHub.
+- Per-comment commit SHAs are temporary review evidence on the feature branch.
+  BenchBox squash-merges the batch, so the durable rescan record must link the
+  remediation PR and resulting `develop` squash commit/tree.
 - The reviewer of the resulting PR should: (a) skim each per-comment commit
   to confirm the change matches the source comment's intent, (b) reject any
   commit that pulled in unrelated edits, (c) verify that a "fixed"
@@ -136,56 +145,49 @@ line citing why.
 # Discover merged PRs in the review window.
 START_DATE=YYYY-MM-DD  # the Monday before the sweep window
 END_DATE=YYYY-MM-DD    # the Sunday closing the window
+SWEEP_HEAD=$(git rev-parse origin/develop)
 
-git log --since="$START_DATE 00:00:00 -0400" --until="$END_DATE 23:59:59 -0400" \
-  --merges --grep '#[0-9]\+' --pretty='%H %s' origin/develop
+gh pr list --repo joeharris76/BenchBox --state merged --base develop --limit 1000 \
+  --json number,mergedAt,mergeCommit,title,url
 
-# For each merged PR, list its inline review comments.
-gh api repos/joeharris76/BenchBox/pulls/<PR>/comments \
-  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
+# The binding uses paginated GraphQL reviewThreads and retains thread ids,
+# resolution, outdated state, anchors, comments, authors, and replies.
+make pr-review-followups-list \
+  PR_REVIEW_SINCE="$START_DATE" PR_REVIEW_UNTIL="$END_DATE" \
+  PR_REVIEW_USAGE_LIMIT_RETRY=0
 ```
 
 Bucket each comment as **Fixed (link the commit)**, **Already fixed by
 earlier merge (link that merge)**, or **Still actionable (becomes a w-unit
 in the TODO)**.
 
-### Axis 2 — In-window blind-spot findings
+### Axis 2 — In-window findings
 
-`_project/blind-spots/YYYY-MM-DD-*.md` may have been filed during the same
-review window by `/code review`, `/blind-spot`, or other paths. PR-review
-threads will not surface these — they came from local agents.
+Findings may have been filed during the same review window by local review
+paths. PR-review threads will not surface them. The tracked
+`_project/blind-spots/` corpus is frozen; current authority is the hosted
+findings domain plus unsynced drafts under `~/.benchbox/finding-drafts/`.
 
 ```bash
-# Findings filed during the review window. Use explicit start/end dates so
-# the listing is bounded to the actual sweep range; ${START_DATE:0:7} only
-# scopes to a calendar month, which can pull pre-window findings or omit
-# late-window ones.
-ls _project/blind-spots/ \
-  | awk -v s="$START_DATE" -v e="$END_DATE" '
-      /^[0-9]{4}-[0-9]{2}-[0-9]{2}-/ {
-        prefix = substr($0, 1, 10)
-        if (prefix >= s && prefix <= e) print
-      }
-    '
+# Hosted findings. Filter the returned created_at timestamps to the exact
+# inclusive window; the list command intentionally has no date flags.
+_project/scripts/todo finding list --json \
+  | jq --arg s "$START_DATE" --arg e "$END_DATE" \
+      '[.[] | select(.created_at[0:10] >= $s and .created_at[0:10] <= $e)]'
 
-# Note: `make blind-spots-list` (sweep_blind_spots.py list) filters by
-# status/kind only and has no --since/--until. Do NOT use it to scope this
-# axis: it pulls historical open findings outside the window and can omit
-# in-window non-open findings, making the sweep scope inconsistent. If a
-# date-window flag is added to sweep_blind_spots.py, replace the awk filter
-# above with that command.
+# Zero-credential local drafts not yet landed in the tracker.
+_project/scripts/todo finding candidates
 ```
 
 For each in-window finding:
 
 - Cross-link it from the TODO's `description:` or relevant `w-unit notes:`.
 - If the finding maps to a w-unit (e.g. a test was loosened in a PR a
-  reviewer also commented on), add a `must_not_do:` line connecting them so a
+  reviewer also commented on), add an `anti_patterns:` entry connecting them so a
   future agent picking up the w-unit cannot land the fix without
   addressing the blind-spot.
-- If the finding is out-of-window or unrelated, mention it explicitly
-  ("blind-spot 2026-MM-DD-foo is out-of-scope: process change tracked
-  separately").
+- If the finding is out-of-window or unrelated, mention it explicitly with its
+  finding id and reason.
 
 The 2026-05-01 sweep added the `do not fix Home.tsx without restoring
 strict cold-load row counts` rule to its `must_not_do` list precisely
@@ -205,7 +207,7 @@ without a guard"; the original scan template had no axis for it.
 # END_DATE, which excludes test changes merged later on the closing day
 # (precisely the changes this axis exists to catch).
 git log --since="$START_DATE 00:00:00 -0400" --until="$END_DATE 23:59:59 -0400" -p \
-  --diff-filter=M --pretty='format:%H %s' origin/develop \
+  --diff-filter=MDR --find-renames --pretty='format:%H %s' "$SWEEP_HEAD" \
   -- '*.spec.ts' '*.spec.tsx' '*test*.py' 'tests/' \
   | rg -B 5 -A 5 'toHaveCount\(.*\) ->|\.length\) ?=>|count.*>\s*0|expect\(.*\)\.toBeGreaterThan\(0\)|assert.*> 0'
 ```
@@ -220,6 +222,10 @@ Patterns to flag (non-exhaustive — extend as new patterns surface):
   `removed test` / `unused test` / `flake` justification on the PR).
 - Loosening `expect(..., {timeout: T1})` to `expect(..., {timeout: T2 > T1})`
   by an order of magnitude (often masks intermittent regressions).
+- Injecting CSS or DOM state before a visual capture so the test repairs the
+  production behavior it is meant to observe.
+- Expanding an accepted exception whitelist to include a raw internal error
+  instead of asserting a supported failure contract and valid output state.
 
 For each match: if no reviewer flagged it, file a w-unit OR a blind-spot
 finding pointing at the diff. Do not silently accept "the team
@@ -236,13 +242,14 @@ w-unit. The 2026-05-01 sweep used a manual cross-check; the next sweep
 should script it:
 
 ```bash
-gh api repos/joeharris76/BenchBox/pulls/<PR>/comments \
-  --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | {id, body, path, original_position, original_commit_id}'
-
-# Then: for each thread, search the merged-PR diff for content that
-# matches the comment's path/anchor; if nothing changed in the comment's
-# vicinity AND the thread is reported resolved, it's a phantom-resolution.
+make pr-review-followups-list \
+  PR_REVIEW_SINCE="$START_DATE" PR_REVIEW_UNTIL="$END_DATE" \
+  PR_REVIEW_INCLUDE_RESOLVED=1 PR_REVIEW_USAGE_LIMIT_RETRY=0
 ```
+
+For every resolved/current row, compare the thread body, path, anchor, replies,
+merged PR diff, and later `develop` history. Resolution alone is not fixing
+evidence; classify it as fixed, already fixed, deferred, or rejected.
 
 ### Axis 5 — DONE-item verification commands that drifted
 
@@ -291,16 +298,30 @@ checks for it going forward:
   fail on the other, so it verifies nothing stable. Pin the date literal.
   (Embodied by `results-explorer-uat-multi-scale-corpus-sweep.yaml`.)
 
-Structural cousins of these are now caught at authoring time by
-`_project/scripts/validate_todo.py` (it rejects `verification.command`
-values that span multiple physical lines without a `|` block scalar). The
-sweep still owns the *semantic* checks above, which a schema linter cannot
-judge.
+The current tracker writer validates command structure at authoring time. The
+sweep still owns the semantic checks above, including exit-status masking,
+which a schema validator cannot judge.
 
-## TODO file shape
+Run the deterministic project lint over current hosted items:
 
-Use `_project/TODO_ENTRY_TEMPLATE.yaml` as the base. The conventional
-fields for a sweep TODO:
+```bash
+_project/scripts/todo lint --all
+uv run -- python _project/scripts/todo_verification_lint.py \
+  --since "$START_DATE" --until "$END_DATE"
+```
+
+Classify `todo lint --all` findings against the pinned window instead of
+claiming the historical corpus is green. The bounded semantic linter must pass
+for the selected window before close-out.
+
+Then manually assess context-dependent exit masking such as `; echo $?`,
+`|| true`, and pipelines ending in `head`, `tail`, or `wc`; their validity
+depends on the expected result and cannot be decided from syntax alone.
+
+## Tracker item shape
+
+Create and update the item only through `_project/scripts/todo`. The
+conventional fields for a sweep item are:
 
 - `id: pr-review-followups-<window-tag>` (e.g. `pr-review-followups-2026-05-01-to-05-07`
   or `pr-review-followups-since-2026-05-01`; the window tag should be readable
@@ -316,8 +337,8 @@ fields for a sweep TODO:
 - `work:` — one w-unit per still-actionable thread; one
   `summary: "Re-run the PR-review thread scan and produce the rescan audit"`
   unit at the end whose `notes:` block lists the required audit sections.
-- `must_not_do:` — must include cross-links from any folded-in
-  blind-spots so the rule travels with the work.
+- `anti_patterns:` — must include cross-links from folded-in findings so the
+  rule travels with the work.
 - `verification:` — must include checks for each w-unit AND a check that
   the rescan audit file exists with the three required sections.
 
@@ -338,8 +359,21 @@ Required sections:
 
 When the TODO completes:
 
-- Triage the cross-linked blind-spots — typically `--action actioned`
-  with a one-line reason citing the TODO id.
-- Mention the rescan audit file in the TODO's `final_notes:` block.
+- Triage the cross-linked findings through `todo finding triage` with a
+  one-line reason citing the tracker item id.
+- Record the rescan audit path in the final work-unit evidence before running
+  `_project/scripts/todo complete --pr <N> <item-id>`.
 - If new patterns surfaced for Axis 3 (test-weakening) that this
   template did not list, add them here so the next sweep starts wider.
+
+Run the authoritative final rescan before close-out:
+
+```bash
+make pr-review-followups-list \
+  PR_REVIEW_SINCE="$START_DATE" PR_REVIEW_UNTIL="$END_DATE" \
+  PR_REVIEW_FAIL_ON_PENDING=1 PR_REVIEW_USAGE_LIMIT_RETRY=0
+```
+
+`make pr-open` opens or reuses the remediation PR with auto-merge withheld.
+After the final self-review and required checks, `make pr-ready` may arm squash
+auto-merge unless the soundness-path guard requires maintainer review.
