@@ -401,6 +401,14 @@ preflight:
 # (which `preflight_kwargs_from_config` always does). Setting it to 0
 # disables every disk gate here. Never populate `peak_database_gib` by
 # estimating; only a measured sweep may flip a row to `measured`.
+#
+# Execute also checks before each inventory-covered cell, reserving the
+# row's known datagen/transient growth above the configured floor. Datagen
+# is reserved once per (benchmark, scale) source because it is reused across
+# platforms. Missing rows and unmeasured database terms stay explicit
+# lower-bound coverage gaps; the post-cell floor remains the backstop for
+# demand the inventory cannot predict. The lifecycle log records the
+# prediction and whether its database component was measured.
 
 # Resume (retired) -------------------------------------------------------
 # The resume manifest (`<log-dir>/resume.json`, `--resume <manifest>`)
