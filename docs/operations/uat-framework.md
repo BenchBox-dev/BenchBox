@@ -895,6 +895,11 @@ double the engine's actual need. SF1 certification therefore runs on Linux;
 macOS keeps the SF0.01 smoke at `baseline-1g`. See
 [ADR: `clickhouse-server` Containerization and Linux SF1 Certification](../development/adr/adr-clickhouse-server-containerization.md).
 
+That placement is a documented requirement, not a gate. Admission checks
+available memory and does not check the platform, so a macOS host with enough
+RAM will pass and produce an SF1 result the ADR does not consider valid. Do not
+treat a darwin SF1 certification as qualified.
+
 For a direct operator compose check, export the selected rung explicitly:
 
 ```bash
