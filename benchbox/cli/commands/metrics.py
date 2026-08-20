@@ -13,22 +13,11 @@ from benchbox.cli.shared import console
 
 @click.group("metrics")
 def metrics_group():
-    """Calculate benchmark performance metrics.
-
-    The metrics command group provides tools for calculating
-    official TPC performance metrics from benchmark results.
-
-    Available subcommands:
-
-    \b
-      qphh    Calculate TPC-H QphH@Size composite metric
+    """Calculate official TPC performance metrics from benchmark results (e.g. QphH@Size).
 
     \b
     Examples:
-        # Calculate TPC-H QphH metric
-        benchbox metrics qphh \\
-          --power-results power.json \\
-          --throughput-results throughput.json
+        benchbox metrics qphh --power-results power.json --throughput-results throughput.json
     """
 
 
