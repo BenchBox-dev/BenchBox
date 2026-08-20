@@ -18,7 +18,7 @@ BenchBox provides industry-standard (TPC-H, TPC-DS), academic (Join Order), and 
 
 BenchBox embeds the entire benchmark lifecycle, including query and data generation, result analysis, and reporting for these benchmarks in a single Python tool with simple setup.
 
-BenchBox uses Python-native interfaces for popular local data tools (DuckDB, DataFusion, Polars) and cloud platforms (Snowflake, Databricks, ClickHouse).
+BenchBox uses Python-native interfaces for popular local data tools (DuckDB, DataFusion, Polars) and cloud adapters (Snowflake, Databricks, ClickHouse). Those warehouse adapters are installable; they are *unproven* on the public corpus until a published bundle exists.
 
 ## Versioning
 
@@ -57,8 +57,15 @@ Registry-backed count claims are checked by unit tests so README and platform do
 - **Benchmark Catalog**: TPC-H, TPC-DS, TPC-DI, TPC-DS-OBT, TPC-H Skew, TPC-Havoc, SSB, AMPLab, JoinOrder, ClickBench, H2ODB, NYC Taxi, Flight Data, TSBS DevOps, CoffeeShop, TPC-H Data Vault, Vector Search, Read Primitives, Write Primitives, Transaction Primitives, Metadata Primitives, AI Primitives
 - **Cross-Database**: Same benchmarks work on any database platform
 - **DataFrame Mode**: Native DataFrame API benchmarking with Polars, Pandas, DataFusion, Dask, and other DataFrame runtimes
-- **SQL Platforms**: DuckDB, MotherDuck, DuckLake, SQLite, DataFusion, PostgreSQL, TimescaleDB, ClickHouse (Local, Server, Cloud), CedarDB, Firebolt, Databend, Doris, StarRocks, SingleStore, QuestDB, InfluxDB, pg_duckdb, pg_mooncake, Databricks SQL, Snowflake, BigQuery, Redshift, Azure Synapse Analytics, Microsoft Fabric Warehouse, Microsoft Fabric Lakehouse SQL, Trino, Starburst, Presto, Amazon Athena, Spark, PySpark, LakeSail Sail, Apache Gluten + Velox, Onehouse Quanton, AWS Glue, Amazon EMR Serverless, Amazon Athena for Apache Spark, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Azure Synapse Analytics Spark
-- **DataFrame Platforms**: DataFusion-DF, Polars-DF, Pandas-DF, Modin-DF, Dask-DF, cuDF-DF (GPU), PySpark-DF, Databricks-DF, LakeSail-DF
+- **SQL platforms**: names and support tiers come from the platform registry (`stable` / `beta` / `experimental` / `deprecated`). *unproven* means the public corpus has no bundle for that platform yet (`results-data/corpus-inventory.json`). This is not a second taxonomy — see [Public Contracts and Support Taxonomy](docs/reference/public-contracts.md). `benchbox platforms list` shows **Support** separately from local **Driver** availability.
+  - **stable**: DataFusion, DuckDB, SQLite
+  - **beta**: Apache Spark, ClickHouse Local (chDB), PySpark; *unproven*: Amazon Athena, Amazon Redshift, Apache Doris, Azure Synapse Analytics, ClickHouse Cloud, ClickHouse Server, Databend, Databricks SQL, DuckLake, Firebolt, Google BigQuery, InfluxDB, Microsoft Fabric Lakehouse SQL, Microsoft Fabric Warehouse, MotherDuck, PostgreSQL, PrestoDB, QuestDB, SingleStore, Snowflake, Starburst, StarRocks, TimescaleDB, Trino
+  - **experimental**: LakeSail Sail; *unproven*: Amazon Athena for Apache Spark, Amazon EMR Serverless, Apache Gluten + Velox, AWS Glue, Azure Synapse Analytics Spark, CedarDB, Databricks DataFrame, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Onehouse Quanton, pg_duckdb, pg_mooncake, Snowpark Connect for Spark
+  - **deprecated**: ClickHouse (*unproven*; compatibility selector)
+- **DataFrame platforms**: same registry labels. *unproven* has the same corpus meaning as above.
+  - **stable**: DataFusion, Polars; *unproven*: Pandas
+  - **beta**: PySpark; *unproven*: Dask, Databricks SQL
+  - **experimental**: LakeSail Sail; *unproven*: Amazon Athena for Apache Spark, Amazon EMR Serverless, AWS Glue, Azure Synapse Analytics Spark, cuDF, Databricks DataFrame, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Modin, Onehouse Quanton, Snowpark Connect for Spark
 - **Open Table Formats**: Delta Lake, Apache Iceberg, Apache Hudi (via Databricks, Quanton, Trino, Spark platforms)
 - **SQL Translation**: Automatic query conversion between SQL dialects
 - **Self-Contained Python Package**: Core install requires no external database servers or system dependencies; opt-in to extra package installs for cloud platforms when needed.
