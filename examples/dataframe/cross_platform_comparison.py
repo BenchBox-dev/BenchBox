@@ -46,9 +46,9 @@ if not any(platforms_available.values()):
 
 def load_polars_context(data_dir: Path):
     """Load data into Polars DataFrame context."""
-    from benchbox.platforms.polars_platform import PolarsDataFrameContext
+    from benchbox.platforms.polars_platform import PolarsAdapter
 
-    ctx = PolarsDataFrameContext()
+    ctx = PolarsAdapter().create_connection()
     parquet_dir = data_dir / "parquet"
 
     tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]

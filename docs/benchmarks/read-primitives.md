@@ -562,9 +562,11 @@ from benchbox.platforms import get_dataframe_adapter
 primitives = ReadPrimitives(scale_factor=0.01)
 primitives.generate_data()
 
-# Create DataFrame context for Polars
+# Create DataFrame context for Polars, then load the generated tables into it.
+# create_context() returns an empty context; working_dir does not register files.
 polars_adapter = get_dataframe_adapter("polars-df", working_dir=str(primitives.output_dir))
 ctx = polars_adapter.create_context()
+polars_adapter.load_tables_from_data_source(ctx, primitives.output_dir)
 
 # Execute expression-family query
 result = aggregation_distinct_expression_impl(ctx)
@@ -573,6 +575,7 @@ print(result.collect())
 # Or create context for Pandas
 pandas_adapter = get_dataframe_adapter("pandas-df", working_dir=str(primitives.output_dir))
 pandas_ctx = pandas_adapter.create_context()
+pandas_adapter.load_tables_from_data_source(pandas_ctx, primitives.output_dir)
 result = aggregation_distinct_pandas_impl(pandas_ctx)
 print(result)
 ```

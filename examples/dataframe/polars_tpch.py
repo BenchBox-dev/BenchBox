@@ -31,7 +31,7 @@ except ImportError:
 def main() -> int:
     """Run Polars DataFrame TPC-H benchmark demonstration."""
     from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES, get_query
-    from benchbox.platforms.polars_platform import PolarsDataFrameContext
+    from benchbox.platforms.polars_platform import PolarsAdapter
 
     print("=" * 60)
     print("Polars DataFrame TPC-H Benchmark")
@@ -55,7 +55,7 @@ def main() -> int:
 
     # Create context with Polars DataFrame
     print("\nCreating Polars DataFrame context...")
-    ctx = PolarsDataFrameContext()
+    ctx = PolarsAdapter().create_connection()
 
     # Load tables (lazy scanning from Parquet)
     parquet_dir = data_dir / "parquet"

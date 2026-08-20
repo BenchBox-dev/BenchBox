@@ -31,7 +31,7 @@ except ImportError:
 def main() -> int:
     """Run Polars DataFrame TPC-DS benchmark demonstration."""
     from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES, get_tpcds_query
-    from benchbox.platforms.polars_platform import PolarsDataFrameContext
+    from benchbox.platforms.polars_platform import PolarsAdapter
 
     print("=" * 60)
     print("Polars DataFrame TPC-DS Benchmark")
@@ -62,7 +62,7 @@ def main() -> int:
 
     # Create context with Polars DataFrame
     print("\nCreating Polars DataFrame context...")
-    ctx = PolarsDataFrameContext()
+    ctx = PolarsAdapter().create_connection()
 
     # TPC-DS has many tables - list the core ones
     tpcds_tables = [

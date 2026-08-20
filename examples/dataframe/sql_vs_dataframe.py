@@ -114,13 +114,13 @@ def _run_sql_mode(parquet_dir: Path, results: dict) -> None:
 
 def _run_dataframe_mode(parquet_dir: Path, results: dict) -> None:
     from benchbox.core.tpch.dataframe_queries import get_query
-    from benchbox.platforms.polars_platform import PolarsDataFrameContext
+    from benchbox.platforms.polars_platform import PolarsAdapter
 
     print("\n" + "-" * 70)
     print("DataFrame Mode (Polars)")
     print("-" * 70)
 
-    ctx = PolarsDataFrameContext()
+    ctx = PolarsAdapter().create_connection()
     for table in TPCH_TABLES:
         table_path = parquet_dir / f"{table}.parquet"
         if table_path.exists():
