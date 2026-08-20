@@ -6,6 +6,11 @@ name: Seed Corpus
 # ClickHouse Cloud jobs require CLICKHOUSE_CLOUD_HOST and CLICKHOUSE_CLOUD_PASSWORD secrets.
 
 on:
+  schedule:
+    # Monthly publication sweep. Generation already existed as an on-demand
+    # workflow; the missing piece was putting it on a calendar so
+    # published-results does not stall until someone remembers to click.
+    - cron: "0 7 1 * *"
   workflow_dispatch:
     inputs:
       benchmark:
@@ -116,7 +121,7 @@ jobs:
     # failed run with zero jobs on every push. `env` at job level *can* read
     # matrix, so the condition is computed once here and each step guards on it.
     env:
-      SELECTED: ${{ github.event.inputs.benchmark == '' || github.event.inputs.benchmark == matrix.benchmark }}
+      SELECTED: ${{ github.event_name == 'schedule' || github.event.inputs.benchmark == '' || github.event.inputs.benchmark == matrix.benchmark }}
       # BenchBox normally keeps generated data beside the checkout so worktrees
       # can share it. CI must keep the run inside the workspace because the
       # later staging steps intentionally collect and commit result bundles.
@@ -147,12 +152,17 @@ jobs:
           CLICKHOUSE_CLOUD_HOST: ${{ secrets.CLICKHOUSE_CLOUD_HOST }}
           CLICKHOUSE_CLOUD_PASSWORD: ${{ secrets.CLICKHOUSE_CLOUD_PASSWORD }}
         run: |
+          EXTRA=()
+          if [ "${{ matrix.benchmark }}" = "tpcds" ]; then
+            EXTRA+=(--official --seed 42)
+          fi
           uv run benchbox run \
             --platform "${{ matrix.platform }}" \
             --benchmark "${{ matrix.benchmark }}" \
             --scale "${{ matrix.scale_factor }}" \
             --phases generate,load,power \
-            --compression zstd:9
+            --compression zstd:9 \
+            "${EXTRA[@]}"
 
       - name: Locate result bundle
         if: env.SELECTED == 'true'
