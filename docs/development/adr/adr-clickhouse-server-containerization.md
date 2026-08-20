@@ -10,7 +10,9 @@ the rung ladder or the admission arithmetic in
 
 ## Date
 
-2026-08-19
+2026-08-19. Amended 2026-08-20 to correct the tracking claim in
+"Follow-up ownership", record that this decision is documented but not
+enforced, and mark the superseded remediation text in the w2 evidence artifact.
 
 ## Context
 
@@ -112,12 +114,44 @@ certifies.
 - The container remains the only place the memory envelope is externally
   enforced, so compose stays authoritative for `CLICKHOUSE_MEMORY_LIMIT` and the
   no-default contract documented in `docs/operations/uat-framework.md` stands.
+- **This decision is documented, not enforced.** No preflight check refuses SF1
+  certification on darwin. `check_memory_headroom` blocks the current host on
+  available memory alone, which is a coincidence of this machine's size: a macOS
+  host with enough RAM would clear admission and emit an SF1 certification
+  result that this ADR considers invalid, because the VM layer and the absent
+  cgroup contract do not appear in the admission arithmetic. Treat a darwin SF1
+  result as unqualified until a gate exists.
+
+## Evidence and superseded records
+
+`~/Developer/benchmark_runs/clickhouse-certification-20260818/sf1-admission-8g-blocked-20260818.json`
+is the admission-denial evidence for work unit w2 and remains valid as a
+measurement. Its `operator_remediation_required` narrative predates this ADR
+and is superseded: it offers "reboot this host and run the SF1 sweep with no
+interactive agent session competing" as a first remedy, which this decision
+rejects. Freeing memory on the macOS host does not make it a certification
+host, because the objection is the virtualization layer and the missing cgroup
+contract, not the byte count on any given day. Read that field as history.
 
 ## Follow-up ownership
 
-Per-query `max_memory_usage` defaults to `"8GB"` in
-`benchbox/platforms/clickhouse/setup.py:33`, equal to the container limit, which
-permits a single query to claim the entire cgroup with nothing left for merges,
-caches, or page cache. That is a tuning question in platform code, out of scope
-for the certification item, and is tracked separately. It is a candidate lever if
-the goal ever becomes lowering the admission bar rather than satisfying it.
+Two follow-ups are open. **Neither is filed in the hosted tracker**, because
+`todo doctor` fails `E_AUTH_MISSING` and no `TODO_DB_*` credential is present on
+this host. Recording them here is the only durable record; file them when
+credentials are restored.
+
+**Per-query `max_memory_usage` equals the container limit.** It defaults to
+`"8GB"` in `benchbox/platforms/clickhouse/setup.py:33`, matching
+`clickhouse_memory_limit` in `tests/uat/config.py:122`, so a single query may
+claim the entire cgroup with nothing left for merges, caches, or page cache. The
+two values are configured independently and do not track each other. Whether
+this is a defect or an intentional ceiling is undecided. Draft at
+`~/.todo-db/finding-drafts/benchbox/clickhouse-per-query-memory-equals-container-limit-2026-08-19.md`;
+rename with the `.merged-to-todo` suffix once filed. It is a candidate lever if
+the goal ever becomes lowering the admission bar rather than satisfying it, but
+it must not be used to unblock SF1 on an unqualified host.
+
+**No gate enforces the Linux requirement.** Making it real means a platform
+check in the UAT admission path that fails SF1 certification on darwin
+regardless of available memory, rather than relying on this document being read.
+That is platform-code work, unscoped and unauthorized here.
