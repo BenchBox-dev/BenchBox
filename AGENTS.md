@@ -144,7 +144,7 @@ never claimable items).
 - CLI dry runs must propagate explicit phases; deterministic runs use a seed.
 - Green focused/fast tests are not UAT or production certification.
 
-Apple/macOS notes: `make test-correctness-gate` uses Linux-generated digests; use `make ci-linux` for parity.
+Apple/macOS notes: correctness-gate digests are Linux-generated; `make ci-linux` for parity (release-guide.md).
 Mocker is local-only, never CI: databend needs docker (its `minio` service exits under mocker),
 doris/starrocks are single-container. See `docs/operations/uat-framework.md` ("Mocker validation status") for
 lifecycle, cleanup, and caveats. Never globally prune without approval.
